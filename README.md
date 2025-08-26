@@ -81,7 +81,7 @@ The **Configurator** is a standalone tool included with EliteMining. It provides
 3. **Timers Tab** – Configure mining-related timers.  
 4. **Mining Tab** – Provides tools for in-game mining operations (Prospector, Announcement Panel, Mining Session, Reports).  
 
-> **Important:** For core / non-core announcements to function properly, ensure that **Secondary Fire** is bound in VoiceAttack for both your keyboard/mouse and your Joystick/HOTAS. In addition, the **Prospector Sequence** toggle in the Configurator must be set to *Enabled* (this is the default setting).
+> **Important:** For core / non-core announcements to function properly, ensure that **Secondary Fire** is bound in VoiceAttack for both your keyboard/mouse and your Joystick/HOTAS. In addition, the **Prospector Sequence** toggle in the Configurator must be set to *Enabled* (default = enabled).
 
 ---
 
