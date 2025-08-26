@@ -11,6 +11,7 @@
 - [Requirements](#-requirements)
 - [Installation](#-installation)
 - [Updating](#-updating)
+- [Configurator](#️-configurator)
 - [Getting Started](#-getting-started)
   - [Firegroup (FG) Setup](#firegroup-fg-setup)
   - [Recommended Key / HOTAS Bindings](#recommended-key--hotas-bindings)
@@ -62,7 +63,62 @@
 2. Replace the existing file in `\VoiceAttack\App\EliteMining`  
 3. Update your *Elite Dangerous* keybindings and joystick/HOTAS buttons as needed  
 
-> **Note:** Some updates may also require replacing both `EliteMining.vap` and the **Variables** folder inside the EliteMining directory.
+> **Note:** Some updates may require a complete refresh of the installation. In such cases, replace the entire EliteMining directory and re-import the updated EliteMining-Profile.vap into VoiceAttack.
+
+---
+
+## 🖥️ Configurator
+
+The **Configurator** is a standalone tool included with EliteMining. It provides a graphical interface to easily adjust firegroups, toggles, timers, and announcement options without editing VoiceAttack directly.  
+
+### Launching the Configurator
+- Say **“Open Configurator”** in VoiceAttack, **or**  
+- Press **Right Ctrl + Right Shift + C** on your keyboard.  
+
+### Using the Configurator
+1. **Firegroups Tab** – Assign Fire Buttons and Firegroups.  
+2. **Toggles Tab** – Enable or disable optional functions.  
+3. **Timers Tab** – Configure mining-related timers.  
+4. **Mining Tab** – Provides tools for in-game mining operations (Prospector, Announcement Panel, Mining Session, Reports).  
+
+> **Important:** For core / non-core announcements to function properly, ensure that **Secondary Fire** is bound in VoiceAttack for both your keyboard/mouse and your Joystick/HOTAS. In addition, the **Prospector Sequence** toggle in the Configurator must be set to *Enabled* (this is the default setting).
+
+---
+
+### 📸 Screenshots  
+
+#### Main Window & Firegroups  
+![Configurator Main](screenshots/configurator-main.png)  
+*Shows the overall Configurator layout, Firegroups, and Fire Buttons.  
+Save, Import, and Preset options are always visible across all tabs.*  
+
+#### Toggles Tab  
+![Configurator Toggles](screenshots/configurator-toggles.png)  
+
+#### Timers Tab  
+![Configurator Timers](screenshots/configurator-timers.png)  
+
+---
+
+### 🪓 Mining Tab  
+
+The Mining tab provides dedicated tools for in-game mining operations. It contains 4 sub-tabs:  
+
+#### Prospector  
+![Mining Prospector](screenshots/mining-prospector.png)  
+*Shows active prospector limpet status and scanned asteroid data.*  
+
+#### Announcement Panel  
+![Mining Announcement Panel](screenshots/mining-announcement.png)  
+*Controls material announcements and filtering of core vs non-core finds.*  
+
+#### Mining Session  
+![Mining Session](screenshots/mining-session.png)  
+*Tracks current mining session time, materials collected, and progress.*  
+
+#### Reports  
+![Mining Reports](screenshots/mining-reports.png)  
+*Provides detailed mining statistics and session summaries.*  
 
 ---
 
@@ -86,7 +142,7 @@
 ### Recommended Key / HOTAS Bindings
 | Action | Description |
 |--------|-------------|
-| Stop All VA Processes | Stops all running VoiceAttack commands |
+| Stop profiles command | Stopping all running commands inside this profile.. |
 | Start Mining | Starts laser mining sequence |
 | Reset Mining | Stops/resets mining sequence |
 | Deploy Seismic Charge Launcher | Switch FG to Seismic Charge Launcher |
@@ -166,9 +222,10 @@ Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack.
 3. Begin mining and practice commands  
 
 ---
+
 ## 🚧 In Development
 - Option to select and swap primary or secondary fire buttons  
-- Develop a GUI to configure ship presets, firegroups, fire buttons, and more
+- Develop a GUI to configure ship presets, firegroups, fire buttons, and more  
 
 ---
 
@@ -197,13 +254,12 @@ If you have questions, want to share feedback, or need help with setup, check ou
 ---
 
 ## 📜 Disclaimer
-This profile is **work-in-progress and **not affiliated with Frontier Developments**.  
+This profile is **work-in-progress** and **not affiliated with Frontier Developments**.  
 Use at your own risk.
 
 ---
 
 ## 👏 Credits
 - [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA  
-
 
 CMDR ViperDude
