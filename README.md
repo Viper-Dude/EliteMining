@@ -105,7 +105,7 @@ Save, Import, and Preset options are always visible across all tabs.*
 The Mining tab provides dedicated tools for in-game mining operations. It contains 4 sub-tabs:  
 
 #### Prospector  
-![Mining Prospector](screenshots/mining-prospector.png)  
+![Mining Prospector](screenshots/mining-prospector.png)
 *Shows active prospector limpet status and scanned asteroid data.*  
 
 #### Announcement Panel  
