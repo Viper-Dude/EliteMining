@@ -224,8 +224,8 @@ Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack.
 ---
 
 ## 🚧 In Development
-- Option to select and swap primary or secondary fire buttons  
-- Develop a GUI to configure ship presets, firegroups, fire buttons, and more  
+- Option to select and swap primary or secondary fire buttons  (In place with release of v 3.5 beta) 
+- Develop a GUI to configure ship presets, firegroups, fire buttons, and more  (In place with release of v 3.5 beta) 
 
 ---
 
