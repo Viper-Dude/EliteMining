@@ -88,15 +88,15 @@ The **Configurator** is a standalone tool included with EliteMining. It provides
 ### 📸 Screenshots  
 
 #### Main Window & Firegroups  
-![Configurator Main](screenshots/configurator-main.png)  
+<img src="screenshots/configurator-main.png" width="600">  
 *Shows the overall Configurator layout, Firegroups, and Fire Buttons.  
 Save, Import, and Preset options are always visible across all tabs.*  
 
 #### Toggles Tab  
-![Configurator Toggles](screenshots/configurator-toggles.png)  
+<img src="screenshots/configurator-toggles.png" width="600">  
 
 #### Timers Tab  
-![Configurator Timers](screenshots/configurator-timers.png)  
+<img src="screenshots/configurator-timers.png" width="600">  
 
 ---
 
@@ -105,19 +105,19 @@ Save, Import, and Preset options are always visible across all tabs.*
 The Mining tab provides dedicated tools for in-game mining operations. It contains 4 sub-tabs:  
 
 #### Prospector  
-![Mining Prospector](screenshots/mining-prospector.png)
+<img src="screenshots/mining-prospector.png" width="600">  
 *Shows active prospector limpet status and scanned asteroid data.*  
 
 #### Announcement Panel  
-![Mining Announcement Panel](screenshots/mining-announcement.png)  
+<img src="screenshots/mining-announcement.png" width="600">  
 *Controls material announcements and filtering of core vs non-core finds.*  
 
 #### Mining Session  
-![Mining Session](screenshots/mining-session.png)  
+<img src="screenshots/mining-session.png" width="600">  
 *Tracks current mining session time, materials collected, and progress.*  
 
 #### Reports  
-![Mining Reports](screenshots/mining-reports.png)  
+<img src="screenshots/mining-reports.png" width="600">  
 *Provides detailed mining statistics and session summaries.*  
 
 ---
