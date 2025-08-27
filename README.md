@@ -247,9 +247,8 @@ Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack.
 ---
 
 ## ❓ Questions / Support
-If you have questions, want to share feedback, or need help with setup, check out the discussion thread on the official Frontier forums:  
+TBA
 
-👉 [EliteMining – VoiceAttack Profile for Almost Hands-Free Mining (Frontier Forums)](https://forums.frontier.co.uk/threads/elitemining-voiceattack-profile-for-almost-hands-free-mining-operations-in-elite-dangerous.640282/)
 
 ---
 
