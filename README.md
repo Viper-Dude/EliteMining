@@ -1,4 +1,4 @@
-# EliteMining – VoiceAttack Profile for Almost Hands-Free Mining in *Elite Dangerous*
+# EliteMining – VoiceAttack Profile to be used for Mining operations in *Elite Dangerous*
 
 **EliteMining** is a VoiceAttack profile designed to make mining in *Elite Dangerous* smoother, faster, and more immersive — with minimal manual input.
 
