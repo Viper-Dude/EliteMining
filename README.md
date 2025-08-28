@@ -247,7 +247,7 @@ Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack.
 ---
 
 ## ❓ Questions / Support
-For feedback, suggestions, or collaboration inquiries, feel free to reach out to me on Discord:  
+For business or collaboration inquiries, feel free to reach out to me on Discord:  
 [![Discord](https://img.shields.io/badge/Discord-7Ven__MP-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/users/394827769378242560)
 
 
