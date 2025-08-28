@@ -143,8 +143,8 @@ The Mining tab provides dedicated tools for in-game mining operations. It contai
 | Action | Description |
 |--------|-------------|
 | Stop profiles command | Stopping all running commands inside this profile.. |
-| Start Mining | Starts laser mining sequence |
-| Reset Mining | Stops/resets mining sequence |
+| Start Mining Sequence | Starts laser mining sequence |
+| Reset Mining Sequence | Stops/resets mining sequence |
 | Deploy Seismic Charge Launcher | Switch FG to Seismic Charge Launcher |
 | Deploy Weapons | Switch FG to weapons |
 | Start Scanning for Cores | Starts scanning sequence (FG set, continuous boost + pulsewave) |
