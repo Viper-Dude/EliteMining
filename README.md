@@ -37,6 +37,7 @@
 ## ✨ Features
 - Custom voice commands to automate mining operations (e.g., deploying limpets, firing mining lasers)
 - Customizable ship presets
+- It's own graphical interface to easily adjust firegroups, toggles, timers, and announcement options without editing VoiceAttack directly.
 - Streamlined workflow for efficient mining
 - Compatible with [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) for automatic in-game data reading
 
