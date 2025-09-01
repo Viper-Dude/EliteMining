@@ -1,10 +1,14 @@
-# 🚀 EliteMining
+# 🚀 EliteMining 3.9.0-beta
 **VoiceAttack Profile tailor made for Mining operations in *Elite Dangerous***
 
 **EliteMining** is a VoiceAttack profile designed to make mining in *Elite Dangerous* smoother, faster, and more immersive — with minimal manual input.
+## 🎤 Training Speech Recognition
+1. Open VoiceAttack  
+2. Navigate: **Help → Utilities → Recognition Training**  
+3. Follow the prompts  
+4. Train in a quiet environment with your gaming microphone  
 
----
-
+Backup your speech profile: [SpProfileMgr.zip](https://voiceattack.com/filesend.aspx?id=SpProfileMgr.zip)
 <details>
 <summary>📑 Table of Contents</summary>
 
@@ -48,23 +52,23 @@ For pilots who prefer manual mining without automated sequences or voice command
 ## ✨ Features
 
 ### With VoiceAttack (Full Experience)
-- 🎤 Voice/hotkey-controlled mining sequences
-- 🤖 Automated collector and prospector deployment
-- 🎯 Smart targeting and laser management
-- 📊 Real-time mining statistics
-- 🔄 Automated cargo management
-- 🎛️ Custom voice commands to automate mining operations
-- ⚙️ Customizable ship presets
-- 🔧 Streamlined workflow for efficient mining
-- 🔗 Compatible with [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) for automatic in-game data reading
+- Voice/hotkey-controlled mining sequences
+- Automated collector and prospector deployment
+- Smart targeting and laser management
+- Real-time mining statistics
+- Automated cargo management
+- Custom voice commands to automate mining operations
+- Customizable ship presets
+- Streamlined workflow for efficient mining
+- Compatible with [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) for automatic in-game data reading
 
 ### Standalone Features (No VoiceAttack Required)
-- 📢 Mining announcements and notifications
-- 📈 Session tracking and reports
-- ⚙️ Ship configuration management
-- 📁 Mining session history
-- 🎛️ Manual control interface
-- 🖥️ Graphical interface to adjust firegroups, toggles, timers, and announcement options
+- Mining announcements and notifications
+- Session tracking and reports
+- Ship configuration management
+- Mining session history
+- Manual control interface
+- Graphical interface to adjust firegroups, toggles, timers, and announcement options
 
 ---
 
@@ -159,7 +163,7 @@ The Mining tab provides dedicated tools for in-game mining operations. It contai
 | Sub-surface Displacement Missile (SSDM) | Set by command or presets | Primary | – |
 | Prospector Limpet Controller | Same as Pulse Wave Analyser (recommended) | Secondary | Must be set manually |
 
-⚠️ **Important:** Collector & Prospector Limpet Controllers **must be set manually**.
+**Important:** Collector & Prospector Limpet Controllers **must be set manually**.
 
 ---
 
@@ -286,4 +290,3 @@ Use at your own risk.
 
 ## 👏 Credits
 - [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA
-
