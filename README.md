@@ -44,10 +44,16 @@
 ---
 
 ## 📦 Requirements
+
+### For Full VoiceAttack Integration:
 - **[EliteVA (API) by Somfic](https://docs.somfic.dev/projects/eliteva)**  
 - **[VoiceAttack](https://voiceattack.com/)** – Paid version  
 - **Working microphone** for voice commands  
 - **Elite Dangerous** (PC version)  
+
+### For Standalone Use (Manual Control):
+- **Elite Dangerous** (PC version) only
+- **No VoiceAttack required** (for mining announcements, session reports, and configuration management)
 
 ---
 
