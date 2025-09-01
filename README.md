@@ -85,10 +85,10 @@ For pilots who prefer manual mining without automated sequences or voice command
 ## 💾 Installation
 
 - **Installer**: Run `EliteMiningSetup.exe` for complete installation with VoiceAttack profile
-- **Portable**: Extract `EliteMining_3.9.0-beta.zip` for standalone use
+- **Portable**: Extract `EliteMining_3.9.0-beta.zip` for manual installation
 
 ### Manual Installation Steps:
-1. Download the latest release from this repository  
+1. Download the latest release from [this repository](https://github.com/Viper-Dude/EliteMining/releases)  
 2. Extract all contents of the downloaded file into your VoiceAttack app folder  
 3. Open VoiceAttack → **Profile > Import Profile**  
 4. Select **EliteMining-Profile.vap**  
