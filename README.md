@@ -2,13 +2,9 @@
 **VoiceAttack Profile tailor made for Mining operations in *Elite Dangerous***
 
 **EliteMining** is a VoiceAttack profile designed to make mining in *Elite Dangerous* smoother, faster, and more immersive — with minimal manual input.
-## 🎤 Training Speech Recognition
-1. Open VoiceAttack  
-2. Navigate: **Help → Utilities → Recognition Training**  
-3. Follow the prompts  
-4. Train in a quiet environment with your gaming microphone  
 
-Backup your speech profile: [SpProfileMgr.zip](https://voiceattack.com/filesend.aspx?id=SpProfileMgr.zip)
+---
+
 <details>
 <summary>📑 Table of Contents</summary>
 
@@ -279,6 +275,10 @@ TBA
 ## ❓ Contact 
 For business or collaboration inquiries, feel free to reach out to me on Discord:  
 [![Discord](https://img.shields.io/badge/Discord-7Ven__MP-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/users/394827769378242560)
+
+### 💬 Community & Support
+Join the discussion and get help from the community:  
+**[EliteMining Discussion Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)** - Share tips, ask questions, and connect with other commanders using EliteMining.
 
 ---
 
