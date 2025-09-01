@@ -198,6 +198,9 @@ Additional categories:
   - Timers optimized for laser mining  
   - Toggles adjusted for power management  
 
+Mining in HAZ area with 4 x lasers or more will in normal condition require a 2 step laser mining sequense.
+(Timer for laser mining, Pause and Timer for Laser mining extra)
+
 ### Customization
 - Add new presets for different ships  
 - Adjust firegroups, timers, and toggles on-the-fly  
