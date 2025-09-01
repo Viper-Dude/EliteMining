@@ -123,7 +123,7 @@ Save, Import, and Preset options are always visible across all tabs.*
 <img src="images/configurator-timers_toggles.png" width="600">  
 
 #### Interface Options Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator.png" width="600">  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600">  
 *Configure interface settings, announcement preferences, and user interface options for optimal mining experience.*  
 
 #### Cargo Hold Tab  
