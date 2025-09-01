@@ -1,4 +1,4 @@
-# 🚀 EliteMining 3.9.0-beta
+# 🚀 EliteMining
 **VoiceAttack Profile tailor made for Mining operations in *Elite Dangerous***
 
 **EliteMining** is a VoiceAttack profile designed to make mining in *Elite Dangerous* smoother, faster, and more immersive — with minimal manual input.
