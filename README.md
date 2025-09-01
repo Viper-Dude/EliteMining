@@ -95,7 +95,7 @@ Save, Import, and Preset options are always visible across all tabs.*
 
 ---
 
-### 🪓 Mining Tab  
+### 🪓 Mining Session Tab  
 
 The Mining tab provides dedicated tools for in-game mining operations. It contains 4 sub-tabs:  
 
