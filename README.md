@@ -1,4 +1,4 @@
-# 🚀 EliteMining
+# <img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/logo_multi.ico" width="32" height="32"> EliteMining
 **VoiceAttack Profile tailor made for Mining operations in *Elite Dangerous***
 
 **EliteMining** is a VoiceAttack profile designed to make mining in *Elite Dangerous* smoother, faster, and more immersive — with minimal manual input.
