@@ -70,7 +70,8 @@
 
 ## 🖥️ Configurator
 
-The **Configurator** is a standalone tool included with EliteMining. It provides a graphical interface to easily adjust firegroups, toggles, timers, and announcement options without editing VoiceAttack directly.  
+The **Configurator** is a standalone tool included with EliteMining. It provides a graphical interface to easily adjust firegroups, toggles, timers, and announcement options without editing VoiceAttack directly.
+If you prefer manual control over automated sequences and don't want voice commands, the Configurator can be used as a standalone application for mining announcements, session reports, and configuration management - VoiceAttack is not required for these features.
 
 ### Launching the Configurator
 - Say **“Open Configurator”** in VoiceAttack, **or**  
@@ -222,8 +223,7 @@ Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack.
 ---
 
 ## 🚧 In Development
-- Option to select and swap primary or secondary fire buttons  (In place with release of v 3.5 beta) 
-- Develop a GUI to configure ship presets, firegroups, fire buttons, and more  (In place with release of v 3.5 beta) 
+TBA 
 
 ---
 
