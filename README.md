@@ -1,4 +1,5 @@
-# EliteMining – VoiceAttack Profile tailor made for Mining operations in *Elite Dangerous*
+# 🚀 EliteMining 3.9.0-beta
+**VoiceAttack Profile tailor made for Mining operations in *Elite Dangerous***
 
 **EliteMining** is a VoiceAttack profile designed to make mining in *Elite Dangerous* smoother, faster, and more immersive — with minimal manual input.
 
@@ -7,10 +8,10 @@
 <details>
 <summary>📑 Table of Contents</summary>
 
+- [Usage Options](#-usage-options)
 - [Features](#-features)
 - [Requirements](#-requirements)
 - [Installation](#-installation)
-- [Updating](#-updating)
 - [Configurator](#️-configurator)
 - [Getting Started](#-getting-started)
   - [Firegroup (FG) Setup](#firegroup-fg-setup)
@@ -26,7 +27,7 @@
 - [Known Limitations](#-known-limitations)
 - [Training Speech Recognition](#-training-speech-recognition)
 - [In Development](#-in-development)
-- [Questions / Support](#-questions--support)
+- [Contact](#-contact)
 - [Disclaimer](#-disclaimer)
 - [Credits](#-credits)
 
@@ -34,59 +35,80 @@
 
 ---
 
+## 🎯 Usage Options
+
+### VoiceAttack Integration (Full Automation)
+Complete voice/hotkey-controlled mining with automated sequences and announcements.
+
+### Standalone Mode (Manual Control)
+For pilots who prefer manual mining without automated sequences or voice commands, the Configurator works independently to provide mining announcements, session tracking, and ship configuration. VoiceAttack is not required for these features.
+
+---
+
 ## ✨ Features
-- Custom voice commands to automate mining operations (e.g., deploying limpets, firing mining lasers)
-- Customizable ship presets
-- It's own graphical interface to easily adjust firegroups, toggles, timers, and announcement options without editing VoiceAttack directly.
-- Streamlined workflow for efficient mining
-- Compatible with [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) for automatic in-game data reading
+
+### With VoiceAttack (Full Experience)
+- 🎤 Voice/hotkey-controlled mining sequences
+- 🤖 Automated collector and prospector deployment
+- 🎯 Smart targeting and laser management
+- 📊 Real-time mining statistics
+- 🔄 Automated cargo management
+- 🎛️ Custom voice commands to automate mining operations
+- ⚙️ Customizable ship presets
+- 🔧 Streamlined workflow for efficient mining
+- 🔗 Compatible with [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) for automatic in-game data reading
+
+### Standalone Features (No VoiceAttack Required)
+- 📢 Mining announcements and notifications
+- 📈 Session tracking and reports
+- ⚙️ Ship configuration management
+- 📁 Mining session history
+- 🎛️ Manual control interface
+- 🖥️ Graphical interface to adjust firegroups, toggles, timers, and announcement options
 
 ---
 
 ## 📦 Requirements
 
-### For Full VoiceAttack Integration:
+**Essential:**
+- **Elite Dangerous** (PC version)
+
+**For Voice Command Automation:**
 - **[EliteVA (API) by Somfic](https://docs.somfic.dev/projects/eliteva)**  
 - **[VoiceAttack](https://voiceattack.com/)** – Paid version  
 - **Working microphone** for voice commands  
-- **Elite Dangerous** (PC version)  
 
-### For Standalone Use (Manual Control):
-- **Elite Dangerous** (PC version) only
-- **No VoiceAttack required** (for mining announcements, session reports, and configuration management)
+**Note:** VoiceAttack is optional - the Configurator can run standalone for mining announcements, session tracking, and manual configuration without any voice automation.
 
 ---
 
-## ⚙️ Installation
+## 💾 Installation
+
+- **Installer**: Run `EliteMiningSetup.exe` for complete installation with VoiceAttack profile
+- **Portable**: Extract `EliteMining_3.9.0-beta.zip` for standalone use
+
+### Manual Installation Steps:
 1. Download the latest release from this repository  
-2. Extract all contents of the downloaded `.rar` file into your VoiceAttack app folder  
+2. Extract all contents of the downloaded file into your VoiceAttack app folder  
 3. Open VoiceAttack → **Profile > Import Profile**  
 4. Select **EliteMining-Profile.vap**  
-
----
-
-## 🔄 Updating
-1. Download the `EliteMining.vap` file from the latest release  
-2. Replace the existing file in `\VoiceAttack\App\EliteMining`  
-3. Update your *Elite Dangerous* keybindings and joystick/HOTAS buttons as needed  
-
-> **Note:** Some updates may require a complete refresh of the installation. In such cases, replace the entire EliteMining directory and re-import the updated EliteMining-Profile.vap into VoiceAttack.
 
 ---
 
 ## 🖥️ Configurator
 
 The **Configurator** is a standalone tool included with EliteMining. It provides a graphical interface to easily adjust firegroups, toggles, timers, and announcement options without editing VoiceAttack directly.
+
 If you prefer manual control over automated sequences and don't want voice commands, the Configurator can be used as a standalone application for mining announcements, session reports, and configuration management - VoiceAttack is not required for these features.
 
 ### Launching the Configurator
-- Say **“Open Configurator”** in VoiceAttack, **or**  
+- Say **"Open Configurator"** in VoiceAttack, **or**  
 - Press **Right Ctrl + Right Shift + C** on your keyboard.  
 
 ### Using the Configurator
 1. **Dashboard - Firegroups & FireButtons Tab** – Assign Fire Buttons and Firegroups.  
 2. **Dashboard - Timers/Toggles Tab** – Enable or disable functions.  
-4. **Mining Session Tab** – Provides tools for in-game mining operations (Prospector, Announcement Panel, Mining Session, Reports).  
+3. **Mining Session Tab** – Provides tools for in-game mining operations (Prospector, Announcement Panel, Mining Session, Reports).  
 
 ---
 
@@ -205,7 +227,7 @@ Additional categories:
   - Timers optimized for laser mining  
   - Toggles adjusted for power management  
 
-Mining in HAZ area with 4 x lasers or more will in normal condition require a 2 step laser mining sequense.
+Mining in HAZ area with 4 x lasers or more will in normal condition require a 2 step laser mining sequence.
 (Timer for laser mining, Pause and Timer for Laser mining extra)
 
 ### Customization
@@ -240,7 +262,7 @@ TBA
 
 ---
 
-## 🎤 Training Speech Recognition
+## � Training Speech Recognition
 1. Open VoiceAttack  
 2. Navigate: **Help → Utilities → Recognition Training**  
 3. Follow the prompts  
@@ -250,10 +272,9 @@ TBA
 
 ---
 
-## ❓ Kontakt 
+## ❓ Contact 
 For business or collaboration inquiries, feel free to reach out to me on Discord:  
 [![Discord](https://img.shields.io/badge/Discord-7Ven__MP-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/users/394827769378242560)
-
 
 ---
 
@@ -264,5 +285,5 @@ Use at your own risk.
 ---
 
 ## 👏 Credits
-- [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA  
-Learn more about New+ by visiting https://aka.ms/PowerToysOverview_NewPlus
+- [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA
+
