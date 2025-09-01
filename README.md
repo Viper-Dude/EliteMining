@@ -77,12 +77,9 @@ The **Configurator** is a standalone tool included with EliteMining. It provides
 - Press **Right Ctrl + Right Shift + C** on your keyboard.  
 
 ### Using the Configurator
-1. **Firegroups Tab** – Assign Fire Buttons and Firegroups.  
-2. **Toggles Tab** – Enable or disable optional functions.  
-3. **Timers Tab** – Configure mining-related timers.  
-4. **Mining Tab** – Provides tools for in-game mining operations (Prospector, Announcement Panel, Mining Session, Reports).  
-
-> **Important:** For core / non-core announcements to function properly, ensure that **Secondary Fire** is bound in VoiceAttack for both your keyboard/mouse and your Joystick/HOTAS. In addition, the **Prospector Sequence** toggle in the Configurator must be set to *Enabled* (default = enabled).
+1. **Dashboard - Firegroups & FireButtons Tab** – Assign Fire Buttons and Firegroups.  
+2. **Dashboard - Timers/Toggles Tab** – Enable or disable functions.  
+4. **Mining Session Tab** – Provides tools for in-game mining operations (Prospector, Announcement Panel, Mining Session, Reports).  
 
 ---
 
