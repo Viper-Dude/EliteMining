@@ -29,7 +29,7 @@ For pilots who prefer manual mining without automated sequences or voice command
 ## ✨ Features
 
 ### With VoiceAttack (Full Experience)
-- 🎤 Voice-controlled mining sequences
+- 🎤 Voice/hotkey-controlled mining sequences
 - 🤖 Automated collector and prospector deployment
 - 🎯 Smart targeting and laser management
 - 📊 Real-time mining statistics
@@ -41,27 +41,3 @@ For pilots who prefer manual mining without automated sequences or voice command
 - ⚙️ Ship configuration management
 - 📁 Mining session history
 - 🎛️ Manual control interface
-
-## 🔧 Configuration
-
-[Add your existing configuration instructions here]
-
-## 📊 Reports & Analytics
-
-[Add your existing reports section here]
-
-## 🎮 Usage
-
-[Add your existing usage instructions here]
-
-## 🤝 Contributing
-
-[Add your existing contributing section here]
-
-## 📄 License
-
-[Add your existing license information here]
-
-## 💖 Support
-
-[Add your existing support/donation information here]
