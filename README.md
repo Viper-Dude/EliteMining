@@ -93,11 +93,8 @@ The **Configurator** is a standalone tool included with EliteMining. It provides
 *Shows the overall Configurator layout, Firegroups, and Fire Buttons.  
 Save, Import, and Preset options are always visible across all tabs.*  
 
-#### Toggles Tab  
+#### Timers/Toggles Tab  
 <img src="images/configurator-timers_toggles.png" width="600">  
-
-#### Timers Tab  
-<img src="images/configurator-timers.png" width="600">  
 
 ---
 
