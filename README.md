@@ -181,7 +181,7 @@ The Mining tab provides dedicated tools for in-game mining operations. It contai
 | Deploy Weapons | Switch FG to weapons |
 | Start Scanning for Cores | Starts scanning sequence (FG set, continuous boost + pulsewave) |
 | Stop Scanning for Cores | Stops scanning sequence |
-| Clear and Jump | Clears mass lock & activates Supercruise/FSD jump |
+| Clear and Jump | Clears mass lock & activates Supercruise/FSD jump/drop from Supercruise |
 | TrackIR Integration | Set pause toggle in TrackIR software to **F9** |
 
 ---
