@@ -3,6 +3,9 @@
 
 **EliteMining** is a VoiceAttack profile designed to make mining in *Elite Dangerous* smoother, faster, and more immersive — with minimal manual input.
 
+
+**Note:** This documentation may not reflect the latest features and improvements and will be updated in the very near future. Please refer to the [v3.9.1-beta Release Notes](https://github.com/Viper-Dude/EliteMining/releases/tag/3.9.1b) for the most current feature information and updates.
+
 ---
 
 <details>
