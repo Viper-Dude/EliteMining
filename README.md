@@ -117,7 +117,7 @@ If you prefer manual control over automated sequences and don't want voice comma
 
 ### 📸 EliteMining GUI
 
-#### Main Window & Firegroups  
+#### Main Window (Dashboard) & Firegroups  
 <img src="images/configurator-main.png" width="600">  
 *Shows the overall Configurator layout, Firegroups, and Fire Buttons.  
 Save, Import, and Preset options are always visible across all tabs.*  
