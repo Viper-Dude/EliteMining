@@ -148,6 +148,7 @@ The Mining tab provides dedicated tools for in-game mining operations.
 <img src="images/mining-session.png" width="600">  
 *Tracks current mining session time, prospector  reports, materials collected, analysis, and progress.*  
 <img src="images/dashboard-graphs_yield_timeline_comparison.png" width="600">  
+<img src="images/dashboard-graphs_material_comparison" width="600">  
 
 
 #### Reports  
