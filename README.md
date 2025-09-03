@@ -139,9 +139,6 @@ Save, Import, and Preset options are always visible across all tabs.*
 
 The Mining tab provides dedicated tools for in-game mining operations. It contains 4 sub-tabs:  
 
-#### Prospector  
-<img src="images/configurator-prospector.png" width="600">  
-*Shows active prospector limpet status and scanned asteroid data.*  
 
 #### Announcement Panel  
 <img src="images/mining-announcement.png" width="600">  
@@ -149,7 +146,7 @@ The Mining tab provides dedicated tools for in-game mining operations. It contai
 
 #### Mining Session  
 <img src="images/mining-session.png" width="600">  
-*Tracks current mining session time, materials collected, and progress.*  
+*Tracks current mining session time, prospector  reports, materials collected, analysis, and progress.*  
 
 #### Reports  
 <img src="images/mining-reports.png" width="600">  
