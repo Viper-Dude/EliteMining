@@ -1,5 +1,5 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/logo_multi.ico" width="32" height="32"> EliteMining
-**Advanced Mining Operations Manager - Standalone or Voice-Controlled for *Elite Dangerous***
+**Mining Operations tool - Standalone or Voice-Controlled for *Elite Dangerous***
 
 **EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables voice-controlled mining sequences for complete hands-free operation.
 
