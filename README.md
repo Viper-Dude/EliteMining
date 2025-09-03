@@ -106,7 +106,8 @@ If you prefer manual control over automated sequences and don't want voice comma
 
 ### Launching the Configurator
 - Say **"Open Configurator"** in VoiceAttack, **or**  
-- Press **Right Ctrl + Right Shift + C** on your keyboard.  
+- Press **Right Ctrl + Right Shift + C** on your keyboard.
+- - Outside Voiceattack, run Elitemining (shortcuts from desktop) or from folder \EliteMining\Configurator\Configurator.exe 
 
 ### Using the Configurator
 1. **Dashboard - Firegroups & FireButtons Tab** – Assign Fire Buttons and Firegroups.  
