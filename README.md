@@ -1,7 +1,7 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/logo_multi.ico" width="32" height="32"> EliteMining
-**VoiceAttack Profile tailor made for Mining operations in *Elite Dangerous***
+**Advanced Mining Operations Manager - Standalone or Voice-Controlled for *Elite Dangerous***
 
-**EliteMining** is a VoiceAttack profile designed to make mining in *Elite Dangerous* smoother, faster, and more immersive — with minimal manual input.
+**EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables voice-controlled mining sequences for complete hands-free operation.
 
 
 **Note:** This documentation may not reflect the latest features and improvements and will be updated in the very near future. Please refer to the [v3.9.1-beta Release Notes](https://github.com/Viper-Dude/EliteMining/releases/tag/3.9.1b) for the most current feature information and updates.
