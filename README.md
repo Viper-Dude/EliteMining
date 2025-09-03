@@ -115,7 +115,7 @@ If you prefer manual control over automated sequences and don't want voice comma
 
 ---
 
-### 📸 Screenshots  
+### 📸 EliteMining GUI
 
 #### Main Window & Firegroups  
 <img src="images/configurator-main.png" width="600">  
@@ -125,13 +125,6 @@ Save, Import, and Preset options are always visible across all tabs.*
 #### Timers/Toggles Tab  
 <img src="images/configurator-timers_toggles.png" width="600">  
 
-#### Interface Options Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600">  
-*Configure interface settings, announcement preferences, and user interface options for optimal mining experience.*  
-
-#### Cargo Hold Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-cargohold.png" width="400">  
-*Monitor your cargo hold status, track collected materials, and manage inventory during mining sessions.*  
 
 ---
 
@@ -150,6 +143,13 @@ The Mining tab provides dedicated tools for in-game mining operations.
 <img src="images/dashboard-graphs_yield_timeline_comparison.png" width="600">  
 <img src="images/dashboard-graphs_material_comparison" width="600">  
 
+#### Interface Options Tab  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600">  
+*Configure interface settings, announcement preferences, and user interface options for optimal mining experience.*  
+
+#### Cargo Hold Tab  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-cargohold.png" width="400">  
+*Monitor your cargo hold status, track collected materials, and manage inventory during mining sessions.*  
 
 #### Reports  
 <img src="images/mining-reports.png" width="600">  
