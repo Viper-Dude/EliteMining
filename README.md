@@ -131,7 +131,7 @@ Save, Import, and Preset options are always visible across all tabs.*
 *Configure interface settings, announcement preferences, and user interface options for optimal mining experience.*  
 
 #### Cargo Hold Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-cargohold.png" width="600">  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-cargohold.png" width="400">  
 *Monitor your cargo hold status, track collected materials, and manage inventory during mining sessions.*  
 
 ---
