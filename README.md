@@ -137,7 +137,7 @@ Save, Import, and Preset options are always visible across all tabs.*
 
 ### 🪓 Mining Session Tab  
 
-The Mining tab provides dedicated tools for in-game mining operations. It contains 4 sub-tabs:  
+The Mining tab provides dedicated tools for in-game mining operations.  
 
 
 #### Announcement Panel  
@@ -147,6 +147,8 @@ The Mining tab provides dedicated tools for in-game mining operations. It contai
 #### Mining Session  
 <img src="images/mining-session.png" width="600">  
 *Tracks current mining session time, prospector  reports, materials collected, analysis, and progress.*  
+<img src="images/dashboard-graphs_yield_timeline_comparison.png" width="600">  
+
 
 #### Reports  
 <img src="images/mining-reports.png" width="600">  
