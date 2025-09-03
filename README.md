@@ -143,7 +143,7 @@ The Mining tab provides dedicated tools for in-game mining operations.
 
 #### Announcement Panel  
 <img src="images/mining-announcement.png" width="600">  
-*Controls material announcements and filtering of core vs non-core finds.*  
+*Controls material announcements, minimal, material conntent % and filtering of core vs non-core finds.*  
 
 #### Mining Session  
 <img src="images/mining-session.png" width="600">  
