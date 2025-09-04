@@ -224,7 +224,7 @@ Additional categories:
 ### 🎮 Miscellaneous
 | Spoken Command | Description |
 |----------------|-------------|
-| "Landing Request" | Requests docking + extends landing gear after 5s |
+| "Landing Request" | Requests docking |
 | "Enable/Disable Autohonk" | Toggles auto-discovery scan after jump (enabled by default) |
 
 ---
