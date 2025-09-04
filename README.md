@@ -2,7 +2,6 @@
 
 **EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables voice-controlled mining sequences for complete hands-free operation.
 
-
 **Note:** This documentation may not reflect the latest features and improvements and will be updated in the very near future. Please refer to the [v3.9.1-beta Release Notes](https://github.com/Viper-Dude/EliteMining/releases/tag/3.9.1b) for the most current feature information and updates.
 
 ---
@@ -105,8 +104,8 @@ If you prefer manual control over automated sequences and don't want voice comma
 
 ### Launching the Configurator
 - Say **"Open Configurator"** in VoiceAttack, **or**  
-- Press **Right Ctrl + Right Shift + C** on your keyboard.
-- - Outside Voiceattack, run Elitemining (shortcuts from desktop) or from folder \EliteMining\Configurator\Configurator.exe 
+- Press **Right Ctrl + Right Shift + C** on your keyboard.  
+- Outside Voiceattack, run Elitemining (shortcuts from desktop) or from folder \EliteMining\Configurator\Configurator.exe  
 
 ### Using the Configurator
 1. **Dashboard - Firegroups & FireButtons Tab** – Assign Fire Buttons and Firegroups.  
@@ -118,13 +117,13 @@ If you prefer manual control over automated sequences and don't want voice comma
 ### 📸 EliteMining GUI
 
 #### Main Window (Dashboard) & Firegroups  
-<img src="images/configurator-main.png" width="600">  
+<img src="images/configurator-main.png" width="600"><br>
 *Shows the overall Configurator layout, Firegroups, and Fire Buttons.  
 Save, Import, and Preset options are always visible across all tabs.*  
 
 #### Timers/Toggles Tab  
-<img src="images/configurator-timers_toggles.png" width="600">  
-
+<img src="images/configurator-timers_toggles.png" width="600"><br>
+*Configure timers and toggles for mining automation.*  
 
 ---
 
@@ -132,32 +131,31 @@ Save, Import, and Preset options are always visible across all tabs.*
 
 The Mining tab provides dedicated tools for in-game mining operations.  
 
-
 #### Announcement Panel  
-<img src="images/mining-announcement.png" width="600">  
-*Controls material announcements, minimal, material conntent % and filtering of core vs non-core finds.*  
+<img src="images/mining-announcement.png" width="600"><br>
+*Controls material announcements, minimal material content %, and filtering of core vs non-core finds.*  
 
 #### Mining Session  
-<img src="images/mining-session.png" width="600">  
-*Tracks current mining session time, prospector  reports, materials collected, analysis, and progress.*  
+<img src="images/mining-session.png" width="600"><br>
+*Tracks current mining session time, prospector reports, materials collected, analysis, and progress.*  
 
+<img src="images/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>
+*Compares yield over time for different mining sessions.*  
 
-<img src="images/dashboard-graphs_yield_timeline_comparison.png" width="600">  
-
-<img src="images/dashboard-graphs_material_comparison.png" width="600">  
-
+<img src="images/dashboard-graphs_material_comparison.png" width="600"><br>
+*Provides material composition and collection comparisons across sessions.*  
 
 #### Reports  
-<img src="images/mining-reports.png" width="600">  
+<img src="images/mining-reports.png" width="600"><br>
 *Provides detailed mining statistics and session summaries.*  
 
 #### Interface Options Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600">  
-*Configure interface settings, announcement preferences, and user interface options for optimal mining experience.*  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600"><br>
+*Configure interface settings, announcement preferences, and user interface options.*  
 
 #### Cargo Hold Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-cargohold.png" width="400">  
-*Monitor your cargo hold status, track collected materials, and manage inventory during mining sessions.*  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-cargohold.png" width="400"><br>
+*Monitor your cargo hold status and track collected materials during mining sessions.*  
 
 ---
 
@@ -242,7 +240,7 @@ Additional categories:
   - Timers optimized for laser mining  
   - Toggles adjusted for power management  
 
-Mining in HAZ area with 4 x lasers or more will in normal condition require a 2 step laser mining sequence.
+Mining in HAZ area with 4 x lasers or more will in normal condition require a 2 step laser mining sequence.  
 (Timer for laser mining, Pause and Timer for Laser mining extra)
 
 ### Customization
@@ -266,7 +264,7 @@ Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack.
 ---
 
 ## 🚧 In Development
-TBA 
+TBA  
 
 ---
 
@@ -277,7 +275,7 @@ TBA
 
 ---
 
-## � Training Speech Recognition
+## 🗣️ Training Speech Recognition
 1. Open VoiceAttack  
 2. Navigate: **Help → Utilities → Recognition Training**  
 3. Follow the prompts  
