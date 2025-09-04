@@ -75,7 +75,7 @@ For pilots who prefer manual mining without automated sequences or voice command
 **Essential:**
 - **Elite Dangerous** (PC version)
 
-**For Voice Command Automation:**
+**For Use with the EliteMining Voiceattack Profile :**
 - **[EliteVA (API) by Somfic](https://docs.somfic.dev/projects/eliteva)**  
 - **[VoiceAttack](https://voiceattack.com/)** – Paid version  
 - **Working microphone** for voice commands  
