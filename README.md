@@ -143,6 +143,11 @@ The Mining tab provides dedicated tools for in-game mining operations.
 <img src="images/dashboard-graphs_yield_timeline_comparison.png" width="600">  
 <img src="images/dashboard-graphs_material_comparison.png" width="600">  
 
+
+#### Reports  
+<img src="images/mining-reports.png" width="600">  
+*Provides detailed mining statistics and session summaries.*  
+
 #### Interface Options Tab  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600">  
 *Configure interface settings, announcement preferences, and user interface options for optimal mining experience.*  
@@ -150,10 +155,6 @@ The Mining tab provides dedicated tools for in-game mining operations.
 #### Cargo Hold Tab  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-cargohold.png" width="400">  
 *Monitor your cargo hold status, track collected materials, and manage inventory during mining sessions.*  
-
-#### Reports  
-<img src="images/mining-reports.png" width="600">  
-*Provides detailed mining statistics and session summaries.*  
 
 ---
 
