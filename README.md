@@ -143,7 +143,7 @@ The Mining tab provides dedicated tools for in-game mining operations.
 <img src="images/dashboard-graphs_material_comparison.png" width="600"><br>
 *Provides material composition and collection comparisons across sessions.*  
 
-#### Reports  
+#### Reports (Work in progress) 
 <img src="images/mining-reports.png" width="600"><br>
 *Provides detailed mining statistics and session summaries.*  
 
