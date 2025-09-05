@@ -148,7 +148,7 @@ The Mining tab provides dedicated tools for in-game mining operations.
 *Provides detailed mining statistics and session summaries.*  
 
 #### Interface Options Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600" height="400"><br>
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600" height="500"><br>
 *Configure interface settings, announcement preferences, and user interface options.*  
 
 #### Cargo Hold 
