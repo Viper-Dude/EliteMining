@@ -2,6 +2,11 @@
 
 **EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables Voice/hotkey- mining sequences for complete hands-free operation.
 
+## ⚠️ Important Note
+Elitemining - profile.vap VoiceAttack profile for EliteMining relies on the EliteVA plugin. Due to recent Frontier Developments updates to Elite Dangerous, EliteVA may no longer correctly parse Status.json or journal data. As a result, some VoiceAttack features of this profile may not function as intended until EliteVA is updated or compatibility is restored.
+
+✅ Note: The EliteMining tool itself works fine without VoiceAttack as a standalone mining announcement and analysis tool.
+
 ---
 
 <details>
@@ -286,12 +291,6 @@ For business or collaboration inquiries, feel free to reach out to me on Discord
 ### 💬 Community & Support
 Join the discussion and get help from the community:  
 **[EliteMining Discussion Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)** - Share tips, ask questions, and connect with other commanders using EliteMining.
-
----
-
-## 📜 Disclaimer
-This profile is **work-in-progress** and **not affiliated with Frontier Developments**.  
-Use at your own risk.
 
 ---
 
