@@ -5,6 +5,7 @@
 ## ⚠️ Important Note
 Elitemining - profile.vap VoiceAttack profile for EliteMining relies on the EliteVA plugin. Due to recent Frontier Developments updates to Elite Dangerous, EliteVA may no longer correctly parse Status.json or journal data. As a result, some VoiceAttack features of this profile may not function as intended until EliteVA is updated or compatibility is restored.
 
+I **recommend not using the VoiceAttack profile** until compatibility is restored.  
 ✅ Note: The EliteMining tool itself works fine without VoiceAttack as a standalone mining announcement and analysis tool.
 
 ---
