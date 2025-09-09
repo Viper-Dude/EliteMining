@@ -31,7 +31,7 @@
 
 </details>
 
----
+--- 
 
 ## 🎯 Usage Options
 
