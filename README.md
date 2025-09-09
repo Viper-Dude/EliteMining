@@ -295,6 +295,14 @@ Join the discussion and get help from the community:
 **[EliteMining Discussion Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)** - Share tips, ask questions, and connect with other commanders using EliteMining.
 
 ---
+## 📜 License & Third-Party Notices
 
+**EliteMining** © 2025 CMDR ViperDude.  
+Distributed under the [MIT License](LICENSE).
+
+This project bundles the following open-source software:
+
+- **ELITEVA** © 2023 Somfic – Licensed under the MIT License
+---
 ## 👏 Credits
 - [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA
