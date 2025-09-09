@@ -2,15 +2,6 @@
 
 **EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables Voice/hotkey- mining sequences for complete hands-free operation.
 
-## ⚠️ Important Note
-Elitemining - profile.vap VoiceAttack profile for EliteMining relies on the EliteVA plugin. Due to recent Frontier Developments updates to Elite Dangerous, EliteVA may no longer correctly parse Status.json or journal data. As a result, some VoiceAttack features of this profile may not function as intended until EliteVA is updated or compatibility is restored.
-
-I **recommend not using the VoiceAttack profile** until compatibility is restored.  
-
-✅ Note: The EliteMining tool itself works fine without VoiceAttack as a standalone mining announcement and analysis tool.
-
----
-
 <details>
 <summary>📑 Table of Contents</summary>
 
@@ -83,6 +74,16 @@ For pilots who prefer manual mining without automated sequences or voice command
 - **[EliteVA (API) by Somfic](https://docs.somfic.dev/projects/eliteva)**  
 - **[VoiceAttack](https://voiceattack.com/)** – Paid version  
 - **Working microphone** for voice commands  
+
+### 🔑 Keybind Requirement for EliteVA
+EliteVA reads your control setup from the `Custom.binds` file.  
+To make the EliteMining VoiceAttack profile work with EliteVA, you must:
+
+1. Open **Elite Dangerous → Options → Controls**  
+2. Change your preset to **Custom** (even if you only adjust a single key)  
+3. Save – this creates or updates the `Custom.binds` file  
+
+Without a valid `Custom.binds`, EliteVA cannot correctly parse your keybinds.
 
 **Note:** VoiceAttack is optional - the Configurator can run standalone for mining announcements, session tracking, and manual configuration without any voice automation.
 
