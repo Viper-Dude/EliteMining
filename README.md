@@ -304,7 +304,7 @@ Join the discussion and get help from the community:
 ## 📜 License & Third-Party Notices
 
 **EliteMining** © 2025 CMDR ViperDude.  
-Distributed under the [MIT License](LICENSE).
+Distributed under the [MIT License](LICENSE.md).
 
 This project bundles the following open-source software:
 
