@@ -39,7 +39,7 @@
 Complete voice/hotkey-controlled mining with automated sequences and announcements.
 
 ### Standalone Mode (Manual Control)
-For pilots who prefer manual mining without automated sequences or voice commands, the Configurator works independently to provide mining announcements, session tracking, and ship configuration. VoiceAttack is not required for these features.
+For pilots who prefer manual mining without automated sequences or voice commands, the Configurator works independently to provide mining announcements and session tracking. VoiceAttack is not required for these features.
 
 ---
 
