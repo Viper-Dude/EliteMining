@@ -151,7 +151,7 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 <img src="images/dashboard-graphs_material_comparison.png" width="600"><br>  
 *Material collection comparisons.*  
 
-#### Reports (WIP)  
+#### Reports 
 <img src="images/mining-reports.png" width="600"><br>  
 *Detailed mining statistics and summaries.*  
 
