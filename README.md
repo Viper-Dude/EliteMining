@@ -11,6 +11,16 @@
 - [Requirements](#-requirements)
 - [Installation](#-installation)
 - [Configurator](#️-configurator)
+  - [EliteMining GUI](#-elitemining-gui)
+    - [Main Window (Dashboard) & Firegroups](#main-window-dashboard--firegroups)
+    - [Timers/Toggles Tab](#timerstoggles-tab)
+    - [Mining Session Tab](#-mining-session-tab)
+      - [Announcement Panel](#announcement-panel)
+      - [Mining Session](#mining-session)
+      - [Reports (Work in progress)](#reports-work-in-progress)
+      - [Bookmarks](#-bookmarks)
+      - [Comprehensive Analytics](#-comprehensive-analytics)
+    - [Interface Options Tab](#interface-options-tab)
 - [Getting Started](#-getting-started)
   - [Firegroup (FG) Setup](#firegroup-fg-setup)
   - [Recommended Key / HOTAS Bindings](#recommended-key--hotas-bindings)
@@ -160,6 +170,26 @@ The Mining tab provides dedicated tools for in-game mining operations.
 <img src="images/mining-reports.png" width="600"><br>
 *Provides detailed mining statistics and session summaries.*  
 
+#### 🔖 Bookmarks
+
+- **Save Your Best Spots**: Bookmark your favorite mining locations with notes and details.  
+- **Auto-Fill Data**: Right-click any mining session to automatically bookmark that location with materials and yield info.  
+- **Smart Filtering**: Find bookmarks by yield level (High/Medium/Low), recent activity, or hotspot locations.  
+- **Easy Management**: Add, edit, or delete bookmarks with a clean, user-friendly interface.  
+- **Search Everything**: Search bookmarks by system name, materials, dates, or your personal notes.  
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/mining-session_bookmarks.png" width="600"><br>  
+
+This new bookmarks system helps you track and return to your most profitable mining spots in *Elite Dangerous*.  
+
+#### 📊 Comprehensive Analytics
+
+- View detailed statistics calculated from all your saved mining sessions, including total tonnage, average yields, hit rates, top-performing locations, and session comparisons to track your mining progress over time.  
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/mining-session_statistic.png" width="600"><br>
+
+---
+
 #### Interface Options Tab  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600" height="400"><br>
 *Configure interface settings, announcement preferences, and user interface options.*  
@@ -270,11 +300,6 @@ Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack.
 
 ---
 
-## 🚧 In Development
-TBA  
-
----
-
 ## ⚠️ Known Limitations
 - Only works with in-game keyboard keybindings (HOTAS setup required manually)  
 - Potential conflicts with HCS VoicePack (adjust commands if needed)  
@@ -289,6 +314,11 @@ TBA
 4. Train in a quiet environment with your gaming microphone  
 
 👉 Backup your speech profile: [SpProfileMgr.zip](https://voiceattack.com/filesend.aspx?id=SpProfileMgr.zip)  
+
+---
+
+## 🚧 In Development
+TBA  
 
 ---
 
