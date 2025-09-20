@@ -1,344 +1,330 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/logo_multi.ico" width="32" height="32"> EliteMining
 
-**EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables Voice/hotkey- mining sequences for complete hands-free operation.
+**EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.  
+
 ---
 
 <details>
 <summary>📑 Table of Contents</summary>
 
-- [Usage Options](#-usage-options)
-- [Features](#-features)
-- [Requirements](#-requirements)
-- [Installation](#-installation)
-- [Configurator](#️-configurator)
-  - [EliteMining GUI](#-elitemining-gui)
-    - [Main Window (Dashboard) & Firegroups](#main-window-dashboard--firegroups)
-    - [Timers/Toggles Tab](#timerstoggles-tab)
-    - [Mining Session Tab](#-mining-session-tab)
-      - [Announcement Panel](#announcement-panel)
-      - [Mining Session](#mining-session)
-      - [Reports (Work in progress)](#reports-work-in-progress)
-      - [Bookmarks](#-bookmarks)
-      - [Comprehensive Analytics](#-comprehensive-analytics)
-    - [Interface Options Tab](#interface-options-tab)
-- [Getting Started](#-getting-started)
-  - [Firegroup (FG) Setup](#firegroup-fg-setup)
-  - [Recommended Key / HOTAS Bindings](#recommended-key--hotas-bindings)
-- [Commands](#-commands)
-  - [Status Checks](#-status-checks)
-  - [Firegroup & Parameter Commands](#-firegroup--parameter-commands)
-  - [Miscellaneous](#-miscellaneous)
-- [Mining Presets](#-mining-presets)
-  - [Hazardous Mining Preset](#hazardous-mining-preset)
-  - [Customization](#customization)
-- [Usage Tips](#-usage-tips)
-- [Known Limitations](#-known-limitations)
-- [Training Speech Recognition](#-training-speech-recognition)
-- [In Development](#-in-development)
-- [Contact](#-contact)
-- [Disclaimer](#-disclaimer)
-- [Credits](#-credits)
+- [Usage Options](#-usage-options)  
+- [Features](#-features)  
+- [Requirements](#-requirements)  
+- [Installation](#-installation)  
+- [Configurator](#️-configurator)  
+  - [EliteMining GUI](#-elitemining-gui)  
+- [Getting Started](#-getting-started)  
+- [Commands](#-commands)  
+- [Mining Presets](#-mining-presets)  
+- [Usage Tips](#-usage-tips)  
+- [Known Limitations](#-known-limitations)  
+- [Training Speech Recognition](#-training-speech-recognition)  
+- [In Development](#-in-development)  
+- [Contact](#-contact)  
+- [License](#-license--third-party-notices)  
+- [Credits](#-credits)  
 
 </details>
 
---- 
+---
 
 ## 🎯 Usage Options
 
-### VoiceAttack Integration (Full Automation)
-Complete voice/hotkey-controlled mining with automated sequences and announcements.
+### VoiceAttack Integration (Full Automation)  
+Complete voice/hotkey-controlled mining with automated sequences and announcements.  
 
-### Standalone Mode (Manual Control)
-For pilots who prefer manual mining without automated sequences or voice commands, the Configurator works independently to provide mining announcements and session tracking. VoiceAttack is not required for these features.
+### Standalone Mode (Manual Control)  
+The Configurator works independently for announcements, reports, and tracking. VoiceAttack is not required.  
+
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
 ## ✨ Features
 
-### With VoiceAttack (Full Experience)
-- Voice/hotkey-controlled mining sequences
-- Automated collector and prospector deployment
-- Smart targeting and laser management
-- Real-time mining statistics
-- Automated cargo management
-- Custom voice commands to automate mining operations
-- Customizable ship presets
-- Streamlined workflow for efficient mining
-- Compatible with [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) for automatic in-game data reading
+### With VoiceAttack (Full Experience)  
+- Voice/hotkey mining sequences  
+- Automated collector & prospector deployment  
+- Smart targeting & laser management  
+- Real-time mining statistics  
+- Cargo management automation  
+- Custom commands & presets  
+- Compatible with [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva)  
 
-### Standalone Features (No VoiceAttack Required)
-- Mining announcements and notifications
-- Session tracking and reports
-- Ship configuration management
-- Mining session history
-- Manual control interface
-- Graphical interface to adjust firegroups, toggles, timers, and announcement options
+### Standalone Features (No VoiceAttack Required)  
+- Mining announcements & notifications  
+- Session tracking & history  
+- Ship configuration management  
+- GUI for firegroups, timers, toggles, and announcements  
+
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
 ## 📦 Requirements
+<details>
+<summary>Click to expand</summary>
 
-**Essential:**
-- **Elite Dangerous** (PC version)
+**Essential:**  
+- **Elite Dangerous** (PC version)  
 
-**For Use with the EliteMining Voiceattack Profile :**
+**For VoiceAttack Integration:**  
 - **[EliteVA (API) by Somfic](https://docs.somfic.dev/projects/eliteva)** *(included in installer)*  
 - **[VoiceAttack](https://voiceattack.com/)** – Paid version  
-- **Working microphone** for voice commands  
+- **Microphone** for voice commands  
 
-### 🔑 Keybind Requirement for EliteVA
-EliteVA reads your control setup from the `Custom.binds` file.  
-To make the EliteMining VoiceAttack profile work with EliteVA, you must:
+### 🔑 Keybind Requirement for EliteVA  
+EliteVA requires the `Custom.binds` file:  
 
 1. Open **Elite Dangerous → Options → Controls**  
-2. Change your preset to **Custom** (even if you only adjust a single key)  
-3. Save – this creates or updates the `Custom.binds` file  
+2. Set preset to **Custom**  
+3. Save — this creates/updates `Custom.binds`  
 
-Without a valid `Custom.binds`, EliteVA cannot correctly parse your keybinds.
+**Note:** VoiceAttack is optional. Configurator can run standalone.  
 
-**Note:** VoiceAttack is optional - the Configurator can run standalone for mining announcements, session tracking, and manual configuration without any voice automation.
+</details>
+
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
 ## 💾 Installation
+<details>
+<summary>Click to expand</summary>
 
-- **Installer**: Run `EliteMiningSetup.exe` for complete installation with VoiceAttack profile
-- **Portable**: Extract `EliteMining_3.9.0-beta.zip` for manual installation
+- **Installer:** Run `EliteMiningSetup.exe` (includes VoiceAttack profile)  
+- **Portable:** Extract `EliteMining_3.9.0-beta.zip`  
 
-### Included Components
-The EliteMining installer includes the required **EliteVA plugin**.  
-You do not need to download EliteVA separately — it is already bundled for convenience.  
+### Included Components  
+The installer bundles the **EliteVA plugin**. No separate download required.  
 
-### Manual Installation Steps:
-1. Download the latest *.zip release from [this repository](https://github.com/Viper-Dude/EliteMining/releases)  
-2. Extract all contents of the downloaded file into your VoiceAttack app folder  
+### Manual Installation  
+1. Download the latest `.zip` from [Releases](https://github.com/Viper-Dude/EliteMining/releases)  
+2. Extract into your VoiceAttack app folder  
 3. Open VoiceAttack → **Profile > Import Profile**  
 4. Select **EliteMining-Profile.vap**  
 
----
+</details>
 
-## 🖥️ Configurator
-
-The **Configurator** is a standalone tool included with EliteMining. It provides a graphical interface to easily adjust firegroups, toggles, timers, and announcement options without editing VoiceAttack directly.
-
-If you prefer manual control over automated sequences and don't want voice commands, the Configurator can be used as a standalone application for mining announcements, session reports, and configuration management - VoiceAttack is not required for these features.
-
-### Launching the Configurator
-- Say **"Open Configurator"** in VoiceAttack, **or**  
-- Press **Right Ctrl + Right Shift + C** on your keyboard.  
-- Outside Voiceattack, run Elitemining (shortcuts from desktop) or from folder \EliteMining\Configurator\Configurator.exe  
-
-### Using the Configurator
-1. **Dashboard - Firegroups & FireButtons Tab** – Assign Fire Buttons and Firegroups.  
-2. **Dashboard - Timers/Toggles Tab** – Enable or disable functions.  
-3. **Mining Session Tab** – Provides tools for in-game mining operations (Prospector, Announcement Panel, Mining Session, Reports).  
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
-### 📸 EliteMining GUI
+## 🖥️ Configurator  
+
+The **Configurator** lets you adjust firegroups, toggles, timers, and announcements via GUI. It can run standalone without VoiceAttack.  
+
+### Launching  
+- VoiceAttack: **"Open Configurator"**  
+- Keyboard: **Right Ctrl + Right Shift + C**  
+- Direct: `\EliteMining\Configurator\Configurator.exe`  
+
+[⬆️ Back to Top](#-elitemining)
+
+---
+
+### 📸 EliteMining GUI  
 
 #### Main Window (Dashboard) & Firegroups  
-<img src="images/configurator-main.png" width="600"><br>
-*Shows the overall Configurator layout, Firegroups, and Fire Buttons.  
-Save, Import, and Preset options are always visible across all tabs.*  
+<img src="images/configurator-main.png" width="600"><br>  
+*Configurator layout with firegroups & buttons.*  
 
 #### Timers/Toggles Tab  
-<img src="images/configurator-timers_toggles.png" width="600"><br>
-*Configure timers and toggles for mining automation.*  
+<img src="images/configurator-timers_toggles.png" width="600"><br>  
+*Configure timers and toggles for automation.*  
 
 ---
 
 ### 🪓 Mining Session Tab  
 
-The Mining tab provides dedicated tools for in-game mining operations.  
-
 #### Announcement Panel  
-<img src="images/mining-announcement.png" width="600"><br>
-*Controls material announcements, minimal material content %, and filtering of core vs non-core finds.*  
+<img src="images/mining-announcement.png" width="600"><br>  
+*Controls announcements, thresholds, and filters.*  
 
 #### Mining Session  
-<img src="images/mining-session.png" width="600"><br>
-*Tracks current mining session time, prospector reports, materials collected, analysis, and progress.*  
+<img src="images/mining-session.png" width="600"><br>  
+*Tracks time, prospector reports, materials, and progress.*  
 
-<img src="images/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>
-*Compares yield over time for different mining sessions.*  
+<img src="images/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>  
+*Yield comparisons across sessions.*  
 
-<img src="images/dashboard-graphs_material_comparison.png" width="600"><br>
-*Provides material composition and collection comparisons across sessions.*  
+<img src="images/dashboard-graphs_material_comparison.png" width="600"><br>  
+*Material collection comparisons.*  
 
-#### Reports (Work in progress) 
-<img src="images/mining-reports.png" width="600"><br>
-*Provides detailed mining statistics and session summaries.*  
+#### Reports (WIP)  
+<img src="images/mining-reports.png" width="600"><br>  
+*Detailed mining statistics and summaries.*  
 
-#### 🔖 Bookmarks
-
-- **Save Your Best Spots**: Bookmark your favorite mining locations with notes and details.  
-- **Auto-Fill Data**: Right-click any mining session to automatically bookmark that location with materials and yield info.  
-- **Smart Filtering**: Find bookmarks by yield level (High/Medium/Low), recent activity, or hotspot locations.  
-- **Easy Management**: Add, edit, or delete bookmarks with a clean, user-friendly interface.  
-- **Search Everything**: Search bookmarks by system name, materials, dates, or your personal notes.  
-
+#### 🔖 Bookmarks  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/mining-session_bookmarks.png" width="600"><br>  
+*Save, search, and manage mining spots.*  
 
-This new bookmarks system helps you track and return to your most profitable mining spots in *Elite Dangerous*.  
-
-#### 📊 Comprehensive Analytics
-
-- View detailed statistics calculated from all your saved mining sessions, including total tonnage, average yields, hit rates, top-performing locations, and session comparisons to track your mining progress over time.  
-
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/mining-session_statistic.png" width="600"><br>
+#### 📊 Comprehensive Analytics  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/mining-session_statistic.png" width="600"><br>  
+*Session statistics: yields, hit rates, and comparisons.*  
 
 ---
 
 #### Interface Options Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600" height="400"><br>
-*Configure interface settings, announcement preferences, and user interface options.*  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600" height="400"><br>  
+*UI and announcement preferences.*  
+
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
 ## 🚀 Getting Started
+<details>
+<summary>Click to expand</summary>
 
-### Firegroup (FG) Setup
+### Firegroup (FG) Setup  
 | Component | FG | Fire Button | Notes |
 |-----------|----|-------------|-------|
-| Discovery Scanner | Set by command or presets | Secondary | – |
+| Discovery Scanner | Preset/Command | Secondary | – |
 | Surface Scanner | A | Primary | – |
-| Mining Lasers | Set by command or presets | Primary | – |
-| Collector Limpet Controller | Set by command or presets | Same as Mining Lasers (and SSDM) | Must be set manually |
-| Pulse Wave Analyser | Set by command or presets | Primary | – |
-| Sub-surface Displacement Missile (SSDM) | Set by command or presets | Primary | – |
-| Prospector Limpet Controller | Same as Pulse Wave Analyser (recommended) | Secondary | Must be set manually |
+| Mining Lasers | Preset/Command | Primary | – |
+| Collector Limpet Controller | Preset/Command | Same as Mining Lasers | Must set manually |
+| Pulse Wave Analyser | Preset/Command | Primary | – |
+| SSDM | Preset/Command | Primary | – |
+| Prospector Limpet Controller | Same as PWA | Secondary | Must set manually |
 
-**Important:** Collector & Prospector Limpet Controllers **must be set manually**.
-
----
-
-### Recommended Key / HOTAS Bindings
+### Key / HOTAS Bindings  
 | Action | Description |
 |--------|-------------|
-| Stop profiles command | Stopping all running commands inside this profile.. |
-| Start Mining Sequence | Starts laser mining sequence |
-| Reset Mining Sequence | Stops/resets mining sequence |
-| Deploy Seismic Charge Launcher | Switch FG to Seismic Charge Launcher |
-| Deploy Weapons | Switch FG to weapons |
-| Start Scanning for Cores | Starts scanning sequence (FG set, continuous boost + pulsewave) |
-| Stop Scanning for Cores | Stops scanning sequence |
-| Clear and Jump | Clears mass lock & activates Supercruise/FSD jump/drop from Supercruise |
-| TrackIR Integration | Set pause toggle in TrackIR software to **F9** |
+| Stop profiles command | Stops all running commands |
+| Start Mining Sequence | Starts laser mining |
+| Reset Mining Sequence | Stops/resets mining |
+| Deploy Seismic Charge Launcher | Switch to launcher |
+| Deploy Weapons | Switch to weapons |
+| Start Scanning for Cores | Scanning sequence |
+| Stop Scanning for Cores | Stops scanning |
+| Clear and Jump | Clears mass lock & jumps |
+| TrackIR Integration | Pause toggle = **F9** |
+
+</details>
+
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
 ## 🎙️ Commands
+<details>
+<summary>Click to expand</summary>
 
-### ✅ Status Checks
+### ✅ Status Checks  
 | Spoken Command | Description |
 |----------------|-------------|
 | "Say firegroup for weapons" | Reports FG for weapons |
-| "Say firegroup for mining lasers" | Reports FG for mining lasers |
-| "Say firegroup for Sub-surface Displacement Missile" | Reports FG for SSDMs |
-| "Say firegroup for Pulse Wave Analyser" | Reports FG for PWA |
-| "Say toggle for cargo scoop / power / mining / etc." | Reports toggle status |
-| "Say timer for laser mining / target / pause" | Reports active timer values |
+| "Say firegroup for mining lasers" | Reports FG for lasers |
+| "Say firegroup for SSDM" | Reports FG for SSDMs |
+| "Say firegroup for PWA" | Reports FG for PWA |
+| "Say toggle for cargo scoop" | Reports toggle status |
+| "Say timer for laser mining" | Reports active timer |
 
----
-
-### 🔧 Firegroup & Parameter Commands
+### 🔧 Firegroup & Parameter Commands  
 | Spoken Command | Description |
 |----------------|-------------|
 | "Set firegroup for Discovery Scanner to [A–H]" | Assigns Discovery Scanner |
 | "Set firegroup for mining lasers to [A–H]" | Assigns Mining Lasers |
-| "Set firegroup for Pulse Wave Analyser to [A–H]" | Assigns PWA |
-| "Set firegroup for Seismic Charge Launcher to [A–H]" | Assigns Seismic Charge Launcher |
-| "Set firegroup for Sub-surface Displacement Missile to [A–H]" | Assigns SSDM |
+| "Set firegroup for PWA to [A–H]" | Assigns PWA |
+| "Set firegroup for Seismic Launcher to [A–H]" | Assigns Launcher |
+| "Set firegroup for SSDM to [A–H]" | Assigns SSDM |
 | "Set firegroup for weapons to [A–H]" | Assigns weapons |
 
-Additional categories:
-- **Commands – Set Firegroups (FG)**  
-- **Commands – Set Timers**  
-- **Commands – Set Toggles**  
-- **Commands – Check – Status**  
-
----
-
-### 🎮 Miscellaneous
+### 🎮 Miscellaneous  
 | Spoken Command | Description |
 |----------------|-------------|
 | "Landing Request" | Requests docking |
-| "Enable/Disable Autohonk" | Toggles auto-discovery scan after jump (enabled by default) |
+| "Enable/Disable Autohonk" | Toggles auto scan |
+
+</details>
+
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
 ## ⚡ Mining Presets
+<details>
+<summary>Click to expand</summary>
 
-### Hazardous Mining Preset
+### Hazardous Mining Preset  
 - **Command:** `"Set mining configuration for 3 x haz"`  
-- **Configuration includes:**
-  - Firegroups set for all mining tools  
-  - Timers optimized for laser mining  
-  - Toggles adjusted for power management  
+- Pre-configured firegroups, timers, and toggles for HAZ mining.  
 
-Mining in HAZ area with 4 x lasers or more will in normal condition require a 2 step laser mining sequence.  
-(Timer for laser mining, Pause and Timer for Laser mining extra)
-
-### Customization
-- Add new presets for different ships  
-- Adjust firegroups, timers, and toggles on-the-fly  
+### Customization  
+- Create presets for different ships  
+- Adjust firegroups/timers on-the-fly  
 - Modify via built-in commands  
+
+</details>
+
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
 ## 💡 Usage Tips
 - **Short press** → Starts command  
 - **Long press** → Stops/resets command  
+- Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack  
 
-Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack.
-
-**Best practice:**
-1. Set fire buttons & FGs  
-2. Select a ship preset  
-3. Begin mining and practice commands  
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
 ## ⚠️ Known Limitations
-- Only works with in-game keyboard keybindings (HOTAS setup required manually)  
-- Potential conflicts with HCS VoicePack (adjust commands if needed)  
-- Works fine with EDCopilot  
+- Only works with in-game keybinds (HOTAS setup manual)  
+- Possible conflicts with HCS VoicePack  
+- Works with EDCopilot  
+
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
 ## 🗣️ Training Speech Recognition
-1. Open VoiceAttack  
-2. Navigate: **Help → Utilities → Recognition Training**  
-3. Follow the prompts  
-4. Train in a quiet environment with your gaming microphone  
+<details>
+<summary>Click to expand</summary>
 
-👉 Backup your speech profile: [SpProfileMgr.zip](https://voiceattack.com/filesend.aspx?id=SpProfileMgr.zip)  
+1. Open VoiceAttack  
+2. Go to **Help → Utilities → Recognition Training**  
+3. Train in a quiet environment  
+4. Backup your speech profile: [SpProfileMgr.zip](https://voiceattack.com/filesend.aspx?id=SpProfileMgr.zip)  
+
+</details>
+
+[⬆️ Back to Top](#-elitemining)
 
 ---
 
-## 🚧 In Development
+## 🚧 In Development  
 TBA  
 
----
-
-## ❓ Contact 
-For business or collaboration inquiries, feel free to reach out to me on Discord:  
-[![Discord](https://img.shields.io/badge/Discord-7Ven__MP-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/users/394827769378242560)
-
-### 💬 Community & Support
-Join the discussion and get help from the community:  
-**[EliteMining Discussion Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)** - Share tips, ask questions, and connect with other commanders using EliteMining.
+[⬆️ Back to Top](#-elitemining)
 
 ---
-## 📜 License & Third-Party Notices
+
+## ❓ Contact  
+For business/collab inquiries:  
+[![Discord](https://img.shields.io/badge/Discord-7Ven__MP-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/users/394827769378242560)  
+
+💬 Join the community: [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)  
+
+[⬆️ Back to Top](#-elitemining)
+
+---
+
+## 📜 License & Third-Party Notices  
 
 **EliteMining** © 2025 CMDR ViperDude.  
-Distributed under the [MIT License](LICENSE.md).
+Distributed under the [MIT License](LICENSE.md).  
 
-This project bundles the following open-source software:
+This project bundles:  
+- **ELITEVA** © 2023 Somfic – MIT License  
 
-- **ELITEVA** © 2023 Somfic – Licensed under the MIT License
+[⬆️ Back to Top](#-elitemining)
+
 ---
-## 👏 Credits
-- [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA
+
+## 👏 Credits  
+- [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA  
+
+[⬆️ Back to Top](#-elitemining)
