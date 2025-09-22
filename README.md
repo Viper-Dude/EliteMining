@@ -13,6 +13,8 @@
 - [Installation](#-installation)  
 - [Configurator](#️-configurator)  
   - [EliteMining GUI](#-elitemining-gui)  
+  - [Ring Search](#-ring-search)  
+  - [Backup & Restore](#-backup--restore)  
 - [Getting Started](#-getting-started)  
 - [Commands](#-commands)  
 - [Mining Presets](#-mining-presets)  
@@ -56,6 +58,8 @@ The Configurator works independently for announcements, reports, and tracking. V
 - Session tracking & history  
 - Ship configuration management  
 - GUI for firegroups, timers, toggles, and announcements  
+- **Ring Search** – Locate planetary rings (Ice, Metal Rich, Rocky, Metallic) for optimal mining opportunities  
+- **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports  
 
 [⬆️ Back to Top](#-elitemining)
 
@@ -168,6 +172,22 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 #### Interface Options Tab  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600" height="400"><br>  
 *UI and announcement preferences.*  
+
+[⬆️ Back to Top](#-elitemining)
+
+---
+
+### 🔍 Ring Search
+- Find planetary rings in systems from your current or any location in the galaxy. Search for specific ring types (Ice, Metal Rich, Rocky, Metallic) within your desired distance to locate the best mining opportunities.  
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/ring_finder.png" width="600"><br>  
+
+---
+
+### 💾 Backup & Restore 
+- Easily save and restore your complete EliteMining setup including settings, bookmarks, and reports. Create timestamped backups before updates or quickly restore previous configurations with one click.  
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/backup.png" width="350"><br>  
 
 [⬆️ Back to Top](#-elitemining)
 
