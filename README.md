@@ -130,11 +130,11 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 ### 📸 EliteMining GUI  
 
 #### Main Window (Dashboard) & Firegroups  
-<img src="images/configurator-main.png" width="600"><br>  
+<img src="screenshots/configurator-main.png" width="600"><br>  
 *Configurator layout with firegroups & buttons.*  
 
 #### Timers/Toggles Tab  
-<img src="images/configurator-timers_toggles.png" width="600"><br>  
+<img src="screenshots/configurator-timers_toggles.png" width="600"><br>  
 *Configure timers and toggles for automation.*  
 
 ---
@@ -142,21 +142,21 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 ### 🪓 Mining Session Tab  
 
 #### Announcement Panel  
-<img src="images/mining-announcement.png" width="600"><br>  
+<img src="screenshots/mining-announcement.png" width="600"><br>  
 *Controls announcements, thresholds, and filters.*  
 
 #### Mining Session  
-<img src="images/mining-session.png" width="600"><br>  
+<img src="screenshots/mining-session.png" width="600"><br>  
 *Tracks time, prospector reports, materials, and progress.*  
 
-<img src="images/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>  
+<img src="screenshots/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>  
 *Yield comparisons across sessions.*  
 
-<img src="images/dashboard-graphs_material_comparison.png" width="600"><br>  
+<img src="screenshots/dashboard-graphs_material_comparison.png" width="600"><br>  
 *Material collection comparisons.*  
 
 #### Reports 
-<img src="images/mining-reports.png" width="600"><br>  
+<img src="screenshots/mining-reports.png" width="600"><br>  
 *Detailed mining statistics and summaries.*  
 
 #### 🔖 Bookmarks  
