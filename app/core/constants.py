@@ -54,3 +54,12 @@ TIMERS = {
     "Target Delay": ("delayTarget.txt", 1, 50, "Delay before selecting the prospector as target after lasers fire."),
     "Boost Interval": ("boostintervalValue.txt", 1, 30, "Interval between boosts when scanning for cores."),
 }
+
+# UI Color Schemes
+MENU_COLORS = {
+    "bg": "#2d2d2d",
+    "fg": "#ffffff", 
+    "activebackground": "#404040",
+    "activeforeground": "#ffffff",
+    "selectcolor": "#404040"
+}

@@ -361,7 +361,7 @@ def _atomic_write_text(path: str, text: str) -> None:
 from core.constants import (
     FIREGROUPS, NATO, NATO_REVERSE,
     VA_VARS, VA_TTS_ANNOUNCEMENT, TOOL_ORDER,
-    ANNOUNCEMENT_TOGGLES, TOGGLES, TIMERS
+    ANNOUNCEMENT_TOGGLES, TOGGLES, TIMERS, MENU_COLORS
 )
 
 # -------------------- Config helpers (persist VA folder, window geometry, etc.) --------------------
@@ -2665,7 +2665,8 @@ class App(tk.Tk):
         
         # Style the dropdown menu items with their actual colors
         menu = self.color_menu['menu']
-        menu.configure(bg="#2e2e2e", fg="#ffffff", activebackground="#444444")
+        menu.configure(bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"], 
+                      activebackground=MENU_COLORS["activebackground"])
         
         # Clear existing items and add colored ones
         menu.delete(0, 'end')
@@ -2993,9 +2994,10 @@ class App(tk.Tk):
 
         # Context menu with dark theme
         self._preset_menu = tk.Menu(self, tearoff=0, 
-                                  bg="#2c3e50", fg="#ecf0f1", 
-                                  activebackground="#3498db", activeforeground="#ffffff",
-                                  selectcolor="#e67e22")
+                                  bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"], 
+                                  activebackground=MENU_COLORS["activebackground"], 
+                                  activeforeground=MENU_COLORS["activeforeground"],
+                                  selectcolor=MENU_COLORS["selectcolor"])
         self._preset_menu.add_command(label="Save as New", command=self._save_as_new)
         self._preset_menu.add_command(label="Overwrite", command=self._overwrite_selected)
         self._preset_menu.add_command(label="Duplicate", command=self._duplicate_selected_preset)

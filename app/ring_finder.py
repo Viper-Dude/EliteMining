@@ -15,6 +15,7 @@ import zlib
 from typing import Dict, List, Optional, Tuple
 import math
 import re
+from core.constants import MENU_COLORS
 
 # ToolTip class for showing helpful information
 class ToolTip:
@@ -374,7 +375,7 @@ class RingFinder:
             }
             self.eddn_hotspots.append(hotspot_entry)
         
-        print(f"Added {len(test_data)} test EDDN hotspots")
+        # Test data added to self.hotspots
         messagebox.showinfo("EDDN Test", f"Added {len(test_data)} test mining hotspot discoveries!\n\nNow search for 'Borann', 'Hyades', or 'Kirre' to see EDDN Live results.")
         
         # Activate EDDN mode for testing
@@ -532,34 +533,25 @@ class RingFinder:
         
         # Set reference system coordinates for distance calculations (case insensitive)
         self.current_system_coords = None
-        print(f"Looking for reference system: '{reference_system}'")
         
         # Try exact match first
         self.current_system_coords = self.systems_data.get(reference_system.lower())
-        if self.current_system_coords:
-            print(f"Found exact match: {reference_system}")
-        else:
+        if not self.current_system_coords:
             # Try partial match (case insensitive)
             for sys_name, sys_coords in self.systems_data.items():
                 if reference_system.lower() in sys_name.lower():
                     self.current_system_coords = sys_coords
-                    print(f"Found reference system match: {sys_name} for '{reference_system}'")
                     break
             
         if not self.current_system_coords:
-            print(f"No coordinates found for reference system: {reference_system}")
             # Try to get coordinates from EDSM as fallback
-            print(f"Attempting to get coordinates from EDSM for: {reference_system}")
             self.current_system_coords = self._get_system_coords_from_edsm(reference_system)
-            if self.current_system_coords:
-                print(f"Retrieved coordinates from EDSM: {self.current_system_coords}")
-            else:
-                print(f"EDSM also failed to provide coordinates for: {reference_system}")
+            if not self.current_system_coords:
                 self.status_var.set(f"Warning: '{reference_system}' coordinates not found - distances may be inaccurate")
         
         # Disable search button
         self.search_btn.configure(state="disabled", text="Searching...")
-        self.status_var.set("Searching hotspot database...")
+        self.status_var.set("Searching for rings...")
         
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker, 
@@ -597,7 +589,6 @@ class RingFinder:
         
         # Try EDSM Bodies API for rings data using reference system and nearby systems
         edsm_results = []
-        print(f"Searching EDSM for ring composition data in system: {reference_system}")
         try:
             # First, search the reference system itself
             edsm_results = self._get_edsm_bodies_with_rings(reference_system, material_filter)
@@ -605,7 +596,6 @@ class RingFinder:
             # Then search nearby systems within range
             if self.current_system_coords and max_distance > 0:
                 nearby_systems = self._get_nearby_systems(reference_system, max_distance)
-                print(f"Found {len(nearby_systems)} systems within {max_distance} LY of {reference_system}")
                 
                 # Early stopping: stop when we have enough results
                 total_results = len(edsm_results)
@@ -631,16 +621,13 @@ class RingFinder:
                         
                         # Early stopping: if we have enough results, stop searching
                         if max_results and total_results >= max_results:
-                            print(f"✓ Early stopping: Found {total_results} results, stopping search")
                             break
                             
                     except Exception as e:
-                        print(f"Failed to query {nearby_system['name']}: {e}")
                         continue
             
-            print(f"✓ EDSM Bodies: {len(edsm_results)} rings with potential {material_filter if material_filter != 'All' else 'mining materials'} found")
         except Exception as e:
-            print(f"✗ EDSM Bodies failed: {e}")
+            pass
         
         # Use EDSM results only
         combined_results = edsm_results
@@ -648,7 +635,6 @@ class RingFinder:
         # Apply max results limit if specified
         if max_results and len(combined_results) > max_results:
             combined_results = combined_results[:max_results]
-            print(f"✓ Limited results to {max_results} as requested")
         
         # Cache results if we have new data
         if combined_results:
@@ -656,8 +642,6 @@ class RingFinder:
                 'data': combined_results,
                 'timestamp': time.time()
             }
-        
-        print(f"Returning {len(combined_results)} total results (0 EDDN + 0 local)")
         return combined_results or cached_results
         
     def _update_systems_from_edsm(self, search_term: str, max_distance: float):
@@ -676,7 +660,8 @@ class RingFinder:
                     
                     # Skip if we still don't have a system name
                     if not current_system_name:
-                        print("No reference system provided for EDSM API")
+                        # No reference system
+                        pass
                         return
                     
                     # Try sphere-systems API with system name
@@ -704,22 +689,22 @@ class RingFinder:
                         # Handle both dict and list responses
                         if isinstance(systems_data, dict):
                             if not systems_data:  # Empty dict means no results
-                                print(f"EDSM returned no systems within {max_distance} LY of {current_system_name}")
+                                pass
                                 return
                             # If dict with data, it might be an error response
                             if 'error' in systems_data:
-                                print(f"EDSM API error: {systems_data.get('error', 'Unknown error')}")
+                                pass
                                 return
                             # Skip this attempt if unexpected dict format
                             continue
                         
                         # Ensure systems_data is a list
                         if not isinstance(systems_data, list):
-                            print(f"EDSM returned unexpected data type: {type(systems_data)}")
+                            pass
                             continue
                         
                         if not systems_data:
-                            print("EDSM returned empty systems list")
+                            pass
                             return
                         
                         # Update systems database
@@ -742,12 +727,12 @@ class RingFinder:
                         print(status_msg)
                         return  # Success, exit function
                     else:
-                        print(f"EDSM returned status {response.status_code}")
+                        pass
                 
                 break  # Exit retry loop if we get here
                         
             except Exception as e:
-                print(f"EDSM attempt {attempt + 1} failed: {e}")
+                pass
                 if attempt == 0:
                     time.sleep(1)  # Wait before retry
                 else:
@@ -756,7 +741,6 @@ class RingFinder:
     def _get_edsm_bodies_with_rings(self, system_name: str, material_filter: str) -> List[Dict]:
         """Get bodies with rings from EDSM and show ring composition (not hotspots)"""
         try:
-            print(f"Querying EDSM Bodies API for: {system_name}")
             url = f"https://www.edsm.net/api-system-v1/bodies"
             params = {'systemName': system_name}
             
@@ -766,7 +750,6 @@ class RingFinder:
                 mining_opportunities = []
                 
                 bodies_found = len(data.get('bodies', []))
-                print(f"EDSM returned {bodies_found} bodies for {system_name}")
                 
                 # Calculate distance if we have current system coordinates
                 distance = 0
@@ -801,7 +784,6 @@ class RingFinder:
                         distance_ls = body.get('distanceToArrival', 0)
                         
                         rings_found = len(body['rings'])
-                        print(f"  Body {body_name}: {rings_found} rings")
                         
                         for ring in body['rings']:
                             ring_type = ring.get('type', 'Unknown')
@@ -838,19 +820,16 @@ class RingFinder:
                                 'source': 'EDSM Ring Data'
                             })
                 
-                print(f"EDSM Bodies: Found {len(mining_opportunities)} rings with {material_filter if material_filter != 'All' else 'all ring types'}")
                 return mining_opportunities
                 
         except Exception as e:
-            print(f"EDSM Bodies API failed: {e}")
+            pass
         
         return []
 
     def _get_nearby_systems(self, reference_system: str, max_distance: float) -> List[Dict]:
         """Get systems within specified distance from reference system using EDSM API"""
         try:
-            print(f"Searching EDSM for systems within {max_distance} LY of {reference_system}...")
-            
             # Use EDSM sphere-systems API to find nearby systems
             url = "https://www.edsm.net/api-v1/sphere-systems"
             params = {
@@ -897,17 +876,11 @@ class RingFinder:
                     # Sort by distance (closest first)
                     nearby_systems.sort(key=lambda x: x['distance'])
                     
-                    print(f"EDSM found {len(nearby_systems)} systems within {max_distance} LY")
-                    if nearby_systems:
-                        print(f"Closest: {nearby_systems[0]['name']} ({nearby_systems[0]['distance']:.1f} LY)")
-                        if len(nearby_systems) > 5:
-                            print(f"Farthest: {nearby_systems[-1]['name']} ({nearby_systems[-1]['distance']:.1f} LY)")
-                    
                     return nearby_systems
                 else:
-                    print("EDSM returned no systems data")
+                    pass
             else:
-                print(f"EDSM API error: {response.status_code}")
+                pass
                 
         except Exception as e:
             print(f"Error finding nearby systems via EDSM: {e}")
@@ -922,11 +895,10 @@ class RingFinder:
             # Get coordinates of reference system
             reference_coords = self.systems_data.get(reference_system.lower())
             if not reference_coords:
-                print(f"No coordinates found for reference system: {reference_system}")
+                # No coordinates found
                 return []
             
             nearby_systems = []
-            print(f"Searching local database for systems within {max_distance} LY of {reference_system}...")
             
             # Search through all known systems
             for system_name, coords in self.systems_data.items():
@@ -942,11 +914,9 @@ class RingFinder:
             # Sort by distance (closest first)
             nearby_systems.sort(key=lambda x: x['distance'])
             
-            print(f"Local database found {len(nearby_systems)} systems within range")
             return nearby_systems
             
         except Exception as e:
-            print(f"Error finding nearby systems in local database: {e}")
             return []
 
     def _clean_ring_name(self, full_ring_name: str, body_name: str, system_name: str) -> str:
@@ -1042,7 +1012,6 @@ class RingFinder:
                 "showCoordinates": 1
             }
             
-            print(f"Querying EDSM for coordinates: {system_name}")
             response = requests.get(url, params=params, timeout=10)
             
             if response.status_code == 200:
@@ -1303,9 +1272,10 @@ class RingFinder:
     def _create_context_menu(self):
         """Create the right-click context menu for results"""
         self.context_menu = tk.Menu(self.parent, tearoff=0,
-                                   bg="#2c3e50", fg="#ecf0f1",
-                                   activebackground="#3498db", activeforeground="#ffffff",
-                                   selectcolor="#e67e22")
+                                   bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
+                                   activebackground=MENU_COLORS["activebackground"], 
+                                   activeforeground=MENU_COLORS["activeforeground"],
+                                   selectcolor=MENU_COLORS["selectcolor"])
         self.context_menu.add_command(label="Copy System Name", command=self._copy_system_name)
     
     def _show_context_menu(self, event):

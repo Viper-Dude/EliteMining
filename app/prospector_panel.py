@@ -20,6 +20,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import subprocess
 from typing import Dict, Any, Optional, List, Tuple
+from core.constants import MENU_COLORS
 
 def get_app_icon_path() -> str:
     """Get the path to the application icon, handling both development and compiled environments"""
@@ -1933,9 +1934,10 @@ class ProspectorPanel(ttk.Frame):
                 # Get all currently selected items after potential addition
                 selected_items = tree.selection()
                 if selected_items:
-                    context_menu = tk.Menu(tree, tearoff=0, bg="#2d2d2d", fg="#ffffff", 
-                                         activebackground="#404040", activeforeground="#ffffff",
-                                         selectcolor="#404040")
+                    context_menu = tk.Menu(tree, tearoff=0, bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"], 
+                                         activebackground=MENU_COLORS["activebackground"], 
+                                         activeforeground=MENU_COLORS["activeforeground"],
+                                         selectcolor=MENU_COLORS["selectcolor"])
                     context_menu.add_command(label="📂 Open Report", command=open_selected)
                     context_menu.add_command(label="📋 Copy System Name", command=lambda: copy_system_to_clipboard_reports(tree))
                     context_menu.add_separator()
