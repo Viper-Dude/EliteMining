@@ -7,18 +7,21 @@ The Enhanced Ring Finder is a major upgrade to EliteMining that provides compreh
 ## Key Features
 
 ### 🌐 Live Community Data (EDDN)
+
 - **Real-time Integration**: Connects to Elite Dangerous Data Network live stream
 - **Community Discoveries**: Receives mining hotspot discoveries from other commanders
 - **ZeroMQ Protocol**: Uses efficient ZeroMQ messaging for live data
 - **Automatic Processing**: Filters and processes fssbodysignals messages for mining hotspots
 
 ### 📊 Hybrid Data Sources
+
 - **EDDN Live Data**: Real-time community mining hotspot discoveries
 - **Local Database**: Comprehensive database with 98 verified hotspots
 - **EDSM Integration**: Enhanced coordinate data for accurate distance calculations
 - **Source Identification**: Clear indication of data source in results
 
 ### 🔍 Enhanced Search Capabilities
+
 - **Material Filtering**: Filter by specific mining materials
 - **Distance Calculations**: Calculate distances from current system
 - **Auto-Detection**: Automatically detect current system from game journals
@@ -27,9 +30,11 @@ The Enhanced Ring Finder is a major upgrade to EliteMining that provides compreh
 ## EDDN Integration Details
 
 ### What is EDDN?
+
 The Elite Dangerous Data Network (EDDN) is a community-driven live data feed that collects and distributes real-time game data from Elite Dangerous commanders worldwide.
 
 ### How It Works
+
 1. **Connection**: Connects to `tcp://eddn.edcd.io:9500` using ZeroMQ
 2. **Message Processing**: Listens for `fssbodysignals` schema messages
 3. **Hotspot Detection**: Identifies mining hotspot signals from FSS scans
@@ -37,6 +42,7 @@ The Elite Dangerous Data Network (EDDN) is a community-driven live data feed tha
 5. **Real-time Updates**: Provides immediate access to community discoveries
 
 ### Supported Materials
+
 - **Platinum**: High-value core mining
 - **Low Temperature Diamonds**: Premium core mining
 - **Painite**: Laser mining
@@ -48,19 +54,22 @@ The Elite Dangerous Data Network (EDDN) is a community-driven live data feed tha
 ## Installation Requirements
 
 ### Dependencies
+
 ```bash
 pip install pyzmq  # For EDDN integration
 pip install requests  # For EDSM API
 ```
 
 ### Optional Components
+
 - **EDSM API**: Enhanced coordinate data (requires API key)
 - **Game Journal Detection**: Automatic current system detection
 
 ## Usage Guide
 
 ### 1. Basic Search
-```
+
+```text
 1. Enter system name in "Search System" field
 2. Select material filter (optional)
 3. Set maximum distance limit
@@ -68,7 +77,8 @@ pip install requests  # For EDSM API
 ```
 
 ### 2. EDDN Live Data
-```
+
+```text
 1. Click "Connect to EDDN" button
 2. Status will show "Connected" when active
 3. Live discoveries will appear with "EDDN Live" source
@@ -76,7 +86,8 @@ pip install requests  # For EDSM API
 ```
 
 ### 3. Distance Calculations
-```
+
+```text
 1. Enter current system in "Current System" field
 2. Click "Auto-Detect" to get from game journal
 3. Results will show accurate distances in light years
@@ -85,17 +96,20 @@ pip install requests  # For EDSM API
 ## User Interface
 
 ### Search Controls
+
 - **Search System**: Target system name (partial matches supported)
 - **Current System**: Your current location for distance calculations
 - **Material Filter**: Filter results by mining material type
 - **Max Distance**: Limit results by distance from current system
 
 ### EDDN Controls
+
 - **Status Indicator**: Shows EDDN connection status
 - **Connect/Disconnect**: Toggle EDDN live data stream
 - **Info Display**: Shows EDDN availability and requirements
 
 ### Results Display
+
 - **Source Column**: Indicates data source (EDDN Live / Local DB)
 - **Distance**: Light years from current system
 - **System**: Target system name
@@ -108,7 +122,8 @@ pip install requests  # For EDSM API
 ## Technical Architecture
 
 ### Data Flow
-```
+
+```text
 EDDN Stream → ZeroMQ → Message Processing → Data Integration → UI Display
      ↓
 Local Database → Coordinate Enhancement → Distance Calculation → Results
@@ -117,6 +132,7 @@ EDSM API → System Coordinates → Distance Validation → Final Results
 ```
 
 ### Error Handling
+
 - **Graceful Degradation**: Falls back to local database if EDDN fails
 - **Dependency Checking**: Automatically detects ZeroMQ availability
 - **Connection Recovery**: Handles network interruptions gracefully
@@ -125,7 +141,9 @@ EDSM API → System Coordinates → Distance Validation → Final Results
 ## Configuration
 
 ### EDSM API Key (Optional)
+
 Add to `config.json`:
+
 ```json
 {
   "edsm_api_key": "your_api_key_here"
@@ -133,6 +151,7 @@ Add to `config.json`:
 ```
 
 ### EDDN Settings
+
 - **Auto-Connect**: Can be enabled in Interface Options
 - **Cache Limits**: Live data limited to 1000 recent entries
 - **Timeout Settings**: Configurable connection timeouts
@@ -189,6 +208,7 @@ Enable debug output in console to see:
 - **Data Export**: Export hotspot data to various formats
 
 ### Community Integration
+
 - **Data Contribution**: Automatic sharing of discoveries
 - **Verification System**: Community validation of hotspot data
 - **Mining Reports**: Integration with mining session tracking
