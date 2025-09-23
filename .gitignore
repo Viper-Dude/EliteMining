@@ -51,3 +51,35 @@ test_*.py
 *prompts*
 copilot-instructions.md
 *.instructions.md
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# User-specific data
+config.json.backup
+mining_bookmarks.json.backup
+*.user
+*.local
+
+# Development/Debug files
+debug.log
+*.debug
+crash_*.txt
+
+# Windows specific
+desktop.ini
+ehthumbs.db
+
+# Archive files (unless needed for releases)
+*.zip
+*.7z
+*.tar.gz
+
+# Personal notes
+notes.txt
+todo.txt
+*.notes
