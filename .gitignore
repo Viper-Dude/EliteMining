@@ -46,3 +46,8 @@ EliteMiningSetup.exe
 
 # Test files
 test_*.py
+
+# Personal/Private files
+*prompts*
+copilot-instructions.md
+*.instructions.md
