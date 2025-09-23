@@ -39,6 +39,7 @@ backup_*
 
 # VoiceAttack profile
 *.vap
+!EliteMining-Profile.vap
 
 # Installer output
 Output/
