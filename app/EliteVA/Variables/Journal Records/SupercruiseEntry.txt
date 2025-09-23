@@ -1,0 +1,8 @@
+ ### ((EliteAPI.SupercruiseEntry)) ###
+
+{DATE:EliteAPI.SupercruiseEntry.timestamp}
+{BOOL:EliteAPI.SupercruiseEntry.Taxi}
+{TXT:EliteAPI.SupercruiseEntry.SystemAddress}
+{TXT:EliteAPI.SupercruiseEntry.StarSystem}
+{BOOL:EliteAPI.SupercruiseEntry.Multicrew}
+{TXT:EliteAPI.SupercruiseEntry.event}

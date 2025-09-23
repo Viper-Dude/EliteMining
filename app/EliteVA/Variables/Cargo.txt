@@ -1,0 +1,16 @@
+ ###  Cargo.json  ### 
+{DATE:EliteAPI.Cargo.timestamp}: 09.09.2025 09:43:19
+ {TXT:EliteAPI.Cargo.event}: Cargo
+ {TXT:EliteAPI.Cargo.Vessel}: Ship
+ {INT:EliteAPI.Cargo.Count}: 386
+ {TXT:EliteAPI.Cargo.Inventory[0].Name}: platinum
+ {INT:EliteAPI.Cargo.Inventory[0].Count}: 224
+ {INT:EliteAPI.Cargo.Inventory[0].Stolen}: 0
+ {TXT:EliteAPI.Cargo.Inventory[1].Name}: osmium
+ {INT:EliteAPI.Cargo.Inventory[1].Count}: 9
+ {INT:EliteAPI.Cargo.Inventory[1].Stolen}: 0
+ {TXT:EliteAPI.Cargo.Inventory[2].Name}: drones
+ {TXT:EliteAPI.Cargo.Inventory[2].Name_Localised}: Limpet
+ {INT:EliteAPI.Cargo.Inventory[2].Count}: 153
+ {INT:EliteAPI.Cargo.Inventory[2].Stolen}: 0
+ {INT:EliteAPI.Cargo.Inventory.Length}: 3

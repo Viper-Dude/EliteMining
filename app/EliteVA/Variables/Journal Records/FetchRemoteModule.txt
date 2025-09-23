@@ -1,0 +1,12 @@
+ ### ((EliteAPI.FetchRemoteModule)) ###
+
+{INT:EliteAPI.FetchRemoteModule.TransferTime}
+{INT:EliteAPI.FetchRemoteModule.TransferCost}
+{DATE:EliteAPI.FetchRemoteModule.timestamp}
+{TXT:EliteAPI.FetchRemoteModule.StoredItem_Localised}
+{TXT:EliteAPI.FetchRemoteModule.StoredItem}
+{INT:EliteAPI.FetchRemoteModule.StorageSlot}
+{TXT:EliteAPI.FetchRemoteModule.ShipID}
+{TXT:EliteAPI.FetchRemoteModule.Ship}
+{TXT:EliteAPI.FetchRemoteModule.ServerId}
+{TXT:EliteAPI.FetchRemoteModule.event}

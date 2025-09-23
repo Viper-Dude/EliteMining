@@ -1,0 +1,10 @@
+ ### ((EliteAPI.EngineerProgress)) ###
+
+{DATE:EliteAPI.EngineerProgress.timestamp}
+{TXT:EliteAPI.EngineerProgress.event}
+{INT:EliteAPI.EngineerProgress.Engineers[n].RankProgress}
+{INT:EliteAPI.EngineerProgress.Engineers[n].Rank}
+{TXT:EliteAPI.EngineerProgress.Engineers[n].Progress}
+{TXT:EliteAPI.EngineerProgress.Engineers[n].EngineerID}
+{TXT:EliteAPI.EngineerProgress.Engineers[n].Engineer}
+{INT:EliteAPI.EngineerProgress.Engineers.Length}

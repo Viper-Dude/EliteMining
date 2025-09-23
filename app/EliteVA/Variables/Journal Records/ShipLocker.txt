@@ -1,0 +1,12 @@
+ ### ((EliteAPI.ShipLocker)) ###
+
+{DATE:EliteAPI.ShipLocker.timestamp}
+{INT:EliteAPI.ShipLocker.Items.Length}
+{TXT:EliteAPI.ShipLocker.event}
+{INT:EliteAPI.ShipLocker.Data.Length}
+{INT:EliteAPI.ShipLocker.Consumables.Length}
+{TXT:EliteAPI.ShipLocker.Components[n].OwnerID}
+{TXT:EliteAPI.ShipLocker.Components[n].Name_Localised}
+{TXT:EliteAPI.ShipLocker.Components[n].Name}
+{INT:EliteAPI.ShipLocker.Components[n].Count}
+{INT:EliteAPI.ShipLocker.Components.Length}

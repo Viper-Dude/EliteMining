@@ -1,0 +1,21 @@
+ ### ((EliteAPI.StoredModules)) ###
+
+{DATE:EliteAPI.StoredModules.timestamp}
+{TXT:EliteAPI.StoredModules.StationName}
+{TXT:EliteAPI.StoredModules.StarSystem}
+{TXT:EliteAPI.StoredModules.MarketID}
+{INT:EliteAPI.StoredModules.Items[n].TransferTime}
+{INT:EliteAPI.StoredModules.Items[n].TransferCost}
+{INT:EliteAPI.StoredModules.Items[n].StorageSlot}
+{TXT:EliteAPI.StoredModules.Items[n].StarSystem}
+{DEC:EliteAPI.StoredModules.Items[n].Quality}
+{TXT:EliteAPI.StoredModules.Items[n].Name_Localised}
+{TXT:EliteAPI.StoredModules.Items[n].Name}
+{TXT:EliteAPI.StoredModules.Items[n].MarketID}
+{INT:EliteAPI.StoredModules.Items[n].Level}
+{BOOL:EliteAPI.StoredModules.Items[n].InTransit}
+{BOOL:EliteAPI.StoredModules.Items[n].Hot}
+{TXT:EliteAPI.StoredModules.Items[n].EngineerModifications}
+{INT:EliteAPI.StoredModules.Items[n].BuyPrice}
+{INT:EliteAPI.StoredModules.Items.Length}
+{TXT:EliteAPI.StoredModules.event}

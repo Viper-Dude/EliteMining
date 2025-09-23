@@ -1,0 +1,26 @@
+ ### ((EliteAPI.Docked)) ###
+
+{DATE:EliteAPI.Docked.timestamp}
+{BOOL:EliteAPI.Docked.Taxi}
+{TXT:EliteAPI.Docked.SystemAddress}
+{TXT:EliteAPI.Docked.StationType}
+{TXT:EliteAPI.Docked.StationServices[n]}
+{INT:EliteAPI.Docked.StationServices.Length}
+{TXT:EliteAPI.Docked.StationName}
+{TXT:EliteAPI.Docked.StationGovernment_Localised}
+{TXT:EliteAPI.Docked.StationGovernment}
+{TXT:EliteAPI.Docked.StationFaction.Name}
+{TXT:EliteAPI.Docked.StationEconomy_Localised}
+{TXT:EliteAPI.Docked.StationEconomy}
+{DEC:EliteAPI.Docked.StationEconomies[n].Proportion}
+{TXT:EliteAPI.Docked.StationEconomies[n].Name_Localised}
+{TXT:EliteAPI.Docked.StationEconomies[n].Name}
+{INT:EliteAPI.Docked.StationEconomies.Length}
+{TXT:EliteAPI.Docked.StarSystem}
+{BOOL:EliteAPI.Docked.Multicrew}
+{TXT:EliteAPI.Docked.MarketID}
+{INT:EliteAPI.Docked.LandingPads.Small}
+{INT:EliteAPI.Docked.LandingPads.Medium}
+{INT:EliteAPI.Docked.LandingPads.Large}
+{TXT:EliteAPI.Docked.event}
+{DEC:EliteAPI.Docked.DistFromStarLS}

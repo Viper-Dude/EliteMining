@@ -1,0 +1,32 @@
+[
+  {
+    "system": "Omicron Capricorni B",
+    "body": "B 1 A Ring",
+    "hotspot": "",
+    "materials": "Osmium",
+    "avg_yield": "442.5 T/hr",
+    "last_mined": "2025-09-19",
+    "notes": "",
+    "date_added": "2025-09-20"
+  },
+  {
+    "system": "Coalsack Sector CL-O b6-5",
+    "body": "3 B Ring",
+    "hotspot": "",
+    "materials": "Bromellite",
+    "avg_yield": "62.2 T/hr",
+    "last_mined": "2025-09-19",
+    "notes": "",
+    "date_added": "2025-09-20"
+  },
+  {
+    "system": "Omicron Capricorni B",
+    "body": "B 1 A Ring",
+    "hotspot": "",
+    "materials": "Osmium, Painite, Platinum",
+    "avg_yield": "442.5 T/hr",
+    "last_mined": "2025-09-19",
+    "notes": "",
+    "date_added": "2025-09-20"
+  }
+]

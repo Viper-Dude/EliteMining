@@ -1,0 +1,16 @@
+ ### ((EliteAPI.ShipTargeted)) ###
+
+{DATE:EliteAPI.ShipTargeted.timestamp}
+{BOOL:EliteAPI.ShipTargeted.TargetLocked}
+{TXT:EliteAPI.ShipTargeted.Ship_Localised}
+{TXT:EliteAPI.ShipTargeted.Ship}
+{DEC:EliteAPI.ShipTargeted.ShieldHealth}
+{INT:EliteAPI.ShipTargeted.ScanStage}
+{TXT:EliteAPI.ShipTargeted.PilotRank}
+{TXT:EliteAPI.ShipTargeted.PilotName_Localised}
+{TXT:EliteAPI.ShipTargeted.PilotName}
+{TXT:EliteAPI.ShipTargeted.LegalStatus}
+{DEC:EliteAPI.ShipTargeted.HullHealth}
+{TXT:EliteAPI.ShipTargeted.Faction}
+{TXT:EliteAPI.ShipTargeted.event}
+{INT:EliteAPI.ShipTargeted.Bounty}

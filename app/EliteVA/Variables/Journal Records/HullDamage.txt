@@ -1,0 +1,7 @@
+ ### ((EliteAPI.HullDamage)) ###
+
+{DATE:EliteAPI.HullDamage.timestamp}
+{BOOL:EliteAPI.HullDamage.PlayerPilot}
+{DEC:EliteAPI.HullDamage.Health}
+{BOOL:EliteAPI.HullDamage.Fighter}
+{TXT:EliteAPI.HullDamage.event}

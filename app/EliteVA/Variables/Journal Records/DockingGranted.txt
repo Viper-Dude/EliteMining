@@ -1,0 +1,8 @@
+ ### ((EliteAPI.DockingGranted)) ###
+
+{DATE:EliteAPI.DockingGranted.timestamp}
+{TXT:EliteAPI.DockingGranted.StationType}
+{TXT:EliteAPI.DockingGranted.StationName}
+{TXT:EliteAPI.DockingGranted.MarketID}
+{INT:EliteAPI.DockingGranted.LandingPad}
+{TXT:EliteAPI.DockingGranted.event}

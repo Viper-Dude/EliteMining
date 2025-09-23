@@ -1,0 +1,1803 @@
+ ###  Shutdown  ### 
+{DATE:EliteAPI.Shutdown.timestamp}: 09.09.2025 09:56:08
+ {TXT:EliteAPI.Shutdown.event}: Shutdown
+
+ ###  ReservoirReplenished  ### 
+{DATE:EliteAPI.ReservoirReplenished.timestamp}: 09.09.2025 09:52:33
+ {TXT:EliteAPI.ReservoirReplenished.event}: ReservoirReplenished
+ {DEC:EliteAPI.ReservoirReplenished.FuelMain}: 37,320004
+ {DEC:EliteAPI.ReservoirReplenished.FuelReservoir}: 1,16
+
+ ###  MiningRefined  ### 
+{DATE:EliteAPI.MiningRefined.timestamp}: 09.09.2025 09:43:16
+ {TXT:EliteAPI.MiningRefined.event}: MiningRefined
+ {TXT:EliteAPI.MiningRefined.Type}: $platinum_name;
+ {TXT:EliteAPI.MiningRefined.Type_Localised}: Platinum
+
+ ###  ProspectedAsteroid  ### 
+{DATE:EliteAPI.ProspectedAsteroid.timestamp}: 09.09.2025 09:42:22
+ {TXT:EliteAPI.ProspectedAsteroid.event}: ProspectedAsteroid
+ {TXT:EliteAPI.ProspectedAsteroid.Materials[0].Name}: Bertrandite
+ {DEC:EliteAPI.ProspectedAsteroid.Materials[0].Proportion}: 30,120602
+ {TXT:EliteAPI.ProspectedAsteroid.Materials[1].Name}: Indite
+ {DEC:EliteAPI.ProspectedAsteroid.Materials[1].Proportion}: 5,595717
+ {TXT:EliteAPI.ProspectedAsteroid.Materials[2].Name}: Gallite
+ {DEC:EliteAPI.ProspectedAsteroid.Materials[2].Proportion}: 5,594963
+ {TXT:EliteAPI.ProspectedAsteroid.Content}: $AsteroidMaterialContent_Medium;
+ {TXT:EliteAPI.ProspectedAsteroid.Content_Localised}: Material Content: Medium
+ {DEC:EliteAPI.ProspectedAsteroid.Remaining}: 100,0
+ {INT:EliteAPI.ProspectedAsteroid.Materials.Length}: 3
+
+ ###  LaunchDrone  ### 
+{DATE:EliteAPI.LaunchDrone.timestamp}: 09.09.2025 09:42:07
+ {TXT:EliteAPI.LaunchDrone.event}: LaunchDrone
+ {TXT:EliteAPI.LaunchDrone.Type}: Prospector
+
+ ###  Friends  ### 
+{DATE:EliteAPI.Friends.timestamp}: 09.09.2025 08:46:41
+ {TXT:EliteAPI.Friends.event}: Friends
+ {TXT:EliteAPI.Friends.Status}: Online
+ {TXT:EliteAPI.Friends.Name}: DocMav82
+
+ ###  Music  ### 
+{DATE:EliteAPI.Music.timestamp}: 09.09.2025 07:27:24
+ {TXT:EliteAPI.Music.event}: Music
+ {TXT:EliteAPI.Music.MusicTrack}: Exploration
+
+ ###  Loadout  ### 
+{DATE:EliteAPI.Loadout.timestamp}: 09.09.2025 07:27:24
+ {TXT:EliteAPI.Loadout.event}: Loadout
+ {TXT:EliteAPI.Loadout.Ship}: cutter
+ {TXT:EliteAPI.Loadout.ShipID}: 29
+ {TXT:EliteAPI.Loadout.ShipName}: grabber
+ {TXT:EliteAPI.Loadout.ShipIdent}: 7ven
+ {INT:EliteAPI.Loadout.HullValue}: 175924977
+ {INT:EliteAPI.Loadout.ModulesValue}: 348967536
+ {DEC:EliteAPI.Loadout.HullHealth}: 1,0
+ {DEC:EliteAPI.Loadout.UnladenMass}: 1852,5
+ {INT:EliteAPI.Loadout.CargoCapacity}: 512
+ {DEC:EliteAPI.Loadout.MaxJumpRange}: 32,046974
+ {DEC:EliteAPI.Loadout.FuelCapacity.Main}: 64,0
+ {DEC:EliteAPI.Loadout.FuelCapacity.Reserve}: 1,16
+ {INT:EliteAPI.Loadout.Rebuy}: 26244626
+ {TXT:EliteAPI.Loadout.Modules[0].Slot}: MediumHardpoint2
+ {TXT:EliteAPI.Loadout.Modules[0].Item}: hpt_mininglaser_fixed_medium
+{BOOL:EliteAPI.Loadout.Modules[0].On}: True
+ {INT:EliteAPI.Loadout.Modules[0].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[0].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[0].Value}: 22012
+ {TXT:EliteAPI.Loadout.Modules[1].Slot}: MediumHardpoint1
+ {TXT:EliteAPI.Loadout.Modules[1].Item}: hpt_mininglaser_fixed_medium
+{BOOL:EliteAPI.Loadout.Modules[1].On}: True
+ {INT:EliteAPI.Loadout.Modules[1].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[1].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[1].Value}: 22012
+ {TXT:EliteAPI.Loadout.Modules[2].Slot}: MediumHardpoint4
+ {TXT:EliteAPI.Loadout.Modules[2].Item}: hpt_mininglaser_fixed_small
+{BOOL:EliteAPI.Loadout.Modules[2].On}: True
+ {INT:EliteAPI.Loadout.Modules[2].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[2].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Engineer}: Selene Jean
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.EngineerID}: 300210
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.BlueprintID}: 128673614
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.BlueprintName}: Weapon_LongRange
+ {INT:EliteAPI.Loadout.Modules[2].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Quality}: 0,0
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.ExperimentalEffect}: special_incendiary_rounds
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.ExperimentalEffect_Localised}: Incendiary Rounds
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[0].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[0].Value}: 20,0
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[0].OriginalValue}: 40,0
+ {INT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[1].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[1].Value}: 0,25
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[1].OriginalValue}: 0,5
+ {INT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[1].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[2].Label}: DamagePerSecond
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[2].Value}: 1,9
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[2].OriginalValue}: 2,0
+ {INT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[3].Label}: DistributorDraw
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[3].Value}: 0,75
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[3].OriginalValue}: 1,5
+ {INT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[3].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[4].Label}: ThermalLoad
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[4].Value}: 1,02
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[4].OriginalValue}: 2,0
+ {INT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[4].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[5].Label}: MaximumRange
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[5].Value}: 2500,0
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[5].OriginalValue}: 500,0
+ {INT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[5].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[6].Label}: DamageType
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[6].ValueStr}: $Thermic;
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[6].ValueStr_Localised}: Thermal
+ {TXT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[7].Label}: DamageFalloffRange
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[7].Value}: 2500,0
+ {DEC:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[7].OriginalValue}: 300,0
+ {INT:EliteAPI.Loadout.Modules[2].Engineering.Modifiers[7].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[3].Slot}: MediumHardpoint3
+ {TXT:EliteAPI.Loadout.Modules[3].Item}: hpt_mininglaser_fixed_small
+{BOOL:EliteAPI.Loadout.Modules[3].On}: True
+ {INT:EliteAPI.Loadout.Modules[3].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[3].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Engineer}: Selene Jean
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.EngineerID}: 300210
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.BlueprintID}: 128673614
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.BlueprintName}: Weapon_LongRange
+ {INT:EliteAPI.Loadout.Modules[3].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Quality}: 0,0
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.ExperimentalEffect}: special_incendiary_rounds
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.ExperimentalEffect_Localised}: Incendiary Rounds
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[0].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[0].Value}: 20,0
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[0].OriginalValue}: 40,0
+ {INT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[1].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[1].Value}: 0,25
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[1].OriginalValue}: 0,5
+ {INT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[1].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[2].Label}: DamagePerSecond
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[2].Value}: 1,9
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[2].OriginalValue}: 2,0
+ {INT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[3].Label}: DistributorDraw
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[3].Value}: 0,75
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[3].OriginalValue}: 1,5
+ {INT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[3].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[4].Label}: ThermalLoad
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[4].Value}: 1,02
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[4].OriginalValue}: 2,0
+ {INT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[4].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[5].Label}: MaximumRange
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[5].Value}: 2500,0
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[5].OriginalValue}: 500,0
+ {INT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[5].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[6].Label}: DamageType
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[6].ValueStr}: $Thermic;
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[6].ValueStr_Localised}: Thermal
+ {TXT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[7].Label}: DamageFalloffRange
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[7].Value}: 2500,0
+ {DEC:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[7].OriginalValue}: 300,0
+ {INT:EliteAPI.Loadout.Modules[3].Engineering.Modifiers[7].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[4].Slot}: LargeHardpoint2
+ {TXT:EliteAPI.Loadout.Modules[4].Item}: hpt_mininglaser_fixed_small
+{BOOL:EliteAPI.Loadout.Modules[4].On}: True
+ {INT:EliteAPI.Loadout.Modules[4].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[4].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Engineer}: Selene Jean
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.EngineerID}: 300210
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.BlueprintID}: 128673614
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.BlueprintName}: Weapon_LongRange
+ {INT:EliteAPI.Loadout.Modules[4].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Quality}: 0,0
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.ExperimentalEffect}: special_incendiary_rounds
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.ExperimentalEffect_Localised}: Incendiary Rounds
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[0].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[0].Value}: 20,0
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[0].OriginalValue}: 40,0
+ {INT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[1].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[1].Value}: 0,25
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[1].OriginalValue}: 0,5
+ {INT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[1].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[2].Label}: DamagePerSecond
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[2].Value}: 1,9
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[2].OriginalValue}: 2,0
+ {INT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[3].Label}: DistributorDraw
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[3].Value}: 0,75
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[3].OriginalValue}: 1,5
+ {INT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[3].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[4].Label}: ThermalLoad
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[4].Value}: 1,02
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[4].OriginalValue}: 2,0
+ {INT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[4].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[5].Label}: MaximumRange
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[5].Value}: 2500,0
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[5].OriginalValue}: 500,0
+ {INT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[5].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[6].Label}: DamageType
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[6].ValueStr}: $Thermic;
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[6].ValueStr_Localised}: Thermal
+ {TXT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[7].Label}: DamageFalloffRange
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[7].Value}: 2500,0
+ {DEC:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[7].OriginalValue}: 300,0
+ {INT:EliteAPI.Loadout.Modules[4].Engineering.Modifiers[7].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[5].Slot}: LargeHardpoint1
+ {TXT:EliteAPI.Loadout.Modules[5].Item}: hpt_mininglaser_fixed_small
+{BOOL:EliteAPI.Loadout.Modules[5].On}: True
+ {INT:EliteAPI.Loadout.Modules[5].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[5].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Engineer}: Selene Jean
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.EngineerID}: 300210
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.BlueprintID}: 128673614
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.BlueprintName}: Weapon_LongRange
+ {INT:EliteAPI.Loadout.Modules[5].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Quality}: 0,0
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.ExperimentalEffect}: special_incendiary_rounds
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.ExperimentalEffect_Localised}: Incendiary Rounds
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[0].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[0].Value}: 20,0
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[0].OriginalValue}: 40,0
+ {INT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[1].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[1].Value}: 0,25
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[1].OriginalValue}: 0,5
+ {INT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[1].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[2].Label}: DamagePerSecond
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[2].Value}: 1,9
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[2].OriginalValue}: 2,0
+ {INT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[3].Label}: DistributorDraw
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[3].Value}: 0,75
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[3].OriginalValue}: 1,5
+ {INT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[3].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[4].Label}: ThermalLoad
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[4].Value}: 1,02
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[4].OriginalValue}: 2,0
+ {INT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[4].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[5].Label}: MaximumRange
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[5].Value}: 2500,0
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[5].OriginalValue}: 500,0
+ {INT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[5].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[6].Label}: DamageType
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[6].ValueStr}: $Thermic;
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[6].ValueStr_Localised}: Thermal
+ {TXT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[7].Label}: DamageFalloffRange
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[7].Value}: 2500,0
+ {DEC:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[7].OriginalValue}: 300,0
+ {INT:EliteAPI.Loadout.Modules[5].Engineering.Modifiers[7].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[6].Slot}: HugeHardpoint1
+ {TXT:EliteAPI.Loadout.Modules[6].Item}: hpt_mininglaser_fixed_medium
+{BOOL:EliteAPI.Loadout.Modules[6].On}: True
+ {INT:EliteAPI.Loadout.Modules[6].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[6].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[6].Value}: 22012
+ {TXT:EliteAPI.Loadout.Modules[7].Slot}: TinyHardpoint1
+ {TXT:EliteAPI.Loadout.Modules[7].Item}: hpt_shieldbooster_size0_class5
+{BOOL:EliteAPI.Loadout.Modules[7].On}: True
+ {INT:EliteAPI.Loadout.Modules[7].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[7].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[7].Value}: 246578
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.Engineer}: Didi Vatermann
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.EngineerID}: 300000
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.BlueprintID}: 128673794
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.BlueprintName}: ShieldBooster_Resistive
+ {INT:EliteAPI.Loadout.Modules[7].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.ExperimentalEffect}: special_shieldbooster_kinetic
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.ExperimentalEffect_Localised}: Force Block
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[0].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[0].Value}: 42,239998
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[0].OriginalValue}: 48,0
+ {INT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[1].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[1].Value}: 1,5
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[1].OriginalValue}: 1,2
+ {INT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[1].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[2].Label}: DefenceModifierShieldMultiplier
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[2].Value}: 18,800009
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[2].OriginalValue}: 20,000004
+ {INT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[3].Label}: KineticResistance
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[3].Value}: 18,660004
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[3].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[4].Label}: ThermicResistance
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[4].Value}: 17,000002
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[4].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[4].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[5].Label}: ExplosiveResistance
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[5].Value}: 17,000002
+ {DEC:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[5].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[7].Engineering.Modifiers[5].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[8].Slot}: TinyHardpoint2
+ {TXT:EliteAPI.Loadout.Modules[8].Item}: hpt_shieldbooster_size0_class5
+{BOOL:EliteAPI.Loadout.Modules[8].On}: True
+ {INT:EliteAPI.Loadout.Modules[8].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[8].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[8].Value}: 246578
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.Engineer}: Didi Vatermann
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.EngineerID}: 300000
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.BlueprintID}: 128673799
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.BlueprintName}: ShieldBooster_Thermic
+ {INT:EliteAPI.Loadout.Modules[8].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[8].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.ExperimentalEffect}: special_shieldbooster_chunky
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.ExperimentalEffect_Localised}: Super Capacitors
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[0].Label}: DefenceModifierShieldMultiplier
+ {DEC:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[0].Value}: 26,0
+ {DEC:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[0].OriginalValue}: 20,000004
+ {INT:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[1].Label}: KineticResistance
+ {DEC:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[1].Value}: -6,079996
+ {DEC:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[1].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[2].Label}: ThermicResistance
+ {DEC:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[2].Value}: 25,54
+ {DEC:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[2].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[3].Label}: ExplosiveResistance
+ {DEC:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[3].Value}: -6,079996
+ {DEC:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[3].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[8].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[9].Slot}: TinyHardpoint3
+ {TXT:EliteAPI.Loadout.Modules[9].Item}: hpt_shieldbooster_size0_class5
+{BOOL:EliteAPI.Loadout.Modules[9].On}: True
+ {INT:EliteAPI.Loadout.Modules[9].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[9].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[9].Value}: 246578
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.Engineer}: Didi Vatermann
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.EngineerID}: 300000
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.BlueprintID}: 128673784
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.BlueprintName}: ShieldBooster_HeavyDuty
+ {INT:EliteAPI.Loadout.Modules[9].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.ExperimentalEffect}: special_shieldbooster_chunky
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.ExperimentalEffect_Localised}: Super Capacitors
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[0].Label}: Mass
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[0].Value}: 14,0
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[0].OriginalValue}: 3,5
+ {INT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[0].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[1].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[1].Value}: 55,199997
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[1].OriginalValue}: 48,0
+ {INT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[2].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[2].Value}: 1,5
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[2].OriginalValue}: 1,2
+ {INT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[2].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[3].Label}: DefenceModifierShieldMultiplier
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[3].Value}: 73,87999
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[3].OriginalValue}: 20,000004
+ {INT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[4].Label}: KineticResistance
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[4].Value}: -1,999998
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[4].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[4].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[5].Label}: ThermicResistance
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[5].Value}: -1,999998
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[5].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[5].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[6].Label}: ExplosiveResistance
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[6].Value}: -1,999998
+ {DEC:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[6].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[9].Engineering.Modifiers[6].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[10].Slot}: TinyHardpoint4
+ {TXT:EliteAPI.Loadout.Modules[10].Item}: hpt_mrascanner_size0_class5
+{BOOL:EliteAPI.Loadout.Modules[10].On}: True
+ {INT:EliteAPI.Loadout.Modules[10].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[10].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[10].Value}: 1069668
+ {TXT:EliteAPI.Loadout.Modules[11].Slot}: TinyHardpoint5
+ {TXT:EliteAPI.Loadout.Modules[11].Item}: hpt_plasmapointdefence_turret_tiny
+{BOOL:EliteAPI.Loadout.Modules[11].On}: True
+ {INT:EliteAPI.Loadout.Modules[11].Priority}: 0
+ {INT:EliteAPI.Loadout.Modules[11].AmmoInClip}: 12
+ {INT:EliteAPI.Loadout.Modules[11].AmmoInHopper}: 10000
+ {DEC:EliteAPI.Loadout.Modules[11].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[11].Value}: 16275
+ {TXT:EliteAPI.Loadout.Modules[12].Slot}: TinyHardpoint6
+ {TXT:EliteAPI.Loadout.Modules[12].Item}: hpt_shieldbooster_size0_class5
+{BOOL:EliteAPI.Loadout.Modules[12].On}: True
+ {INT:EliteAPI.Loadout.Modules[12].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[12].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[12].Value}: 246578
+ {TXT:EliteAPI.Loadout.Modules[12].Engineering.Engineer}: Didi Vatermann
+ {TXT:EliteAPI.Loadout.Modules[12].Engineering.EngineerID}: 300000
+ {TXT:EliteAPI.Loadout.Modules[12].Engineering.BlueprintID}: 128673792
+ {TXT:EliteAPI.Loadout.Modules[12].Engineering.BlueprintName}: ShieldBooster_Resistive
+ {INT:EliteAPI.Loadout.Modules[12].Engineering.Level}: 3
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[0].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[0].Value}: 44,16
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[0].OriginalValue}: 48,0
+ {INT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[1].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[1].Value}: 1,38
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[1].OriginalValue}: 1,2
+ {INT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[1].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[2].Label}: KineticResistance
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[2].Value}: 11,000002
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[2].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[3].Label}: ThermicResistance
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[3].Value}: 11,000002
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[3].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[4].Label}: ExplosiveResistance
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[4].Value}: 11,000002
+ {DEC:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[4].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[12].Engineering.Modifiers[4].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[13].Slot}: TinyHardpoint7
+ {TXT:EliteAPI.Loadout.Modules[13].Item}: hpt_shieldbooster_size0_class5
+{BOOL:EliteAPI.Loadout.Modules[13].On}: True
+ {INT:EliteAPI.Loadout.Modules[13].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[13].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[13].Value}: 273975
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.Engineer}: Didi Vatermann
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.EngineerID}: 300000
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.BlueprintID}: 128673794
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.BlueprintName}: ShieldBooster_Resistive
+ {INT:EliteAPI.Loadout.Modules[13].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.ExperimentalEffect}: special_shieldbooster_kinetic
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.ExperimentalEffect_Localised}: Force Block
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[0].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[0].Value}: 42,239998
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[0].OriginalValue}: 48,0
+ {INT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[1].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[1].Value}: 1,5
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[1].OriginalValue}: 1,2
+ {INT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[1].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[2].Label}: DefenceModifierShieldMultiplier
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[2].Value}: 18,800009
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[2].OriginalValue}: 20,000004
+ {INT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[3].Label}: KineticResistance
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[3].Value}: 18,660004
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[3].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[4].Label}: ThermicResistance
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[4].Value}: 17,000002
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[4].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[4].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[5].Label}: ExplosiveResistance
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[5].Value}: 17,000002
+ {DEC:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[5].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[13].Engineering.Modifiers[5].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[14].Slot}: TinyHardpoint8
+ {TXT:EliteAPI.Loadout.Modules[14].Item}: hpt_shieldbooster_size0_class5
+{BOOL:EliteAPI.Loadout.Modules[14].On}: True
+ {INT:EliteAPI.Loadout.Modules[14].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[14].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[14].Value}: 246578
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.Engineer}: Didi Vatermann
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.EngineerID}: 300000
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.BlueprintID}: 128673799
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.BlueprintName}: ShieldBooster_Thermic
+ {INT:EliteAPI.Loadout.Modules[14].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[14].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.ExperimentalEffect}: special_shieldbooster_chunky
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.ExperimentalEffect_Localised}: Super Capacitors
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[0].Label}: DefenceModifierShieldMultiplier
+ {DEC:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[0].Value}: 26,0
+ {DEC:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[0].OriginalValue}: 20,000004
+ {INT:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[1].Label}: KineticResistance
+ {DEC:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[1].Value}: -6,079996
+ {DEC:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[1].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[2].Label}: ThermicResistance
+ {DEC:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[2].Value}: 25,54
+ {DEC:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[2].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[3].Label}: ExplosiveResistance
+ {DEC:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[3].Value}: -6,079996
+ {DEC:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[3].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[14].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[15].Slot}: PaintJob
+ {TXT:EliteAPI.Loadout.Modules[15].Item}: paintjob_cutter_vibrant_purple
+{BOOL:EliteAPI.Loadout.Modules[15].On}: True
+ {INT:EliteAPI.Loadout.Modules[15].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[15].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[16].Slot}: Decal1
+ {TXT:EliteAPI.Loadout.Modules[16].Item}: decal_explorer_elite
+{BOOL:EliteAPI.Loadout.Modules[16].On}: True
+ {INT:EliteAPI.Loadout.Modules[16].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[16].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[17].Slot}: Decal2
+ {TXT:EliteAPI.Loadout.Modules[17].Item}: decal_explorer_elite
+{BOOL:EliteAPI.Loadout.Modules[17].On}: True
+ {INT:EliteAPI.Loadout.Modules[17].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[17].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[18].Slot}: Decal3
+ {TXT:EliteAPI.Loadout.Modules[18].Item}: decal_explorer_elite
+{BOOL:EliteAPI.Loadout.Modules[18].On}: True
+ {INT:EliteAPI.Loadout.Modules[18].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[18].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[19].Slot}: ShipName0
+ {TXT:EliteAPI.Loadout.Modules[19].Item}: nameplate_wings01_grey
+{BOOL:EliteAPI.Loadout.Modules[19].On}: True
+ {INT:EliteAPI.Loadout.Modules[19].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[19].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[20].Slot}: ShipName1
+ {TXT:EliteAPI.Loadout.Modules[20].Item}: nameplate_wings01_black
+{BOOL:EliteAPI.Loadout.Modules[20].On}: True
+ {INT:EliteAPI.Loadout.Modules[20].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[20].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[21].Slot}: Armour
+ {TXT:EliteAPI.Loadout.Modules[21].Item}: cutter_armour_grade1
+{BOOL:EliteAPI.Loadout.Modules[21].On}: True
+ {INT:EliteAPI.Loadout.Modules[21].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[21].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[21].Engineering.Engineer}: Selene Jean
+ {TXT:EliteAPI.Loadout.Modules[21].Engineering.EngineerID}: 300210
+ {TXT:EliteAPI.Loadout.Modules[21].Engineering.BlueprintID}: 128673644
+ {TXT:EliteAPI.Loadout.Modules[21].Engineering.BlueprintName}: Armour_HeavyDuty
+ {INT:EliteAPI.Loadout.Modules[21].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[21].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[0].Label}: DefenceModifierHealthMultiplier
+ {DEC:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[0].Value}: 137,59999
+ {DEC:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[0].OriginalValue}: 79,99999
+ {INT:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[1].Label}: KineticResistance
+ {DEC:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[1].Value}: -13,999998
+ {DEC:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[1].OriginalValue}: -20,000004
+ {INT:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[2].Label}: ThermicResistance
+ {DEC:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[2].Value}: 5,000001
+ {DEC:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[2].OriginalValue}: 0,0
+ {INT:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[3].Label}: ExplosiveResistance
+ {DEC:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[3].Value}: -32,999992
+ {DEC:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[3].OriginalValue}: -39,999996
+ {INT:EliteAPI.Loadout.Modules[21].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[22].Slot}: PowerPlant
+ {TXT:EliteAPI.Loadout.Modules[22].Item}: int_powerplant_size8_class5
+{BOOL:EliteAPI.Loadout.Modules[22].On}: True
+ {INT:EliteAPI.Loadout.Modules[22].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[22].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[22].Value}: 102439239
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.Engineer}: Hera Tani
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.EngineerID}: 300090
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.BlueprintID}: 128673769
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.BlueprintName}: PowerPlant_Boosted
+ {INT:EliteAPI.Loadout.Modules[22].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[22].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.ExperimentalEffect}: special_powerplant_highcharge
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.ExperimentalEffect_Localised}: Monstered
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[0].Label}: Mass
+ {DEC:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[0].Value}: 88,0
+ {DEC:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[0].OriginalValue}: 80,0
+ {INT:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[0].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[1].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[1].Value}: 123,75
+ {DEC:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[1].OriginalValue}: 165,0
+ {INT:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[2].Label}: PowerCapacity
+ {DEC:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[2].Value}: 52,919994
+ {DEC:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[2].OriginalValue}: 36,0
+ {INT:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[3].Label}: HeatEfficiency
+ {DEC:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[3].Value}: 0,5
+ {DEC:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[3].OriginalValue}: 0,4
+ {INT:EliteAPI.Loadout.Modules[22].Engineering.Modifiers[3].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[23].Slot}: MainEngines
+ {TXT:EliteAPI.Loadout.Modules[23].Item}: int_engine_size8_class5
+{BOOL:EliteAPI.Loadout.Modules[23].On}: True
+ {INT:EliteAPI.Loadout.Modules[23].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[23].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[23].Value}: 142669643
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.Engineer}: Professor Palin
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.EngineerID}: 300220
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.BlueprintID}: 128673659
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.BlueprintName}: Engine_Dirty
+ {INT:EliteAPI.Loadout.Modules[23].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.ExperimentalEffect}: special_engine_overloaded
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.ExperimentalEffect_Localised}: Drag Drives
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[0].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[0].Value}: 140,25
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[0].OriginalValue}: 165,0
+ {INT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[1].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[1].Value}: 12,096001
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[1].OriginalValue}: 10,8
+ {INT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[1].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[2].Label}: EngineOptimalMass
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[2].Value}: 2940,0
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[2].OriginalValue}: 3360,0
+ {INT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[3].Label}: EngineOptPerformance
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[3].Value}: 145,59999
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[3].OriginalValue}: 100,0
+ {INT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[4].Label}: EngineHeatRate
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[4].Value}: 2,288
+ {DEC:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[4].OriginalValue}: 1,3
+ {INT:EliteAPI.Loadout.Modules[23].Engineering.Modifiers[4].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[24].Slot}: FrameShiftDrive
+ {TXT:EliteAPI.Loadout.Modules[24].Item}: int_hyperdrive_overcharge_size7_class5
+{BOOL:EliteAPI.Loadout.Modules[24].On}: True
+ {INT:EliteAPI.Loadout.Modules[24].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[24].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[24].Value}: 60008262
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.Engineer}: Elvira Martuuk
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.EngineerID}: 300160
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.BlueprintID}: 128673694
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.BlueprintName}: FSD_LongRange
+ {INT:EliteAPI.Loadout.Modules[24].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[24].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.ExperimentalEffect}: special_fsd_heavy
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.ExperimentalEffect_Localised}: Mass Manager
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[0].Label}: Mass
+ {DEC:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[0].Value}: 104,0
+ {DEC:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[0].OriginalValue}: 80,0
+ {INT:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[0].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[1].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[1].Value}: 128,24802
+ {DEC:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[1].OriginalValue}: 164,0
+ {INT:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[2].Label}: PowerDraw
+ {DEC:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[2].Value}: 1,035
+ {DEC:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[2].OriginalValue}: 0,9
+ {INT:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[2].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[3].Label}: FSDOptimalMass
+ {DEC:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[3].Value}: 4836,0
+ {DEC:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[3].OriginalValue}: 3000,0
+ {INT:EliteAPI.Loadout.Modules[24].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[25].Slot}: LifeSupport
+ {TXT:EliteAPI.Loadout.Modules[25].Item}: int_lifesupport_size7_class2
+{BOOL:EliteAPI.Loadout.Modules[25].On}: True
+ {INT:EliteAPI.Loadout.Modules[25].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[25].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[25].Value}: 546546
+ {TXT:EliteAPI.Loadout.Modules[25].Engineering.Engineer}: Bill Turner
+ {TXT:EliteAPI.Loadout.Modules[25].Engineering.EngineerID}: 300010
+ {TXT:EliteAPI.Loadout.Modules[25].Engineering.BlueprintID}: 128731493
+ {TXT:EliteAPI.Loadout.Modules[25].Engineering.BlueprintName}: Misc_LightWeight
+ {INT:EliteAPI.Loadout.Modules[25].Engineering.Level}: 3
+ {DEC:EliteAPI.Loadout.Modules[25].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[25].Engineering.Modifiers[0].Label}: Mass
+ {DEC:EliteAPI.Loadout.Modules[25].Engineering.Modifiers[0].Value}: 11,200001
+ {DEC:EliteAPI.Loadout.Modules[25].Engineering.Modifiers[0].OriginalValue}: 32,0
+ {INT:EliteAPI.Loadout.Modules[25].Engineering.Modifiers[0].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[25].Engineering.Modifiers[1].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[25].Engineering.Modifiers[1].Value}: 82,6
+ {DEC:EliteAPI.Loadout.Modules[25].Engineering.Modifiers[1].OriginalValue}: 118,0
+ {INT:EliteAPI.Loadout.Modules[25].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[26].Slot}: PowerDistributor
+ {TXT:EliteAPI.Loadout.Modules[26].Item}: int_powerdistributor_size7_class5
+{BOOL:EliteAPI.Loadout.Modules[26].On}: True
+ {INT:EliteAPI.Loadout.Modules[26].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[26].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[26].Value}: 9488627
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.Engineer}: The Dweller
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.EngineerID}: 300180
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.BlueprintID}: 128673754
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.BlueprintName}: PowerDistributor_PriorityWeapons
+ {INT:EliteAPI.Loadout.Modules[26].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.ExperimentalEffect}: special_powerdistributor_fast
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.ExperimentalEffect_Localised}: Super Conduits
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[0].Label}: WeaponsCapacity
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[0].Value}: 93,696
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[0].OriginalValue}: 61,0
+ {INT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[1].Label}: WeaponsRecharge
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[1].Value}: 9,13536
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[1].OriginalValue}: 6,1
+ {INT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[2].Label}: EnginesCapacity
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[2].Value}: 33,456
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[2].OriginalValue}: 41,0
+ {INT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[3].Label}: EnginesRecharge
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[3].Value}: 3,536
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[3].OriginalValue}: 4,0
+ {INT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[4].Label}: SystemsCapacity
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[4].Value}: 33,456
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[4].OriginalValue}: 41,0
+ {INT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[4].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[5].Label}: SystemsRecharge
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[5].Value}: 3,952
+ {DEC:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[5].OriginalValue}: 4,0
+ {INT:EliteAPI.Loadout.Modules[26].Engineering.Modifiers[5].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[27].Slot}: Radar
+ {TXT:EliteAPI.Loadout.Modules[27].Item}: int_sensors_size7_class2
+{BOOL:EliteAPI.Loadout.Modules[27].On}: True
+ {INT:EliteAPI.Loadout.Modules[27].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[27].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[27].Value}: 546546
+ {TXT:EliteAPI.Loadout.Modules[27].Engineering.Engineer}: Juri Ishmaak
+ {TXT:EliteAPI.Loadout.Modules[27].Engineering.EngineerID}: 300250
+ {TXT:EliteAPI.Loadout.Modules[27].Engineering.BlueprintID}: 128740136
+ {TXT:EliteAPI.Loadout.Modules[27].Engineering.BlueprintName}: Sensor_LongRange
+ {INT:EliteAPI.Loadout.Modules[27].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[27].Engineering.Quality}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[0].Label}: Mass
+ {DEC:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[0].Value}: 64,0
+ {DEC:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[0].OriginalValue}: 32,0
+ {INT:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[0].LessIsGood}: 1
+ {TXT:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[1].Label}: SensorTargetScanAngle
+ {DEC:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[1].Value}: 21,0
+ {DEC:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[1].OriginalValue}: 30,0
+ {INT:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[2].Label}: Range
+ {DEC:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[2].Value}: 9765,0
+ {DEC:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[2].OriginalValue}: 5580,0
+ {INT:EliteAPI.Loadout.Modules[27].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[28].Slot}: FuelTank
+ {TXT:EliteAPI.Loadout.Modules[28].Item}: int_fueltank_size6_class3
+{BOOL:EliteAPI.Loadout.Modules[28].On}: True
+ {INT:EliteAPI.Loadout.Modules[28].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[28].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[28].Value}: 299733
+ {TXT:EliteAPI.Loadout.Modules[29].Slot}: Slot01_Size8
+ {TXT:EliteAPI.Loadout.Modules[29].Item}: int_cargorack_size8_class1
+{BOOL:EliteAPI.Loadout.Modules[29].On}: True
+ {INT:EliteAPI.Loadout.Modules[29].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[29].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[29].Value}: 3360708
+ {TXT:EliteAPI.Loadout.Modules[30].Slot}: Slot02_Size8
+ {TXT:EliteAPI.Loadout.Modules[30].Item}: int_cargorack_size8_class1
+{BOOL:EliteAPI.Loadout.Modules[30].On}: True
+ {INT:EliteAPI.Loadout.Modules[30].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[30].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[30].Value}: 3360708
+ {TXT:EliteAPI.Loadout.Modules[31].Slot}: Slot03_Size6
+ {TXT:EliteAPI.Loadout.Modules[31].Item}: int_shieldgenerator_size6_class5
+{BOOL:EliteAPI.Loadout.Modules[31].On}: True
+ {INT:EliteAPI.Loadout.Modules[31].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[31].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[31].Value}: 14197539
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.Engineer}: Lei Cheung
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.EngineerID}: 300120
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.BlueprintID}: 128673844
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.BlueprintName}: ShieldGenerator_Thermic
+ {INT:EliteAPI.Loadout.Modules[31].Engineering.Level}: 5
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Quality}: 0,446
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.ExperimentalEffect}: special_shield_regenerative
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.ExperimentalEffect_Localised}: Fast Charge
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[0].Label}: Integrity
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[0].Value}: 186,6328
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[0].OriginalValue}: 136,0
+ {INT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[0].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[1].Label}: RegenRate
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[1].Value}: 1,5295
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[1].OriginalValue}: 1,33
+ {INT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[1].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[2].Label}: BrokenRegenRate
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[2].Value}: 6,1295
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[2].OriginalValue}: 5,33
+ {INT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[2].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[3].Label}: KineticResistance
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[3].Value}: 26,919996
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[3].OriginalValue}: 39,999996
+ {INT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[3].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[4].Label}: ThermicResistance
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[4].Value}: 33,497204
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[4].OriginalValue}: -20,000004
+ {INT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[4].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[5].Label}: ExplosiveResistance
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[5].Value}: 49,25
+ {DEC:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[5].OriginalValue}: 50,0
+ {INT:EliteAPI.Loadout.Modules[31].Engineering.Modifiers[5].LessIsGood}: 0
+ {TXT:EliteAPI.Loadout.Modules[32].Slot}: Slot04_Size6
+ {TXT:EliteAPI.Loadout.Modules[32].Item}: int_dronecontrol_collection_size5_class5
+{BOOL:EliteAPI.Loadout.Modules[32].On}: True
+ {INT:EliteAPI.Loadout.Modules[32].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[32].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[32].Value}: 758160
+ {TXT:EliteAPI.Loadout.Modules[33].Slot}: Slot05_Size6
+ {TXT:EliteAPI.Loadout.Modules[33].Item}: int_dronecontrol_collection_size5_class5
+{BOOL:EliteAPI.Loadout.Modules[33].On}: True
+ {INT:EliteAPI.Loadout.Modules[33].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[33].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[33].Value}: 682344
+ {TXT:EliteAPI.Loadout.Modules[34].Slot}: Slot06_Size5
+ {TXT:EliteAPI.Loadout.Modules[34].Item}: int_dronecontrol_collection_size5_class5
+{BOOL:EliteAPI.Loadout.Modules[34].On}: True
+ {INT:EliteAPI.Loadout.Modules[34].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[34].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[34].Value}: 758160
+ {TXT:EliteAPI.Loadout.Modules[35].Slot}: Slot07_Size5
+ {TXT:EliteAPI.Loadout.Modules[35].Item}: int_dronecontrol_prospector_size5_class5
+{BOOL:EliteAPI.Loadout.Modules[35].On}: True
+ {INT:EliteAPI.Loadout.Modules[35].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[35].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[35].Value}: 758160
+ {TXT:EliteAPI.Loadout.Modules[36].Slot}: Slot08_Size4
+ {TXT:EliteAPI.Loadout.Modules[36].Item}: int_refinery_size4_class5
+{BOOL:EliteAPI.Loadout.Modules[36].On}: True
+ {INT:EliteAPI.Loadout.Modules[36].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[36].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[36].Value}: 4388325
+ {TXT:EliteAPI.Loadout.Modules[37].Slot}: Slot09_Size3
+ {TXT:EliteAPI.Loadout.Modules[37].Item}: int_multidronecontrol_mining_size3_class3
+{BOOL:EliteAPI.Loadout.Modules[37].On}: True
+ {INT:EliteAPI.Loadout.Modules[37].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[37].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[37].Value}: 48750
+ {TXT:EliteAPI.Loadout.Modules[38].Slot}: Slot10_Size1
+ {TXT:EliteAPI.Loadout.Modules[38].Item}: int_detailedsurfacescanner_tiny
+{BOOL:EliteAPI.Loadout.Modules[38].On}: True
+ {INT:EliteAPI.Loadout.Modules[38].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[38].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[38].Value}: 250000
+ {TXT:EliteAPI.Loadout.Modules[39].Slot}: Military01
+ {TXT:EliteAPI.Loadout.Modules[39].Item}: int_guardianshieldreinforcement_size5_class2
+{BOOL:EliteAPI.Loadout.Modules[39].On}: True
+ {INT:EliteAPI.Loadout.Modules[39].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[39].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[39].Value}: 873402
+ {TXT:EliteAPI.Loadout.Modules[40].Slot}: Military02
+ {TXT:EliteAPI.Loadout.Modules[40].Item}: int_guardianshieldreinforcement_size5_class2
+{BOOL:EliteAPI.Loadout.Modules[40].On}: True
+ {INT:EliteAPI.Loadout.Modules[40].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[40].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[40].Value}: 873402
+ {TXT:EliteAPI.Loadout.Modules[41].Slot}: PlanetaryApproachSuite
+ {TXT:EliteAPI.Loadout.Modules[41].Item}: int_planetapproachsuite_advanced
+{BOOL:EliteAPI.Loadout.Modules[41].On}: True
+ {INT:EliteAPI.Loadout.Modules[41].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[41].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules[41].Value}: 438
+ {TXT:EliteAPI.Loadout.Modules[42].Slot}: Bobble01
+ {TXT:EliteAPI.Loadout.Modules[42].Item}: bobble_planet_earth
+{BOOL:EliteAPI.Loadout.Modules[42].On}: True
+ {INT:EliteAPI.Loadout.Modules[42].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[42].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[43].Slot}: Bobble04
+ {TXT:EliteAPI.Loadout.Modules[43].Item}: bobble_text7
+{BOOL:EliteAPI.Loadout.Modules[43].On}: True
+ {INT:EliteAPI.Loadout.Modules[43].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[43].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[44].Slot}: Bobble05
+ {TXT:EliteAPI.Loadout.Modules[44].Item}: bobble_textv
+{BOOL:EliteAPI.Loadout.Modules[44].On}: True
+ {INT:EliteAPI.Loadout.Modules[44].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[44].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[45].Slot}: Bobble06
+ {TXT:EliteAPI.Loadout.Modules[45].Item}: bobble_texte
+{BOOL:EliteAPI.Loadout.Modules[45].On}: True
+ {INT:EliteAPI.Loadout.Modules[45].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[45].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[46].Slot}: Bobble07
+ {TXT:EliteAPI.Loadout.Modules[46].Item}: bobble_textn
+{BOOL:EliteAPI.Loadout.Modules[46].On}: True
+ {INT:EliteAPI.Loadout.Modules[46].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[46].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[47].Slot}: Bobble10
+ {TXT:EliteAPI.Loadout.Modules[47].Item}: bobble_pilotfemale
+{BOOL:EliteAPI.Loadout.Modules[47].On}: True
+ {INT:EliteAPI.Loadout.Modules[47].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[47].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[48].Slot}: WeaponColour
+ {TXT:EliteAPI.Loadout.Modules[48].Item}: weaponcustomisation_purple
+{BOOL:EliteAPI.Loadout.Modules[48].On}: True
+ {INT:EliteAPI.Loadout.Modules[48].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[48].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[49].Slot}: EngineColour
+ {TXT:EliteAPI.Loadout.Modules[49].Item}: enginecustomisation_purple
+{BOOL:EliteAPI.Loadout.Modules[49].On}: True
+ {INT:EliteAPI.Loadout.Modules[49].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[49].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[50].Slot}: StringLights
+ {TXT:EliteAPI.Loadout.Modules[50].Item}: string_lights_thargoidprobe
+{BOOL:EliteAPI.Loadout.Modules[50].On}: True
+ {INT:EliteAPI.Loadout.Modules[50].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[50].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[51].Slot}: VesselVoice
+ {TXT:EliteAPI.Loadout.Modules[51].Item}: voicepack_verity
+{BOOL:EliteAPI.Loadout.Modules[51].On}: True
+ {INT:EliteAPI.Loadout.Modules[51].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[51].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[52].Slot}: ShipCockpit
+ {TXT:EliteAPI.Loadout.Modules[52].Item}: cutter_cockpit
+{BOOL:EliteAPI.Loadout.Modules[52].On}: True
+ {INT:EliteAPI.Loadout.Modules[52].Priority}: 1
+ {DEC:EliteAPI.Loadout.Modules[52].Health}: 1,0
+ {TXT:EliteAPI.Loadout.Modules[53].Slot}: CargoHatch
+ {TXT:EliteAPI.Loadout.Modules[53].Item}: modularcargobaydoor
+{BOOL:EliteAPI.Loadout.Modules[53].On}: True
+ {INT:EliteAPI.Loadout.Modules[53].Priority}: 0
+ {DEC:EliteAPI.Loadout.Modules[53].Health}: 1,0
+ {INT:EliteAPI.Loadout.Modules.Length}: 54
+
+ ###  SAASignalsFound  ### 
+{DATE:EliteAPI.SAASignalsFound.timestamp}: 09.09.2025 07:27:24
+ {TXT:EliteAPI.SAASignalsFound.event}: SAASignalsFound
+ {TXT:EliteAPI.SAASignalsFound.BodyName}: Paesia 2 A Ring
+ {TXT:EliteAPI.SAASignalsFound.SystemAddress}: 3657466647274
+ {TXT:EliteAPI.SAASignalsFound.BodyID}: 20
+ {TXT:EliteAPI.SAASignalsFound.Signals[0].Type}: Rhodplumsite
+ {INT:EliteAPI.SAASignalsFound.Signals[0].Count}: 1
+ {TXT:EliteAPI.SAASignalsFound.Signals[1].Type}: Painite
+ {INT:EliteAPI.SAASignalsFound.Signals[1].Count}: 1
+ {TXT:EliteAPI.SAASignalsFound.Signals[2].Type}: Platinum
+ {INT:EliteAPI.SAASignalsFound.Signals[2].Count}: 2
+ {INT:EliteAPI.SAASignalsFound.Signals.Length}: 3
+ {INT:EliteAPI.SAASignalsFound.Genuses.Length}: 0
+
+ ###  Missions  ### 
+{DATE:EliteAPI.Missions.timestamp}: 09.09.2025 07:27:24
+ {TXT:EliteAPI.Missions.event}: Missions
+ {INT:EliteAPI.Missions.Active.Length}: 0
+ {INT:EliteAPI.Missions.Failed.Length}: 0
+ {INT:EliteAPI.Missions.Complete.Length}: 0
+
+ ###  Powerplay  ### 
+{DATE:EliteAPI.Powerplay.timestamp}: 09.09.2025 07:27:24
+ {TXT:EliteAPI.Powerplay.event}: Powerplay
+ {TXT:EliteAPI.Powerplay.Power}: Aisling Duval
+ {INT:EliteAPI.Powerplay.Rank}: 82
+ {INT:EliteAPI.Powerplay.Merits}: 634116
+ {INT:EliteAPI.Powerplay.TimePledged}: 26620016
+
+ ###  Location  ### 
+{DATE:EliteAPI.Location.timestamp}: 09.09.2025 07:27:24
+ {TXT:EliteAPI.Location.event}: Location
+ {DEC:EliteAPI.Location.DistFromStarLS}: 821,3513
+{BOOL:EliteAPI.Location.Docked}: False
+{BOOL:EliteAPI.Location.Taxi}: False
+{BOOL:EliteAPI.Location.Multicrew}: False
+ {TXT:EliteAPI.Location.StarSystem}: Paesia
+ {TXT:EliteAPI.Location.SystemAddress}: 3657466647274
+ {DEC:EliteAPI.Location.StarPos[0]}: 107,59375
+ {DEC:EliteAPI.Location.StarPos[1]}: -15,0625
+ {DEC:EliteAPI.Location.StarPos[2]}: 130,4375
+ {TXT:EliteAPI.Location.SystemAllegiance}: Empire
+ {TXT:EliteAPI.Location.SystemEconomy}: $economy_Industrial;
+ {TXT:EliteAPI.Location.SystemEconomy_Localised}: Industrial
+ {TXT:EliteAPI.Location.SystemSecondEconomy}: $economy_Military;
+ {TXT:EliteAPI.Location.SystemSecondEconomy_Localised}: Military
+ {TXT:EliteAPI.Location.SystemGovernment}: $government_Corporate;
+ {TXT:EliteAPI.Location.SystemGovernment_Localised}: Corporate
+ {TXT:EliteAPI.Location.SystemSecurity}: $SYSTEM_SECURITY_medium;
+ {TXT:EliteAPI.Location.SystemSecurity_Localised}: Medium Security
+ {INT:EliteAPI.Location.Population}: 4603749
+ {TXT:EliteAPI.Location.Body}: Paesia 2 A Ring
+ {TXT:EliteAPI.Location.BodyID}: 20
+ {TXT:EliteAPI.Location.BodyType}: PlanetaryRing
+ {TXT:EliteAPI.Location.ControllingPower}: Aisling Duval
+ {TXT:EliteAPI.Location.Powers[0]}: Aisling Duval
+ {TXT:EliteAPI.Location.Powers[1]}: Nakato Kaine
+ {TXT:EliteAPI.Location.PowerplayState}: Stronghold
+ {DEC:EliteAPI.Location.PowerplayStateControlProgress}: 1,221744
+ {INT:EliteAPI.Location.PowerplayStateReinforcement}: 377994
+ {INT:EliteAPI.Location.PowerplayStateUndermining}: 156250
+ {TXT:EliteAPI.Location.Factions[0].Name}: Paesia Future
+ {TXT:EliteAPI.Location.Factions[0].FactionState}: None
+ {TXT:EliteAPI.Location.Factions[0].Government}: Democracy
+ {DEC:EliteAPI.Location.Factions[0].Influence}: 0,038423
+ {TXT:EliteAPI.Location.Factions[0].Allegiance}: Federation
+ {TXT:EliteAPI.Location.Factions[0].Happiness}: $Faction_HappinessBand2;
+ {TXT:EliteAPI.Location.Factions[0].Happiness_Localised}: Happy
+ {DEC:EliteAPI.Location.Factions[0].MyReputation}: 100,0
+ {TXT:EliteAPI.Location.Factions[0].RecoveringStates[0].State}: InfrastructureFailure
+ {INT:EliteAPI.Location.Factions[0].RecoveringStates[0].Trend}: 0
+ {TXT:EliteAPI.Location.Factions[1].Name}: Paesia Partners
+ {TXT:EliteAPI.Location.Factions[1].FactionState}: None
+ {TXT:EliteAPI.Location.Factions[1].Government}: Corporate
+ {DEC:EliteAPI.Location.Factions[1].Influence}: 0,077856
+ {TXT:EliteAPI.Location.Factions[1].Allegiance}: Independent
+ {TXT:EliteAPI.Location.Factions[1].Happiness}: $Faction_HappinessBand2;
+ {TXT:EliteAPI.Location.Factions[1].Happiness_Localised}: Happy
+ {DEC:EliteAPI.Location.Factions[1].MyReputation}: 96,6106
+ {TXT:EliteAPI.Location.Factions[2].Name}: Platinum Imperia Mining Ltd
+ {TXT:EliteAPI.Location.Factions[2].FactionState}: Expansion
+ {TXT:EliteAPI.Location.Factions[2].Government}: Corporate
+ {DEC:EliteAPI.Location.Factions[2].Influence}: 0,75632
+ {TXT:EliteAPI.Location.Factions[2].Allegiance}: Empire
+ {TXT:EliteAPI.Location.Factions[2].Happiness}: $Faction_HappinessBand1;
+ {TXT:EliteAPI.Location.Factions[2].Happiness_Localised}: Elated
+ {DEC:EliteAPI.Location.Factions[2].MyReputation}: 89,44
+ {TXT:EliteAPI.Location.Factions[2].RecoveringStates[0].State}: InfrastructureFailure
+ {INT:EliteAPI.Location.Factions[2].RecoveringStates[0].Trend}: 0
+ {TXT:EliteAPI.Location.Factions[2].ActiveStates[0].State}: Boom
+ {TXT:EliteAPI.Location.Factions[2].ActiveStates[1].State}: CivilLiberty
+ {TXT:EliteAPI.Location.Factions[2].ActiveStates[2].State}: Expansion
+ {TXT:EliteAPI.Location.Factions[3].Name}: United Paesia First
+ {TXT:EliteAPI.Location.Factions[3].FactionState}: None
+ {TXT:EliteAPI.Location.Factions[3].Government}: Dictatorship
+ {DEC:EliteAPI.Location.Factions[3].Influence}: 0,061678
+ {TXT:EliteAPI.Location.Factions[3].Allegiance}: Independent
+ {TXT:EliteAPI.Location.Factions[3].Happiness}: $Faction_HappinessBand2;
+ {TXT:EliteAPI.Location.Factions[3].Happiness_Localised}: Happy
+ {DEC:EliteAPI.Location.Factions[3].MyReputation}: 27,1513
+ {TXT:EliteAPI.Location.Factions[4].Name}: Paesia Blue Clan
+ {TXT:EliteAPI.Location.Factions[4].FactionState}: None
+ {TXT:EliteAPI.Location.Factions[4].Government}: Anarchy
+ {DEC:EliteAPI.Location.Factions[4].Influence}: 0,010111
+ {TXT:EliteAPI.Location.Factions[4].Allegiance}: Independent
+ {TXT:EliteAPI.Location.Factions[4].Happiness}: $Faction_HappinessBand2;
+ {TXT:EliteAPI.Location.Factions[4].Happiness_Localised}: Happy
+ {DEC:EliteAPI.Location.Factions[4].MyReputation}: 0,0
+ {TXT:EliteAPI.Location.Factions[5].Name}: Paesia Corporation
+ {TXT:EliteAPI.Location.Factions[5].FactionState}: InfrastructureFailure
+ {TXT:EliteAPI.Location.Factions[5].Government}: Corporate
+ {DEC:EliteAPI.Location.Factions[5].Influence}: 0,055612
+ {TXT:EliteAPI.Location.Factions[5].Allegiance}: Independent
+ {TXT:EliteAPI.Location.Factions[5].Happiness}: $Faction_HappinessBand2;
+ {TXT:EliteAPI.Location.Factions[5].Happiness_Localised}: Happy
+ {DEC:EliteAPI.Location.Factions[5].MyReputation}: 87,0762
+ {TXT:EliteAPI.Location.Factions[5].ActiveStates[0].State}: InfrastructureFailure
+ {TXT:EliteAPI.Location.SystemFaction.Name}: Platinum Imperia Mining Ltd
+ {TXT:EliteAPI.Location.SystemFaction.FactionState}: Expansion
+ {INT:EliteAPI.Location.StarPos.Length}: 3
+ {INT:EliteAPI.Location.Powers.Length}: 2
+ {INT:EliteAPI.Location.Factions.Length}: 6
+
+ ###  FSSSignalDiscovered  ### 
+{DATE:EliteAPI.FSSSignalDiscovered.timestamp}: 09.09.2025 07:27:24
+ {TXT:EliteAPI.FSSSignalDiscovered.event}: FSSSignalDiscovered
+ {TXT:EliteAPI.FSSSignalDiscovered.SystemAddress}: 3657466647274
+ {TXT:EliteAPI.FSSSignalDiscovered.SignalName}: **ROLEN MARCEL** V7Z-17V
+ {TXT:EliteAPI.FSSSignalDiscovered.SignalType}: FleetCarrier
+{BOOL:EliteAPI.FSSSignalDiscovered.IsStation}: True
+
+ ###  ReceiveText  ### 
+{DATE:EliteAPI.ReceiveText.timestamp}: 09.09.2025 07:27:24
+ {TXT:EliteAPI.ReceiveText.event}: ReceiveText
+ {TXT:EliteAPI.ReceiveText.From}: 
+ {TXT:EliteAPI.ReceiveText.Message}: $COMMS_entered:#name=Paesia;
+ {TXT:EliteAPI.ReceiveText.Message_Localised}: Entered Channel: Paesia
+ {TXT:EliteAPI.ReceiveText.Channel}: npc
+
+ ###  Statistics  ### 
+{DATE:EliteAPI.Statistics.timestamp}: 09.09.2025 07:27:21
+ {TXT:EliteAPI.Statistics.event}: Statistics
+ {DEC:EliteAPI.Statistics.Bank_Account.Current_Wealth}: 64410979736
+ {INT:EliteAPI.Statistics.Bank_Account.Spent_On_Ships}: 1422101586
+ {DEC:EliteAPI.Statistics.Bank_Account.Spent_On_Outfitting}: 6020481100
+ {INT:EliteAPI.Statistics.Bank_Account.Spent_On_Repairs}: 45806448
+ {INT:EliteAPI.Statistics.Bank_Account.Spent_On_Fuel}: 1007323
+ {INT:EliteAPI.Statistics.Bank_Account.Spent_On_Ammo_Consumables}: 4064067
+ {INT:EliteAPI.Statistics.Bank_Account.Insurance_Claims}: 55
+ {INT:EliteAPI.Statistics.Bank_Account.Spent_On_Insurance}: 385893575
+ {INT:EliteAPI.Statistics.Bank_Account.Owned_Ship_Count}: 16
+ {INT:EliteAPI.Statistics.Bank_Account.Spent_On_Suits}: 150000
+ {INT:EliteAPI.Statistics.Bank_Account.Spent_On_Weapons}: 175000
+ {INT:EliteAPI.Statistics.Bank_Account.Spent_On_Suit_Consumables}: 0
+ {INT:EliteAPI.Statistics.Bank_Account.Suits_Owned}: 2
+ {INT:EliteAPI.Statistics.Bank_Account.Weapons_Owned}: 2
+ {INT:EliteAPI.Statistics.Bank_Account.Spent_On_Premium_Stock}: 0
+ {INT:EliteAPI.Statistics.Bank_Account.Premium_Stock_Bought}: 0
+ {INT:EliteAPI.Statistics.Combat.Bounties_Claimed}: 2812
+ {INT:EliteAPI.Statistics.Combat.Bounty_Hunting_Profit}: 623839924
+ {INT:EliteAPI.Statistics.Combat.Combat_Bonds}: 163
+ {INT:EliteAPI.Statistics.Combat.Combat_Bond_Profits}: 14908511
+ {INT:EliteAPI.Statistics.Combat.Assassinations}: 117
+ {INT:EliteAPI.Statistics.Combat.Assassination_Profits}: 108165148
+ {INT:EliteAPI.Statistics.Combat.Highest_Single_Reward}: 2049193
+ {INT:EliteAPI.Statistics.Combat.Skimmers_Killed}: 42
+ {INT:EliteAPI.Statistics.Combat.OnFoot_Combat_Bonds}: 0
+ {INT:EliteAPI.Statistics.Combat.OnFoot_Combat_Bonds_Profits}: 0
+ {INT:EliteAPI.Statistics.Combat.OnFoot_Vehicles_Destroyed}: 0
+ {INT:EliteAPI.Statistics.Combat.OnFoot_Ships_Destroyed}: 0
+ {INT:EliteAPI.Statistics.Combat.Dropships_Taken}: 0
+ {INT:EliteAPI.Statistics.Combat.Dropships_Booked}: 0
+ {INT:EliteAPI.Statistics.Combat.Dropships_Cancelled}: 0
+ {INT:EliteAPI.Statistics.Combat.ConflictZone_High}: 0
+ {INT:EliteAPI.Statistics.Combat.ConflictZone_Medium}: 0
+ {INT:EliteAPI.Statistics.Combat.ConflictZone_Low}: 0
+ {INT:EliteAPI.Statistics.Combat.ConflictZone_Total}: 0
+ {INT:EliteAPI.Statistics.Combat.ConflictZone_High_Wins}: 0
+ {INT:EliteAPI.Statistics.Combat.ConflictZone_Medium_Wins}: 0
+ {INT:EliteAPI.Statistics.Combat.ConflictZone_Low_Wins}: 0
+ {INT:EliteAPI.Statistics.Combat.ConflictZone_Total_Wins}: 0
+ {INT:EliteAPI.Statistics.Combat.Settlement_Defended}: 0
+ {INT:EliteAPI.Statistics.Combat.Settlement_Conquered}: 0
+ {INT:EliteAPI.Statistics.Combat.OnFoot_Skimmers_Killed}: 0
+ {INT:EliteAPI.Statistics.Combat.OnFoot_Scavs_Killed}: 0
+ {INT:EliteAPI.Statistics.Crime.Notoriety}: 0
+ {INT:EliteAPI.Statistics.Crime.Fines}: 201
+ {INT:EliteAPI.Statistics.Crime.Total_Fines}: 158699
+ {INT:EliteAPI.Statistics.Crime.Bounties_Received}: 152
+ {INT:EliteAPI.Statistics.Crime.Total_Bounties}: 284000
+ {INT:EliteAPI.Statistics.Crime.Highest_Bounty}: 10000
+ {INT:EliteAPI.Statistics.Crime.Malware_Uploaded}: 0
+ {INT:EliteAPI.Statistics.Crime.Settlements_State_Shutdown}: 0
+ {INT:EliteAPI.Statistics.Crime.Production_Sabotage}: 0
+ {INT:EliteAPI.Statistics.Crime.Production_Theft}: 0
+ {INT:EliteAPI.Statistics.Crime.Total_Murders}: 0
+ {INT:EliteAPI.Statistics.Crime.Citizens_Murdered}: 0
+ {INT:EliteAPI.Statistics.Crime.Omnipol_Murdered}: 0
+ {INT:EliteAPI.Statistics.Crime.Guards_Murdered}: 0
+ {INT:EliteAPI.Statistics.Crime.Data_Stolen}: 0
+ {INT:EliteAPI.Statistics.Crime.Goods_Stolen}: 0
+ {INT:EliteAPI.Statistics.Crime.Sample_Stolen}: 0
+ {INT:EliteAPI.Statistics.Crime.Total_Stolen}: 0
+ {INT:EliteAPI.Statistics.Crime.Turrets_Destroyed}: 0
+ {INT:EliteAPI.Statistics.Crime.Turrets_Overloaded}: 0
+ {INT:EliteAPI.Statistics.Crime.Turrets_Total}: 0
+ {INT:EliteAPI.Statistics.Crime.Value_Stolen_StateChange}: 0
+ {INT:EliteAPI.Statistics.Crime.Profiles_Cloned}: 0
+ {INT:EliteAPI.Statistics.Smuggling.Black_Markets_Traded_With}: 0
+ {INT:EliteAPI.Statistics.Smuggling.Black_Markets_Profits}: 0
+ {INT:EliteAPI.Statistics.Smuggling.Resources_Smuggled}: 0
+ {INT:EliteAPI.Statistics.Smuggling.Average_Profit}: 0
+ {INT:EliteAPI.Statistics.Smuggling.Highest_Single_Transaction}: 0
+ {INT:EliteAPI.Statistics.Trading.Markets_Traded_With}: 109
+ {DEC:EliteAPI.Statistics.Trading.Market_Profits}: 49634687005
+ {INT:EliteAPI.Statistics.Trading.Resources_Traded}: 172899
+ {DEC:EliteAPI.Statistics.Trading.Average_Profit}: 77072500,0
+ {INT:EliteAPI.Statistics.Trading.Highest_Single_Transaction}: 505687840
+ {INT:EliteAPI.Statistics.Trading.Data_Sold}: 0
+ {INT:EliteAPI.Statistics.Trading.Goods_Sold}: 0
+ {INT:EliteAPI.Statistics.Trading.Assets_Sold}: 0
+ {DEC:EliteAPI.Statistics.Mining.Mining_Profits}: 49568371006
+ {INT:EliteAPI.Statistics.Mining.Quantity_Mined}: 284420
+ {INT:EliteAPI.Statistics.Mining.Materials_Collected}: 77292
+ {INT:EliteAPI.Statistics.Exploration.Systems_Visited}: 6944
+ {INT:EliteAPI.Statistics.Exploration.Exploration_Profits}: 623785199
+ {INT:EliteAPI.Statistics.Exploration.Planets_Scanned_To_Level_2}: 36753
+ {INT:EliteAPI.Statistics.Exploration.Planets_Scanned_To_Level_3}: 36748
+ {INT:EliteAPI.Statistics.Exploration.Efficient_Scans}: 386
+ {INT:EliteAPI.Statistics.Exploration.Highest_Payout}: 11576897
+ {INT:EliteAPI.Statistics.Exploration.Total_Hyperspace_Distance}: 271406
+ {INT:EliteAPI.Statistics.Exploration.Total_Hyperspace_Jumps}: 9746
+ {DEC:EliteAPI.Statistics.Exploration.Greatest_Distance_From_Start}: 5843,3677
+ {INT:EliteAPI.Statistics.Exploration.Time_Played}: 10400760
+ {INT:EliteAPI.Statistics.Exploration.OnFoot_Distance_Travelled}: 45073
+ {INT:EliteAPI.Statistics.Exploration.Shuttle_Journeys}: 7
+ {DEC:EliteAPI.Statistics.Exploration.Shuttle_Distance_Travelled}: 355,60886
+ {INT:EliteAPI.Statistics.Exploration.Spent_On_Shuttles}: 164258
+ {INT:EliteAPI.Statistics.Exploration.First_Footfalls}: 108
+ {INT:EliteAPI.Statistics.Exploration.Planet_Footfalls}: 161
+ {INT:EliteAPI.Statistics.Exploration.Settlements_Visited}: 3
+ {INT:EliteAPI.Statistics.Passengers.Passengers_Missions_Accepted}: 73
+ {INT:EliteAPI.Statistics.Passengers.Passengers_Missions_Disgruntled}: 20
+ {INT:EliteAPI.Statistics.Passengers.Passengers_Missions_Bulk}: 0
+ {INT:EliteAPI.Statistics.Passengers.Passengers_Missions_VIP}: 384
+ {INT:EliteAPI.Statistics.Passengers.Passengers_Missions_Delivered}: 384
+ {INT:EliteAPI.Statistics.Passengers.Passengers_Missions_Ejected}: 38
+ {INT:EliteAPI.Statistics.Search_And_Rescue.SearchRescue_Traded}: 12
+ {INT:EliteAPI.Statistics.Search_And_Rescue.SearchRescue_Profit}: 361897
+ {INT:EliteAPI.Statistics.Search_And_Rescue.SearchRescue_Count}: 3
+ {INT:EliteAPI.Statistics.Search_And_Rescue.Salvage_Legal_POI}: 0
+ {INT:EliteAPI.Statistics.Search_And_Rescue.Salvage_Legal_Settlements}: 0
+ {INT:EliteAPI.Statistics.Search_And_Rescue.Salvage_Illegal_POI}: 0
+ {INT:EliteAPI.Statistics.Search_And_Rescue.Salvage_Illegal_Settlements}: 0
+ {INT:EliteAPI.Statistics.Search_And_Rescue.Maglocks_Opened}: 0
+ {INT:EliteAPI.Statistics.Search_And_Rescue.Panels_Opened}: 0
+ {INT:EliteAPI.Statistics.Search_And_Rescue.Settlements_State_FireOut}: 0
+ {INT:EliteAPI.Statistics.Search_And_Rescue.Settlements_State_Reboot}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_Credits_Deposited}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_Credits_Withdrawn}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_Commodities_Deposited_Num}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_Commodities_Deposited_Value}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_Commodities_Withdrawn_Num}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_Commodities_Withdrawn_Value}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_PersonalAssets_Deposited_Num}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_PersonalAssets_Deposited_Value}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_PersonalAssets_Withdrawn_Num}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_PersonalAssets_Withdrawn_Value}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_Ships_Deposited_Num}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Bank_Ships_Deposited_Value}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_aegis_highestcontribution}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_bgs_highestcontribution}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_bounty_highestcontribution}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_colonisation_contribution_highestcontribution}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_combat_highestcontribution}: 150
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_cqc_highestcontribution}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_exploration_highestcontribution}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_mining_highestcontribution}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_powerplay_highestcontribution}: 3
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_trade_highestcontribution}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_trade_illicit_highestcontribution}: 0
+ {INT:EliteAPI.Statistics.Squadron.Squadron_Leaderboard_podiums}: 0
+ {INT:EliteAPI.Statistics.TG_ENCOUNTERS.TG_ENCOUNTER_TOTAL}: 6
+ {TXT:EliteAPI.Statistics.TG_ENCOUNTERS.TG_ENCOUNTER_TOTAL_LAST_SYSTEM}: Luyten's Star
+ {TXT:EliteAPI.Statistics.TG_ENCOUNTERS.TG_ENCOUNTER_TOTAL_LAST_TIMESTAMP}: 3310-12-16 23:08
+ {TXT:EliteAPI.Statistics.TG_ENCOUNTERS.TG_ENCOUNTER_TOTAL_LAST_SHIP}: Krait Mk II
+ {INT:EliteAPI.Statistics.Crafting.Count_Of_Used_Engineers}: 17
+ {INT:EliteAPI.Statistics.Crafting.Recipes_Generated}: 3830
+ {INT:EliteAPI.Statistics.Crafting.Recipes_Generated_Rank_1}: 476
+ {INT:EliteAPI.Statistics.Crafting.Recipes_Generated_Rank_2}: 577
+ {INT:EliteAPI.Statistics.Crafting.Recipes_Generated_Rank_3}: 797
+ {INT:EliteAPI.Statistics.Crafting.Recipes_Generated_Rank_4}: 970
+ {INT:EliteAPI.Statistics.Crafting.Recipes_Generated_Rank_5}: 1010
+ {INT:EliteAPI.Statistics.Crafting.Suit_Mods_Applied}: 0
+ {INT:EliteAPI.Statistics.Crafting.Weapon_Mods_Applied}: 0
+ {INT:EliteAPI.Statistics.Crafting.Suits_Upgraded}: 0
+ {INT:EliteAPI.Statistics.Crafting.Weapons_Upgraded}: 0
+ {INT:EliteAPI.Statistics.Crafting.Suits_Upgraded_Full}: 0
+ {INT:EliteAPI.Statistics.Crafting.Weapons_Upgraded_Full}: 0
+ {INT:EliteAPI.Statistics.Crafting.Suit_Mods_Applied_Full}: 0
+ {INT:EliteAPI.Statistics.Crafting.Weapon_Mods_Applied_Full}: 0
+ {DEC:EliteAPI.Statistics.Crew.NpcCrew_TotalWages}: 4468219036
+ {INT:EliteAPI.Statistics.Crew.NpcCrew_Hired}: 6
+ {INT:EliteAPI.Statistics.Crew.NpcCrew_Fired}: 5
+ {INT:EliteAPI.Statistics.Crew.NpcCrew_Died}: 3
+ {INT:EliteAPI.Statistics.Multicrew.Multicrew_Time_Total}: 101
+ {INT:EliteAPI.Statistics.Multicrew.Multicrew_Gunner_Time_Total}: 0
+ {INT:EliteAPI.Statistics.Multicrew.Multicrew_Fighter_Time_Total}: 0
+ {INT:EliteAPI.Statistics.Multicrew.Multicrew_Credits_Total}: 0
+ {INT:EliteAPI.Statistics.Multicrew.Multicrew_Fines_Total}: 0
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Trades_Completed}: 1288
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Materials_Traded}: 63163
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Encoded_Materials_Traded}: 11960
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Raw_Materials_Traded}: 26443
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Grade_1_Materials_Traded}: 13653
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Grade_2_Materials_Traded}: 17431
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Grade_3_Materials_Traded}: 15941
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Grade_4_Materials_Traded}: 12618
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Grade_5_Materials_Traded}: 3520
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Assets_Traded_In}: 0
+ {INT:EliteAPI.Statistics.Material_Trader_Stats.Assets_Traded_Out}: 0
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_EXPORT_TOTAL}: 426783
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_IMPORT_TOTAL}: 104882
+ {DEC:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_TRADEPROFIT_TOTAL}: 97201213661
+ {DEC:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_TRADESPEND_TOTAL}: 20886733244
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_STOLENPROFIT_TOTAL}: 0
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_STOLENSPEND_TOTAL}: 0
+ {DEC:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_DISTANCE_TRAVELLED}: 125010,414
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_TOTAL_JUMPS}: 647
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_SHIPYARD_SOLD}: 0
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_SHIPYARD_PROFIT}: 0
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_OUTFITTING_SOLD}: 234
+ {DEC:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_OUTFITTING_PROFIT}: 9100230826
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_REARM_TOTAL}: 1123
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_REFUEL_TOTAL}: 3202
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_REFUEL_PROFIT}: 627735
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_REPAIRS_TOTAL}: 2718
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_VOUCHERS_REDEEMED}: 644
+ {INT:EliteAPI.Statistics.FLEETCARRIER.FLEETCARRIER_VOUCHERS_PROFIT}: 169841527
+ {INT:EliteAPI.Statistics.Exobiology.Organic_Genus_Encountered}: 13
+ {INT:EliteAPI.Statistics.Exobiology.Organic_Species_Encountered}: 51
+ {INT:EliteAPI.Statistics.Exobiology.Organic_Variant_Encountered}: 127
+ {DEC:EliteAPI.Statistics.Exobiology.Organic_Data_Profits}: 5725392900
+ {INT:EliteAPI.Statistics.Exobiology.Organic_Data}: 301
+ {DEC:EliteAPI.Statistics.Exobiology.First_Logged_Profits}: 4139404400
+ {INT:EliteAPI.Statistics.Exobiology.First_Logged}: 236
+ {INT:EliteAPI.Statistics.Exobiology.Organic_Systems}: 104
+ {INT:EliteAPI.Statistics.Exobiology.Organic_Planets}: 140
+ {INT:EliteAPI.Statistics.Exobiology.Organic_Genus}: 10
+ {INT:EliteAPI.Statistics.Exobiology.Organic_Species}: 19
+
+ ###  CarrierLocation  ### 
+{DATE:EliteAPI.CarrierLocation.timestamp}: 09.09.2025 07:26:59
+ {TXT:EliteAPI.CarrierLocation.event}: CarrierLocation
+ {TXT:EliteAPI.CarrierLocation.CarrierType}: SquadronCarrier
+ {TXT:EliteAPI.CarrierLocation.CarrierID}: 3713208832
+ {TXT:EliteAPI.CarrierLocation.StarSystem}: R CrA Sector IM-V c2-18
+ {TXT:EliteAPI.CarrierLocation.SystemAddress}: 5031789007658
+ {TXT:EliteAPI.CarrierLocation.BodyID}: 4
+
+ ###  SquadronStartup  ### 
+{DATE:EliteAPI.SquadronStartup.timestamp}: 09.09.2025 07:26:58
+ {TXT:EliteAPI.SquadronStartup.event}: SquadronStartup
+ {TXT:EliteAPI.SquadronStartup.SquadronID}: 74283
+ {TXT:EliteAPI.SquadronStartup.SquadronName}: MORPHEUS MINING CORP.
+ {INT:EliteAPI.SquadronStartup.CurrentRank}: 3
+ {TXT:EliteAPI.SquadronStartup.CurrentRankName}: Executor
+
+ ###  LoadGame  ### 
+{DATE:EliteAPI.LoadGame.timestamp}: 09.09.2025 07:26:57
+ {TXT:EliteAPI.LoadGame.event}: LoadGame
+ {TXT:EliteAPI.LoadGame.FID}: F258756
+ {TXT:EliteAPI.LoadGame.Commander}: ViperDude
+{BOOL:EliteAPI.LoadGame.Horizons}: True
+{BOOL:EliteAPI.LoadGame.Odyssey}: True
+ {TXT:EliteAPI.LoadGame.Ship}: Cutter
+ {TXT:EliteAPI.LoadGame.Ship_Localised}: Imperial Cutter
+ {TXT:EliteAPI.LoadGame.ShipID}: 29
+ {TXT:EliteAPI.LoadGame.ShipName}: grabber
+ {TXT:EliteAPI.LoadGame.ShipIdent}: 7ven
+ {DEC:EliteAPI.LoadGame.FuelLevel}: 45,440002
+ {DEC:EliteAPI.LoadGame.FuelCapacity}: 64,0
+ {TXT:EliteAPI.LoadGame.GameMode}: Open
+ {DEC:EliteAPI.LoadGame.Credits}: 54397810658
+ {INT:EliteAPI.LoadGame.Loan}: 0
+ {TXT:EliteAPI.LoadGame.language}: English/UK
+ {TXT:EliteAPI.LoadGame.gameversion}: 4.2.0.2
+ {TXT:EliteAPI.LoadGame.build}: r318329/r0 
+
+ ###  EngineerProgress  ### 
+{DATE:EliteAPI.EngineerProgress.timestamp}: 09.09.2025 07:26:57
+ {TXT:EliteAPI.EngineerProgress.event}: EngineerProgress
+ {TXT:EliteAPI.EngineerProgress.Engineers[0].Engineer}: Hera Tani
+ {TXT:EliteAPI.EngineerProgress.Engineers[0].EngineerID}: 300090
+ {TXT:EliteAPI.EngineerProgress.Engineers[0].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[0].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[0].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[1].Engineer}: The Sarge
+ {TXT:EliteAPI.EngineerProgress.Engineers[1].EngineerID}: 300040
+ {TXT:EliteAPI.EngineerProgress.Engineers[1].Progress}: Invited
+ {TXT:EliteAPI.EngineerProgress.Engineers[2].Engineer}: Professor Palin
+ {TXT:EliteAPI.EngineerProgress.Engineers[2].EngineerID}: 300220
+ {TXT:EliteAPI.EngineerProgress.Engineers[2].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[2].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[2].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[3].Engineer}: Felicity Farseer
+ {TXT:EliteAPI.EngineerProgress.Engineers[3].EngineerID}: 300100
+ {TXT:EliteAPI.EngineerProgress.Engineers[3].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[3].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[3].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[4].Engineer}: Eleanor Bresa
+ {TXT:EliteAPI.EngineerProgress.Engineers[4].EngineerID}: 400011
+ {TXT:EliteAPI.EngineerProgress.Engineers[4].Progress}: Known
+ {TXT:EliteAPI.EngineerProgress.Engineers[5].Engineer}: Hero Ferrari
+ {TXT:EliteAPI.EngineerProgress.Engineers[5].EngineerID}: 400003
+ {TXT:EliteAPI.EngineerProgress.Engineers[5].Progress}: Known
+ {TXT:EliteAPI.EngineerProgress.Engineers[6].Engineer}: Tiana Fortune
+ {TXT:EliteAPI.EngineerProgress.Engineers[6].EngineerID}: 300270
+ {TXT:EliteAPI.EngineerProgress.Engineers[6].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[6].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[6].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[7].Engineer}: Jude Navarro
+ {TXT:EliteAPI.EngineerProgress.Engineers[7].EngineerID}: 400001
+ {TXT:EliteAPI.EngineerProgress.Engineers[7].Progress}: Known
+ {TXT:EliteAPI.EngineerProgress.Engineers[8].Engineer}: Broo Tarquin
+ {TXT:EliteAPI.EngineerProgress.Engineers[8].EngineerID}: 300030
+ {TXT:EliteAPI.EngineerProgress.Engineers[8].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[8].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[8].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[9].Engineer}: Etienne Dorn
+ {TXT:EliteAPI.EngineerProgress.Engineers[9].EngineerID}: 300290
+ {TXT:EliteAPI.EngineerProgress.Engineers[9].Progress}: Invited
+ {TXT:EliteAPI.EngineerProgress.Engineers[10].Engineer}: Lori Jameson
+ {TXT:EliteAPI.EngineerProgress.Engineers[10].EngineerID}: 300230
+ {TXT:EliteAPI.EngineerProgress.Engineers[10].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[10].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[10].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[11].Engineer}: Bill Turner
+ {TXT:EliteAPI.EngineerProgress.Engineers[11].EngineerID}: 300010
+ {TXT:EliteAPI.EngineerProgress.Engineers[11].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[11].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[11].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[12].Engineer}: Liz Ryder
+ {TXT:EliteAPI.EngineerProgress.Engineers[12].EngineerID}: 300080
+ {TXT:EliteAPI.EngineerProgress.Engineers[12].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[12].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[12].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[13].Engineer}: Rosa Dayette
+ {TXT:EliteAPI.EngineerProgress.Engineers[13].EngineerID}: 400012
+ {TXT:EliteAPI.EngineerProgress.Engineers[13].Progress}: Known
+ {TXT:EliteAPI.EngineerProgress.Engineers[14].Engineer}: Juri Ishmaak
+ {TXT:EliteAPI.EngineerProgress.Engineers[14].EngineerID}: 300250
+ {TXT:EliteAPI.EngineerProgress.Engineers[14].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[14].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[14].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[15].Engineer}: Zacariah Nemo
+ {TXT:EliteAPI.EngineerProgress.Engineers[15].EngineerID}: 300050
+ {TXT:EliteAPI.EngineerProgress.Engineers[15].Progress}: Known
+ {TXT:EliteAPI.EngineerProgress.Engineers[16].Engineer}: Mel Brandon
+ {TXT:EliteAPI.EngineerProgress.Engineers[16].EngineerID}: 300280
+ {TXT:EliteAPI.EngineerProgress.Engineers[16].Progress}: Known
+ {TXT:EliteAPI.EngineerProgress.Engineers[17].Engineer}: Selene Jean
+ {TXT:EliteAPI.EngineerProgress.Engineers[17].EngineerID}: 300210
+ {TXT:EliteAPI.EngineerProgress.Engineers[17].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[17].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[17].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[18].Engineer}: Marco Qwent
+ {TXT:EliteAPI.EngineerProgress.Engineers[18].EngineerID}: 300200
+ {TXT:EliteAPI.EngineerProgress.Engineers[18].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[18].RankProgress}: 56
+ {INT:EliteAPI.EngineerProgress.Engineers[18].Rank}: 3
+ {TXT:EliteAPI.EngineerProgress.Engineers[19].Engineer}: Chloe Sedesi
+ {TXT:EliteAPI.EngineerProgress.Engineers[19].EngineerID}: 300300
+ {TXT:EliteAPI.EngineerProgress.Engineers[19].Progress}: Invited
+ {TXT:EliteAPI.EngineerProgress.Engineers[20].Engineer}: Baltanos
+ {TXT:EliteAPI.EngineerProgress.Engineers[20].EngineerID}: 400010
+ {TXT:EliteAPI.EngineerProgress.Engineers[20].Progress}: Known
+ {TXT:EliteAPI.EngineerProgress.Engineers[21].Engineer}: Petra Olmanova
+ {TXT:EliteAPI.EngineerProgress.Engineers[21].EngineerID}: 300130
+ {TXT:EliteAPI.EngineerProgress.Engineers[21].Progress}: Invited
+ {TXT:EliteAPI.EngineerProgress.Engineers[22].Engineer}: Ram Tah
+ {TXT:EliteAPI.EngineerProgress.Engineers[22].EngineerID}: 300110
+ {TXT:EliteAPI.EngineerProgress.Engineers[22].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[22].RankProgress}: 51
+ {INT:EliteAPI.EngineerProgress.Engineers[22].Rank}: 2
+ {TXT:EliteAPI.EngineerProgress.Engineers[23].Engineer}: The Dweller
+ {TXT:EliteAPI.EngineerProgress.Engineers[23].EngineerID}: 300180
+ {TXT:EliteAPI.EngineerProgress.Engineers[23].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[23].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[23].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[24].Engineer}: Elvira Martuuk
+ {TXT:EliteAPI.EngineerProgress.Engineers[24].EngineerID}: 300160
+ {TXT:EliteAPI.EngineerProgress.Engineers[24].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[24].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[24].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[25].Engineer}: Lei Cheung
+ {TXT:EliteAPI.EngineerProgress.Engineers[25].EngineerID}: 300120
+ {TXT:EliteAPI.EngineerProgress.Engineers[25].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[25].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[25].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[26].Engineer}: Colonel Bris Dekker
+ {TXT:EliteAPI.EngineerProgress.Engineers[26].EngineerID}: 300140
+ {TXT:EliteAPI.EngineerProgress.Engineers[26].Progress}: Invited
+ {TXT:EliteAPI.EngineerProgress.Engineers[27].Engineer}: Didi Vatermann
+ {TXT:EliteAPI.EngineerProgress.Engineers[27].EngineerID}: 300000
+ {TXT:EliteAPI.EngineerProgress.Engineers[27].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[27].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[27].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[28].Engineer}: Tod 'The Blaster' McQuinn
+ {TXT:EliteAPI.EngineerProgress.Engineers[28].EngineerID}: 300260
+ {TXT:EliteAPI.EngineerProgress.Engineers[28].Progress}: Unlocked
+ {INT:EliteAPI.EngineerProgress.Engineers[28].RankProgress}: 0
+ {INT:EliteAPI.EngineerProgress.Engineers[28].Rank}: 5
+ {TXT:EliteAPI.EngineerProgress.Engineers[29].Engineer}: Domino Green
+ {TXT:EliteAPI.EngineerProgress.Engineers[29].EngineerID}: 400002
+ {TXT:EliteAPI.EngineerProgress.Engineers[29].Progress}: Invited
+ {TXT:EliteAPI.EngineerProgress.Engineers[30].Engineer}: Marsha Hicks
+ {TXT:EliteAPI.EngineerProgress.Engineers[30].EngineerID}: 300150
+ {TXT:EliteAPI.EngineerProgress.Engineers[30].Progress}: Invited
+ {INT:EliteAPI.EngineerProgress.Engineers.Length}: 31
+
+ ###  Reputation  ### 
+{DATE:EliteAPI.Reputation.timestamp}: 09.09.2025 07:26:57
+ {TXT:EliteAPI.Reputation.event}: Reputation
+ {DEC:EliteAPI.Reputation.Empire}: 75,0
+ {DEC:EliteAPI.Reputation.Federation}: 75,0
+ {DEC:EliteAPI.Reputation.Independent}: 0,0
+ {DEC:EliteAPI.Reputation.Alliance}: 74,109
+
+ ###  Progress  ### 
+{DATE:EliteAPI.Progress.timestamp}: 09.09.2025 07:26:57
+ {TXT:EliteAPI.Progress.event}: Progress
+ {INT:EliteAPI.Progress.Combat}: 10
+ {INT:EliteAPI.Progress.Trade}: 100
+ {INT:EliteAPI.Progress.Explore}: 1
+ {INT:EliteAPI.Progress.Soldier}: 0
+ {INT:EliteAPI.Progress.Exobiologist}: 39
+ {INT:EliteAPI.Progress.Empire}: 9
+ {INT:EliteAPI.Progress.Federation}: 21
+ {INT:EliteAPI.Progress.CQC}: 0
+
+ ###  Rank  ### 
+{DATE:EliteAPI.Rank.timestamp}: 09.09.2025 07:26:57
+ {TXT:EliteAPI.Rank.event}: Rank
+ {INT:EliteAPI.Rank.Combat}: 6
+ {INT:EliteAPI.Rank.Trade}: 13
+ {INT:EliteAPI.Rank.Explore}: 9
+ {INT:EliteAPI.Rank.Soldier}: 0
+ {INT:EliteAPI.Rank.Exobiologist}: 7
+ {INT:EliteAPI.Rank.Empire}: 13
+ {INT:EliteAPI.Rank.Federation}: 12
+ {INT:EliteAPI.Rank.CQC}: 0
+
+ ###  Materials  ### 
+{DATE:EliteAPI.Materials.timestamp}: 09.09.2025 07:26:57
+ {TXT:EliteAPI.Materials.event}: Materials
+ {TXT:EliteAPI.Materials.Raw[0].Name}: manganese
+ {INT:EliteAPI.Materials.Raw[0].Count}: 250
+ {TXT:EliteAPI.Materials.Raw[1].Name}: sulphur
+ {INT:EliteAPI.Materials.Raw[1].Count}: 300
+ {TXT:EliteAPI.Materials.Raw[2].Name}: nickel
+ {INT:EliteAPI.Materials.Raw[2].Count}: 300
+ {TXT:EliteAPI.Materials.Raw[3].Name}: phosphorus
+ {INT:EliteAPI.Materials.Raw[3].Count}: 300
+ {TXT:EliteAPI.Materials.Raw[4].Name}: zinc
+ {INT:EliteAPI.Materials.Raw[4].Count}: 250
+ {TXT:EliteAPI.Materials.Raw[5].Name}: chromium
+ {INT:EliteAPI.Materials.Raw[5].Count}: 250
+ {TXT:EliteAPI.Materials.Raw[6].Name}: carbon
+ {INT:EliteAPI.Materials.Raw[6].Count}: 300
+ {TXT:EliteAPI.Materials.Raw[7].Name}: lead
+ {INT:EliteAPI.Materials.Raw[7].Count}: 300
+ {TXT:EliteAPI.Materials.Raw[8].Name}: vanadium
+ {INT:EliteAPI.Materials.Raw[8].Count}: 250
+ {TXT:EliteAPI.Materials.Raw[9].Name}: cadmium
+ {INT:EliteAPI.Materials.Raw[9].Count}: 40
+ {TXT:EliteAPI.Materials.Raw[10].Name}: germanium
+ {INT:EliteAPI.Materials.Raw[10].Count}: 221
+ {TXT:EliteAPI.Materials.Raw[11].Name}: niobium
+ {INT:EliteAPI.Materials.Raw[11].Count}: 124
+ {TXT:EliteAPI.Materials.Raw[12].Name}: rhenium
+ {INT:EliteAPI.Materials.Raw[12].Count}: 270
+ {TXT:EliteAPI.Materials.Raw[13].Name}: arsenic
+ {INT:EliteAPI.Materials.Raw[13].Count}: 72
+ {TXT:EliteAPI.Materials.Raw[14].Name}: iron
+ {INT:EliteAPI.Materials.Raw[14].Count}: 300
+ {TXT:EliteAPI.Materials.Raw[15].Name}: molybdenum
+ {INT:EliteAPI.Materials.Raw[15].Count}: 50
+ {TXT:EliteAPI.Materials.Raw[16].Name}: tin
+ {INT:EliteAPI.Materials.Raw[16].Count}: 164
+ {TXT:EliteAPI.Materials.Raw[17].Name}: selenium
+ {INT:EliteAPI.Materials.Raw[17].Count}: 150
+ {TXT:EliteAPI.Materials.Raw[18].Name}: tungsten
+ {INT:EliteAPI.Materials.Raw[18].Count}: 69
+ {TXT:EliteAPI.Materials.Raw[19].Name}: zirconium
+ {INT:EliteAPI.Materials.Raw[19].Count}: 206
+ {TXT:EliteAPI.Materials.Raw[20].Name}: mercury
+ {INT:EliteAPI.Materials.Raw[20].Count}: 15
+ {TXT:EliteAPI.Materials.Raw[21].Name}: boron
+ {INT:EliteAPI.Materials.Raw[21].Count}: 21
+ {TXT:EliteAPI.Materials.Raw[22].Name}: ruthenium
+ {INT:EliteAPI.Materials.Raw[22].Count}: 2
+ {TXT:EliteAPI.Materials.Raw[23].Name}: polonium
+ {INT:EliteAPI.Materials.Raw[23].Count}: 16
+ {TXT:EliteAPI.Materials.Manufactured[0].Name}: chemicalprocessors
+ {TXT:EliteAPI.Materials.Manufactured[0].Name_Localised}: Chemical Processors
+ {INT:EliteAPI.Materials.Manufactured[0].Count}: 93
+ {TXT:EliteAPI.Materials.Manufactured[1].Name}: precipitatedalloys
+ {TXT:EliteAPI.Materials.Manufactured[1].Name_Localised}: Precipitated Alloys
+ {INT:EliteAPI.Materials.Manufactured[1].Count}: 70
+ {TXT:EliteAPI.Materials.Manufactured[2].Name}: wornshieldemitters
+ {TXT:EliteAPI.Materials.Manufactured[2].Name_Localised}: Worn Shield Emitters
+ {INT:EliteAPI.Materials.Manufactured[2].Count}: 154
+ {TXT:EliteAPI.Materials.Manufactured[3].Name}: compoundshielding
+ {TXT:EliteAPI.Materials.Manufactured[3].Name_Localised}: Compound Shielding
+ {INT:EliteAPI.Materials.Manufactured[3].Count}: 71
+ {TXT:EliteAPI.Materials.Manufactured[4].Name}: salvagedalloys
+ {TXT:EliteAPI.Materials.Manufactured[4].Name_Localised}: Salvaged Alloys
+ {INT:EliteAPI.Materials.Manufactured[4].Count}: 84
+ {TXT:EliteAPI.Materials.Manufactured[5].Name}: shieldingsensors
+ {TXT:EliteAPI.Materials.Manufactured[5].Name_Localised}: Shielding Sensors
+ {INT:EliteAPI.Materials.Manufactured[5].Count}: 200
+ {TXT:EliteAPI.Materials.Manufactured[6].Name}: chemicaldistillery
+ {TXT:EliteAPI.Materials.Manufactured[6].Name_Localised}: Chemical Distillery
+ {INT:EliteAPI.Materials.Manufactured[6].Count}: 62
+ {TXT:EliteAPI.Materials.Manufactured[7].Name}: heatresistantceramics
+ {TXT:EliteAPI.Materials.Manufactured[7].Name_Localised}: Heat Resistant Ceramics
+ {INT:EliteAPI.Materials.Manufactured[7].Count}: 51
+ {TXT:EliteAPI.Materials.Manufactured[8].Name}: galvanisingalloys
+ {TXT:EliteAPI.Materials.Manufactured[8].Name_Localised}: Galvanising Alloys
+ {INT:EliteAPI.Materials.Manufactured[8].Count}: 188
+ {TXT:EliteAPI.Materials.Manufactured[9].Name}: heatexchangers
+ {TXT:EliteAPI.Materials.Manufactured[9].Name_Localised}: Heat Exchangers
+ {INT:EliteAPI.Materials.Manufactured[9].Count}: 97
+ {TXT:EliteAPI.Materials.Manufactured[10].Name}: highdensitycomposites
+ {TXT:EliteAPI.Materials.Manufactured[10].Name_Localised}: High Density Composites
+ {INT:EliteAPI.Materials.Manufactured[10].Count}: 66
+ {TXT:EliteAPI.Materials.Manufactured[11].Name}: crystalshards
+ {TXT:EliteAPI.Materials.Manufactured[11].Name_Localised}: Crystal Shards
+ {INT:EliteAPI.Materials.Manufactured[11].Count}: 109
+ {TXT:EliteAPI.Materials.Manufactured[12].Name}: refinedfocuscrystals
+ {TXT:EliteAPI.Materials.Manufactured[12].Name_Localised}: Refined Focus Crystals
+ {INT:EliteAPI.Materials.Manufactured[12].Count}: 58
+ {TXT:EliteAPI.Materials.Manufactured[13].Name}: conductivecomponents
+ {TXT:EliteAPI.Materials.Manufactured[13].Name_Localised}: Conductive Components
+ {INT:EliteAPI.Materials.Manufactured[13].Count}: 12
+ {TXT:EliteAPI.Materials.Manufactured[14].Name}: conductivepolymers
+ {TXT:EliteAPI.Materials.Manufactured[14].Name_Localised}: Conductive Polymers
+ {INT:EliteAPI.Materials.Manufactured[14].Count}: 39
+ {TXT:EliteAPI.Materials.Manufactured[15].Name}: polymercapacitors
+ {TXT:EliteAPI.Materials.Manufactured[15].Name_Localised}: Polymer Capacitors
+ {INT:EliteAPI.Materials.Manufactured[15].Count}: 10
+ {TXT:EliteAPI.Materials.Manufactured[16].Name}: shieldemitters
+ {TXT:EliteAPI.Materials.Manufactured[16].Name_Localised}: Shield Emitters
+ {INT:EliteAPI.Materials.Manufactured[16].Count}: 250
+ {TXT:EliteAPI.Materials.Manufactured[17].Name}: mechanicalequipment
+ {TXT:EliteAPI.Materials.Manufactured[17].Name_Localised}: Mechanical Equipment
+ {INT:EliteAPI.Materials.Manufactured[17].Count}: 24
+ {TXT:EliteAPI.Materials.Manufactured[18].Name}: electrochemicalarrays
+ {TXT:EliteAPI.Materials.Manufactured[18].Name_Localised}: Electrochemical Arrays
+ {INT:EliteAPI.Materials.Manufactured[18].Count}: 3
+ {TXT:EliteAPI.Materials.Manufactured[19].Name}: conductiveceramics
+ {TXT:EliteAPI.Materials.Manufactured[19].Name_Localised}: Conductive Ceramics
+ {INT:EliteAPI.Materials.Manufactured[19].Count}: 7
+ {TXT:EliteAPI.Materials.Manufactured[20].Name}: focuscrystals
+ {TXT:EliteAPI.Materials.Manufactured[20].Name_Localised}: Focus Crystals
+ {INT:EliteAPI.Materials.Manufactured[20].Count}: 125
+ {TXT:EliteAPI.Materials.Manufactured[21].Name}: heatvanes
+ {TXT:EliteAPI.Materials.Manufactured[21].Name_Localised}: Heat Vanes
+ {INT:EliteAPI.Materials.Manufactured[21].Count}: 45
+ {TXT:EliteAPI.Materials.Manufactured[22].Name}: phasealloys
+ {TXT:EliteAPI.Materials.Manufactured[22].Name_Localised}: Phase Alloys
+ {INT:EliteAPI.Materials.Manufactured[22].Count}: 177
+ {TXT:EliteAPI.Materials.Manufactured[23].Name}: hybridcapacitors
+ {TXT:EliteAPI.Materials.Manufactured[23].Name_Localised}: Hybrid Capacitors
+ {INT:EliteAPI.Materials.Manufactured[23].Count}: 21
+ {TXT:EliteAPI.Materials.Manufactured[24].Name}: uncutfocuscrystals
+ {TXT:EliteAPI.Materials.Manufactured[24].Name_Localised}: Flawed Focus Crystals
+ {INT:EliteAPI.Materials.Manufactured[24].Count}: 139
+ {TXT:EliteAPI.Materials.Manufactured[25].Name}: mechanicalscrap
+ {TXT:EliteAPI.Materials.Manufactured[25].Name_Localised}: Mechanical Scrap
+ {INT:EliteAPI.Materials.Manufactured[25].Count}: 15
+ {TXT:EliteAPI.Materials.Manufactured[26].Name}: heatdispersionplate
+ {TXT:EliteAPI.Materials.Manufactured[26].Name_Localised}: Heat Dispersion Plate
+ {INT:EliteAPI.Materials.Manufactured[26].Count}: 90
+ {TXT:EliteAPI.Materials.Manufactured[27].Name}: mechanicalcomponents
+ {TXT:EliteAPI.Materials.Manufactured[27].Name_Localised}: Mechanical Components
+ {INT:EliteAPI.Materials.Manufactured[27].Count}: 130
+ {TXT:EliteAPI.Materials.Manufactured[28].Name}: chemicalmanipulators
+ {TXT:EliteAPI.Materials.Manufactured[28].Name_Localised}: Chemical Manipulators
+ {INT:EliteAPI.Materials.Manufactured[28].Count}: 38
+ {TXT:EliteAPI.Materials.Manufactured[29].Name}: configurablecomponents
+ {TXT:EliteAPI.Materials.Manufactured[29].Name_Localised}: Configurable Components
+ {INT:EliteAPI.Materials.Manufactured[29].Count}: 20
+ {TXT:EliteAPI.Materials.Manufactured[30].Name}: heatconductionwiring
+ {TXT:EliteAPI.Materials.Manufactured[30].Name_Localised}: Heat Conduction Wiring
+ {INT:EliteAPI.Materials.Manufactured[30].Count}: 19
+ {TXT:EliteAPI.Materials.Manufactured[31].Name}: protolightalloys
+ {TXT:EliteAPI.Materials.Manufactured[31].Name_Localised}: Proto Light Alloys
+ {INT:EliteAPI.Materials.Manufactured[31].Count}: 150
+ {TXT:EliteAPI.Materials.Manufactured[32].Name}: gridresistors
+ {TXT:EliteAPI.Materials.Manufactured[32].Name_Localised}: Grid Resistors
+ {INT:EliteAPI.Materials.Manufactured[32].Count}: 88
+ {TXT:EliteAPI.Materials.Manufactured[33].Name}: imperialshielding
+ {TXT:EliteAPI.Materials.Manufactured[33].Name_Localised}: Imperial Shielding
+ {INT:EliteAPI.Materials.Manufactured[33].Count}: 86
+ {TXT:EliteAPI.Materials.Manufactured[34].Name}: fedproprietarycomposites
+ {TXT:EliteAPI.Materials.Manufactured[34].Name_Localised}: Proprietary Composites
+ {INT:EliteAPI.Materials.Manufactured[34].Count}: 147
+ {TXT:EliteAPI.Materials.Manufactured[35].Name}: guardian_techcomponent
+ {TXT:EliteAPI.Materials.Manufactured[35].Name_Localised}: Guardian Technology Component
+ {INT:EliteAPI.Materials.Manufactured[35].Count}: 1
+ {TXT:EliteAPI.Materials.Manufactured[36].Name}: guardian_powercell
+ {TXT:EliteAPI.Materials.Manufactured[36].Name_Localised}: Guardian Power Cell
+ {INT:EliteAPI.Materials.Manufactured[36].Count}: 109
+ {TXT:EliteAPI.Materials.Manufactured[37].Name}: guardian_powerconduit
+ {TXT:EliteAPI.Materials.Manufactured[37].Name_Localised}: Guardian Power Conduit
+ {INT:EliteAPI.Materials.Manufactured[37].Count}: 111
+ {TXT:EliteAPI.Materials.Manufactured[38].Name}: guardian_sentinel_wreckagecomponents
+ {TXT:EliteAPI.Materials.Manufactured[38].Name_Localised}: Guardian Wreckage Components
+ {INT:EliteAPI.Materials.Manufactured[38].Count}: 102
+ {TXT:EliteAPI.Materials.Manufactured[39].Name}: guardian_sentinel_weaponparts
+ {TXT:EliteAPI.Materials.Manufactured[39].Name_Localised}: Guardian Sentinel Weapon Parts
+ {INT:EliteAPI.Materials.Manufactured[39].Count}: 48
+ {TXT:EliteAPI.Materials.Manufactured[40].Name}: fedcorecomposites
+ {TXT:EliteAPI.Materials.Manufactured[40].Name_Localised}: Core Dynamics Composites
+ {INT:EliteAPI.Materials.Manufactured[40].Count}: 100
+ {TXT:EliteAPI.Materials.Manufactured[41].Name}: protoradiolicalloys
+ {TXT:EliteAPI.Materials.Manufactured[41].Name_Localised}: Proto Radiolic Alloys
+ {INT:EliteAPI.Materials.Manufactured[41].Count}: 100
+ {TXT:EliteAPI.Materials.Manufactured[42].Name}: thermicalloys
+ {TXT:EliteAPI.Materials.Manufactured[42].Name_Localised}: Thermic Alloys
+ {INT:EliteAPI.Materials.Manufactured[42].Count}: 35
+ {TXT:EliteAPI.Materials.Manufactured[43].Name}: filamentcomposites
+ {TXT:EliteAPI.Materials.Manufactured[43].Name_Localised}: Filament Composites
+ {INT:EliteAPI.Materials.Manufactured[43].Count}: 110
+ {TXT:EliteAPI.Materials.Manufactured[44].Name}: temperedalloys
+ {TXT:EliteAPI.Materials.Manufactured[44].Name_Localised}: Tempered Alloys
+ {INT:EliteAPI.Materials.Manufactured[44].Count}: 31
+ {TXT:EliteAPI.Materials.Manufactured[45].Name}: compactcomposites
+ {TXT:EliteAPI.Materials.Manufactured[45].Name_Localised}: Compact Composites
+ {INT:EliteAPI.Materials.Manufactured[45].Count}: 29
+ {TXT:EliteAPI.Materials.Manufactured[46].Name}: pharmaceuticalisolators
+ {TXT:EliteAPI.Materials.Manufactured[46].Name_Localised}: Pharmaceutical Isolators
+ {INT:EliteAPI.Materials.Manufactured[46].Count}: 100
+ {TXT:EliteAPI.Materials.Manufactured[47].Name}: unknownenergysource
+ {TXT:EliteAPI.Materials.Manufactured[47].Name_Localised}: Sensor Fragment
+ {INT:EliteAPI.Materials.Manufactured[47].Count}: 8
+ {TXT:EliteAPI.Materials.Manufactured[48].Name}: militarygradealloys
+ {TXT:EliteAPI.Materials.Manufactured[48].Name_Localised}: Military Grade Alloys
+ {INT:EliteAPI.Materials.Manufactured[48].Count}: 100
+ {TXT:EliteAPI.Materials.Manufactured[49].Name}: exquisitefocuscrystals
+ {TXT:EliteAPI.Materials.Manufactured[49].Name_Localised}: Exquisite Focus Crystals
+ {INT:EliteAPI.Materials.Manufactured[49].Count}: 31
+ {TXT:EliteAPI.Materials.Manufactured[50].Name}: militarysupercapacitors
+ {TXT:EliteAPI.Materials.Manufactured[50].Name_Localised}: Military Supercapacitors
+ {INT:EliteAPI.Materials.Manufactured[50].Count}: 41
+ {TXT:EliteAPI.Materials.Manufactured[51].Name}: protoheatradiators
+ {TXT:EliteAPI.Materials.Manufactured[51].Name_Localised}: Proto Heat Radiators
+ {INT:EliteAPI.Materials.Manufactured[51].Count}: 100
+ {TXT:EliteAPI.Materials.Manufactured[52].Name}: biotechconductors
+ {TXT:EliteAPI.Materials.Manufactured[52].Name_Localised}: Biotech Conductors
+ {INT:EliteAPI.Materials.Manufactured[52].Count}: 13
+ {TXT:EliteAPI.Materials.Manufactured[53].Name}: chemicalstorageunits
+ {TXT:EliteAPI.Materials.Manufactured[53].Name_Localised}: Chemical Storage Units
+ {INT:EliteAPI.Materials.Manufactured[53].Count}: 11
+ {TXT:EliteAPI.Materials.Manufactured[54].Name}: basicconductors
+ {TXT:EliteAPI.Materials.Manufactured[54].Name_Localised}: Basic Conductors
+ {INT:EliteAPI.Materials.Manufactured[54].Count}: 16
+ {TXT:EliteAPI.Materials.Manufactured[55].Name}: improvisedcomponents
+ {TXT:EliteAPI.Materials.Manufactured[55].Name_Localised}: Improvised Components
+ {INT:EliteAPI.Materials.Manufactured[55].Count}: 100
+ {TXT:EliteAPI.Materials.Manufactured[56].Name}: tg_propulsionelement
+ {TXT:EliteAPI.Materials.Manufactured[56].Name_Localised}: Propulsion Elements
+ {INT:EliteAPI.Materials.Manufactured[56].Count}: 11
+ {TXT:EliteAPI.Materials.Manufactured[57].Name}: tg_causticshard
+ {TXT:EliteAPI.Materials.Manufactured[57].Name_Localised}: Caustic Shard
+ {INT:EliteAPI.Materials.Manufactured[57].Count}: 3
+ {TXT:EliteAPI.Materials.Encoded[0].Name}: emissiondata
+ {TXT:EliteAPI.Materials.Encoded[0].Name_Localised}: Unexpected Emission Data
+ {INT:EliteAPI.Materials.Encoded[0].Count}: 19
+ {TXT:EliteAPI.Materials.Encoded[1].Name}: shieldpatternanalysis
+ {TXT:EliteAPI.Materials.Encoded[1].Name_Localised}: Aberrant Shield Pattern Analysis
+ {INT:EliteAPI.Materials.Encoded[1].Count}: 18
+ {TXT:EliteAPI.Materials.Encoded[2].Name}: shielddensityreports
+ {TXT:EliteAPI.Materials.Encoded[2].Name_Localised}: Untypical Shield Scans
+ {INT:EliteAPI.Materials.Encoded[2].Count}: 41
+ {TXT:EliteAPI.Materials.Encoded[3].Name}: consumerfirmware
+ {TXT:EliteAPI.Materials.Encoded[3].Name_Localised}: Modified Consumer Firmware
+ {INT:EliteAPI.Materials.Encoded[3].Count}: 246
+ {TXT:EliteAPI.Materials.Encoded[4].Name}: decodedemissiondata
+ {TXT:EliteAPI.Materials.Encoded[4].Name_Localised}: Decoded Emission Data
+ {INT:EliteAPI.Materials.Encoded[4].Count}: 8
+ {TXT:EliteAPI.Materials.Encoded[5].Name}: bulkscandata
+ {TXT:EliteAPI.Materials.Encoded[5].Name_Localised}: Anomalous Bulk Scan Data
+ {INT:EliteAPI.Materials.Encoded[5].Count}: 297
+ {TXT:EliteAPI.Materials.Encoded[6].Name}: shieldsoakanalysis
+ {TXT:EliteAPI.Materials.Encoded[6].Name_Localised}: Inconsistent Shield Soak Analysis
+ {INT:EliteAPI.Materials.Encoded[6].Count}: 59
+ {TXT:EliteAPI.Materials.Encoded[7].Name}: scandatabanks
+ {TXT:EliteAPI.Materials.Encoded[7].Name_Localised}: Classified Scan Databanks
+ {INT:EliteAPI.Materials.Encoded[7].Count}: 54
+ {TXT:EliteAPI.Materials.Encoded[8].Name}: shieldcyclerecordings
+ {TXT:EliteAPI.Materials.Encoded[8].Name_Localised}: Distorted Shield Cycle Recordings
+ {INT:EliteAPI.Materials.Encoded[8].Count}: 298
+ {TXT:EliteAPI.Materials.Encoded[9].Name}: scanarchives
+ {TXT:EliteAPI.Materials.Encoded[9].Name_Localised}: Unidentified Scan Archives
+ {INT:EliteAPI.Materials.Encoded[9].Count}: 82
+ {TXT:EliteAPI.Materials.Encoded[10].Name}: archivedemissiondata
+ {TXT:EliteAPI.Materials.Encoded[10].Name_Localised}: Irregular Emission Data
+ {INT:EliteAPI.Materials.Encoded[10].Count}: 38
+ {TXT:EliteAPI.Materials.Encoded[11].Name}: compactemissionsdata
+ {TXT:EliteAPI.Materials.Encoded[11].Name_Localised}: Abnormal Compact Emissions Data
+ {INT:EliteAPI.Materials.Encoded[11].Count}: 9
+ {TXT:EliteAPI.Materials.Encoded[12].Name}: shieldfrequencydata
+ {TXT:EliteAPI.Materials.Encoded[12].Name_Localised}: Peculiar Shield Frequency Data
+ {INT:EliteAPI.Materials.Encoded[12].Count}: 35
+ {TXT:EliteAPI.Materials.Encoded[13].Name}: hyperspacetrajectories
+ {TXT:EliteAPI.Materials.Encoded[13].Name_Localised}: Eccentric Hyperspace Trajectories
+ {INT:EliteAPI.Materials.Encoded[13].Count}: 27
+ {TXT:EliteAPI.Materials.Encoded[14].Name}: disruptedwakeechoes
+ {TXT:EliteAPI.Materials.Encoded[14].Name_Localised}: Atypical Disrupted Wake Echoes
+ {INT:EliteAPI.Materials.Encoded[14].Count}: 294
+ {TXT:EliteAPI.Materials.Encoded[15].Name}: fsdtelemetry
+ {TXT:EliteAPI.Materials.Encoded[15].Name_Localised}: Anomalous FSD Telemetry
+ {INT:EliteAPI.Materials.Encoded[15].Count}: 250
+ {TXT:EliteAPI.Materials.Encoded[16].Name}: encodedscandata
+ {TXT:EliteAPI.Materials.Encoded[16].Name_Localised}: Divergent Scan Data
+ {INT:EliteAPI.Materials.Encoded[16].Count}: 5
+ {TXT:EliteAPI.Materials.Encoded[17].Name}: classifiedscandata
+ {TXT:EliteAPI.Materials.Encoded[17].Name_Localised}: Classified Scan Fragment
+ {INT:EliteAPI.Materials.Encoded[17].Count}: 10
+ {TXT:EliteAPI.Materials.Encoded[18].Name}: dataminedwake
+ {TXT:EliteAPI.Materials.Encoded[18].Name_Localised}: Datamined Wake Exceptions
+ {INT:EliteAPI.Materials.Encoded[18].Count}: 1
+ {TXT:EliteAPI.Materials.Encoded[19].Name}: wakesolutions
+ {TXT:EliteAPI.Materials.Encoded[19].Name_Localised}: Strange Wake Solutions
+ {INT:EliteAPI.Materials.Encoded[19].Count}: 200
+ {TXT:EliteAPI.Materials.Encoded[20].Name}: encryptioncodes
+ {TXT:EliteAPI.Materials.Encoded[20].Name_Localised}: Tagged Encryption Codes
+ {INT:EliteAPI.Materials.Encoded[20].Count}: 71
+ {TXT:EliteAPI.Materials.Encoded[21].Name}: adaptiveencryptors
+ {TXT:EliteAPI.Materials.Encoded[21].Name_Localised}: Adaptive Encryptors Capture
+ {INT:EliteAPI.Materials.Encoded[21].Count}: 89
+ {TXT:EliteAPI.Materials.Encoded[22].Name}: symmetrickeys
+ {TXT:EliteAPI.Materials.Encoded[22].Name_Localised}: Open Symmetric Keys
+ {INT:EliteAPI.Materials.Encoded[22].Count}: 172
+ {TXT:EliteAPI.Materials.Encoded[23].Name}: legacyfirmware
+ {TXT:EliteAPI.Materials.Encoded[23].Name_Localised}: Specialised Legacy Firmware
+ {INT:EliteAPI.Materials.Encoded[23].Count}: 300
+ {TXT:EliteAPI.Materials.Encoded[24].Name}: encryptionarchives
+ {TXT:EliteAPI.Materials.Encoded[24].Name_Localised}: Atypical Encryption Archives
+ {INT:EliteAPI.Materials.Encoded[24].Count}: 150
+ {TXT:EliteAPI.Materials.Encoded[25].Name}: scrambledemissiondata
+ {TXT:EliteAPI.Materials.Encoded[25].Name_Localised}: Exceptional Scrambled Emission Data
+ {INT:EliteAPI.Materials.Encoded[25].Count}: 126
+ {TXT:EliteAPI.Materials.Encoded[26].Name}: industrialfirmware
+ {TXT:EliteAPI.Materials.Encoded[26].Name_Localised}: Cracked Industrial Firmware
+ {INT:EliteAPI.Materials.Encoded[26].Count}: 193
+ {TXT:EliteAPI.Materials.Encoded[27].Name}: encryptedfiles
+ {TXT:EliteAPI.Materials.Encoded[27].Name_Localised}: Unusual Encrypted Files
+ {INT:EliteAPI.Materials.Encoded[27].Count}: 280
+ {TXT:EliteAPI.Materials.Encoded[28].Name}: guardian_moduleblueprint
+ {TXT:EliteAPI.Materials.Encoded[28].Name_Localised}: Guardian Module Blueprint Fragment
+ {INT:EliteAPI.Materials.Encoded[28].Count}: 1
+ {TXT:EliteAPI.Materials.Encoded[29].Name}: securityfirmware
+ {TXT:EliteAPI.Materials.Encoded[29].Name_Localised}: Security Firmware Patch
+ {INT:EliteAPI.Materials.Encoded[29].Count}: 12
+ {TXT:EliteAPI.Materials.Encoded[30].Name}: embeddedfirmware
+ {TXT:EliteAPI.Materials.Encoded[30].Name_Localised}: Modified Embedded Firmware
+ {INT:EliteAPI.Materials.Encoded[30].Count}: 5
+ {TXT:EliteAPI.Materials.Encoded[31].Name}: ancienthistoricaldata
+ {TXT:EliteAPI.Materials.Encoded[31].Name_Localised}: Pattern Gamma Obelisk Data
+ {INT:EliteAPI.Materials.Encoded[31].Count}: 39
+ {TXT:EliteAPI.Materials.Encoded[32].Name}: ancienttechnologicaldata
+ {TXT:EliteAPI.Materials.Encoded[32].Name_Localised}: Pattern Epsilon Obelisk Data
+ {INT:EliteAPI.Materials.Encoded[32].Count}: 18
+ {TXT:EliteAPI.Materials.Encoded[33].Name}: ancientlanguagedata
+ {TXT:EliteAPI.Materials.Encoded[33].Name_Localised}: Pattern Delta Obelisk Data
+ {INT:EliteAPI.Materials.Encoded[33].Count}: 3
+ {TXT:EliteAPI.Materials.Encoded[34].Name}: ancientculturaldata
+ {TXT:EliteAPI.Materials.Encoded[34].Name_Localised}: Pattern Beta Obelisk Data
+ {INT:EliteAPI.Materials.Encoded[34].Count}: 33
+ {TXT:EliteAPI.Materials.Encoded[35].Name}: ancientbiologicaldata
+ {TXT:EliteAPI.Materials.Encoded[35].Name_Localised}: Pattern Alpha Obelisk Data
+ {INT:EliteAPI.Materials.Encoded[35].Count}: 9
+ {TXT:EliteAPI.Materials.Encoded[36].Name}: tg_interdictiondata
+ {TXT:EliteAPI.Materials.Encoded[36].Name_Localised}: Thargoid Interdiction Telemetry
+ {INT:EliteAPI.Materials.Encoded[36].Count}: 36
+ {TXT:EliteAPI.Materials.Encoded[37].Name}: tg_shutdowndata
+ {TXT:EliteAPI.Materials.Encoded[37].Name_Localised}: Massive Energy Surge Analytics
+ {INT:EliteAPI.Materials.Encoded[37].Count}: 7
+ {INT:EliteAPI.Materials.Raw.Length}: 24
+ {INT:EliteAPI.Materials.Manufactured.Length}: 58
+ {INT:EliteAPI.Materials.Encoded.Length}: 38
+
+ ###  Commander  ### 
+{DATE:EliteAPI.Commander.timestamp}: 09.09.2025 07:26:57
+ {TXT:EliteAPI.Commander.event}: Commander
+ {TXT:EliteAPI.Commander.FID}: F258756
+ {TXT:EliteAPI.Commander.Name}: ViperDude
+
+ ###  Fileheader  ### 
+{DATE:EliteAPI.Fileheader.timestamp}: 09.09.2025 07:26:06
+ {TXT:EliteAPI.Fileheader.event}: Fileheader
+ {INT:EliteAPI.Fileheader.part}: 1
+ {TXT:EliteAPI.Fileheader.language}: English/UK
+{BOOL:EliteAPI.Fileheader.Odyssey}: True
+ {TXT:EliteAPI.Fileheader.gameversion}: 4.2.0.2
+ {TXT:EliteAPI.Fileheader.build}: r318329/r0 
+

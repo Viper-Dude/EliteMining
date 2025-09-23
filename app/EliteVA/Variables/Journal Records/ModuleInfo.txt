@@ -1,0 +1,4 @@
+ ### ((EliteAPI.ModuleInfo)) ###
+
+{DATE:EliteAPI.ModuleInfo.timestamp}
+{TXT:EliteAPI.ModuleInfo.event}

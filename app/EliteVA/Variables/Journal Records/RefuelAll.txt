@@ -1,0 +1,6 @@
+ ### ((EliteAPI.RefuelAll)) ###
+
+{DATE:EliteAPI.RefuelAll.timestamp}
+{TXT:EliteAPI.RefuelAll.event}
+{INT:EliteAPI.RefuelAll.Cost}
+{DEC:EliteAPI.RefuelAll.Amount}

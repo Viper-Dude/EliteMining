@@ -1,0 +1,7 @@
+ ### ((EliteAPI.Outfitting)) ###
+
+{DATE:EliteAPI.Outfitting.timestamp}
+{TXT:EliteAPI.Outfitting.StationName}
+{TXT:EliteAPI.Outfitting.StarSystem}
+{TXT:EliteAPI.Outfitting.MarketID}
+{TXT:EliteAPI.Outfitting.event}

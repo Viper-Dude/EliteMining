@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+dist_test/
+*.spec.bak
+
+# App specific
+app/Settings/*.json
+app/Settings/*.json.backup
+app/Reports/
+*.log
+backup_*
+
+# VoiceAttack profile
+*.vap
+
+# Installer output
+Output/
+EliteMiningSetup.exe
+
+# Test files
+test_*.py

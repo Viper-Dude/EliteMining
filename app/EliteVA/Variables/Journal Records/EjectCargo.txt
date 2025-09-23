@@ -1,0 +1,8 @@
+ ### ((EliteAPI.EjectCargo)) ###
+
+{TXT:EliteAPI.EjectCargo.Type_Localised}
+{TXT:EliteAPI.EjectCargo.Type}
+{DATE:EliteAPI.EjectCargo.timestamp}
+{TXT:EliteAPI.EjectCargo.event}
+{INT:EliteAPI.EjectCargo.Count}
+{BOOL:EliteAPI.EjectCargo.Abandoned}

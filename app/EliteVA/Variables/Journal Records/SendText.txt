@@ -1,0 +1,7 @@
+ ### ((EliteAPI.SendText)) ###
+
+{TXT:EliteAPI.SendText.To}
+{DATE:EliteAPI.SendText.timestamp}
+{BOOL:EliteAPI.SendText.Sent}
+{TXT:EliteAPI.SendText.Message}
+{TXT:EliteAPI.SendText.event}

@@ -1,0 +1,4 @@
+ ### ((EliteAPI.Shutdown)) ###
+
+{DATE:EliteAPI.Shutdown.timestamp}
+{TXT:EliteAPI.Shutdown.event}

@@ -1,0 +1,5 @@
+ ### ((EliteAPI.ShieldState)) ###
+
+{DATE:EliteAPI.ShieldState.timestamp}
+{BOOL:EliteAPI.ShieldState.ShieldsUp}
+{TXT:EliteAPI.ShieldState.event}

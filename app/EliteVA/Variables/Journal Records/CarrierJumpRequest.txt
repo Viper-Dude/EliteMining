@@ -1,0 +1,11 @@
+ ### ((EliteAPI.CarrierJumpRequest)) ###
+
+{DATE:EliteAPI.CarrierJumpRequest.timestamp}
+{TXT:EliteAPI.CarrierJumpRequest.SystemName}
+{TXT:EliteAPI.CarrierJumpRequest.SystemAddress}
+{TXT:EliteAPI.CarrierJumpRequest.event}
+{DATE:EliteAPI.CarrierJumpRequest.DepartureTime}
+{TXT:EliteAPI.CarrierJumpRequest.CarrierType}
+{TXT:EliteAPI.CarrierJumpRequest.CarrierID}
+{TXT:EliteAPI.CarrierJumpRequest.BodyID}
+{TXT:EliteAPI.CarrierJumpRequest.Body}

@@ -1,0 +1,7 @@
+ ### ((EliteAPI.PowerplayMerits)) ###
+
+{INT:EliteAPI.PowerplayMerits.TotalMerits}
+{DATE:EliteAPI.PowerplayMerits.timestamp}
+{TXT:EliteAPI.PowerplayMerits.Power}
+{INT:EliteAPI.PowerplayMerits.MeritsGained}
+{TXT:EliteAPI.PowerplayMerits.event}

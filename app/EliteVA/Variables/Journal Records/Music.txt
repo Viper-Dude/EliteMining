@@ -1,0 +1,5 @@
+ ### ((EliteAPI.Music)) ###
+
+{DATE:EliteAPI.Music.timestamp}
+{TXT:EliteAPI.Music.MusicTrack}
+{TXT:EliteAPI.Music.event}

@@ -1,0 +1,7 @@
+ ### ((EliteAPI.Repair)) ###
+
+{DATE:EliteAPI.Repair.timestamp}
+{TXT:EliteAPI.Repair.Items[n]}
+{INT:EliteAPI.Repair.Items.Length}
+{TXT:EliteAPI.Repair.event}
+{INT:EliteAPI.Repair.Cost}

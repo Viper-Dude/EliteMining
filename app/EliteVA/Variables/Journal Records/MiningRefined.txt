@@ -1,0 +1,6 @@
+ ### ((EliteAPI.MiningRefined)) ###
+
+{TXT:EliteAPI.MiningRefined.Type_Localised}
+{TXT:EliteAPI.MiningRefined.Type}
+{DATE:EliteAPI.MiningRefined.timestamp}
+{TXT:EliteAPI.MiningRefined.event}

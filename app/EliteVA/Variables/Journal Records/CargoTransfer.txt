@@ -1,0 +1,9 @@
+ ### ((EliteAPI.CargoTransfer)) ###
+
+{TXT:EliteAPI.CargoTransfer.Transfers[n].Type_Localised}
+{TXT:EliteAPI.CargoTransfer.Transfers[n].Type}
+{TXT:EliteAPI.CargoTransfer.Transfers[n].Direction}
+{INT:EliteAPI.CargoTransfer.Transfers[n].Count}
+{INT:EliteAPI.CargoTransfer.Transfers.Length}
+{DATE:EliteAPI.CargoTransfer.timestamp}
+{TXT:EliteAPI.CargoTransfer.event}

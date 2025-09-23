@@ -1,0 +1,76 @@
+ ###  Status.json  ### 
+{BOOL:EliteAPI.Available}: False
+{BOOL:EliteAPI.Docked}: False
+{BOOL:EliteAPI.Landed}: False
+{BOOL:EliteAPI.Gear}: False
+{BOOL:EliteAPI.Shields}: False
+{BOOL:EliteAPI.Supercruise}: False
+{BOOL:EliteAPI.FlightAssist}: True
+{BOOL:EliteAPI.Hardpoints}: False
+{BOOL:EliteAPI.Winging}: False
+{BOOL:EliteAPI.Lights}: False
+{BOOL:EliteAPI.SilentRunning}: False
+{BOOL:EliteAPI.Scooping}: False
+{BOOL:EliteAPI.SrvHandbrake}: False
+{BOOL:EliteAPI.SrvTurret}: False
+{BOOL:EliteAPI.SrvNearShip}: False
+{BOOL:EliteAPI.SrvDriveAssist}: False
+{BOOL:EliteAPI.MassLocked}: False
+{BOOL:EliteAPI.FsdCharging}: False
+{BOOL:EliteAPI.FsdCooldown}: False
+{BOOL:EliteAPI.LowFuel}: False
+{BOOL:EliteAPI.Overheating}: False
+{BOOL:EliteAPI.HasLatLong}: False
+{BOOL:EliteAPI.InDanger}: False
+{BOOL:EliteAPI.InInterdiction}: False
+{BOOL:EliteAPI.InMothership}: False
+{BOOL:EliteAPI.InFighter}: False
+{BOOL:EliteAPI.InSrv}: False
+{BOOL:EliteAPI.AnalysisMode}: False
+{BOOL:EliteAPI.NightVision}: False
+{BOOL:EliteAPI.AltitudeFromAverageRadius}: False
+{BOOL:EliteAPI.FsdJump}: False
+{BOOL:EliteAPI.SrvHighBeam}: False
+{BOOL:EliteAPI.OnFoot}: False
+{BOOL:EliteAPI.InTaxi}: False
+{BOOL:EliteAPI.InMultiCrew}: False
+{BOOL:EliteAPI.OnFootInStation}: False
+{BOOL:EliteAPI.OnFootOnPlanet}: False
+{BOOL:EliteAPI.AimDownSight}: False
+{BOOL:EliteAPI.LowOxygen}: False
+{BOOL:EliteAPI.LowHealth}: False
+{BOOL:EliteAPI.Cold}: False
+{BOOL:EliteAPI.Hot}: False
+{BOOL:EliteAPI.VeryCold}: False
+{BOOL:EliteAPI.VeryHot}: False
+{BOOL:EliteAPI.Gliding}: False
+{BOOL:EliteAPI.OnFootInHangar}: False
+{BOOL:EliteAPI.OnFootInSocialSpace}: False
+{BOOL:EliteAPI.OnFootInExterior}: False
+{BOOL:EliteAPI.BreathableAtmosphere}: False
+ {INT:EliteAPI.Pips.System}: 0
+ {INT:EliteAPI.Pips.Engines}: 0
+ {INT:EliteAPI.Pips.Weapons}: 0
+ {INT:EliteAPI.FireGroup}: 0
+ {INT:EliteAPI.GuiFocus}: 0
+ {DEC:EliteAPI.Fuel.FuelMain}: 0,0
+ {DEC:EliteAPI.Fuel.FuelReservoir}: 0,0
+ {INT:EliteAPI.LegalState}: 0
+ {DEC:EliteAPI.Balance}: 54397810658
+ {TXT:EliteAPI.Destination.System}: 
+ {TXT:EliteAPI.Destination.Body}: 
+ {TXT:EliteAPI.Destination.Name}: 
+ {DEC:EliteAPI.BodyRadius}: 0,0
+ {DEC:EliteAPI.Oxygen}: 0,0
+ {DEC:EliteAPI.Health}: 0,0
+ {DEC:EliteAPI.Temperature}: 0,0
+ {TXT:EliteAPI.SelectedWeapon.Symbol}: 
+ {TXT:EliteAPI.SelectedWeapon.Local}: 
+ {DEC:EliteAPI.Gravity}: 0,0
+ {DEC:EliteAPI.Latitude}: 0,0
+ {DEC:EliteAPI.Longitude}: 0,0
+ {DEC:EliteAPI.Heading}: 0,0
+ {DEC:EliteAPI.Altitude}: 0,0
+{BOOL:EliteAPI.CargoScoop}: False
+ {INT:EliteAPI.Cargo}: 0
+ {INT:EliteAPI.Balance}: 0

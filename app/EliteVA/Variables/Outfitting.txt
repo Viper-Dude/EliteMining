@@ -1,0 +1,8 @@
+ ###  Outfitting.json  ### 
+{DATE:EliteAPI.Outfitting.timestamp}: 07.09.2025 16:24:26
+ {TXT:EliteAPI.Outfitting.event}: Outfitting
+ {TXT:EliteAPI.Outfitting.MarketID}: 3706791680
+ {TXT:EliteAPI.Outfitting.StationName}: V0W-W7T
+ {TXT:EliteAPI.Outfitting.StarSystem}: Paesia
+{BOOL:EliteAPI.Outfitting.Horizons}: True
+ {INT:EliteAPI.Outfitting.Items.Length}: 0

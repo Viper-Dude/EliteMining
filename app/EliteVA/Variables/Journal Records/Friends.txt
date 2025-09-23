@@ -1,0 +1,6 @@
+ ### ((EliteAPI.Friends)) ###
+
+{DATE:EliteAPI.Friends.timestamp}
+{TXT:EliteAPI.Friends.Status}
+{TXT:EliteAPI.Friends.Name}
+{TXT:EliteAPI.Friends.event}

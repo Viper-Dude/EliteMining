@@ -1,0 +1,21 @@
+ ### ((EliteAPI.LoadGame)) ###
+
+{DATE:EliteAPI.LoadGame.timestamp}
+{TXT:EliteAPI.LoadGame.ShipName}
+{TXT:EliteAPI.LoadGame.ShipIdent}
+{TXT:EliteAPI.LoadGame.ShipID}
+{TXT:EliteAPI.LoadGame.Ship_Localised}
+{TXT:EliteAPI.LoadGame.Ship}
+{BOOL:EliteAPI.LoadGame.Odyssey}
+{INT:EliteAPI.LoadGame.Loan}
+{TXT:EliteAPI.LoadGame.language}
+{BOOL:EliteAPI.LoadGame.Horizons}
+{TXT:EliteAPI.LoadGame.gameversion}
+{TXT:EliteAPI.LoadGame.GameMode}
+{DEC:EliteAPI.LoadGame.FuelLevel}
+{DEC:EliteAPI.LoadGame.FuelCapacity}
+{TXT:EliteAPI.LoadGame.FID}
+{TXT:EliteAPI.LoadGame.event}
+{DEC:EliteAPI.LoadGame.Credits}
+{TXT:EliteAPI.LoadGame.Commander}
+{TXT:EliteAPI.LoadGame.build}

@@ -1,0 +1,5 @@
+ ### ((EliteAPI.LaunchDrone)) ###
+
+{TXT:EliteAPI.LaunchDrone.Type}
+{DATE:EliteAPI.LaunchDrone.timestamp}
+{TXT:EliteAPI.LaunchDrone.event}

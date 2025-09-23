@@ -1,0 +1,6 @@
+ ### ((EliteAPI.ReservoirReplenished)) ###
+
+{DATE:EliteAPI.ReservoirReplenished.timestamp}
+{DEC:EliteAPI.ReservoirReplenished.FuelReservoir}
+{DEC:EliteAPI.ReservoirReplenished.FuelMain}
+{TXT:EliteAPI.ReservoirReplenished.event}

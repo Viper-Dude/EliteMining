@@ -1,0 +1,9 @@
+ ### ((EliteAPI.ReceiveText)) ###
+
+{DATE:EliteAPI.ReceiveText.timestamp}
+{TXT:EliteAPI.ReceiveText.Message_Localised}
+{TXT:EliteAPI.ReceiveText.Message}
+{TXT:EliteAPI.ReceiveText.From_Localised}
+{TXT:EliteAPI.ReceiveText.From}
+{TXT:EliteAPI.ReceiveText.event}
+{TXT:EliteAPI.ReceiveText.Channel}

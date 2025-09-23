@@ -1,0 +1,130 @@
+ ###  ShipLocker.json  ### 
+{DATE:EliteAPI.ShipLocker.timestamp}: 09.09.2025 07:27:24
+ {TXT:EliteAPI.ShipLocker.event}: ShipLocker
+ {TXT:EliteAPI.ShipLocker.Components[0].Name}: graphene
+ {TXT:EliteAPI.ShipLocker.Components[0].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[0].Count}: 45
+ {TXT:EliteAPI.ShipLocker.Components[1].Name}: aerogel
+ {TXT:EliteAPI.ShipLocker.Components[1].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[1].Count}: 25
+ {TXT:EliteAPI.ShipLocker.Components[2].Name}: carbonfibreplating
+ {TXT:EliteAPI.ShipLocker.Components[2].Name_Localised}: Carbon Fibre Plating
+ {TXT:EliteAPI.ShipLocker.Components[2].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[2].Count}: 30
+ {TXT:EliteAPI.ShipLocker.Components[3].Name}: chemicalcatalyst
+ {TXT:EliteAPI.ShipLocker.Components[3].Name_Localised}: Chemical Catalyst
+ {TXT:EliteAPI.ShipLocker.Components[3].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[3].Count}: 20
+ {TXT:EliteAPI.ShipLocker.Components[4].Name}: chemicalsuperbase
+ {TXT:EliteAPI.ShipLocker.Components[4].Name_Localised}: Chemical Superbase
+ {TXT:EliteAPI.ShipLocker.Components[4].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[4].Count}: 15
+ {TXT:EliteAPI.ShipLocker.Components[5].Name}: circuitboard
+ {TXT:EliteAPI.ShipLocker.Components[5].Name_Localised}: Circuit Board
+ {TXT:EliteAPI.ShipLocker.Components[5].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[5].Count}: 35
+ {TXT:EliteAPI.ShipLocker.Components[6].Name}: circuitswitch
+ {TXT:EliteAPI.ShipLocker.Components[6].Name_Localised}: Circuit Switch
+ {TXT:EliteAPI.ShipLocker.Components[6].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[6].Count}: 30
+ {TXT:EliteAPI.ShipLocker.Components[7].Name}: electricalfuse
+ {TXT:EliteAPI.ShipLocker.Components[7].Name_Localised}: Electrical Fuse
+ {TXT:EliteAPI.ShipLocker.Components[7].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[7].Count}: 20
+ {TXT:EliteAPI.ShipLocker.Components[8].Name}: electricalwiring
+ {TXT:EliteAPI.ShipLocker.Components[8].Name_Localised}: Electrical Wiring
+ {TXT:EliteAPI.ShipLocker.Components[8].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[8].Count}: 20
+ {TXT:EliteAPI.ShipLocker.Components[9].Name}: encryptedmemorychip
+ {TXT:EliteAPI.ShipLocker.Components[9].Name_Localised}: Encrypted Memory Chip
+ {TXT:EliteAPI.ShipLocker.Components[9].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[9].Count}: 50
+ {TXT:EliteAPI.ShipLocker.Components[10].Name}: epoxyadhesive
+ {TXT:EliteAPI.ShipLocker.Components[10].Name_Localised}: Epoxy Adhesive
+ {TXT:EliteAPI.ShipLocker.Components[10].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[10].Count}: 25
+ {TXT:EliteAPI.ShipLocker.Components[11].Name}: memorychip
+ {TXT:EliteAPI.ShipLocker.Components[11].Name_Localised}: Memory Chip
+ {TXT:EliteAPI.ShipLocker.Components[11].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[11].Count}: 25
+ {TXT:EliteAPI.ShipLocker.Components[12].Name}: metalcoil
+ {TXT:EliteAPI.ShipLocker.Components[12].Name_Localised}: Metal Coil
+ {TXT:EliteAPI.ShipLocker.Components[12].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[12].Count}: 30
+ {TXT:EliteAPI.ShipLocker.Components[13].Name}: microhydraulics
+ {TXT:EliteAPI.ShipLocker.Components[13].Name_Localised}: Micro Hydraulics
+ {TXT:EliteAPI.ShipLocker.Components[13].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[13].Count}: 30
+ {TXT:EliteAPI.ShipLocker.Components[14].Name}: microsupercapacitor
+ {TXT:EliteAPI.ShipLocker.Components[14].Name_Localised}: Micro Supercapacitor
+ {TXT:EliteAPI.ShipLocker.Components[14].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[14].Count}: 10
+ {TXT:EliteAPI.ShipLocker.Components[15].Name}: microthrusters
+ {TXT:EliteAPI.ShipLocker.Components[15].Name_Localised}: Micro Thrusters
+ {TXT:EliteAPI.ShipLocker.Components[15].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[15].Count}: 15
+ {TXT:EliteAPI.ShipLocker.Components[16].Name}: microtransformer
+ {TXT:EliteAPI.ShipLocker.Components[16].Name_Localised}: Micro Transformer
+ {TXT:EliteAPI.ShipLocker.Components[16].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[16].Count}: 30
+ {TXT:EliteAPI.ShipLocker.Components[17].Name}: motor
+ {TXT:EliteAPI.ShipLocker.Components[17].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[17].Count}: 35
+ {TXT:EliteAPI.ShipLocker.Components[18].Name}: opticalfibre
+ {TXT:EliteAPI.ShipLocker.Components[18].Name_Localised}: Optical Fibre
+ {TXT:EliteAPI.ShipLocker.Components[18].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[18].Count}: 35
+ {TXT:EliteAPI.ShipLocker.Components[19].Name}: opticallens
+ {TXT:EliteAPI.ShipLocker.Components[19].Name_Localised}: Optical Lens
+ {TXT:EliteAPI.ShipLocker.Components[19].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[19].Count}: 35
+ {TXT:EliteAPI.ShipLocker.Components[20].Name}: scrambler
+ {TXT:EliteAPI.ShipLocker.Components[20].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[20].Count}: 40
+ {TXT:EliteAPI.ShipLocker.Components[21].Name}: titaniumplating
+ {TXT:EliteAPI.ShipLocker.Components[21].Name_Localised}: Titanium Plating
+ {TXT:EliteAPI.ShipLocker.Components[21].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[21].Count}: 20
+ {TXT:EliteAPI.ShipLocker.Components[22].Name}: transmitter
+ {TXT:EliteAPI.ShipLocker.Components[22].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[22].Count}: 45
+ {TXT:EliteAPI.ShipLocker.Components[23].Name}: tungstencarbide
+ {TXT:EliteAPI.ShipLocker.Components[23].Name_Localised}: Tungsten Carbide
+ {TXT:EliteAPI.ShipLocker.Components[23].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[23].Count}: 40
+ {TXT:EliteAPI.ShipLocker.Components[24].Name}: viscoelasticpolymer
+ {TXT:EliteAPI.ShipLocker.Components[24].Name_Localised}: Viscoelastic Polymer
+ {TXT:EliteAPI.ShipLocker.Components[24].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[24].Count}: 30
+ {TXT:EliteAPI.ShipLocker.Components[25].Name}: rdx
+ {TXT:EliteAPI.ShipLocker.Components[25].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[25].Count}: 30
+ {TXT:EliteAPI.ShipLocker.Components[26].Name}: electromagnet
+ {TXT:EliteAPI.ShipLocker.Components[26].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[26].Count}: 35
+ {TXT:EliteAPI.ShipLocker.Components[27].Name}: oxygenicbacteria
+ {TXT:EliteAPI.ShipLocker.Components[27].Name_Localised}: Oxygenic Bacteria
+ {TXT:EliteAPI.ShipLocker.Components[27].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[27].Count}: 40
+ {TXT:EliteAPI.ShipLocker.Components[28].Name}: epinephrine
+ {TXT:EliteAPI.ShipLocker.Components[28].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[28].Count}: 40
+ {TXT:EliteAPI.ShipLocker.Components[29].Name}: phneutraliser
+ {TXT:EliteAPI.ShipLocker.Components[29].Name_Localised}: pH Neutraliser
+ {TXT:EliteAPI.ShipLocker.Components[29].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[29].Count}: 20
+ {TXT:EliteAPI.ShipLocker.Components[30].Name}: microelectrode
+ {TXT:EliteAPI.ShipLocker.Components[30].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[30].Count}: 25
+ {TXT:EliteAPI.ShipLocker.Components[31].Name}: ionbattery
+ {TXT:EliteAPI.ShipLocker.Components[31].Name_Localised}: Ion Battery
+ {TXT:EliteAPI.ShipLocker.Components[31].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[31].Count}: 25
+ {TXT:EliteAPI.ShipLocker.Components[32].Name}: weaponcomponent
+ {TXT:EliteAPI.ShipLocker.Components[32].Name_Localised}: Weapon Component
+ {TXT:EliteAPI.ShipLocker.Components[32].OwnerID}: 0
+ {INT:EliteAPI.ShipLocker.Components[32].Count}: 50
+ {INT:EliteAPI.ShipLocker.Items.Length}: 0
+ {INT:EliteAPI.ShipLocker.Components.Length}: 33
+ {INT:EliteAPI.ShipLocker.Consumables.Length}: 0
+ {INT:EliteAPI.ShipLocker.Data.Length}: 0

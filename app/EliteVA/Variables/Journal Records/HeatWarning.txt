@@ -1,0 +1,4 @@
+ ### ((EliteAPI.HeatWarning)) ###
+
+{DATE:EliteAPI.HeatWarning.timestamp}
+{TXT:EliteAPI.HeatWarning.event}

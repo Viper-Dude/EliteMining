@@ -1,0 +1,12 @@
+ ### ((EliteAPI.SAASignalsFound)) ###
+
+{DATE:EliteAPI.SAASignalsFound.timestamp}
+{TXT:EliteAPI.SAASignalsFound.SystemAddress}
+{TXT:EliteAPI.SAASignalsFound.Signals[n].Type_Localised}
+{TXT:EliteAPI.SAASignalsFound.Signals[n].Type}
+{INT:EliteAPI.SAASignalsFound.Signals[n].Count}
+{INT:EliteAPI.SAASignalsFound.Signals.Length}
+{INT:EliteAPI.SAASignalsFound.Genuses.Length}
+{TXT:EliteAPI.SAASignalsFound.event}
+{TXT:EliteAPI.SAASignalsFound.BodyName}
+{TXT:EliteAPI.SAASignalsFound.BodyID}

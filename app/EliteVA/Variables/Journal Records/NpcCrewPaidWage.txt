@@ -1,0 +1,7 @@
+ ### ((EliteAPI.NpcCrewPaidWage)) ###
+
+{DATE:EliteAPI.NpcCrewPaidWage.timestamp}
+{TXT:EliteAPI.NpcCrewPaidWage.NpcCrewName}
+{TXT:EliteAPI.NpcCrewPaidWage.NpcCrewId}
+{TXT:EliteAPI.NpcCrewPaidWage.event}
+{INT:EliteAPI.NpcCrewPaidWage.Amount}

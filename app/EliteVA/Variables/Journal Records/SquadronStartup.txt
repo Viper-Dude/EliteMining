@@ -1,0 +1,8 @@
+ ### ((EliteAPI.SquadronStartup)) ###
+
+{DATE:EliteAPI.SquadronStartup.timestamp}
+{TXT:EliteAPI.SquadronStartup.SquadronName}
+{TXT:EliteAPI.SquadronStartup.SquadronID}
+{TXT:EliteAPI.SquadronStartup.event}
+{TXT:EliteAPI.SquadronStartup.CurrentRankName}
+{INT:EliteAPI.SquadronStartup.CurrentRank}

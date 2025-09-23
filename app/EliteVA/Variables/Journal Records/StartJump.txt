@@ -1,0 +1,9 @@
+ ### ((EliteAPI.StartJump)) ###
+
+{DATE:EliteAPI.StartJump.timestamp}
+{BOOL:EliteAPI.StartJump.Taxi}
+{TXT:EliteAPI.StartJump.SystemAddress}
+{TXT:EliteAPI.StartJump.StarSystem}
+{TXT:EliteAPI.StartJump.StarClass}
+{TXT:EliteAPI.StartJump.JumpType}
+{TXT:EliteAPI.StartJump.event}

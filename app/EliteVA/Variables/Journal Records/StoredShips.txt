@@ -1,0 +1,15 @@
+ ### ((EliteAPI.StoredShips)) ###
+
+{DATE:EliteAPI.StoredShips.timestamp}
+{TXT:EliteAPI.StoredShips.StationName}
+{TXT:EliteAPI.StoredShips.StarSystem}
+{INT:EliteAPI.StoredShips.ShipsRemote.Length}
+{INT:EliteAPI.StoredShips.ShipsHere[n].Value}
+{TXT:EliteAPI.StoredShips.ShipsHere[n].ShipType_Localised}
+{TXT:EliteAPI.StoredShips.ShipsHere[n].ShipType}
+{TXT:EliteAPI.StoredShips.ShipsHere[n].ShipID}
+{TXT:EliteAPI.StoredShips.ShipsHere[n].Name}
+{BOOL:EliteAPI.StoredShips.ShipsHere[n].Hot}
+{INT:EliteAPI.StoredShips.ShipsHere.Length}
+{TXT:EliteAPI.StoredShips.MarketID}
+{TXT:EliteAPI.StoredShips.event}

@@ -1,0 +1,219 @@
+import win32com.client
+import time
+from config import _load_cfg, _save_cfg
+
+_speaker = None
+_voices = None
+_selected_voice = None
+_initialization_failed = False
+_speech_queue = []
+_is_speaking = False
+
+def _initialize_tts():
+    """Initialize TTS engine with retry logic"""
+    global _speaker, _voices, _initialization_failed
+    
+    if _speaker is not None and not _initialization_failed:
+        return True
+    
+    max_retries = 1  # Reduce retries to prevent multiple instances
+    for attempt in range(max_retries):
+        try:
+            # Ensure we only have one instance
+            if _speaker is not None:
+                _speaker = None
+            _speaker = win32com.client.Dispatch("SAPI.SpVoice")
+            _voices = _speaker.GetVoices()
+            _initialization_failed = False
+            return True
+        except Exception as e:
+            print(f"[ANNOUNCER] TTS init failed: {e}")
+            _initialization_failed = True
+    
+    return False
+
+def list_voices():
+    """Get list of available TTS voices"""
+    if not _initialize_tts():
+        return []
+    try:
+        return [v.GetDescription() for v in _voices]
+    except Exception as e:
+        print(f"[ANNOUNCER ERROR] Failed to list voices: {e}")
+        return []
+
+def set_voice(name: str):
+    """Set TTS voice by name"""
+    global _selected_voice
+    if not _initialize_tts():
+        return False
+    
+    try:
+        # Check if the voice name exists first
+        available_voices = [v.GetDescription() for v in _voices]
+        if name not in available_voices:
+            print(f"[ANNOUNCER ERROR] Voice '{name}' not found in available voices: {available_voices}")
+            return False
+        
+        for v in _voices:
+            if v.GetDescription() == name:
+                _speaker.Voice = v
+                _selected_voice = name
+                from config import update_config_value
+                update_config_value("tts_voice", name)
+                return True
+    except Exception as e:
+        # Don't save a broken voice to config
+        return False
+    return False
+
+def set_volume(vol: int):
+    """Set TTS volume (0-100)"""
+    if not _initialize_tts():
+        return
+    
+    try:
+        vol = max(0, min(100, int(vol)))
+        _speaker.Volume = vol
+        from config import update_config_value
+        update_config_value("tts_volume", vol)
+    except Exception as e:
+        pass
+
+def get_current_voice():
+    """Get the currently active voice name"""
+    if not _initialize_tts():
+        return "Unknown (TTS not initialized)"
+    
+    try:
+        current_voice = _speaker.Voice.GetDescription()
+        return current_voice
+    except Exception as e:
+        print(f"[ANNOUNCER ERROR] Failed to get current voice: {e}")
+        return "Unknown (Error getting voice)"
+
+def get_volume() -> int:
+    """Get current TTS volume"""
+    if not _initialize_tts():
+        return 100
+    
+    try:
+        return int(_speaker.Volume)
+    except Exception as e:
+        print(f"[ANNOUNCER ERROR] Failed to get volume: {e}")
+        return 100
+
+def load_saved_settings():
+    """Load saved TTS settings from config"""
+    global _selected_voice
+    if not _initialize_tts():
+        return
+    
+    cfg = _load_cfg()
+    name = cfg.get("tts_voice")
+    vol = cfg.get("tts_volume", 100)
+    
+    # Always set volume first (safer)
+    set_volume(vol)
+    
+    # Try to set saved voice, but fall back gracefully if it fails
+    if name:
+        success = set_voice(name)
+        if not success:
+            # Try to use the first available voice as fallback
+            available_voices = list_voices()
+            if available_voices:
+                fallback_voice = available_voices[0]
+                set_voice(fallback_voice)
+    else:
+        pass  # No saved voice found, using system default
+
+def say(text: str):
+    """Queue text for TTS speech"""
+    global _speech_queue, _is_speaking
+    print(f"[ANNOUNCER] say() called with: {text}")
+    
+    if not _initialize_tts():
+        print(f"[ANNOUNCER] TTS initialization failed for: {text}")
+        return
+    
+    if text.strip():
+        _speech_queue.append(text.strip())
+        print(f"[ANNOUNCER] Added to queue: {text}")
+        _process_speech_queue()
+
+def _process_speech_queue():
+    """Process queued speech items"""
+    global _is_speaking, _speech_queue
+    
+    if _is_speaking or not _speech_queue:
+        return
+    
+    try:
+        text = _speech_queue.pop(0)
+        _is_speaking = True
+        print(f"[ANNOUNCER] Speaking: {text}")
+        
+        # Use asynchronous speech and check status periodically
+        _speaker.Speak(text, 1)  # SVSFlagsAsync = 1 (asynchronous)
+        
+        # Start monitoring speech completion
+        import threading
+        threading.Thread(target=_monitor_speech_completion, daemon=True).start()
+            
+    except Exception as e:
+        print(f"[ANNOUNCER] Error in _process_speech_queue(): {e}")
+        _is_speaking = False
+        _reset_tts()
+
+def _monitor_speech_completion():
+    """Monitor when speech is complete and process next item"""
+    global _is_speaking
+    
+    try:
+        # Wait for speech to finish
+        while _speaker.Status.RunningState == 2:  # Speaking
+            time.sleep(0.1)
+        
+        _is_speaking = False
+        print(f"[ANNOUNCER] Speech completed")
+        
+        # Process next item if any
+        if _speech_queue:
+            _process_speech_queue()
+            
+    except Exception as e:
+        print(f"[ANNOUNCER] Error monitoring speech: {e}")
+        _is_speaking = False
+
+def _reset_tts():
+    """Reset TTS engine variables"""
+    global _speaker, _voices, _initialization_failed, _speech_queue, _is_speaking
+    _speaker = None
+    _voices = None
+    _initialization_failed = True
+    _speech_queue.clear()
+    _is_speaking = False
+
+def diagnose_tts():
+    """Diagnose TTS system for debugging"""
+    try:
+        # Test TTS initialization
+        if _initialize_tts():
+            # Test basic functionality with async speech
+            _speaker.Speak("TTS test successful", 1)  # Async
+            return True
+        else:
+            return False
+    except Exception as e:
+        return False
+
+def reinitialize_tts():
+    """Force reinitialize TTS engine (useful when voices are recycled)"""
+    _reset_tts()
+    _initialization_failed = False
+    return _initialize_tts()
+
+# Initialize TTS engine and load saved settings on module import
+if _initialize_tts():
+    load_saved_settings()

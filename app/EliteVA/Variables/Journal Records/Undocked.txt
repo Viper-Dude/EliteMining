@@ -1,0 +1,9 @@
+ ### ((EliteAPI.Undocked)) ###
+
+{DATE:EliteAPI.Undocked.timestamp}
+{BOOL:EliteAPI.Undocked.Taxi}
+{TXT:EliteAPI.Undocked.StationType}
+{TXT:EliteAPI.Undocked.StationName}
+{BOOL:EliteAPI.Undocked.Multicrew}
+{TXT:EliteAPI.Undocked.MarketID}
+{TXT:EliteAPI.Undocked.event}

@@ -1,0 +1,16 @@
+ ### ((EliteAPI.ModuleRetrieve)) ###
+
+{DATE:EliteAPI.ModuleRetrieve.timestamp}
+{TXT:EliteAPI.ModuleRetrieve.SwapOutItem_Localised}
+{TXT:EliteAPI.ModuleRetrieve.SwapOutItem}
+{TXT:EliteAPI.ModuleRetrieve.Slot}
+{TXT:EliteAPI.ModuleRetrieve.ShipID}
+{TXT:EliteAPI.ModuleRetrieve.Ship}
+{TXT:EliteAPI.ModuleRetrieve.RetrievedItem_Localised}
+{TXT:EliteAPI.ModuleRetrieve.RetrievedItem}
+{DEC:EliteAPI.ModuleRetrieve.Quality}
+{TXT:EliteAPI.ModuleRetrieve.MarketID}
+{INT:EliteAPI.ModuleRetrieve.Level}
+{BOOL:EliteAPI.ModuleRetrieve.Hot}
+{TXT:EliteAPI.ModuleRetrieve.event}
+{TXT:EliteAPI.ModuleRetrieve.EngineerModifications}

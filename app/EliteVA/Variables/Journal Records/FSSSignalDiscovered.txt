@@ -1,0 +1,9 @@
+ ### ((EliteAPI.FSSSignalDiscovered)) ###
+
+{DATE:EliteAPI.FSSSignalDiscovered.timestamp}
+{TXT:EliteAPI.FSSSignalDiscovered.SystemAddress}
+{TXT:EliteAPI.FSSSignalDiscovered.SignalType}
+{TXT:EliteAPI.FSSSignalDiscovered.SignalName_Localised}
+{TXT:EliteAPI.FSSSignalDiscovered.SignalName}
+{BOOL:EliteAPI.FSSSignalDiscovered.IsStation}
+{TXT:EliteAPI.FSSSignalDiscovered.event}

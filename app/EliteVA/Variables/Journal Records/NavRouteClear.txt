@@ -1,0 +1,4 @@
+ ### ((EliteAPI.NavRouteClear)) ###
+
+{DATE:EliteAPI.NavRouteClear.timestamp}
+{TXT:EliteAPI.NavRouteClear.event}

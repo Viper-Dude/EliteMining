@@ -1,0 +1,9 @@
+ ### ((EliteAPI.SAAScanComplete)) ###
+
+{DATE:EliteAPI.SAAScanComplete.timestamp}
+{TXT:EliteAPI.SAAScanComplete.SystemAddress}
+{INT:EliteAPI.SAAScanComplete.ProbesUsed}
+{TXT:EliteAPI.SAAScanComplete.event}
+{INT:EliteAPI.SAAScanComplete.EfficiencyTarget}
+{TXT:EliteAPI.SAAScanComplete.BodyName}
+{TXT:EliteAPI.SAAScanComplete.BodyID}
