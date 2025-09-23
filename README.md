@@ -160,17 +160,17 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 *Detailed mining statistics and summaries.*  
 
 #### 🔖 Bookmarks  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/mining-session_bookmarks.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/mining-session_bookmarks.png" width="600"><br>  
 *Save, search, and manage mining spots.*  
 
 #### 📊 Comprehensive Analytics  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/mining-session_statistic.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/mining-session_statistic.png" width="600"><br>  
 *Session statistics: yields, hit rates, and comparisons.*  
 
 ---
 
 #### Interface Options Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/configurator-options.png" width="600" height="400"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/configurator-options.png" width="600" height="400"><br>  
 *UI and announcement preferences.*  
 
 [⬆️ Back to Top](#-elitemining)
@@ -180,14 +180,14 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 ### 🔍 Ring Search
 - Find planetary rings in systems from your current or any location in the galaxy. Search for specific ring types (Ice, Metal Rich, Rocky, Metallic) within your desired distance to locate the best mining opportunities.  
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/ring_finder.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/ring_finder.png" width="600"><br>  
 
 ---
 
 ### 💾 Backup & Restore 
 - Easily save and restore your complete EliteMining setup including settings, bookmarks, and reports. Create timestamped backups before updates or quickly restore previous configurations with one click.  
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/images/backup.png" width="350"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/backup.png" width="350"><br>  
 
 [⬆️ Back to Top](#-elitemining)
 
