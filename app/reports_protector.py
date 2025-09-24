@@ -40,19 +40,25 @@ class ReportsProtector:
             backup_reports = backup_location / "Reports"
             shutil.copytree(self.reports_dir, backup_reports, dirs_exist_ok=True)
             
-            # Save backup info
+            # Count different types of files for detailed reporting
+            file_counts = self._count_files_by_type(backup_reports)
+            total_files = sum(file_counts.values())
+            
+            # Save backup info with detailed file breakdown
             backup_info = {
                 "backup_time": datetime.now().isoformat(),
                 "backup_location": str(backup_location),
                 "original_location": str(self.reports_dir),
-                "files_count": sum(1 for _ in backup_reports.rglob('*') if _.is_file())
+                "files_count": total_files,
+                "file_breakdown": file_counts
             }
             
             with open(self.backup_info_file, 'w') as f:
                 json.dump(backup_info, f, indent=2)
                 
             print(f"✅ Reports backup created at: {backup_location}")
-            print(f"   Files backed up: {backup_info['files_count']}")
+            print(f"   Total files backed up: {backup_info['files_count']}")
+            self._print_file_breakdown(file_counts)
             return str(backup_location)
             
         except Exception as e:
@@ -94,9 +100,13 @@ class ReportsProtector:
             # Restore from backup
             shutil.copytree(backup_reports, self.reports_dir, dirs_exist_ok=True)
             
-            files_restored = sum(1 for _ in self.reports_dir.rglob('*') if _.is_file())
+            # Count restored files with breakdown
+            file_counts = self._count_files_by_type(self.reports_dir)
+            total_files = sum(file_counts.values())
+            
             print(f"✅ Reports folder restored successfully")
-            print(f"   Files restored: {files_restored}")
+            print(f"   Total files restored: {total_files}")
+            self._print_file_breakdown(file_counts)
             
             # Clean up backup info file
             if self.backup_info_file.exists():
@@ -166,6 +176,52 @@ class ReportsProtector:
         except Exception as e:
             print(f"❌ Error merging backup: {e}")
             return False
+    
+    def _count_files_by_type(self, reports_path):
+        """Count files by type for detailed backup reporting"""
+        file_counts = {
+            "session_reports": 0,
+            "screenshots": 0,
+            "graphs": 0,
+            "csv_files": 0,
+            "json_files": 0,
+            "other": 0
+        }
+        
+        for file_path in reports_path.rglob('*'):
+            if file_path.is_file():
+                file_name = file_path.name.lower()
+                file_ext = file_path.suffix.lower()
+                
+                if "mining session" in str(file_path).lower() and file_ext == '.txt':
+                    file_counts["session_reports"] += 1
+                elif "screenshot" in str(file_path).lower() and file_ext in ['.png', '.jpg', '.jpeg']:
+                    file_counts["screenshots"] += 1
+                elif str(file_path.parent).endswith("Graphs") and file_ext == '.png':
+                    file_counts["graphs"] += 1
+                elif file_ext == '.csv':
+                    file_counts["csv_files"] += 1
+                elif file_ext == '.json':
+                    file_counts["json_files"] += 1
+                else:
+                    file_counts["other"] += 1
+                    
+        return file_counts
+    
+    def _print_file_breakdown(self, file_counts):
+        """Print detailed breakdown of backed up files"""
+        if file_counts["session_reports"] > 0:
+            print(f"   • Session reports: {file_counts['session_reports']}")
+        if file_counts["screenshots"] > 0:
+            print(f"   • Screenshots: {file_counts['screenshots']}")
+        if file_counts["graphs"] > 0:
+            print(f"   • Mining graphs: {file_counts['graphs']}")
+        if file_counts["csv_files"] > 0:
+            print(f"   • CSV index files: {file_counts['csv_files']}")
+        if file_counts["json_files"] > 0:
+            print(f"   • Configuration files: {file_counts['json_files']}")
+        if file_counts["other"] > 0:
+            print(f"   • Other files: {file_counts['other']}")
 
 
 def main():

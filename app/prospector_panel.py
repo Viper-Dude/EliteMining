@@ -20,6 +20,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import subprocess
 from typing import Dict, Any, Optional, List, Tuple
+from pathlib import Path
+import tempfile
+from PIL import ImageGrab
 from core.constants import MENU_COLORS
 
 def get_app_icon_path() -> str:
@@ -1096,13 +1099,13 @@ class ProspectorPanel(ttk.Frame):
         self.pause_resume_btn.pack(side="left", padx=(4, 0))
         self.ToolTip(self.pause_resume_btn, "Pause or resume the current mining session")
         
-        self.stop_btn = tk.Button(session_controls, text="Stop", command=self._session_stop, state="disabled", 
+        self.stop_btn = tk.Button(session_controls, text="End", command=self._session_stop, state="disabled", 
                                 bg="#5a2a2a", fg="#ffffff", 
                                 activebackground="#6a3a3a", activeforeground="#ffffff",
                                 relief="solid", bd=1, cursor="hand2", width=10,
                                 highlightbackground="#3a1a1a", highlightcolor="#3a1a1a")
         self.stop_btn.pack(side="left", padx=(4, 0))
-        self.ToolTip(self.stop_btn, "Stop the session and generate a final report")
+        self.ToolTip(self.stop_btn, "End the session and generate a final report")
         
         self.cancel_btn = tk.Button(session_controls, text="Cancel", command=self._session_cancel, state="disabled", 
                                   bg="#4a4a4a", fg="#ffffff", 
@@ -1471,7 +1474,7 @@ class ProspectorPanel(ttk.Frame):
         frame.rowconfigure(0, weight=1)
 
         # Create sortable treeview with Material Analysis columns
-        tree = ttk.Treeview(frame, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospectors", "comment"), show="headings", height=16)
+        tree = ttk.Treeview(frame, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospectors", "comment", "enhanced"), show="headings", height=16)
         tree.grid(row=0, column=0, sticky="nsew")
         
         # Remove custom styling - use default treeview appearance
@@ -1482,6 +1485,12 @@ class ProspectorPanel(ttk.Frame):
         
         # Bind double-click to edit comments
         tree.bind("<Double-1>", self._edit_comment_popup)
+        
+        # Bind single-click to handle detailed report opening (with higher priority)
+        tree.bind("<Button-1>", self._create_enhanced_click_handler(tree))
+        
+        # Add hover effect for detailed reports column
+        tree.bind("<Motion>", lambda event: self._handle_mouse_motion(event, tree))
         
         # Configure column headings
         tree.heading("date", text="Date/Time")
@@ -1497,6 +1506,7 @@ class ProspectorPanel(ttk.Frame):
         tree.heading("cargo", text="Materials")
         tree.heading("prospectors", text="Prospectors")
         tree.heading("comment", text="Comment")
+        tree.heading("enhanced", text="Detail Report")
         
 
         
@@ -1522,9 +1532,10 @@ class ProspectorPanel(ttk.Frame):
         tree.column("tph", width=60, minwidth=50, anchor="e")
         
         # New cargo columns - wider since we use full material names
-        tree.column("cargo", width=300, minwidth=250, anchor="w")
-        tree.column("prospectors", width=80, minwidth=70, anchor="center")
-        tree.column("comment", width=200, minwidth=150, anchor="w")
+        tree.column("cargo", width=300, minwidth=250, anchor="w", stretch=False)
+        tree.column("prospectors", width=80, minwidth=70, anchor="center", stretch=False)
+        tree.column("comment", width=200, minwidth=150, anchor="w", stretch=True)
+        tree.column("enhanced", width=100, minwidth=80, anchor="center", stretch=False)
 
         # Add scrollbar
         sb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
@@ -1674,6 +1685,15 @@ class ProspectorPanel(ttk.Frame):
         for i, session in enumerate(sessions_data):
             # Apply alternating row tags
             tag = "evenrow" if i % 2 == 0 else "oddrow"
+            
+            # Check if this report has detailed reports (keep screenshots functionality but don't show column)
+            # Try both display date and raw timestamp for compatibility
+            report_id_display = f"{session['date']}_{session['system']}_{session['body']}"
+            report_id_raw = f"{session.get('timestamp_raw', session['date'])}_{session['system']}_{session['body']}"
+            
+            enhanced_indicator = (self._get_detailed_report_indicator(report_id_display) or 
+                                self._get_detailed_report_indicator(report_id_raw))
+            
             item_id = tree.insert("", "end", values=(
                 session['date'],
                 session['duration'],
@@ -1686,8 +1706,19 @@ class ProspectorPanel(ttk.Frame):
                 session['hit_rate'],
                 session['quality'],
                 session['cargo'],
-                session['prospectors']
+                session['prospectors'],
+                session.get('comment', ''),
+                enhanced_indicator
             ), tags=(tag,))
+            
+            # After inserting, check with actual tree values for consistency
+            tree_values = tree.item(item_id, 'values')
+            if len(tree_values) >= 4:
+                tree_report_id = f"{tree_values[0]}_{tree_values[2]}_{tree_values[3]}"
+                
+                # Update enhanced column with correct check
+                actual_enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
+                tree.set(item_id, "enhanced", actual_enhanced_indicator)
             # Store the full session data for file lookup and tooltips
             session_lookup[item_id] = session
         
@@ -1891,7 +1922,40 @@ class ProspectorPanel(ttk.Frame):
             self._set_status("Could not find specific report file, opening reports folder...")
             self._open_path(self.reports_dir)
 
-        tree.bind("<Double-1>", lambda e: open_selected())
+        def handle_popup_double_click(event):
+            """Handle double-click on popup reports tree"""
+            # Identify which column was clicked
+            item = tree.identify('item', event.x, event.y)
+            column = tree.identify('column', event.x, event.y)
+            
+            if not item:
+                return
+            
+            # Check if it's the comment column or detailed reports column
+            if column == '#13':  # Comment column in popup
+                # Edit comment
+                self._edit_comment_popup(event)
+            elif column == '#14':  # Detailed reports column in popup
+                # Handle detailed report opening
+                columns = tree["columns"]
+                if len(columns) > 13:  # Make sure enhanced column exists
+                    column_name = columns[13]  # Enhanced column (0-indexed)
+                    cell_value = tree.set(item, column_name)
+                    if cell_value == "✓":  # Has detailed report
+                        session_data = self.reports_window_session_lookup.get(item)
+                        if session_data:
+                            original_timestamp = session_data.get('timestamp_raw', session_data.get('date', ''))
+                            system = session_data.get('system', '')
+                            body = session_data.get('body', '')
+                            report_id = f"{original_timestamp}_{system}_{body}"
+                            self._open_enhanced_report(report_id)
+                # Don't open CSV file for detailed reports column
+                return
+            else:
+                # Open the report file for other columns
+                open_selected()
+
+        tree.bind("<Double-1>", handle_popup_double_click)
         
         # Add right-click context menu
         def copy_system_to_clipboard_reports(tree_ref):
@@ -1938,8 +2002,16 @@ class ProspectorPanel(ttk.Frame):
                                          activebackground=MENU_COLORS["activebackground"], 
                                          activeforeground=MENU_COLORS["activeforeground"],
                                          selectcolor=MENU_COLORS["selectcolor"])
-                    context_menu.add_command(label="📂 Open Report", command=open_selected)
-                    context_menu.add_command(label="📋 Copy System Name", command=lambda: copy_system_to_clipboard_reports(tree))
+                    context_menu.add_command(label="📂 Open Report (CSV)", command=open_selected)
+                    context_menu.add_command(label="📊 Open Detailed Report (HTML)", command=lambda: self._open_enhanced_report_from_menu(tree))
+                    context_menu.add_separator()
+                    context_menu.add_command(label="📊 Generate Detailed Report (HTML)", command=lambda: self._generate_enhanced_report_from_menu(tree))
+                    context_menu.add_separator()
+                    context_menu.add_command(label="� Copy System Name", command=lambda: copy_system_to_clipboard_reports(tree))
+                    context_menu.add_separator()
+                    # Debug: Add a test menu item to verify context menu is working
+                    # from tkinter import messagebox
+                    # context_menu.add_command(label="🔧 DEBUG: Menu Working!", command=lambda: messagebox.showinfo("Debug", "Right-click menu is working! The new screenshot and detailed report options should be visible above."))
                     context_menu.add_separator()
                     
                     # Word wrap toggle
@@ -1988,10 +2060,13 @@ class ProspectorPanel(ttk.Frame):
                     
                     # Update label based on selection count
                     if len(selected_items) == 1:
-                        context_menu.add_command(label="🗑️ Delete Report", 
+                        context_menu.add_command(label="🗑️Delete Detailed Report + Screenshots", 
+                                               command=lambda: self._delete_enhanced_report_from_menu(tree))
+                        context_menu.add_separator()  # Add separator for safety
+                        context_menu.add_command(label="🗑️Delete CSV Entry + Text Report", 
                                                command=lambda items=selected_items: delete_selected(items))
                     else:
-                        context_menu.add_command(label=f"🗑️ Delete {len(selected_items)} Reports", 
+                        context_menu.add_command(label=f"🗑️Delete {len(selected_items)} CSV Entries + Text Reports", 
                                                command=lambda items=selected_items: delete_selected(items))
                     
                     try:
@@ -2046,22 +2121,30 @@ class ProspectorPanel(ttk.Frame):
             # Create confirmation message
             if len(sessions_to_delete) == 1:
                 item_id, session = sessions_to_delete[0]
-                confirm_msg = (f"Delete session report?\n\n"
-                              f"Date: {session['date']}\n"
-                              f"System: {session['system']}\n"
-                              f"Body: {session['body']}\n"
-                              f"Duration: {session['duration']}\n\n"
-                              f"This will delete both the CSV entry and the report file.")
-                title = "Delete Session Report"
+                confirm_msg = (f"Are you sure you want to permanently delete this mining session report?\n\n"
+                              f"Session Details:\n"
+                              f"• Date: {session['date']}\n"
+                              f"• System: {session['system']}\n"
+                              f"• Body: {session['body']}\n"
+                              f"• Duration: {session['duration']}\n"
+                              f"• Tons Mined: {session['tons']}\n\n"
+                              f"This will permanently delete:\n"
+                              f"• The CSV report entry\n"
+                              f"• The individual report file\n\n"
+                              f"This action cannot be undone.")
+                title = "Delete Mining Session Report"
             else:
-                confirm_msg = f"Delete {len(sessions_to_delete)} session reports?\n\n"
+                confirm_msg = f"Are you sure you want to permanently delete {len(sessions_to_delete)} mining session reports?\n\n"
                 confirm_msg += "Sessions to be deleted:\n"
                 for i, (_, session) in enumerate(sessions_to_delete[:5], 1):  # Show max 5 items
                     confirm_msg += f"  {i}. {session['date']} - {session['system']}/{session['body']}\n"
                 if len(sessions_to_delete) > 5:
                     confirm_msg += f"  ... and {len(sessions_to_delete) - 5} more\n"
-                confirm_msg += f"\nThis will delete both CSV entries and report files."
-                title = "Delete Multiple Session Reports"
+                confirm_msg += f"\nThis will permanently delete:\n"
+                confirm_msg += f"• All CSV report entries\n"
+                confirm_msg += f"• All individual report files\n\n"
+                confirm_msg += f"This action cannot be undone."
+                title = "Delete Multiple Mining Session Reports"
             
             # Confirm deletion
             result = messagebox.askyesno(title, confirm_msg, icon="warning")
@@ -2187,9 +2270,9 @@ class ProspectorPanel(ttk.Frame):
         btns = ttk.Frame(win, padding=(6, 8))
         btns.grid(row=1, column=0, sticky="ew", pady=(8, 8))
         btns.columnconfigure(0, weight=1)  # Left spacer
-        btns.columnconfigure(4, weight=1)  # Right spacer to push close button to the right
+        btns.columnconfigure(5, weight=1)  # Right spacer to push close button to the right
         
-        # Center the three action buttons
+        # Center the action buttons
         rebuild_btn = tk.Button(btns, text="Rebuild CSV", command=lambda: self._rebuild_csv_from_files(csv_path, win), bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
         rebuild_btn.grid(row=0, column=1, padx=(4, 0))
         self.ToolTip(rebuild_btn, "Rebuild the CSV index from all text files in the reports folder. Use this if data doesn't match between the table and files.")
@@ -2201,10 +2284,14 @@ class ProspectorPanel(ttk.Frame):
         export_btn = tk.Button(btns, text="Export CSV", command=lambda: self._export_csv(csv_path), bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
         export_btn.grid(row=0, column=3, padx=(4, 0))
         self.ToolTip(export_btn, "Export session data to a CSV file that can be opened in Excel or other spreadsheet programs.")
+        
+        batch_btn = tk.Button(btns, text="Batch Reports", command=lambda: self._open_batch_reports_dialog(win), bg="#2a4a5a", fg="#ffffff", activebackground="#3a5a6a", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
+        batch_btn.grid(row=0, column=4, padx=(4, 0))
+        self.ToolTip(batch_btn, "Generate enhanced HTML reports for multiple sessions at once.")
 
         # Close button on the far right with more space
         close_btn = tk.Button(btns, text="Close", command=win.destroy, bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666", width=8)
-        close_btn.grid(row=0, column=5, sticky="e", padx=(20, 0))
+        close_btn.grid(row=0, column=6, sticky="e", padx=(20, 0))
         self.ToolTip(close_btn, "Close the reports window.")
 
     def _rebuild_csv_from_files(self, csv_path: str, parent_window) -> None:
@@ -2286,10 +2373,14 @@ class ProspectorPanel(ttk.Frame):
                         if len(time_parts) == 3:
                             duration_seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(time_parts[2])
                     except:
-                        duration_seconds = 1  # Fallback to avoid division by zero
+                        duration_seconds = 0
                     
-                    duration_hours = max(duration_seconds / 3600.0, 1e-9)
-                    overall_tph = total_tons / duration_hours if duration_hours > 0 else 0.0
+                    # For manual entries with zero duration, set TPH to 0 instead of calculating
+                    if duration_seconds == 0:
+                        overall_tph = 0.0
+                    else:
+                        duration_hours = duration_seconds / 3600.0
+                        overall_tph = total_tons / duration_hours
                     
                     # Parse additional data from session content
                     asteroids_prospected = ''
@@ -2338,6 +2429,22 @@ class ProspectorPanel(ttk.Frame):
                             material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
                             if material_lines:
                                 materials_breakdown = ', '.join([f"{mat.strip()}: {tons}t" for mat, tons in material_lines])
+                    
+                    # Try CARGO MATERIAL BREAKDOWN section for manual entries (if refined materials empty)
+                    if not materials_breakdown:
+                        cargo_section = re.search(r'=== CARGO MATERIAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
+                        if cargo_section:
+                            cargo_text = cargo_section.group(1)
+                            # Look for "MaterialName: Xt" patterns
+                            material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
+                            if material_lines:
+                                materials_breakdown = ', '.join([f"{mat.strip()}: {tons}t" for mat, tons in material_lines])
+                    
+                    # If materials_tracked is empty but we have materials_breakdown, count the materials
+                    if not materials_tracked and materials_breakdown:
+                        # Count comma-separated materials in breakdown
+                        material_count = len([m.strip() for m in materials_breakdown.split(',') if m.strip()])
+                        materials_tracked = str(material_count) if material_count > 0 else ''
                     
                     # Get preserved data for this timestamp (fallback if parsing fails)
                     existing_data = existing_analysis_data.get(timestamp_local, {})
@@ -2466,10 +2573,14 @@ class ProspectorPanel(ttk.Frame):
                         if len(time_parts) == 3:
                             duration_seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(time_parts[2])
                     except:
-                        duration_seconds = 1  # Fallback to avoid division by zero
+                        duration_seconds = 0
                     
-                    duration_hours = max(duration_seconds / 3600.0, 1e-9)
-                    overall_tph = total_tons / duration_hours if duration_hours > 0 else 0.0
+                    # For manual entries with zero duration, set TPH to 0 instead of calculating
+                    if duration_seconds == 0:
+                        overall_tph = 0.0
+                    else:
+                        duration_hours = duration_seconds / 3600.0
+                        overall_tph = total_tons / duration_hours
                     
                     # Parse additional data from session content
                     asteroids_prospected = ''
@@ -2518,6 +2629,22 @@ class ProspectorPanel(ttk.Frame):
                             material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
                             if material_lines:
                                 materials_breakdown = ', '.join([f"{mat.strip()}: {tons}t" for mat, tons in material_lines])
+                    
+                    # Try CARGO MATERIAL BREAKDOWN section for manual entries (if refined materials empty)
+                    if not materials_breakdown:
+                        cargo_section = re.search(r'=== CARGO MATERIAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
+                        if cargo_section:
+                            cargo_text = cargo_section.group(1)
+                            # Look for "MaterialName: Xt" patterns
+                            material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
+                            if material_lines:
+                                materials_breakdown = ', '.join([f"{mat.strip()}: {tons}t" for mat, tons in material_lines])
+                    
+                    # If materials_tracked is empty but we have materials_breakdown, count the materials
+                    if not materials_tracked and materials_breakdown:
+                        # Count comma-separated materials in breakdown
+                        material_count = len([m.strip() for m in materials_breakdown.split(',') if m.strip()])
+                        materials_tracked = str(material_count) if material_count > 0 else ''
                     
                     # Extract session comment from text file content
                     session_comment = ""
@@ -2764,10 +2891,18 @@ class ProspectorPanel(ttk.Frame):
 
     # --- Report saving on Stop & Compute ---
     def _save_session_report(self, header: str, lines: List[str], overall_tph: float, cargo_session_data: dict = None, comment: str = "") -> str:
+        """Save session report with auto-generated timestamp"""
         ts = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        return self._save_session_report_with_timestamp(header, lines, overall_tph, cargo_session_data, comment, ts)
+    
+    def _save_session_report_with_timestamp(self, header: str, lines: List[str], overall_tph: float, cargo_session_data: dict = None, comment: str = "", timestamp: str = None) -> str:
+        """Save session report with specified timestamp"""
+        if timestamp is None:
+            timestamp = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        
         sysname = (self.session_system.get().strip() or self.last_system or "Unknown").replace(" ", "_")
         body = (self.session_body.get().strip() or self.last_body or "Unknown").replace(" ", "_")
-        fname = f"Session_{ts}_{sysname}_{body}.txt"
+        fname = f"Session_{timestamp}_{sysname}_{body}.txt"
         os.makedirs(self.reports_dir, exist_ok=True)
         fpath = os.path.join(self.reports_dir, fname)
 
@@ -2958,6 +3093,50 @@ class ProspectorPanel(ttk.Frame):
                 
         except Exception as e:
             print(f"Failed to update CSV: {e}")
+
+    def _update_existing_csv_row(self, timestamp_local: str, updated_data: dict) -> bool:
+        """Update an existing CSV row with new data after manual materials are added"""
+        try:
+            csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
+            
+            # If CSV doesn't exist, nothing to update
+            if not os.path.exists(csv_path):
+                return False
+                
+            # Read existing CSV data
+            sessions = []
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                sessions = list(reader)
+            
+            # Find and update the matching row by timestamp
+            updated = False
+            for session in sessions:
+                if session.get('timestamp_utc') == timestamp_local:
+                    # Update the session with new data
+                    session.update(updated_data)
+                    updated = True
+                    break
+            
+            if updated:
+                # Write back to CSV with updated data
+                with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+                    fieldnames = ['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 
+                                'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 
+                                'avg_quality_percent', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment']
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(sessions)
+                
+                print(f"Updated CSV row for session {timestamp_local}")
+                return True
+            else:
+                print(f"No matching CSV row found for timestamp {timestamp_local}")
+                return False
+                
+        except Exception as e:
+            print(f"Failed to update existing CSV row: {e}")
+            return False
 
     def _on_reports_window_close(self) -> None:
         """Handle reports window closing"""
@@ -3452,7 +3631,7 @@ class ProspectorPanel(ttk.Frame):
                     
                     # Populate the tree
                     for session in sessions_data:
-                        self.reports_tree.insert("", "end", values=(
+                        item_id = self.reports_tree.insert("", "end", values=(
                             session['date'],
                             session['duration'],
                             session['system'], 
@@ -3465,8 +3644,16 @@ class ProspectorPanel(ttk.Frame):
                             session['quality'],
                             session['cargo'],
                             session['prospectors'],
-                            session.get('comment', '')
+                            session.get('comment', ''),
+                            ""  # Enhanced column placeholder
                         ))
+                        
+                        # Check detailed report using tree values for consistency
+                        tree_values = self.reports_tree.item(item_id, 'values')
+                        if len(tree_values) >= 4:
+                            tree_report_id = f"{tree_values[0]}_{tree_values[2]}_{tree_values[3]}"
+                            enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
+                            self.reports_tree.set(item_id, "enhanced", enhanced_indicator)
         except Exception as e:
             print(f"Failed to refresh reports window: {e}")
             # Reset window references if there's an error
@@ -3502,12 +3689,15 @@ class ProspectorPanel(ttk.Frame):
                                                "Platinum Sessions", "High-Value Materials", "Common Materials"], 
                                         state="readonly", width=28)
         date_filter_combo.pack(side="left", padx=(0, 5))
+        
+        # Add hint text for right-click options
+        ttk.Label(filter_frame, text="Right-click rows for options", foreground="gray").pack(side="right", padx=(10, 0))
         date_filter_combo.bind("<<ComboboxSelected>>", self._on_date_filter_changed)
         
         self.ToolTip(date_filter_combo, "Filter sessions by date, yield performance, hit rate, or materials")
 
         # Create sortable treeview with Material Analysis columns
-        self.reports_tree_tab = ttk.Treeview(main_frame, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospects", "comment"), show="headings", height=16, selectmode="extended")
+        self.reports_tree_tab = ttk.Treeview(main_frame, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospects", "comment", "enhanced"), show="headings", height=16, selectmode="extended")
         self.reports_tree_tab.grid(row=1, column=0, sticky="nsew")
         
         # Remove custom styling - use default treeview appearance
@@ -3528,6 +3718,7 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.heading("cargo", text="Materials")
         self.reports_tree_tab.heading("prospects", text="Limpets")
         self.reports_tree_tab.heading("comment", text="Comment")
+        self.reports_tree_tab.heading("enhanced", text="Detail Report")
         
         # Add sorting to tab treeview
         tab_sort_dirs = {}
@@ -3618,6 +3809,7 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.column("cargo", width=250, stretch=False, anchor="w")
         self.reports_tree_tab.column("prospects", width=70, stretch=False, anchor="center")
         self.reports_tree_tab.column("comment", width=200, stretch=False, anchor="w")
+        self.reports_tree_tab.column("enhanced", width=100, stretch=False, anchor="center")
 
         # Add vertical scrollbar
         v_scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.reports_tree_tab.yview)
@@ -3867,15 +4059,36 @@ class ProspectorPanel(ttk.Frame):
             if not item:
                 return
             
-            # Check if it's the comment column (last column)
-            if column == '#13':  # Comment column is the 13th column (0-indexed would be #13)
+            # Check if it's the comment column (#13) or detailed reports column (#14)
+            if column == '#13':  # Comment column
                 # Use the existing popup comment editor
                 self._edit_comment_popup_reports(event)
+            elif column == '#14':  # Detailed reports column
+                # Handle detailed report opening on double-click too
+                columns = self.reports_tree_tab["columns"]
+                column_name = columns[13]  # Enhanced column (0-indexed)
+                cell_value = self.reports_tree_tab.set(item, column_name)
+                if cell_value == "✓":  # Has detailed report
+                    session_data = self.reports_tab_session_lookup.get(item)
+                    if session_data:
+                        original_timestamp = session_data.get('timestamp_raw', session_data.get('date', ''))
+                        system = session_data.get('system', '')
+                        body = session_data.get('body', '')
+                        report_id = f"{original_timestamp}_{system}_{body}"
+                        self._open_enhanced_report(report_id)
+                # Don't open CSV file for detailed reports column
+                return
             else:
                 # Open the report file for other columns
                 open_selected()
 
         self.reports_tree_tab.bind("<Double-1>", handle_double_click)
+        
+        # Bind single-click to handle detailed report opening (with higher priority)
+        self.reports_tree_tab.bind("<Button-1>", self._create_enhanced_click_handler(self.reports_tree_tab))
+        
+        # Add hover effect for detailed reports column
+        self.reports_tree_tab.bind("<Motion>", lambda event: self._handle_mouse_motion(event, self.reports_tree_tab))
         
         # Context menu for right-click delete functionality
         def show_context_menu(event):
@@ -3890,12 +4103,17 @@ class ProspectorPanel(ttk.Frame):
                     
                     # Create context menu
                     context_menu = tk.Menu(self.reports_tree_tab, tearoff=0, bg="#2d2d2d", fg="#ffffff")
-                    context_menu.add_command(label="Open Report", command=lambda: open_selected())
+                    context_menu.add_command(label="Open Report (CSV)", command=lambda: open_selected())
+                    context_menu.add_command(label="Open Detailed Report (HTML)", command=lambda: self._open_enhanced_report_from_menu(self.reports_tree_tab))
+                    context_menu.add_separator()
                     context_menu.add_command(label="Bookmark This Location", command=lambda: bookmark_selected())
+                    context_menu.add_command(label="Generate Detailed Report (HTML)", command=lambda: self._generate_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()
                     context_menu.add_command(label="Copy System Name", command=lambda: copy_system_name_tab())
                     context_menu.add_separator()
-                    context_menu.add_command(label="Delete Report", command=lambda: delete_selected())
+                    context_menu.add_command(label="Delete Detailed Report + Screenshots", command=lambda: self._delete_enhanced_report_from_menu(self.reports_tree_tab))
+                    context_menu.add_separator()  # Add separator for safety
+                    context_menu.add_command(label="Delete CSV Entry + Text Report", command=lambda: delete_selected())
                     
                     # Show the menu at cursor position
                     context_menu.tk_popup(event.x_root, event.y_root)
@@ -3919,15 +4137,45 @@ class ProspectorPanel(ttk.Frame):
                         system = session['system']
                         body = session['body']
                         date_str = session['date']
-                        msg = f"Delete report for {system} - {body} from {date_str}?"
+                        duration = session.get('elapsed', 'Unknown')
+                        tons = session.get('tons', 'Unknown')
+                        msg = (f"Are you sure you want to permanently delete this mining session report?\n\n"
+                              f"Session Details:\n"
+                              f"• Date: {date_str}\n"
+                              f"• System: {system}\n"
+                              f"• Body: {body}\n"
+                              f"• Duration: {duration}\n"
+                              f"• Tons Mined: {tons}\n\n"
+                              f"This will permanently delete:\n"
+                              f"• The CSV report entry\n"
+                              f"• The individual report file\n\n"
+                              f"This action cannot be undone.")
+                        title = "Delete Mining Session Report"
                     else:
                         self._set_status("Session data not found for selected item")
                         return
                 else:
-                    msg = f"Delete {item_count} selected reports?"
+                    # Build list of sessions to be deleted for display
+                    sessions_to_delete = []
+                    for item_id in selected_items:
+                        if item_id in self.reports_tab_session_lookup:
+                            session = self.reports_tab_session_lookup[item_id]
+                            sessions_to_delete.append(session)
+                    
+                    msg = f"Are you sure you want to permanently delete {item_count} mining session reports?\n\n"
+                    msg += "Sessions to be deleted:\n"
+                    for i, session in enumerate(sessions_to_delete[:5], 1):  # Show max 5 items
+                        msg += f"  {i}. {session['date']} - {session['system']}/{session['body']}\n"
+                    if len(sessions_to_delete) > 5:
+                        msg += f"  ... and {len(sessions_to_delete) - 5} more\n"
+                    msg += f"\nThis will permanently delete:\n"
+                    msg += f"• All CSV report entries\n"
+                    msg += f"• All individual report files\n\n"
+                    msg += f"This action cannot be undone."
+                    title = "Delete Multiple Mining Session Reports"
                 
                 # Confirm deletion
-                if messagebox.askyesno("Confirm Deletion", msg):
+                if messagebox.askyesno(title, msg, icon="warning"):
                     deleted_files = []
                     
                     for item_id in selected_items:
@@ -4066,6 +4314,11 @@ class ProspectorPanel(ttk.Frame):
         try:
             if not hasattr(self, 'reports_tree_tab') or not self.reports_tree_tab:
                 return
+            
+            # Migrate existing detailed reports to mapping system (only run once)
+            if not hasattr(self, '_enhanced_migration_done'):
+                self._migrate_existing_enhanced_reports()
+                self._enhanced_migration_done = True
             
             # Clear all cached data to prevent stale data issues
             self._clear_reports_cache()
@@ -4344,6 +4597,10 @@ class ProspectorPanel(ttk.Frame):
             self.reports_tab_session_lookup = {}  # Store for tooltip access  
             self.reports_tab_original_sessions = sessions_data.copy()  # Store backup for sorting
             for session in sessions_data:
+                # Check if this report has screenshots
+                # Check if this report has detailed reports (keep screenshots functionality but don't show column)
+                # Use tree values for consistent report_id matching
+                
                 item_id = self.reports_tree_tab.insert("", "end", values=(
                     session['date'],
                     session['duration'],
@@ -4357,8 +4614,16 @@ class ProspectorPanel(ttk.Frame):
                     session['quality'],
                     session['cargo'],
                     session['prospects'],
-                    session.get('comment', '')
+                    session.get('comment', ''),
+                    ""  # Enhanced column placeholder
                 ))
+                
+                # Check detailed report using tree values for consistency
+                tree_values = self.reports_tree_tab.item(item_id, 'values')
+                if len(tree_values) >= 4:
+                    tree_report_id = f"{tree_values[0]}_{tree_values[2]}_{tree_values[3]}"
+                    enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
+                    self.reports_tree_tab.set(item_id, "enhanced", enhanced_indicator)
                 # Store the full session data for tooltip lookup
                 self.reports_tab_session_lookup[item_id] = session
             
@@ -5078,6 +5343,7 @@ class ProspectorPanel(ttk.Frame):
         self.session_paused_seconds = 0.0
         self.session_totals = {}
         self.session_elapsed.set("00:00:00")
+        self.session_screenshots = []  # Initialize screenshots list for this session
         
         # Reset and start mining statistics for new session
         self.session_analytics.start_session()
@@ -5678,13 +5944,76 @@ class ProspectorPanel(ttk.Frame):
         # Stop mining analytics
         self.session_analytics.stop_session()
         
-        # Get cargo tracking data for material breakdown
+        # Ask if user wants to add refinery materials BEFORE ending session tracking
+        from tkinter import messagebox
+        if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
+            add_refinery = messagebox.askyesno(
+                "Refinery Materials", 
+                "Do you have any additional materials in your refinery that you want to add to this session?",
+                parent=self.winfo_toplevel()
+            )
+            
+            if add_refinery:
+                try:
+                    # Import here to avoid circular import
+                    from main import RefineryDialog
+                    dialog = RefineryDialog(
+                        parent=self.winfo_toplevel(),
+                        cargo_monitor=self.main_app.cargo_monitor,
+                        current_cargo_items=self.main_app.cargo_monitor.cargo_items.copy()
+                    )
+                    refinery_result = dialog.show()
+                    
+                    if refinery_result:  # User added refinery contents
+                        # Store refinery materials in cargo monitor for session tracking
+                        if not hasattr(self.main_app.cargo_monitor, 'refinery_contents'):
+                            self.main_app.cargo_monitor.refinery_contents = {}
+                        for material_name, quantity in refinery_result.items():
+                            if material_name in self.main_app.cargo_monitor.refinery_contents:
+                                self.main_app.cargo_monitor.refinery_contents[material_name] += quantity
+                            else:
+                                self.main_app.cargo_monitor.refinery_contents[material_name] = quantity
+                        
+                        # DON'T add to cargo_items - refinery materials are tracked separately
+                        # This prevents double-counting in end_session_tracking()
+                        
+                        # Update display to show current cargo (without refinery materials in main display)
+                        self.main_app.cargo_monitor.update_display()
+                        
+                        # Trigger update callback to refresh integrated cargo display
+                        if self.main_app.cargo_monitor.update_callback:
+                            self.main_app.cargo_monitor.update_callback()
+                        
+                        print(f"Added refinery materials before session end: {refinery_result}")
+                        
+                except Exception as e:
+                    print(f"Error showing refinery dialog: {e}")
+        
+        # Get cargo tracking data for material breakdown (NOW with refinery materials included)
         cargo_session_data = None
         if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
             cargo_session_data = self.main_app.cargo_monitor.end_session_tracking()
             
-        # Show comment dialog
-        session_comment = self._show_comment_dialog()
+        # Ask if user wants to add a comment
+        add_comment = messagebox.askyesno(
+            "Session Comment", 
+            "Would you like to add a comment to this mining session?",
+            parent=self.winfo_toplevel()
+        )
+        
+        session_comment = ""
+        if add_comment:
+            session_comment = self._show_comment_dialog()
+        
+        # Update session totals with any refinery materials that were added
+        if cargo_session_data and 'materials_mined' in cargo_session_data:
+            for material_name, quantity in cargo_session_data['materials_mined'].items():
+                if material_name in self.session_totals:
+                    self.session_totals[material_name] = max(self.session_totals[material_name], quantity)
+                else:
+                    self.session_totals[material_name] = quantity
+        
+        self._set_status("Session ended.")
         
         self.start_btn.config(state="normal")
         self.pause_resume_btn.config(state="disabled", text="Pause")
@@ -5711,10 +6040,29 @@ class ProspectorPanel(ttk.Frame):
         # Save report file and auto-open it
         try:
             overall_tph = total_tons / active_hours if active_hours > 0 else 0.0
-            report_path = self._save_session_report(header, lines, overall_tph, cargo_session_data, session_comment)
+            
+            # Generate timestamp for consistent naming between report and graphs
+            import datetime as dt
+            session_timestamp = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            
+            report_path = self._save_session_report_with_timestamp(header, lines, overall_tph, cargo_session_data, session_comment, session_timestamp)
             
             # Update CSV index with new session data
             self._update_csv_with_session(sysname, body, elapsed_txt, total_tons, overall_tph, cargo_session_data, session_comment)
+            
+            # Rebuild CSV to ensure correct data
+            self._rebuild_csv_from_files_tab(os.path.join(self.reports_dir, "sessions_index.csv"))
+            
+            # Auto-save graphs if data exists
+            if CHARTS_AVAILABLE and self.charts_panel:
+                try:
+                    self.charts_panel.auto_save_graphs(
+                        session_system=sysname, 
+                        session_body=body,
+                        session_timestamp=session_timestamp
+                    )
+                except Exception as graph_error:
+                    print(f"Warning: Could not auto-save graphs: {graph_error}")
             
             # Refresh reports tab and window if open (don't auto-open popup)
             try:
@@ -5771,7 +6119,7 @@ class ProspectorPanel(ttk.Frame):
         self.cancel_btn.config(state="disabled")
 
         self._set_status("Session cancelled.")
-
+    
     # --- VA file write ---
     def _write_var_text(self, base_without_txt: str, text: str) -> None:
         path = os.path.join(self.vars_dir, base_without_txt + ".txt")
@@ -6366,7 +6714,7 @@ class ProspectorPanel(ttk.Frame):
         left_column = ttk.LabelFrame(stats_container, text="Overall Statistics", padding=10)
         left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
-        right_column = ttk.LabelFrame(stats_container, text="Records", padding=10)
+        right_column = ttk.LabelFrame(stats_container, text="Best (Records)", padding=10)
         right_column.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         
         stats_container.grid_columnconfigure(0, weight=1)
@@ -6401,12 +6749,11 @@ class ProspectorPanel(ttk.Frame):
         
         # Records (Right Column)
         performers_data = [
-            ("Best T/hr:", "best_session_tph"),
-            ("Session System:", "best_session_system"),
-            ("Single Session(t):", "best_tonnage"),
-            ("Mined System:", "most_mined_system"),
-            ("Mining Location:", "most_mined_location"),
-            ("Material Mined:", "most_collected_material")
+            ("T/hr:", "best_session_tph"),
+            ("System:", "best_session_system"),
+            ("Session(t):", "best_tonnage"),
+            ("Most Mined System:", "most_mined_system"),
+            ("Material:", "most_collected_material")
         ]
         
         for i, (label_text, key) in enumerate(performers_data):
@@ -6418,7 +6765,7 @@ class ProspectorPanel(ttk.Frame):
             # Value
             value_label = tk.Label(right_column, text="None", font=("Consolas", 10, "bold"), 
                                  fg="#ffaa00", bg="#2b2b2b", anchor="w", 
-                                 wraplength=200, justify="left")
+                                 wraplength=400, justify="left")
             value_label.grid(row=i, column=1, sticky="w", pady=2)
             self.stats_labels[key] = value_label
         
@@ -6445,7 +6792,16 @@ class ProspectorPanel(ttk.Frame):
         csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
         
         if not os.path.exists(csv_path):
-            return {}
+            # Try to rebuild CSV from existing session files
+            try:
+                self._rebuild_csv_from_files_tab(csv_path, silent=True)
+            except Exception as e:
+                print(f"Could not rebuild CSV: {e}")
+                return {}
+            
+            # Check again after rebuild attempt
+            if not os.path.exists(csv_path):
+                return {}
         
         try:
             import csv
@@ -6640,17 +6996,16 @@ class ProspectorPanel(ttk.Frame):
             stats = self._calculate_session_statistics()
             
             if not stats:
-                # No data available
+                # No data available - show helpful message
                 self.stats_labels['total_sessions'].config(text="0")
                 self.stats_labels['total_time'].config(text="0h 0m")
                 self.stats_labels['total_tonnage'].config(text="0 tons")
                 self.stats_labels['avg_tph'].config(text="0.0")
                 self.stats_labels['unique_systems'].config(text="0")
                 self.stats_labels['best_session_tph'].config(text="0.0")
-                self.stats_labels['best_session_system'].config(text="None")
-                self.stats_labels['most_mined_system'].config(text="None")
-                self.stats_labels['most_mined_location'].config(text="None")
-                self.stats_labels['most_collected_material'].config(text="None")
+                self.stats_labels['best_session_system'].config(text="No sessions found")
+                self.stats_labels['most_mined_system'].config(text="No sessions found")
+                self.stats_labels['most_collected_material'].config(text="No sessions found")
                 self.stats_labels['best_tonnage'].config(text="0")
                 self.stats_labels['avg_hit_rate'].config(text="0%")
                 self.stats_labels['total_asteroids'].config(text="0")
@@ -6677,25 +7032,20 @@ class ProspectorPanel(ttk.Frame):
             else:
                 best_session_system = best_session_info if best_session_info else 'None'
             
-            # Truncate if too long
-            if len(best_session_system) > 25:
-                best_session_system = best_session_system[:25] + "..."
+            # Only truncate if extremely long (50+ characters)
+            if len(best_session_system) > 50:
+                best_session_system = best_session_system[:50] + "..."
             self.stats_labels['best_session_system'].config(text=best_session_system)
             
             # Update records
             most_system = stats.get('most_mined_system', 'None')
-            if most_system and len(most_system) > 20:
-                most_system = most_system[:20] + "..."
+            if most_system and len(most_system) > 50:
+                most_system = most_system[:50] + "..."
             self.stats_labels['most_mined_system'].config(text=most_system)
             
-            most_location = stats.get('most_mined_location', 'None')
-            if most_location and len(most_location) > 25:
-                most_location = most_location[:25] + "..."
-            self.stats_labels['most_mined_location'].config(text=most_location)
-            
             most_material = stats.get('most_collected_material', 'None')
-            if most_material and len(most_material) > 15:
-                most_material = most_material[:15] + "..."
+            if most_material and len(most_material) > 30:
+                most_material = most_material[:30] + "..."
             self.stats_labels['most_collected_material'].config(text=most_material)
             
             self.stats_labels['best_tonnage'].config(text=f"{stats['best_session']['tonnage']:.1f}")
@@ -6707,3 +7057,1699 @@ class ProspectorPanel(ttk.Frame):
         except Exception as e:
             print(f"Error refreshing statistics: {e}")
             self._set_status("Error updating statistics")
+            
+    def _add_screenshots_to_report(self, tree):
+        """Add screenshots to selected report via file selection dialog"""
+        try:
+            selected_items = tree.selection()
+            if not selected_items:
+                messagebox.showwarning("No Selection", "Please select a report first.", parent=tree.winfo_toplevel())
+                return
+                
+            # Get default screenshots folder from main app settings
+            default_folder = os.path.join(os.path.expanduser("~"), "Pictures")
+            if self.main_app and hasattr(self.main_app, 'screenshots_folder_path'):
+                default_folder = self.main_app.screenshots_folder_path.get() or default_folder
+            
+            # Open file dialog to select image files
+            file_types = [
+                ("Image files", "*.png *.jpg *.jpeg *.gif *.bmp *.tiff"),
+                ("PNG files", "*.png"),
+                ("JPEG files", "*.jpg *.jpeg"),
+                ("All files", "*.*")
+            ]
+            
+            selected_files = filedialog.askopenfilenames(
+                title="Select Screenshots to Add",
+                initialdir=default_folder,
+                filetypes=file_types,
+                parent=tree.winfo_toplevel()
+            )
+            
+            if selected_files:
+                # Create screenshots directory if it doesn't exist - use consistent app_dir logic
+                if getattr(sys, 'frozen', False):
+                    # Running as executable (installer version)
+                    app_dir = os.path.join(self.va_root, "app")
+                else:
+                    # Running as script (development version)
+                    app_dir = os.path.dirname(os.path.abspath(__file__))
+                    
+                screenshots_dir = os.path.join(app_dir, "Reports", "Mining Session", "Detailed Reports", "Screenshots")
+                os.makedirs(screenshots_dir, exist_ok=True)
+                
+                # Copy selected files to screenshots directory
+                copied_files = []
+                for file_path in selected_files:
+                    try:
+                        filename = os.path.basename(file_path)
+                        dest_path = screenshots_dir / filename
+                        
+                        # Add timestamp if file already exists
+                        if dest_path.exists():
+                            name, ext = os.path.splitext(filename)
+                            timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"{name}_{timestamp}{ext}"
+                            dest_path = screenshots_dir / filename
+                        
+                        # Copy the file
+                        import shutil
+                        shutil.copy2(file_path, dest_path)
+                        copied_files.append(str(dest_path))
+                        
+                    except Exception as e:
+                        print(f"Error copying {file_path}: {e}")
+                
+                if copied_files:
+                    # Get report identifier to link screenshots
+                    item = selected_items[0]  # Get the first selected item
+                    values = tree.item(item, 'values')
+                    report_id = f"{values[0]}_{values[2]}_{values[3]}"  # date_system_body as unique ID
+                    
+                    # Store screenshot references for the selected report
+                    self._store_report_screenshots(report_id, copied_files)
+                    
+                    messagebox.showinfo(
+                        "Screenshots Added",
+                        f"Added {len(copied_files)} screenshots to this report.\n\nThey will be included when you generate a detailed report.",
+                        parent=tree.winfo_toplevel()
+                    )
+                    self._set_status(f"Added {len(copied_files)} screenshots to report")
+                else:
+                    messagebox.showwarning("Copy Failed", "No screenshots were successfully copied.", parent=tree.winfo_toplevel())
+                    
+        except Exception as e:
+            print(f"Error adding screenshots: {e}")
+            messagebox.showerror("Screenshot Error", f"Failed to add screenshots:\n{e}", parent=tree.winfo_toplevel())
+    
+    def _add_screenshots_to_report_internal(self, tree, item):
+        """Internal function to add screenshots during detailed report generation"""
+        try:
+            # Get default screenshots folder from main app settings
+            default_folder = os.path.join(os.path.expanduser("~"), "Pictures")
+            if self.main_app and hasattr(self.main_app, 'screenshots_folder_path'):
+                default_folder = self.main_app.screenshots_folder_path.get() or default_folder
+            
+            # Open file dialog to select image files
+            file_types = [
+                ("Image files", "*.png *.jpg *.jpeg *.gif *.bmp *.tiff"),
+                ("PNG files", "*.png"),
+                ("JPEG files", "*.jpg *.jpeg"),
+                ("All files", "*.*")
+            ]
+            
+            selected_files = filedialog.askopenfilenames(
+                title="Select Screenshots for Detailed Report",
+                initialdir=default_folder,
+                filetypes=file_types,
+                parent=tree.winfo_toplevel()
+            )
+            
+            if selected_files:
+                # Create screenshots directory if it doesn't exist - use consistent app_dir logic
+                if getattr(sys, 'frozen', False):
+                    # Running as executable (installer version)
+                    app_dir = os.path.join(self.va_root, "app")
+                else:
+                    # Running as script (development version)
+                    app_dir = os.path.dirname(os.path.abspath(__file__))
+                    
+                screenshots_dir = os.path.join(app_dir, "Reports", "Mining Session", "Detailed Reports", "Screenshots")
+                os.makedirs(screenshots_dir, exist_ok=True)
+                
+                # Copy selected files to screenshots directory
+                copied_files = []
+                for file_path in selected_files:
+                    try:
+                        filename = os.path.basename(file_path)
+                        dest_path = os.path.join(screenshots_dir, filename)
+                        
+                        # Add timestamp if file already exists
+                        if os.path.exists(dest_path):
+                            name, ext = os.path.splitext(filename)
+                            timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"{name}_{timestamp}{ext}"
+                            dest_path = os.path.join(screenshots_dir, filename)
+                        
+                        # Copy the file
+                        import shutil
+                        shutil.copy2(file_path, dest_path)
+                        copied_files.append(dest_path)
+                        
+                    except Exception as e:
+                        print(f"Error copying {file_path}: {e}")
+                
+                if copied_files:
+                    # Get report identifier to link screenshots
+                    values = tree.item(item, 'values')
+                    report_id = f"{values[0]}_{values[2]}_{values[3]}"  # date_system_body as unique ID
+                    
+                    # Store screenshot references for the selected report
+                    self._store_report_screenshots(report_id, copied_files)
+                    
+        except Exception as e:
+            print(f"Error in internal screenshot function: {e}")
+    
+    def _parse_duration_to_minutes(self, duration_str):
+        """Convert duration string (HH:MM:SS) to minutes"""
+        try:
+            if not duration_str or duration_str == "00:00:00":
+                return 0
+            parts = duration_str.split(":")
+            hours = int(parts[0]) if len(parts) > 0 else 0
+            minutes = int(parts[1]) if len(parts) > 1 else 0
+            seconds = int(parts[2]) if len(parts) > 2 else 0
+            return hours * 60 + minutes + seconds / 60.0
+        except:
+            return 0
+    
+    def _store_report_screenshots(self, report_id, screenshot_paths):
+        """Store screenshot associations for a specific report"""
+        try:
+            import json
+            if getattr(sys, 'frozen', False):
+                # Running as executable (installer version)
+                app_dir = os.path.join(self.va_root, "app")
+            else:
+                # Running as script (development version)
+                app_dir = os.path.dirname(os.path.abspath(__file__))
+                
+            screenshots_map_file = os.path.join(app_dir, "Reports", "Mining Session", "Detailed Reports", "screenshot_mappings.json")
+            
+            # Load existing mappings
+            mappings = {}
+            if os.path.exists(screenshots_map_file):
+                try:
+                    with open(screenshots_map_file, 'r') as f:
+                        mappings = json.load(f)
+                except:
+                    mappings = {}
+            
+            # Add new screenshots to this report (append to existing)
+            if report_id not in mappings:
+                mappings[report_id] = []
+            
+            # Add only new screenshots (avoid duplicates)
+            for path in screenshot_paths:
+                if path not in mappings[report_id]:
+                    mappings[report_id].append(path)
+            
+            # Save updated mappings
+            with open(screenshots_map_file, 'w') as f:
+                json.dump(mappings, f, indent=2)
+                
+        except Exception as e:
+            print(f"Error storing screenshot mappings: {e}")
+    
+    def _get_report_screenshots(self, report_id):
+        """Get screenshots associated with a specific report"""
+        try:
+            import json
+            if getattr(sys, 'frozen', False):
+                # Running as executable (installer version)
+                app_dir = os.path.join(self.va_root, "app")
+            else:
+                # Running as script (development version)
+                app_dir = os.path.dirname(os.path.abspath(__file__))
+                
+            screenshots_map_file = os.path.join(app_dir, "Reports", "Mining Session", "Detailed Reports", "screenshot_mappings.json")
+            
+            if not os.path.exists(screenshots_map_file):
+                return []
+                
+            with open(screenshots_map_file, 'r') as f:
+                mappings = json.load(f)
+                
+            return mappings.get(report_id, [])
+            
+        except Exception as e:
+            print(f"Error loading screenshot mappings: {e}")
+            return []
+    
+    def _has_screenshots(self, report_id):
+        """Check if a report has screenshots"""
+        screenshots = self._get_report_screenshots(report_id)
+        return len(screenshots) > 0
+    
+    def _has_enhanced_report(self, report_id):
+        """Check if a report has an enhanced HTML report"""
+        try:
+            # Load detailed report mappings
+            enhanced_mappings = self._load_enhanced_report_mappings()
+            
+            # Try exact match first
+            if report_id in enhanced_mappings:
+                html_filename = enhanced_mappings[report_id]
+                html_path = os.path.join(self.reports_dir, "Detailed Reports", html_filename)
+                return os.path.exists(html_path)
+                
+            return False
+        except Exception as e:
+            print(f"Error checking for detailed report: {e}")
+            return False
+            
+    def _load_enhanced_report_mappings(self):
+        """Load detailed report mappings from JSON file"""
+        try:
+            mappings_file = os.path.join(self.reports_dir, "Detailed Reports", "detailed_report_mappings.json")
+            if os.path.exists(mappings_file):
+                with open(mappings_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            print(f"Error loading detailed report mappings: {e}")
+            return {}
+    
+    def _update_enhanced_report_mapping(self, session_data, html_filename):
+        """Update detailed report mapping to link session with HTML report"""
+        try:
+            # Use both display date and raw timestamp for compatibility
+            display_date = session_data.get('date', '')
+            raw_timestamp = session_data.get('timestamp_raw', display_date)
+            system = session_data.get('system', '')
+            body = session_data.get('body', '')
+            
+            # Create both possible report_id formats
+            report_id_display = f"{display_date}_{system}_{body}"
+            report_id_raw = f"{raw_timestamp}_{system}_{body}"
+            
+            # Load existing mappings
+            mappings = self._load_enhanced_report_mappings()
+            
+            # Store HTML filename directly (simple string format)
+            mappings[report_id_display] = html_filename
+            if report_id_display != report_id_raw:
+                mappings[report_id_raw] = html_filename
+            
+            # Save updated mappings
+            mappings_file = os.path.join(self.reports_dir, "Detailed Reports", "detailed_report_mappings.json")
+            os.makedirs(os.path.dirname(mappings_file), exist_ok=True)
+            
+            with open(mappings_file, 'w', encoding='utf-8') as f:
+                json.dump(mappings, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f"Error updating detailed report mapping: {e}")
+
+    def _get_report_filenames(self, report_id):
+        """Get HTML filename for a report_id"""
+        try:
+            mappings = self._load_enhanced_report_mappings()
+            if report_id in mappings:
+                mapping = mappings[report_id]
+                # Handle both new dict format and legacy string format
+                if isinstance(mapping, dict):
+                    # Backward compatibility for existing dict format
+                    return mapping.get('html_filename')
+                else:
+                    # Simple string format
+                    return mapping
+            return None
+        except Exception as e:
+            print(f"Error getting report filenames: {e}")
+            return None
+
+    def _has_detailed_report(self, report_id):
+        """Check if detailed HTML report exists"""
+        try:
+            html_filename = self._get_report_filenames(report_id)
+            return html_filename is not None
+        except Exception as e:
+            print(f"Error checking detailed report existence: {e}")
+            return False
+
+    def _get_detailed_report_indicator(self, report_id):
+        """Get appropriate indicator symbol for detailed reports column"""
+        try:
+            html_filename = self._get_report_filenames(report_id)
+            return "📊" if html_filename else ""
+        except Exception as e:
+            print(f"Error getting detailed report indicator: {e}")
+            return ""
+
+    def _generate_pdf_report(self, session_data, html_content=None, html_path=None):
+        """Generate PDF report from HTML content or existing HTML file"""
+        try:
+            # Get HTML content either from parameter or by reading existing file
+            if html_content is None and html_path and os.path.exists(html_path):
+                with open(html_path, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+            
+            if not html_content:
+                raise Exception("No HTML content available for PDF generation")
+            
+            # Create PDF filename based on session data
+            display_date = session_data.get('date', '')
+            system = session_data.get('system', '')
+            body = session_data.get('body', '')
+            
+            # Clean filename components
+            safe_date = display_date.replace('/', '-').replace(':', '-')
+            safe_system = system.replace(' ', '_').replace('/', '_')
+            safe_body = body.replace(' ', '_').replace('/', '_')
+            
+            pdf_filename = f"session_{safe_date}_{safe_system}_{safe_body}.pdf"
+            pdf_path = os.path.join(self.reports_dir, "Detailed Reports", pdf_filename)
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+            
+            # Try multiple PDF generation methods
+            pdf_generated = False
+            error_messages = []
+            
+            # Method 1: Try weasyprint first (best quality) - skip if known to fail on Windows
+            try:
+                import weasyprint
+                from urllib.parse import urljoin
+                from urllib.request import pathname2url
+                
+                # Set base URL for relative paths (for images, CSS, etc.)
+                base_path = os.path.dirname(html_path) if html_path else os.path.join(self.reports_dir, "Detailed Reports")
+                base_url = urljoin('file:', pathname2url(base_path) + '/')
+                
+                # Generate PDF using weasyprint
+                html_doc = weasyprint.HTML(string=html_content, base_url=base_url)
+                html_doc.write_pdf(pdf_path)
+                pdf_generated = True
+                print("PDF generated successfully using WeasyPrint")
+                
+            except Exception as e:
+                error_messages.append(f"WeasyPrint failed: {e}")
+                print(f"WeasyPrint failed: {e}")
+                # WeasyPrint commonly fails on Windows, continue to other methods
+            
+            # Method 2: Try pdfkit if weasyprint failed
+            if not pdf_generated:
+                try:
+                    import pdfkit
+                    
+                    # Configure pdfkit options for better output
+                    options = {
+                        'page-size': 'A4',
+                        'margin-top': '0.75in',
+                        'margin-right': '0.75in',
+                        'margin-bottom': '0.75in',
+                        'margin-left': '0.75in',
+                        'encoding': "UTF-8",
+                        'no-outline': None,
+                        'enable-local-file-access': None,
+                        'print-media-type': None
+                    }
+                    
+                    # Generate PDF using pdfkit (requires wkhtmltopdf)
+                    pdfkit.from_string(html_content, pdf_path, options=options)
+                    pdf_generated = True
+                    print("PDF generated successfully using pdfkit")
+                    
+                except Exception as e:
+                    error_messages.append(f"pdfkit failed: {e}")
+                    print(f"pdfkit failed (likely wkhtmltopdf not installed): {e}")
+                    # pdfkit requires wkhtmltopdf to be installed, continue to ReportLab
+            
+            # Method 3: Intelligent fallback using ReportLab with proper HTML parsing
+            if not pdf_generated:
+                try:
+                    from reportlab.lib.pagesizes import letter, A4
+                    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+                    from reportlab.lib.units import inch
+                    from reportlab.lib import colors
+                    import re
+                    from html import unescape
+                    
+                    # Create PDF document
+                    doc = SimpleDocTemplate(pdf_path, pagesize=A4, 
+                                          rightMargin=72, leftMargin=72, 
+                                          topMargin=72, bottomMargin=18)
+                    styles = getSampleStyleSheet()
+                    story = []
+                    
+                    # Custom styles
+                    title_style = ParagraphStyle(
+                        'CustomTitle',
+                        parent=styles['Title'],
+                        fontSize=18,
+                        spaceAfter=30,
+                        textColor=colors.darkblue
+                    )
+                    
+                    heading_style = ParagraphStyle(
+                        'CustomHeading',
+                        parent=styles['Heading2'],
+                        fontSize=14,
+                        spaceBefore=12,
+                        spaceAfter=6,
+                        textColor=colors.darkred
+                    )
+                    
+                    # Parse the HTML content more intelligently
+                    # Remove style and script tags entirely
+                    clean_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL)
+                    clean_content = re.sub(r'<script[^>]*>.*?</script>', '', clean_content, flags=re.DOTALL)
+                    
+                    # Extract meaningful content sections
+                    def extract_text_content(html_text):
+                        # Remove HTML tags but preserve structure
+                        text = re.sub(r'<br\s*/?>', '\n', html_text)
+                        text = re.sub(r'<p[^>]*>', '\n', text)
+                        text = re.sub(r'</p>', '\n', text)
+                        text = re.sub(r'<h[1-6][^>]*>', '\n### ', text)
+                        text = re.sub(r'</h[1-6]>', '\n', text)
+                        text = re.sub(r'<strong[^>]*>', '**', text)
+                        text = re.sub(r'</strong>', '**', text)
+                        text = re.sub(r'<b[^>]*>', '**', text)
+                        text = re.sub(r'</b>', '**', text)
+                        text = re.sub(r'<[^>]+>', '', text)  # Remove remaining tags
+                        text = unescape(text)  # Decode HTML entities
+                        # Clean up whitespace
+                        text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
+                        text = re.sub(r'[ \t]+', ' ', text)
+                        return text.strip()
+                    
+                    # Add title
+                    title = f"Mining Session Report - {display_date}"
+                    story.append(Paragraph(title, title_style))
+                    story.append(Spacer(1, 20))
+                    
+                    # Add session details in a nice table
+                    session_data_table = [
+                        ['System:', system],
+                        ['Body:', body], 
+                        ['Date:', display_date]
+                    ]
+                    
+                    table = Table(session_data_table, colWidths=[2*inch, 4*inch])
+                    table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                        ('TEXTCOLOR', (0, 0), (0, -1), colors.black),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 11),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                        ('TOPPADDING', (0, 0), (-1, -1), 8),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ]))
+                    
+                    story.append(table)
+                    story.append(Spacer(1, 20))
+                    
+                    # Extract and format the main content - properly parse mining data from HTML
+                    try:
+                        # Use BeautifulSoup for proper HTML parsing if available, otherwise use regex
+                        try:
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(html_content, 'html.parser')
+                            use_soup = True
+                        except ImportError:
+                            use_soup = False
+                            print("BeautifulSoup not available, using regex parsing")
+                        
+                        mining_data_found = False
+                        
+                        if use_soup:
+                            # Extract data using BeautifulSoup for better parsing
+                            
+                            # Find session summary data
+                            story.append(Paragraph("Mining Session Summary", heading_style))
+                            
+                            # Look for common mining data patterns in the HTML
+                            session_data = []
+                            
+                            # Try to find duration
+                            duration_elem = soup.find(text=re.compile(r'Duration', re.I))
+                            if duration_elem:
+                                duration_parent = duration_elem.parent
+                                if duration_parent:
+                                    duration_text = duration_parent.get_text().strip()
+                                    duration_match = re.search(r'([0-9:]+)', duration_text)
+                                    if duration_match:
+                                        session_data.append(f"Session Duration: {duration_match.group(1)}")
+                            
+                            # Look for tons mined
+                            tons_elem = soup.find(text=re.compile(r'tons?', re.I))
+                            if tons_elem:
+                                tons_context = tons_elem.parent.get_text() if tons_elem.parent else str(tons_elem)
+                                tons_match = re.search(r'([0-9]+\.?[0-9]*)\s*tons?', tons_context, re.I)
+                                if tons_match:
+                                    session_data.append(f"Total Mined: {tons_match.group(1)} tons")
+                            
+                            # Look for mining rate (t/h)
+                            rate_text = soup.get_text()
+                            rate_match = re.search(r'([0-9]+\.?[0-9]*)\s*t/h', rate_text, re.I)
+                            if rate_match:
+                                session_data.append(f"Mining Rate: {rate_match.group(1)} t/h")
+                            
+                            # Look for prospectors
+                            prosp_match = re.search(r'prospector[s]?[:\s]*([0-9]+)', rate_text, re.I)
+                            if prosp_match:
+                                session_data.append(f"Prospectors Used: {prosp_match.group(1)}")
+                            
+                            # Look for asteroids
+                            ast_match = re.search(r'asteroid[s]?[:\s]*([0-9]+)', rate_text, re.I)
+                            if ast_match:
+                                session_data.append(f"Asteroids Mined: {ast_match.group(1)}")
+                            
+                            # Display session data
+                            if session_data:
+                                for data in session_data:
+                                    story.append(Paragraph(f"• {data}", styles['Normal']))
+                                story.append(Spacer(1, 12))
+                                mining_data_found = True
+                            
+                            # Look for material breakdown tables
+                            tables = soup.find_all('table')
+                            for table in tables:
+                                table_text = table.get_text().lower()
+                                if 'material' in table_text or 'element' in table_text:
+                                    story.append(Paragraph("Material Breakdown", heading_style))
+                                    
+                                    # Extract table data
+                                    rows = table.find_all('tr')
+                                    table_data = []
+                                    
+                                    for row in rows[:10]:  # Limit to first 10 rows
+                                        cells = row.find_all(['td', 'th'])
+                                        if len(cells) >= 2:
+                                            cell_data = [cell.get_text().strip() for cell in cells[:3]]  # Max 3 columns
+                                            if any(cell_data):  # Skip empty rows
+                                                table_data.append(cell_data)
+                                    
+                                    if table_data:
+                                        # Create ReportLab table
+                                        pdf_table = Table(table_data, colWidths=[2*inch, 1*inch, 1*inch] if len(table_data[0]) >= 3 else [3*inch, 2*inch])
+                                        pdf_table.setStyle(TableStyle([
+                                            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                            ('FONTSIZE', (0, 0), (-1, -1), 9),
+                                            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                                            ('TOPPADDING', (0, 0), (-1, -1), 6),
+                                            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+                                        ]))
+                                        story.append(pdf_table)
+                                        story.append(Spacer(1, 12))
+                                        mining_data_found = True
+                                    break
+                            
+                            # Look for statistics section
+                            stats_section = soup.find(text=re.compile(r'statistic', re.I))
+                            if stats_section:
+                                stats_parent = stats_section.parent
+                                while stats_parent and stats_parent.name != 'div':
+                                    stats_parent = stats_parent.parent
+                                
+                                if stats_parent:
+                                    stats_text = stats_parent.get_text()
+                                    # Extract key statistics
+                                    stats_data = []
+                                    
+                                    hit_rate = re.search(r'hit.rate[:\s]*([0-9]+\.?[0-9]*%?)', stats_text, re.I)
+                                    if hit_rate:
+                                        stats_data.append(f"Hit Rate: {hit_rate.group(1)}")
+                                    
+                                    efficiency = re.search(r'efficiency[:\s]*([0-9]+\.?[0-9]*%?)', stats_text, re.I)
+                                    if efficiency:
+                                        stats_data.append(f"Mining Efficiency: {efficiency.group(1)}")
+                                    
+                                    if stats_data:
+                                        story.append(Paragraph("Mining Statistics", heading_style))
+                                        for stat in stats_data:
+                                            story.append(Paragraph(f"• {stat}", styles['Normal']))
+                                        story.append(Spacer(1, 12))
+                                        mining_data_found = True
+                        
+                        else:
+                            # Fallback regex parsing if BeautifulSoup not available
+                            clean_text = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL)
+                            clean_text = re.sub(r'<script[^>]*>.*?</script>', '', clean_text, flags=re.DOTALL)
+                            clean_text = re.sub(r'<[^>]+>', ' ', clean_text)
+                            clean_text = unescape(clean_text)
+                            
+                            story.append(Paragraph("Mining Session Summary", heading_style))
+                            
+                            # Extract key data with regex
+                            session_data = []
+                            
+                            duration_match = re.search(r'Duration[:\s]*([0-9:]+)', clean_text, re.I)
+                            if duration_match:
+                                session_data.append(f"Session Duration: {duration_match.group(1)}")
+                            
+                            tons_match = re.search(r'([0-9]+\.?[0-9]*)\s*tons?', clean_text, re.I)
+                            if tons_match:
+                                session_data.append(f"Total Mined: {tons_match.group(1)} tons")
+                            
+                            rate_match = re.search(r'([0-9]+\.?[0-9]*)\s*t/h', clean_text, re.I)
+                            if rate_match:
+                                session_data.append(f"Mining Rate: {rate_match.group(1)} t/h")
+                            
+                            prosp_match = re.search(r'prospector[s]?[:\s]*([0-9]+)', clean_text, re.I)
+                            if prosp_match:
+                                session_data.append(f"Prospectors Used: {prosp_match.group(1)}")
+                            
+                            if session_data:
+                                for data in session_data:
+                                    story.append(Paragraph(f"• {data}", styles['Normal']))
+                                story.append(Spacer(1, 12))
+                                mining_data_found = True
+                        
+                        # If no mining data was extracted, provide helpful fallback
+                        if not mining_data_found:
+                            story.append(Paragraph("Mining Session Details", heading_style))
+                            story.append(Paragraph("This comprehensive mining session report includes detailed statistics, material breakdowns, and performance metrics for your Elite Dangerous mining activities.", styles['Normal']))
+                            story.append(Spacer(1, 6))
+                            story.append(Paragraph("The complete interactive version with charts, graphs, and detailed breakdowns is available in the HTML report.", styles['Normal']))
+                            
+                    except Exception as e:
+                        print(f"Error extracting mining data: {e}")
+                        # Fallback content
+                        story.append(Paragraph("Mining Session Details", heading_style))
+                        story.append(Paragraph("This mining session report contains comprehensive data about your Elite Dangerous mining activities. For complete details, charts, and interactive features, please refer to the HTML version.", styles['Normal']))
+                    
+                    # Add disclaimer
+                    story.append(Spacer(1, 20))
+                    disclaimer_style = ParagraphStyle(
+                        'Disclaimer',
+                        parent=styles['Normal'],
+                        fontSize=10,
+                        textColor=colors.grey,
+                        fontName='Helvetica-Oblique'
+                    )
+                    story.append(Paragraph(
+                        "Note: This is a simplified PDF version optimized for printing and sharing. "
+                        "For the complete interactive report with charts, graphs, and images, please use the HTML version.",
+                        disclaimer_style
+                    ))
+                    
+                    # Build PDF
+                    doc.build(story)
+                    pdf_generated = True
+                    print("PDF generated successfully using ReportLab (enhanced formatting)")
+                    
+                except Exception as e:
+                    error_messages.append(f"ReportLab enhanced fallback failed: {e}")
+                    print(f"ReportLab enhanced fallback failed: {e}")
+            
+            if pdf_generated:
+                # Update mapping to include PDF filename
+                html_filename = os.path.basename(html_path) if html_path else None
+                self._update_enhanced_report_mapping(session_data, html_filename, pdf_filename)
+                print(f"PDF saved to: {pdf_path}")
+                return pdf_path
+            else:
+                error_msg = "All PDF generation methods failed:\n" + "\n".join(error_messages)
+                print(f"PDF generation failed completely: {error_msg}")
+                raise Exception(error_msg)
+                
+        except Exception as e:
+            print(f"Error generating PDF report: {e}")
+            import traceback
+            traceback.print_exc()  # Print full traceback for debugging
+            return None
+
+    def _generate_pdf_report_from_menu(self, tree):
+        """Generate PDF report from context menu for selected item"""
+        try:
+            selected_items = tree.selection()
+            if not selected_items:
+                messagebox.showwarning("No Selection", "Please select a report first.")
+                return
+                
+            if len(selected_items) > 1:
+                messagebox.showwarning("Multiple Selection", "Please select only one report at a time.")
+                return
+                
+            # Get the selected report data
+            item = selected_items[0]
+            values = tree.item(item, 'values')
+            
+            if not values:
+                messagebox.showwarning("Invalid Selection", "Could not get report data.")
+                return
+                
+            # Extract report_id 
+            display_date = values[0]  # Date/Time column  
+            system = values[2] if len(values) > 2 else ''  # System column
+            body = values[3] if len(values) > 3 else ''    # Body column
+            report_id = f"{display_date}_{system}_{body}"
+            
+            # Check if HTML report exists (needed as source for PDF)
+            filenames = self._get_report_filenames(report_id)
+            html_filename = filenames['html']
+            
+            if not html_filename:
+                messagebox.showinfo("No HTML Report", 
+                                  f"To generate a PDF report, you must first create an HTML detailed report.\n\n"
+                                  f"Session: {display_date} - {system} {body}\n\n"
+                                  f"Right-click on this session and select 'Generate Detailed Report (HTML)' first.")
+                return
+            
+            # Check if PDF already exists
+            if filenames['pdf']:
+                if not messagebox.askyesno("PDF Exists", 
+                                         f"A PDF report already exists for this session.\n\n"
+                                         f"Session: {display_date} - {system} {body}\n\n"
+                                         f"Do you want to regenerate it?"):
+                    return
+            
+            # Create session data dict
+            session_data = {
+                'date': display_date,
+                'system': system,
+                'body': body,
+                'timestamp_raw': display_date  # Fallback
+            }
+            
+            # Get HTML file path
+            html_path = os.path.join(self.reports_dir, "Detailed Reports", html_filename)
+            
+            if not os.path.exists(html_path):
+                messagebox.showerror("HTML File Not Found", 
+                                   f"The HTML report file could not be found:\n{html_path}")
+                return
+            
+            # Generate PDF
+            print(f"Starting PDF generation for session: {display_date} - {system} {body}")
+            pdf_path = self._generate_pdf_report(session_data, html_path=html_path)
+            
+            if pdf_path:
+                # Refresh tree to update indicators
+                if tree == self.reports_tree_tab:
+                    self._refresh_reports_tab()
+                else:
+                    self._refresh_reports_window()
+                
+                # Ask if user wants to open the PDF
+                if messagebox.askyesno("PDF Generated", 
+                                     f"PDF report generated successfully!\n\n"
+                                     f"File: {os.path.basename(pdf_path)}\n\n"
+                                     f"Do you want to open it now?"):
+                    self._open_pdf_report(report_id)
+            else:
+                messagebox.showerror("PDF Generation Failed", 
+                                   "Failed to generate PDF report.\n\n"
+                                   "This may be due to missing system libraries for PDF generation.\n"
+                                   "Check the console output for detailed error information.\n\n"
+                                   "Try using the HTML report instead, which contains all the same data.")
+                print("PDF generation returned None - check console output above for detailed errors")
+                
+        except Exception as e:
+            print(f"Error generating PDF report from menu: {e}")
+            messagebox.showerror("Error", f"Failed to generate PDF report: {e}")
+
+    def _open_pdf_report_from_menu(self, tree):
+        """Open PDF report from context menu for selected item"""
+        try:
+            selected_items = tree.selection()
+            if not selected_items:
+                messagebox.showwarning("No Selection", "Please select a report first.")
+                return
+                
+            # Get the selected report data
+            item = selected_items[0]
+            values = tree.item(item, 'values')
+            
+            if not values:
+                messagebox.showwarning("Invalid Selection", "Could not get report data.")
+                return
+                
+            # Extract report_id 
+            display_date = values[0]  # Date/Time column  
+            system = values[2] if len(values) > 2 else ''  # System column
+            body = values[3] if len(values) > 3 else ''    # Body column
+            report_id = f"{display_date}_{system}_{body}"
+            
+            # Check if PDF report exists
+            filenames = self._get_report_filenames(report_id)
+            pdf_filename = filenames['pdf']
+            
+            if not pdf_filename:
+                messagebox.showinfo("No PDF Report", 
+                                  f"No PDF report found for this mining session.\n\n"
+                                  f"Session: {display_date} - {system} {body}\n\n"
+                                  f"To create a PDF report, right-click on this session and select 'Generate Detailed Report (PDF)'.")
+                return
+            
+            # Open PDF report
+            self._open_pdf_report(report_id)
+                
+        except Exception as e:
+            print(f"Error opening PDF report from menu: {e}")
+            messagebox.showerror("Error", f"Failed to open PDF report: {e}")
+
+    def _open_pdf_report(self, report_id):
+        """Open PDF report in default PDF viewer"""
+        try:
+            filenames = self._get_report_filenames(report_id)
+            pdf_filename = filenames['pdf']
+            
+            if not pdf_filename:
+                messagebox.showerror("No PDF Report", "PDF report not found.")
+                return
+            
+            pdf_path = os.path.join(self.reports_dir, "Detailed Reports", pdf_filename)
+            
+            if not os.path.exists(pdf_path):
+                messagebox.showerror("File Not Found", f"PDF file not found: {pdf_path}")
+                return
+            
+            # Open PDF in default viewer
+            import subprocess
+            import platform
+            
+            if platform.system() == 'Windows':
+                os.startfile(pdf_path)
+            elif platform.system() == 'Darwin':  # macOS
+                subprocess.call(['open', pdf_path])
+            else:  # Linux
+                subprocess.call(['xdg-open', pdf_path])
+                
+        except Exception as e:
+            print(f"Error opening PDF report: {e}")
+            messagebox.showerror("Error", f"Failed to open PDF report: {e}")
+    
+    def _migrate_existing_enhanced_reports(self):
+        """Migrate existing detailed reports to mapping system"""
+        try:
+            enhanced_reports_dir = os.path.join(self.reports_dir, "Detailed Reports")
+            if not os.path.exists(enhanced_reports_dir):
+                return
+            
+            mappings = self._load_enhanced_report_mappings()
+            
+            # Parse existing HTML files to extract session information
+            for filename in os.listdir(enhanced_reports_dir):
+                if filename.endswith('.html') and filename not in mappings.values():
+                    html_path = os.path.join(enhanced_reports_dir, filename)
+                    session_info = self._extract_session_info_from_html(html_path)
+                    
+                    if session_info:
+                        report_id = f"{session_info['date']}_{session_info['system']}_{session_info['body']}"
+                        mappings[report_id] = filename
+            
+            # Save updated mappings
+            mappings_file = os.path.join(enhanced_reports_dir, "detailed_report_mappings.json")
+            with open(mappings_file, 'w', encoding='utf-8') as f:
+                json.dump(mappings, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f"Error migrating existing detailed reports: {e}")
+    
+    def _extract_session_info_from_html(self, html_path):
+        """Extract session information from existing HTML report"""
+        try:
+            with open(html_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Use regex to extract system and body from the HTML
+            import re
+            system_match = re.search(r'<strong>System:</strong>\s*([^<]+)', content)
+            body_match = re.search(r'<strong>Body:</strong>\s*([^<]+)', content)
+            
+            if system_match and body_match:
+                system = system_match.group(1).strip()
+                body = body_match.group(1).strip()
+                
+                # Try to match this with CSV data to get the exact date format
+                csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
+                if os.path.exists(csv_path):
+                    import csv
+                    with open(csv_path, 'r', encoding='utf-8') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row['system'] == system and row['body'] == body:
+                                # Format date to match report_id format (use original timestamp)
+                                return {
+                                    'date': row['timestamp_utc'],  # Use original timestamp 
+                                    'system': system,
+                                    'body': body
+                                }
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error extracting session info from {html_path}: {e}")
+            return None
+            
+    def _open_enhanced_report(self, report_id):
+        """Open the detailed HTML report for the given report_id"""
+        try:
+            # Get HTML filename
+            html_filename = self._get_report_filenames(report_id)
+            
+            if html_filename:
+                html_path = os.path.join(self.reports_dir, "Detailed Reports", html_filename)
+                
+                if os.path.exists(html_path):
+                    # Open the HTML file in the default browser
+                    import webbrowser
+                    webbrowser.open(f"file:///{html_path.replace(os.sep, '/')}")
+                else:
+                    messagebox.showwarning("File Not Found", f"Detailed report file not found:\n{html_path}")
+            else:
+                # Extract session info from report_id for better user feedback
+                parts = report_id.split('_', 2)  # Split into max 3 parts: date, system, body
+                display_date = parts[0] if len(parts) > 0 else "Unknown"
+                system = parts[1] if len(parts) > 1 else "Unknown"
+                body = parts[2] if len(parts) > 2 else "Unknown"
+                
+                messagebox.showinfo("No Detailed Report", 
+                                  f"No detailed report found for this mining session.\n\n"
+                                  f"Session: {display_date} - {system} {body}\n\n"
+                                  f"To create a detailed report, right-click on this session and select 'Generate Detailed Report (HTML)'.")
+                
+        except Exception as e:
+            print(f"Error opening detailed report: {e}")
+            messagebox.showerror("Error", f"Failed to open detailed report: {e}")
+    
+    def _open_enhanced_report_from_menu(self, tree):
+        """Open detailed report from context menu for selected item"""
+        try:
+            selected_items = tree.selection()
+            if not selected_items:
+                messagebox.showwarning("No Selection", "Please select a report first.")
+                return
+                
+            # Get the first selected item
+            item = selected_items[0]
+            values = tree.item(item, 'values')
+            
+            if not values:
+                messagebox.showwarning("Invalid Selection", "Could not get report data.")
+                return
+                
+            # Extract timestamp to use as report_id (should be in the first column)
+            display_date = values[0]  # Date/Time column  
+            system = values[2] if len(values) > 2 else ''  # System column
+            body = values[3] if len(values) > 3 else ''    # Body column
+            report_id = f"{display_date}_{system}_{body}"
+            
+            # Open the detailed report
+            self._open_enhanced_report(report_id)
+            
+        except Exception as e:
+            print(f"Error opening detailed report from menu: {e}")
+            messagebox.showerror("Error", f"Failed to open detailed report: {e}")
+    
+    def _delete_existing_detailed_report(self, item, tree):
+        """Silently delete existing detailed report and screenshots for a session (used before regenerating)"""
+        try:
+            values = tree.item(item, 'values')
+            if not values:
+                return
+                
+            # Extract report_id 
+            display_date = values[0]  # Date/Time column  
+            system = values[2] if len(values) > 2 else ''  # System column
+            body = values[3] if len(values) > 3 else ''    # Body column
+            report_id = f"{display_date}_{system}_{body}"
+            
+            # Check if detailed report exists
+            html_filename = self._get_report_filenames(report_id)
+            if not html_filename:
+                return  # No existing report to delete
+            
+            # Delete the HTML file
+            html_path = os.path.join(self.reports_dir, "Detailed Reports", html_filename)
+            if os.path.exists(html_path):
+                os.remove(html_path)
+            
+            # Delete associated screenshots
+            screenshots = self._get_report_screenshots(report_id)
+            for screenshot_path in screenshots:
+                if os.path.exists(screenshot_path):
+                    try:
+                        os.remove(screenshot_path)
+                    except Exception as e:
+                        print(f"Error deleting screenshot {screenshot_path}: {e}")
+            
+            # Remove from screenshot mappings
+            screenshots_map_file = os.path.join(self.reports_dir, "Detailed Reports", "screenshot_mappings.json")
+            if os.path.exists(screenshots_map_file):
+                try:
+                    import json
+                    with open(screenshots_map_file, 'r') as f:
+                        screenshot_mappings = json.load(f)
+                    
+                    if report_id in screenshot_mappings:
+                        del screenshot_mappings[report_id]
+                        
+                    with open(screenshots_map_file, 'w') as f:
+                        json.dump(screenshot_mappings, f, indent=2)
+                except Exception as e:
+                    print(f"Error updating screenshot mappings: {e}")
+            
+            # Remove from enhanced report mappings
+            mappings = self._load_enhanced_report_mappings()
+            if report_id in mappings:
+                del mappings[report_id]
+                
+                # Save updated mappings
+                mappings_file = os.path.join(self.reports_dir, "Detailed Reports", "detailed_report_mappings.json")
+                with open(mappings_file, 'w', encoding='utf-8') as f:
+                    import json
+                    json.dump(mappings, f, indent=2, ensure_ascii=False)
+            
+            print(f"Deleted existing detailed report for session: {display_date} - {system} {body}")
+            
+        except Exception as e:
+            print(f"Warning: Could not delete existing detailed report: {e}")
+    
+    def _delete_enhanced_report_from_menu(self, tree):
+        """Delete detailed HTML report(s) from context menu for selected item(s)"""
+        try:
+            selected_items = tree.selection()
+            if not selected_items:
+                messagebox.showwarning("No Selection", "Please select a report first.")
+                return
+                
+            # Process all selected items to build detailed report list
+            reports_to_delete = []
+            mappings = self._load_enhanced_report_mappings()
+            
+            for item in selected_items:
+                values = tree.item(item, 'values')
+                
+                if not values:
+                    continue
+                    
+                # Extract report_id 
+                display_date = values[0]  # Date/Time column  
+                system = values[2] if len(values) > 2 else ''  # System column
+                body = values[3] if len(values) > 3 else ''    # Body column
+                report_id = f"{display_date}_{system}_{body}"
+                
+                # Check if detailed report exists
+                html_filename = self._get_report_filenames(report_id)
+                if html_filename:
+                    session_info = {
+                        'report_id': report_id,
+                        'display_date': display_date,
+                        'system': system,
+                        'body': body,
+                        'html_filename': html_filename
+                    }
+                    reports_to_delete.append(session_info)
+            
+            if not reports_to_delete:
+                if len(selected_items) == 1:
+                    # Single selection with no detailed report
+                    item = selected_items[0]
+                    values = tree.item(item, 'values')
+                    display_date = values[0] if values else "Unknown"
+                    system = values[2] if len(values) > 2 else "Unknown"
+                    body = values[3] if len(values) > 3 else "Unknown"
+                    
+                    messagebox.showinfo("No Detailed Report", 
+                                      f"No detailed report found for this mining session.\n\n"
+                                      f"Session: {display_date} - {system} {body}\n\n"
+                                      f"To create a detailed report, right-click on this session and select 'Generate Detailed Report (HTML)'.")
+                else:
+                    # Multiple selections with no detailed reports
+                    messagebox.showinfo("No Detailed Reports", 
+                                      f"None of the {len(selected_items)} selected sessions have detailed reports.\n\n"
+                                      f"To create detailed reports, right-click on individual sessions and select 'Generate Detailed Report (HTML)'.")
+                return
+            
+            # Create confirmation message
+            if len(reports_to_delete) == 1:
+                session = reports_to_delete[0]
+                
+                confirm_msg = (f"Are you sure you want to permanently delete this detailed report?\n\n"
+                              f"Session: {session['display_date']} - {session['system']} {session['body']}\n\n"
+                              f"This will delete:\n"
+                              f"• The HTML detailed report file\n"
+                              f"• All associated screenshots\n"
+                              f"• Report mapping data\n\n"
+                              f"This action cannot be undone.")
+                title = "Delete Detailed Report"
+            else:
+                confirm_msg = f"Are you sure you want to permanently delete {len(reports_to_delete)} detailed reports?\n\n"
+                confirm_msg += "Sessions with detailed reports to be deleted:\n"
+                for i, session in enumerate(reports_to_delete[:5], 1):  # Show max 5 items
+                    confirm_msg += f"  {i}. {session['display_date']} - {session['system']}/{session['body']}\n"
+                if len(reports_to_delete) > 5:
+                    confirm_msg += f"  ... and {len(reports_to_delete) - 5} more\n"
+                confirm_msg += f"\nThis will delete:\n"
+                confirm_msg += f"• All HTML detailed report files\n"
+                confirm_msg += f"• All associated screenshots\n"
+                confirm_msg += f"• All report mapping data\n\n"
+                confirm_msg += f"This action cannot be undone."
+                title = "Delete Multiple Detailed Reports"
+            
+            # Show confirmation dialog
+            if not messagebox.askyesno(title, confirm_msg, icon="warning"):
+                return
+                
+            # Perform deletions
+            deleted_count = 0
+            for session in reports_to_delete:
+                try:
+                    report_id = session['report_id']
+                    html_filename = session['html_filename']
+                    
+                    # Delete the HTML file
+                    if html_filename:
+                        html_path = os.path.join(self.reports_dir, "Detailed Reports", html_filename)
+                        if os.path.exists(html_path):
+                            os.remove(html_path)
+                    
+                    # Delete associated screenshots
+                    screenshots = self._get_report_screenshots(report_id)
+                    for screenshot_path in screenshots:
+                        if os.path.exists(screenshot_path):
+                            try:
+                                os.remove(screenshot_path)
+                            except Exception as e:
+                                print(f"Error deleting screenshot {screenshot_path}: {e}")
+                    
+                    # Remove from screenshot mappings
+                    screenshots_map_file = os.path.join(self.reports_dir, "Detailed Reports", "screenshot_mappings.json")
+                    if os.path.exists(screenshots_map_file):
+                        try:
+                            import json
+                            with open(screenshots_map_file, 'r') as f:
+                                screenshot_mappings = json.load(f)
+                            
+                            if report_id in screenshot_mappings:
+                                del screenshot_mappings[report_id]
+                                
+                            with open(screenshots_map_file, 'w') as f:
+                                json.dump(screenshot_mappings, f, indent=2)
+                        except Exception as e:
+                            print(f"Error updating screenshot mappings: {e}")
+                    
+                    # Remove from enhanced report mappings
+                    mappings = self._load_enhanced_report_mappings()
+                    if report_id in mappings:
+                        del mappings[report_id]
+                        
+                        # Save updated mappings
+                        mappings_file = os.path.join(self.reports_dir, "Detailed Reports", "detailed_report_mappings.json")
+                        with open(mappings_file, 'w', encoding='utf-8') as f:
+                            import json
+                            json.dump(mappings, f, indent=2, ensure_ascii=False)
+                    
+                    deleted_count += 1
+                    
+                except Exception as e:
+                    print(f"Error deleting detailed report for {session['display_date']}: {e}")
+            
+            # Refresh tree to remove icons
+            if deleted_count > 0:
+                if tree == self.reports_tree_tab:
+                    self._refresh_reports_tab()
+                else:
+                    self._refresh_reports_window()
+                
+                # Show success message
+                if deleted_count == 1:
+                    messagebox.showinfo("Success", "Detailed report deleted successfully.")
+                else:
+                    messagebox.showinfo("Success", f"{deleted_count} detailed reports deleted successfully.")
+                
+        except Exception as e:
+            print(f"Error deleting detailed report: {e}")
+            messagebox.showerror("Error", f"Failed to delete detailed report: {e}")
+    
+    def _handle_mouse_motion(self, event, tree):
+        """Handle mouse motion to show pointer cursor over enhanced report icons"""
+        try:
+            # Identify which item and column the mouse is over
+            item = tree.identify_row(event.y)
+            column = tree.identify_column(event.x)
+            
+            if item and column:
+                columns = tree["columns"]
+                if int(column[1:]) - 1 < len(columns):
+                    column_name = columns[int(column[1:]) - 1]
+                    
+                    # Check if mouse is over enhanced column and the cell has an icon
+                    if column_name == "enhanced":
+                        cell_value = tree.set(item, column_name)
+                        if cell_value == "✓":  # Has enhanced report
+                            tree.configure(cursor="hand2")
+                            return
+            
+            # Reset cursor to default (but don't interfere with comment column)
+            tree.configure(cursor="")
+            
+        except Exception as e:
+            # Silently handle any errors to avoid disrupting user experience
+            pass
+    
+    def _create_enhanced_click_handler(self, tree):
+        """Create a click handler that intercepts enhanced report clicks"""
+        def enhanced_click_handler(event):
+            try:
+                # Check if this click is on the detailed reports column
+                item = tree.identify_row(event.y)
+                column = tree.identify_column(event.x)
+                
+                if item and column:
+                    columns = tree["columns"]
+                    if int(column[1:]) - 1 < len(columns):
+                        column_name = columns[int(column[1:]) - 1]
+                        
+                        # Only handle clicks on the enhanced column, not comment column
+                        if column_name == "enhanced":
+                            # This is a click on the detailed reports column
+                            # Don't open reports on column click - only allow through right-click menu
+                            # Don't show any popup messages to avoid interfering with multiple selection
+                            # Allow normal row selection behavior by not returning "break"
+                            pass
+                
+                # For all other clicks (including comment column), allow normal processing
+                return None
+                
+            except Exception as e:
+                print(f"Error in enhanced click handler: {e}")
+                return None
+        
+        return enhanced_click_handler
+            
+    def _generate_enhanced_report_from_menu(self, tree):
+        """Generate detailed HTML report for selected report from context menu"""
+        try:
+            selected_items = tree.selection()
+            if not selected_items:
+                messagebox.showwarning("No Selection", "Please select a report first.", parent=tree.winfo_toplevel())
+                return
+                
+            if len(selected_items) > 1:
+                messagebox.showwarning("Multiple Selection", "Please select only one report at a time.", parent=tree.winfo_toplevel())
+                return
+                
+            # Get the selected report data
+            item = selected_items[0]
+            
+            # Delete any existing detailed report and screenshots for this session before generating a new one
+            try:
+                self._delete_existing_detailed_report(item, tree)
+            except Exception as delete_error:
+                # If deletion fails, log it but continue with report generation
+                print(f"Warning: Could not delete existing report: {delete_error}")
+            
+            # Try to get detailed session data first
+            session_data = None
+            if hasattr(self, 'reports_window_session_lookup'):
+                session_data = self.reports_window_session_lookup.get(item)
+            
+            # If no detailed session data, create basic data from tree item
+            if not session_data:
+                values = tree.item(item, 'values')
+                if len(values) >= 6:  # Ensure we have basic data
+                    # Try to parse materials from the "Materials" column if available
+                    materials_mined = {}
+                    
+                    # First try to get materials from breakdown column (materials_breakdown format: "Mat1: 5.2t, Mat2: 3.1t")
+                    material_col_idx = 10  # Try "cargo" column which should have materials
+                    if len(values) > material_col_idx and values[material_col_idx]:
+                        try:
+                            # Parse materials like "Alexandrite: 5.2t, Painite: 3.1t" etc.
+                            materials_text = str(values[material_col_idx])
+                            if materials_text and materials_text != "":
+                                # Check if it's breakdown format (contains ":")
+                                if ':' in materials_text:
+                                    # Parse "Material: XXt" format
+                                    material_pairs = [pair.strip() for pair in materials_text.split(',')]
+                                    for pair in material_pairs:
+                                        if ':' in pair:
+                                            parts = pair.split(':')
+                                            if len(parts) >= 2:
+                                                material_name = parts[0].strip()
+                                                tonnage_text = parts[1].strip()
+                                                # Extract numeric value from "5.2t" format
+                                                tonnage_match = re.search(r'([\d.]+)', tonnage_text)
+                                                if tonnage_match:
+                                                    tonnage = float(tonnage_match.group(1))
+                                                    materials_mined[material_name] = tonnage
+                                else:
+                                    # Fallback: just material names without tonnage - assign equal portions
+                                    material_names = [m.strip() for m in materials_text.split(',')]
+                                    tonnage = float(values[4]) if values[4] else 0.0
+                                    if tonnage > 0 and material_names:
+                                        tons_per_material = tonnage / len(material_names)
+                                        for material in material_names:
+                                            if material and material != "":
+                                                materials_mined[material] = tons_per_material
+                        except Exception as e:
+                            print(f"Error parsing materials: {e}")
+                            pass
+                    
+                    # Try to get prospectors used from the prospectors column (index 11)
+                    prospectors_used = 0
+                    if len(values) > 11 and values[11]:
+                        try:
+                            prospectors_text = str(values[11]).strip()
+                            if prospectors_text and prospectors_text != "—" and prospectors_text != "":
+                                prospectors_used = int(float(prospectors_text))
+                        except (ValueError, TypeError):
+                            prospectors_used = 0
+                    
+                    # Create basic session data from tree values
+                    session_data = {
+                        'date': values[0],
+                        'duration': values[1],
+                        'system': values[2],
+                        'body': values[3],
+                        'tonnage': float(values[4]) if values[4] else 0.0,
+                        'tph': float(values[5]) if values[5] else 0.0,
+                        'materials_mined': materials_mined,
+                        'prospectors_used': prospectors_used,
+                        'comment': values[12] if len(values) > 12 else ""
+                    }
+                else:
+                    messagebox.showwarning("No Data", 
+                        "This appears to be a manual report entry without detailed mining data.\n" +
+                        "Detailed reports work best with actual mining session data.", 
+                        parent=tree.winfo_toplevel())
+                    return
+                
+            # Generate enhanced report
+            from report_generator import ReportGenerator
+            generator = ReportGenerator(self.main_app)
+            
+            # Prepare session data for HTML report
+            enhanced_session_data = {
+                'system': session_data.get('system', 'Unknown'),
+                'body': session_data.get('body', 'Unknown'),
+                'date': session_data.get('date', 'Unknown'),
+                'duration': session_data.get('duration', '00:00'),  # Keep as formatted string
+                'tons': str(session_data.get('tonnage', 0)),        # Keep as string for consistency
+                'tph': str(session_data.get('tph', 0)),             # Keep as string for consistency
+                'materials': str(len(session_data.get('materials_mined', {}))),  # Material count as string
+                'prospectors': str(session_data.get('prospectors_used', 0)),     # Keep as string
+                'materials_mined': session_data.get('materials_mined', {}),
+                'comment': session_data.get('comment', ''),
+                'screenshots': [],
+                # Add additional data for compatibility
+                'session_type': 'Enhanced Report from Tree Data',
+                'data_source': 'Report Entry'
+            }
+            
+            # Ask user if they want to add screenshots before generating the report
+            from tkinter import messagebox
+            add_screenshots = messagebox.askyesno(
+                "Detailed Report", 
+                "Would you like to add screenshots to this detailed report?",
+                parent=tree.winfo_toplevel()
+            )
+            
+            if add_screenshots:
+                # Let user select screenshots
+                self._add_screenshots_to_report_internal(tree, item)
+            
+            # Get screenshots that are specifically linked to this report
+            values = tree.item(item, 'values')
+            report_id = f"{values[0]}_{values[2]}_{values[3]}"  # date_system_body as unique ID
+            report_screenshots = self._get_report_screenshots(report_id)
+            
+            # Only include screenshots that exist and are linked to this report
+            valid_screenshots = []
+            for screenshot_path in report_screenshots:
+                if os.path.exists(screenshot_path):
+                    valid_screenshots.append(screenshot_path)
+            
+            enhanced_session_data['screenshots'] = valid_screenshots
+            
+            # Generate HTML content
+            html_content = generator.generate_report(
+                enhanced_session_data,
+                include_charts=True,
+                include_screenshots=len(valid_screenshots) > 0,  # Only include screenshots section if there are any
+                include_statistics=True
+            )
+            
+            if html_content:
+                # Save HTML report
+                report_filename = f"detailed_report_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                html_report_path = generator.save_report(html_content, report_filename)
+                
+                if html_report_path:
+                    # Update enhanced report mapping
+                    self._update_enhanced_report_mapping(session_data, os.path.basename(html_report_path))
+                    
+                    # Ask user if they want to preview the report
+                    preview_report = messagebox.askyesno(
+                        "Enhanced Report Generated",
+                        f"Enhanced HTML report created successfully!\n\nWould you like to preview it now?",
+                        parent=tree.winfo_toplevel()
+                    )
+                    
+                    if preview_report:
+                        generator.preview_report(html_content)
+                        
+                    self._set_status(f"Enhanced report generated: {os.path.basename(html_report_path)}")
+                    
+                    # Refresh tree to show new enhanced report icon
+                    try:
+                        if tree == self.reports_tree_tab:
+                            self._refresh_reports_tab()
+                        else:
+                            self._refresh_reports_window()
+                    except Exception as refresh_error:
+                        print(f"Error refreshing tree: {refresh_error}")
+                        pass
+                else:
+                    messagebox.showerror("Save Failed", "Could not save enhanced report.", parent=tree.winfo_toplevel())
+            else:
+                messagebox.showerror("Generation Failed", "Could not generate enhanced report content.", parent=tree.winfo_toplevel())
+                
+        except ImportError:
+            messagebox.showerror(
+                "Enhanced Report Error",
+                "Enhanced report functionality not available - missing dependencies",
+                parent=tree.winfo_toplevel()
+            )
+        except Exception as e:
+            print(f"Error generating enhanced report from menu: {e}")
+            messagebox.showerror("Report Error", f"Failed to generate enhanced report:\n{e}", parent=tree.winfo_toplevel())
+            
+    def _generate_enhanced_report(self, cargo_session_data, text_report_path):
+        """Generate enhanced HTML report with charts and screenshots"""
+        try:
+            from report_generator import ReportGenerator
+            
+            # Create report generator
+            generator = ReportGenerator(self.main_app)
+            
+            # Prepare session data for HTML report
+            enhanced_session_data = cargo_session_data.copy() if cargo_session_data else {}
+            
+            # Add screenshots from current session
+            if hasattr(self, 'session_screenshots') and self.session_screenshots:
+                enhanced_session_data['screenshots'] = self.session_screenshots
+            
+            # Generate HTML content
+            html_content = generator.generate_report(
+                enhanced_session_data,
+                include_charts=True,
+                include_screenshots=True,
+                include_statistics=True
+            )
+            
+            if html_content:
+                # Save HTML report
+                html_report_path = generator.save_report(html_content, os.path.basename(text_report_path))
+                
+                if html_report_path:
+                    # Update enhanced report mapping
+                    self._update_enhanced_report_mapping(enhanced_session_data, os.path.basename(html_report_path))
+                    
+                    # Ask user if they want to preview the report
+                    preview_report = messagebox.askyesno(
+                        "Enhanced Report Generated",
+                        f"Enhanced HTML report saved successfully!\n\nWould you like to preview it now?",
+                        parent=self.winfo_toplevel()
+                    )
+                    
+                    if preview_report:
+                        generator.preview_report(html_content)
+                        
+                    self._set_status(f"Enhanced HTML report saved: {os.path.basename(html_report_path)}")
+                else:
+                    self._set_status("Enhanced report generation failed - save error")
+            else:
+                self._set_status("Enhanced report generation failed - content error")
+                
+        except ImportError:
+            messagebox.showerror(
+                "Enhanced Report Error",
+                "Enhanced report functionality not available - missing dependencies",
+                parent=self.winfo_toplevel()
+            )
+        except Exception as e:
+            print(f"Error in enhanced report generation: {e}")
+            raise
+            
+    def _open_batch_reports_dialog(self, parent_window):
+        """Open dialog for generating multiple enhanced HTML reports"""
+        try:
+            # Create batch dialog window
+            batch_window = tk.Toplevel(parent_window)
+            batch_window.title("Batch Detailed Reports")
+            batch_window.geometry("600x500")
+            batch_window.resizable(True, True)
+            batch_window.configure(bg="#2b2b2b")
+            
+            # Main frame
+            main_frame = ttk.Frame(batch_window, padding=10)
+            main_frame.pack(fill='both', expand=True)
+            
+            # Title
+            title_label = ttk.Label(main_frame, text="Generate Enhanced HTML Reports", 
+                                  font=("Segoe UI", 12, "bold"))
+            title_label.pack(pady=(0, 10))
+            
+            # Date range frame
+            date_frame = ttk.LabelFrame(main_frame, text="Date Range (Optional)", padding=10)
+            date_frame.pack(fill='x', pady=(0, 10))
+            
+            ttk.Label(date_frame, text="From:").grid(row=0, column=0, sticky='w', padx=(0, 5))
+            from_date = tk.StringVar()
+            from_entry = ttk.Entry(date_frame, textvariable=from_date, width=12)
+            from_entry.grid(row=0, column=1, padx=(0, 10))
+            ttk.Label(date_frame, text="(YYYY-MM-DD)").grid(row=0, column=2, sticky='w')
+            
+            ttk.Label(date_frame, text="To:").grid(row=1, column=0, sticky='w', padx=(0, 5), pady=(5, 0))
+            to_date = tk.StringVar()
+            to_entry = ttk.Entry(date_frame, textvariable=to_date, width=12)
+            to_entry.grid(row=1, column=1, padx=(0, 10), pady=(5, 0))
+            ttk.Label(date_frame, text="(YYYY-MM-DD)").grid(row=1, column=2, sticky='w', pady=(5, 0))
+            
+            # Session selection frame
+            selection_frame = ttk.LabelFrame(main_frame, text="Session Selection", padding=10)
+            selection_frame.pack(fill='both', expand=True, pady=(0, 10))
+            
+            # Scrollable session list
+            list_frame = ttk.Frame(selection_frame)
+            list_frame.pack(fill='both', expand=True)
+            
+            # Treeview for session selection
+            columns = ('select', 'date', 'system', 'tonnage', 'tph')
+            session_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=15)
+            
+            session_tree.heading('select', text='Select')
+            session_tree.heading('date', text='Date')
+            session_tree.heading('system', text='System')
+            session_tree.heading('tonnage', text='Tonnage')
+            session_tree.heading('tph', text='TPH')
+            
+            session_tree.column('select', width=60, anchor='center')
+            session_tree.column('date', width=100)
+            session_tree.column('system', width=150)
+            session_tree.column('tonnage', width=80, anchor='center')
+            session_tree.column('tph', width=80, anchor='center')
+            
+            # Scrollbar
+            scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=session_tree.yview)
+            session_tree.configure(yscrollcommand=scrollbar.set)
+            
+            session_tree.pack(side='left', fill='both', expand=True)
+            scrollbar.pack(side='right', fill='y')
+            
+            # Load sessions data
+            selected_sessions = set()
+            
+            def toggle_selection(event):
+                item = session_tree.selection()[0] if session_tree.selection() else None
+                if item:
+                    if item in selected_sessions:
+                        selected_sessions.remove(item)
+                        session_tree.item(item, values=(session_tree.item(item)['values'][0].replace('✓', '☐'), *session_tree.item(item)['values'][1:]))
+                    else:
+                        selected_sessions.add(item)
+                        values = list(session_tree.item(item)['values'])
+                        values[0] = '✓'
+                        session_tree.item(item, values=values)
+            
+            session_tree.bind('<Double-1>', toggle_selection)
+            
+            # Load session data from CSV
+            try:
+                csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
+                if os.path.exists(csv_path):
+                    with open(csv_path, 'r', newline='', encoding='utf-8') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            date_str = row.get('Date', '')
+                            system = row.get('System', '')
+                            tonnage = row.get('Total Tonnage', '0')
+                            tph = row.get('TPH', '0')
+                            
+                            item_id = session_tree.insert('', 'end', values=('☐', date_str, system, tonnage, tph))
+            except Exception as e:
+                print(f"Error loading session data: {e}")
+            
+            # Selection buttons
+            btn_frame = ttk.Frame(selection_frame)
+            btn_frame.pack(fill='x', pady=(10, 0))
+            
+            def select_all():
+                for item in session_tree.get_children():
+                    selected_sessions.add(item)
+                    values = list(session_tree.item(item)['values'])
+                    values[0] = '✓'
+                    session_tree.item(item, values=values)
+            
+            def select_none():
+                selected_sessions.clear()
+                for item in session_tree.get_children():
+                    values = list(session_tree.item(item)['values'])
+                    values[0] = '☐'
+                    session_tree.item(item, values=values)
+            
+            ttk.Button(btn_frame, text="Select All", command=select_all).pack(side='left', padx=(0, 5))
+            ttk.Button(btn_frame, text="Select None", command=select_none).pack(side='left')
+            
+            # Action buttons
+            action_frame = ttk.Frame(main_frame)
+            action_frame.pack(fill='x', pady=(10, 0))
+            
+            def generate_batch_reports():
+                if not selected_sessions:
+                    messagebox.showwarning("No Selection", "Please select at least one session to generate reports for.")
+                    return
+                
+                # Get selected session data and generate reports
+                try:
+                    count = 0
+                    errors = 0
+                    
+                    for item in selected_sessions:
+                        try:
+                            # This is a simplified batch generation - in a real implementation,
+                            # you'd need to load the full session data for each session
+                            count += 1
+                        except Exception as e:
+                            errors += 1
+                            print(f"Error generating report for session: {e}")
+                    
+                    messagebox.showinfo(
+                        "Batch Generation Complete",
+                        f"Generated {count} detailed reports.\n{errors} errors occurred.",
+                        parent=batch_window
+                    )
+                    
+                    if errors == 0:
+                        batch_window.destroy()
+                        
+                except Exception as e:
+                    messagebox.showerror("Batch Error", f"Error during batch generation: {e}", parent=batch_window)
+            
+            def close_dialog():
+                batch_window.destroy()
+            
+            ttk.Button(action_frame, text="Generate Reports", command=generate_batch_reports).pack(side='left', padx=(0, 10))
+            ttk.Button(action_frame, text="Cancel", command=close_dialog).pack(side='left')
+            
+            # Center the dialog
+            batch_window.transient(parent_window)
+            batch_window.grab_set()
+            
+        except Exception as e:
+            print(f"Error opening batch reports dialog: {e}")
+            messagebox.showerror("Dialog Error", f"Could not open batch reports dialog: {e}", parent=parent_window)

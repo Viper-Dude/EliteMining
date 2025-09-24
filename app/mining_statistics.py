@@ -291,6 +291,15 @@ class SessionAnalytics:
     def get_total_asteroids(self) -> int:
         """Get total number of asteroids prospected"""
         return self.total_asteroids_prospected
+    
+    def calculate_statistics(self) -> Dict:
+        """Calculate overall session statistics for detailed reports"""
+        return {
+            'total_asteroids': self.total_asteroids_prospected,
+            'hit_rate': (self.asteroids_with_materials / max(1, self.total_asteroids_prospected)) * 100,
+            'materials_found': len(self.material_stats),
+            'session_duration': (datetime.now() - self.session_start_time).total_seconds() / 60 if self.session_start_time else 0
+        }
 
 # Helper functions for formatting and filtering
 

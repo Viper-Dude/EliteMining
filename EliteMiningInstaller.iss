@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.1.1
+AppVersion=v4.1.2
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetVAPath}
 AppendDefaultDirName=no
@@ -20,10 +20,10 @@ UninstallDisplayName=EliteMining
 UninstallDisplayIcon={app}\Apps\EliteMining\Configurator\Configurator.exe
 
 [Files]
-; Only include needed subfolders
-Source: "app\Images\*";    DestDir: "{app}\Apps\EliteMining\app\Images";    Flags: recursesubdirs createallsubdirs ignoreversion
-Source: "app\Settings\*";  DestDir: "{app}\Apps\EliteMining\app\Settings";  Flags: recursesubdirs createallsubdirs onlyifdoesntexist
-Source: "app\Reports\*";   DestDir: "{app}\Apps\EliteMining\app\Reports";   Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "sessions_index.csv"
+; Only include specific file types from needed subfolders (exclude .py files)
+Source: "app\Images\*";    DestDir: "{app}\Apps\EliteMining\app\Images";    Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.py,*.pyc,__pycache__"
+Source: "app\Settings\*";  DestDir: "{app}\Apps\EliteMining\app\Settings";  Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "*.py,*.pyc,__pycache__"
+; Reports folder intentionally excluded - users must earn their reports by mining! 😉
 
 ; New Configurator executable
 Source: "dist\Configurator.exe"; DestDir: "{app}\Apps\EliteMining\Configurator"; Flags: ignoreversion
@@ -66,6 +66,7 @@ Filename: "{cmd}"; Parameters: "/C del ""{app}\Apps\Uninstall_EliteMining.exe"""
 
 [Messages]
 SelectDirDesc=Install EliteMining to your VoiceAttack folder. If auto-detection failed, click Browse and select your VoiceAttack root folder (contains VoiceAttack.exe).
+UninstalledAll=EliteMining has been successfully uninstalled.%n%nNOTE: Some files have been intentionally left behind to preserve your data:%n• Mining reports and detailed reports%n• Configuration files (config.json, mining_bookmarks.json)%n• Settings folder%n• Variables folder%n• Documentation folder%n• VoiceAttack profile (EliteMining-Profile.vap)%n%nTo completely remove all EliteMining data, manually delete the folder:%n%1\Apps\EliteMining
 
 [Code]
 function GetVAPath(Default: String): String;
@@ -114,4 +115,40 @@ begin
   { Remove old Start Menu shortcuts }
   if DirExists(ExpandConstant('{commonprograms}\Elite Mining')) then
     DelTree(ExpandConstant('{commonprograms}\Elite Mining'), True, True, True);
+end;
+
+{ Show information about preserved files during uninstall }
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  LeftoverPath: String;
+  MsgText: String;
+  ErrorCode: Integer;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    LeftoverPath := ExpandConstant('{app}\Apps\EliteMining');
+    
+    { Only show message if the directory still exists (contains preserved files) }
+    if DirExists(LeftoverPath) then
+    begin
+      MsgText := 'EliteMining has been uninstalled, but some files were left behind to preserve your data:' + #13#13 +
+                 '• Mining reports and detailed reports' + #13 +
+                 '• Screenshots from mining sessions' + #13 +
+                 '• Mining performance graphs and charts' + #13 +
+                 '• Configuration files (config.json, mining_bookmarks.json)' + #13 +
+                 '• Settings folder' + #13 +
+                 '• Variables folder' + #13 +
+                 '• Documentation folder' + #13 +
+                 '• VoiceAttack profile (EliteMining-Profile.vap)' + #13#13 +
+                 'These files are located at:' + #13 +
+                 LeftoverPath + #13#13 +
+                 'To completely remove all EliteMining data, manually delete this folder.' + #13#13 +
+                 'Would you like to open the folder location now?';
+                 
+      if MsgBox(MsgText, mbInformation, MB_YESNO) = IDYES then
+      begin
+        Exec('explorer.exe', '/select,"' + LeftoverPath + '"', '', SW_SHOW, ewNoWait, ErrorCode);
+      end;
+    end;
+  end;
 end;

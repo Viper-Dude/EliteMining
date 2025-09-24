@@ -4,6 +4,10 @@ Mining Analytics Charts Module
 Provides real-time graphical analysis for mining statistics
 """
 
+import json
+import os
+from datetime import datetime
+
 # Import matplotlib with error handling for PyInstaller compatibility
 try:
     import matplotlib
@@ -404,6 +408,110 @@ class MiningChartsPanel:
         """Grid the main frame"""
         self.frame.grid(**kwargs)
     
+    def has_timeline_data(self):
+        """Check if the timeline chart has actual data"""
+        materials = self.session_analytics.get_tracked_materials()
+        return bool(materials)  # If we have tracked materials, we have data
+    
+    def has_comparison_data(self):
+        """Check if the comparison chart has actual data"""
+        summary_data = self.session_analytics.get_live_summary()
+        return bool(summary_data)  # If we have summary data, we have data
+    
+    def auto_save_graphs(self, session_system=None, session_body=None, session_timestamp=None):
+        """Auto-save graphs to Reports/Mining Session/Graphs/ folder if data exists"""
+        if not MATPLOTLIB_AVAILABLE:
+            return False
+            
+        # Only save if we have data
+        has_timeline = self.has_timeline_data()
+        has_comparison = self.has_comparison_data()
+        
+        if not has_timeline and not has_comparison:
+            return False  # No data to save
+        
+        try:
+            # Create graphs folder if it doesn't exist
+            graphs_dir = os.path.join(os.path.dirname(__file__), "Reports", "Mining Session", "Graphs")
+            os.makedirs(graphs_dir, exist_ok=True)
+            
+            # Generate timestamp and filename components
+            if session_timestamp:
+                timestamp = session_timestamp
+            else:
+                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            
+            # Create session-specific filename prefix
+            session_prefix = f"Session_{timestamp}"
+            if session_system:
+                # Clean system name for filename (remove invalid characters)
+                clean_system = "".join(c for c in session_system if c.isalnum() or c in (' ', '-', '_')).strip()
+                clean_system = clean_system.replace(' ', '_')
+                session_prefix += f"_{clean_system}"
+            if session_body:
+                # Clean body name for filename  
+                clean_body = "".join(c for c in session_body if c.isalnum() or c in (' ', '-', '_')).strip()
+                clean_body = clean_body.replace(' ', '_')
+                session_prefix += f"_{clean_body}"
+            
+            saved_files = []
+            
+            # Save timeline chart if it has data
+            timeline_filename = None
+            if has_timeline:
+                timeline_filename = f"{session_prefix}_Timeline.png"
+                timeline_path = os.path.join(graphs_dir, timeline_filename)
+                self.timeline_fig.savefig(timeline_path, dpi=300, bbox_inches='tight', 
+                                        facecolor='#2b2b2b', edgecolor='none')
+                saved_files.append(timeline_filename)
+            
+            # Save comparison chart if it has data
+            comparison_filename = None
+            if has_comparison:
+                comparison_filename = f"{session_prefix}_Comparison.png"
+                comparison_path = os.path.join(graphs_dir, comparison_filename)
+                self.bar_fig.savefig(comparison_path, dpi=300, bbox_inches='tight', 
+                                   facecolor='#2b2b2b', edgecolor='none')
+                saved_files.append(comparison_filename)
+            
+            # Create/update graph mappings JSON
+            self._update_graph_mappings(session_prefix, timeline_filename, comparison_filename)
+            
+            print(f"Auto-saved graphs: {', '.join(saved_files)} to {graphs_dir}")
+            return True
+            
+        except Exception as e:
+            print(f"Error auto-saving graphs: {e}")
+            return False
+
+    def _update_graph_mappings(self, session_id, timeline_filename, comparison_filename):
+        """Update the graph mappings JSON file"""
+        try:
+            mappings_file = os.path.join(os.path.dirname(__file__), "Reports", "Mining Session", "Graphs", "graph_mappings.json")
+            
+            # Load existing mappings
+            mappings = {}
+            if os.path.exists(mappings_file):
+                try:
+                    with open(mappings_file, 'r', encoding='utf-8') as f:
+                        mappings = json.load(f)
+                except (json.JSONDecodeError, IOError):
+                    mappings = {}
+            
+            # Add/update mapping for this session
+            mappings[session_id] = {
+                "timeline_graph": timeline_filename,
+                "comparison_graph": comparison_filename,
+                "created": datetime.now().isoformat()
+            }
+            
+            # Save updated mappings
+            with open(mappings_file, 'w', encoding='utf-8') as f:
+                json.dump(mappings, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f"Warning: Could not update graph mappings: {e}")
+
     def export_charts_png(self):
         """Export both charts as PNG images"""
         if not MATPLOTLIB_AVAILABLE:

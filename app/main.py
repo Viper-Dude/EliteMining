@@ -15,7 +15,7 @@ import time
 import zipfile
 import announcer
 from ring_finder import RingFinder
-from config import _load_cfg, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry, load_cargo_window_position, save_cargo_window_position
+from config import _load_cfg, _save_cfg, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry, load_cargo_window_position, save_cargo_window_position
 from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
 from update_checker import UpdateChecker
 
@@ -326,7 +326,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "Elite Mining – Configuration"
-APP_VERSION = "v4.1.1"
+APP_VERSION = "v4.1.2"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -361,7 +361,7 @@ def _atomic_write_text(path: str, text: str) -> None:
 from core.constants import (
     FIREGROUPS, NATO, NATO_REVERSE,
     VA_VARS, VA_TTS_ANNOUNCEMENT, TOOL_ORDER,
-    ANNOUNCEMENT_TOGGLES, TOGGLES, TIMERS, MENU_COLORS
+    ANNOUNCEMENT_TOGGLES, TOGGLES, TIMERS, MENU_COLORS, MINING_MATERIALS
 )
 
 # -------------------- Config helpers (persist VA folder, window geometry, etc.) --------------------
@@ -435,8 +435,644 @@ def detect_va_folder_interactive(parent: tk.Tk) -> Optional[str]:
         return folder
     return None
 
+# --- Refinery Contents Dialog class ---
+class RefineryDialog:
+    def __init__(self, parent, cargo_monitor, current_cargo_items=None):
+        self.parent = parent
+        self.cargo_monitor = cargo_monitor
+        self.current_cargo_items = current_cargo_items or {}
+        
+        # Load existing refinery contents from cargo monitor
+        if cargo_monitor and hasattr(cargo_monitor, 'refinery_contents'):
+            self.refinery_contents = cargo_monitor.refinery_contents.copy()
+        else:
+            self.refinery_contents = {}
+            
+        self.result = None
+        
+        # Create dialog window
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Add Refinery Contents")
+        self.dialog.geometry("600x650")
+        self.dialog.configure(bg="#1e1e1e")
+        self.dialog.resizable(True, True)  # Allow resizing so user can adjust if needed
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        # Set icon using the same method as main app
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                self.dialog.iconbitmap(icon_path)
+            elif icon_path:
+                self.dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+        except:
+            pass  # Silently handle icon loading errors
+        
+        # Center the dialog on parent window
+        self.dialog.update_idletasks()
+        
+        if parent:
+            parent.update_idletasks()
+            # Get parent window position and size
+            parent_x = parent.winfo_rootx()
+            parent_y = parent.winfo_rooty()
+            parent_width = parent.winfo_width()
+            parent_height = parent.winfo_height()
+            
+            # Calculate center position relative to parent
+            dialog_width = 600
+            dialog_height = 650
+            x = parent_x + (parent_width - dialog_width) // 2
+            y = parent_y + (parent_height - dialog_height) // 2
+        else:
+            # Fallback to screen center
+            x = (self.dialog.winfo_screenwidth() // 2) - (600 // 2)
+            y = (self.dialog.winfo_screenheight() // 2) - (650 // 2)
+        
+        self.dialog.geometry(f"600x650+{x}+{y}")
+        
+        self._create_ui()
+        
+    def _create_ui(self):
+        """Create the refinery dialog UI"""
+        from core.constants import MINING_MATERIALS
+        
+        # Main frame
+        main_frame = tk.Frame(self.dialog, bg="#1e1e1e", padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="⚗️ Add Refinery Contents", 
+                              bg="#1e1e1e", fg="#ffffff", 
+                              font=("Segoe UI", 14, "bold"))
+        title_label.pack(pady=(0, 15))
+        
+        # Manual add section (moved to top for dropdown space)
+        manual_frame = tk.LabelFrame(main_frame, text="🔍 Add Other Materials", 
+                                   bg="#1e1e1e", fg="#ffffff", 
+                                   font=("Segoe UI", 10, "bold"))
+        manual_frame.pack(fill="x", pady=(0, 15))
+        
+        manual_inner = tk.Frame(manual_frame, bg="#1e1e1e")
+        manual_inner.pack(fill="x", padx=10, pady=10)
+        
+        # Configure grid columns for proper spacing
+        manual_inner.columnconfigure(1, weight=1)  # Material dropdown column
+        manual_inner.columnconfigure(3, weight=0)  # Quantity entry column
+        
+        # Material selection
+        tk.Label(manual_inner, text="Material:", bg="#1e1e1e", fg="#ffffff").grid(row=0, column=0, sticky="w", padx=(0, 5))
+        
+        self.material_var = tk.StringVar(value="Select Material...")
+        
+        # Material selection button using standard app styling
+        material_btn = tk.Button(manual_inner, textvariable=self.material_var,
+                               command=self._open_material_selector,
+                               bg="#4a9eff", fg="#ffffff", 
+                               font=("Segoe UI", 9))
+        material_btn.grid(row=0, column=1, padx=5, sticky="w")
+        
+        # Quantity entry
+        tk.Label(manual_inner, text="Quantity:", bg="#1e1e1e", fg="#ffffff").grid(row=0, column=2, sticky="w", padx=(10, 5))
+        
+        self.quantity_var = tk.StringVar()
+        quantity_entry = tk.Entry(manual_inner, textvariable=self.quantity_var, width=8,
+                                bg="#2d2d2d", fg="#ffffff", 
+                                insertbackground="#ffffff",  # Cursor color
+                                selectbackground="#404040",   # Selection background
+                                selectforeground="#ffffff",   # Selection text
+                                relief="sunken", bd=1)
+        quantity_entry.grid(row=0, column=3, padx=5)
+        
+        tk.Label(manual_inner, text="tons", bg="#1e1e1e", fg="#ffffff").grid(row=0, column=4, sticky="w", padx=(5, 0))
+        
+        # Add button
+        add_btn = tk.Button(manual_inner, text="+ Add", 
+                          command=self._add_manual_material,
+                          bg="#4a9eff", fg="#ffffff", 
+                          font=("Segoe UI", 9, "bold"))
+        add_btn.grid(row=0, column=5, padx=(10, 0))
+
+        # Session summary
+        if self.cargo_monitor:
+            summary_frame = tk.Frame(main_frame, bg="#2d2d2d", relief="raised", bd=1)
+            summary_frame.pack(fill="x", pady=(0, 15))
+            
+            cargo_total = getattr(self.cargo_monitor, 'current_cargo', 0)
+            capacity = getattr(self.cargo_monitor, 'max_cargo', 0)
+            
+            summary_label = tk.Label(summary_frame, 
+                                   text=f"📦 Cargo Hold Detected: {cargo_total} tons",
+                                   bg="#2d2d2d", fg="#ffffff", 
+                                   font=("Segoe UI", 10))
+            summary_label.pack(pady=8)
+        
+        # Quick add from cargo section
+        if self.current_cargo_items:
+            cargo_frame = tk.LabelFrame(main_frame, text="📦 Quick Add from Current Cargo", 
+                                      bg="#1e1e1e", fg="#ffffff", 
+                                      font=("Segoe UI", 10, "bold"))
+            cargo_frame.pack(fill="x", pady=(0, 15))
+            
+            cargo_inner = tk.Frame(cargo_frame, bg="#1e1e1e")
+            cargo_inner.pack(fill="x", padx=10, pady=10)
+            
+            # Create quick-add buttons for materials in cargo
+            row = 0
+            col = 0
+            for material, quantity in self.current_cargo_items.items():
+                if material in MINING_MATERIALS:  # Only show known mining materials
+                    material_frame = tk.Frame(cargo_inner, bg="#1e1e1e")
+                    material_frame.grid(row=row, column=col, padx=5, pady=5, sticky="w")
+                    
+                    # Material label
+                    mat_label = tk.Label(material_frame, text=f"{material}:", 
+                                       bg="#1e1e1e", fg="#ffffff", 
+                                       font=("Segoe UI", 9))
+                    mat_label.pack(side="left")
+                    
+                    # Quick add buttons
+                    for amount in [5, 10, 15]:
+                        if amount <= quantity:  # Only show realistic amounts
+                            btn = tk.Button(material_frame, text=f"+{amount}t", 
+                                          command=lambda m=material, a=amount: self._quick_add_material(m, a),
+                                          bg="#404040", fg="#ffffff", 
+                                          font=("Segoe UI", 8), width=6)
+                            btn.pack(side="left", padx=2)
+                    
+                    col += 1
+                    if col > 1:  # 2 columns
+                        col = 0
+                        row += 1
+        
+        # Current refinery contents
+        contents_frame = tk.LabelFrame(main_frame, text="⚗️ Current Refinery Contents", 
+                                     bg="#1e1e1e", fg="#ffffff", 
+                                     font=("Segoe UI", 10, "bold"))
+        contents_frame.pack(fill="x", pady=(0, 15))
+        
+        # Scrollable list of refinery contents - with fixed height
+        list_frame = tk.Frame(contents_frame, bg="#1e1e1e")
+        list_frame.pack(fill="x", padx=10, pady=10)
+        
+        self.contents_listbox = tk.Listbox(list_frame, bg="#2d2d2d", fg="#ffffff", 
+                                         selectbackground="#404040", 
+                                         font=("Segoe UI", 9), height=6)
+        self.contents_listbox.pack(side="left", fill="x", expand=True)
+        
+        scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=self.contents_listbox.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.contents_listbox.configure(yscrollcommand=scrollbar.set)
+        
+        # Edit and Remove buttons
+        button_container = tk.Frame(contents_frame, bg="#1e1e1e")
+        button_container.pack(pady=(0, 10))
+        
+        edit_btn = tk.Button(button_container, text="Edit Selected", 
+                           command=self._edit_selected,
+                           bg="#4a9eff", fg="#ffffff")
+        edit_btn.pack(side="left", padx=(0, 5))
+        
+        remove_btn = tk.Button(button_container, text="Remove Selected", 
+                             command=self._remove_selected,
+                             bg="#ff6b6b", fg="#ffffff")
+        remove_btn.pack(side="left")
+        
+        # Summary section
+        self.summary_frame = tk.Frame(main_frame, bg="#2d2d2d", relief="raised", bd=1)
+        self.summary_frame.pack(fill="x", pady=(0, 15))
+        
+        self.summary_label = tk.Label(self.summary_frame, 
+                                    text="Refinery Total: 0 tons",
+                                    bg="#2d2d2d", fg="#ffffff", 
+                                    font=("Segoe UI", 10, "bold"))
+        self.summary_label.pack(pady=8)
+        
+        # Buttons
+        button_frame = tk.Frame(main_frame, bg="#1e1e1e")
+        button_frame.pack(fill="x")
+        
+        clear_btn = tk.Button(button_frame, text="Clear All", 
+                            command=self._clear_all,
+                            bg="#666666", fg="#ffffff")
+        clear_btn.pack(side="left")
+        
+        cancel_btn = tk.Button(button_frame, text="Cancel", 
+                             command=self._cancel,
+                             bg="#666666", fg="#ffffff")
+        cancel_btn.pack(side="right", padx=(5, 0))
+        
+        apply_btn = tk.Button(button_frame, text="Apply to Session", 
+                            command=self._apply,
+                            bg="#4caf50", fg="#ffffff", 
+                            font=("Segoe UI", 9, "bold"))
+        apply_btn.pack(side="right", padx=(5, 0))
+        
+        # Update display to show any existing refinery contents
+        self._update_display()
+        self._update_summary()
+    
+    def _quick_add_material(self, material, amount):
+        """Add material from quick-add buttons"""
+        # Check refinery capacity limit (10t max)
+        current_total = sum(self.refinery_contents.values())
+        if current_total + amount > 10.0:
+            remaining_capacity = 10.0 - current_total
+            messagebox.showerror("Refinery Capacity Exceeded", 
+                               f"Refinery capacity is 10t maximum.\n"
+                               f"Current: {current_total}t\n"
+                               f"Available: {remaining_capacity}t\n"
+                               f"Cannot add {amount}t")
+            return
+            
+        if material in self.refinery_contents:
+            self.refinery_contents[material] += amount
+        else:
+            self.refinery_contents[material] = amount
+        self._update_display()
+        
+        # Trigger CSV update if this is being used after session end
+        self._check_and_trigger_csv_update({material: amount})
+    
+    def _add_manual_material(self):
+        """Add material from manual entry"""
+        material = self.material_var.get()
+        
+        # Check if material is selected
+        if not material or material == "Select Material...":
+            messagebox.showerror("No Material Selected", "Please select a material before adding.")
+            return
+            
+        try:
+            quantity_str = self.quantity_var.get().strip()
+            if not quantity_str:
+                messagebox.showerror("No Quantity Entered", "Please enter a quantity.")
+                return
+                
+            quantity = float(quantity_str)
+            if quantity <= 0:
+                raise ValueError("Quantity must be positive")
+            
+            # Check refinery capacity limit (10t max)
+            current_total = sum(self.refinery_contents.values())
+            if current_total + quantity > 10.0:
+                remaining_capacity = 10.0 - current_total
+                messagebox.showerror("Refinery Capacity Exceeded", 
+                                   f"Refinery capacity is 10t maximum.\n"
+                                   f"Current: {current_total}t\n"
+                                   f"Available: {remaining_capacity}t\n"
+                                   f"Cannot add {quantity}t")
+                return
+                
+            if material in self.refinery_contents:
+                self.refinery_contents[material] += quantity
+            else:
+                self.refinery_contents[material] = quantity
+                
+            self.quantity_var.set("")  # Clear entry
+            self._update_display()
+            
+            # Trigger CSV update if this is being used after session end
+            self._check_and_trigger_csv_update({material: quantity})
+            
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter a valid positive number for quantity.")
+    
+    def _check_and_trigger_csv_update(self, added_materials: dict):
+        """Check if we should trigger CSV update when materials are added manually"""
+        import os
+        # Only trigger updates if we have a cargo monitor reference and it has the update function
+        if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, '_update_csv_after_refinery_addition'):
+            # Check if there are recent session files that might need updating
+            try:
+                prospector_panel = getattr(self.cargo_monitor, 'main_app_ref', None)
+                if prospector_panel and hasattr(prospector_panel, 'prospector_panel'):
+                    reports_dir = prospector_panel.prospector_panel.reports_dir
+                    if os.path.exists(reports_dir):
+                        session_files = [f for f in os.listdir(reports_dir) 
+                                       if f.startswith("Session_") and f.endswith(".txt")]
+                        if session_files:
+                            # Trigger the update with accumulated refinery contents
+                            self.cargo_monitor._update_csv_after_refinery_addition(self.refinery_contents.copy())
+            except Exception as e:
+                print(f"Error checking for CSV update: {e}")
+
+    def _remove_selected(self):
+        """Remove selected material from refinery contents"""
+        selection = self.contents_listbox.curselection()
+        if selection:
+            index = selection[0]
+            materials = list(self.refinery_contents.keys())
+            if index < len(materials):
+                material = materials[index]
+                del self.refinery_contents[material]
+                self._update_display()
+    
+    def _edit_selected(self):
+        """Edit the quantity of selected material"""
+        selection = self.contents_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a material to edit.")
+            return
+            
+        index = selection[0]
+        materials = list(self.refinery_contents.keys())
+        if index < len(materials):
+            material = materials[index]
+            current_qty = self.refinery_contents[material]
+            
+            # Create custom edit dialog with dark theme and proper positioning
+            new_qty = self._show_edit_quantity_dialog(material, current_qty)
+            
+            if new_qty is not None:
+                if new_qty == 0:
+                    # Remove if quantity is 0
+                    del self.refinery_contents[material]
+                else:
+                    # Update quantity
+                    self.refinery_contents[material] = new_qty
+                self._update_display()
+                
+    def _show_edit_quantity_dialog(self, material, current_qty):
+        """Show a custom dark-themed edit quantity dialog positioned near parent"""
+        # Create dialog window
+        edit_dialog = tk.Toplevel(self.dialog)
+        edit_dialog.title("Edit Material Quantity")
+        edit_dialog.geometry("400x200")
+        edit_dialog.configure(bg="#1e1e1e")
+        edit_dialog.resizable(False, False)
+        edit_dialog.transient(self.dialog)
+        edit_dialog.grab_set()
+        
+        # Set app icon using the same method as main app
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                edit_dialog.iconbitmap(icon_path)
+            elif icon_path:
+                edit_dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+        except:
+            pass  # Silently handle icon loading errors
+        
+        # Position near parent dialog (not on distant monitor)
+        self.dialog.update_idletasks()
+        edit_dialog.update_idletasks()
+        
+        # Calculate center position relative to parent dialog
+        parent_x = self.dialog.winfo_x()
+        parent_y = self.dialog.winfo_y()
+        parent_width = self.dialog.winfo_width()
+        parent_height = self.dialog.winfo_height()
+        
+        dialog_width = 400
+        dialog_height = 200
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+        
+        edit_dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        
+        # Create UI with dark theme
+        main_frame = tk.Frame(edit_dialog, bg="#1e1e1e", padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True)
+        
+        # Title
+        title_label = tk.Label(main_frame, text=f"Edit {material} Quantity", 
+                              bg="#1e1e1e", fg="#ffffff", 
+                              font=("Segoe UI", 12, "bold"))
+        title_label.pack(pady=(0, 15))
+        
+        # Current quantity info
+        info_label = tk.Label(main_frame, text=f"Current quantity: {current_qty} tons", 
+                             bg="#1e1e1e", fg="#cccccc", 
+                             font=("Segoe UI", 10))
+        info_label.pack(pady=(0, 10))
+        
+        # New quantity entry
+        entry_frame = tk.Frame(main_frame, bg="#1e1e1e")
+        entry_frame.pack(pady=(0, 20))
+        
+        tk.Label(entry_frame, text="New quantity:", bg="#1e1e1e", fg="#ffffff",
+                font=("Segoe UI", 10)).pack(side="left")
+        
+        quantity_var = tk.StringVar(value=str(current_qty))
+        quantity_entry = tk.Entry(entry_frame, textvariable=quantity_var, width=10,
+                                bg="#2d2d2d", fg="#ffffff", 
+                                insertbackground="#ffffff",
+                                selectbackground="#404040",
+                                selectforeground="#ffffff",
+                                font=("Segoe UI", 10),
+                                relief="sunken", bd=1)
+        quantity_entry.pack(side="left", padx=(10, 5))
+        
+        tk.Label(entry_frame, text="tons", bg="#1e1e1e", fg="#ffffff",
+                font=("Segoe UI", 10)).pack(side="left")
+        
+        # Focus and select all text
+        quantity_entry.focus_set()
+        quantity_entry.select_range(0, tk.END)
+        
+        # Buttons
+        button_frame = tk.Frame(main_frame, bg="#1e1e1e")
+        button_frame.pack()
+        
+        result = [None]  # Use list to store result (mutable)
+        
+        def ok_clicked():
+            try:
+                value = float(quantity_var.get())
+                if value < 0:
+                    messagebox.showerror("Invalid Input", "Quantity cannot be negative.", parent=edit_dialog)
+                    return
+                result[0] = value
+                edit_dialog.destroy()
+            except ValueError:
+                messagebox.showerror("Invalid Input", "Please enter a valid number.", parent=edit_dialog)
+        
+        def cancel_clicked():
+            result[0] = None
+            edit_dialog.destroy()
+        
+        # OK button
+        ok_btn = tk.Button(button_frame, text="OK", command=ok_clicked,
+                          bg="#4caf50", fg="#ffffff", 
+                          font=("Segoe UI", 9, "bold"), width=8)
+        ok_btn.pack(side="left", padx=(0, 10))
+        
+        # Cancel button  
+        cancel_btn = tk.Button(button_frame, text="Cancel", command=cancel_clicked,
+                              bg="#666666", fg="#ffffff", 
+                              font=("Segoe UI", 9), width=8)
+        cancel_btn.pack(side="left")
+        
+        # Bind Enter key to OK and Escape to Cancel
+        edit_dialog.bind('<Return>', lambda e: ok_clicked())
+        edit_dialog.bind('<Escape>', lambda e: cancel_clicked())
+        
+        # Wait for dialog to close and return result
+        edit_dialog.wait_window()
+        return result[0]
+    
+    def _clear_all(self):
+        """Clear all refinery contents"""
+        self.refinery_contents.clear()
+        self._update_display()
+    
+    def _update_display(self):
+        """Update the contents listbox and summary"""
+        self.contents_listbox.delete(0, tk.END)
+        
+        for material, quantity in self.refinery_contents.items():
+            self.contents_listbox.insert(tk.END, f"{material}: {quantity} tons")
+        
+        self._update_summary()
+    
+    def _update_summary(self):
+        """Update the summary label"""
+        total = sum(self.refinery_contents.values())
+        self.summary_label.configure(text=f"Refinery Total: {total} tons")
+        
+        # Update final calculation if we have cargo data
+        if self.cargo_monitor:
+            cargo_total = getattr(self.cargo_monitor, 'current_cargo', 0)
+            final_total = cargo_total + total
+            
+            summary_text = f"Refinery Total: +{total} tons\n"
+            summary_text += f"Final Total: {cargo_total} + {total} = {final_total} tons"
+            self.summary_label.configure(text=summary_text)
+    
+    def _cancel(self):
+        """Cancel the dialog"""
+        self.result = None
+        self.dialog.destroy()
+    
+    def _apply(self):
+        """Apply the refinery contents"""
+        self.result = self.refinery_contents.copy()
+        # Rebuild CSV after materials are applied
+        if hasattr(self.cargo_monitor, 'main_app_ref') and hasattr(self.cargo_monitor.main_app_ref, 'prospector_panel'):
+            prospector_panel = self.cargo_monitor.main_app_ref.prospector_panel
+            csv_path = os.path.join(prospector_panel.reports_dir, "sessions_index.csv")
+            prospector_panel.after(100, lambda: prospector_panel._rebuild_csv_from_files_tab(csv_path))
+        self.dialog.destroy()
+    
+    def show(self):
+        """Show the dialog and return the result"""
+        self.dialog.wait_window()
+        return self.result
+    
+    def _open_material_selector(self):
+        """Open a material selection window"""
+        from core.constants import MINING_MATERIALS
+        
+        # Create selection window
+        selector = tk.Toplevel(self.dialog)
+        selector.title("Select Material")
+        selector.geometry("400x500")
+        selector.configure(bg="#1e1e1e")
+        selector.resizable(False, False)
+        selector.transient(self.dialog)
+        selector.grab_set()
+        
+        # Set icon using the same method as main app
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                selector.iconbitmap(icon_path)
+            elif icon_path:
+                selector.iconphoto(False, tk.PhotoImage(file=icon_path))
+        except:
+            pass  # Silently handle icon loading errors
+        
+        # Center on parent
+        selector.update_idletasks()
+        x = self.dialog.winfo_x() + (self.dialog.winfo_width() // 2) - 200
+        y = self.dialog.winfo_y() + (self.dialog.winfo_height() // 2) - 250
+        selector.geometry(f"400x500+{x}+{y}")
+        
+        # Title
+        title_label = tk.Label(selector, text="Select Mining Material", 
+                              bg="#1e1e1e", fg="#ffffff", 
+                              font=("Segoe UI", 12, "bold"))
+        title_label.pack(pady=15)
+        
+        # Search frame
+        search_frame = tk.Frame(selector, bg="#1e1e1e")
+        search_frame.pack(fill="x", padx=20, pady=(0, 10))
+        
+        tk.Label(search_frame, text="Search:", bg="#1e1e1e", fg="#ffffff").pack(side="left")
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(search_frame, textvariable=search_var, bg="#404040", fg="#ffffff")
+        search_entry.pack(side="left", fill="x", expand=True, padx=(5, 0))
+        
+        # Materials listbox
+        list_frame = tk.Frame(selector, bg="#1e1e1e")
+        list_frame.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+        
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side="right", fill="y")
+        
+        materials_list = tk.Listbox(list_frame, bg="#2d2d2d", fg="#ffffff",
+                                  selectbackground="#404040", 
+                                  font=("Segoe UI", 9),
+                                  yscrollcommand=scrollbar.set)
+        materials_list.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=materials_list.yview)
+        
+        # Populate list
+        materials = list(MINING_MATERIALS.keys())
+        for material in sorted(materials):
+            materials_list.insert(tk.END, material)
+        
+        # Search function
+        def filter_materials(*args):
+            search_term = search_var.get().lower()
+            materials_list.delete(0, tk.END)
+            for material in sorted(materials):
+                if search_term in material.lower():
+                    materials_list.insert(tk.END, material)
+        
+        search_var.trace('w', filter_materials)
+        
+        # Buttons
+        btn_frame = tk.Frame(selector, bg="#1e1e1e")
+        btn_frame.pack(fill="x", padx=20, pady=(0, 15))
+        
+        def select_material():
+            selection = materials_list.curselection()
+            if selection:
+                selected = materials_list.get(selection[0])
+                self.material_var.set(selected)
+            selector.destroy()
+        
+        def cancel_selection():
+            selector.destroy()
+        
+        select_btn = tk.Button(btn_frame, text="Select", command=select_material,
+                             bg="#4a9eff", fg="#ffffff", font=("Segoe UI", 9, "bold"))
+        select_btn.pack(side="right", padx=(5, 0))
+        
+        cancel_btn = tk.Button(btn_frame, text="Cancel", command=cancel_selection,
+                             bg="#666666", fg="#ffffff", font=("Segoe UI", 9))
+        cancel_btn.pack(side="right")
+        
+        # Double-click to select
+        materials_list.bind("<Double-Button-1>", lambda e: select_material())
+        
+        # Focus search entry
+        search_entry.focus_set()
+
 # --- Cargo Hold Monitor class ---
 class CargoMonitor:
+    """
+    Cargo monitoring system that reads Elite Dangerous game data.
+    
+    This class provides the core cargo tracking functionality and can display in two ways:
+    1. Popup Window Mode: Separate always-on-top window (optional)
+    2. Integrated Mode: Built into main app interface (always present)
+    
+    Both modes share the same underlying data and functionality.
+    """
     def __init__(self, update_callback=None, capacity_changed_callback=None):
         self.cargo_window = None
         self.cargo_label = None
@@ -446,6 +1082,7 @@ class CargoMonitor:
         self.max_cargo = 200  # Will be auto-detected from journal
         self.current_cargo = 0
         self.cargo_items = {}  # Dict of item_name: quantity
+        self.refinery_contents = {}  # Dict of refinery material adjustments
         self.update_callback = update_callback  # Callback to notify main app of changes
         self.capacity_changed_callback = capacity_changed_callback  # Callback when cargo capacity changes
         
@@ -468,6 +1105,9 @@ class CargoMonitor:
         
         # Session tracking for mining reports
         self.session_start_snapshot = None
+        self.last_mining_activity = None
+        self.session_end_dialog_shown = False
+        self.mining_activity_timeout = 300  # 5 minutes of inactivity to trigger session end
         
         # Status.json file path for current ship data  
         self.status_json_path = os.path.join(self.journal_dir, "Status.json")
@@ -629,6 +1269,113 @@ class CargoMonitor:
         self.cargo_items.clear()
         self.current_cargo = 0
         self.update_display()
+    
+    def reset_cargo_hold(self):
+        """Reset cargo hold to actual game state using real-time Status.json data"""
+        print("Resetting cargo hold...")
+        
+        # Temporarily stop journal monitoring to prevent interference
+        old_monitor_state = getattr(self, 'journal_monitor_active', False)
+        self.journal_monitor_active = False
+        print(f"Reset: Temporarily stopped journal monitoring (was {old_monitor_state})")
+        
+        # Clear all cargo items and reset counters
+        self.cargo_items.clear()
+        self.current_cargo = 0
+        
+        # Reset file timestamps to force fresh read
+        self.last_cargo_mtime = 0
+        self.last_file_size = 0
+        
+        success = False
+        status_cargo_weight = 0
+        
+        # Get real-time cargo weight from Status.json (always current)
+        if self.read_status_json_cargo():
+            status_cargo_weight = self.current_cargo
+            success = True
+            print(f"Reset: Status.json shows {status_cargo_weight}t total cargo (real-time)")
+        
+        # Try to get detailed items from Cargo.json, but validate against Status.json
+        cargo_json_weight = 0
+        if self.read_cargo_json():
+            # Calculate total weight from Cargo.json items
+            try:
+                cargo_json_weight = 0
+                for name, item in self.cargo_items.items():
+                    if isinstance(item, dict):
+                        count = item.get('Count', 0)
+                        cargo_json_weight += count
+                    elif isinstance(item, (int, float)):
+                        cargo_json_weight += item
+                    else:
+                        print(f"Warning: Unknown cargo item format: {type(item)}")
+                
+                print(f"Reset: Cargo.json shows {cargo_json_weight}t total cargo")
+            except Exception as e:
+                print(f"Error calculating Cargo.json weight: {e}")
+                cargo_json_weight = 0
+            
+            # Check if Cargo.json data matches Status.json (within 1 ton tolerance)
+            if abs(cargo_json_weight - status_cargo_weight) <= 1:
+                print("Reset: Cargo.json data matches Status.json - using detailed items")
+                success = True
+            else:
+                print(f"Reset: Cargo.json data is outdated ({cargo_json_weight}t vs {status_cargo_weight}t)")
+                print("Reset: Clearing outdated Cargo.json data, using Status.json weight only")
+                # Clear the outdated detailed items but keep the accurate weight
+                self.cargo_items.clear()
+                self.current_cargo = status_cargo_weight
+                success = True
+        
+        # If we only have weight but no detailed items, show a placeholder entry
+        if success and not self.cargo_items and self.current_cargo > 0:
+            self.cargo_items['Unknown Cargo'] = {
+                'Name': 'Unknown Cargo',
+                'Count': self.current_cargo,
+                'Description': 'Open cargo hold in Elite Dangerous to see details'
+            }
+            print(f"Reset: Created placeholder for {self.current_cargo}t of unknown cargo")
+        
+        # If no data from either source, try journal as last resort
+        if not success or (not self.cargo_items and self.current_cargo == 0):
+            print("Reset: Trying journal data as fallback...")
+            self.force_cargo_update()
+            if self.cargo_items or self.current_cargo > 0:
+                success = True
+                print("Reset: Loaded cargo from journal")
+        
+        # Update display with force refresh
+        self.update_display()
+        
+        # Force refresh the display by clearing any cached display elements
+        if hasattr(self, 'item_vars'):
+            self.item_vars.clear()
+        
+        # Update display again to ensure changes are shown
+        self.update_display()
+        
+        # Notify main app
+        if self.update_callback:
+            self.update_callback()
+        
+        status_msg = f"Cargo reset: {len(self.cargo_items)} items, {self.current_cargo}t total"
+        print(status_msg)
+        
+        # Wait a moment then restart journal monitoring to prevent immediate override
+        import threading
+        def restart_monitoring():
+            import time
+            time.sleep(3)  # Wait 3 seconds before restarting monitoring
+            self.journal_monitor_active = old_monitor_state
+            print(f"Reset: Journal monitoring restarted (set to {old_monitor_state})")
+        
+        if old_monitor_state:
+            thread = threading.Thread(target=restart_monitoring, daemon=True)
+            thread.start()
+            print("Reset: Scheduled journal monitoring restart in 3 seconds")
+        
+        return success
     
     def read_cargo_json(self):
         """Read detailed cargo data from Cargo.json file"""
@@ -948,6 +1695,9 @@ cargo panel forces Elite to write detailed inventory data.
         self.current_cargo = sum(self.cargo_items.values())
         self.update_display()
         
+        # Record mining activity for session end detection
+        self.record_mining_activity()
+        
         # Notify main app of changes
         if self.update_callback:
             self.update_callback()
@@ -1145,6 +1895,38 @@ cargo panel forces Elite to write detailed inventory data.
         except Exception as e:
             pass  # Silent fail in background monitoring
     
+    def read_status_json_cargo(self):
+        """Read current cargo weight from Status.json (real-time data)"""
+        try:
+            if os.path.exists(self.status_json_path):
+                with open(self.status_json_path, 'r') as f:
+                    status_data = json.load(f)
+                
+                # Status.json contains current cargo weight (real-time)
+                current_cargo_weight = status_data.get("Cargo", 0)
+                cargo_capacity = status_data.get("CargoCapacity", self.max_cargo)
+                
+                print(f"Status.json cargo: {current_cargo_weight}t / {cargo_capacity}t")
+                
+                # If we have real-time cargo weight but no detailed breakdown,
+                # we can at least show the correct total
+                if current_cargo_weight > 0 and not self.cargo_items:
+                    # Set the total without item breakdown
+                    self.current_cargo = current_cargo_weight
+                    self.max_cargo = cargo_capacity
+                    return True
+                elif current_cargo_weight == 0:
+                    # If Status.json shows 0 cargo, clear everything
+                    self.cargo_items.clear()
+                    self.current_cargo = 0
+                    self.max_cargo = cargo_capacity
+                    return True
+                    
+                return False
+        except Exception as e:
+            print(f"Error reading Status.json: {e}")
+            return False
+    
     def stop_journal_monitoring(self):
         """Stop journal monitoring"""
         self.journal_monitor_active = False
@@ -1254,6 +2036,83 @@ cargo panel forces Elite to write detailed inventory data.
         # Schedule next check
         if self.cargo_window:
             self.cargo_window.after(1000, self.check_journal_updates)  # Check every second
+            
+        # Check for session end (after scheduling next check)
+        self.check_session_end()
+    
+    def check_session_end(self):
+        """Check if mining session has ended and show refinery dialog if needed"""
+        import time
+        from tkinter import messagebox
+        
+        # Only check if we have had mining activity and enough time has passed
+        if (self.last_mining_activity and 
+            not self.session_end_dialog_shown and 
+            self.cargo_items and  # Only if we have cargo items detected
+            len(self.cargo_items) > 0):
+            
+            time_since_activity = time.time() - self.last_mining_activity
+            
+            # If 5 minutes have passed since last mining activity
+            if time_since_activity >= self.mining_activity_timeout:
+                self.session_end_dialog_shown = True
+                
+                # Show refinery dialog
+                try:
+                    dialog = RefineryDialog(
+                        parent=self.cargo_window if self.cargo_window else None,
+                        cargo_monitor=self,
+                        current_cargo_items=self.cargo_items.copy()
+                    )
+                    result = dialog.show()
+                    
+                    if result:  # User added refinery contents
+                        # Store refinery contents for integration with reports
+                        self.refinery_contents = result.copy()
+                        
+                        # Add refinery materials to actual cargo items for live display
+                        for material_name, refinery_qty in result.items():
+                            if material_name in self.cargo_items:
+                                self.cargo_items[material_name] += refinery_qty
+                            else:
+                                self.cargo_items[material_name] = refinery_qty
+                        
+                        # Update current cargo total
+                        self.current_cargo = sum(self.cargo_items.values())
+                        
+                        # Calculate totals
+                        refinery_total = sum(result.values())
+                        
+                        # Update display with adjustment info
+                        if hasattr(self, 'cargo_text') and self.cargo_text:
+                            self.cargo_text.insert(tk.END, f"\n⚗️ REFINERY ADJUSTMENT:\n")
+                            for material, quantity in result.items():
+                                self.cargo_text.insert(tk.END, f"   +{material}: {quantity} tons\n")
+                            self.cargo_text.insert(tk.END, f"📊 Total Added: {refinery_total} tons from refinery\n")
+                            self.cargo_text.see(tk.END)
+                        
+                        # Update all displays to reflect new cargo totals
+                        self.update_display()
+                        
+                        # Notify main app of changes
+                        if self.update_callback:
+                            self.update_callback()
+                        
+                        # Show confirmation
+                        print(f"Refinery contents applied: {len(result)} materials, {refinery_total} tons total")
+                        messagebox.showinfo("Refinery Contents Added", 
+                                          f"Added {refinery_total} tons from refinery.\n"
+                                          f"New total: {self.current_cargo} tons\n\n"
+                                          f"These materials will be included in mining reports and statistics.")
+                    
+                except Exception as e:
+                    print(f"Error showing refinery dialog: {e}")
+    
+    def record_mining_activity(self):
+        """Record that mining activity occurred (call when cargo changes)"""
+        import time
+        self.last_mining_activity = time.time()
+        self.session_end_dialog_shown = False  # Reset dialog flag if activity resumes
     
     def read_new_journal_entries(self):
         """Read new entries from the journal file"""
@@ -1584,8 +2443,13 @@ cargo panel forces Elite to write detailed inventory data.
             'total_cargo': self.current_cargo,
             'cargo_items': self.cargo_items.copy(),
             'prospector_count': self._get_prospector_count(),
-            'max_cargo': self.max_cargo  # Store capacity at session start
+            'max_cargo': self.max_cargo,  # Store capacity at session start
+            'initial_refinery_contents': self.refinery_contents.copy()  # Preserve existing refinery materials
         }
+        
+        # Clear refinery contents for new session AFTER preserving them
+        self.refinery_contents = {}
+        
         return self.session_start_snapshot
     
     def _validate_cargo_capacity(self):
@@ -1624,6 +2488,19 @@ cargo panel forces Elite to write detailed inventory data.
             start_qty = start_items.get(item_name, 0)
             if end_qty > start_qty:
                 materials_mined[item_name] = end_qty - start_qty
+        
+        # Add refinery contents to materials_mined (not just totals)
+        # Check current refinery contents
+        if hasattr(self, 'refinery_contents') and self.refinery_contents:
+            for material_name, refinery_qty in self.refinery_contents.items():
+                if material_name in materials_mined:
+                    materials_mined[material_name] += refinery_qty
+                else:
+                    materials_mined[material_name] = refinery_qty
+        
+        # Clear refinery contents after adding to prevent reuse in next session
+        if hasattr(self, 'refinery_contents'):
+            self.refinery_contents = {}
         
         # Calculate prospector limpets used (start count - end count)
         prospectors_used = max(0, self.session_start_snapshot['prospector_count'] - end_snapshot['prospector_count'])
@@ -1675,6 +2552,10 @@ cargo panel forces Elite to write detailed inventory data.
                 # Already counted above, skip
                 continue
         
+        # Add refinery contents to live calculation
+        if hasattr(self, 'refinery_contents') and self.refinery_contents:
+            materials_mined += sum(self.refinery_contents.values())
+        
         return round(materials_mined, 1)
 
     def _get_prospector_count(self):
@@ -1684,6 +2565,197 @@ cargo panel forces Elite to write detailed inventory data.
             if "limpet" in item_name.lower():
                 limpet_count += qty
         return limpet_count
+
+    def show_refinery_dialog(self):
+        """Show the refinery adjustment dialog and store the results"""
+        try:
+            dialog = RefineryDialog(
+                parent=self.cargo_window if self.cargo_window else None,
+                cargo_monitor=self,
+                current_cargo_items=self.cargo_items.copy()
+            )
+            result = dialog.show()
+            
+            if result:  # User added refinery contents
+                self.refinery_contents = result.copy()
+                total_refinery = sum(result.values())
+                print(f"Refinery contents applied: {len(result)} materials, {total_refinery} tons total")
+                
+                # Add refinery materials to actual cargo items for live display
+                for material_name, refinery_qty in result.items():
+                    if material_name in self.cargo_items:
+                        self.cargo_items[material_name] += refinery_qty
+                    else:
+                        self.cargo_items[material_name] = refinery_qty
+                
+                # Update current cargo total
+                self.current_cargo = sum(self.cargo_items.values())
+                
+                # Update display with adjustment info
+                if hasattr(self, 'cargo_text') and self.cargo_text:
+                    self.cargo_text.insert(tk.END, f"\n⚗️ REFINERY MATERIALS ADDED:\n")
+                    for material, quantity in result.items():
+                        self.cargo_text.insert(tk.END, f"   +{material}: {quantity} tons\n")
+                    self.cargo_text.insert(tk.END, f"📊 Total Added: {total_refinery} tons from refinery\n")
+                    self.cargo_text.see(tk.END)
+                
+                # Update all displays to reflect new cargo totals
+                self.update_display()
+                
+                # Notify main app of changes
+                if self.update_callback:
+                    self.update_callback()
+                
+                # Auto-update CSV if we have a prospector panel reference and manual materials were added
+                print(f"DEBUG: About to call _update_csv_after_refinery_addition with materials: {result}")
+                self._update_csv_after_refinery_addition(result)
+            else:
+                print("Refinery dialog cancelled")
+                
+        except Exception as e:
+            print(f"Error showing refinery dialog: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _update_csv_after_refinery_addition(self, refinery_materials: dict):
+        """Update the most recent session file and CSV row after manual materials are added"""
+        try:
+            import re
+            import os
+            
+            # Check if we have access to the prospector panel
+            if not hasattr(self, 'main_app_ref') or not hasattr(self.main_app_ref, 'prospector_panel'):
+                print("No prospector panel reference - cannot auto-update CSV")
+                return
+                
+            prospector_panel = self.main_app_ref.prospector_panel
+            reports_dir = prospector_panel.reports_dir
+            
+            if not os.path.exists(reports_dir):
+                print("Reports directory not found - cannot auto-update CSV")
+                return
+                
+            # Find the most recent session text file
+            session_files = [f for f in os.listdir(reports_dir) 
+                           if f.startswith("Session_") and f.endswith(".txt")]
+            
+            if not session_files:
+                print("No session files found - cannot auto-update CSV")
+                return
+                
+            # Sort by modification time to get the most recent
+            session_files.sort(key=lambda f: os.path.getmtime(os.path.join(reports_dir, f)), reverse=True)
+            most_recent_file = session_files[0]
+            session_path = os.path.join(reports_dir, most_recent_file)
+            
+            print(f"Updating most recent session file: {most_recent_file}")
+            
+            # Read the current session file content
+            with open(session_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Parse existing material breakdown and add new materials
+            updated_materials = {}
+            total_added = 0.0
+            
+            # Check if there's already a CARGO MATERIAL BREAKDOWN section
+            cargo_section_match = re.search(r'=== CARGO MATERIAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
+            if cargo_section_match:
+                # Parse existing materials
+                cargo_text = cargo_section_match.group(1)
+                existing_materials = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
+                for mat_name, quantity in existing_materials:
+                    updated_materials[mat_name.strip()] = float(quantity)
+            
+            # Add new refinery materials
+            for material_name, quantity in refinery_materials.items():
+                if material_name in updated_materials:
+                    updated_materials[material_name] += quantity
+                else:
+                    updated_materials[material_name] = quantity
+                total_added += quantity
+            
+            # Update session header with new total
+            header_match = re.search(r'^(Session: .* — .* — .* — Total )(\d+(?:\.\d+)?)t', content, re.MULTILINE)
+            if header_match:
+                old_total = float(header_match.group(2))
+                new_total = old_total + total_added
+                new_header = f"{header_match.group(1)}{new_total:.0f}t"
+                content = content.replace(header_match.group(0), new_header)
+            
+            # Update or add CARGO MATERIAL BREAKDOWN section
+            cargo_breakdown_text = "\n=== CARGO MATERIAL BREAKDOWN ===\n"
+            prospectors_line = ""
+            if "Prospector Limpets Used:" in content:
+                prospector_match = re.search(r'Prospector Limpets Used:\s*(\d+)', content)
+                if prospector_match:
+                    cargo_breakdown_text += f"Prospector Limpets Used: {prospector_match.group(1)}\n"
+            
+            cargo_breakdown_text += f"Materials Collected: {len(updated_materials)} types\n\n"
+            
+            # Sort materials by quantity (highest first)
+            sorted_materials = sorted(updated_materials.items(), key=lambda x: x[1], reverse=True)
+            for material_name, quantity in sorted_materials:
+                cargo_breakdown_text += f"{material_name}: {quantity:.1f}t\n"
+            
+            cargo_breakdown_text += f"\nTotal Cargo Collected: {sum(updated_materials.values()):.1f}t"
+            
+            # Replace or add the cargo breakdown section
+            if cargo_section_match:
+                # Replace existing section
+                old_section = cargo_section_match.group(0)
+                content = content.replace(old_section, cargo_breakdown_text)
+            else:
+                # Add new section before any session comment
+                comment_match = re.search(r'\n=== SESSION COMMENT ===', content)
+                if comment_match:
+                    content = content.replace(comment_match.group(0), cargo_breakdown_text + comment_match.group(0))
+                else:
+                    content += cargo_breakdown_text
+            
+            # Write updated content back to file
+            with open(session_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            # Extract timestamp from filename for CSV update
+            import re
+            timestamp_match = re.search(r'Session_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})', most_recent_file)
+            if timestamp_match:
+                date_part = timestamp_match.group(1)
+                time_part = timestamp_match.group(2).replace('-', ':')
+                timestamp_local = f"{date_part}T{time_part}"
+                
+                # Calculate updated CSV data
+                materials_breakdown = ', '.join([f"{mat}: {qty:.1f}t" for mat, qty in sorted_materials])
+                material_count = len(updated_materials)
+                new_total_tons = sum(updated_materials.values())
+                
+                # Update CSV row
+                updated_csv_data = {
+                    'total_tons': new_total_tons,
+                    'materials_tracked': str(material_count) if material_count > 0 else '',
+                    'materials_breakdown': materials_breakdown
+                }
+                
+                if prospector_panel._update_existing_csv_row(timestamp_local, updated_csv_data):
+                    print(f"Successfully updated CSV and session file with {len(refinery_materials)} manual materials")
+                    
+                    # Refresh reports displays if they exist
+                    try:
+                        prospector_panel._refresh_reports_tab()
+                        if hasattr(prospector_panel, 'reports_window') and prospector_panel.reports_window:
+                            prospector_panel._refresh_reports_window()
+                    except Exception as e:
+                        print(f"Error refreshing reports displays: {e}")
+                else:
+                    print("Failed to update CSV row")
+            else:
+                print("Could not extract timestamp from session filename")
+                
+        except Exception as e:
+            print(f"Error updating CSV after refinery addition: {e}")
+            import traceback
+            traceback.print_exc()
 
 from prospector_panel import ProspectorPanel
 
@@ -1954,6 +3026,8 @@ class App(tk.Tk):
         # Initialize cargo monitor (before loading preferences) with callback
         self.cargo_monitor = CargoMonitor(update_callback=self._on_cargo_changed, 
                                         capacity_changed_callback=self._on_cargo_capacity_detected)
+        # Set the main app reference so cargo monitor can access prospector panel later
+        self.cargo_monitor.main_app_ref = self
         
         # Setup keyboard shortcuts
         self._setup_keyboard_shortcuts()
@@ -2277,6 +3351,42 @@ class App(tk.Tk):
             self._update_integrated_cargo_display()
         except Exception as e:
             pass  # Silently handle any update errors
+
+    def reset_cargo_hold(self):
+        """
+        Reset cargo hold to actual game state by calling cargo monitor reset.
+        
+        This method provides UI feedback and delegates to the CargoMonitor's reset functionality.
+        Works for both popup window and integrated cargo displays.
+        """
+        if hasattr(self, 'cargo_monitor') and self.cargo_monitor is not None:
+            success = self.cargo_monitor.reset_cargo_hold()
+            if success:
+                item_count = len(self.cargo_monitor.cargo_items)
+                total_weight = self.cargo_monitor.current_cargo
+                messagebox.showinfo("Reset Complete", 
+                    f"Cargo hold reset to actual game state.\n\n"
+                    f"Found: {item_count} item types\n"
+                    f"Total: {total_weight} tons")
+            else:
+                messagebox.showwarning("Reset Issue", 
+                    "Cargo hold was cleared but no game data was found.\n"
+                    "Make sure Elite Dangerous is running and you have opened your cargo hold in-game.")
+        else:
+            messagebox.showwarning("No Cargo Monitor", "Cargo monitor is not available.")
+
+    def _validate_cargo_monitor(self):
+        """Validate that cargo monitor is properly initialized - for debugging"""
+        if not hasattr(self, 'cargo_monitor'):
+            print("ERROR: App instance missing cargo_monitor attribute")
+            return False
+        if self.cargo_monitor is None:
+            print("ERROR: cargo_monitor is None")
+            return False
+        if not hasattr(self.cargo_monitor, 'reset_cargo_hold'):
+            print("ERROR: cargo_monitor missing reset_cargo_hold method")
+            return False
+        return True
 
     # ---------- Comprehensive Dashboard with Sub-tabs ----------
     def _build_comprehensive_dashboard(self, frame: ttk.Frame) -> None:
@@ -2894,6 +4004,40 @@ class App(tk.Tk):
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
+        # ========== SCREENSHOTS FOLDER SECTION ==========
+        ttk.Label(scrollable_frame, text="Screenshots Folder", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        r += 1
+        
+        # Add separator line
+        separator_screenshots = tk.Frame(scrollable_frame, height=1, bg="#444444")
+        separator_screenshots.grid(row=r, column=0, sticky="ew", pady=(0, 8))
+        r += 1
+        
+        # Screenshots folder path setting
+        screenshots_folder_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        screenshots_folder_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
+        tk.Label(screenshots_folder_frame, text="Screenshots folder:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        
+        # Create StringVar for screenshots folder path
+        self.screenshots_folder_path = tk.StringVar()
+        self.screenshots_folder_path.set(_load_cfg().get('screenshots_folder', os.path.join(os.path.expanduser("~"), "Pictures")))
+        
+        # Initialize screenshots folder label (will be updated with actual path)
+        self.screenshots_folder_lbl = tk.Label(screenshots_folder_frame, text=self.screenshots_folder_path.get(), fg="gray", bg="#1e1e1e", font=("Segoe UI", 9))
+        self.screenshots_folder_lbl.pack(side="left", padx=(6, 0))
+        
+        screenshots_btn = tk.Button(screenshots_folder_frame, text="Change…", command=self._change_screenshots_folder,
+                                  bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                                  activeforeground="#ffffff", relief="ridge", bd=1, 
+                                  font=("Segoe UI", 8, "normal"), cursor="hand2")
+        screenshots_btn.pack(side="left", padx=(8, 0))
+        ToolTip(screenshots_btn, "Select the default folder for importing screenshots\nUsually located in: Documents\\Pictures")
+        
+        r += 1
+        tk.Label(scrollable_frame, text="Default folder for selecting screenshots when adding them to reports", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+
         # ========== BACKUP & RESTORE SECTION ==========
         r += 1
         ttk.Label(scrollable_frame, text="Backup & Restore", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
@@ -2914,7 +4058,7 @@ class App(tk.Tk):
                               relief="ridge", bd=1, padx=12, pady=4,
                               font=("Segoe UI", 9, "normal"), cursor="hand2")
         backup_btn.pack(side="left", padx=(0, 8))
-        ToolTip(backup_btn, "Create backup of Ship Presets, Reports, and Bookmarks\nBackup is saved as a timestamped zip file")
+        ToolTip(backup_btn, "Create backup of Ship Presets, Reports, Bookmarks, and VoiceAttack Profile\nBackup is saved as a timestamped zip file")
         
         restore_btn = tk.Button(backup_frame, text="📂 Restore", command=self._show_restore_dialog,
                                bg="#4a3a2a", fg="#e0e0e0", 
@@ -2927,9 +4071,10 @@ class App(tk.Tk):
         r += 1
         tk.Label(scrollable_frame, text="Backup and restore ship presets, reports, and bookmarks", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
 
-        # ========== HELP SECTION ==========
-        ttk.Label(scrollable_frame, text="Help & Updates", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        # ========== UPDATES SECTION ==========
+        ttk.Label(scrollable_frame, text="Updates", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -3767,6 +4912,35 @@ class App(tk.Tk):
                         
             # Always update the label after checking/setting
             self._update_journal_label()
+            
+    def _change_screenshots_folder(self) -> None:
+        """Change the default screenshots folder"""
+        try:
+            # Start from current folder if set, otherwise use Pictures
+            current_folder = self.screenshots_folder_path.get() or os.path.join(os.path.expanduser("~"), "Pictures")
+            if not os.path.isdir(current_folder):
+                current_folder = os.path.expanduser("~")
+                
+            folder = filedialog.askdirectory(
+                title="Select Default Screenshots folder",
+                initialdir=current_folder
+            )
+            
+            if folder:
+                self.screenshots_folder_path.set(folder)
+                # Update the label text to match new path
+                if hasattr(self, 'screenshots_folder_lbl'):
+                    self.screenshots_folder_lbl.config(text=folder)
+                
+                # Save to config
+                cfg = _load_cfg()
+                cfg['screenshots_folder'] = folder
+                _save_cfg(cfg)
+                
+                self._set_status("Screenshots folder updated.")
+            
+        except Exception as e:
+            self._set_status(f"Error updating screenshots folder: {e}")
 
     # ---------- Text overlay preference handling ----------
     def _load_text_overlay_preference(self) -> None:
@@ -4141,6 +5315,7 @@ class App(tk.Tk):
             backup_presets = tk.IntVar(value=1)
             backup_reports = tk.IntVar(value=1)
             backup_bookmarks = tk.IntVar(value=1)
+            backup_va_profile = tk.IntVar(value=1)
             backup_all = tk.IntVar(value=0)
             
             def on_all_change():
@@ -4148,15 +5323,18 @@ class App(tk.Tk):
                     backup_presets.set(1)
                     backup_reports.set(1)
                     backup_bookmarks.set(1)
+                    backup_va_profile.set(1)
                     # Disable individual checkboxes
                     presets_cb.config(state="disabled")
                     reports_cb.config(state="disabled")
                     bookmarks_cb.config(state="disabled")
+                    va_profile_cb.config(state="disabled")
                 else:
                     # Enable individual checkboxes
                     presets_cb.config(state="normal")
                     reports_cb.config(state="normal")
                     bookmarks_cb.config(state="normal")
+                    va_profile_cb.config(state="normal")
             
             # All checkbox
             all_cb = tk.Checkbutton(options_frame, text="📂 Backup Everything",
@@ -4201,6 +5379,15 @@ class App(tk.Tk):
                                         font=("Segoe UI", 10))
             bookmarks_cb.pack(anchor="w", pady=2)
             
+            va_profile_cb = tk.Checkbutton(options_frame, text="🎤 VoiceAttack Profile",
+                                         variable=backup_va_profile,
+                                         bg="#2c3e50", fg="#ecf0f1",
+                                         selectcolor="#34495e",
+                                         activebackground="#34495e",
+                                         activeforeground="#ecf0f1",
+                                         font=("Segoe UI", 10))
+            va_profile_cb.pack(anchor="w", pady=2)
+            
             # Buttons frame
             btn_frame = tk.Frame(dialog, bg="#2c3e50")
             btn_frame.pack(pady=20)
@@ -4210,13 +5397,14 @@ class App(tk.Tk):
                 include_presets = backup_presets.get() or backup_all.get()
                 include_reports = backup_reports.get() or backup_all.get()
                 include_bookmarks = backup_bookmarks.get() or backup_all.get()
+                include_va_profile = backup_va_profile.get() or backup_all.get()
                 
-                if not (include_presets or include_reports or include_bookmarks):
+                if not (include_presets or include_reports or include_bookmarks or include_va_profile):
                     messagebox.showwarning("No Selection", "Please select at least one item to backup.")
                     return
                 
                 dialog.destroy()
-                self._create_backup(include_presets, include_reports, include_bookmarks)
+                self._create_backup(include_presets, include_reports, include_bookmarks, include_va_profile)
             
             def on_cancel():
                 dialog.destroy()
@@ -4239,7 +5427,7 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showerror("Backup Dialog Error", f"Failed to show backup dialog: {str(e)}")
 
-    def _create_backup(self, include_presets: bool, include_reports: bool, include_bookmarks: bool) -> None:
+    def _create_backup(self, include_presets: bool, include_reports: bool, include_bookmarks: bool, include_va_profile: bool) -> None:
         """Create backup zip file with selected data"""
         try:
             # Ask for backup location
@@ -4253,8 +5441,10 @@ class App(tk.Tk):
                 parts.append("Reports")
             if include_bookmarks:
                 parts.append("Bookmarks")
+            if include_va_profile:
+                parts.append("VA Profile")
             
-            if len(parts) == 3:
+            if len(parts) == 4:
                 content_desc = "Full"
             else:
                 content_desc = "_".join(parts)
@@ -4302,6 +5492,19 @@ class App(tk.Tk):
                     if os.path.exists(bookmarks_file):
                         zipf.write(bookmarks_file, "mining_bookmarks.json")
                 
+                # Add VoiceAttack profile
+                if include_va_profile:
+                    # VoiceAttack profile is in the installer dir at \Apps\EliteMining\
+                    if getattr(sys, 'frozen', False):
+                        # Running as executable - profile is in the parent directory
+                        va_profile_path = os.path.join(os.path.dirname(sys.executable), "EliteMining-Profile.vap")
+                    else:
+                        # Running in development - profile is in project root
+                        va_profile_path = os.path.join(os.path.dirname(app_data_dir), "EliteMining-Profile.vap")
+                    
+                    if os.path.exists(va_profile_path):
+                        zipf.write(va_profile_path, "EliteMining-Profile.vap")
+                
                 # Add manifest file with backup info
                 manifest = {
                     "backup_date": dt.datetime.now().isoformat(),
@@ -4309,7 +5512,8 @@ class App(tk.Tk):
                     "included": {
                         "ship_presets": include_presets,
                         "mining_reports": include_reports,
-                        "mining_bookmarks": include_bookmarks
+                        "mining_bookmarks": include_bookmarks,
+                        "va_profile": include_va_profile
                     }
                 }
                 zipf.writestr("backup_manifest.json", json.dumps(manifest, indent=2))
