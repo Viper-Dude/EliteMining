@@ -58,6 +58,7 @@ The Configurator works independently for announcements, reports, and tracking. V
 - Session tracking & history  
 - Ship configuration management  
 - GUI for firegroups, timers, toggles, and announcements  
+- **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
 - **Ring Search** – Locate planetary rings (Ice, Metal Rich, Rocky, Metallic) for optimal mining opportunities  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports  
 
