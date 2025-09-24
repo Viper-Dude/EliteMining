@@ -443,21 +443,7 @@ class MiningChartsPanel:
                 
             # Create graphs folder if it doesn't exist
             graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
-            print(f"DEBUG: Creating graphs directory at: {graphs_dir}")
-            # Also write to debug file for installer testing
-            try:
-                debug_file = os.path.join(os.path.dirname(graphs_dir), "graph_debug.txt")
-                with open(debug_file, "a", encoding="utf-8") as f:
-                    f.write(f"DEBUG: Creating graphs directory at: {graphs_dir}\n")
-            except:
-                pass
             os.makedirs(graphs_dir, exist_ok=True)
-            print(f"DEBUG: Graphs directory exists: {os.path.exists(graphs_dir)}")
-            try:
-                with open(debug_file, "a", encoding="utf-8") as f:
-                    f.write(f"DEBUG: Graphs directory exists: {os.path.exists(graphs_dir)}\n")
-            except:
-                pass
             
             # Generate timestamp and filename components
             if session_timestamp:
