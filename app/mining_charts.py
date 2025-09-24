@@ -497,13 +497,13 @@ class MiningChartsPanel:
     def _update_graph_mappings(self, session_id, timeline_filename, comparison_filename):
         """Update the graph mappings JSON file"""
         try:
-            # Get the correct app directory using EXACT same logic as screenshots in prospector_panel
+            # Get the correct app directory using EXACT same logic as auto_save_graphs
             if getattr(sys, 'frozen', False):
                 # Running as executable (installer version)
                 app_dir = os.path.join(self.main_app.va_root, "app")
             else:
                 # Running in development mode
-                app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                app_dir = os.path.dirname(os.path.abspath(__file__))
             
             mappings_file = os.path.join(app_dir, "Reports", "Mining Session", "Graphs", "graph_mappings.json")
             

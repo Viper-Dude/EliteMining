@@ -2063,7 +2063,7 @@ class ProspectorPanel(ttk.Frame):
                         context_menu.add_command(label="🗑️Delete Detailed Report + Screenshots", 
                                                command=lambda: self._delete_enhanced_report_from_menu(tree))
                         context_menu.add_separator()  # Add separator for safety
-                        context_menu.add_command(label="🗑️Delete CSV Entry + Text Report", 
+                        context_menu.add_command(label="🗑️Delete Complete Session", 
                                                command=lambda items=selected_items: delete_selected(items))
                     else:
                         context_menu.add_command(label=f"🗑️Delete {len(selected_items)} CSV Entries + Text Reports", 
@@ -2201,6 +2201,77 @@ class ProspectorPanel(ttk.Frame):
                         
                         if file_deleted:
                             file_delete_count += 1
+                        
+                        # Delete corresponding graph files
+                        try:
+                            # Get graphs directory using same logic as auto_save_graphs
+                            if getattr(sys, 'frozen', False):
+                                app_dir = os.path.join(self.va_root, "app")
+                            else:
+                                app_dir = os.path.dirname(os.path.abspath(__file__))
+                            
+                            graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
+                            print(f"DEBUG: Looking for graphs in: {graphs_dir}")
+                            
+                            # Also write debug to file
+                            debug_file = os.path.join(os.path.dirname(graphs_dir), "delete_debug.txt")
+                            with open(debug_file, "a", encoding="utf-8") as f:
+                                f.write(f"DELETE DEBUG: Starting graph deletion for session\n")
+                                f.write(f"DELETE DEBUG: Graphs dir: {graphs_dir}\n")
+                                f.write(f"DELETE DEBUG: Session data: {session}\n")
+                            
+                            if os.path.exists(graphs_dir):
+                                # Create session ID to match graph files - use EXACT same logic as auto_save_graphs
+                                try:
+                                    timestamp = session['timestamp_raw'].replace('Z', '').replace('T', '_').replace(':', '-')
+                                    session_prefix = f"Session_{timestamp}"
+                                    
+                                    if session['system']:
+                                        # Clean system name for filename (same as auto_save_graphs)
+                                        clean_system = "".join(c for c in session['system'] if c.isalnum() or c in (' ', '-', '_')).strip()
+                                        clean_system = clean_system.replace(' ', '_')
+                                        session_prefix += f"_{clean_system}"
+                                    
+                                    if session['body']:
+                                        # Clean body name for filename (same as auto_save_graphs)
+                                        clean_body = "".join(c for c in session['body'] if c.isalnum() or c in (' ', '-', '_')).strip()
+                                        clean_body = clean_body.replace(' ', '_')
+                                        session_prefix += f"_{clean_body}"
+                                    
+                                    print(f"DEBUG: Looking for graphs with prefix: {session_prefix}")
+                                    
+                                    # Delete graph files
+                                    deleted_graphs = []
+                                    for graph_file in os.listdir(graphs_dir):
+                                        if graph_file.startswith(session_prefix) and graph_file.endswith('.png'):
+                                            graph_path = os.path.join(graphs_dir, graph_file)
+                                            os.remove(graph_path)
+                                            deleted_graphs.append(graph_file)
+                                            print(f"DEBUG: Deleted graph: {graph_file}")
+                                    
+                                    if not deleted_graphs:
+                                        print(f"DEBUG: No graph files found matching prefix: {session_prefix}")
+                                        print(f"DEBUG: Available files: {os.listdir(graphs_dir)}")
+                                    
+                                    # Update graph mappings JSON
+                                    mappings_file = os.path.join(graphs_dir, "graph_mappings.json")
+                                    if os.path.exists(mappings_file):
+                                        try:
+                                            with open(mappings_file, 'r', encoding='utf-8') as f:
+                                                mappings = json.load(f)
+                                            if session_prefix in mappings:
+                                                del mappings[session_prefix]
+                                                with open(mappings_file, 'w', encoding='utf-8') as f:
+                                                    json.dump(mappings, f, indent=2)
+                                                print(f"DEBUG: Removed {session_prefix} from mappings")
+                                        except Exception as e:
+                                            print(f"DEBUG: Error updating mappings: {e}")
+                                except Exception as e:
+                                    print(f"DEBUG: Error processing session data: {e}")
+                            else:
+                                print(f"DEBUG: Graphs directory does not exist: {graphs_dir}")
+                        except Exception as e:
+                            print(f"DEBUG: Error in graph deletion: {e}")
                         
                         success_count += 1
                         
@@ -4113,7 +4184,7 @@ class ProspectorPanel(ttk.Frame):
                     context_menu.add_separator()
                     context_menu.add_command(label="Delete Detailed Report + Screenshots", command=lambda: self._delete_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()  # Add separator for safety
-                    context_menu.add_command(label="Delete CSV Entry + Text Report", command=lambda: delete_selected())
+                    context_menu.add_command(label="Delete Complete Session", command=lambda: delete_selected())
                     
                     # Show the menu at cursor position
                     context_menu.tk_popup(event.x_root, event.y_root)
@@ -4148,7 +4219,10 @@ class ProspectorPanel(ttk.Frame):
                               f"• Tons Mined: {tons}\n\n"
                               f"This will permanently delete:\n"
                               f"• The CSV report entry\n"
-                              f"• The individual report file\n\n"
+                              f"• The individual report file\n"
+                              f"• Graph files (if any)\n"
+                              f"• Detailed HTML report (if any)\n"
+                              f"• Screenshots (if any)\n\n"
                               f"This action cannot be undone.")
                         title = "Delete Mining Session Report"
                     else:
@@ -4233,6 +4307,86 @@ class ProspectorPanel(ttk.Frame):
                                     
                             except Exception as e:
                                 self._set_status(f"Error deleting file: {e}")
+                            
+                            # Delete corresponding graph files
+                            try:
+                                # Get graphs directory using same logic as auto_save_graphs
+                                if getattr(sys, 'frozen', False):
+                                    app_dir = os.path.join(self.va_root, "app")
+                                else:
+                                    app_dir = os.path.dirname(os.path.abspath(__file__))
+                                
+                                graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
+                                
+                                if os.path.exists(graphs_dir):
+                                    # Create session prefix using same logic as auto_save_graphs
+                                    try:
+                                        dt = datetime.fromisoformat(timestamp_raw.replace('Z', ''))
+                                        timestamp = dt.strftime("%Y-%m-%d_%H-%M-%S")
+                                        session_prefix = f"Session_{timestamp}"
+                                        
+                                        if system:
+                                            clean_system = "".join(c for c in system if c.isalnum() or c in (' ', '-', '_')).strip()
+                                            clean_system = clean_system.replace(' ', '_')
+                                            session_prefix += f"_{clean_system}"
+                                        
+                                        if body:
+                                            clean_body = "".join(c for c in body if c.isalnum() or c in (' ', '-', '_')).strip()
+                                            clean_body = clean_body.replace(' ', '_')
+                                            session_prefix += f"_{clean_body}"
+                                        
+                                        # Delete graph files
+                                        deleted_graphs = []
+                                        for graph_file in os.listdir(graphs_dir):
+                                            if graph_file.startswith(session_prefix) and graph_file.endswith('.png'):
+                                                graph_path = os.path.join(graphs_dir, graph_file)
+                                                os.remove(graph_path)
+                                                deleted_graphs.append(graph_file)
+                                        
+                                        # Update graph mappings JSON
+                                        mappings_file = os.path.join(graphs_dir, "graph_mappings.json")
+                                        if os.path.exists(mappings_file):
+                                            try:
+                                                with open(mappings_file, 'r', encoding='utf-8') as f:
+                                                    mappings = json.load(f)
+                                                if session_prefix in mappings:
+                                                    del mappings[session_prefix]
+                                                    with open(mappings_file, 'w', encoding='utf-8') as f:
+                                                        json.dump(mappings, f, indent=2)
+                                            except Exception as map_error:
+                                                pass
+                                                
+                                            if deleted_graphs:
+                                                pass  # Graphs deleted successfully
+                                            
+                                    except Exception as graph_error:
+                                        pass  # Silent error handling
+                            except Exception as graph_error:
+                                pass  # Silent error handling
+                            
+                            # Delete screenshots and HTML report silently
+                            try:
+                                values = self.reports_tree_tab.item(item_id, 'values')
+                                if values and len(values) >= 4:
+                                    display_date = values[0]
+                                    system_val = values[2] if len(values) > 2 else system
+                                    body_val = values[3] if len(values) > 3 else body
+                                    report_id = f"{display_date}_{system_val}_{body_val}"
+                                    
+                                    # Delete HTML file
+                                    html_filename = self._get_report_filenames(report_id)
+                                    if html_filename:
+                                        html_path = os.path.join(self.reports_dir, "Detailed Reports", html_filename)
+                                        if os.path.exists(html_path):
+                                            os.remove(html_path)
+                                    
+                                    # Delete screenshots
+                                    screenshots = self._get_report_screenshots(report_id)
+                                    for screenshot_path in screenshots:
+                                        if os.path.exists(screenshot_path):
+                                            os.remove(screenshot_path)
+                            except:
+                                pass
                                 
                         except Exception as e:
                             self._set_status(f"Error deleting {system}-{body}: {e}")
