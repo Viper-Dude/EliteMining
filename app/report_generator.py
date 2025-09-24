@@ -891,8 +891,19 @@ class ReportGenerator:
             if not session_id:
                 return None
             
-            # Load graph mappings
-            graphs_dir = os.path.join(os.path.dirname(__file__), "Reports", "Mining Session", "Graphs")
+            # Load graph mappings - use same path logic as graph saving
+            if self.main_app and hasattr(self.main_app, 'va_root'):
+                if getattr(sys, 'frozen', False):
+                    # Running as executable (installer version)
+                    app_dir = os.path.join(self.main_app.va_root, "app")
+                else:
+                    # Running as script (development version)
+                    app_dir = os.path.dirname(os.path.abspath(__file__))
+            else:
+                # Fallback
+                app_dir = os.path.dirname(__file__)
+                
+            graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
             mappings_file = os.path.join(graphs_dir, "graph_mappings.json")
             
             if not os.path.exists(mappings_file):

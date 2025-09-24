@@ -1356,7 +1356,7 @@ class ProspectorPanel(ttk.Frame):
             charts.rowconfigure(0, weight=1)
             
             # Create graphs panel
-            self.charts_panel = MiningChartsPanel(charts, self.session_analytics)
+            self.charts_panel = MiningChartsPanel(charts, self.session_analytics, self.main_app)
             self.charts_panel.ToolTip = self.ToolTip  # Pass ToolTip function to charts panel
             self.charts_panel.setup_tooltips()  # Setup tooltips after ToolTip is assigned
             self.charts_panel.grid(row=0, column=0, sticky="nsew")
