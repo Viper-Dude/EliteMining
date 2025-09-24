@@ -130,11 +130,11 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 ### 📸 EliteMining GUI  
 
 #### Main Window (Dashboard) & Firegroups  
-<img src="screenshots/configurator-main.png" width="600"><br>  
+<img src="Screenshot/configurator-main.png" width="600"><br>  
 *Configurator layout with firegroups & buttons.*  
 
 #### Timers/Toggles Tab  
-<img src="screenshots/configurator-timers_toggles.png" width="600"><br>  
+<img src="Screenshot/configurator-timers_toggles.png" width="600"><br>  
 *Configure timers and toggles for automation.*  
 
 ---
@@ -142,24 +142,24 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 ### 🪓 Mining Session Tab  
 
 #### Announcement Panel  
-<img src="screenshots/mining-announcement.png" width="600"><br>  
+<img src="Screenshot/mining-announcement.png" width="600"><br>  
 *Controls announcements, thresholds, and filters.*  
 
 #### Mining Session  
-<img src="screenshots/mining-session.png" width="600"><br>  
+<img src="Screenshot/mining-session.png" width="600"><br>  
 *Tracks time, prospector reports, materials, and progress.*  
 
-<img src="screenshots/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>  
+<img src="Screenshot/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>  
 *Yield comparisons across sessions.*  
 
-<img src="screenshots/dashboard-graphs_material_comparison.png" width="600"><br>  
+<img src="Screenshot/dashboard-graphs_material_comparison.png" width="600"><br>  
 *Material collection comparisons.*  
 
 #### Reports 
-<img src="screenshots/mining-reports.png" width="600"><br>  
+<img src="Screenshot/mining-reports.png" width="600"><br>  
 *Detailed mining statistics and summaries.*  
 
-#### � Enhanced HTML Reports  
+#### � Detailed HTML Reports  
 *HTML reports with charts and statistics.*  
 
 Generate comprehensive HTML reports with interactive charts, mining analytics, and session comments. Features include:
@@ -181,17 +181,17 @@ Generate comprehensive HTML reports with interactive charts, mining analytics, a
 Right-click any mining session to generate a detailed report, add screenshots, or manage existing reports. All reports are saved with your session data and can be opened directly from the reports tab.
 
 #### �🔖 Bookmarks  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/mining-session_bookmarks.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_bookmarks.png" width="600"><br>  
 *Save, search, and manage mining spots.*  
 
 #### 📊 Comprehensive Analytics  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/mining-session_statistic.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_statistic.png" width="600"><br>  
 *Session statistics: yields, hit rates, and comparisons.*  
 
 ---
 
 #### Interface Options Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/configurator-options.png" width="600" height="400"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-options.png" width="600" height="400"><br>  
 *UI and announcement preferences.*  
 
 [⬆️ Back to Top](#-elitemining)
@@ -201,14 +201,14 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 ### 🔍 Ring Search
 - Find planetary rings in systems from your current or any location in the galaxy. Search for specific ring types (Ice, Metal Rich, Rocky, Metallic) within your desired distance to locate the best mining opportunities.  
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/ring_finder.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="600"><br>  
 
 ---
 
 ### 💾 Backup & Restore 
 - Easily save and restore your complete EliteMining setup including settings, bookmarks, and reports. Create timestamped backups before updates or quickly restore previous configurations with one click.  
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/backup.png" width="350"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/backup.png" width="350"><br>  
 
 [⬆️ Back to Top](#-elitemining)
 
