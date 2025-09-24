@@ -6,6 +6,7 @@ Provides real-time graphical analysis for mining statistics
 
 import json
 import os
+import sys
 from datetime import datetime
 
 # Import matplotlib with error handling for PyInstaller compatibility
@@ -55,9 +56,10 @@ from mining_statistics import SessionAnalytics
 class MiningChartsPanel:
     """Panel containing live mining analytics charts"""
     
-    def __init__(self, parent: tk.Widget, session_analytics: SessionAnalytics):
+    def __init__(self, parent: tk.Widget, session_analytics: SessionAnalytics, main_app=None):
         self.parent = parent
         self.session_analytics = session_analytics
+        self.main_app = main_app
         
         # Create main frame
         self.frame = ttk.Frame(parent, padding=8)
@@ -431,9 +433,31 @@ class MiningChartsPanel:
             return False  # No data to save
         
         try:
+            # Use EXACT same app_dir logic as screenshots in prospector_panel
+            if getattr(sys, 'frozen', False):
+                # Running as executable (installer version) - use va_root from main_app
+                app_dir = os.path.join(self.main_app.va_root, "app")
+            else:
+                # Running in development mode
+                app_dir = os.path.dirname(os.path.abspath(__file__))
+                
             # Create graphs folder if it doesn't exist
-            graphs_dir = os.path.join(os.path.dirname(__file__), "Reports", "Mining Session", "Graphs")
+            graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
+            print(f"DEBUG: Creating graphs directory at: {graphs_dir}")
+            # Also write to debug file for installer testing
+            try:
+                debug_file = os.path.join(os.path.dirname(graphs_dir), "graph_debug.txt")
+                with open(debug_file, "a", encoding="utf-8") as f:
+                    f.write(f"DEBUG: Creating graphs directory at: {graphs_dir}\n")
+            except:
+                pass
             os.makedirs(graphs_dir, exist_ok=True)
+            print(f"DEBUG: Graphs directory exists: {os.path.exists(graphs_dir)}")
+            try:
+                with open(debug_file, "a", encoding="utf-8") as f:
+                    f.write(f"DEBUG: Graphs directory exists: {os.path.exists(graphs_dir)}\n")
+            except:
+                pass
             
             # Generate timestamp and filename components
             if session_timestamp:
@@ -487,7 +511,15 @@ class MiningChartsPanel:
     def _update_graph_mappings(self, session_id, timeline_filename, comparison_filename):
         """Update the graph mappings JSON file"""
         try:
-            mappings_file = os.path.join(os.path.dirname(__file__), "Reports", "Mining Session", "Graphs", "graph_mappings.json")
+            # Get the correct app directory using EXACT same logic as screenshots in prospector_panel
+            if getattr(sys, 'frozen', False):
+                # Running as executable (installer version)
+                app_dir = os.path.join(self.main_app.va_root, "app")
+            else:
+                # Running in development mode
+                app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            
+            mappings_file = os.path.join(app_dir, "Reports", "Mining Session", "Graphs", "graph_mappings.json")
             
             # Load existing mappings
             mappings = {}
