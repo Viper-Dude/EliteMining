@@ -159,7 +159,28 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 <img src="screenshots/mining-reports.png" width="600"><br>  
 *Detailed mining statistics and summaries.*  
 
-#### 🔖 Bookmarks  
+#### � Enhanced HTML Reports  
+*HTML reports with charts and statistics.*  
+
+Generate comprehensive HTML reports with interactive charts, mining analytics, and session comments. Features include:
+- **Dark/Light Theme Toggle** - Switch between themes with one click  
+- **Session Comments** - Add notes and observations to your reports  
+- **Visual Charts** - Material breakdowns and performance graphs  
+- **Screenshot Integration** - Attach screenshots to document your sessions  
+- **Overall Statistics** - Compare current session to your mining history
+- **Analytics Tooltips** - Hover explanations for all efficiency metrics
+- **Clickable Images** - Charts and screenshots expand to full size
+- **Data Preservation** - Reports protected during software updates
+- **Export Options** - CSV, HTML, and PDF formats available
+
+**File Locations:**
+- Reports saved to: `Reports/Mining Session/`
+- Screenshots: `Reports/Mining Session/Detailed Reports/Screenshots/`
+- Performance graphs: `Reports/Mining Session/Graphs/`  
+
+Right-click any mining session to generate a detailed report, add screenshots, or manage existing reports. All reports are saved with your session data and can be opened directly from the reports tab.
+
+#### �🔖 Bookmarks  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/screenshots/mining-session_bookmarks.png" width="600"><br>  
 *Save, search, and manage mining spots.*  
 

@@ -26,7 +26,7 @@ if (-not $InstallDir) {
 $ReportsDir = Join-Path $InstallDir "app\Reports"
 $BackupInfoFile = Join-Path $InstallDir "reports_backup_info.json"
 
-function Create-ReportsBackup {
+function New-ReportsBackup {
     param([string]$BackupPath = "")
     
     if (-not (Test-Path $ReportsDir)) {
@@ -48,21 +48,24 @@ function Create-ReportsBackup {
         $BackupReports = Join-Path $BackupPath "Reports"
         Copy-Item -Path $ReportsDir -Destination $BackupReports -Recurse -Force
         
-        # Count files
-        $FileCount = (Get-ChildItem -Path $BackupReports -Recurse -File).Count
+        # Count files by type for detailed reporting
+        $FileCounts = Get-FileCountsByType -Path $BackupReports
+        $TotalFiles = ($FileCounts.Values | Measure-Object -Sum).Sum
         
-        # Save backup info
+        # Save backup info with file breakdown
         $BackupInfo = @{
             backup_time = (Get-Date).ToString("o")
             backup_location = $BackupPath
             original_location = $ReportsDir
-            files_count = $FileCount
+            files_count = $TotalFiles
+            file_breakdown = $FileCounts
         }
         
         $BackupInfo | ConvertTo-Json -Depth 2 | Out-File -FilePath $BackupInfoFile -Encoding UTF8
         
         Write-Host "✅ Reports backup created at: $BackupPath" -ForegroundColor Green
-        Write-Host "   Files backed up: $FileCount" -ForegroundColor Green
+        Write-Host "   Total files backed up: $TotalFiles" -ForegroundColor Green
+        Write-FileBreakdown -FileCounts $FileCounts
         
         return $BackupPath
     }
@@ -111,9 +114,13 @@ function Restore-ReportsBackup {
         # Restore from backup
         Copy-Item -Path $BackupReports -Destination $ReportsDir -Recurse -Force
         
-        $FilesRestored = (Get-ChildItem -Path $ReportsDir -Recurse -File).Count
+        # Count restored files with breakdown
+        $FileCounts = Get-FileCountsByType -Path $ReportsDir
+        $TotalFiles = ($FileCounts.Values | Measure-Object -Sum).Sum
+        
         Write-Host "✅ Reports folder restored successfully" -ForegroundColor Green
-        Write-Host "   Files restored: $FilesRestored" -ForegroundColor Green
+        Write-Host "   Total files restored: $TotalFiles" -ForegroundColor Green
+        Write-FileBreakdown -FileCounts $FileCounts
         
         # Clean up backup info file
         if (Test-Path $BackupInfoFile) {
@@ -193,10 +200,75 @@ function Merge-ReportsWithBackup {
     }
 }
 
+function Get-FileCountsByType {
+    param([string]$Path)
+    
+    $FileCounts = @{
+        session_reports = 0
+        screenshots = 0
+        graphs = 0
+        csv_files = 0
+        json_files = 0
+        other = 0
+    }
+    
+    $AllFiles = Get-ChildItem -Path $Path -Recurse -File
+    
+    foreach ($File in $AllFiles) {
+        $FileName = $File.Name.ToLower()
+        $FileExt = $File.Extension.ToLower()
+        $FilePath = $File.FullName.ToLower()
+        
+        if ($FilePath -like "*mining session*" -and $FileExt -eq ".txt") {
+            $FileCounts.session_reports++
+        }
+        elseif ($FilePath -like "*screenshot*" -and $FileExt -in @(".png", ".jpg", ".jpeg")) {
+            $FileCounts.screenshots++
+        }
+        elseif ($File.Directory.Name -eq "Graphs" -and $FileExt -eq ".png") {
+            $FileCounts.graphs++
+        }
+        elseif ($FileExt -eq ".csv") {
+            $FileCounts.csv_files++
+        }
+        elseif ($FileExt -eq ".json") {
+            $FileCounts.json_files++
+        }
+        else {
+            $FileCounts.other++
+        }
+    }
+    
+    return $FileCounts
+}
+
+function Write-FileBreakdown {
+    param($FileCounts)
+    
+    if ($FileCounts.session_reports -gt 0) {
+        Write-Host "   • Session reports: $($FileCounts.session_reports)" -ForegroundColor Green
+    }
+    if ($FileCounts.screenshots -gt 0) {
+        Write-Host "   • Screenshots: $($FileCounts.screenshots)" -ForegroundColor Green
+    }
+    if ($FileCounts.graphs -gt 0) {
+        Write-Host "   • Mining graphs: $($FileCounts.graphs)" -ForegroundColor Green
+    }
+    if ($FileCounts.csv_files -gt 0) {
+        Write-Host "   • CSV index files: $($FileCounts.csv_files)" -ForegroundColor Green
+    }
+    if ($FileCounts.json_files -gt 0) {
+        Write-Host "   • Configuration files: $($FileCounts.json_files)" -ForegroundColor Green
+    }
+    if ($FileCounts.other -gt 0) {
+        Write-Host "   • Other files: $($FileCounts.other)" -ForegroundColor Green
+    }
+}
+
 # Main execution
 switch ($Action.ToLower()) {
     "backup" {
-        $BackupPath = Create-ReportsBackup -BackupPath $BackupLocation
+        $BackupPath = New-ReportsBackup -BackupPath $BackupLocation
         if ($BackupPath) {
             Write-Host ""
             Write-Host "Backup created successfully!" -ForegroundColor Green

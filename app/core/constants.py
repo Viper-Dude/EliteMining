@@ -63,3 +63,35 @@ MENU_COLORS = {
     "activeforeground": "#ffffff",
     "selectcolor": "#404040"
 }
+
+# Mining Materials Database
+MINING_MATERIALS = {
+    # Core materials (most common)
+    "Painite": {"tier": "core", "typical_yield": "high"},
+    "Low Temperature Diamonds": {"tier": "core", "typical_yield": "high"},
+    "Void Opals": {"tier": "core", "typical_yield": "high"},
+    "Alexandrite": {"tier": "core", "typical_yield": "medium"},
+    "Benitoite": {"tier": "core", "typical_yield": "medium"},
+    "Monazite": {"tier": "core", "typical_yield": "medium"},
+    "Musgravite": {"tier": "core", "typical_yield": "medium"},
+    "Red Beryl": {"tier": "core", "typical_yield": "medium"},
+    "Rhodplumsite": {"tier": "core", "typical_yield": "medium"},
+    "Serendibite": {"tier": "core", "typical_yield": "medium"},
+    
+    # Standard materials (laser mining)
+    "Platinum": {"tier": "standard", "typical_yield": "high"},
+    "Osmium": {"tier": "standard", "typical_yield": "medium"},
+    "Gold": {"tier": "standard", "typical_yield": "medium"},
+    "Silver": {"tier": "standard", "typical_yield": "medium"},
+    "Palladium": {"tier": "standard", "typical_yield": "medium"},
+    "Bertrandite": {"tier": "standard", "typical_yield": "low"},
+    "Indite": {"tier": "standard", "typical_yield": "low"},
+    "Gallite": {"tier": "standard", "typical_yield": "low"},
+    "Coltan": {"tier": "standard", "typical_yield": "low"},
+    "Uraninite": {"tier": "standard", "typical_yield": "low"},
+    "Lepidolite": {"tier": "standard", "typical_yield": "low"},
+    "Cobalt": {"tier": "standard", "typical_yield": "low"},
+    "Lithium": {"tier": "standard", "typical_yield": "low"},
+    "Titanium": {"tier": "standard", "typical_yield": "low"},
+    "Copper": {"tier": "standard", "typical_yield": "low"}
+}

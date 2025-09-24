@@ -1,0 +1,14 @@
+{
+  "backup_time": "2025-09-24T18:34:44.671063",
+  "backup_location": "C:\\Users\\olmba\\AppData\\Local\\Temp\\EliteMining_Reports_Backup_20250924_183444",
+  "original_location": "D:\\My Apps Work Folder\\Elitemining Working folder\\Releases\\EliteMining-Dev\\app\\Reports",
+  "files_count": 29,
+  "file_breakdown": {
+    "session_reports": 9,
+    "screenshots": 1,
+    "graphs": 6,
+    "csv_files": 1,
+    "json_files": 3,
+    "other": 9
+  }
+}
