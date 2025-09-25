@@ -5508,14 +5508,40 @@ class App(tk.Tk):
                 if include_va_profile:
                     # VoiceAttack profile is in the installer dir at \Apps\EliteMining\
                     if getattr(sys, 'frozen', False):
-                        # Running as executable - profile is in the parent directory
-                        va_profile_path = os.path.join(os.path.dirname(sys.executable), "EliteMining-Profile.vap")
+                        # Running as executable - profile is in the same directory as the executable
+                        exe_dir = os.path.dirname(sys.executable)
+                        va_profile_path = os.path.join(exe_dir, "EliteMining-Profile.vap")
+                        
+                        # Also check if we're in the Configurator subdirectory (installed version)
+                        if not os.path.exists(va_profile_path):
+                            # Check parent directory (Apps\EliteMining\)
+                            parent_dir = os.path.dirname(exe_dir)
+                            va_profile_path = os.path.join(parent_dir, "EliteMining-Profile.vap")
+                            
+                            # If still not found, check if we're in VoiceAttack\Apps\EliteMining\Configurator\
+                            # and need to go up to VoiceAttack\Apps\EliteMining\
+                            if not os.path.exists(va_profile_path):
+                                # Go up one more level from Configurator to Apps\EliteMining
+                                grandparent_dir = os.path.dirname(parent_dir)  
+                                if os.path.basename(grandparent_dir) == "Apps":
+                                    # We're in VoiceAttack\Apps\EliteMining\Configurator
+                                    va_profile_path = os.path.join(parent_dir, "EliteMining-Profile.vap")
                     else:
                         # Running in development - profile is in project root
                         va_profile_path = os.path.join(os.path.dirname(app_data_dir), "EliteMining-Profile.vap")
                     
+                    if not getattr(sys, 'frozen', False):  # Only show debug in development
+                        print(f"DEBUG: Executable location: {sys.executable if getattr(sys, 'frozen', False) else 'Development mode'}")
+                        print(f"DEBUG: Looking for VoiceAttack profile at: {va_profile_path}")
+                        print(f"DEBUG: Profile exists: {os.path.exists(va_profile_path)}")
+                    
                     if os.path.exists(va_profile_path):
                         zipf.write(va_profile_path, "EliteMining-Profile.vap")
+                        if not getattr(sys, 'frozen', False):  # Only show debug in development
+                            print(f"DEBUG: Successfully added VoiceAttack profile to backup")
+                    else:
+                        if not getattr(sys, 'frozen', False):  # Only show debug in development
+                            print(f"DEBUG: VoiceAttack profile not found at expected location")
                 
                 # Add manifest file with backup info
                 manifest = {
@@ -5564,12 +5590,13 @@ class App(tk.Tk):
                     has_presets = any(f.startswith("Settings/") and f.endswith(".json") for f in file_list)
                     has_reports = any(f.startswith("Reports/") for f in file_list)
                     has_bookmarks = "mining_bookmarks.json" in file_list
+                    has_va_profile = "EliteMining-Profile.vap" in file_list
                     
-                    if not (has_presets or has_reports or has_bookmarks):
+                    if not (has_presets or has_reports or has_bookmarks or has_va_profile):
                         messagebox.showerror("Invalid Backup", "This doesn't appear to be a valid EliteMining backup file.")
                         return
                     
-                    self._show_restore_options_dialog(backup_path, has_presets, has_reports, has_bookmarks, manifest)
+                    self._show_restore_options_dialog(backup_path, has_presets, has_reports, has_bookmarks, has_va_profile, manifest)
                     
             except zipfile.BadZipFile:
                 messagebox.showerror("Invalid File", "Selected file is not a valid ZIP archive.")
@@ -5580,7 +5607,7 @@ class App(tk.Tk):
             messagebox.showerror("Restore Dialog Error", f"Failed to show restore dialog: {str(e)}")
 
     def _show_restore_options_dialog(self, backup_path: str, has_presets: bool, has_reports: bool, 
-                                   has_bookmarks: bool, manifest: Optional[Dict] = None) -> None:
+                                   has_bookmarks: bool, has_va_profile: bool, manifest: Optional[Dict] = None) -> None:
         """Show dialog to select what to restore from backup"""
         try:
             dialog = tk.Toplevel(self)
@@ -5641,6 +5668,7 @@ class App(tk.Tk):
             restore_presets = tk.IntVar(value=1 if has_presets else 0)
             restore_reports = tk.IntVar(value=1 if has_reports else 0)
             restore_bookmarks = tk.IntVar(value=1 if has_bookmarks else 0)
+            restore_va_profile = tk.IntVar(value=1 if has_va_profile else 0)
             
             # Checkboxes for available items
             if has_presets:
@@ -5673,6 +5701,16 @@ class App(tk.Tk):
                                             font=("Segoe UI", 10))
                 bookmarks_cb.pack(anchor="w", pady=2)
             
+            if has_va_profile:
+                va_profile_cb = tk.Checkbutton(options_frame, text="🎤 VoiceAttack Profile",
+                                             variable=restore_va_profile,
+                                             bg="#2c3e50", fg="#ecf0f1",
+                                             selectcolor="#34495e",
+                                             activebackground="#34495e",
+                                             activeforeground="#ecf0f1",
+                                             font=("Segoe UI", 10))
+                va_profile_cb.pack(anchor="w", pady=2)
+            
             # Warning label
             warning_label = tk.Label(dialog, 
                                    text="⚠️ Warning: This will overwrite existing files!",
@@ -5693,6 +5731,8 @@ class App(tk.Tk):
                     restore_any = True
                 if has_bookmarks and restore_bookmarks.get():
                     restore_any = True
+                if has_va_profile and restore_va_profile.get():
+                    restore_any = True
                 
                 if not restore_any:
                     messagebox.showwarning("No Selection", "Please select at least one item to restore.")
@@ -5706,10 +5746,11 @@ class App(tk.Tk):
                     return
                 
                 dialog.destroy()
-                self._restore_from_backup(backup_path, 
+                self._restore_from_backup(backup_path,
                                         restore_presets.get() if has_presets else False,
                                         restore_reports.get() if has_reports else False,
-                                        restore_bookmarks.get() if has_bookmarks else False)
+                                        restore_bookmarks.get() if has_bookmarks else False,
+                                        restore_va_profile.get() if has_va_profile else False)
             
             def on_cancel():
                 dialog.destroy()
@@ -5733,7 +5774,7 @@ class App(tk.Tk):
             messagebox.showerror("Restore Options Error", f"Failed to show restore options: {str(e)}")
 
     def _restore_from_backup(self, backup_path: str, restore_presets: bool, 
-                           restore_reports: bool, restore_bookmarks: bool) -> None:
+                           restore_reports: bool, restore_bookmarks: bool, restore_va_profile: bool) -> None:
         """Restore selected items from backup zip file"""
         try:
             app_data_dir = self._get_app_data_dir()
@@ -5778,6 +5819,30 @@ class App(tk.Tk):
                     with open(target_path, 'wb') as f:
                         f.write(zipf.read("mining_bookmarks.json"))
                     restored_items.append("Mining Bookmarks")
+                
+                # Restore VoiceAttack profile
+                if restore_va_profile and "EliteMining-Profile.vap" in zipf.namelist():
+                    # Use same path detection logic as backup
+                    if getattr(sys, 'frozen', False):
+                        # Running as executable - profile should go to same directory as executable or parent
+                        exe_dir = os.path.dirname(sys.executable)
+                        va_profile_path = os.path.join(exe_dir, "EliteMining-Profile.vap")
+                        
+                        # Check if we need to place it in parent directory instead
+                        if not os.path.exists(os.path.join(exe_dir, "EliteMining-Profile.vap")) and os.path.basename(exe_dir) == "Configurator":
+                            parent_dir = os.path.dirname(exe_dir)
+                            va_profile_path = os.path.join(parent_dir, "EliteMining-Profile.vap")
+                    else:
+                        # Running in development - profile goes to project root
+                        va_profile_path = os.path.join(os.path.dirname(app_data_dir), "EliteMining-Profile.vap")
+                    
+                    # Create target directory if needed
+                    target_dir = os.path.dirname(va_profile_path)
+                    os.makedirs(target_dir, exist_ok=True)
+                    
+                    with open(va_profile_path, 'wb') as f:
+                        f.write(zipf.read("EliteMining-Profile.vap"))
+                    restored_items.append("VoiceAttack Profile")
             
             if restored_items:
                 items_text = ", ".join(restored_items)
