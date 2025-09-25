@@ -8878,11 +8878,92 @@ class ProspectorPanel(ttk.Frame):
                 'asteroids_prospected': session_data.get('asteroids_prospected'),
                 'best_material': session_data.get('best_material'),
                 'materials_tracked': session_data.get('materials_tracked'),
-                'individual_yields': session_data.get('individual_yields', {}),  # Add individual yield breakdown
+                'individual_yields': session_data.get('individual_yields', {}),  # Comprehensive yields (all asteroids)
+                # Try to add filtered yields from live session analytics if available
+                'filtered_yields': {},
+                'threshold_settings': {},
                 # Add additional data for compatibility
                 'session_type': 'Enhanced Report from Tree Data',
                 'data_source': 'Report Entry'
             }
+            
+            # If this is a live session or we have access to session analytics, add filtered yield data
+            if hasattr(self, 'session_analytics') and hasattr(self, 'min_pct_map'):
+                try:
+                    # Get filtered yields (threshold-based from announcement settings)
+                    filtered_summary = self.session_analytics.get_quality_summary(self.min_pct_map)
+                    if filtered_summary:
+                        enhanced_session_data['filtered_yields'] = {
+                            material: stats['avg_percentage'] 
+                            for material, stats in filtered_summary.items()
+                        }
+                        enhanced_session_data['threshold_settings'] = self.min_pct_map.copy()
+                except Exception as e:
+                    print(f"Could not get filtered yields from live session: {e}")
+                    pass
+            
+            # Try to extract filtered yields from session text file if not available from live session
+            if not enhanced_session_data.get('filtered_yields'):
+                try:
+                    session_text_file = None
+                    
+                    # Try to find the session text file using multiple methods
+                    if 'file_path' in session_data:
+                        session_text_file = session_data['file_path']
+                    elif 'system' in session_data and 'body' in session_data:
+                        # Try to construct filename from session data
+                        session_system = session_data.get('system', '').replace(':', '_').replace('/', '_').replace('\\', '_')
+                        session_body = session_data.get('body', '').replace(':', '_').replace('/', '_').replace('\\', '_')
+                        session_date = session_data.get('date', '')
+                        
+                        print(f"DEBUG: Looking for session files with system: '{session_system}', body: '{session_body}'")
+                        
+                        if session_system and session_body:
+                            # Look for matching session file - try multiple patterns
+                            search_patterns = [
+                                # Pattern 1: Use system and body names
+                                os.path.join(self.reports_dir, f"*{session_system}*{session_body}*.txt"),
+                                # Pattern 2: Use just system name
+                                os.path.join(self.reports_dir, f"*{session_system}*.txt"),
+                                # Pattern 3: Any text file with body name
+                                os.path.join(self.reports_dir, f"*{session_body}*.txt"),
+                                # Pattern 4: Try with spaces replaced by underscores
+                                os.path.join(self.reports_dir, f"*{session_system.replace(' ', '_')}*.txt"),
+                                # Pattern 5: Try with all special chars replaced
+                                os.path.join(self.reports_dir, f"*{session_system.replace(' ', '*').replace('-', '*')}*.txt"),
+                                # Pattern 6: Search for any file containing key parts
+                                os.path.join(self.reports_dir, f"*Coalsack*.txt"),
+                                os.path.join(self.reports_dir, f"*Ring*.txt"),
+                            ]
+                            
+                            # Try each pattern
+                            for pattern in search_patterns:
+                                print(f"DEBUG: Trying pattern: {pattern}")
+                                matching_files = glob.glob(pattern)
+                                print(f"DEBUG: Found {len(matching_files)} matches")
+                                if matching_files:
+                                    # Use the most recent matching file
+                                    session_text_file = max(matching_files, key=os.path.getmtime)
+                                    print(f"DEBUG: Selected file: {session_text_file}")
+                                    break
+                    
+                    # Parse filtered yields from session text file
+                    if session_text_file and os.path.exists(session_text_file):
+                        print(f"DEBUG: Attempting to parse filtered yields from: {session_text_file}")
+                        filtered_yields_from_text = self._parse_filtered_yields_from_session_file(session_text_file)
+                        if filtered_yields_from_text:
+                            enhanced_session_data['filtered_yields'] = filtered_yields_from_text
+                            print(f"DEBUG: Successfully parsed filtered yields: {filtered_yields_from_text}")
+                        else:
+                            print("DEBUG: No filtered yields found in session file")
+                    else:
+                        print(f"DEBUG: Session text file not found. Searched for system: {session_data.get('system', 'N/A')}, body: {session_data.get('body', 'N/A')}")
+                            
+                except Exception as e:
+                    print(f"Could not parse filtered yields from session file: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    pass
             
             # Ask user if they want to add screenshots before generating the report
             from tkinter import messagebox
@@ -8962,6 +9043,50 @@ class ProspectorPanel(ttk.Frame):
             print(f"Error generating enhanced report from menu: {e}")
             messagebox.showerror("Report Error", f"Failed to generate enhanced report:\n{e}", parent=tree.winfo_toplevel())
             
+    def _parse_filtered_yields_from_session_file(self, session_file_path):
+        """Parse filtered yield data from session text file"""
+        try:
+            with open(session_file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Look for "Material Performance" section
+            if "--- Material Performance ---" not in content:
+                return {}
+            
+            # Extract the Material Performance section
+            performance_start = content.find("--- Material Performance ---")
+            performance_section = content[performance_start:]
+            
+            # Parse each material's average percentage
+            filtered_yields = {}
+            lines = performance_section.split('\n')
+            
+            current_material = None
+            for line in lines:
+                line = line.strip()
+                
+                # Look for material name (ends with :)
+                if line.endswith(':') and not line.startswith('•') and not line.startswith('-'):
+                    current_material = line.rstrip(':')
+                
+                # Look for average percentage line
+                elif current_material and line.startswith('• Average:'):
+                    try:
+                        # Extract percentage from "• Average: 44.1%"
+                        avg_part = line.split('Average:')[1].strip()
+                        percentage_str = avg_part.replace('%', '').strip()
+                        percentage = float(percentage_str)
+                        filtered_yields[current_material] = percentage
+                        current_material = None  # Reset for next material
+                    except (ValueError, IndexError):
+                        continue
+            
+            return filtered_yields
+            
+        except Exception as e:
+            print(f"Error parsing filtered yields from session file: {e}")
+            return {}
+    
     def _generate_enhanced_report(self, cargo_session_data, text_report_path):
         """Generate enhanced HTML report with charts and screenshots"""
         try:

@@ -1465,58 +1465,102 @@ class ReportGenerator:
                 
                 analytics_html += "</div></div>"
             
-            # Yield Breakdown Section - Show individual material yields
+            # Yield Breakdown Section - Show both comprehensive and filtered yields
             individual_yields = session_data.get('individual_yields', {})
-            if individual_yields:
+            filtered_yields = session_data.get('filtered_yields', {})
+            
+            if individual_yields or filtered_yields:
                 analytics_html += """
                 <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
-                    <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📊 Material Yield Breakdown</h3>
+                    <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📊 Material Yield Analysis</h3>
                 """
                 
-                # Calculate total average yield for display
-                total_yield = sum(individual_yields.values()) / len(individual_yields) if individual_yields else 0
-                
-                analytics_html += f"""
-                    <div style="margin-bottom: 15px;">
-                        <div class="stat-card" style="display: inline-block; margin-right: 20px;">
-                            <div class="stat-value">{total_yield:.1f}%</div>
-                            <div class="stat-label">Total Average Yield</div>
-                        </div>
-                        <div class="stat-card" style="display: inline-block;">
-                            <div class="stat-value">{len(individual_yields)}</div>
-                            <div class="stat-label">Materials Analyzed</div>
-                        </div>
-                    </div>
+                # Show filtered yields first if available (announcement threshold based)
+                if filtered_yields:
+                    analytics_html += """
+                    <div style="margin-bottom: 25px;">
+                        <h4 style="color: #4CAF50; margin-bottom: 15px; font-size: 16px;">🎯 Calculation based on thresholds set in announcement panel</h4>
+                        <p style="color: #cccccc; font-size: 14px; margin-bottom: 15px; font-style: italic;">
+                            Only asteroids that met your announcement thresholds - represents your "good finds" performance
+                        </p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    """
                     
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
-                """
+                    # Sort filtered yields by percentage (highest first)
+                    sorted_filtered = sorted(filtered_yields.items(), key=lambda x: x[1], reverse=True)
+                    
+                    for material, yield_percent in sorted_filtered:
+                        # Color code based on yield quality - filtered yields tend to be higher
+                        if yield_percent >= 30.0:
+                            color_style = "background: linear-gradient(135deg, #4CAF50, #45a049); color: white;"
+                        elif yield_percent >= 20.0:
+                            color_style = "background: linear-gradient(135deg, #2196F3, #1976D2); color: white;"
+                        elif yield_percent >= 10.0:
+                            color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
+                        else:
+                            color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
+                        
+                        analytics_html += f"""
+                        <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
+                            <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{material}</div>
+                            <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
+                        </div>
+                        """
+                    
+                    analytics_html += "</div></div>"
                 
-                # Sort materials by yield percentage (highest first)
-                sorted_yields = sorted(individual_yields.items(), key=lambda x: x[1], reverse=True)
-                
-                for material, yield_percent in sorted_yields:
-                    # Color code based on yield quality
-                    if yield_percent >= 15.0:
-                        color_class = "excellent"
-                        color_style = "background: linear-gradient(135deg, #4CAF50, #45a049); color: white;"
-                    elif yield_percent >= 10.0:
-                        color_class = "good"  
-                        color_style = "background: linear-gradient(135deg, #2196F3, #1976D2); color: white;"
-                    elif yield_percent >= 5.0:
-                        color_class = "fair"
-                        color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
-                    else:
-                        color_class = "poor"
-                        color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
+                # Show comprehensive yields (all asteroids)
+                if individual_yields:
+                    analytics_html += """
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="color: #2196F3; margin-bottom: 15px; font-size: 16px;">🌍 Calculation based on all asteroids scanned</h4>
+                        <p style="color: #cccccc; font-size: 14px; margin-bottom: 15px; font-style: italic;">
+                            Includes all asteroids prospected - represents your overall prospecting efficiency
+                        </p>
+                    """
+                    
+                    # Calculate total average yield for display
+                    total_yield = sum(individual_yields.values()) / len(individual_yields) if individual_yields else 0
                     
                     analytics_html += f"""
-                    <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
-                        <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{material}</div>
-                        <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
-                    </div>
+                        <div style="margin-bottom: 15px;">
+                            <div class="stat-card" style="display: inline-block; margin-right: 20px;">
+                                <div class="stat-value">{total_yield:.1f}%</div>
+                                <div class="stat-label">Total Average Yield</div>
+                            </div>
+                            <div class="stat-card" style="display: inline-block;">
+                                <div class="stat-value">{len(individual_yields)}</div>
+                                <div class="stat-label">Materials Analyzed</div>
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
                     """
+                    
+                    # Sort materials by yield percentage (highest first)
+                    sorted_yields = sorted(individual_yields.items(), key=lambda x: x[1], reverse=True)
+                    
+                    for material, yield_percent in sorted_yields:
+                        # Color code based on yield quality - comprehensive yields tend to be lower
+                        if yield_percent >= 15.0:
+                            color_style = "background: linear-gradient(135deg, #4CAF50, #45a049); color: white;"
+                        elif yield_percent >= 10.0:
+                            color_style = "background: linear-gradient(135deg, #2196F3, #1976D2); color: white;"
+                        elif yield_percent >= 5.0:
+                            color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
+                        else:
+                            color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
+                        
+                        analytics_html += f"""
+                        <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
+                            <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{material}</div>
+                            <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
+                        </div>
+                        """
+                    
+                    analytics_html += "</div></div>"
                 
-                analytics_html += "</div></div>"
+                analytics_html += "</div>"
             
             # Material Analysis Section
             if materials_mined:
