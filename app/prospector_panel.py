@@ -1600,9 +1600,6 @@ class ProspectorPanel(ttk.Frame):
                     
                     # Enhanced materials display with yield percentages
                     materials_breakdown = self._enhance_materials_with_yields(materials_breakdown_raw, avg_quality)
-                    print(f"DEBUG: Original materials: {materials_breakdown_raw}")
-                    print(f"DEBUG: Yield data: {avg_quality}")
-                    print(f"DEBUG: Enhanced materials: {materials_breakdown}")
                     
                     # Apply word wrap formatting if enabled
                     if word_wrap_enabled.get() and materials_breakdown != '—':
@@ -2019,9 +2016,6 @@ class ProspectorPanel(ttk.Frame):
                     context_menu.add_separator()
                     context_menu.add_command(label="� Copy System Name", command=lambda: copy_system_to_clipboard_reports(tree))
                     context_menu.add_separator()
-                    # Debug: Add a test menu item to verify context menu is working
-                    # from tkinter import messagebox
-                    # context_menu.add_command(label="🔧 DEBUG: Menu Working!", command=lambda: messagebox.showinfo("Debug", "Right-click menu is working! The new screenshot and detailed report options should be visible above."))
                     context_menu.add_separator()
                     
                     # Word wrap toggle
@@ -2221,14 +2215,6 @@ class ProspectorPanel(ttk.Frame):
                                 app_dir = os.path.dirname(os.path.abspath(__file__))
                             
                             graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
-                            print(f"DEBUG: Looking for graphs in: {graphs_dir}")
-                            
-                            # Also write debug to file
-                            debug_file = os.path.join(os.path.dirname(graphs_dir), "delete_debug.txt")
-                            with open(debug_file, "a", encoding="utf-8") as f:
-                                f.write(f"DELETE DEBUG: Starting graph deletion for session\n")
-                                f.write(f"DELETE DEBUG: Graphs dir: {graphs_dir}\n")
-                                f.write(f"DELETE DEBUG: Session data: {session}\n")
                             
                             if os.path.exists(graphs_dir):
                                 # Create session ID to match graph files - use EXACT same logic as auto_save_graphs
@@ -2248,8 +2234,6 @@ class ProspectorPanel(ttk.Frame):
                                         clean_body = clean_body.replace(' ', '_')
                                         session_prefix += f"_{clean_body}"
                                     
-                                    print(f"DEBUG: Looking for graphs with prefix: {session_prefix}")
-                                    
                                     # Delete graph files
                                     deleted_graphs = []
                                     for graph_file in os.listdir(graphs_dir):
@@ -2257,11 +2241,6 @@ class ProspectorPanel(ttk.Frame):
                                             graph_path = os.path.join(graphs_dir, graph_file)
                                             os.remove(graph_path)
                                             deleted_graphs.append(graph_file)
-                                            print(f"DEBUG: Deleted graph: {graph_file}")
-                                    
-                                    if not deleted_graphs:
-                                        print(f"DEBUG: No graph files found matching prefix: {session_prefix}")
-                                        print(f"DEBUG: Available files: {os.listdir(graphs_dir)}")
                                     
                                     # Update graph mappings JSON
                                     mappings_file = os.path.join(graphs_dir, "graph_mappings.json")
