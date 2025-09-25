@@ -3243,6 +3243,9 @@ class ProspectorPanel(ttk.Frame):
                 # Clear all items from prospector reports table
                 for item in self.tree.get_children():
                     self.tree.delete(item)
+            
+            # Also clear the history data so only current session asteroids show up
+            self.history = []
         except Exception as e:
             print(f"Failed to clear prospector reports: {e}")
 
