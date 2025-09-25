@@ -2943,7 +2943,13 @@ class App(tk.Tk):
             self.destroy()
             return
         self.vars_dir = os.path.join(self.va_root, "Variables")
-        self.settings_dir = os.path.join(self.va_root, "app", "Settings")
+        # For dev version, use local settings directory instead of VA folder
+        if getattr(sys, 'frozen', False):
+            # Installer version - use VA folder
+            self.settings_dir = os.path.join(self.va_root, "app", "Ship Presets")
+        else:
+            # Dev version - use local folder
+            self.settings_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Ship Presets")
         os.makedirs(self.vars_dir, exist_ok=True)
         os.makedirs(self.settings_dir, exist_ok=True)
 
@@ -3060,8 +3066,14 @@ class App(tk.Tk):
         # Setup keyboard shortcuts
         self._setup_keyboard_shortcuts()
         
-        # Initialize update checker with proper settings directory
-        self.update_checker = UpdateChecker(get_version(), UPDATE_CHECK_URL, self.settings_dir)
+        # Initialize update checker with app directory (not settings dir)
+        if getattr(sys, 'frozen', False):
+            # Installer - use VA app directory
+            update_dir = os.path.join(self.va_root, "app")
+        else:
+            # Dev - use local app directory
+            update_dir = os.path.dirname(os.path.abspath(__file__))
+        self.update_checker = UpdateChecker(get_version(), UPDATE_CHECK_URL, update_dir)
 
         # Build UI
         self._build_ui()
@@ -5468,7 +5480,7 @@ class App(tk.Tk):
                 
                 # Add ship presets
                 if include_presets:
-                    settings_dir = os.path.join(app_data_dir, "Settings")
+                    settings_dir = os.path.join(app_data_dir, "Ship Presets")
                     if os.path.exists(settings_dir):
                         for file_name in os.listdir(settings_dir):
                             if file_name.endswith('.json'):
@@ -5730,7 +5742,7 @@ class App(tk.Tk):
             with zipfile.ZipFile(backup_path, 'r') as zipf:
                 # Restore ship presets
                 if restore_presets:
-                    settings_dir = os.path.join(app_data_dir, "Settings")
+                    settings_dir = os.path.join(app_data_dir, "Ship Presets")
                     os.makedirs(settings_dir, exist_ok=True)
                     
                     preset_files = [f for f in zipf.namelist() if f.startswith("Settings/") and f.endswith(".json")]
