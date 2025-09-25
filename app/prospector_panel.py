@@ -6187,12 +6187,29 @@ class ProspectorPanel(ttk.Frame):
 
         # Session summary (removed yield table functionality)
         lines = []
-        total_tons = 0.0
-        for mat in sorted(self.session_totals.keys(), key=str.casefold):
-            tons = self.session_totals[mat]
-            tph = tons / active_hours
-            total_tons += tons
-            lines.append(f"{mat} {tons:.0f}t ({tph:.2f} t/hr)")
+        # Calculate actual mined tons from cargo session data
+        if cargo_session_data and 'total_tons_mined' in cargo_session_data:
+            total_tons = cargo_session_data['total_tons_mined']
+        else:
+            # Fallback to session totals for older sessions
+            total_tons = 0.0
+            for mat in sorted(self.session_totals.keys(), key=str.casefold):
+                tons = self.session_totals[mat]
+                total_tons += tons
+
+        # Generate lines using actual mined materials from cargo data
+        if cargo_session_data and 'materials_mined' in cargo_session_data:
+            materials_mined = cargo_session_data['materials_mined']
+            for mat in sorted(materials_mined.keys(), key=str.casefold):
+                tons = materials_mined[mat]
+                tph = tons / active_hours
+                lines.append(f"{mat} {tons:.0f}t ({tph:.2f} t/hr)")
+        else:
+            # Fallback for older sessions without cargo data
+            for mat in sorted(self.session_totals.keys(), key=str.casefold):
+                tons = self.session_totals[mat]
+                tph = tons / active_hours
+                lines.append(f"{mat} {tons:.0f}t ({tph:.2f} t/hr)")
 
         sysname = self.session_system.get().strip() or self.last_system or "Unknown System"
         body = self.session_body.get().strip() or self.last_body or "Unknown Body"
