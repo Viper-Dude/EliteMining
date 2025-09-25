@@ -8,6 +8,8 @@ import threading
 import time
 import json
 import os
+import sys
+import tempfile
 from pathlib import Path
 from packaging import version
 import tkinter as tk
@@ -25,10 +27,17 @@ class UpdateChecker:
         if settings_dir:
             settings_path = Path(settings_dir)
         else:
-            # Fallback to user's local app data
-            import os
-            app_data = os.path.expanduser("~/.elitemining")
-            settings_path = Path(app_data)
+            # Use writable app directory
+            if getattr(sys, 'frozen', False):
+                # Installer - use VA root app directory (writable)
+                va_root = os.environ.get('VA_ROOT', '')
+                if va_root:
+                    settings_path = Path(va_root) / "Apps" / "EliteMining" / "app"
+                else:
+                    settings_path = Path(tempfile.gettempdir()) / "EliteMining"
+            else:
+                # Dev - use app directory  
+                settings_path = Path(os.path.dirname(os.path.abspath(__file__)))
         
         settings_path.mkdir(exist_ok=True)
         self.last_check_file = settings_path / "last_update_check.json"

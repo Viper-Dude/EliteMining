@@ -86,7 +86,7 @@ function Get-UserChoice {
     Write-Host "Uninstall Options:" -ForegroundColor Yellow
     Write-Host "1. Smart Uninstall (Recommended)" -ForegroundColor Green
     Write-Host "   - Removes application files"
-    Write-Host "   - Preserves Reports, Settings, config.json"
+    Write-Host "   - Preserves Reports, Ship Presets, config.json"
     Write-Host "   - Clean removal with data safety"
     Write-Host ""
     Write-Host "2. Complete Removal" -ForegroundColor Red
@@ -126,13 +126,13 @@ function Backup-UserData {
         Write-Host "  ✅ Reports folder backed up" -ForegroundColor Green
     }
     
-    # Backup Settings
-    $settingsPath = Join-Path $InstallPath "app\Settings"
+    # Backup Ship Presets
+    $settingsPath = Join-Path $InstallPath "app\Ship Presets"
     if (Test-Path $settingsPath) {
-        $backupSettings = Join-Path $BackupPath "Settings"
+        $backupSettings = Join-Path $BackupPath "Ship Presets"
         Copy-Item $settingsPath $backupSettings -Recurse -Force
-        $backedUp += "Settings folder"
-        Write-Host "  ✅ Settings folder backed up" -ForegroundColor Green
+        $backedUp += "Ship Presets folder"
+        Write-Host "  ✅ Ship Presets folder backed up" -ForegroundColor Green
     }
     
     # Backup config.json
@@ -274,13 +274,13 @@ function Restore-UserData {
         Write-Host "  ✅ Reports restored" -ForegroundColor Green
     }
     
-    # Restore Settings
-    $backupSettings = Join-Path $BackupPath "Settings"
+    # Restore Ship Presets
+    $backupSettings = Join-Path $BackupPath "Ship Presets"
     if (Test-Path $backupSettings) {
-        $settingsPath = Join-Path $InstallPath "app\Settings"
+        $settingsPath = Join-Path $InstallPath "app\Ship Presets"
         Copy-Item $backupSettings $settingsPath -Recurse -Force
-        $restored += "Settings"
-        Write-Host "  ✅ Settings restored" -ForegroundColor Green
+        $restored += "Ship Presets"
+        Write-Host "  ✅ Ship Presets restored" -ForegroundColor Green
     }
     
     # Restore config.json

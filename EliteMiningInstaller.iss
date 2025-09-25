@@ -22,7 +22,7 @@ UninstallDisplayIcon={app}\Apps\EliteMining\Configurator\Configurator.exe
 [Files]
 ; Only include specific file types from needed subfolders (exclude .py files)
 Source: "app\Images\*";    DestDir: "{app}\Apps\EliteMining\app\Images";    Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.py,*.pyc,__pycache__"
-Source: "app\Settings\*";  DestDir: "{app}\Apps\EliteMining\app\Settings";  Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "*.py,*.pyc,__pycache__"
+Source: "app\Ship Presets\*";  DestDir: "{app}\Apps\EliteMining\app\Ship Presets";  Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "*.py,*.pyc,__pycache__"
 ; Reports folder intentionally excluded - users must earn their reports by mining! 😉
 
 ; New Configurator executable

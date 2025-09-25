@@ -166,7 +166,7 @@ class ReleaseBuilder:
                 
                 # Add app folder contents (Images, Settings, Reports, etc.) under EliteMining/app/
                 app_dir = self.project_root / "app"
-                for item in ["Images", "Settings", "Reports"]:
+                for item in ["Images", "Ship Presets", "Reports"]:
                     item_path = app_dir / item
                     if item_path.exists():
                         if item_path.is_dir():

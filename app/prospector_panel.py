@@ -6086,7 +6086,9 @@ class ProspectorPanel(ttk.Frame):
         if not self.session_active or not self.session_start:
             return
 
+        # Handle paused session - resume calculations
         if self.session_paused and self.session_pause_started:
+            import datetime as dt
             self.session_paused_seconds += (dt.datetime.utcnow() - self.session_pause_started).total_seconds()
             self.session_paused = False
             self.session_pause_started = None
