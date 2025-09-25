@@ -1,11 +1,6 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 
-**EliteMining** optimizes your m#### 📋 Detailed HTML Reports  
-*HTML reports with charts and statistics.*  
-
-> **⚠️ Work in Progress:** The detailed HTML report system is under active development. New features and improvements are being added regularly. Report layouts, analytics calculations, and data presentation may change in future updates.
-
-Generate comprehensive HTML reports with interactive charts, mining analytics, and session comments. Features include:g efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.  
+**EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.  
 
 ---
 
@@ -165,8 +160,10 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 <img src="Screenshot/mining-reports.png" width="600"><br>  
 *Detailed mining statistics and summaries.*  
 
-#### � Detailed HTML Reports  
+#### 📋 Detailed HTML Reports  
 *HTML reports with charts and statistics.*  
+
+> **⚠️ Work in Progress:** The detailed HTML report system is under active development. New features and improvements are being added regularly. Report layouts, analytics calculations, and data presentation may change in future updates.
 
 Generate comprehensive HTML reports with interactive charts, mining analytics, and session comments. Features include:
 - **Dark/Light Theme Toggle** - Switch between themes with one click  
