@@ -331,6 +331,14 @@ class ReportGenerator:
         }}
         
         .chart-container {{
+            display: inline-block;
+            text-align: center;
+            margin: 20px 10px;
+            vertical-align: top;
+            width: 420px;
+        }}
+        
+        .charts-grid {{
             text-align: center;
             margin: 20px 0;
         }}
@@ -656,7 +664,7 @@ class ReportGenerator:
             const closeBtn = document.querySelector('.close-modal');
             
             // Add click handlers to all chart and screenshot images
-            const images = document.querySelectorAll('.chart-container img, .screenshot img');
+            const images = document.querySelectorAll('.chart-container img, .screenshot img, div[style*="flex"] img[alt*="Material Breakdown"]');
             
             images.forEach(function(img, index) {{
                 // Add thumbnail indicator class
@@ -842,6 +850,7 @@ class ReportGenerator:
         charts_html = """
         <div class="section">
             <h2>📈 Mining Charts</h2>
+            <div class="charts-grid">
         """
         
         try:
@@ -854,16 +863,6 @@ class ReportGenerator:
             else:
                 # If no saved charts found and matplotlib available, generate them
                 if MATPLOTLIB_AVAILABLE:
-                    # Generate material breakdown pie chart
-                    pie_chart_base64 = self._generate_pie_chart(session_data)
-                    if pie_chart_base64:
-                        charts_html += f"""
-                        <div class="chart-container">
-                            <h3>Material Breakdown</h3>
-                            <img src="data:image/png;base64,{pie_chart_base64}" alt="Material Breakdown Chart">
-                        </div>
-                        """
-                    
                     # Generate yield timeline chart if available
                     timeline_chart_base64 = self._generate_timeline_chart(session_data)
                     if timeline_chart_base64:
@@ -880,7 +879,9 @@ class ReportGenerator:
             print(f"Error generating charts: {e}")
             charts_html += "<p><em>Error generating charts</em></p>"
             
-        charts_html += "</div>"
+        charts_html += """
+            </div>
+        </div>"""
         return charts_html
 
     def _add_saved_charts(self, session_data):
@@ -976,15 +977,15 @@ class ReportGenerator:
                         </div>
                         """
             
-            # Add pie chart for material breakdown (still generated dynamically)
-            pie_chart_base64 = self._generate_pie_chart(session_data)
-            if pie_chart_base64:
-                charts_html += f"""
-                <div class="chart-container">
-                    <h3>Material Breakdown</h3>
-                    <img src="data:image/png;base64,{pie_chart_base64}" alt="Material Breakdown Chart">
-                </div>
-                """
+            # Add pie chart for material breakdown (still generated dynamically) - moved to Session Overview
+            # pie_chart_base64 = self._generate_pie_chart(session_data)
+            # if pie_chart_base64:
+            #     charts_html += f"""
+            #     <div class="chart-container">
+            #         <h3>Material Breakdown</h3>
+            #         <img src="data:image/png;base64,{pie_chart_base64}" alt="Material Breakdown Chart">
+            #     </div>
+            #     """
             
             return charts_html if charts_html else None
             
@@ -1301,14 +1302,19 @@ class ReportGenerator:
                 if hasattr(self.main_app, 'prospector_panel'):
                     try:
                         # Use the same method the Statistics tab uses
+                        pie_chart_base64 = self._generate_pie_chart(session_data)
+                        
                         statistics_html += f"""
-                        <div style="background: var(--section-bg); padding: 15px; border-radius: 8px; margin: 20px 0; color: var(--text-color);">
-                            <h4 style="margin-top: 0; color: var(--header-color);">Session Overview</h4>
-                            <p style="color: var(--text-color);"><strong>System:</strong> {session_data.get('system', 'Unknown')}</p>
-                            <p style="color: var(--text-color);"><strong>Body:</strong> {session_data.get('body', 'Unknown')}</p>
-                            <p style="color: var(--text-color);"><strong>Total Tonnage:</strong> {session_data.get('tons', 0)}t</p>
-                            <p style="color: var(--text-color);"><strong>TPH:</strong> {session_data.get('tph', 0)}</p>
-                            <p style="color: var(--text-color);"><strong>Duration:</strong> {session_data.get('duration', 'Unknown')}</p>
+                        <div style="background: var(--section-bg); padding: 15px; border-radius: 8px; margin: 20px 0; color: var(--text-color); display: flex; align-items: flex-start; gap: 20px;">
+                            <div style="flex: 1;">
+                                <h4 style="margin-top: 0; color: var(--header-color);">Session Overview</h4>
+                                <p style="color: var(--text-color);"><strong>System:</strong> {session_data.get('system', 'Unknown')}</p>
+                                <p style="color: var(--text-color);"><strong>Body:</strong> {session_data.get('body', 'Unknown')}</p>
+                                <p style="color: var(--text-color);"><strong>Total Tonnage:</strong> {session_data.get('tons', 0)}t</p>
+                                <p style="color: var(--text-color);"><strong>TPH:</strong> {session_data.get('tph', 0)}</p>
+                                <p style="color: var(--text-color);"><strong>Duration:</strong> {session_data.get('duration', 'Unknown')}</p>
+                            </div>
+                            {"<div style='flex-shrink: 0;'><img src='data:image/png;base64," + pie_chart_base64 + "' alt='Material Breakdown Chart' style='max-width: 200px; height: auto; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer;'></div>" if pie_chart_base64 else ""}
                         </div>
                         """
                     except:
@@ -1459,11 +1465,64 @@ class ReportGenerator:
                 
                 analytics_html += "</div></div>"
             
+            # Yield Breakdown Section - Show individual material yields
+            individual_yields = session_data.get('individual_yields', {})
+            if individual_yields:
+                analytics_html += """
+                <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
+                    <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📊 Material Yield Breakdown</h3>
+                """
+                
+                # Calculate total average yield for display
+                total_yield = sum(individual_yields.values()) / len(individual_yields) if individual_yields else 0
+                
+                analytics_html += f"""
+                    <div style="margin-bottom: 15px;">
+                        <div class="stat-card" style="display: inline-block; margin-right: 20px;">
+                            <div class="stat-value">{total_yield:.1f}%</div>
+                            <div class="stat-label">Total Average Yield</div>
+                        </div>
+                        <div class="stat-card" style="display: inline-block;">
+                            <div class="stat-value">{len(individual_yields)}</div>
+                            <div class="stat-label">Materials Analyzed</div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                """
+                
+                # Sort materials by yield percentage (highest first)
+                sorted_yields = sorted(individual_yields.items(), key=lambda x: x[1], reverse=True)
+                
+                for material, yield_percent in sorted_yields:
+                    # Color code based on yield quality
+                    if yield_percent >= 15.0:
+                        color_class = "excellent"
+                        color_style = "background: linear-gradient(135deg, #4CAF50, #45a049); color: white;"
+                    elif yield_percent >= 10.0:
+                        color_class = "good"  
+                        color_style = "background: linear-gradient(135deg, #2196F3, #1976D2); color: white;"
+                    elif yield_percent >= 5.0:
+                        color_class = "fair"
+                        color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
+                    else:
+                        color_class = "poor"
+                        color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
+                    
+                    analytics_html += f"""
+                    <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
+                        <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{material}</div>
+                        <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
+                    </div>
+                    """
+                
+                analytics_html += "</div></div>"
+            
             # Material Analysis Section
             if materials_mined:
                 analytics_html += """
                 <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
-                    <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">💎 Material Analysis</h3>
+                    <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">💎 Most Mined Material Analysis</h3>
                 """
                 
                 # Sort materials by quantity for analysis
@@ -1478,19 +1537,19 @@ class ReportGenerator:
                     <div class="stats-grid">
                         <div class="stat-card">
                             <div class="stat-value">{top_material}</div>
-                            <div class="stat-label">Top Material</div>
+                            <div class="stat-label">Most Mined Material</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">{self._safe_float(top_quantity):.1f}t</div>
-                            <div class="stat-label">Top Material Yield</div>
+                            <div class="stat-label">Tonnage Mined</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">{self._safe_float(top_percentage):.1f}%</div>
-                            <div class="stat-label">% of Total Yield</div>
+                            <div class="stat-label">% of Total Tonnage</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">{len(materials_mined)}</div>
-                            <div class="stat-label">Material Diversity</div>
+                            <div class="stat-label">Total Materials</div>
                         </div>
                     </div>
                     """
@@ -1532,7 +1591,16 @@ class ReportGenerator:
                     <div style="background: #2a2a2a; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #4CAF50;">
                         <p style="color: #cccccc; margin: 0; font-size: 13px;">
                             <strong>💡 Understanding Your Mining Metrics:</strong><br>
-                            These metrics help you evaluate and compare different mining sessions. Hover over each card for detailed explanations.
+                            These metrics help you evaluate and compare different mining sessions. Hover over each card for detailed explanations.<br><br>
+                            <strong>🎯 Ring Quality Assessment:</strong><br>
+                            • <strong>Excellent (≥500 t/h):</strong> Outstanding locations worth bookmarking<br>
+                            • <strong>Good (≥350 t/h):</strong> Solid performance, worth returning to<br>
+                            • <strong>Fair (≥200 t/h):</strong> Minimum acceptable mining rate<br>
+                            • <strong>Poor (&lt;200 t/h):</strong> Not worth the time investment - find better spots!<br><br>
+                            <strong>📊 Complete Scoring System (100 points total):</strong><br>
+                            • <strong>TPH (70%):</strong> ≥500=70pts, ≥350=50pts, ≥200=30pts, &lt;200=10pts<br>
+                            • <strong>Materials (30%):</strong> &gt;3types=30pts, &gt;2types=25pts, &gt;1type=15pts, 1type=5pts<br>
+                            <em>Final Rating: Excellent=85-100pts, Good=65-84pts, Fair=45-64pts, Poor=&lt;45pts</em>
                         </p>
                     </div>
                     <div class="stats-grid">
@@ -1568,34 +1636,50 @@ class ReportGenerator:
                     </div>
                     """
                 
-                # Time efficiency
-                if len(materials_mined) > 0:
-                    materials_per_hour = len(materials_mined) / (duration_minutes / 60)
-                    analytics_html += f"""
-                    <div class="stat-card" title="How many different types of materials you're discovering per hour of mining. Higher numbers suggest you're mining in a diverse asteroid field with variety. Some miners prefer focused mining (few types, high volume) while others prefer variety (many types for different uses).">
-                        <div class="stat-value">{self._safe_float(materials_per_hour):.1f}</div>
-                        <div class="stat-label">Material Types/Hour</div>
-                        <div class="stat-help">🔍 Different materials found per hour</div>
-                    </div>
-                    """
+                # Ring Quality Assessment - simplified to focus on what actually matters
+                ring_quality = "Poor"
+                quality_explanation = ""
+                quality_score = 0
                 
-                # Session intensity rating
-                intensity = "Low"
-                intensity_explanation = ""
-                if tph > 100:
-                    intensity = "High"
-                    intensity_explanation = f"High activity mining - {tph:.1f} tons/hour"
-                elif tph > 50:
-                    intensity = "Medium"
-                    intensity_explanation = f"Moderate activity mining - {tph:.1f} tons/hour"
+                # Factor 1: TPH (70% weight) - The primary performance indicator
+                if tph >= 500:
+                    quality_score += 70
+                elif tph >= 350:
+                    quality_score += 50
+                elif tph >= 200:
+                    quality_score += 30
                 else:
-                    intensity_explanation = f"Relaxed mining pace - {tph:.1f} tons/hour"
+                    quality_score += 10
+                
+                # Factor 2: Material Diversity (30% weight) - Independent engineering value
+                materials_count = len(session_data.get('materials_mined', {}))
+                if materials_count > 3:
+                    quality_score += 30
+                elif materials_count > 2:
+                    quality_score += 25
+                elif materials_count > 1:
+                    quality_score += 15
+                else:
+                    quality_score += 5
+                
+                # Determine overall ring quality with simplified thresholds
+                if quality_score >= 85:
+                    ring_quality = "Excellent"
+                    quality_explanation = f"Outstanding mining location - {tph:.1f} t/h with {materials_count} material types"
+                elif quality_score >= 65:
+                    ring_quality = "Good"
+                    quality_explanation = f"Solid mining location - {tph:.1f} t/h with {materials_count} material types"
+                elif quality_score >= 45:
+                    ring_quality = "Fair" 
+                    quality_explanation = f"Decent mining spot - {tph:.1f} t/h with {materials_count} material types"
+                else:
+                    quality_explanation = f"Poor mining location - {tph:.1f} t/h with {materials_count} material types"
                 
                 analytics_html += f"""
-                <div class="stat-card" title="Mining activity level based on your tons per hour rate. High (>100 t/h) = intense active mining, Medium (50-100 t/h) = steady mining, Low (<50 t/h) = casual mining with breaks or lower efficiency.">
-                    <div class="stat-value">{intensity}</div>
-                    <div class="stat-label">Session Intensity</div>
-                    <div class="stat-help">⚡ {intensity_explanation}</div>
+                <div class="stat-card" title="Overall assessment of this mining location based primarily on tons per hour performance and material diversity for engineering needs. Excellent/Good locations are worth bookmarking for future mining sessions.">
+                    <div class="stat-value">{ring_quality}</div>
+                    <div class="stat-label">Ring Quality</div>
+                    <div class="stat-help">💎 {quality_explanation}</div>
                 </div>
                 """
                 

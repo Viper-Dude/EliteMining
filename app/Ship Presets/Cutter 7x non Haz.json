@@ -35,7 +35,7 @@
     "Laser Mining Extra": 0,
     "Prospector Sequence": 0,
     "Power Settings": 0,
-    "Target": 1,
+    "Target": 0,
     "Auto Honk": 1,
     "Headtracker Docking Control": 1
   },
@@ -43,7 +43,7 @@
   "Timers": {
     "Cargo Scoop Delay": 5,
     "Laser Mining Extra Delay": 9,
-    "Laser Mining Duration": 25,
+    "Laser Mining Duration": 22,
     "Pause Duration": 4,
     "Target Delay": 10,
     "Boost Interval": 3
