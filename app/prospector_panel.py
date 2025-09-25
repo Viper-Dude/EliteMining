@@ -2542,7 +2542,12 @@ class ProspectorPanel(ttk.Frame):
                     continue
             
             if not sessions:
-                messagebox.showwarning("No Data", "No valid session files found to rebuild CSV.")
+                # If no session files exist, create empty CSV with headers
+                with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
+                    writer.writeheader()
+                messagebox.showinfo("CSV Created", "Created new CSV file - ready for your first session")
+                parent_window.destroy()
                 return
             
             # Sort by timestamp
@@ -2748,8 +2753,12 @@ class ProspectorPanel(ttk.Frame):
                     continue
             
             if not sessions:
+                # If no session files exist, create empty CSV with headers
+                with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
+                    writer.writeheader()
                 if not silent:
-                    messagebox.showwarning("No Data", "No valid session files found to rebuild CSV.")
+                    self._set_status("Created new CSV file - ready for first session")
                 return
             
             # Sort by timestamp
