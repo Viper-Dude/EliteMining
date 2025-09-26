@@ -316,9 +316,9 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 ---
 
 ## ⚠️ Known Limitations
-- Only works with in-game keybinds (HOTAS setup manual)  
-- Possible conflicts with HCS VoicePack  
-- Works with EDCopilot  
+Only works with in-game keybinds (HOTAS setup manual)
+There may be conflicts with HCS VoicePack commands, but these can be easily adjusted manually in the EliteMining Profile within VoiceAttack.
+Works with EDCopilot
 
 [⬆️ Back to Top](#-elitemining)
 
