@@ -3910,7 +3910,7 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.column("asteroids", width=80, stretch=False, anchor="center")
         self.reports_tree_tab.column("hit_rate", width=90, stretch=False, anchor="center")
         self.reports_tree_tab.column("quality", width=120, stretch=False, anchor="center")
-        self.reports_tree_tab.column("cargo", width=250, stretch=False, anchor="w")
+        self.reports_tree_tab.column("cargo", width=350, stretch=False, anchor="w")
         self.reports_tree_tab.column("prospects", width=70, stretch=False, anchor="center")
         self.reports_tree_tab.column("comment", width=200, stretch=False, anchor="w")
         self.reports_tree_tab.column("enhanced", width=100, stretch=False, anchor="center")
