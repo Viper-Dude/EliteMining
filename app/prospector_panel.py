@@ -3728,7 +3728,7 @@ class ProspectorPanel(ttk.Frame):
                             session['quality'],
                             session['cargo'],
                             session['prospectors'],
-                            session.get('comment', ''),
+                            '💬' if session.get('comment', '').strip() else '',  # Show emoji if comment exists
                             ""  # Enhanced column placeholder
                         ))
                         
@@ -3912,7 +3912,7 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.column("quality", width=120, stretch=False, anchor="center")
         self.reports_tree_tab.column("cargo", width=350, stretch=False, anchor="w")
         self.reports_tree_tab.column("prospects", width=70, stretch=False, anchor="center")
-        self.reports_tree_tab.column("comment", width=200, stretch=False, anchor="w")
+        self.reports_tree_tab.column("comment", width=80, stretch=False, anchor="center")  # Wider to show header text
         self.reports_tree_tab.column("enhanced", width=100, stretch=False, anchor="center")
 
         # Add vertical scrollbar
@@ -4901,7 +4901,7 @@ class ProspectorPanel(ttk.Frame):
                     session['quality'],
                     session['cargo'],
                     session['prospects'],
-                    session.get('comment', ''),
+                    '💬' if session.get('comment', '').strip() else '',  # Show emoji if comment exists
                     ""  # Enhanced column placeholder
                 ))
                 
@@ -5696,9 +5696,24 @@ class ProspectorPanel(ttk.Frame):
     def _edit_comment(self, tree, item):
         """Edit comment for selected session"""
         
-        # Get current comment
-        values = tree.item(item, 'values')
-        current_comment = values[12] if len(values) > 12 else ""
+        # Get actual comment from session data, not from tree display (which shows emoji)
+        current_comment = ""
+        
+        # Get the actual comment from session lookup data
+        if tree == self.reports_tree_tab and hasattr(self, 'reports_tab_session_lookup'):
+            session_data = self.reports_tab_session_lookup.get(item)
+            if session_data:
+                current_comment = session_data.get('comment', '')
+        elif tree == self.reports_tree and hasattr(self, 'session_lookup'):
+            session_data = self.session_lookup.get(item)
+            if session_data:
+                current_comment = session_data.get('comment', '')
+        
+        # Fallback: if no session data found, try to find comment by timestamp
+        if not current_comment:
+            values = tree.item(item, 'values')
+            timestamp = values[0] if len(values) > 0 else ""
+            current_comment = self._get_comment_by_timestamp(timestamp)
         
         # Show custom edit dialog with app logo
         new_comment = self._show_custom_comment_dialog(
@@ -5708,12 +5723,15 @@ class ProspectorPanel(ttk.Frame):
         )
         
         if new_comment is not None:  # User didn't cancel
-            # Update tree display
+            # Update tree display with emoji instead of full comment text
+            values = tree.item(item, 'values')
             new_values = list(values)
+            comment_display = '💬' if new_comment.strip() else ''  # Show emoji if comment exists
+            
             if len(new_values) > 12:
-                new_values[12] = new_comment
+                new_values[12] = comment_display
             else:
-                new_values.append(new_comment)
+                new_values.append(comment_display)
             tree.item(item, values=new_values)
             
             # Get the raw timestamp for CSV update from session lookup
@@ -5756,9 +5774,31 @@ class ProspectorPanel(ttk.Frame):
                     icon="warning"
                 )
                 if result:  # User chose to revert
-                    # Revert the UI change
-                    new_values[12] = current_comment
+                    # Revert the UI change to show original comment emoji state
+                    original_comment_display = '💬' if current_comment.strip() else ''
+                    new_values[12] = original_comment_display
                     tree.item(item, values=new_values)
+    
+    def _get_comment_by_timestamp(self, timestamp):
+        """Get comment by timestamp from session files as fallback"""
+        try:
+            import os
+            import json
+            reports_dir = "Reports/Mining Session"
+            if os.path.exists(reports_dir):
+                for filename in os.listdir(reports_dir):
+                    if filename.endswith('.json'):
+                        filepath = os.path.join(reports_dir, filename)
+                        try:
+                            with open(filepath, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                                if data.get('date') == timestamp:
+                                    return data.get('comment', '')
+                        except:
+                            continue
+        except:
+            pass
+        return ""
     
     def _edit_body(self, tree, item):
         """Edit body name for selected session"""
@@ -6528,7 +6568,7 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.column("hotspot", width=100, stretch=False, anchor="w")
         self.bookmarks_tree.column("materials", width=200, stretch=False, anchor="w")
         self.bookmarks_tree.column("avg_yield", width=80, stretch=False, anchor="center")
-        self.bookmarks_tree.column("notes", width=250, stretch=False, anchor="w")
+        self.bookmarks_tree.column("notes", width=50, stretch=False, anchor="center")  # Narrower for emoji
 
         # Add vertical scrollbar
         v_scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.bookmarks_tree.yview)
@@ -6615,6 +6655,9 @@ class ProspectorPanel(ttk.Frame):
         # Double-click to edit
         self.bookmarks_tree.bind("<Double-1>", self._on_bookmark_double_click)
         
+        # Single-click handler for Notes column
+        self.bookmarks_tree.bind("<Button-1>", self._on_bookmark_single_click)
+        
         # Right-click context menu
         self._setup_bookmark_context_menu()
         
@@ -6690,6 +6733,9 @@ class ProspectorPanel(ttk.Frame):
                     continue
             
             # Add to tree
+            notes = bookmark.get('notes', '')
+            notes_display = '💬' if notes.strip() else ''  # Show emoji if notes exist
+            
             self.bookmarks_tree.insert("", "end", values=(
                 bookmark.get('last_mined', ''),
                 bookmark.get('system', ''),
@@ -6697,7 +6743,7 @@ class ProspectorPanel(ttk.Frame):
                 bookmark.get('hotspot', ''),
                 bookmark.get('materials', ''),
                 bookmark.get('avg_yield', ''),
-                bookmark.get('notes', '')
+                notes_display
             ))
 
     def _on_bookmark_double_click(self, event) -> None:
@@ -6705,6 +6751,21 @@ class ProspectorPanel(ttk.Frame):
         # Check if click is on an actual item, not header
         item = self.bookmarks_tree.identify('item', event.x, event.y)
         if item:  # Only edit if there's an actual item under the cursor
+            self._edit_bookmark_dialog()
+
+    def _on_bookmark_single_click(self, event) -> None:
+        """Handle single-click on bookmark tree - open edit dialog if clicking on Notes column"""
+        # Identify what was clicked
+        item = self.bookmarks_tree.identify('item', event.x, event.y)
+        column = self.bookmarks_tree.identify('column', event.x, event.y)
+        
+        # Check if clicking on Notes column and there's a valid item
+        if item and column == '#7':  # Notes column is the 7th column (0-indexed: #7)
+            # Select the clicked item first
+            self.bookmarks_tree.selection_set(item)
+            self.bookmarks_tree.focus(item)
+            
+            # Open the edit bookmark dialog
             self._edit_bookmark_dialog()
 
     def _add_bookmark_dialog(self) -> None:
