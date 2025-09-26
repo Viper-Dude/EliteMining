@@ -6816,7 +6816,7 @@ class ProspectorPanel(ttk.Frame):
         
         # Notes field
         ttk.Label(frame, text="Notes:").grid(row=5, column=0, sticky="nw", pady=(0, 5))
-        notes_text = tk.Text(frame, width=40, height=4)  # Reduced from 6 to 4
+        notes_text = tk.Text(frame, width=40, height=4, insertbackground="#ffffff")  # White cursor for visibility
         notes_text.grid(row=5, column=1, sticky="ew", pady=(0, 10))
         if bookmark_data:
             notes_text.insert("1.0", bookmark_data.get('notes', ''))
