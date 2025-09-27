@@ -18,6 +18,8 @@ from ring_finder import RingFinder
 from config import _load_cfg, _save_cfg, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry, load_cargo_window_position, save_cargo_window_position
 from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
 from update_checker import UpdateChecker
+from user_database import UserDatabase
+from journal_parser import JournalParser
 
 # --- Simple Tooltip class with global enable/disable ---
 class ToolTip:
@@ -326,7 +328,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "Elite Mining – Configuration"
-APP_VERSION = "v4.1.2"
+APP_VERSION = "v4.1.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1073,7 +1075,7 @@ class CargoMonitor:
     
     Both modes share the same underlying data and functionality.
     """
-    def __init__(self, update_callback=None, capacity_changed_callback=None):
+    def __init__(self, update_callback=None, capacity_changed_callback=None, app_dir=None):
         self.cargo_window = None
         self.cargo_label = None
         self.position = "upper_right"
@@ -1111,6 +1113,20 @@ class CargoMonitor:
         
         # Status.json file path for current ship data  
         self.status_json_path = os.path.join(self.journal_dir, "Status.json")
+        
+        # Initialize user database and journal parser for real-time hotspot tracking
+        if app_dir:
+            # Use provided app directory to construct database path
+            data_dir = os.path.join(app_dir, "data")
+            db_path = os.path.join(data_dir, "user_data.db")
+            print(f"DEBUG: CargoMonitor using explicit database path: {db_path}")
+            self.user_db = UserDatabase(db_path)
+        else:
+            # Fall back to default path resolution
+            print("DEBUG: CargoMonitor using default database path resolution")
+            self.user_db = UserDatabase()
+            print(f"DEBUG: CargoMonitor actual database path: {self.user_db.db_path}")
+        self.current_system = None  # Track current system for hotspot detection
         
         # Start journal monitoring regardless of window state
         self.start_journal_monitoring()
@@ -2271,6 +2287,98 @@ cargo panel forces Elite to write detailed inventory data.
                     if hasattr(self, 'status_label'):
                         self.status_label.configure(text=f"💰 Sold {count}x {item_name}")
                         
+            elif event_type in ["FSDJump", "Location", "CarrierJump"]:
+                # Track current system for hotspot detection
+                system_name = event.get("StarSystem", "")
+                print(f"DEBUG: Processing {event_type} event for system: {system_name}")
+                
+                if system_name:
+                    self.current_system = system_name
+                    
+                    # Also add to visited systems database
+                    timestamp = event.get("timestamp", "")
+                    system_address = event.get("SystemAddress")
+                    star_pos = event.get("StarPos", [])
+                    
+                    print(f"DEBUG: Event data - timestamp: {timestamp}, system_address: {system_address}, star_pos: {star_pos}")
+                    
+                    coordinates = None
+                    if len(star_pos) >= 3:
+                        coordinates = (star_pos[0], star_pos[1], star_pos[2])
+                        print(f"DEBUG: Parsed coordinates: {coordinates}")
+                    
+                    try:
+                        print(f"DEBUG: Attempting to add visited system: {system_name}")
+                        self.user_db.add_visited_system(
+                            system_name=system_name,
+                            visit_date=timestamp,
+                            system_address=system_address,
+                            coordinates=coordinates
+                        )
+                        print(f"DEBUG: Successfully added visited system: {system_name}")
+                    except Exception as e:
+                        print(f"Error adding visited system: {e}")
+                        print(f"DEBUG: Full error details - system: {system_name}, timestamp: {timestamp}, address: {system_address}, coords: {coordinates}")
+                else:
+                    print(f"DEBUG: No system name found in {event_type} event")
+                        
+            elif event_type == "SAASignalsFound":
+                # Process ring scans for hotspot data
+                try:
+                    body_name = event.get("BodyName", "")
+                    # Check if it's a ring body
+                    if body_name and " Ring" in body_name:
+                        signals = event.get("Signals", [])
+                        if signals:
+                            timestamp = event.get("timestamp", "")
+                            system_address = event.get("SystemAddress")
+                            body_id = event.get("BodyID")
+                            
+                            # Extract system name from ring body name if current_system not available
+                            system_name = self.current_system
+                            if not system_name:
+                                # Try to extract from ring name
+                                if " A Ring" in body_name or " B Ring" in body_name or " C Ring" in body_name:
+                                    # Pattern: "System Name X Y Ring" -> extract everything before the last part
+                                    parts = body_name.split()
+                                    if len(parts) >= 3:
+                                        system_name = " ".join(parts[:-2])  # Everything except "X Ring"
+                            
+                            if system_name:
+                                # Process each signal (all signals in rings are materials)
+                                for signal in signals:
+                                    signal_type = signal.get("Type", "")
+                                    count = signal.get("Count", 0)
+                                    
+                                    if signal_type and count > 0:
+                                        # Use Type_Localised if available, otherwise use Type
+                                        material_name = signal.get("Type_Localised", signal_type)
+                                        
+                                        try:
+                                            self.user_db.add_hotspot_data(
+                                                system_name=system_name,
+                                                body_name=body_name,
+                                                material_name=material_name,
+                                                hotspot_count=count,
+                                                scan_date=timestamp,
+                                                system_address=system_address,
+                                                body_id=body_id
+                                            )
+                                            
+                                            # Show notification in status (if available)
+                                            if hasattr(self, 'status_label'):
+                                                self.status_label.configure(
+                                                    text=f"🔍 Ring scan: {material_name} ({count}) in {body_name}"
+                                                )
+                                            
+                                            print(f"Added hotspot: {system_name} - {body_name} - {material_name} ({count})")
+                                            
+                                        except Exception as db_error:
+                                            print(f"Error adding hotspot data: {db_error}")
+                                            
+                except Exception as e:
+                    print(f"Error processing ring scan: {e}")
+                        
         except json.JSONDecodeError:
             pass  # Skip invalid JSON lines
         except Exception as e:
@@ -2950,6 +3058,14 @@ class App(tk.Tk):
         else:
             # Dev version - use local folder
             self.settings_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Ship Presets")
+            
+        # Initialize cargo monitor with correct app directory (after va_root is set)
+        app_dir = os.path.join(self.va_root, "app") if getattr(sys, 'frozen', False) else None
+        self.cargo_monitor = CargoMonitor(update_callback=self._on_cargo_changed, 
+                                        capacity_changed_callback=self._on_cargo_capacity_detected,
+                                        app_dir=app_dir)
+        # Set the main app reference so cargo monitor can access prospector panel later
+        self.cargo_monitor.main_app_ref = self
         os.makedirs(self.vars_dir, exist_ok=True)
         os.makedirs(self.settings_dir, exist_ok=True)
 
@@ -3028,12 +3144,6 @@ class App(tk.Tk):
         
         # Initialize text overlay for TTS announcements (before loading preferences)
         self.text_overlay = TextOverlay()
-        
-        # Initialize cargo monitor (before loading preferences) with callback
-        self.cargo_monitor = CargoMonitor(update_callback=self._on_cargo_changed, 
-                                        capacity_changed_callback=self._on_cargo_capacity_detected)
-        # Set the main app reference so cargo monitor can access prospector panel later
-        self.cargo_monitor.main_app_ref = self
         
         # Setup keyboard shortcuts
         self._setup_keyboard_shortcuts()
@@ -4047,6 +4157,64 @@ class App(tk.Tk):
         
         r += 1
         tk.Label(scrollable_frame, text="Default folder for selecting screenshots when adding them to reports", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+
+        # ========== EDSM API KEY SECTION ==========
+        ttk.Label(scrollable_frame, text="EDSM API Key", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        r += 1
+        
+        # Add separator line
+        separator_edsm = tk.Frame(scrollable_frame, height=1, bg="#444444")
+        separator_edsm.grid(row=r, column=0, sticky="ew", pady=(0, 8))
+        r += 1
+        
+        # EDSM signup instructions
+        instructions_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        instructions_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
+        
+        tk.Label(instructions_frame, text="1. Sign up at EDSM:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w")
+        
+        # EDSM link
+        import webbrowser
+        edsm_link = tk.Label(instructions_frame, text="https://www.edsm.net/", bg="#1e1e1e", fg="#4da6ff", font=("Segoe UI", 9, "underline"), cursor="hand2")
+        edsm_link.pack(anchor="w", padx=(15, 0))
+        edsm_link.bind("<Button-1>", lambda e: webbrowser.open("https://www.edsm.net/"))
+        
+        tk.Label(instructions_frame, text="2. Log in → Account settings → API key", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
+        tk.Label(instructions_frame, text="3. Paste the key here:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
+        
+        r += 1
+        
+        # EDSM API key input
+        api_key_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        api_key_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
+        
+        # Initialize EDSM API key variable
+        if not hasattr(self, 'edsm_api_key'):
+            self.edsm_api_key = tk.StringVar()
+            self.edsm_api_key.set(_load_cfg().get('edsm_api_key', ''))
+        
+        api_key_entry = tk.Entry(api_key_frame, textvariable=self.edsm_api_key, bg="#2d2d2d", fg="#ffffff", 
+                                font=("Consolas", 9), width=45, show="*")
+        api_key_entry.grid(row=0, column=0, padx=(0, 8))
+        
+        # Save button
+        def _save_api_key():
+            key = self.edsm_api_key.get().strip()
+            from config import update_config_value
+            update_config_value("edsm_api_key", key)
+            messagebox.showinfo("Saved", "EDSM API key saved successfully!")
+        
+        save_btn = tk.Button(api_key_frame, text="Save", command=_save_api_key,
+                            bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                            activeforeground="#ffffff", relief="ridge", bd=1, 
+                            font=("Segoe UI", 8, "normal"), cursor="hand2")
+        save_btn.grid(row=0, column=1)
+        
+        r += 1
+        tk.Label(scrollable_frame, text="Required for Ring Finder to search nearby systems for comprehensive results.", 
+                 wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -5882,7 +6050,10 @@ class App(tk.Tk):
     def _setup_ring_finder(self, parent_frame):
         """Setup the ring finder tab"""
         try:
-            self.ring_finder = RingFinder(parent_frame, self.prospector_panel)
+            # Pass the correct app directory to Ring Finder for proper database path
+            # Only use va_root path in installer mode, None in dev mode for consistent database location
+            app_dir = os.path.join(self.va_root, "app") if getattr(sys, 'frozen', False) and hasattr(self, 'va_root') and self.va_root else None
+            self.ring_finder = RingFinder(parent_frame, self.prospector_panel, app_dir)
         except Exception as e:
             print(f"Ring finder setup failed: {e}")
 
