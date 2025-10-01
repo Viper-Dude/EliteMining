@@ -8,7 +8,7 @@ import sqlite3
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
-from path_utils import get_app_data_dir
+from app_utils import get_app_data_dir
 
 log = logging.getLogger("EliteMining.UserDatabase")
 
@@ -419,3 +419,58 @@ class UserDatabase:
         except Exception as e:
             log.error(f"Error getting database stats: {e}")
             return {'total_hotspots': 0, 'unique_bodies': 0, 'visited_systems': 0}
+    
+    def _get_nearby_visited_systems(self, center_x: float, center_y: float, center_z: float, 
+                                   max_distance: float, exclude_system: str = "") -> List[Dict[str, Any]]:
+        """Get visited systems within specified distance from reference coordinates
+        
+        Args:
+            center_x, center_y, center_z: Reference coordinates 
+            max_distance: Maximum distance in light years
+            exclude_system: System name to exclude from results
+            
+        Returns:
+            List of systems with name, distance, and coordinates
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Query visited systems with coordinates
+                query = '''
+                    SELECT DISTINCT system_name, x_coord, y_coord, z_coord
+                    FROM visited_systems 
+                    WHERE x_coord IS NOT NULL AND y_coord IS NOT NULL AND z_coord IS NOT NULL
+                      AND system_name != ?
+                '''
+                
+                cursor.execute(query, (exclude_system,))
+                results = cursor.fetchall()
+                
+                nearby_systems = []
+                max_distance_squared = max_distance * max_distance
+                
+                for row in results:
+                    system_name, x, y, z = row
+                    
+                    # Calculate 3D distance
+                    dx = center_x - x
+                    dy = center_y - y  
+                    dz = center_z - z
+                    dist_squared = dx*dx + dy*dy + dz*dz
+                    
+                    if dist_squared <= max_distance_squared:
+                        distance = dist_squared ** 0.5
+                        nearby_systems.append({
+                            'name': system_name,
+                            'distance': distance,
+                            'coordinates': {'x': x, 'y': y, 'z': z}
+                        })
+                
+                # Sort by distance
+                nearby_systems.sort(key=lambda s: s['distance'])
+                return nearby_systems
+                
+        except Exception as e:
+            log.error(f"Error searching nearby visited systems: {e}")
+            return []

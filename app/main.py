@@ -1,9 +1,21 @@
 import os
+import sys
+import logging
+
+# Determine app directory for both PyInstaller and script execution
+if hasattr(sys, '_MEIPASS'):
+    app_dir = os.path.dirname(sys.executable)
+else:
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+
+log_path = os.path.join(app_dir, "debug_log.txt")
+logging.basicConfig(filename=log_path, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 import json
 import glob
 import re
 import shutil
 import datetime as dt
+import logging
 import logging
 from logging.handlers import RotatingFileHandler
 import tkinter as tk
@@ -20,6 +32,7 @@ from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
 from update_checker import UpdateChecker
 from user_database import UserDatabase
 from journal_parser import JournalParser
+from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir
 
 # --- Simple Tooltip class with global enable/disable ---
 class ToolTip:
@@ -368,55 +381,6 @@ from core.constants import (
 
 # -------------------- Config helpers (persist VA folder, window geometry, etc.) --------------------
 
-def get_app_icon_path() -> str:
-    """Get the path to the application icon, handling both development and compiled environments"""
-    # Try multiple approaches to find the icon
-    search_paths = []
-    
-    # Method 1: Use __file__ if available (development)
-    try:
-        if hasattr(sys, '_MEIPASS'):
-            # PyInstaller compiled executable
-            search_paths.append(sys._MEIPASS)
-        elif '__file__' in globals():
-            # Development environment
-            search_paths.append(os.path.dirname(os.path.abspath(__file__)))
-    except:
-        pass
-    
-    # Method 2: Current working directory
-    search_paths.append(os.getcwd())
-    
-    # Method 3: Directory containing the executable
-    try:
-        if getattr(sys, 'frozen', False):
-            search_paths.append(os.path.dirname(sys.executable))
-    except:
-        pass
-    
-    # Method 4: Hardcoded relative paths
-    search_paths.extend(['.', 'app', '..', '../app'])
-    
-    # Try each path with different icon names
-    icon_names = ['logo.ico', 'logo_multi.ico', 'logo.png']
-    
-    for base_path in search_paths:
-        for subdir in ['Images', 'images', 'img']:
-            for icon_name in icon_names:
-                icon_path = os.path.join(base_path, subdir, icon_name)
-                if os.path.exists(icon_path):
-                    return icon_path
-                    
-        # Also try directly in the base path
-        for icon_name in icon_names:
-            icon_path = os.path.join(base_path, icon_name)
-            if os.path.exists(icon_path):
-                return icon_path
-    
-    return None
-
-
-
 # -------------------- VA folder detection --------------------
 def detect_va_folder_interactive(parent: tk.Tk) -> Optional[str]:
     saved = load_saved_va_folder()
@@ -743,7 +707,7 @@ class RefineryDialog:
     
     def _check_and_trigger_csv_update(self, added_materials: dict):
         """Check if we should trigger CSV update when materials are added manually"""
-        import os
+    # import os removed (already imported globally)
         # Only trigger updates if we have a cargo monitor reference and it has the update function
         if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, '_update_csv_after_refinery_addition'):
             # Check if there are recent session files that might need updating
@@ -1120,6 +1084,8 @@ class CargoMonitor:
             data_dir = os.path.join(app_dir, "data")
             db_path = os.path.join(data_dir, "user_data.db")
             print(f"DEBUG: CargoMonitor using explicit database path: {db_path}")
+            # import os removed (already imported globally)
+            print(f"DEBUG: Current working directory: {os.getcwd()}")
             self.user_db = UserDatabase(db_path)
         else:
             # Fall back to default path resolution
@@ -1136,6 +1102,7 @@ class CargoMonitor:
         
         # Try to initialize cargo capacity from Status.json on startup
         self.refresh_ship_capacity()
+        logging.basicConfig(filename="debug_log.txt", level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
     
     def create_window(self):
         """Create the cargo monitor as a separate window (not overlay)"""
@@ -2729,7 +2696,7 @@ cargo panel forces Elite to write detailed inventory data.
         """Update the most recent session file and CSV row after manual materials are added"""
         try:
             import re
-            import os
+            # import os removed (already imported globally)
             
             # Check if we have access to the prospector panel
             if not hasattr(self, 'main_app_ref') or not hasattr(self.main_app_ref, 'prospector_panel'):
@@ -3687,7 +3654,7 @@ class App(tk.Tk):
         
         # --- EliteMining logo on the left ---
         try:
-            import os
+            # import os removed (already imported globally)
             import sys
             
             # Use consistent path detection like config.py
@@ -4120,6 +4087,13 @@ class App(tk.Tk):
                                font=("Segoe UI", 8, "normal"), cursor="hand2")
         journal_btn.pack(side="left", padx=(8, 0))
         ToolTip(journal_btn, "Select the Elite Dangerous Journal folder\nUsually located in: Documents\\Frontier Developments\\Elite Dangerous")
+        
+        import_btn = tk.Button(journal_frame, text="Import History", command=self._import_journal_history,
+                              bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                              activeforeground="#ffffff", relief="ridge", bd=1,
+                              font=("Segoe UI", 8, "normal"), cursor="hand2")
+        import_btn.pack(side="left", padx=(8, 0))
+        ToolTip(import_btn, "Import visited systems and hotspots from existing journal files")
         
         r += 1
         tk.Label(scrollable_frame, text="Path to Elite Dangerous journal files for prospector monitoring", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
@@ -5030,10 +5004,100 @@ class App(tk.Tk):
             self._set_status("Error changing stay on top setting")
 
     # ---------- Journal folder preference handling ----------
+    def _import_journal_history(self):
+        """Import journal history from existing journal files"""
+        try:
+            journal_dir = self.cargo_monitor.journal_dir
+            journal_files = glob.glob(os.path.join(journal_dir, "Journal.*.log"))
+            if not journal_files:
+                messagebox.showwarning("No Journal Files", "No journal files found in the selected folder.")
+                return
+                
+            progress = tk.Toplevel(self)
+            progress.title("Importing Journal History")
+            progress.geometry("400x200")
+            progress.resizable(False, False)
+            progress.configure(bg="#1e1e1e")
+            progress.transient(self)
+            progress.grab_set()
+            
+            # Position relative to main window
+            self.update_idletasks()
+            x = self.winfo_x() + (self.winfo_width() // 2) - 200
+            y = self.winfo_y() + (self.winfo_height() // 2) - 100
+            progress.geometry(f"400x200+{x}+{y}")
+            
+            # Set icon using centralized utility
+            set_window_icon(progress)
+            
+            tk.Label(progress, text="Processing journal files...", bg="#1e1e1e", fg="#ffffff").pack(pady=20)
+            progress_var = tk.StringVar(value="Starting...")
+            progress_label = tk.Label(progress, textvariable=progress_var, bg="#1e1e1e", fg="#cccccc")
+            progress_label.pack(pady=10)
+            
+            def process_files():
+                systems_added = 0
+                hotspots_added = 0
+                
+                for i, journal_file in enumerate(journal_files):
+                    progress_var.set(f"Processing {os.path.basename(journal_file)} ({i+1}/{len(journal_files)})")
+                    progress.update()
+                    
+                    try:
+                        with open(journal_file, 'r', encoding='utf-8') as f:
+                            for line in f:
+                                try:
+                                    event = json.loads(line.strip())
+                                    event_type = event.get("event", "")
+                                    
+                                    if event_type in ["FSDJump", "Location", "CarrierJump"]:
+                                        system_name = event.get("StarSystem", "")
+                                        if system_name:
+                                            star_pos = event.get("StarPos", [])
+                                            coordinates = (star_pos[0], star_pos[1], star_pos[2]) if len(star_pos) >= 3 else None
+                                            self.cargo_monitor.user_db.add_visited_system(
+                                                system_name=system_name,
+                                                visit_date=event.get("timestamp", ""),
+                                                system_address=event.get("SystemAddress"),
+                                                coordinates=coordinates
+                                            )
+                                            systems_added += 1
+                                            
+                                    elif event_type == "SAASignalsFound":
+                                        body_name = event.get("BodyName", "")
+                                        if body_name and " Ring" in body_name:
+                                            system_name = event.get("StarSystem", "")
+                                            for signal in event.get("Signals", []):
+                                                material_name = signal.get("Type_Localised", signal.get("Type", ""))
+                                                count = signal.get("Count", 0)
+                                                if material_name and count > 0:
+                                                    self.cargo_monitor.user_db.add_hotspot_data(
+                                                        system_name=system_name or body_name.split()[0],
+                                                        body_name=body_name,
+                                                        material_name=material_name,
+                                                        hotspot_count=count,
+                                                        scan_date=event.get("timestamp", ""),
+                                                        system_address=event.get("SystemAddress"),
+                                                        body_id=event.get("BodyID")
+                                                    )
+                                                    hotspots_added += 1
+                                except json.JSONDecodeError:
+                                    continue
+                    except Exception:
+                        continue
+                        
+                progress.destroy()
+                messagebox.showinfo("Import Complete", f"Successfully imported:\n• {systems_added} visited systems\n• {hotspots_added} hotspots")
+                
+            threading.Thread(target=process_files, daemon=True).start()
+            
+        except Exception as e:
+            messagebox.showerror("Import Error", f"Error importing journal history: {e}")
+    
     def _change_journal_dir(self) -> None:
         """Change the Elite Dangerous journal folder"""
         from tkinter import filedialog
-        import os
+    # import os removed (already imported globally)
         
         # Get current directory from prospector panel if available
         current_dir = None
@@ -6024,28 +6088,12 @@ class App(tk.Tk):
             messagebox.showerror("Restore Failed", f"Failed to restore from backup: {str(e)}")
 
     def _get_app_icon_path(self) -> Optional[str]:
-        """Get the app icon path for dialogs"""
-        try:
-            app_dir = os.path.dirname(os.path.abspath(__file__))
-            # Look for icon files in the parent directory
-            possible_icons = ["logo.ico", "logo_multi.ico"]
-            for icon_name in possible_icons:
-                icon_path = os.path.join(os.path.dirname(app_dir), icon_name)
-                if os.path.exists(icon_path):
-                    return icon_path
-            return None
-        except Exception:
-            return None
+        """Get the app icon path for dialogs - uses centralized app utilities"""
+        return get_app_icon_path()
 
     def _get_app_data_dir(self) -> str:
-        """Get the application data directory, handling both development and compiled modes"""
-        if getattr(sys, 'frozen', False):
-            # Running as compiled executable
-            exe_dir = os.path.dirname(sys.executable)
-            return os.path.join(os.path.dirname(exe_dir), 'app')
-        else:
-            # Running in development mode
-            return os.path.dirname(os.path.abspath(__file__))
+        """Get the application data directory - uses centralized app utilities"""
+        return get_app_data_dir()
 
     def _setup_ring_finder(self, parent_frame):
         """Setup the ring finder tab"""

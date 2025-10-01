@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.1.2
+AppVersion=v4.1.3
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetVAPath}
 AppendDefaultDirName=no
@@ -27,6 +27,13 @@ Source: "app\Ship Presets\*";  DestDir: "{app}\Apps\EliteMining\app\Ship Presets
 
 ; New Configurator executable
 Source: "dist\Configurator.exe"; DestDir: "{app}\Apps\EliteMining\Configurator"; Flags: ignoreversion
+
+; Local systems database (~14 MB) - populated systems within the bubble for fast searches
+Source: "app\data\galaxy_systems.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "app\data\database_metadata.json"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
+
+; User database - preserve existing user data (hotspots, visited systems)
+Source: "app\data\user_data.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: onlyifdoesntexist skipifsourcedoesntexist
 
 ; Documentation, variables, profile
 Source: "Doc\*"; DestDir: "{app}\Apps\EliteMining\Doc"; Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
