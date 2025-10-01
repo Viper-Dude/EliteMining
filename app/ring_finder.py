@@ -101,6 +101,7 @@ class RingFinder:
         self.prospector_panel = prospector_panel  # Reference to get current system
         self.systems_data = {}  # System coordinates cache
         self.current_system_coords = None
+        self.app_dir = app_dir  # Store app_dir for galaxy database access
         # Initialize local database manager
         self.local_db = LocalSystemsDatabase()
         # Initialize user database for hotspot data with correct app directory
@@ -1742,7 +1743,7 @@ class RingFinder:
             from pathlib import Path
             
             # Use bundled galaxy database
-            script_dir = Path(__file__).parent
+            script_dir = Path(self.app_dir) if self.app_dir else Path(__file__).parent
             galaxy_db_path = script_dir / "data" / "galaxy_systems.db"
             
             if not galaxy_db_path.exists():
@@ -1768,7 +1769,7 @@ class RingFinder:
             from pathlib import Path
             
             # Use bundled galaxy database
-            script_dir = Path(__file__).parent
+            script_dir = Path(self.app_dir) if self.app_dir else Path(__file__).parent
             galaxy_db_path = script_dir / "data" / "galaxy_systems.db"
             
             if not galaxy_db_path.exists():
