@@ -200,6 +200,16 @@ class ReleaseBuilder:
                             arc_name = f"EliteMining/Doc/{file_path.relative_to(doc_dir)}"
                             zipf.write(file_path, arc_name)
                     print(f"✅ Added: EliteMining/Doc/ (directory)")
+                
+                # Add galaxy systems database if it exists
+                galaxy_db_path = self.project_root / "app" / "data" / "galaxy_systems.db"
+                if galaxy_db_path.exists():
+                    arc_name = "EliteMining/app/data/galaxy_systems.db"
+                    zipf.write(galaxy_db_path, arc_name)
+                    size_mb = galaxy_db_path.stat().st_size / 1024 / 1024
+                    print(f"✅ Added: EliteMining/app/data/galaxy_systems.db ({size_mb:.1f} MB)")
+                else:
+                    print("⚠️  Galaxy systems database not found - ZIP users may need to download separately")
             
             print(f"✅ ZIP package created successfully: {zip_path}")
             return True

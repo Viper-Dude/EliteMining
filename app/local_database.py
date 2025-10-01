@@ -35,7 +35,7 @@ class LocalSystemsDatabase:
             self.db_path = bundled_db_path
             self.cache_dir = bundled_db_path.parent
             self.is_bundled = True
-            print(f"✅ Using bundled galaxy database: {self.db_path}")
+            print(f"Using bundled galaxy database: {self.db_path}")
         else:
             # Fallback to old behavior for development/testing
             if cache_dir is None:
@@ -47,7 +47,7 @@ class LocalSystemsDatabase:
             self.cache_dir.mkdir(exist_ok=True)
             self.db_path = self.cache_dir / "systems.db"
             self.is_bundled = False
-            print(f"⚠️ No bundled database found, using cache: {self.db_path}")
+            print(f"No bundled database found, using cache: {self.db_path}")
             
         self.download_path = self.cache_dir / "systemsPopulated.json.gz"
         self.metadata_path = self.cache_dir / "database_metadata.json"

@@ -3901,7 +3901,7 @@ class ProspectorPanel(ttk.Frame):
         # Configure column widths - locked at startup size, no resizing allowed
         
         self.reports_tree_tab.column("date", width=105, stretch=False, anchor="w")
-        self.reports_tree_tab.column("system", width=220, stretch=False, anchor="w")
+        self.reports_tree_tab.column("system", width=260, stretch=False, anchor="w")
         self.reports_tree_tab.column("body", width=125, stretch=False, anchor="center")
         self.reports_tree_tab.column("duration", width=80, stretch=False, anchor="center")
         self.reports_tree_tab.column("tons", width=80, stretch=False, anchor="center")
