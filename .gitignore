@@ -85,6 +85,10 @@ app/data/EDSM/bodies7days.json
 app/data/EDSM/bodies7days.json.gz
 app/debug_log.txt
 
+# Large data folders and files
+app/data/Hotspots/
+app/data/All_Materials_Combined_ready_matched_cleaned_density_locale.xlsx
+
 # Personal notes
 notes.txt
 todo.txt
