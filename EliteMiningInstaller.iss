@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.1.4
+AppVersion=v4.1.5
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetVAPath}
 AppendDefaultDirName=no
@@ -38,11 +38,11 @@ Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\Apps\EliteMi
 ; Documentation, variables, profile
 Source: "Doc\*"; DestDir: "{app}\Apps\EliteMining\Doc"; Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
 Source: "Variables\*"; DestDir: "{app}\Apps\EliteMining\Variables"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist
-; Overwrites VoiceAttack profile only if installer file is newer (default Inno Setup behavior)
-Source: "EliteMining-Profile.vap"; DestDir: "{app}\Apps\EliteMining"; Flags: uninsneveruninstall skipifsourcedoesntexist
-; REMINDER: Change config.json back to "onlyifdoesntexist" for next version to preserve user settings
-; Current version overwrites only if installer file is newer (based on timestamp/version)
-Source: "app\config.json"; DestDir: "{app}\Apps\EliteMining"
+; v4.1.5+: Never overwrite VoiceAttack profile - preserves user modifications
+Source: "EliteMining-Profile.vap"; DestDir: "{app}\Apps\EliteMining"; Flags: uninsneveruninstall skipifsourcedoesntexist onlyifdoesntexist
+; v4.1.5+: Never overwrite config.json - preserves user settings
+; NOTE: Remove "onlyifdoesntexist" flag if critical config updates are needed in future versions
+Source: "app\config.json"; DestDir: "{app}\Apps\EliteMining"; Flags: onlyifdoesntexist
 Source: "app\mining_bookmarks.json"; DestDir: "{app}\Apps\EliteMining\app"; Flags: onlyifdoesntexist skipifsourcedoesntexist
 Source: "app\EliteVA\*"; DestDir: "{app}\Apps\EliteVA"; Flags: recursesubdirs createallsubdirs
 Source: "LICENSE.txt"; DestDir: "{app}\Apps\EliteMining"

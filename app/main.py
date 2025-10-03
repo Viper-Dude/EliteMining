@@ -348,7 +348,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "Elite Mining – Configuration"
-APP_VERSION = "v4.1.4"
+APP_VERSION = "v4.1.5"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")

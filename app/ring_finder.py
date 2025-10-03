@@ -749,7 +749,7 @@ class RingFinder:
             self.parent.after(0, self._show_error, error_msg)
         finally:
             # Re-enable search button
-            self.parent.after(0, lambda: self.search_btn.configure(state="normal", text="Ring Search"))
+            self.parent.after(0, lambda: self.search_btn.configure(state="normal", text="Search"))
     
     def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None) -> List[Dict]:
         """Get hotspot data using user database only - no EDSM dependencies"""
