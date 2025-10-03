@@ -137,6 +137,15 @@ def _clean_name(name: str) -> str:
         s = s.split("_")[-1]
     if s and s.lower().startswith("material content"):
         s = s[len("Material Content:"):].strip()
+    
+    # Normalize "Low Temp. Diamonds" to "Low Temperature Diamonds"
+    if s.lower() in ['low temp. diamonds', 'low temp diamonds']:
+        return "Low Temperature Diamonds"
+    
+    # Normalize "Opal" variants to "Void Opals"
+    if s.lower() in ['opal', 'void opal']:
+        return "Void Opals"
+    
     return s.title() if s else ""
 
 def _extract_material_name(m: Dict[str, Any]) -> str:
@@ -207,12 +216,13 @@ def _extract_location_display(full_body_name: str, body_type: str = "", station_
     
     # Priority 3: Asteroid rings (mining context)
     if body_type == "PlanetaryRing" or "Ring" in full_body_name:
-        # First try to match patterns like "B 1 A Ring" (planet + number + ring letter)
-        ring_match = re.search(r'([A-Za-z]\s+\d+\s+[A-Za-z]\s+Ring)$', full_body_name)
+        # First try to match patterns like "AB 2 B Ring" (planet letters + number + ring letter)
+        # Use [A-Z]+ to match one or more uppercase letters (A, B, AB, ABC, etc.)
+        ring_match = re.search(r'\b([A-Z]+\s+\d+\s+[A-Za-z]\s+Ring)$', full_body_name)
         if ring_match:
             return ring_match.group(1)
-        # Fallback for simpler patterns like "1 A Ring"  
-        ring_match = re.search(r'(\d+\s+[A-Za-z]\s+Ring)$', full_body_name)
+        # Fallback for simpler patterns like "2 A Ring" - match number at start
+        ring_match = re.search(r'\b(\d+\s+[A-Za-z]\s+Ring)$', full_body_name)
         if ring_match:
             return ring_match.group(1)
     
@@ -323,6 +333,7 @@ KNOWN_MATERIALS = [
     "Samarium",
     "Serendibite",
     "Silver",
+    "Tritium",
     "Uraninite",
     "Void Opals",
     "Water"
@@ -390,12 +401,21 @@ class ProspectorPanel(ttk.Frame):
         self.reports_window = None
         self.reports_tree = None
 
-        # Initialize bookmarks system
-        self.bookmarks_file = os.path.join(app_dir, "mining_bookmarks.json")
+        # Initialize bookmarks system - use centralized path utility
+        from path_utils import get_bookmarks_file
+        self.bookmarks_file = get_bookmarks_file()
         self.bookmarks_data = []
         self._load_bookmarks()
 
-        self.journal_dir = self._detect_journal_dir_default() or ""
+        # Load journal directory from config or detect default
+        from config import _load_cfg
+        cfg = _load_cfg()
+        saved_dir = cfg.get("journal_dir", None)
+        
+        if saved_dir and os.path.exists(saved_dir):
+            self.journal_dir = saved_dir
+        else:
+            self.journal_dir = self._detect_journal_dir_default() or ""
         
         # Status.json file path for real-time game state
         self.status_json_path = os.path.join(self.journal_dir, "Status.json")
@@ -413,6 +433,9 @@ class ProspectorPanel(ttk.Frame):
         
         # Track whether we're processing startup events or real-time events
         self.startup_processing: bool = True
+        
+        # Read initial location from journal on startup
+        self._read_initial_location_from_journal()
 
         # Prospector history view
         self.history: List[Tuple[str, str, str]] = []
@@ -442,6 +465,12 @@ class ProspectorPanel(ttk.Frame):
 
         # UI
         self._build_ui()
+        
+        # Update location display with any data found during journal scan
+        if self.last_system or self.last_body:
+            self._update_location_display()
+            print(f"[STARTUP] UI updated - System: '{self.session_system.get()}', Body: '{self.session_body.get()}'")
+        
         # Load last settings after UI is built
         self._load_last_material_settings()
         # Force announce_map to UI after build
@@ -598,6 +627,11 @@ class ProspectorPanel(ttk.Frame):
     
     def _update_location_display(self) -> None:
         """Update the location display with current context"""
+        # Update system field if we have one and it's empty
+        if self.last_system and not self.session_system.get():
+            self.session_system.set(self.last_system)
+        
+        # Update body field
         body_display = _extract_location_display(
             self.last_body or "", 
             self.last_body_type, 
@@ -613,6 +647,84 @@ class ProspectorPanel(ttk.Frame):
         # If Status.json doesn't provide clear location info, the journal data might be stale
         # Force an update to show what we currently think the location is
         self._update_location_display()
+    
+    def _read_initial_location_from_journal(self) -> None:
+        """Read the most recent journal file to populate initial system/body location on startup"""
+        if not self.journal_dir or not os.path.isdir(self.journal_dir):
+            return
+        
+        try:
+            # Find the most recent journal file
+            journal_files = [f for f in os.listdir(self.journal_dir) if f.startswith("Journal.") and f.endswith(".log")]
+            if not journal_files:
+                return
+            
+            # Sort by filename (date/time in name) to get most recent
+            journal_files.sort(reverse=True)
+            latest_journal = os.path.join(self.journal_dir, journal_files[0])
+            
+            # Read journal backwards to find most recent Location or FSDJump event
+            with open(latest_journal, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # Process from end to beginning to find most recent location
+            for line in reversed(lines[-500:]):  # Check last 500 lines (~1-2 hours of gameplay)
+                try:
+                    entry = json.loads(line.strip())
+                    event_type = entry.get("event", "")
+                    
+                    # Found location - extract system and body
+                    if event_type == "Location":
+                        self.last_system = entry.get("StarSystem", "")
+                        body_name = entry.get("Body", "")
+                        body_type = entry.get("BodyType", "")
+                        
+                        if body_name:
+                            self.last_body = body_name
+                            self.last_body_type = body_type
+                        
+                        # Stop after finding location
+                        break
+                    
+                    elif event_type == "SupercruiseExit":
+                        # Dropped from supercruise - this has body info!
+                        self.last_system = entry.get("StarSystem", "")
+                        body_name = entry.get("Body", "")
+                        body_type = entry.get("BodyType", "")
+                        
+                        if body_name:
+                            self.last_body = body_name
+                            self.last_body_type = body_type
+                        
+                        # Stop after finding supercruise exit
+                        break
+                    
+                    elif event_type == "FSDJump":
+                        self.last_system = entry.get("StarSystem", "")
+                        # After jump, we don't know the body yet
+                        break
+                    
+                    elif event_type == "SupercruiseEntry":
+                        # Just entered supercruise - clear body info
+                        system = entry.get("StarSystem", "")
+                        if system:
+                            self.last_system = system
+                        break
+                        
+                except (json.JSONDecodeError, KeyError):
+                    continue
+            
+            # If we found system/body, save them (UI widgets don't exist yet)
+            if self.last_system:
+                print(f"[STARTUP] Found system from journal: {self.last_system}")
+                if self.last_body:
+                    print(f"[STARTUP] Found body from journal: {self.last_body} (type: {self.last_body_type})")
+                else:
+                    print(f"[STARTUP] No body found in journal")
+                # Note: UI will be updated later when widgets are created
+                    
+        except Exception as e:
+            print(f"Error reading initial location from journal: {e}")
 
     def _load_min_pct_map(self) -> Dict[str, float]:
         cfg = self._load_cfg()
@@ -734,8 +846,20 @@ class ProspectorPanel(ttk.Frame):
         if not data:
             messagebox.showinfo(f"Load Preset {num}", f"No Preset {num} saved yet.")
             return
-        self.announce_map = data.get('announce_map', {}).copy()
-        self.min_pct_map = data.get('min_pct_map', {}).copy()
+        
+        # Merge preset data with current materials to preserve new materials
+        preset_announce = data.get('announce_map', {})
+        preset_minpct = data.get('min_pct_map', {})
+        
+        # Keep existing values for materials in KNOWN_MATERIALS but not in preset
+        for material in KNOWN_MATERIALS:
+            if material not in preset_announce:
+                preset_announce[material] = self.announce_map.get(material, True)
+            if material not in preset_minpct:
+                preset_minpct[material] = self.min_pct_map.get(material, 20.0)
+        
+        self.announce_map = preset_announce
+        self.min_pct_map = preset_minpct
         self.threshold.set(data.get('announce_threshold', 20.0))
         
         # Load Core/Non-Core asteroid settings from announcement presets
@@ -2062,6 +2186,12 @@ class ProspectorPanel(ttk.Frame):
                     context_menu.add_command(label=wrap_text, command=toggle_word_wrap)
                     context_menu.add_separator()
                     
+                    # Add Refinery Contents option (only for single selection)
+                    if len(selected_items) == 1:
+                        context_menu.add_command(label="⚗️ Add Refinery Contents", 
+                                               command=lambda: self._add_refinery_to_session_from_menu(tree, selected_items[0]))
+                        context_menu.add_separator()
+                    
                     # Update label based on selection count
                     if len(selected_items) == 1:
                         context_menu.add_command(label="🗑️Delete Detailed Report + Screenshots", 
@@ -2907,7 +3037,12 @@ class ProspectorPanel(ttk.Frame):
             self.journal_lbl.config(text=sel)
             self._jrnl_path = None
             self._jrnl_pos = 0
-            self._set_status("Journal folder updated.")
+            
+            # Save to config.json so it persists across restarts
+            from config import update_config_value
+            update_config_value("journal_dir", sel)
+            
+            self._set_status("Journal folder updated and saved.")
 
     def _on_enabled_changed(self) -> None:
         try:
@@ -5016,7 +5151,12 @@ class ProspectorPanel(ttk.Frame):
             return
         if self._jrnl_path != latest:
             self._jrnl_path = latest
-            self._jrnl_pos = 0
+            # Skip to end of file to avoid reading old events
+            try:
+                file_size = os.path.getsize(latest)
+                self._jrnl_pos = file_size  # Start at end, not 0!
+            except Exception:
+                self._jrnl_pos = 0
             self._last_mtime = current_mtime
             self._last_size = current_size
         elif (current_mtime <= self._last_mtime and current_size <= self._last_size):
@@ -5038,7 +5178,7 @@ class ProspectorPanel(ttk.Frame):
                 self._jrnl_pos = 0
 
             with open(self._jrnl_path, "r", encoding="utf-8") as f:
-                if self._jrnl_pos:
+                if self._jrnl_pos > 0:  # Explicit comparison, not truthiness
                     f.seek(self._jrnl_pos)
                 new_data = f.read()
                 if not new_data:
@@ -5338,10 +5478,18 @@ class ProspectorPanel(ttk.Frame):
                         
                         if non_core_materials:
                             # Reorder the materials (percentage first, then material name)
-                            reordered_materials = [
-                                " ".join([p.split()[1], p.split()[0]]) if len(p.split()) >= 2 and not p.startswith("Motherlode:") else p
-                                for p in non_core_materials
-                            ]
+                            # Handle multi-word material names by splitting at the LAST space (percentage is always last word)
+                            reordered_materials = []
+                            for p in non_core_materials:
+                                if p.startswith("Motherlode:"):
+                                    reordered_materials.append(p)
+                                else:
+                                    parts = p.rsplit(' ', 1)  # Split at last space only
+                                    if len(parts) == 2:
+                                        # Swap: "Material Name 18.7%" -> "18.7% Material Name"
+                                        reordered_materials.append(f"{parts[1]} {parts[0]}")
+                                    else:
+                                        reordered_materials.append(p)
                             
                             # Join materials with "and" before the last item
                             if len(reordered_materials) == 1:
@@ -7319,11 +7467,20 @@ class ProspectorPanel(ttk.Frame):
             
             # Find most collected material
             if stats['material_totals']:
-                most_material = max(stats['material_totals'].items(), key=lambda x: x[1])
-                stats['most_collected_material'] = most_material[0]
-                stats['most_collected_material_amount'] = most_material[1]
-                # Add material count
-                stats['material_count'] = len(stats['material_totals'])
+                # Filter out summary entries like "Total Cargo Collected"
+                actual_materials = {k: v for k, v in stats['material_totals'].items() 
+                                  if k.lower() not in ['total cargo collected', 'total', 'cargo collected']}
+                
+                if actual_materials:
+                    most_material = max(actual_materials.items(), key=lambda x: x[1])
+                    stats['most_collected_material'] = most_material[0]
+                    stats['most_collected_material_amount'] = most_material[1]
+                else:
+                    stats['most_collected_material'] = 'None'
+                    stats['most_collected_material_amount'] = 0
+                
+                # Add material count (only actual materials)
+                stats['material_count'] = len(actual_materials)
             else:
                 stats['material_count'] = 0
             
@@ -8708,6 +8865,114 @@ class ProspectorPanel(ttk.Frame):
                 return None
         
         return enhanced_click_handler
+    
+    def _add_refinery_to_session_from_menu(self, tree, item):
+        """Add refinery contents to a completed session from the Reports tab context menu"""
+        try:
+            # Get session data from tree
+            values = tree.item(item, 'values')
+            if not values:
+                messagebox.showwarning("No Selection", "Please select a report first.")
+                return
+            
+            # Extract session info
+            display_date = values[0]  # Date/Time column
+            system = values[2] if len(values) > 2 else ''  # System column
+            body = values[3] if len(values) > 3 else ''    # Body column
+            
+            # Parse cargo data from column 10 (cargo column)
+            cargo_raw = values[10] if len(values) > 10 else ''
+            current_cargo_items = {}
+            
+            # Parse cargo string (format: "Material: X tons; Material2: Y tons")
+            if cargo_raw:
+                cargo_parts = cargo_raw.split(';')
+                for part in cargo_parts:
+                    part = part.strip()
+                    if ':' in part:
+                        material_part, quantity_part = part.rsplit(':', 1)
+                        material = material_part.strip()
+                        try:
+                            # Extract numeric value from "X tons"
+                            quantity = float(quantity_part.strip().split()[0])
+                            current_cargo_items[material] = quantity
+                        except (ValueError, IndexError):
+                            pass
+            
+            # Open Refinery Dialog
+            from main import RefineryDialog
+            # Get the top-level window as parent
+            parent_window = self.winfo_toplevel()
+            dialog = RefineryDialog(
+                parent=parent_window,
+                cargo_monitor=self.main_app.cargo_monitor,
+                current_cargo_items=current_cargo_items
+            )
+            refinery_result = dialog.show()
+            
+            if refinery_result:  # User added refinery contents
+                # Calculate totals
+                cargo_total = sum(current_cargo_items.values())
+                refinery_total = sum(refinery_result.values())
+                new_total = cargo_total + refinery_total
+                
+                # Update the session file with refinery contents
+                report_id = f"{display_date}_{system}_{body}"
+                session_filename = f"Session_{report_id}.txt"
+                session_path = os.path.join(self.reports_dir, session_filename)
+                
+                if os.path.exists(session_path):
+                    # Read existing session file
+                    with open(session_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Update cargo total line
+                    import re
+                    content = re.sub(
+                        r'Total Cargo:.*',
+                        f'Total Cargo: {new_total:.1f} tons (includes {refinery_total:.1f} tons from refinery)',
+                        content
+                    )
+                    
+                    # Add refinery section before the cargo breakdown
+                    refinery_section = "\n⚗️ Refinery Contents Added:\n"
+                    for material, quantity in sorted(refinery_result.items()):
+                        refinery_section += f"  {material}: {quantity:.1f} tons\n"
+                    refinery_section += "\n"
+                    
+                    # Insert refinery section before "Cargo Breakdown:"
+                    if "Cargo Breakdown:" in content:
+                        content = content.replace("Cargo Breakdown:", refinery_section + "Cargo Breakdown:")
+                    else:
+                        # If no cargo breakdown section, add at end
+                        content += refinery_section
+                    
+                    # Write updated content
+                    with open(session_path, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    
+                    # Rebuild CSV to reflect changes
+                    csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
+                    self._rebuild_csv_from_files_tab(csv_path)
+                    
+                    messagebox.showinfo(
+                        "Refinery Contents Added",
+                        f"Added {refinery_total:.1f} tons from refinery to session.\n\n"
+                        f"New total: {new_total:.1f} tons\n\n"
+                        f"Session file and CSV index have been updated."
+                    )
+                else:
+                    messagebox.showerror(
+                        "Session Not Found",
+                        f"Could not find session file:\n{session_filename}\n\n"
+                        f"The session may have been moved or deleted."
+                    )
+                    
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add refinery contents:\n{str(e)}")
+            print(f"Error adding refinery to session: {e}")
+            import traceback
+            traceback.print_exc()
             
     def _generate_enhanced_report_from_menu(self, tree):
         """Generate detailed HTML report for selected report from context menu"""

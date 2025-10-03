@@ -2,14 +2,20 @@ import os
 import sys
 import logging
 
+# Initialize logging for installer version (per-session logs with auto-cleanup)
+from logging_setup import setup_logging
+log_file = setup_logging()  # Only activates when running as packaged executable
+if log_file:
+    print(f"✓ Logging enabled: {log_file}")
+
 # Determine app directory for both PyInstaller and script execution
 if hasattr(sys, '_MEIPASS'):
     app_dir = os.path.dirname(sys.executable)
 else:
     app_dir = os.path.dirname(os.path.abspath(__file__))
 
+# Legacy debug log (kept for compatibility, but logging_setup.py is now primary)
 log_path = os.path.join(app_dir, "debug_log.txt")
-logging.basicConfig(filename=log_path, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 import json
 import glob
 import re
@@ -33,6 +39,7 @@ from update_checker import UpdateChecker
 from user_database import UserDatabase
 from journal_parser import JournalParser
 from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir
+from path_utils import get_ship_presets_dir, get_reports_dir
 
 # --- Simple Tooltip class with global enable/disable ---
 class ToolTip:
@@ -341,7 +348,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "Elite Mining – Configuration"
-APP_VERSION = "v4.1.3"
+APP_VERSION = "v4.1.4"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -559,7 +566,7 @@ class RefineryDialog:
                     mat_label.pack(side="left")
                     
                     # Quick add buttons
-                    for amount in [5, 10, 15]:
+                    for amount in [1, 4, 6, 8, 10]:
                         if amount <= quantity:  # Only show realistic amounts
                             btn = tk.Button(material_frame, text=f"+{amount}t", 
                                           command=lambda m=material, a=amount: self._quick_add_material(m, a),
@@ -1062,8 +1069,15 @@ class CargoMonitor:
         self.last_journal_file = None
         self.last_file_size = 0
         
-        # Elite Dangerous journal directory
-        self.journal_dir = os.path.expanduser("~\\Saved Games\\Frontier Developments\\Elite Dangerous")
+        # Elite Dangerous journal directory - load from config or use default
+        cfg = _load_cfg()
+        saved_dir = cfg.get("journal_dir", None)
+        default_dir = os.path.expanduser("~\\Saved Games\\Frontier Developments\\Elite Dangerous")
+        
+        if saved_dir and os.path.exists(saved_dir):
+            self.journal_dir = saved_dir
+        else:
+            self.journal_dir = default_dir
         
         # Cargo.json file path for detailed cargo data
         self.cargo_json_path = os.path.join(self.journal_dir, "Cargo.json")
@@ -1093,6 +1107,9 @@ class CargoMonitor:
             self.user_db = UserDatabase()
             print(f"DEBUG: CargoMonitor actual database path: {self.user_db.db_path}")
         self.current_system = None  # Track current system for hotspot detection
+        
+        # Initialize JournalParser for proper Scan and SAASignalsFound processing
+        self.journal_parser = JournalParser(self.journal_dir, self.user_db)
         
         # Start journal monitoring regardless of window state
         self.start_journal_monitoring()
@@ -2289,62 +2306,25 @@ cargo panel forces Elite to write detailed inventory data.
                 else:
                     print(f"DEBUG: No system name found in {event_type} event")
                         
+            elif event_type == "Scan":
+                # Process Scan events through JournalParser to store ring info
+                self.journal_parser.process_scan(event)
+                        
             elif event_type == "SAASignalsFound":
-                # Process ring scans for hotspot data
-                try:
-                    body_name = event.get("BodyName", "")
-                    # Check if it's a ring body
-                    if body_name and " Ring" in body_name:
-                        signals = event.get("Signals", [])
-                        if signals:
-                            timestamp = event.get("timestamp", "")
-                            system_address = event.get("SystemAddress")
-                            body_id = event.get("BodyID")
-                            
-                            # Extract system name from ring body name if current_system not available
-                            system_name = self.current_system
-                            if not system_name:
-                                # Try to extract from ring name
-                                if " A Ring" in body_name or " B Ring" in body_name or " C Ring" in body_name:
-                                    # Pattern: "System Name X Y Ring" -> extract everything before the last part
-                                    parts = body_name.split()
-                                    if len(parts) >= 3:
-                                        system_name = " ".join(parts[:-2])  # Everything except "X Ring"
-                            
-                            if system_name:
-                                # Process each signal (all signals in rings are materials)
-                                for signal in signals:
-                                    signal_type = signal.get("Type", "")
-                                    count = signal.get("Count", 0)
-                                    
-                                    if signal_type and count > 0:
-                                        # Use Type_Localised if available, otherwise use Type
-                                        material_name = signal.get("Type_Localised", signal_type)
-                                        
-                                        try:
-                                            self.user_db.add_hotspot_data(
-                                                system_name=system_name,
-                                                body_name=body_name,
-                                                material_name=material_name,
-                                                hotspot_count=count,
-                                                scan_date=timestamp,
-                                                system_address=system_address,
-                                                body_id=body_id
-                                            )
-                                            
-                                            # Show notification in status (if available)
-                                            if hasattr(self, 'status_label'):
-                                                self.status_label.configure(
-                                                    text=f"🔍 Ring scan: {material_name} ({count}) in {body_name}"
-                                                )
-                                            
-                                            print(f"Added hotspot: {system_name} - {body_name} - {material_name} ({count})")
-                                            
-                                        except Exception as db_error:
-                                            print(f"Error adding hotspot data: {db_error}")
-                                            
-                except Exception as e:
-                    print(f"Error processing ring scan: {e}")
+                # Process ring scans through JournalParser for complete hotspot data with ring info
+                self.journal_parser.process_saa_signals_found(event, self.current_system)
+                
+                # Show notification in status (if available)
+                body_name = event.get("BodyName", "")
+                if hasattr(self, 'status_label') and body_name:
+                    signals = event.get("Signals", [])
+                    if signals:
+                        first_signal = signals[0]
+                        material_name = first_signal.get("Type_Localised", first_signal.get("Type", ""))
+                        count = first_signal.get("Count", 0)
+                        self.status_label.configure(
+                            text=f"🔍 Ring scan: {material_name} ({count}) in {body_name}"
+                        )
                         
         except json.JSONDecodeError:
             pass  # Skip invalid JSON lines
@@ -2525,6 +2505,8 @@ cargo panel forces Elite to write detailed inventory data.
         # Clear refinery contents for new session AFTER preserving them
         self.refinery_contents = {}
         
+        print(f"[SESSION] Started mining session - Cargo: {self.current_cargo}/{self.max_cargo}t, Prospectors: {self._get_prospector_count()}")
+        
         return self.session_start_snapshot
     
     def _validate_cargo_capacity(self):
@@ -2588,6 +2570,11 @@ cargo panel forces Elite to write detailed inventory data.
             'total_tons_mined': sum(materials_mined.values()),
             'session_duration': end_snapshot['timestamp'] - self.session_start_snapshot['timestamp']
         }
+        
+        # Log session end
+        duration_mins = session_data['session_duration'] / 60
+        print(f"[SESSION] Ended mining session - Duration: {duration_mins:.1f}min, Mined: {session_data['total_tons_mined']:.1f}t, "
+              f"Prospectors used: {prospectors_used}, Materials: {len(materials_mined)}")
         
         # Clear the session tracking
         self.session_start_snapshot = None
@@ -3018,13 +3005,10 @@ class App(tk.Tk):
             self.destroy()
             return
         self.vars_dir = os.path.join(self.va_root, "Variables")
-        # For dev version, use local settings directory instead of VA folder
-        if getattr(sys, 'frozen', False):
-            # Installer version - use VA folder
-            self.settings_dir = os.path.join(self.va_root, "app", "Ship Presets")
-        else:
-            # Dev version - use local folder
-            self.settings_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Ship Presets")
+        
+        # Use centralized path utility for Ship Presets - ensures consistency
+        # This prevents writing to wrong folder in installer vs dev mode
+        self.settings_dir = get_ship_presets_dir()
             
         # Initialize cargo monitor with correct app directory (after va_root is set)
         app_dir = os.path.join(self.va_root, "app") if getattr(sys, 'frozen', False) else None
@@ -3075,6 +3059,11 @@ class App(tk.Tk):
         self.stay_on_top = tk.IntVar(value=0)  # Default disabled
         self._load_stay_on_top_preference()
         self.stay_on_top.trace('w', self._on_stay_on_top_toggle)
+        
+        # Auto-scan journals on startup
+        self.auto_scan_journals = tk.IntVar(value=1)  # Default enabled
+        self._load_auto_scan_preference()
+        self.auto_scan_journals.trace('w', self._on_auto_scan_toggle)
         
         # Text overlay enable/disable, transparency, and color
         self.text_overlay_enabled = tk.IntVar(value=0)  # Default disabled
@@ -3157,6 +3146,9 @@ class App(tk.Tk):
         
         # Check for updates after UI is ready (automatic check once per day)
         self.after(1000, self._check_for_updates_startup)  # Check after 1 second
+        
+        # Auto-scan new journal entries after startup
+        self.after(2000, self._auto_scan_journals_startup)  # Check after 2 seconds
 
     def _setup_keyboard_shortcuts(self):
         """Setup keyboard shortcuts for the application"""
@@ -3190,15 +3182,15 @@ class App(tk.Tk):
         self._build_comprehensive_dashboard(dashboard_tab)
         self.notebook.add(dashboard_tab, text="Dashboard")
 
-        # Interface Options tab
+        # Settings tab
         interface_tab = ttk.Frame(self.notebook, padding=8)
         self._build_interface_options_tab(interface_tab)
-        self.notebook.add(interface_tab, text="Interface Options")
+        self.notebook.add(interface_tab, text="Settings")
 
-        # Ring Finder tab
+        # Hotspots Finder tab
         ring_finder_tab = ttk.Frame(self.notebook, padding=8)
         self._setup_ring_finder(ring_finder_tab)
-        self.notebook.add(ring_finder_tab, text="Ring Finder")
+        self.notebook.add(ring_finder_tab, text="Hotspots Finder")
 
         # Actions row (global)
         actions = ttk.Frame(content_frame)
@@ -3560,7 +3552,7 @@ class App(tk.Tk):
 
         tips = [
             "For core mining, Set Pulse Wave Analyser and Prospector Limpet to the same firegroup with different Fire Buttons.",
-            "Set your collector limpets to the same firegroup as your mining lasers.",
+            "Set your collector limpets to the same firegroup as your mining lasers and MVR.",
         ]
         r = 1
         for tip in tips:
@@ -4063,8 +4055,8 @@ class App(tk.Tk):
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
-        # ========== JOURNAL FOLDER SECTION ==========
-        ttk.Label(scrollable_frame, text="Journal Folder", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        # ========== JOURNAL FILES SECTION ==========
+        ttk.Label(scrollable_frame, text="Journal Files", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -4097,6 +4089,38 @@ class App(tk.Tk):
         
         r += 1
         tk.Label(scrollable_frame, text="Path to Elite Dangerous journal files for prospector monitoring", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+        
+        # Import prompt preference checkbox
+        self.ask_import_on_path_change = tk.IntVar()
+        import_prompt_check = tk.Checkbutton(
+            scrollable_frame,
+            text="Ask to import history when changing journal folder",
+            variable=self.ask_import_on_path_change,
+            command=self._save_import_prompt_preference,
+            bg="#1e1e1e",
+            fg="#ffffff",
+            selectcolor="#34495e",
+            activebackground="#1e1e1e",
+            activeforeground="#ffffff",
+            font=("Segoe UI", 9)
+        )
+        import_prompt_check.grid(row=r, column=0, sticky="w", pady=(0, 4))
+        
+        # Load preference
+        cfg = _load_cfg()
+        self.ask_import_on_path_change.set(1 if cfg.get("ask_import_on_path_change", True) else 0)
+        r += 1
+        
+        # Auto-scan journals on startup checkbox
+        tk.Checkbutton(scrollable_frame, text="Auto-scan Journals on Startup", variable=self.auto_scan_journals, 
+                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
+                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+        r += 1
+        tk.Label(scrollable_frame, text="Automatically check for new mining data in Elite Dangerous journals when the app starts. Disable if you prefer manual imports via Settings → Import History", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -4134,63 +4158,63 @@ class App(tk.Tk):
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
-        # ========== EDSM API KEY SECTION ==========
-        ttk.Label(scrollable_frame, text="EDSM API Key", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
-        r += 1
-        
-        # Add separator line
-        separator_edsm = tk.Frame(scrollable_frame, height=1, bg="#444444")
-        separator_edsm.grid(row=r, column=0, sticky="ew", pady=(0, 8))
-        r += 1
-        
-        # EDSM signup instructions
-        instructions_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
-        instructions_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        
-        tk.Label(instructions_frame, text="1. Sign up at EDSM:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w")
-        
-        # EDSM link
-        import webbrowser
-        edsm_link = tk.Label(instructions_frame, text="https://www.edsm.net/", bg="#1e1e1e", fg="#4da6ff", font=("Segoe UI", 9, "underline"), cursor="hand2")
-        edsm_link.pack(anchor="w", padx=(15, 0))
-        edsm_link.bind("<Button-1>", lambda e: webbrowser.open("https://www.edsm.net/"))
-        
-        tk.Label(instructions_frame, text="2. Log in → Account settings → API key", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
-        tk.Label(instructions_frame, text="3. Paste the key here:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
-        
-        r += 1
-        
-        # EDSM API key input
-        api_key_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
-        api_key_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        
-        # Initialize EDSM API key variable
-        if not hasattr(self, 'edsm_api_key'):
-            self.edsm_api_key = tk.StringVar()
-            self.edsm_api_key.set(_load_cfg().get('edsm_api_key', ''))
-        
-        api_key_entry = tk.Entry(api_key_frame, textvariable=self.edsm_api_key, bg="#2d2d2d", fg="#ffffff", 
-                                font=("Consolas", 9), width=45, show="*")
-        api_key_entry.grid(row=0, column=0, padx=(0, 8))
-        
-        # Save button
-        def _save_api_key():
-            key = self.edsm_api_key.get().strip()
-            from config import update_config_value
-            update_config_value("edsm_api_key", key)
-            messagebox.showinfo("Saved", "EDSM API key saved successfully!")
-        
-        save_btn = tk.Button(api_key_frame, text="Save", command=_save_api_key,
-                            bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                            activeforeground="#ffffff", relief="ridge", bd=1, 
-                            font=("Segoe UI", 8, "normal"), cursor="hand2")
-        save_btn.grid(row=0, column=1)
-        
-        r += 1
-        tk.Label(scrollable_frame, text="Required for Ring Finder to search nearby systems for comprehensive results.", 
-                 wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
-        r += 1
+        # ========== EDSM API KEY SECTION - DISABLED ==========
+        # ttk.Label(scrollable_frame, text="EDSM API Key", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        # r += 1
+        # 
+        # # Add separator line
+        # separator_edsm = tk.Frame(scrollable_frame, height=1, bg="#444444")
+        # separator_edsm.grid(row=r, column=0, sticky="ew", pady=(0, 8))
+        # r += 1
+        # 
+        # # EDSM signup instructions
+        # instructions_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        # instructions_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
+        # 
+        # tk.Label(instructions_frame, text="1. Sign up at EDSM:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w")
+        # 
+        # # EDSM link
+        # import webbrowser
+        # edsm_link = tk.Label(instructions_frame, text="https://www.edsm.net/", bg="#1e1e1e", fg="#4da6ff", font=("Segoe UI", 9, "underline"), cursor="hand2")
+        # edsm_link.pack(anchor="w", padx=(15, 0))
+        # edsm_link.bind("<Button-1>", lambda e: webbrowser.open("https://www.edsm.net/"))
+        # 
+        # tk.Label(instructions_frame, text="2. Log in → Account settings → API key", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
+        # tk.Label(instructions_frame, text="3. Paste the key here:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
+        # 
+        # r += 1
+        # 
+        # # EDSM API key input
+        # api_key_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        # api_key_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
+        # 
+        # # Initialize EDSM API key variable
+        # if not hasattr(self, 'edsm_api_key'):
+        #     self.edsm_api_key = tk.StringVar()
+        #     self.edsm_api_key.set(_load_cfg().get('edsm_api_key', ''))
+        # 
+        # api_key_entry = tk.Entry(api_key_frame, textvariable=self.edsm_api_key, bg="#2d2d2d", fg="#ffffff", 
+        #                         font=("Consolas", 9), width=45, show="*")
+        # api_key_entry.grid(row=0, column=0, padx=(0, 8))
+        # 
+        # # Save button
+        # def _save_api_key():
+        #     key = self.edsm_api_key.get().strip()
+        #     from config import update_config_value
+        #     update_config_value("edsm_api_key", key)
+        #     messagebox.showinfo("Saved", "EDSM API key saved successfully!")
+        # 
+        # save_btn = tk.Button(api_key_frame, text="Save", command=_save_api_key,
+        #                     bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+        #                     activeforeground="#ffffff", relief="ridge", bd=1, 
+        #                     font=("Segoe UI", 8, "normal"), cursor="hand2")
+        # save_btn.grid(row=0, column=1)
+        # 
+        # r += 1
+        # tk.Label(scrollable_frame, text="Required for Ring Finder to search nearby systems for comprehensive results.", 
+        #          wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        #          font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        # r += 1
 
         # ========== BACKUP & RESTORE SECTION ==========
         r += 1
@@ -4905,6 +4929,11 @@ class App(tk.Tk):
         """Save tooltip enabled state to config"""
         from config import update_config_value
         update_config_value("tooltips_enabled", bool(self.tooltips_enabled.get()))
+    
+    def _save_import_prompt_preference(self) -> None:
+        """Save import prompt preference to config"""
+        from config import update_config_value
+        update_config_value("ask_import_on_path_change", bool(self.ask_import_on_path_change.get()))
 
     def _on_tooltip_toggle(self, *args) -> None:
         """Called when tooltip checkbox is toggled"""
@@ -5002,17 +5031,36 @@ class App(tk.Tk):
         except Exception as e:
             print(f"Error setting stay on top: {e}")
             self._set_status("Error changing stay on top setting")
+    
+    def _load_auto_scan_preference(self) -> None:
+        """Load auto-scan journals preference from config"""
+        cfg = _load_cfg()
+        enabled = cfg.get("auto_scan_journals", True)  # Default to enabled
+        self.auto_scan_journals.set(1 if enabled else 0)
+        print(f"Loaded auto-scan preference: {enabled}")
+    
+    def _save_auto_scan_preference(self) -> None:
+        """Save auto-scan journals preference to config"""
+        from config import update_config_value
+        update_config_value("auto_scan_journals", bool(self.auto_scan_journals.get()))
+        print(f"Saved auto-scan preference: {bool(self.auto_scan_journals.get())}")
+    
+    def _on_auto_scan_toggle(self, *args) -> None:
+        """Called when auto-scan checkbox is toggled"""
+        enabled = bool(self.auto_scan_journals.get())
+        self._save_auto_scan_preference()
+        self._set_status(f"Auto-scan on startup {'enabled' if enabled else 'disabled'}")
 
     # ---------- Journal folder preference handling ----------
     def _import_journal_history(self):
         """Import journal history from existing journal files"""
         try:
             journal_dir = self.cargo_monitor.journal_dir
-            journal_files = glob.glob(os.path.join(journal_dir, "Journal.*.log"))
-            if not journal_files:
-                messagebox.showwarning("No Journal Files", "No journal files found in the selected folder.")
+            if not os.path.exists(journal_dir):
+                messagebox.showwarning("Invalid Path", "Journal directory not found.")
                 return
                 
+            # Create progress window
             progress = tk.Toplevel(self)
             progress.title("Importing Journal History")
             progress.geometry("400x200")
@@ -5027,7 +5075,7 @@ class App(tk.Tk):
             y = self.winfo_y() + (self.winfo_height() // 2) - 100
             progress.geometry(f"400x200+{x}+{y}")
             
-            # Set icon using centralized utility
+            # Set icon
             set_window_icon(progress)
             
             tk.Label(progress, text="Processing journal files...", bg="#1e1e1e", fg="#ffffff").pack(pady=20)
@@ -5036,59 +5084,34 @@ class App(tk.Tk):
             progress_label.pack(pady=10)
             
             def process_files():
-                systems_added = 0
-                hotspots_added = 0
+                # Use JournalParser class which already handles everything correctly
+                from journal_parser import JournalParser
                 
-                for i, journal_file in enumerate(journal_files):
-                    progress_var.set(f"Processing {os.path.basename(journal_file)} ({i+1}/{len(journal_files)})")
+                # Get user_db from cargo_monitor which has it
+                user_db = self.cargo_monitor.user_db if hasattr(self.cargo_monitor, 'user_db') else self.user_db
+                parser = JournalParser(journal_dir, user_db)
+                
+                # Progress callback to update UI
+                def progress_callback(current_file, total_files, stats):
+                    progress_var.set(f"Processing file {current_file}/{total_files}...")
                     progress.update()
-                    
-                    try:
-                        with open(journal_file, 'r', encoding='utf-8') as f:
-                            for line in f:
-                                try:
-                                    event = json.loads(line.strip())
-                                    event_type = event.get("event", "")
-                                    
-                                    if event_type in ["FSDJump", "Location", "CarrierJump"]:
-                                        system_name = event.get("StarSystem", "")
-                                        if system_name:
-                                            star_pos = event.get("StarPos", [])
-                                            coordinates = (star_pos[0], star_pos[1], star_pos[2]) if len(star_pos) >= 3 else None
-                                            self.cargo_monitor.user_db.add_visited_system(
-                                                system_name=system_name,
-                                                visit_date=event.get("timestamp", ""),
-                                                system_address=event.get("SystemAddress"),
-                                                coordinates=coordinates
-                                            )
-                                            systems_added += 1
-                                            
-                                    elif event_type == "SAASignalsFound":
-                                        body_name = event.get("BodyName", "")
-                                        if body_name and " Ring" in body_name:
-                                            system_name = event.get("StarSystem", "")
-                                            for signal in event.get("Signals", []):
-                                                material_name = signal.get("Type_Localised", signal.get("Type", ""))
-                                                count = signal.get("Count", 0)
-                                                if material_name and count > 0:
-                                                    self.cargo_monitor.user_db.add_hotspot_data(
-                                                        system_name=system_name or body_name.split()[0],
-                                                        body_name=body_name,
-                                                        material_name=material_name,
-                                                        hotspot_count=count,
-                                                        scan_date=event.get("timestamp", ""),
-                                                        system_address=event.get("SystemAddress"),
-                                                        body_id=event.get("BodyID")
-                                                    )
-                                                    hotspots_added += 1
-                                except json.JSONDecodeError:
-                                    continue
-                    except Exception:
-                        continue
-                        
-                progress.destroy()
-                messagebox.showinfo("Import Complete", f"Successfully imported:\n• {systems_added} visited systems\n• {hotspots_added} hotspots")
                 
+                # Parse all journals
+                stats = parser.parse_all_journals(progress_callback)
+                
+                # Close progress window
+                progress.destroy()
+                
+                # Show results
+                messagebox.showinfo(
+                    "Import Complete", 
+                    f"Successfully imported:\n"
+                    f"• {stats['systems_visited']} visited systems\n"
+                    f"• {stats['hotspots_found']} hotspots\n"
+                    f"• Processed {stats['files_processed']} journal files"
+                )
+            
+            # Run in thread to keep UI responsive
             threading.Thread(target=process_files, daemon=True).start()
             
         except Exception as e:
@@ -5116,11 +5139,156 @@ class App(tk.Tk):
                 self.prospector_panel._jrnl_path = None
                 self.prospector_panel._jrnl_pos = 0
             
+            # Update cargo_monitor to keep them synchronized
+            if hasattr(self, 'cargo_monitor'):
+                self.cargo_monitor.journal_dir = sel
+                # Update dependent paths in cargo_monitor
+                self.cargo_monitor.cargo_json_path = os.path.join(sel, "Cargo.json")
+                self.cargo_monitor.status_json_path = os.path.join(sel, "Status.json")
+            
+            # Save to config.json so it persists across restarts
+            from config import update_config_value
+            update_config_value("journal_dir", sel)
+            
             # Update the UI label
             if hasattr(self, 'journal_lbl'):
                 self.journal_lbl.config(text=sel)
             
-            self._set_status("Journal folder updated.")
+            self._set_status("Journal folder updated and saved.")
+            
+            # Show import prompt (if not disabled)
+            self._show_journal_import_prompt(sel)
+
+    def _show_journal_import_prompt(self, new_path: str) -> None:
+        """Show dialog asking if user wants to import journal history from new path"""
+        from config import _load_cfg, update_config_value
+        
+        # Check if user disabled this prompt
+        cfg = _load_cfg()
+        if not cfg.get("ask_import_on_path_change", True):
+            return  # User disabled the prompt
+        
+        # Create modal dialog
+        dialog = tk.Toplevel(self)
+        dialog.title("Import Journal History?")
+        dialog.configure(bg="#2c3e50")
+        dialog.geometry("550x350")  # Increased size to accommodate long paths
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        # Set app icon (consistent across app)
+        set_window_icon(dialog)
+        
+        # CENTER ON PARENT (SAME MONITOR!)
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Title label
+        title_label = tk.Label(
+            dialog, 
+            text="Import Journal History?",
+            bg="#2c3e50", 
+            fg="#ecf0f1", 
+            font=("Segoe UI", 12, "bold")
+        )
+        title_label.pack(pady=(20, 10))
+        
+        # Info text
+        info_text = (
+            f"You've changed to a new journal folder:\n\n"
+            f"{new_path}\n\n"
+            f"Would you like to scan these journal files for\n"
+            f"hotspot data to add to your database?"
+        )
+        
+        info_label = tk.Label(
+            dialog,
+            text=info_text,
+            bg="#2c3e50",
+            fg="#bdc3c7",
+            font=("Segoe UI", 10),
+            justify="center",
+            wraplength=500  # Wrap long paths
+        )
+        info_label.pack(pady=10)
+        
+        # Checkbox for "don't ask again"
+        dont_ask_var = tk.IntVar(value=0)
+        checkbox = tk.Checkbutton(
+            dialog,
+            text="Don't ask me again when changing paths",
+            variable=dont_ask_var,
+            bg="#2c3e50",
+            fg="#bdc3c7",
+            selectcolor="#34495e",
+            activebackground="#2c3e50",
+            activeforeground="#ecf0f1",
+            font=("Segoe UI", 9)
+        )
+        checkbox.pack(pady=10)
+        
+        # Button frame
+        btn_frame = tk.Frame(dialog, bg="#2c3e50")
+        btn_frame.pack(pady=20)
+        
+        result = {"import": False, "dont_ask": False}
+        
+        def on_import():
+            result["import"] = True
+            result["dont_ask"] = bool(dont_ask_var.get())
+            dialog.destroy()
+        
+        def on_skip():
+            result["import"] = False
+            result["dont_ask"] = bool(dont_ask_var.get())
+            dialog.destroy()
+        
+        # Import button
+        import_btn = tk.Button(
+            btn_frame,
+            text="Import Now",
+            command=on_import,
+            bg="#27ae60",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            width=12,
+            height=1,
+            relief=tk.FLAT,
+            cursor="hand2"
+        )
+        import_btn.pack(side=tk.LEFT, padx=10)
+        
+        # Skip button
+        skip_btn = tk.Button(
+            btn_frame,
+            text="Skip",
+            command=on_skip,
+            bg="#95a5a6",
+            fg="white",
+            font=("Segoe UI", 10),
+            width=12,
+            height=1,
+            relief=tk.FLAT,
+            cursor="hand2"
+        )
+        skip_btn.pack(side=tk.LEFT, padx=10)
+        
+        # Bind Escape key to skip
+        dialog.bind('<Escape>', lambda e: on_skip())
+        
+        # Wait for user response
+        dialog.wait_window()
+        
+        # Save "don't ask again" preference
+        if result["dont_ask"]:
+            update_config_value("ask_import_on_path_change", False)
+        
+        # Trigger import if requested
+        if result["import"]:
+            self._import_journal_history()
 
     def _update_journal_label(self) -> None:
         """Update the journal folder label in Interface Options"""
@@ -5150,8 +5318,16 @@ class App(tk.Tk):
                 for default_dir in possible_dirs:
                     if os.path.exists(default_dir):
                         self.prospector_panel.journal_dir = default_dir
-                        if hasattr(self.prospector_panel, '_save_journal_dir_preference'):
-                            self.prospector_panel._save_journal_dir_preference()
+                        
+                        # Also update cargo_monitor if it exists
+                        if hasattr(self, 'cargo_monitor'):
+                            self.cargo_monitor.journal_dir = default_dir
+                            self.cargo_monitor.cargo_json_path = os.path.join(default_dir, "Cargo.json")
+                            self.cargo_monitor.status_json_path = os.path.join(default_dir, "Status.json")
+                        
+                        # Save to config
+                        from config import update_config_value
+                        update_config_value("journal_dir", default_dir)
                         break
                         
             # Always update the label after checking/setting
@@ -5560,6 +5736,7 @@ class App(tk.Tk):
             backup_reports = tk.IntVar(value=1)
             backup_bookmarks = tk.IntVar(value=1)
             backup_va_profile = tk.IntVar(value=1)
+            backup_journals = tk.IntVar(value=0)
             backup_all = tk.IntVar(value=0)
             
             def on_all_change():
@@ -5568,17 +5745,20 @@ class App(tk.Tk):
                     backup_reports.set(1)
                     backup_bookmarks.set(1)
                     backup_va_profile.set(1)
+                    backup_journals.set(1)
                     # Disable individual checkboxes
                     presets_cb.config(state="disabled")
                     reports_cb.config(state="disabled")
                     bookmarks_cb.config(state="disabled")
                     va_profile_cb.config(state="disabled")
+                    journals_cb.config(state="disabled")
                 else:
                     # Enable individual checkboxes
                     presets_cb.config(state="normal")
                     reports_cb.config(state="normal")
                     bookmarks_cb.config(state="normal")
                     va_profile_cb.config(state="normal")
+                    journals_cb.config(state="normal")
             
             # All checkbox
             all_cb = tk.Checkbutton(options_frame, text="📂 Backup Everything",
@@ -5632,6 +5812,15 @@ class App(tk.Tk):
                                          font=("Segoe UI", 10))
             va_profile_cb.pack(anchor="w", pady=2)
             
+            journals_cb = tk.Checkbutton(options_frame, text="📝 Journal Files",
+                                        variable=backup_journals,
+                                        bg="#2c3e50", fg="#ecf0f1",
+                                        selectcolor="#34495e",
+                                        activebackground="#34495e",
+                                        activeforeground="#ecf0f1",
+                                        font=("Segoe UI", 10))
+            journals_cb.pack(anchor="w", pady=2)
+            
             # Buttons frame
             btn_frame = tk.Frame(dialog, bg="#2c3e50")
             btn_frame.pack(pady=20)
@@ -5642,13 +5831,14 @@ class App(tk.Tk):
                 include_reports = backup_reports.get() or backup_all.get()
                 include_bookmarks = backup_bookmarks.get() or backup_all.get()
                 include_va_profile = backup_va_profile.get() or backup_all.get()
+                include_journals = backup_journals.get() or backup_all.get()
                 
-                if not (include_presets or include_reports or include_bookmarks or include_va_profile):
+                if not (include_presets or include_reports or include_bookmarks or include_va_profile or include_journals):
                     messagebox.showwarning("No Selection", "Please select at least one item to backup.")
                     return
                 
                 dialog.destroy()
-                self._create_backup(include_presets, include_reports, include_bookmarks, include_va_profile)
+                self._create_backup(include_presets, include_reports, include_bookmarks, include_va_profile, include_journals)
             
             def on_cancel():
                 dialog.destroy()
@@ -5671,7 +5861,7 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showerror("Backup Dialog Error", f"Failed to show backup dialog: {str(e)}")
 
-    def _create_backup(self, include_presets: bool, include_reports: bool, include_bookmarks: bool, include_va_profile: bool) -> None:
+    def _create_backup(self, include_presets: bool, include_reports: bool, include_bookmarks: bool, include_va_profile: bool, include_journals: bool = False) -> None:
         """Create backup zip file with selected data"""
         try:
             # Ask for backup location
@@ -5687,8 +5877,10 @@ class App(tk.Tk):
                 parts.append("Bookmarks")
             if include_va_profile:
                 parts.append("VA Profile")
+            if include_journals:
+                parts.append("Journals")
             
-            if len(parts) == 4:
+            if len(parts) == 5:
                 content_desc = "Full"
             else:
                 content_desc = "_".join(parts)
@@ -5710,31 +5902,69 @@ class App(tk.Tk):
                 # Get the correct app data directory
                 app_data_dir = self._get_app_data_dir()
                 
+                # Debug: Show what directory we're using
+                print(f"BACKUP DEBUG: app_data_dir = '{app_data_dir}'")
+                print(f"BACKUP DEBUG: Frozen = {getattr(sys, 'frozen', False)}")
+                print(f"BACKUP DEBUG: sys.executable = '{sys.executable if getattr(sys, 'frozen', False) else 'N/A'}'")
+                
                 # Add ship presets
                 if include_presets:
-                    settings_dir = os.path.join(app_data_dir, "Ship Presets")
+                    # Use dedicated path function for correct installer/dev paths
+                    settings_dir = get_ship_presets_dir()
+                    print(f"BACKUP DEBUG: Looking for presets in: '{settings_dir}'")
+                    print(f"BACKUP DEBUG: Presets folder exists: {os.path.exists(settings_dir)}")
                     if os.path.exists(settings_dir):
+                        preset_count = 0
                         for file_name in os.listdir(settings_dir):
                             if file_name.endswith('.json'):
                                 file_path = os.path.join(settings_dir, file_name)
                                 zipf.write(file_path, f"Settings/{file_name}")
+                                preset_count += 1
+                                print(f"BACKUP DEBUG: Added preset: {file_name}")
+                        print(f"BACKUP DEBUG: Total presets backed up: {preset_count}")
+                    else:
+                        print(f"BACKUP DEBUG: Presets folder NOT FOUND!")
+                        # Try alternate paths
+                        alt_path = os.path.join(app_data_dir, "Ship Presets")
+                        print(f"BACKUP DEBUG: Trying alternate path: '{alt_path}' - Exists: {os.path.exists(alt_path)}")
                 
                 # Add mining reports
                 if include_reports:
-                    reports_dir = os.path.join(app_data_dir, "Reports")
-                    if os.path.exists(reports_dir):
-                        for root, dirs, files in os.walk(reports_dir):
+                    # Use dedicated path function - gets Reports root, not Mining Session subdirectory
+                    reports_root = os.path.dirname(get_reports_dir())  # Get Reports folder (parent of Mining Session)
+                    print(f"BACKUP DEBUG: Looking for reports in: '{reports_root}'")
+                    print(f"BACKUP DEBUG: Reports folder exists: {os.path.exists(reports_root)}")
+                    if os.path.exists(reports_root):
+                        report_count = 0
+                        for root, dirs, files in os.walk(reports_root):
                             for file_name in files:
                                 if file_name.endswith(('.csv', '.txt', '.json')):
                                     file_path = os.path.join(root, file_name)
-                                    rel_path = os.path.relpath(file_path, app_data_dir)
+                                    rel_path = os.path.relpath(file_path, os.path.dirname(reports_root))
                                     zipf.write(file_path, rel_path)
+                                    report_count += 1
+                        print(f"BACKUP DEBUG: Total report files backed up: {report_count}")
+                    else:
+                        print(f"BACKUP DEBUG: Reports folder NOT FOUND!")
+                        # Try alternate path
+                        alt_path = os.path.join(app_data_dir, "Reports")
+                        print(f"BACKUP DEBUG: Trying alternate path: '{alt_path}' - Exists: {os.path.exists(alt_path)}")
                 
                 # Add mining bookmarks
                 if include_bookmarks:
                     bookmarks_file = os.path.join(app_data_dir, "mining_bookmarks.json")
+                    print(f"BACKUP DEBUG: Looking for bookmarks at: '{bookmarks_file}'")
+                    print(f"BACKUP DEBUG: Bookmarks file exists: {os.path.exists(bookmarks_file)}")
+                    
                     if os.path.exists(bookmarks_file):
                         zipf.write(bookmarks_file, "mining_bookmarks.json")
+                        print(f"BACKUP DEBUG: Bookmarks file backed up successfully")
+                    else:
+                        print(f"BACKUP DEBUG: Bookmarks file NOT FOUND!")
+                        # List what's actually in app_data_dir
+                        if os.path.exists(app_data_dir):
+                            files = os.listdir(app_data_dir)
+                            print(f"BACKUP DEBUG: Files in app_data_dir: {files[:10]}")  # First 10 files
                 
                 # Add VoiceAttack profile
                 if include_va_profile:
@@ -5775,6 +6005,36 @@ class App(tk.Tk):
                         if not getattr(sys, 'frozen', False):  # Only show debug in development
                             print(f"DEBUG: VoiceAttack profile not found at expected location")
                 
+                # Add journal files
+                if include_journals:
+                    # Get journal folder from prospector panel
+                    journal_folder = None
+                    if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, 'journal_dir'):
+                        journal_folder = self.prospector_panel.journal_dir
+                    
+                    if journal_folder and os.path.isdir(journal_folder):
+                        journal_files = [f for f in os.listdir(journal_folder) if f.endswith('.log')]
+                        
+                        if journal_files:
+                            journal_count = 0
+                            journal_size = 0
+                            
+                            for journal_file in journal_files:
+                                journal_path = os.path.join(journal_folder, journal_file)
+                                if os.path.isfile(journal_path):
+                                    zipf.write(journal_path, f"Journals/{journal_file}")
+                                    journal_count += 1
+                                    journal_size += os.path.getsize(journal_path)
+                            
+                            if not getattr(sys, 'frozen', False):  # Only show debug in development
+                                print(f"DEBUG: Backed up {journal_count} journal files ({journal_size / 1024 / 1024:.1f} MB) from {journal_folder}")
+                        else:
+                            messagebox.showwarning("No Journal Files", f"No journal (.log) files found in:\n{journal_folder}")
+                    else:
+                        messagebox.showwarning("Journal Folder Not Set", 
+                                             "Journal folder is not configured in Interface Options.\n\n"
+                                             "Please set your journal folder first, then try again.")
+                
                 # Add manifest file with backup info
                 manifest = {
                     "backup_date": dt.datetime.now().isoformat(),
@@ -5783,7 +6043,8 @@ class App(tk.Tk):
                         "ship_presets": include_presets,
                         "mining_reports": include_reports,
                         "mining_bookmarks": include_bookmarks,
-                        "va_profile": include_va_profile
+                        "va_profile": include_va_profile,
+                        "journal_files": include_journals
                     }
                 }
                 zipf.writestr("backup_manifest.json", json.dumps(manifest, indent=2))
@@ -5823,12 +6084,13 @@ class App(tk.Tk):
                     has_reports = any(f.startswith("Reports/") for f in file_list)
                     has_bookmarks = "mining_bookmarks.json" in file_list
                     has_va_profile = "EliteMining-Profile.vap" in file_list
+                    has_journals = any(f.startswith("Journals/") and f.endswith(".log") for f in file_list)
                     
-                    if not (has_presets or has_reports or has_bookmarks or has_va_profile):
+                    if not (has_presets or has_reports or has_bookmarks or has_va_profile or has_journals):
                         messagebox.showerror("Invalid Backup", "This doesn't appear to be a valid EliteMining backup file.")
                         return
                     
-                    self._show_restore_options_dialog(backup_path, has_presets, has_reports, has_bookmarks, has_va_profile, manifest)
+                    self._show_restore_options_dialog(backup_path, has_presets, has_reports, has_bookmarks, has_va_profile, has_journals, manifest)
                     
             except zipfile.BadZipFile:
                 messagebox.showerror("Invalid File", "Selected file is not a valid ZIP archive.")
@@ -5839,12 +6101,12 @@ class App(tk.Tk):
             messagebox.showerror("Restore Dialog Error", f"Failed to show restore dialog: {str(e)}")
 
     def _show_restore_options_dialog(self, backup_path: str, has_presets: bool, has_reports: bool, 
-                                   has_bookmarks: bool, has_va_profile: bool, manifest: Optional[Dict] = None) -> None:
+                                   has_bookmarks: bool, has_va_profile: bool, has_journals: bool = False, manifest: Optional[Dict] = None) -> None:
         """Show dialog to select what to restore from backup"""
         try:
             dialog = tk.Toplevel(self)
             dialog.title("Restore from Backup")
-            dialog.geometry("450x400")
+            dialog.geometry("450x550")
             dialog.resizable(False, False)
             dialog.configure(bg="#2c3e50")
             dialog.transient(self)
@@ -5901,6 +6163,7 @@ class App(tk.Tk):
             restore_reports = tk.IntVar(value=1 if has_reports else 0)
             restore_bookmarks = tk.IntVar(value=1 if has_bookmarks else 0)
             restore_va_profile = tk.IntVar(value=1 if has_va_profile else 0)
+            restore_journals = tk.IntVar(value=0)  # Default to unchecked for safety
             
             # Checkboxes for available items
             if has_presets:
@@ -5943,6 +6206,16 @@ class App(tk.Tk):
                                              font=("Segoe UI", 10))
                 va_profile_cb.pack(anchor="w", pady=2)
             
+            if has_journals:
+                journals_cb = tk.Checkbutton(options_frame, text="📝 Journal Files",
+                                           variable=restore_journals,
+                                           bg="#2c3e50", fg="#ecf0f1",
+                                           selectcolor="#34495e",
+                                           activebackground="#34495e",
+                                           activeforeground="#ecf0f1",
+                                           font=("Segoe UI", 10))
+                journals_cb.pack(anchor="w", pady=2)
+            
             # Warning label
             warning_label = tk.Label(dialog, 
                                    text="⚠️ Warning: This will overwrite existing files!",
@@ -5965,6 +6238,8 @@ class App(tk.Tk):
                     restore_any = True
                 if has_va_profile and restore_va_profile.get():
                     restore_any = True
+                if has_journals and restore_journals.get():
+                    restore_any = True
                 
                 if not restore_any:
                     messagebox.showwarning("No Selection", "Please select at least one item to restore.")
@@ -5982,7 +6257,8 @@ class App(tk.Tk):
                                         restore_presets.get() if has_presets else False,
                                         restore_reports.get() if has_reports else False,
                                         restore_bookmarks.get() if has_bookmarks else False,
-                                        restore_va_profile.get() if has_va_profile else False)
+                                        restore_va_profile.get() if has_va_profile else False,
+                                        restore_journals.get() if has_journals else False)
             
             def on_cancel():
                 dialog.destroy()
@@ -6006,7 +6282,7 @@ class App(tk.Tk):
             messagebox.showerror("Restore Options Error", f"Failed to show restore options: {str(e)}")
 
     def _restore_from_backup(self, backup_path: str, restore_presets: bool, 
-                           restore_reports: bool, restore_bookmarks: bool, restore_va_profile: bool) -> None:
+                           restore_reports: bool, restore_bookmarks: bool, restore_va_profile: bool, restore_journals: bool = False) -> None:
         """Restore selected items from backup zip file"""
         try:
             app_data_dir = self._get_app_data_dir()
@@ -6075,6 +6351,31 @@ class App(tk.Tk):
                     with open(va_profile_path, 'wb') as f:
                         f.write(zipf.read("EliteMining-Profile.vap"))
                     restored_items.append("VoiceAttack Profile")
+                
+                # Restore journal files
+                if restore_journals:
+                    journal_files = [f for f in zipf.namelist() if f.startswith("Journals/") and f.endswith(".log")]
+                    
+                    if journal_files:
+                        # Ask user where to restore journals
+                        restore_location = filedialog.askdirectory(
+                            title="Select where to restore journal files",
+                            initialdir=os.path.expanduser("~")
+                        )
+                        
+                        if restore_location:
+                            os.makedirs(restore_location, exist_ok=True)
+                            journal_count = 0
+                            
+                            for file_path in journal_files:
+                                file_name = os.path.basename(file_path)
+                                target_path = os.path.join(restore_location, file_name)
+                                
+                                with open(target_path, 'wb') as f:
+                                    f.write(zipf.read(file_path))
+                                journal_count += 1
+                            
+                            restored_items.append(f"Journal Files ({journal_count} files)")
             
             if restored_items:
                 items_text = ", ".join(restored_items)
@@ -6117,6 +6418,308 @@ class App(tk.Tk):
     def _manual_update_check(self):
         """Manually check for updates (from menu)"""
         self.update_checker.manual_check(self)
+    
+    def _auto_scan_journals_startup(self):
+        """Auto-scan new journal entries on startup, with welcome dialog for first-time users"""
+        import threading
+        import glob
+        from incremental_journal_scanner import IncrementalJournalScanner
+        from journal_scan_state import JournalScanState
+        
+        # Check if auto-scan is enabled in settings
+        cfg = _load_cfg()
+        auto_scan_enabled = cfg.get("auto_scan_journals", True)
+        
+        if not auto_scan_enabled:
+            print("[JOURNAL] Auto-scan disabled by user preference")
+            return
+        
+        print("[JOURNAL] Starting auto-scan on startup...")
+        
+        # Check if this is first run (no state file)
+        state = JournalScanState()
+        last_journal = state.get_last_journal_file()
+        is_first_run = not last_journal
+        
+        print(f"DEBUG: First run check - last_journal={last_journal}, is_first_run={is_first_run}")
+        
+        if is_first_run:
+            # Count journal files for the welcome message
+            journal_dir = self.cargo_monitor.journal_dir
+            pattern = os.path.join(journal_dir, "Journal.*.log")
+            all_journals = sorted(glob.glob(pattern))
+            journal_count = len(all_journals)
+            
+            if journal_count > 0:
+                # Show welcome dialog
+                self._show_first_run_welcome_dialog(journal_count, all_journals)
+            else:
+                print("No journal files found, skipping initial import")
+        else:
+            # Not first run - do incremental auto-scan
+            self._run_auto_scan_background()
+    
+    def _show_first_run_welcome_dialog(self, journal_count, all_journals):
+        """Show welcome dialog for first-time users"""
+        # Get oldest journal date for display
+        oldest_date = "unknown"
+        if all_journals:
+            oldest_file = os.path.basename(all_journals[0])
+            try:
+                # Parse date from filename: Journal.2023-09-01T120000.01.log
+                date_part = oldest_file.split('.')[1].split('T')[0]
+                oldest_date = date_part
+            except:
+                pass
+        
+        # Estimate time (rough: ~18 journals/second based on test)
+        estimated_minutes = max(1, journal_count // (18 * 60))
+        time_text = f"{estimated_minutes} minute{'s' if estimated_minutes != 1 else ''}"
+        
+        dialog = tk.Toplevel(self)
+        dialog.title("Welcome to EliteMining!")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        
+        # Set icon
+        set_window_icon(dialog)
+        
+        # Position centered on parent
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - 200
+        y = self.winfo_y() + (self.winfo_height() // 2) - 175
+        dialog.geometry(f"400x350+{x}+{y}")
+        
+        # Main content frame
+        content = tk.Frame(dialog, bg="#2b2b2b", padx=20, pady=20)
+        content.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        title = tk.Label(content, text="Welcome to EliteMining!", 
+                        font=("Segoe UI", 14, "bold"), 
+                        bg="#2b2b2b", fg="#ffffff")
+        title.pack(pady=(0, 10))
+        
+        # Message
+        message_text = f"""This appears to be your first time running EliteMining.
+
+Would you like to scan your Elite Dangerous journal files to import your mining history?"""
+        
+        message = tk.Label(content, text=message_text,
+                          font=("Segoe UI", 10),
+                          bg="#2b2b2b", fg="#e6e6e6",
+                          justify=tk.LEFT, wraplength=360)
+        message.pack(pady=(0, 15))
+        
+        # Bullet points
+        bullets_text = f"""• This will import all discovered rings, hotspots, and visited systems
+• Found {journal_count:,} journal files dating back to {oldest_date}
+• Scanning will take approximately {time_text}
+• You can skip this and manually import your history later from Settings → Import History"""
+        
+        bullets = tk.Label(content, text=bullets_text,
+                          font=("Segoe UI", 9),
+                          bg="#2b2b2b", fg="#cccccc",
+                          justify=tk.LEFT, wraplength=360)
+        bullets.pack(pady=(0, 20))
+        
+        # Question
+        question = tk.Label(content, text="Scan now?",
+                           font=("Segoe UI", 10, "bold"),
+                           bg="#2b2b2b", fg="#ffffff")
+        question.pack(pady=(0, 15))
+        
+        # Button frame
+        button_frame = tk.Frame(content, bg="#2b2b2b")
+        button_frame.pack()
+        
+        def on_scan():
+            dialog.destroy()
+            self._run_initial_import_with_progress()
+        
+        def on_skip():
+            dialog.destroy()
+            # Create empty state file so we don't ask again
+            # but still allow auto-scan for new journals
+            from journal_scan_state import JournalScanState
+            state = JournalScanState()
+            # Set state to latest journal with current position
+            journal_dir = self.cargo_monitor.journal_dir
+            pattern = os.path.join(journal_dir, "Journal.*.log")
+            all_journals = sorted(glob.glob(pattern))
+            if all_journals:
+                latest = all_journals[-1]
+                file_size = os.path.getsize(latest)
+                state.save_state(latest, file_size)
+            print("Initial import skipped by user")
+        
+        # Scan Now button (green, recommended)
+        scan_btn = tk.Button(button_frame, text="Scan Now", command=on_scan,
+                            bg="#27ae60", fg="white", 
+                            font=("Segoe UI", 10, "bold"),
+                            width=12, cursor="hand2", relief=tk.FLAT,
+                            activebackground="#229954")
+        scan_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Skip button
+        skip_btn = tk.Button(button_frame, text="Skip", command=on_skip,
+                            bg="#5a5a5a", fg="white",
+                            font=("Segoe UI", 10),
+                            width=12, cursor="hand2", relief=tk.FLAT,
+                            activebackground="#4a4a4a")
+        skip_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Bind Escape to skip
+        dialog.bind('<Escape>', lambda e: on_skip())
+        
+        # Make Scan Now the default (Enter key)
+        scan_btn.focus_set()
+        dialog.bind('<Return>', lambda e: on_scan())
+    
+    def _run_initial_import_with_progress(self):
+        """Run initial import with progress dialog"""
+        import threading
+        from incremental_journal_scanner import IncrementalJournalScanner
+        
+        # Create progress dialog
+        progress_dialog = tk.Toplevel(self)
+        progress_dialog.title("Importing Journal History")
+        progress_dialog.transient(self)
+        progress_dialog.grab_set()
+        progress_dialog.resizable(False, False)
+        progress_dialog.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable X button
+        
+        # Set icon
+        set_window_icon(progress_dialog)
+        
+        # Position centered on parent
+        progress_dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - 200
+        y = self.winfo_y() + (self.winfo_height() // 2) - 100
+        progress_dialog.geometry(f"400x200+{x}+{y}")
+        
+        # Content frame
+        content = tk.Frame(progress_dialog, bg="#2b2b2b", padx=20, pady=20)
+        content.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        title = tk.Label(content, text="Importing Mining History", 
+                        font=("Segoe UI", 12, "bold"), 
+                        bg="#2b2b2b", fg="#ffffff")
+        title.pack(pady=(0, 15))
+        
+        # Progress label
+        progress_label = tk.Label(content, text="Preparing scan...",
+                                 font=("Segoe UI", 9),
+                                 bg="#2b2b2b", fg="#e6e6e6")
+        progress_label.pack(pady=(0, 5))
+        
+        # Progress bar
+        progress_bar = ttk.Progressbar(content, length=360, mode='determinate')
+        progress_bar.pack(pady=(0, 10))
+        
+        # Stats label
+        stats_label = tk.Label(content, text="Files: 0 | Events: 0",
+                              font=("Segoe UI", 9),
+                              bg="#2b2b2b", fg="#cccccc")
+        stats_label.pack(pady=(0, 15))
+        
+        # Cancel button
+        cancel_requested = {'value': False}
+        
+        def on_cancel():
+            cancel_requested['value'] = True
+            cancel_btn.config(state=tk.DISABLED, text="Cancelling...")
+        
+        cancel_btn = tk.Button(content, text="Cancel", command=on_cancel,
+                              bg="#5a5a5a", fg="white",
+                              font=("Segoe UI", 9),
+                              width=15, cursor="hand2", relief=tk.FLAT,
+                              activebackground="#4a4a4a")
+        cancel_btn.pack()
+        
+        # Scan in background
+        def scan_with_progress():
+            try:
+                journal_dir = self.cargo_monitor.journal_dir
+                user_db = self.cargo_monitor.user_db
+                scanner = IncrementalJournalScanner(journal_dir, user_db)
+                
+                total_events = 0
+                
+                def progress_callback(files_done, total_files, current_file):
+                    if cancel_requested['value']:
+                        return  # Stop processing
+                    
+                    # Update UI in main thread
+                    percent = int((files_done / total_files) * 100) if total_files > 0 else 0
+                    self.after(0, lambda: progress_bar.config(value=percent))
+                    self.after(0, lambda: progress_label.config(text=f"Scanning: {current_file}"))
+                    self.after(0, lambda f=files_done, t=total_files, e=total_events: 
+                              stats_label.config(text=f"Files: {f}/{t} | Events: {e:,}"))
+                
+                # Modified scan that checks for cancel
+                files, events = scanner.scan_new_entries(progress_callback=progress_callback)
+                total_events = events
+                
+                # Close dialog and show result
+                self.after(0, lambda: progress_dialog.destroy())
+                
+                if cancel_requested['value']:
+                    print(f"Import cancelled by user. Processed {files} files, {events} events (partial data kept)")
+                    self.after(0, lambda e=events: self._set_status(f"Import cancelled - {e:,} events imported"))
+                else:
+                    print(f"✓ Import complete: {files} files, {events} events processed")
+                    self.after(0, lambda e=events: self._set_status(f"Imported {e:,} journal entries"))
+                    
+            except Exception as e:
+                print(f"Error during import: {e}")
+                import traceback
+                traceback.print_exc()
+                self.after(0, lambda: progress_dialog.destroy())
+                self.after(0, lambda: self._set_status("Import failed"))
+        
+        thread = threading.Thread(target=scan_with_progress, daemon=True)
+        thread.start()
+    
+    def _run_auto_scan_background(self):
+        """Run auto-scan in background thread"""
+        import threading
+        from incremental_journal_scanner import IncrementalJournalScanner
+        
+        def scan_in_background():
+            try:
+                print("[JOURNAL] Auto-scanning journals for new entries...")
+                
+                # Get journal directory and user database
+                journal_dir = self.cargo_monitor.journal_dir
+                user_db = self.cargo_monitor.user_db
+                
+                # Create scanner
+                scanner = IncrementalJournalScanner(journal_dir, user_db)
+                
+                # Scan new entries
+                files, events = scanner.scan_new_entries(
+                    progress_callback=lambda f, t, name: print(f"[JOURNAL] Scanning: {name} ({f}/{t})")
+                )
+                
+                if files > 0 or events > 0:
+                    print(f"[JOURNAL] ✓ Auto-scan complete: {files} file(s), {events} event(s) processed")
+                    # Update status in UI thread using _set_status for auto-clear
+                    event_count = events
+                    self.after(0, lambda e=event_count: self._set_status(f"Scanned {e} new journal entries"))
+                else:
+                    print("[JOURNAL] ✓ Auto-scan complete: No new entries")
+                    
+            except Exception as e:
+                print(f"[JOURNAL] ERROR during auto-scan: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Run in background thread to not block UI
+        thread = threading.Thread(target=scan_in_background, daemon=True)
+        thread.start()
 
 if __name__ == "__main__":
     app = App()

@@ -6,7 +6,13 @@ a = Analysis(
     pathex=['app'],
     binaries=[],
     datas=[],
-    hiddenimports=['requests', 'requests.adapters', 'requests.auth', 'requests.cookies', 'requests.models', 'requests.sessions', 'requests.structures', 'urllib3', 'hotspot_finder', 'zlib'],
+    hiddenimports=[
+        'requests', 'requests.adapters', 'requests.auth', 'requests.cookies', 
+        'requests.models', 'requests.sessions', 'requests.structures', 'urllib3', 
+        'hotspot_finder', 'zlib',
+        # Logging and journal scanning modules
+        'logging_setup', 'incremental_journal_scanner', 'journal_scan_state'
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

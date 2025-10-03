@@ -1,0 +1,94 @@
+[2025-10-03 15:12:36] === EliteMining File Organization Started ===
+[2025-10-03 15:12:36] Root directory: D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev
+[2025-10-03 15:12:36] Log file: D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\organization_log_20251003_151236.txt
+[2025-10-03 15:12:36] Rollback script: D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\ROLLBACK_organization.ps1
+[2025-10-03 15:12:36] 
+=== Creating folder structure ===
+[2025-10-03 15:12:36] Created folder: scripts
+[2025-10-03 15:12:36] Created folder: scripts\database
+[2025-10-03 15:12:36] Created folder: scripts\database\checks
+[2025-10-03 15:12:36] Created folder: scripts\database\maintenance
+[2025-10-03 15:12:36] Created folder: scripts\cleanup
+[2025-10-03 15:12:36] Created folder: scripts\tools
+[2025-10-03 15:12:36] Created folder: scripts\build
+[2025-10-03 15:12:36] Created folder: scripts\installer
+[2025-10-03 15:12:36] Created folder: scripts\testing
+[2025-10-03 15:12:36] Created folder: docs
+[2025-10-03 15:12:36] Created folder: docs\implementation
+[2025-10-03 15:12:36] Created folder: docs\debug
+[2025-10-03 15:12:36] Created folder: docs\features
+[2025-10-03 15:12:36] 
+=== Moving database check scripts ===
+[2025-10-03 15:12:36] MOVED: check_backup.py -> scripts\database\checks\check_backup.py
+[2025-10-03 15:12:36] MOVED: check_current_materials.py -> scripts\database\checks\check_current_materials.py
+[2025-10-03 15:12:36] MOVED: check_db_status.py -> scripts\database\checks\check_db_status.py
+[2025-10-03 15:12:36] MOVED: check_excel_body_names.py -> scripts\database\checks\check_excel_body_names.py
+[2025-10-03 15:12:36] MOVED: check_hr4977.py -> scripts\database\checks\check_hr4977.py
+[2025-10-03 15:12:36] MOVED: check_lowercase_bodies.py -> scripts\database\checks\check_lowercase_bodies.py
+[2025-10-03 15:12:36] MOVED: check_opals.py -> scripts\database\checks\check_opals.py
+[2025-10-03 15:12:36] MOVED: check_ring_data.py -> scripts\database\checks\check_ring_data.py
+[2025-10-03 15:12:36] MOVED: check_system.py -> scripts\database\checks\check_system.py
+[2025-10-03 15:12:36] 
+=== Moving database maintenance scripts ===
+[2025-10-03 15:12:36] MOVED: run_fix.py -> scripts\database\maintenance\run_fix.py
+[2025-10-03 15:12:36] MOVED: find_any_lowercase.py -> scripts\database\maintenance\find_any_lowercase.py
+[2025-10-03 15:12:36] MOVED: find_lowercase_rings.py -> scripts\database\maintenance\find_lowercase_rings.py
+[2025-10-03 15:12:36] MOVED: fix_body_names.py -> scripts\database\maintenance\fix_body_names.py
+[2025-10-03 15:12:36] MOVED: fix_material_names.py -> scripts\database\maintenance\fix_material_names.py
+[2025-10-03 15:12:36] 
+=== Moving database creation scripts ===
+[2025-10-03 15:12:36] MOVED: import_excel_to_database.py -> scripts\database\import_excel_to_database.py
+[2025-10-03 15:12:36] MOVED: init_database.py -> scripts\database\init_database.py
+[2025-10-03 15:12:37] MOVED: app\create_bubble_database.py -> scripts\database\create_bubble_database.py
+[2025-10-03 15:12:37] MOVED: app\migrate_excel_to_db.py -> scripts\database\migrate_excel_to_db.py
+[2025-10-03 15:12:37] MOVED: app\add_hotspot_columns.py -> scripts\database\add_hotspot_columns.py
+[2025-10-03 15:12:37] 
+=== Moving cleanup scripts ===
+[2025-10-03 15:12:37] MOVED: app\clear_user_data_db.py -> scripts\cleanup\clear_user_data_db.py
+[2025-10-03 15:12:37] 
+=== Moving tools ===
+[2025-10-03 15:12:37] MOVED: app\check_versions.py -> scripts\tools\check_versions.py
+[2025-10-03 15:12:37] MOVED: app\process_journals.py -> scripts\tools\process_journals.py
+[2025-10-03 15:12:37] 
+=== Moving build scripts ===
+[2025-10-03 15:12:37] MOVED: app\build_executable.py -> scripts\build\build_executable.py
+[2025-10-03 15:12:37] MOVED: app\verify_installer.py -> scripts\build\verify_installer.py
+[2025-10-03 15:12:37] 
+=== Moving installer scripts ===
+[2025-10-03 15:12:37] MOVED: app\config_installer.py -> scripts\installer\config_installer.py
+[2025-10-03 15:12:37] MOVED: app\config_installer.bat -> scripts\installer\config_installer.bat
+[2025-10-03 15:12:37] 
+=== Moving test scripts ===
+[2025-10-03 15:12:37] MOVED: test_auto_scan.py -> scripts\testing\test_auto_scan.py
+[2025-10-03 15:12:37] 
+=== Moving documentation - Implementation ===
+[2025-10-03 15:12:37] MOVED: ENHANCED_RING_FINDER_IMPLEMENTATION.md -> docs\implementation\ENHANCED_RING_FINDER_IMPLEMENTATION.md
+[2025-10-03 15:12:37] MOVED: ENHANCED_RING_FINDER.md -> docs\implementation\ENHANCED_RING_FINDER.md
+[2025-10-03 15:12:37] MOVED: GALAXY_DATABASE_IMPLEMENTATION.md -> docs\implementation\GALAXY_DATABASE_IMPLEMENTATION.md
+[2025-10-03 15:12:37] MOVED: RING_DENSITY_IMPLEMENTATION.md -> docs\implementation\RING_DENSITY_IMPLEMENTATION.md
+[2025-10-03 15:12:37] MOVED: JOURNAL_PATH_CHANGE_IMPLEMENTATION.md -> docs\implementation\JOURNAL_PATH_CHANGE_IMPLEMENTATION.md
+[2025-10-03 15:12:37] MOVED: JOURNAL_PATH_IMPLEMENTATION_COMPLETE.md -> docs\implementation\JOURNAL_PATH_IMPLEMENTATION_COMPLETE.md
+[2025-10-03 15:12:37] MOVED: LOGGING_IMPLEMENTATION.md -> docs\implementation\LOGGING_IMPLEMENTATION.md
+[2025-10-03 15:12:37] MOVED: MIGRATION_NOTES.md -> docs\implementation\MIGRATION_NOTES.md
+[2025-10-03 15:12:37] MOVED: ICON_STANDARDS.md -> docs\implementation\ICON_STANDARDS.md
+[2025-10-03 15:12:37] MOVED: INSTALLER_COMPLETENESS_CHECK.md -> docs\implementation\INSTALLER_COMPLETENESS_CHECK.md
+[2025-10-03 15:12:37] 
+=== Moving documentation - Debug/Analysis ===
+[2025-10-03 15:12:37] MOVED: RING_SEARCH_ANALYSIS.md -> docs\debug\RING_SEARCH_ANALYSIS.md
+[2025-10-03 15:12:37] MOVED: RING_SEARCH_SORT_ORDER_ANALYSIS.md -> docs\debug\RING_SEARCH_SORT_ORDER_ANALYSIS.md
+[2025-10-03 15:12:37] MOVED: RING_FINDER_DEBUG_SESSION_SUMMARY.md -> docs\debug\RING_FINDER_DEBUG_SESSION_SUMMARY.md
+[2025-10-03 15:12:37] MOVED: JOURNAL_PATH_BUG_ANALYSIS.md -> docs\debug\JOURNAL_PATH_BUG_ANALYSIS.md
+[2025-10-03 15:12:37] MOVED: OLD_ANNOUNCEMENT_BUG_ANALYSIS.md -> docs\debug\OLD_ANNOUNCEMENT_BUG_ANALYSIS.md
+[2025-10-03 15:12:37] 
+=== Moving documentation - Features ===
+[2025-10-03 15:12:37] MOVED: app\CONFIG_MANAGEMENT.md -> docs\features\CONFIG_MANAGEMENT.md
+[2025-10-03 15:12:37] MOVED: app\INSTALLER_INTEGRATION.md -> docs\features\INSTALLER_INTEGRATION.md
+[2025-10-03 15:12:37] MOVED: app\INSTALLER_PROCESS_HANDLING.md -> docs\features\INSTALLER_PROCESS_HANDLING.md
+[2025-10-03 15:12:37] MOVED: app\REPORTS_PROTECTION.md -> docs\features\REPORTS_PROTECTION.md
+[2025-10-03 15:12:37] MOVED: app\SMART_UNINSTALLER_README.md -> docs\features\SMART_UNINSTALLER_README.md
+[2025-10-03 15:12:37] 
+=== Organization Complete ===
+[2025-10-03 15:12:37] Total operations logged to: D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\organization_log_20251003_151236.txt
+[2025-10-03 15:12:37] Rollback script created: D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\ROLLBACK_organization.ps1
+[2025-10-03 15:12:37] 
+To undo these changes, run: .\D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\ROLLBACK_organization.ps1

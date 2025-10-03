@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.1.3
+AppVersion=v4.1.4
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetVAPath}
 AppendDefaultDirName=no
@@ -32,14 +32,17 @@ Source: "dist\Configurator.exe"; DestDir: "{app}\Apps\EliteMining\Configurator";
 Source: "app\data\galaxy_systems.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "app\data\database_metadata.json"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 
-; User database - preserve existing user data (hotspots, visited systems)
-Source: "app\data\user_data.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: onlyifdoesntexist skipifsourcedoesntexist
+; User database - use pre-populated database for new installs, preserve existing for updates
+Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: onlyifdoesntexist
 
 ; Documentation, variables, profile
 Source: "Doc\*"; DestDir: "{app}\Apps\EliteMining\Doc"; Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
 Source: "Variables\*"; DestDir: "{app}\Apps\EliteMining\Variables"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist
+; Overwrites VoiceAttack profile only if installer file is newer (default Inno Setup behavior)
 Source: "EliteMining-Profile.vap"; DestDir: "{app}\Apps\EliteMining"; Flags: uninsneveruninstall skipifsourcedoesntexist
-Source: "app\config.json"; DestDir: "{app}\Apps\EliteMining"; Flags: onlyifdoesntexist
+; REMINDER: Change config.json back to "onlyifdoesntexist" for next version to preserve user settings
+; Current version overwrites only if installer file is newer (based on timestamp/version)
+Source: "app\config.json"; DestDir: "{app}\Apps\EliteMining"
 Source: "app\mining_bookmarks.json"; DestDir: "{app}\Apps\EliteMining\app"; Flags: onlyifdoesntexist skipifsourcedoesntexist
 Source: "app\EliteVA\*"; DestDir: "{app}\Apps\EliteVA"; Flags: recursesubdirs createallsubdirs
 Source: "LICENSE.txt"; DestDir: "{app}\Apps\EliteMining"

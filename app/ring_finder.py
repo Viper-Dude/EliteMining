@@ -124,37 +124,26 @@ class RingFinder:
         threading.Thread(target=self._preload_data, daemon=True).start()
         
     def _abbreviate_material_for_display(self, hotspot_text: str) -> str:
-        """Abbreviate material names in hotspot display text for Ring Finder column"""
+        """Abbreviate material names in hotspot display text for Ring Finder column
+        
+        Uses recognizable 3-4 character abbreviations for better readability
+        while saving space in the 'All Materials' view.
+        """
         abbreviations = {
-            'Platinum': 'Pt',
-            'Palladium': 'Pd', 
-            'Gold': 'Au',
-            'Silver': 'Ag',
-            'Osmium': 'Os',
-            'Painite': 'Pai',
-            'Alexandrite': 'Ale',
-            'Rhodplumsite': 'Rhd',
-            'Bixbite': 'Bix',
-            'Grandidierite': 'Grd',
-            'Monazite': 'Mon',
-            'Musgravite': 'Mus',
-            'Serendibite': 'Ser',
-            'Taaffeite': 'Taa',
-            'Jadeite': 'Jad',
-            'Red Beryl': 'RBe',
-            'Bromellite': 'Bro',
-            'Tritium': 'Tri',
-            'tritium': 'Tri',  # Handle lowercase variant
-            'Bertrandite': 'Ber',
-            'Indite': 'Ind',
+            # Current materials in database (13 materials)
+            'Alexandrite': 'Alex',
+            'Benitoite': 'Beni',
+            'Bromellite': 'Brom',
+            'Grandidierite': 'Gran',
             'Low Temperature Diamonds': 'LTD',
-            'LowTemperatureDiamond': 'LTD',  # Handle database format
-            'Low Temp. Diamonds': 'LTD',
-            'Low Tem Diamond': 'LTD',  # Handle abbreviated form
-            'Benitoite': 'Ben',  # Add missing Benitoite abbreviation
-            'Void Opals': 'VO',
-            'Opals': 'VO',
-            'Opal': 'VO'  # Handle singular form
+            'Monazite': 'Mona',
+            'Musgravite': 'Musg',
+            'Painite': 'Pain',
+            'Platinum': 'Plat',
+            'Rhodplumsite': 'Rhod',
+            'Serendibite': 'Sere',
+            'Tritium': 'Trit',
+            'Void Opals': 'Opals',
         }
         
         # Replace full material names with abbreviations in the display text
@@ -209,13 +198,22 @@ class RingFinder:
                                 font=("Segoe UI", 8), foreground="#888888")
         status_label.pack(side="right")
         
+        # Database info label (discreet, below status)
+        db_info_header = ttk.Frame(self.scrollable_frame)
+        db_info_header.pack(fill="x", padx=10, pady=(0, 5))
+        
+        self.db_info_var = tk.StringVar(value="Total: ... hotspots in ... systems")
+        db_info_label = tk.Label(db_info_header, textvariable=self.db_info_var,
+                                font=("Segoe UI", 8, "italic"), foreground="#888888", bg="#1e1e1e")
+        db_info_label.pack(side="right")
+        
         search_frame = ttk.Frame(self.scrollable_frame)
         search_frame.pack(fill="x", padx=10, pady=(0, 5))
         
         # Single smart search input
         ttk.Label(search_frame, text="Reference System:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.system_var = tk.StringVar()
-        self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=25)
+        self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=35)
         self.system_entry.bind('<Return>', lambda e: self.search_hotspots())
         self.system_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         
@@ -256,7 +254,7 @@ class RingFinder:
         specific_material_combo.grid(row=2, column=1, sticky="w", padx=5, pady=5)
         
         # Add tooltips for the filters
-        ToolTip(material_combo, "Filter by ring type:\nâ€¢ Metallic: Platinum, Gold, Silver\nâ€¢ Icy: LTDs, Tritium, Bromellite\nâ€¢ Rocky: Alexandrite, Benitoite, Opals\nâ€¢ Metal Rich: Painite, Osmium")
+        ToolTip(material_combo, "Filter by ring type:\n- Metallic: Platinum, Gold, Silver\n- Icy: LTDs, Tritium, Bromellite\n- Rocky: Alexandrite, Benitoite, Opals\n- Metal Rich: Painite, Osmium")
         ToolTip(specific_material_combo, "Filter by specific material:\nAutomatically shows only confirmed hotspots\n(no theoretical ring data)")
         
         # Distance filter (now a dropdown)
@@ -273,23 +271,23 @@ class RingFinder:
         max_results_combo['values'] = ("10", "20", "30", "50", "All")
         max_results_combo.grid(row=2, column=3, sticky="w", padx=5, pady=5)
         
-        # Confirmed hotspots only checkbox
-        try:
-            self.confirmed_only_var = tk.BooleanVar(value=False)
-            self.confirmed_checkbox = tk.Checkbutton(search_frame, 
-                                              text="Confirmed hotspots only",
-                                              variable=self.confirmed_only_var,
-                                              fg="#cccccc", bg="#1e1e1e", 
-                                              selectcolor="#333333",
-                                              activeforeground="#ffffff",
-                                              activebackground="#1e1e1e")
-            self.confirmed_checkbox.grid(row=3, column=0, columnspan=2, sticky="w", padx=5, pady=5)
-            ToolTip(self.confirmed_checkbox, "Show only rings with confirmed mining hotspots\n(automatically enabled when material filter is used)")
-        except Exception as e:
-            print(f"Error creating confirmed hotspots checkbox: {e}")
-            # Create fallback variables
-            self.confirmed_only_var = tk.BooleanVar(value=False)
-            self.confirmed_checkbox = None
+        # Confirmed hotspots only checkbox - DISABLED FOR TESTING
+        # try:
+        #     self.confirmed_only_var = tk.BooleanVar(value=False)
+        #     self.confirmed_checkbox = tk.Checkbutton(search_frame, 
+        #                                       text="Confirmed hotspots only",
+        #                                       variable=self.confirmed_only_var,
+        #                                       fg="#cccccc", bg="#1e1e1e", 
+        #                                       selectcolor="#333333",
+        #                                       activeforeground="#ffffff",
+        #                                       activebackground="#1e1e1e")
+        #     self.confirmed_checkbox.grid(row=3, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        #     ToolTip(self.confirmed_checkbox, "Show only rings with confirmed mining hotspots\n(automatically enabled when material filter is used)")
+        # except Exception as e:
+        #     print(f"Error creating confirmed hotspots checkbox: {e}")
+        #     # Create fallback variables
+        self.confirmed_only_var = tk.BooleanVar(value=False)
+        self.confirmed_checkbox = None
         
         # Now bind material combo change and initialize (after all widgets are created)
         specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_change)
@@ -301,11 +299,11 @@ class RingFinder:
             print(f"Warning: Failed to initialize material change handler: {e}")
         
         # Add tooltip for distance limitation
-        ToolTip(distance_combo, "Maximum search radius in light years\nEDSM API limits searches to 100 LY maximum\nRecommended: 10-50 LY for better performance")
+        ToolTip(distance_combo, "Maximum search radius in light years\nSearches are limited to 100 LY maximum\nRecommended: 10-50 LY for better performance")
         
         # Search limitations info text (bottom of search controls)
         info_text = tk.Label(search_frame, 
-                            text="ℹ Search covers populated systems within the bubble • Ring data from EDTools community database • Please allow time between searches",
+                            text="ℹ Search covers systems within the bubble  |  'No data' = Information not available",
                             fg="#cccccc", bg="#1e1e1e", font=("Segoe UI", 8, "italic"), 
                             justify="left")
         info_text.grid(row=4, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 10))
@@ -319,7 +317,7 @@ class RingFinder:
         tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Visited", "Ring", "Ring Type", "Hotspots", "Density", "Radius (Inner/Outer)")
+        columns = ("Distance", "LS", "System", "Visited", "Ring", "Ring Type", "Hotspots", "Density")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
         
         # Set column widths - similar to EDTOOLS layout
@@ -331,8 +329,7 @@ class RingFinder:
             "Ring Type": 120,
             "Hotspots": 200,
             "Visited": 60,
-            "Density": 110,
-            "Radius (Inner/Outer)": 180
+            "Density": 110
         }
         
         for col in columns:
@@ -355,8 +352,6 @@ class RingFinder:
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
             elif col == "Density":
                 self.results_tree.column(col, width=column_widths[col], minwidth=90, anchor="center", stretch=False)
-            elif col == "Radius (Inner/Outer)":
-                self.results_tree.column(col, width=column_widths[col], minwidth=180, anchor="center", stretch=False)
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.results_tree.yview)
@@ -374,6 +369,11 @@ class RingFinder:
         # Configure grid weights
         tree_frame.grid_columnconfigure(0, weight=1)
         tree_frame.grid_rowconfigure(0, weight=1)
+        
+        # Update database info immediately and schedule a delayed update (use parent window's after method)
+        self._update_database_info()
+        if hasattr(self.master, 'after'):
+            self.master.after(100, self._update_database_info)
         
         # Store sort state
         self.sort_reverse = {}
@@ -394,7 +394,7 @@ class RingFinder:
             # Numeric sort - handle N/A values
             def sort_key(item):
                 val = item[0]
-                if val == "N/A" or val == "":
+                if val == "No data" or val == "":
                     return float('inf') if not reverse else float('-inf')
                 # Remove commas and convert to float
                 try:
@@ -413,10 +413,38 @@ class RingFinder:
         # Update sort direction for next click
         self.sort_reverse[col] = not reverse
         
-        # Update heading to show sort direction
-        heading_text = col + (" â†“" if reverse else " â†‘")
-        self.results_tree.heading(col, text=heading_text, command=lambda: self._sort_column(col, self.sort_reverse[col]))
+        # Update heading without sort indicators
+        self.results_tree.heading(col, text=col, command=lambda: self._sort_column(col, self.sort_reverse[col]))
         
+    def _update_database_info(self):
+        """Update the database info label with total hotspots and systems count"""
+        try:
+            import sqlite3
+            print(f"[DB INFO] Updating database info from: {self.user_db.db_path}")
+            with sqlite3.connect(self.user_db.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Count total hotspots (table is named hotspot_data, not hotspots)
+                cursor.execute("SELECT COUNT(*) FROM hotspot_data")
+                total_hotspots = cursor.fetchone()[0]
+                
+                # Count unique systems
+                cursor.execute("SELECT COUNT(DISTINCT system_name) FROM hotspot_data")
+                total_systems = cursor.fetchone()[0]
+                
+                # Format with thousand separators
+                hotspots_str = f"{total_hotspots:,}"
+                systems_str = f"{total_systems:,}"
+                
+                info_text = f"Total: {hotspots_str} hotspots in {systems_str} systems"
+                print(f"[DB INFO] Setting text: {info_text}")
+                self.db_info_var.set(info_text)
+        except Exception as e:
+            print(f"[DB INFO] Error updating database info: {e}")
+            import traceback
+            traceback.print_exc()
+            self.db_info_var.set("Total: ... hotspots in ... systems")
+    
     def _on_canvas_configure(self, event):
         """Handle canvas resize to make scrollable frame fill canvas dimensions"""
         canvas_width = event.width
@@ -436,13 +464,13 @@ class RingFinder:
                 db_materials = cursor.fetchall()
                 
                 # Convert database materials to display names and collect them
-                display_materials = []
+                display_materials = set()  # Use set to automatically deduplicate
                 for (material,) in db_materials:
                     display_name = self._format_material_for_display(material)
-                    display_materials.append(display_name)
+                    display_materials.add(display_name)
                 
-                # Sort the display names alphabetically
-                display_materials.sort()
+                # Convert to sorted list
+                display_materials = sorted(display_materials)
                 
                 # Add sorted materials to the list
                 materials.extend(display_materials)
@@ -453,14 +481,15 @@ class RingFinder:
             print(f"Warning: Could not load materials from database: {e}")
             # Fallback to hardcoded sorted list
             return ("All Materials", "Alexandrite", "Benitoite", "Bromellite", "Grandidierite", 
-                   "Low Temperature Diamonds", "Monazite", "Musgravite", "Painite", 
+                   "Low Temp Diamonds", "Monazite", "Musgravite", "Painite", 
                    "Platinum", "Rhodplumsite", "Serendibite", "Tritium", "Void Opals")
     
     def _format_material_for_display(self, material_name: str) -> str:
         """Format material name for display in dropdown"""
         # Convert database names to user-friendly display names
         display_mapping = {
-            'LowTemperatureDiamond': 'Low Temperature Diamonds',
+            'Low Temperature Diamonds': 'Low Temp Diamonds',  # Shorten for dropdown
+            'LowTemperatureDiamond': 'Low Temp Diamonds',     # Handle old format
             'Opal': 'Void Opals'  # Since these are void opal hotspots
         }
         
@@ -614,16 +643,16 @@ class RingFinder:
             if specific_material in material_abbrevs:
                 for abbrev in material_abbrevs[specific_material]:
                     if abbrev in hotspot_display:
-                        print(f"âœ… DEBUG: Found '{specific_material}' (as {abbrev}) in hotspot: {hotspot_display}")
+                        print(f" DEBUG: Found '{specific_material}' (as {abbrev}) in hotspot: {hotspot_display}")
                         return True
             
             # Also check for full material name (case insensitive)
             if specific_material.lower() in hotspot_display.lower():
-                print(f"âœ… DEBUG: Found '{specific_material}' (full name) in hotspot: {hotspot_display}")
+                print(f" DEBUG: Found '{specific_material}' (full name) in hotspot: {hotspot_display}")
                 return True
                 
-            print(f"âŒ DEBUG: '{specific_material}' not found in hotspot: {hotspot_display}")
-            print(f"ðŸ” DEBUG: Looking for abbreviations: {material_abbrevs.get(specific_material, [])} in: {hotspot_display}")
+            print(f" DEBUG: '{specific_material}' not found in hotspot: {hotspot_display}")
+            print(f" DEBUG: Looking for abbreviations: {material_abbrevs.get(specific_material, [])} in: {hotspot_display}")
         
         return False
     
@@ -647,9 +676,9 @@ class RingFinder:
         # Auto-enable confirmed hotspots when filtering by specific material
         if specific_material != "All Materials":
             confirmed_only = True
-            print(f"ðŸŽ¯ DEBUG: Material filter active - auto-enabling confirmed hotspots only")
+            print(f" DEBUG: Material filter active - auto-enabling confirmed hotspots only")
 
-        print(f"ðŸ” SEARCH DEBUG: Ring Type='{material_filter}', Material='{specific_material}', Confirmed Only={confirmed_only}")
+        print(f" SEARCH DEBUG: Ring Type='{material_filter}', Material='{specific_material}', Confirmed Only={confirmed_only}")
         # self._log_debug(f"SEARCH: RingType='{material_filter}', Material='{specific_material}', ConfirmedOnly={confirmed_only}, ReferenceSystem='{reference_system}', MaxDistance={max_distance}")
 
         if not reference_system:
@@ -665,7 +694,7 @@ class RingFinder:
                 if old_system and old_system == reference_system:
                     # Same system, different criteria - clear material-specific cache
                     self.local_db.clear_cache(f"material_")
-                    print(f"ðŸ§¹ DEBUG: Cleared cache due to search criteria change")
+                    print(f" DEBUG: Cleared cache due to search criteria change")
         self._last_search_key = current_search_key
 
         # Set reference system coordinates for distance calculations (case insensitive)
@@ -685,13 +714,13 @@ class RingFinder:
             galaxy_coords = self._get_system_coords_from_galaxy_db(reference_system)
             if galaxy_coords:
                 self.current_system_coords = galaxy_coords
-                print(f"ðŸŒŒ DEBUG: Using galaxy database coordinates for '{reference_system}'")
+                print(f" DEBUG: Using galaxy database coordinates for '{reference_system}'")
             else:
                 # Only use EDSM as final fallback
                 # EDSM disabled - only use galaxy database as fallback
                 # self.current_system_coords = self._get_system_coords_from_edsm(reference_system)
                 if self.current_system_coords:
-                    print(f"ðŸ“¡ DEBUG: Using EDSM coordinates for '{reference_system}' (galaxy db not available)")
+                    print(f" DEBUG: Using EDSM coordinates for '{reference_system}' (galaxy db not available)")
 
             if not self.current_system_coords:
                 self.status_var.set(f"Warning: '{reference_system}' coordinates not found - distances may be inaccurate")
@@ -742,11 +771,11 @@ class RingFinder:
     def _search_user_database_first(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int = None) -> List[Dict]:
         """Search user database first for confirmed hotspots, return results in _update_results compatible format"""
         try:
-            print(f"ðŸ’Ž DEBUG: User database-first search for {specific_material} within {max_distance} LY")
+            print(f" DEBUG: User database-first search for {specific_material} within {max_distance} LY")
             
             # Get user database hotspots
             user_hotspots = self._get_user_database_hotspots(reference_system, material_filter, specific_material, max_distance)
-            print(f"ðŸ’Ž DEBUG: Found {len(user_hotspots)} user database hotspots")
+            print(f" DEBUG: Found {len(user_hotspots)} user database hotspots")
             
             if not user_hotspots:
                 return []
@@ -765,19 +794,19 @@ class RingFinder:
                 
                 # Get distance (already calculated in user_hotspots)
                 distance = hotspot.get('distance', 0)
-                ls_distance = hotspot.get('ls_distance', "N/A")  # Use actual LS distance from database
-                density = hotspot.get('density', "N/A")  # Use actual density from database
+                ls_distance = hotspot.get('ls_distance', "No data")  # Use actual LS distance from database
+                density = hotspot.get('density', "No data")  # Use actual density from database
                 
-                # Format LS distance properly for display
-                if ls_distance != "N/A" and ls_distance is not None:
+                # Format LS distance properly for display with comma separators
+                if ls_distance != "No data" and ls_distance is not None:
                     try:
-                        ls_distance = f"{int(float(ls_distance))}"
+                        ls_distance = f"{int(float(ls_distance)):,}"
                     except (ValueError, TypeError):
-                        ls_distance = "N/A"
+                        ls_distance = "No data"
                 
                 # Clean up the ring name using the existing method
                 raw_ring_name = body_name
-                clean_ring_name = self._clean_ring_name(raw_ring_name, body_name, system_name, source="spreadsheet")
+                clean_ring_name = self._clean_ring_name(raw_ring_name, body_name, system_name, source="user_database")
                 
                 # Debug: Check conversion for Delkar 7A entries
                 if system_name == "Delkar" and "7 A" in body_name:
@@ -792,13 +821,15 @@ class RingFinder:
                     'body': body_name,
                     'bodyName': body_name,
                     'ring': clean_ring_name,  # Use cleaned ring name
-                    'ring_type': hotspot.get('ring_type', 'Unknown'),  # Use ring_type from database
+                    'ring_type': hotspot.get('ring_type', 'No data') if hotspot.get('ring_type') not in [None, 'Unknown'] else 'No data',  # Clean ring_type from database
                     'type': material_name,  # Add the material name here
                     'ls': ls_distance,
                     'distance': f"{distance:.1f}" if distance > 0 else "0.0",
-                    'mass': "N/A",  # User database doesn't store ring mass
-                    'radius': "N/A",  # User database doesn't store ring radius
+                    'mass': "No data",  # User database doesn't store ring mass
+                    'radius': "No data",  # User database doesn't store ring radius
                     'density': density,  # Include density from database
+                    'inner_radius': hotspot.get('inner_radius'),  # Include inner radius from database
+                    'outer_radius': hotspot.get('outer_radius'),  # Include outer radius from database
                     'has_hotspots': True,
                     'hotspot_data': hotspot,
                     'count': hotspot_count,
@@ -817,11 +848,11 @@ class RingFinder:
             if max_results and len(compatible_results) > max_results:
                 compatible_results = compatible_results[:max_results]
             
-            print(f"ðŸ’Ž DEBUG: Converted {len(compatible_results)} user database hotspots to compatible format")
+            print(f" DEBUG: Converted {len(compatible_results)} user database hotspots to compatible format")
             return compatible_results
             
         except Exception as e:
-            print(f"âŒ DEBUG: User database-first search failed: {e}")
+            print(f" DEBUG: User database-first search failed: {e}")
             return []
     
     def _material_matches(self, target_material: str, hotspot_material: str) -> bool:
@@ -885,7 +916,7 @@ class RingFinder:
         return False
     
     def _determine_ring_type_from_material(self, material_name: str) -> str:
-        """DEPRECATED: Always return 'Unknown' to identify wrong code paths"""
+        """DEPRECATED: Always return 'No data' to identify wrong code paths"""
         print(f"⚠️ WARNING: Fallback ring type function called for '{material_name}' - this should not happen!")
         return "Unknown"  # Force obvious identification
             
@@ -924,13 +955,13 @@ class RingFinder:
             except:
                 pass
             
-            print(f"ðŸ” DEBUG: Calling EDSM bodies API for '{system_name}': {url}")
+            print(f" DEBUG: Calling EDSM bodies API for '{system_name}': {url}")
             response = requests.get(url, params=params, timeout=10)
-            print(f"ðŸ“¡ DEBUG: EDSM bodies API status: {response.status_code}")
+            print(f" DEBUG: EDSM bodies API status: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
-                print(f"ðŸ“Š DEBUG: EDSM bodies API returned {len(data.get('bodies', []))} bodies for '{system_name}'")
+                print(f" DEBUG: EDSM bodies API returned {len(data.get('bodies', []))} bodies for '{system_name}'")
                 mining_opportunities = []
                 
                 bodies_found = len(data.get('bodies', []))
@@ -970,7 +1001,7 @@ class RingFinder:
                         rings_found = len(body['rings'])
                         
                         for ring in body['rings']:
-                            ring_type = ring.get('type', 'Unknown')
+                            ring_type = ring.get('type', 'No data')
                             ring_name = ring.get('name', f"{body_name} Ring")
                             
                             # Get ring physical data
@@ -1003,9 +1034,9 @@ class RingFinder:
                                 mass_display = formatted.replace(".", ",")
                                 
                                 # Debug output
-                                print(f"ðŸ” DEBUG: Ring mass {ring_mass:.2e} API units = {mass_in_em:.4f} EM -> display: {mass_display}")
+                                print(f" DEBUG: Ring mass {ring_mass:.2e} API units = {mass_in_em:.4f} EM -> display: {mass_display}")
                             else:
-                                mass_display = "N/A"
+                                mass_display = "No data"
                             
                             # Clean up ring name to show only essential part
                             clean_ring_name = self._clean_ring_name(ring_name, body_name, system_name, source="spreadsheet")
@@ -1025,7 +1056,7 @@ class RingFinder:
                                     continue
                             
                             # Show primary materials for this ring type
-                            materials_to_show = materials_in_ring.get('primary', ['Unknown'])
+                            materials_to_show = materials_in_ring.get('primary', ['No data'])
                             
                             # Create single entry for this ring
                             mining_opportunities.append({
@@ -1033,10 +1064,10 @@ class RingFinder:
                                 'body': body_name,
                                 'ring': clean_ring_name,
                                 'ring_type': ring_type,
-                                'ls': str(int(distance_ls)) if distance_ls > 0 else "N/A",
+                                'ls': str(int(distance_ls)) if distance_ls > 0 else "No data",
                                 'distance': f"{distance:.1f}" if distance > 0 else "0.0",
                                 'mass': mass_display,
-                                'radius': f"{inner_radius:,} - {outer_radius:,}" if inner_radius > 0 and outer_radius > 0 else "N/A",
+                                'radius': f"{inner_radius:,} - {outer_radius:,}" if inner_radius > 0 and outer_radius > 0 else "No data",
                                 'source': 'EDSM Ring Data'
                             })
                 
@@ -1051,16 +1082,16 @@ class RingFinder:
         """Get systems within specified distance from reference system using local database or EDSM APIs"""
         
         reference_coords = self.current_system_coords
-        print(f"ðŸ” DEBUG: Reference system: {reference_system}")
-        print(f"ðŸ“ DEBUG: Reference coords: {reference_coords}")
-        print(f"ðŸ” DEBUG: Max distance: {max_distance} ly")
-        print(f"ðŸ—„ï¸ DEBUG: Using local database: {self.use_local_db}")
-        print(f"ðŸŽ¯ DEBUG: Material filter: {specific_material}")
+        print(f" DEBUG: Reference system: {reference_system}")
+        print(f" DEBUG: Reference coords: {reference_coords}")
+        print(f" DEBUG: Max distance: {max_distance} ly")
+        print(f" DEBUG: Using local database: {self.use_local_db}")
+        print(f" DEBUG: Material filter: {specific_material}")
         
         # Try local database first if enabled and available
         if self.use_local_db and self.local_db.is_database_available() and reference_coords:
             try:
-                print(f"ðŸ—„ï¸ DEBUG: Searching local database for systems within {max_distance} ly")
+                print(f" DEBUG: Searching local database for systems within {max_distance} ly")
                 # Create cache context that includes search criteria
                 cache_context = f"material_{specific_material}"
                 local_results = self.local_db.find_nearby_systems(
@@ -1073,13 +1104,13 @@ class RingFinder:
                 )
                 
                 if local_results:
-                    print(f"âœ… DEBUG: Local database found {len(local_results)} systems")
+                    print(f" DEBUG: Local database found {len(local_results)} systems")
                     
                     # Check for specific test systems
                     test_systems = ["Coalsack Sector RI-T c3-22", "Coalsack Sector AQ-O b6-10"]
                     for test_system in test_systems:
                         found_in_results = any(s['name'].lower() == test_system.lower() for s in local_results)
-                        print(f"ðŸ” DEBUG: Test system '{test_system}' found in results: {found_in_results}")
+                        print(f" DEBUG: Test system '{test_system}' found in results: {found_in_results}")
                         if found_in_results:
                             system_data = next(s for s in local_results if s['name'].lower() == test_system.lower())
                             print(f"  ðŸ“ Coordinates: ({system_data['coordinates']['x']:.2f}, {system_data['coordinates']['y']:.2f}, {system_data['coordinates']['z']:.2f})")
@@ -1094,19 +1125,19 @@ class RingFinder:
                             'coordinates': system['coordinates']
                         })
                     
-                    print(f"ðŸŽ¯ DEBUG: Local database distance range: {nearby_systems[0]['distance']:.2f} - {nearby_systems[-1]['distance']:.2f} ly")
+                    print(f" DEBUG: Local database distance range: {nearby_systems[0]['distance']:.2f} - {nearby_systems[-1]['distance']:.2f} ly")
                     
                     # Log first few and last few systems for debugging
-                    print("ðŸ—„ï¸ DEBUG: First 3 systems:")
+                    print(" DEBUG: First 3 systems:")
                     for i, system in enumerate(nearby_systems[:3]):
                         print(f"  {i+1}. {system['name']} ({system['distance']:.2f} LY)")
                     if len(nearby_systems) > 6:
-                        print("ðŸ—„ï¸ DEBUG: Last 3 systems:")
+                        print(" DEBUG: Last 3 systems:")
                         for i, system in enumerate(nearby_systems[-3:]):
                             print(f"  {len(nearby_systems)-2+i}. {system['name']} ({system['distance']:.2f} LY)")
                     
                     # ENHANCEMENT: Also search user database for visited systems with coordinates
-                    print("ðŸ‘¤ DEBUG: Searching user database for additional visited systems...")
+                    print(" DEBUG: Searching user database for additional visited systems...")
                     try:
                         if hasattr(self, 'user_db') and self.user_db:
                             user_systems = self.user_db._get_nearby_visited_systems(
@@ -1118,7 +1149,7 @@ class RingFinder:
                             )
                             
                             if user_systems:
-                                print(f"ðŸ‘¤ DEBUG: Found {len(user_systems)} additional systems from user database")
+                                print(f" DEBUG: Found {len(user_systems)} additional systems from user database")
                                 
                                 # Merge user systems with galaxy systems, avoiding duplicates
                                 existing_names = {s['name'].lower() for s in nearby_systems}
@@ -1129,21 +1160,21 @@ class RingFinder:
                                 
                                 # Re-sort by distance after adding user systems
                                 nearby_systems.sort(key=lambda x: x['distance'])
-                                print(f"ðŸŽ¯ DEBUG: Combined database distance range: {nearby_systems[0]['distance']:.2f} - {nearby_systems[-1]['distance']:.2f} ly")
+                                print(f" DEBUG: Combined database distance range: {nearby_systems[0]['distance']:.2f} - {nearby_systems[-1]['distance']:.2f} ly")
                             else:
-                                print("ðŸ‘¤ DEBUG: No additional systems found in user database")
+                                print(" DEBUG: No additional systems found in user database")
                     except Exception as e:
-                        print(f"âš ï¸ DEBUG: Error searching user database: {e}")
+                        print(f" DEBUG: Error searching user database: {e}")
                     
                     return nearby_systems
                 else:
-                    print(f"âš ï¸ DEBUG: Local database returned no results")
+                    print(f" DEBUG: Local database returned no results")
             except Exception as e:
-                print(f"âŒ DEBUG: Local database search failed: {e}")
+                print(f" DEBUG: Local database search failed: {e}")
                 # Fall back to API search
                 
         # Fallback to existing API-based search methods (Note: Local database is much more efficient)
-        print(f"ðŸŒ DEBUG: Falling back to API-based search methods (Recommend enabling local database for better results)")
+        print(f" DEBUG: Falling back to API-based search methods (Recommend enabling local database for better results)")
         
         # Get API key from config first
         api_key = ""
@@ -1152,16 +1183,16 @@ class RingFinder:
             cfg = _load_cfg()
             api_key = cfg.get("edsm_api_key", "")
             if api_key:
-                print(f"ðŸ”‘ DEBUG: Using EDSM API key from config")
+                print(f" DEBUG: Using EDSM API key from config")
             else:
-                print(f"âš ï¸ DEBUG: No EDSM API key configured")
+                print(f" DEBUG: No EDSM API key configured")
         except Exception as e:
-            print(f"âŒ DEBUG: Could not load API key from config: {e}")
+            print(f" DEBUG: Could not load API key from config: {e}")
             
         reference_coords = self.current_system_coords
-        print(f"ðŸ” DEBUG: Reference system: {reference_system}")
-        print(f"ï¿½ DEBUG: Reference coords: {reference_coords}")
-        print(f"ðŸ” DEBUG: Max distance: {max_distance} ly")
+        print(f" DEBUG: Reference system: {reference_system}")
+        print(f" DEBUG: Reference coords: {reference_coords}")
+        print(f" DEBUG: Max distance: {max_distance} ly")
             
         # Try EDSM cube-systems API first (more reliable than sphere-systems)
         try:
@@ -1176,29 +1207,29 @@ class RingFinder:
                     "size": min(max_distance * 2, 200),  # EDSM max is 200 ly, cube needs size not radius
                     "showCoordinates": 1
                 }
-                print(f"ðŸŒ DEBUG: Using EDSM cube-systems with coordinates and size: {min(max_distance * 2, 200)} ly")
+                print(f" DEBUG: Using EDSM cube-systems with coordinates and size: {min(max_distance * 2, 200)} ly")
             else:
                 params = {
                     "systemName": reference_system,
                     "size": min(max_distance * 2, 200),  # EDSM max is 200 ly
                     "showCoordinates": 1
                 }
-                print(f"ðŸŒ DEBUG: Using EDSM cube-systems with system name: {reference_system}")
+                print(f" DEBUG: Using EDSM cube-systems with system name: {reference_system}")
             
             if api_key:
                 params["apiKey"] = api_key
             
-            print(f"ðŸ”„ DEBUG: EDSM cube-systems API call: {url}")
+            print(f" DEBUG: EDSM cube-systems API call: {url}")
             
             response = requests.get(url, params=params, timeout=15)
             response.raise_for_status()
-            print(f"ðŸ“¡ DEBUG: EDSM cube-systems Response status: {response.status_code}")
+            print(f" DEBUG: EDSM cube-systems Response status: {response.status_code}")
             
             systems_data = response.json()
-            print(f"ðŸ“Š DEBUG: EDSM cube-systems returned data type: {type(systems_data)}")
+            print(f" DEBUG: EDSM cube-systems returned data type: {type(systems_data)}")
             
             if isinstance(systems_data, list) and len(systems_data) > 0:
-                print(f"âœ… DEBUG: Found {len(systems_data)} systems near {reference_system} using cube-systems API")
+                print(f" DEBUG: Found {len(systems_data)} systems near {reference_system} using cube-systems API")
                 
                 nearby_systems = []
                 test_systems = ["Coalsack Sector RI-T c3-22", "Coalsack Sector AQ-O b6-10"]
@@ -1210,7 +1241,7 @@ class RingFinder:
                         
                         # Check for test systems in raw EDSM data
                         if any(test_sys.lower() in system['name'].lower() for test_sys in test_systems):
-                            print(f"ðŸ” DEBUG: Found test system in EDSM data: '{system['name']}' at {distance:.2f} LY")
+                            print(f" DEBUG: Found test system in EDSM data: '{system['name']}' at {distance:.2f} LY")
                             print(f"  ðŸ“ Coordinates: ({system_coords['x']:.2f}, {system_coords['y']:.2f}, {system_coords['z']:.2f})")
                             print(f"  âœ… Within max distance ({max_distance} LY): {distance <= max_distance}")
                             print(f"  âœ… Not reference system: {system['name'].lower() != reference_system.lower()}")
@@ -1228,32 +1259,32 @@ class RingFinder:
                 # Check if test systems made it into final results
                 for test_system in test_systems:
                     found_in_final = any(s['name'].lower() == test_system.lower() for s in nearby_systems)
-                    print(f"ðŸ” DEBUG: Test system '{test_system}' in final API results: {found_in_final}")
+                    print(f" DEBUG: Test system '{test_system}' in final API results: {found_in_final}")
                 
                 # Sort by distance
                 nearby_systems.sort(key=lambda x: x['distance'])
-                print(f"âœ… DEBUG: Processed {len(nearby_systems)} nearby systems within {max_distance} ly using cube-systems API")
+                print(f" DEBUG: Processed {len(nearby_systems)} nearby systems within {max_distance} ly using cube-systems API")
                 if nearby_systems:
-                    print(f"ðŸŽ¯ DEBUG: Distance range: {nearby_systems[0]['distance']:.2f} - {nearby_systems[-1]['distance']:.2f} ly")
+                    print(f" DEBUG: Distance range: {nearby_systems[0]['distance']:.2f} - {nearby_systems[-1]['distance']:.2f} ly")
                 return nearby_systems
                 
             elif isinstance(systems_data, dict):
                 if 'error' in systems_data:
-                    print(f"âŒ DEBUG: EDSM cube-systems API error: {systems_data['error']}")
+                    print(f" DEBUG: EDSM cube-systems API error: {systems_data['error']}")
                 elif len(systems_data) == 0:
-                    print(f"âš ï¸ DEBUG: EDSM cube-systems API returned empty dict (API may have changed or require different parameters)")
+                    print(f" DEBUG: EDSM cube-systems API returned empty dict (API may have changed or require different parameters)")
                 else:
-                    print(f"âš ï¸ DEBUG: EDSM cube-systems returned unexpected dict format: {systems_data}")
+                    print(f" DEBUG: EDSM cube-systems returned unexpected dict format: {systems_data}")
             else:
-                print(f"âš ï¸ DEBUG: EDSM cube-systems returned unexpected format")
+                print(f" DEBUG: EDSM cube-systems returned unexpected format")
                 
         except Exception as e:
-            print(f"âŒ DEBUG: EDSM cube-systems API failed: {e}")
+            print(f" DEBUG: EDSM cube-systems API failed: {e}")
             
         # Try sector-based search as secondary fallback
         try:
             if reference_coords:
-                print(f"ðŸ” DEBUG: Trying sector-based search for region near {reference_system}")
+                print(f" DEBUG: Trying sector-based search for region near {reference_system}")
                 
                 # Common sector patterns in Elite Dangerous
                 sector_patterns = [
@@ -1282,7 +1313,7 @@ class RingFinder:
                         if response.status_code == 200:
                             systems = response.json()
                             if isinstance(systems, list):
-                                print(f"ðŸ“¡ DEBUG: Found {len(systems)} systems matching '{pattern}'")
+                                print(f" DEBUG: Found {len(systems)} systems matching '{pattern}'")
                                 
                                 for system in systems[:500]:  # Limit to first 500 to avoid timeout
                                     if 'coords' in system and 'name' in system:
@@ -1304,21 +1335,21 @@ class RingFinder:
                                     break
                                     
                     except Exception as pattern_error:
-                        print(f"âš ï¸ DEBUG: Pattern '{pattern}' search failed: {pattern_error}")
+                        print(f" DEBUG: Pattern '{pattern}' search failed: {pattern_error}")
                         continue
                 
                 if sector_systems:
                     sector_systems.sort(key=lambda x: x['distance'])
-                    print(f"âœ… DEBUG: Sector-based search found {len(sector_systems)} systems within {max_distance} ly")
+                    print(f" DEBUG: Sector-based search found {len(sector_systems)} systems within {max_distance} ly")
                     if sector_systems:
-                        print(f"ðŸŽ¯ DEBUG: Distance range: {sector_systems[0]['distance']:.2f} - {sector_systems[-1]['distance']:.2f} ly")
+                        print(f" DEBUG: Distance range: {sector_systems[0]['distance']:.2f} - {sector_systems[-1]['distance']:.2f} ly")
                     return sector_systems
                     
         except Exception as e:
-            print(f"âŒ DEBUG: Sector-based search failed: {e}")
+            print(f" DEBUG: Sector-based search failed: {e}")
             
         # Final fallback: Use a curated list of known systems for popular mining areas
-        print(f"ï¿½ DEBUG: Using fallback system list for nearby systems search")
+        print(f" DEBUG: Using fallback system list for nearby systems search")
         
         known_mining_systems = [
             "Sol", "Alpha Centauri", "Wolf 359", "Lalande 21185", "Sirius", "BV Phoenicis",
@@ -1337,7 +1368,7 @@ class RingFinder:
         reference_coords = self.current_system_coords
         
         if reference_coords:
-            print(f"ðŸŽ¯ DEBUG: Reference coords available: {reference_coords}")
+            print(f" DEBUG: Reference coords available: {reference_coords}")
             for sys_name in known_mining_systems:
                 # Skip the reference system itself
                 if sys_name.lower() == reference_system.lower():
@@ -1363,7 +1394,7 @@ class RingFinder:
             
             # If no systems found within range, relax the distance requirement
             if not nearby_systems and max_distance < 200:
-                print(f"âš ï¸ DEBUG: No systems found within {max_distance} LY, expanding search to find closest systems")
+                print(f" DEBUG: No systems found within {max_distance} LY, expanding search to find closest systems")
                 # Find the closest systems regardless of distance limit
                 all_systems_with_distances = []
                 for sys_name in known_mining_systems:
@@ -1387,17 +1418,17 @@ class RingFinder:
                 if all_systems_with_distances:
                     all_systems_with_distances.sort(key=lambda x: x['distance'])
                     nearby_systems = all_systems_with_distances[:10]
-                    print(f"ðŸŽ¯ DEBUG: Using {len(nearby_systems)} closest systems as fallback (range: {nearby_systems[0]['distance']:.1f} - {nearby_systems[-1]['distance']:.1f} LY)")
+                    print(f" DEBUG: Using {len(nearby_systems)} closest systems as fallback (range: {nearby_systems[0]['distance']:.1f} - {nearby_systems[-1]['distance']:.1f} LY)")
                         
             # Sort by distance
             nearby_systems.sort(key=lambda x: x['distance'])
             if nearby_systems:
-                print(f"ðŸŽ¯ DEBUG: Fallback method found {len(nearby_systems)} systems within {max_distance} LY")
+                print(f" DEBUG: Fallback method found {len(nearby_systems)} systems within {max_distance} LY")
             else:
-                print(f"ðŸŽ¯ DEBUG: Fallback method found {len(nearby_systems)} systems (expanded search)")
+                print(f" DEBUG: Fallback method found {len(nearby_systems)} systems (expanded search)")
         else:
             # If no reference coordinates, return a reasonable subset of known systems
-            print(f"âš ï¸ DEBUG: No reference coordinates available, using nearby systems from popular mining areas")
+            print(f" DEBUG: No reference coordinates available, using nearby systems from popular mining areas")
             for sys_name in known_mining_systems[:30]:
                 if sys_name.lower() != reference_system.lower():
                     nearby_systems.append({
@@ -1405,15 +1436,16 @@ class RingFinder:
                         'distance': 0.0,  # Unknown distance
                         'coordinates': {'x': 0, 'y': 0, 'z': 0}
                     })
-            print(f"ðŸŽ¯ DEBUG: Fallback method (no coords) returning {len(nearby_systems)} popular systems")
+            print(f" DEBUG: Fallback method (no coords) returning {len(nearby_systems)} popular systems")
                 
         return nearby_systems
 
     def _clean_ring_name(self, full_ring_name: str, body_name: str, system_name: str, source: str = None) -> str:
-        """Preserve spreadsheet-imported ring names; clean only for journal/API data."""
+        """Preserve spreadsheet-imported and user database ring names; clean only for journal/API data."""
         try:
-            # If source is spreadsheet import, return the original name
-            if source == "spreadsheet":
+            # If source is spreadsheet import or user database, return the original name
+            # These sources already have properly formatted ring names
+            if source in ("spreadsheet", "user_database"):
                 return full_ring_name
             # Otherwise, apply cleaning for journal/API data
             # ...existing cleaning logic...
@@ -1458,7 +1490,7 @@ class RingFinder:
 
     def _get_fallback_hotspots(self, search_term: str, material_filter: str) -> List[Dict]:
         """Search user database for hotspots when EDSM has no results"""
-        print(f"ðŸ” DEBUG: Searching user database for {material_filter} hotspots")
+        print(f" DEBUG: Searching user database for {material_filter} hotspots")
         
         try:
             # Search user database for hotspots - no distance filtering needed
@@ -1484,7 +1516,7 @@ class RingFinder:
                     ''', (material_filter,))
                 
                 results = cursor.fetchall()
-                print(f"ðŸ“Š DEBUG: Found {len(results)} hotspot entries in user database")
+                print(f" DEBUG: Found {len(results)} hotspot entries in user database")
                 
                 # Process each hotspot result
                 for system_name, body_name, material_name, hotspot_count, ring_type_db in results:
@@ -1512,14 +1544,14 @@ class RingFinder:
                             'coords': system_coords,
                             'data_source': 'EDTools.cc Community Data',
                             'ring_mass': 0,  # Default values for compatibility
-                            'ring_type': ring_type_db if ring_type_db else 'Unknown',  # Use ring_type from database
+                            'ring_type': ring_type_db if ring_type_db else 'No data',  # Use ring_type from database
                             'debug_id': 'SECTION_1'  # Track which section created this entry
                         }
                         
                         user_hotspots.append(hotspot_entry)
                         
                     except Exception as e:
-                        print(f"âš ï¸ DEBUG: Error processing {system_name}: {e}")
+                        print(f" DEBUG: Error processing {system_name}: {e}")
                         continue
                 
                 # Sort by hotspot count first (best hotspots), then by distance
@@ -1529,13 +1561,13 @@ class RingFinder:
                 max_user_results = 50
                 if len(user_hotspots) > max_user_results:
                     user_hotspots = user_hotspots[:max_user_results]
-                    print(f"ðŸ“ DEBUG: Limited user database results to {max_user_results}")
+                    print(f" DEBUG: Limited user database results to {max_user_results}")
                 
-                print(f"âœ… DEBUG: Returning {len(user_hotspots)} user database hotspots")
+                print(f" DEBUG: Returning {len(user_hotspots)} user database hotspots")
                 return user_hotspots
                 
         except Exception as e:
-            print(f"âŒ DEBUG: User database search failed: {e}")
+            print(f" DEBUG: User database search failed: {e}")
             return []
     
     def _get_user_database_hotspots(self, reference_system: str, ring_type_filter: str, material_filter: str, max_distance: float) -> List[Dict]:
@@ -1549,27 +1581,40 @@ class RingFinder:
             # Get reference coordinates from multiple sources FIRST
             reference_coords = self.current_system_coords
             if not reference_coords and reference_system:
-                # Try user database first
+                # Try user database first - check visited_systems table (most reliable for current location)
                 with sqlite3.connect(self.user_db.db_path) as conn:
                     cursor = conn.cursor()
                     cursor.execute('''
-                        SELECT DISTINCT x_coord, y_coord, z_coord 
-                        FROM hotspot_data 
+                        SELECT x_coord, y_coord, z_coord 
+                        FROM visited_systems 
                         WHERE system_name = ? AND x_coord IS NOT NULL
                         LIMIT 1
                     ''', (reference_system,))
                     ref_result = cursor.fetchone()
                     if ref_result:
                         reference_coords = {'x': ref_result[0], 'y': ref_result[1], 'z': ref_result[2]}
-                        print(f"ðŸ’Ž DEBUG: Found reference system {reference_system} in user database")
+                        print(f" DEBUG: Found reference system {reference_system} in visited_systems table")
+                    
+                    # Fallback to hotspot_data table if not in visited_systems
+                    if not ref_result:
+                        cursor.execute('''
+                            SELECT DISTINCT x_coord, y_coord, z_coord 
+                            FROM hotspot_data 
+                            WHERE system_name = ? AND x_coord IS NOT NULL
+                            LIMIT 1
+                        ''', (reference_system,))
+                        ref_result = cursor.fetchone()
+                        if ref_result:
+                            reference_coords = {'x': ref_result[0], 'y': ref_result[1], 'z': ref_result[2]}
+                            print(f" DEBUG: Found reference system {reference_system} in hotspot_data table")
                 
                 # Fallback to galaxy_systems.db for reference coordinates
                 if not reference_coords:
                     reference_coords = self._get_system_coords_from_galaxy_db(reference_system)
                     if reference_coords:
-                        print(f"ðŸŒŒ DEBUG: Found reference system {reference_system} in galaxy database")
+                        print(f" DEBUG: Found reference system {reference_system} in galaxy database")
                     else:
-                        print(f"âš  DEBUG: Reference system {reference_system} not found in any database, will show all results without distance filtering")
+                        print(f" DEBUG: Reference system {reference_system} not found in any database, will show all results without distance filtering")
             
             with sqlite3.connect(self.user_db.db_path) as conn:
                 cursor = conn.cursor()
@@ -1579,39 +1624,75 @@ class RingFinder:
                 if reference_coords and max_distance < 1000:  # Only pre-filter for specific distance searches
                     systems_in_range = self._find_systems_in_range(reference_coords, max_distance)
                     if systems_in_range:
-                        print(f"ðŸŽ¯ DEBUG: Pre-filtered to {len(systems_in_range)} systems within {max_distance} LY")
+                        print(f" DEBUG: Pre-filtered to {len(systems_in_range)} systems within {max_distance} LY")
                 
                 # Build optimized query based on whether we have a system filter
                 if systems_in_range:
                     # Create placeholders for the IN clause
                     placeholders = ','.join(['?'] * len(systems_in_range))
-                    query = f'''
-                        SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
-                               x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type
-                        FROM hotspot_data
-                        WHERE system_name IN ({placeholders})
-                        ORDER BY 
-                            hotspot_count DESC, system_name, body_name
-                    '''
+                    
+                    # Different query for "All Materials" vs specific material
+                    if material_filter == "All Materials":
+                        # Show ALL rings of this type (one row per ring, combining hotspot info)
+                        query = f'''
+                            SELECT system_name, body_name, 
+                                   GROUP_CONCAT(material_name, ', ') as material_name,
+                                   SUM(hotspot_count) as hotspot_count,
+                                   x_coord, y_coord, z_coord, coord_source, 
+                                   ls_distance, density, ring_type, inner_radius, outer_radius
+                            FROM hotspot_data
+                            WHERE system_name IN ({placeholders})
+                            GROUP BY system_name, body_name
+                            ORDER BY system_name, body_name
+                        '''
+                    else:
+                        # Show only rings WITH this specific material (current behavior)
+                        query = f'''
+                            SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
+                                   x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type, inner_radius, outer_radius
+                            FROM hotspot_data
+                            WHERE system_name IN ({placeholders})
+                            ORDER BY 
+                                hotspot_count DESC, system_name, body_name
+                        '''
                     cursor.execute(query, systems_in_range)
                 else:
                     # If no systems in range found, try direct system name search first
-                    direct_search_query = '''
-                        SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
-                               x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type
-                        FROM hotspot_data
-                        WHERE system_name LIKE ? OR system_name = ?
-                        ORDER BY 
-                            hotspot_count DESC, system_name, body_name
-                        LIMIT 1000
-                    '''
                     search_pattern = f"%{reference_system}%"
+                    
+                    # Different query for "All Materials" vs specific material
+                    if material_filter == "All Materials":
+                        # Show ALL rings of this type (one row per ring)
+                        direct_search_query = '''
+                            SELECT system_name, body_name, 
+                                   GROUP_CONCAT(material_name, ', ') as material_name,
+                                   SUM(hotspot_count) as hotspot_count,
+                                   x_coord, y_coord, z_coord, coord_source, 
+                                   ls_distance, density, ring_type, inner_radius, outer_radius
+                            FROM hotspot_data
+                            WHERE system_name LIKE ? OR system_name = ?
+                            GROUP BY system_name, body_name
+                            ORDER BY system_name, body_name
+                            LIMIT 1000
+                        '''
+                    else:
+                        # Show only rings WITH this specific material
+                        direct_search_query = '''
+                            SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
+                                   x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type, inner_radius, outer_radius
+                            FROM hotspot_data
+                            WHERE system_name LIKE ? OR system_name = ?
+                            ORDER BY 
+                                hotspot_count DESC, system_name, body_name
+                            LIMIT 1000
+                        '''
+                    
                     cursor.execute(direct_search_query, (search_pattern, reference_system))
                     direct_results = cursor.fetchall()
                     
                     if direct_results:
                         results = direct_results
-                        print(f"� DEBUG: Found {len(results)} systems matching '{reference_system}'")
+                        print(f" DEBUG: Found {len(results)} systems matching '{reference_system}'")
                     else:
                         print(f"❌ No systems found matching '{reference_system}' - search complete")
                         # Update status to show no results found
@@ -1622,21 +1703,20 @@ class RingFinder:
                         return []
                 
                 results = cursor.fetchall()
-                print(f"ðŸ’Ž DEBUG: Found {len(results)} total hotspot entries, will filter by material using smart matching")
+                print(f" DEBUG: Found {len(results)} total hotspot entries, will filter by material using smart matching")
                 
                 material_matches = 0
                 systems_with_coords = 0
                 systems_without_coords = 0
                 
-                for system_name, body_name, material_name, hotspot_count, x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type_db in results:
+                for system_name, body_name, material_name, hotspot_count, x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type_db, inner_radius, outer_radius in results:
                     try:
                         # Filter by specific material using our smart material matching
                         if material_filter != "All Materials" and not self._material_matches(material_filter, material_name):
                             continue
                         
-                        # Use ring type from database instead of determining from material
-                        # ring_type = self._determine_ring_type_from_material(material_name)  # OLD WRONG WAY
-                        ring_type = ring_type_db if ring_type_db else self._determine_ring_type_from_material(material_name)  # Use DB first, fallback if needed
+                        # Use ring type from database - no fallback needed
+                        ring_type = ring_type_db if ring_type_db else "No data"
                         
                         # Filter by ring type
                         if ring_type_filter != "All" and ring_type != ring_type_filter:
@@ -1697,13 +1777,15 @@ class RingFinder:
                             'ring_type': ring_type,  # Use ring_type from database
                             'ls_distance': ls_distance,  # Include LS distance from database
                             'density': density,  # Include density from database
+                            'inner_radius': inner_radius,  # Include inner radius from database
+                            'outer_radius': outer_radius,  # Include outer radius from database
                             'debug_id': 'SECTION_2'  # Track which section created this entry
                         }
                         
                         user_hotspots.append(hotspot_entry)
                         
                     except Exception as e:
-                        print(f"ðŸ’Ž DEBUG: Error processing {system_name}: {e}")
+                        print(f" DEBUG: Error processing {system_name}: {e}")
                         continue
                 
                 # Sort by hotspot quality first, then distance
@@ -1714,15 +1796,15 @@ class RingFinder:
                     # For "All Materials", sort by distance if available, otherwise by count
                     user_hotspots.sort(key=lambda x: (x['distance'], -x['count']))
                 
-                print(f"ðŸ’Ž DEBUG: Material matches: {material_matches}")
-                print(f"ðŸ’Ž DEBUG: Applied filters - Ring Type: '{ring_type_filter}', Material: '{material_filter}'")
-                print(f"ðŸ’Ž DEBUG: Systems with coordinates: {systems_with_coords}, without coordinates: {systems_without_coords}")
-                print(f"ðŸ’Ž DEBUG: Distance filter: {max_distance} LY from {reference_system or 'current system'}")
-                print(f"ðŸ’Ž DEBUG: Returning {len(user_hotspots)} user database hotspots after filtering")
+                print(f" DEBUG: Material matches: {material_matches}")
+                print(f" DEBUG: Applied filters - Ring Type: '{ring_type_filter}', Material: '{material_filter}'")
+                print(f" DEBUG: Systems with coordinates: {systems_with_coords}, without coordinates: {systems_without_coords}")
+                print(f" DEBUG: Distance filter: {max_distance} LY from {reference_system or 'current system'}")
+                print(f" DEBUG: Returning {len(user_hotspots)} user database hotspots after filtering")
                 return user_hotspots
                 
         except Exception as e:
-            print(f"ðŸ’Ž DEBUG: User database search failed: {e}")
+            print(f" DEBUG: User database search failed: {e}")
             return []
     
     def _calculate_distance(self, coord1: Dict, coord2: Dict) -> float:
@@ -1751,14 +1833,14 @@ class RingFinder:
                 
             with sqlite3.connect(str(galaxy_db_path)) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT x, y, z FROM systems WHERE name = ? LIMIT 1", (system_name,))
+                cursor.execute("SELECT x, y, z FROM systems WHERE name = ? COLLATE NOCASE LIMIT 1", (system_name,))
                 result = cursor.fetchone()
                 
                 if result:
                     return {'x': result[0], 'y': result[1], 'z': result[2]}
                     
         except Exception as e:
-            print(f"âš  DEBUG: Error accessing galaxy database: {e}")
+            print(f" DEBUG: Error accessing galaxy database: {e}")
             
         return None
     
@@ -1806,11 +1888,39 @@ class RingFinder:
                     if distance <= max_distance:
                         systems_in_range.append(name)
                         
-                print(f"ðŸŒŒ DEBUG: Found {len(systems_in_range)} systems within {max_distance} LY using galaxy database")
+                print(f" DEBUG: Found {len(systems_in_range)} systems within {max_distance} LY using galaxy database")
+                
+                # Also check user database for visited systems within range
+                try:
+                    with sqlite3.connect(self.user_db.db_path) as user_conn:
+                        user_cursor = user_conn.cursor()
+                        
+                        # Get all visited systems with coordinates
+                        user_cursor.execute("""
+                            SELECT system_name, x_coord, y_coord, z_coord 
+                            FROM visited_systems
+                            WHERE x_coord IS NOT NULL
+                        """)
+                        
+                        user_systems_in_range = 0
+                        for system_name, x, y, z in user_cursor.fetchall():
+                            system_coords = {'x': x, 'y': y, 'z': z}
+                            distance = self._calculate_distance(reference_coords, system_coords)
+                            
+                            if distance <= max_distance and system_name not in systems_in_range:
+                                systems_in_range.append(system_name)
+                                user_systems_in_range += 1
+                        
+                        if user_systems_in_range > 0:
+                            print(f"ðŸ' DEBUG: Added {user_systems_in_range} systems from user database (visited systems)")
+                            
+                except Exception as user_e:
+                    print(f"âš  DEBUG: Error checking user database for systems in range: {user_e}")
+                
                 return systems_in_range
                         
         except Exception as e:
-            print(f"âš  DEBUG: Error finding systems in range: {e}")
+            print(f" DEBUG: Error finding systems in range: {e}")
             
         return []
         
@@ -1840,15 +1950,15 @@ class RingFinder:
                         }
                         # Cache it in our local systems data for future use
                         self.systems_data[system_name.lower()] = coords
-                        print(f"âœ… DEBUG: Successfully got coordinates from EDSM for '{system_name}': {coords}")
+                        print(f" DEBUG: Successfully got coordinates from EDSM for '{system_name}': {coords}")
                         return coords
                     else:
-                        print(f"âŒ DEBUG: No coordinates in EDSM response for '{system_name}'")
+                        print(f" DEBUG: No coordinates in EDSM response for '{system_name}'")
                 else:
-                    print(f"âš ï¸ DEBUG: System '{system_name}' not found in EDSM - may be incomplete name or not discovered yet")
+                    print(f" DEBUG: System '{system_name}' not found in EDSM - may be incomplete name or not discovered yet")
                     
         except Exception as e:
-            print(f"âŒ DEBUG: Failed to get coordinates from EDSM: {e}")
+            print(f" DEBUG: Failed to get coordinates from EDSM: {e}")
             
         return None
         
@@ -1872,13 +1982,13 @@ class RingFinder:
         if delkar_7a_entries:
             print(f"DEBUG: Processing {len(delkar_7a_entries)} Delkar 7A hotspots in _update_results:")
             for i, entry in enumerate(delkar_7a_entries):
-                material = entry.get('type', 'Unknown')
+                material = entry.get('type', 'No data')
                 ring_type = entry.get('ring_type', 'Missing')
-                source = entry.get('data_source', 'Unknown')
+                source = entry.get('data_source', 'No data')
                 # Check all ring-related fields
                 hotspot_data = entry.get('hotspot_data', {})
-                body_name = entry.get('bodyName', 'Unknown')
-                distance = entry.get('distance', 'Unknown')
+                body_name = entry.get('bodyName', 'No data')
+                distance = entry.get('distance', 'No data')
                 print(f"  [{i+1}] Material: {material} | Ring Type: {ring_type} | Body: {body_name} | Distance: {distance} | Source: {source}")
                 if hotspot_data:
                     print(f"      Hotspot Data Ring Type: {hotspot_data.get('ring_type', 'Missing')}")
@@ -1892,9 +2002,9 @@ class RingFinder:
         if delkar_7a_entries:
             print(f"DEBUG: Delkar 7A entries found: {len(delkar_7a_entries)}")
             for i, entry in enumerate(delkar_7a_entries):
-                material = entry.get('type', 'Unknown')
+                material = entry.get('type', 'No data')
                 ring_type = entry.get('ring_type', 'Missing')
-                source = entry.get('data_source', 'Unknown')
+                source = entry.get('data_source', 'No data')
                 print(f"  [{i+1}] {material} -> ring_type: {ring_type} | source: {source}")
                 
             # Check for duplicates
@@ -1909,9 +2019,13 @@ class RingFinder:
             if duplicates:
                 print(f"DEBUG: Duplicate materials found: {duplicates}")
             
-        # Sort by distance if available
+        # Sort by distance, then system name, then ring name for predictable ordering
         try:
-            hotspots.sort(key=lambda x: float(x.get('distance', 0)))
+            hotspots.sort(key=lambda x: (
+                float(x.get('distance', 999)),           # Primary: Distance (closest first)
+                x.get('systemName', x.get('system', '')).lower(),  # Secondary: System name (alphabetical)
+                x.get('bodyName', x.get('ring', '')).lower()       # Tertiary: Ring name (alphabetical)
+            ))
         except:
             pass
             
@@ -1946,7 +2060,7 @@ class RingFinder:
                 body_name = hotspot_data.get('bodyName', '')
                 # DISABLED: Don't make additional database calls during UI display
                 # hotspot_display = self.user_db.format_hotspots_for_display(system_name, body_name)
-                # Show the full material name instead of abbreviations
+                # Show the full material name or abbreviated, depending on filter
                 material_name = hotspot.get("type", "Unknown Material")
                 
                 # Convert database format to display format for special cases
@@ -1955,8 +2069,13 @@ class RingFinder:
                 
                 hotspot_count = hotspot.get("count", 1)
                 hotspot_display = f"{material_name} ({hotspot_count})"
-                # Don't abbreviate - show full name since each row is one material
-                hotspot_count_display = hotspot_display
+                
+                # Abbreviate material names ONLY when "All Materials" filter is selected
+                if self.specific_material_var.get() == "All Materials":
+                    hotspot_count_display = self._abbreviate_material_for_display(hotspot_display)
+                else:
+                    # Show full name when a specific material is filtered
+                    hotspot_count_display = hotspot_display
             elif "EDTools" in data_source:
                 # EDTools data - show the count
                 hotspot_count_display = str(hotspot.get("count", "-"))
@@ -1970,22 +2089,23 @@ class RingFinder:
             # Check if player has visited this system
             visited_status = "Yes" if self.user_db.has_visited_system(system_name) else "No"
             
-            # Format density for display
-            density_value = hotspot.get("density", "N/A")
-            if density_value != "N/A" and density_value is not None:
+            # Format density for display - use existing density column as fallback
+            density_formatted = "No data"
+            
+            # Try to use existing density value from database first
+            density_value = hotspot.get("density")
+            if density_value is not None and density_value != "No data":
                 try:
-                    # If density is from journal (int), divide; if from spreadsheet (float), use directly
-                    if isinstance(density_value, int) and density_value > 10000:
-                        density_formatted = f"{float(density_value) / 1000000:.6f}"
-                    else:
+                    # Format the existing density value
+                    if isinstance(density_value, (int, float)):
                         density_formatted = f"{float(density_value):.6f}"
+                    else:
+                        density_formatted = str(density_value)
                 except:
-                    density_formatted = "N/A"
-            else:
-                density_formatted = "N/A"
+                    density_formatted = "No data"
             
             # Debug: Check what's actually going to UI and identify source
-            ui_ring_type = hotspot.get("ring_type", "N/A")
+            ui_ring_type = hotspot.get("ring_type", "No data")
             if system_name == "Delkar" and "7 A" in ring_name:
                 hotspot_source = hotspot.get("data_source", "Unknown Source")
                 hotspot_type = hotspot.get("type", "Unknown Material")
@@ -1995,16 +2115,24 @@ class RingFinder:
                 caller_info = traceback.extract_stack()[-3].filename.split('\\')[-1] + ":" + str(traceback.extract_stack()[-3].lineno)
                 print(f"UI INSERT: {ring_name} -> ring_type: {ui_ring_type} | material: {hotspot_type} | source: {hotspot_source} | ID: {debug_id} | caller: {caller_info}")
             
+            # Clean up None values before display
+            ls_val = hotspot.get("ls", "No data")
+            if ls_val is None or ls_val == "None":
+                ls_val = "No data"
+            
+            ring_type_val = hotspot.get("ring_type", "No data")
+            if ring_type_val is None or ring_type_val == "None":
+                ring_type_val = "No data"
+            
             self.results_tree.insert("", "end", values=(
-                hotspot.get("distance", "N/A"),
-                hotspot.get("ls", "N/A"),
+                hotspot.get("distance", "No data"),
+                ls_val,
                 system_name,
                 visited_status,
                 ring_name,
-                hotspot.get("ring_type", "N/A"),
+                ring_type_val,
                 hotspot_count_display,
-                density_formatted,
-                hotspot.get("radius", "N/A")
+                density_formatted
             ))
             
         # Update status with source information 
@@ -2015,12 +2143,12 @@ class RingFinder:
         if search_term:
             if material_filter != 'All':
                 if count > 0:
-                    status_msg = f"Found {count} {material_filter} ring{'s' if count != 1 else ''} near '{search_term}'"
+                    status_msg = f"Found {count} {material_filter} location{'s' if count != 1 else ''} near '{search_term}'"
                 else:
                     status_msg = f"No {material_filter} rings found within search criteria for '{search_term}'"
             else:
                 if count > 0:
-                    status_msg = f"Found {count} ring{'s' if count != 1 else ''} near '{search_term}'"
+                    status_msg = f"Found {count} location{'s' if count != 1 else ''} near '{search_term}'"
                 else:
                     status_msg = f"No rings found within search criteria for '{search_term}'"
         else:
@@ -2035,10 +2163,7 @@ class RingFinder:
                 else:
                     status_msg = f"No rings found within current search parameters"
             
-        # Add EDSM source indication
-        if count > 0:
-            status_msg += f" (ring composition from EDSM)"
-        
+        # Set status message
         self.status_var.set(status_msg)
             
     def _show_error(self, error_msg: str):
@@ -2108,7 +2233,7 @@ class RingFinder:
                 info_parts = []
                 columns = ("Distance", "System", "Ring", "Ring Type", "LS")
                 for i, (col, val) in enumerate(zip(columns, values)):
-                    if val and val != "N/A":
+                    if val and val != "No data":
                         info_parts.append(f"{col}: {val}")
                 
                 all_info = " | ".join(info_parts)
@@ -2146,7 +2271,7 @@ class RingFinder:
 
             # Parse materials from hotspots column (abbreviated materials like "Pt, Pai, Ale")
             materials = ""
-            if hotspots and hotspots not in ["None", "N/A", ""]:
+            if hotspots and hotspots not in ["None", "No data", ""]:
                 # Convert abbreviated materials back to full names for bookmark
                 materials = self._expand_abbreviated_materials(hotspots)
 
