@@ -80,6 +80,11 @@ ehthumbs.db
 *.7z
 *.tar.gz
 
+# Large data files (exceed GitHub 100MB limit)
+app/data/EDSM/bodies7days.json
+app/data/EDSM/bodies7days.json.gz
+app/debug_log.txt
+
 # Personal notes
 notes.txt
 todo.txt
