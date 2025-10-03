@@ -210,6 +210,23 @@ class ReleaseBuilder:
                     print(f"✅ Added: EliteMining/app/data/galaxy_systems.db ({size_mb:.1f} MB)")
                 else:
                     print("⚠️  Galaxy systems database not found - ZIP users may need to download separately")
+                
+                # Add user database (pre-populated with hotspots) if it exists
+                user_db_path = self.project_root / "app" / "data" / "UserDb for install" / "user_data.db"
+                if user_db_path.exists():
+                    arc_name = "EliteMining/app/data/user_data.db"
+                    zipf.write(user_db_path, arc_name)
+                    size_kb = user_db_path.stat().st_size / 1024
+                    print(f"✅ Added: EliteMining/app/data/user_data.db ({size_kb:.1f} KB) - Pre-populated with hotspots")
+                else:
+                    print("⚠️  User database not found - ZIP users will start with empty database")
+                
+                # Add database metadata if it exists
+                metadata_path = self.project_root / "app" / "data" / "database_metadata.json"
+                if metadata_path.exists():
+                    arc_name = "EliteMining/app/data/database_metadata.json"
+                    zipf.write(metadata_path, arc_name)
+                    print(f"✅ Added: EliteMining/app/data/database_metadata.json")
             
             print(f"✅ ZIP package created successfully: {zip_path}")
             return True

@@ -17,13 +17,13 @@ NATO_REVERSE: Dict[str, str] = {v.upper(): k for k, v in NATO.items()}  # "ALPHA
 
 # VoiceAttack variable mappings
 VA_VARS: Dict[str, Dict[str, Optional[str]]] = {
-    "Mining lasers": {"fg": "fgLasers", "btn": "btnLasers"},
-    "Discovery scanner": {"fg": "fgDiscoveryScanner", "btn": "btndiscovery"},
-    "Prospector limpet": {"fg": "fgProspector", "btn": "btnprospector"},
-    "Pulse wave analyser": {"fg": "fgPulsewave", "btn": "btnpwa"},
-    "Seismic charge launcher": {"fg": "fgScl", "btn": None},
-    "Weapons": {"fg": "fgWeapons", "btn": None},
-    "Sub-surface displacement missile": {"fg": "fgSsm", "btn": None},
+    "Mining lasers/MVR:": {"fg": "fgLasers", "btn": "btnLasers"},
+    "Discovery scanner:": {"fg": "fgDiscoveryScanner", "btn": "btndiscovery"},
+    "Prospector limpet:": {"fg": "fgProspector", "btn": "btnprospector"},
+    "Pulse wave analyser:": {"fg": "fgPulsewave", "btn": "btnpwa"},
+    "Seismic charge launcher:": {"fg": "fgScl", "btn": None},
+    "Weapons:": {"fg": "fgWeapons", "btn": None},
+    "Sub-surface displacement missile:": {"fg": "fgSsm", "btn": None},
 }
 VA_TTS_ANNOUNCEMENT = "ttsProspectorAnnouncement"
 TOOL_ORDER = list(VA_VARS.keys())

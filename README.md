@@ -13,7 +13,7 @@
 - [Installation](#-installation)  
 - [Configurator](#️-configurator)  
   - [EliteMining GUI](#-elitemining-gui)  
-  - [Ring Search](#-ring-search)  
+  - [Hotspot Finder](#-hotspot-finder)  
   - [Backup & Restore](#-backup--restore)  
 - [Getting Started](#-getting-started)  
 - [Commands](#-commands)  
@@ -59,7 +59,7 @@ The Configurator works independently for announcements, reports, and tracking. V
 - Ship configuration management  
 - GUI for firegroups, timers, toggles, and announcements  
 - **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
-- **Ring Search** – Locate planetary rings (Ice, Metal Rich, Rocky, Metallic) for optimal mining opportunities  
+- **Hotspot Finder** – Search 29,854+ mining hotspots by material, ring type, and distance with detailed location data  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports  
 
 [⬆️ Back to Top](#-elitemining)
@@ -201,10 +201,19 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 ---
 
-### 🔍 Ring Search
-- Find planetary rings in systems from your current or any location in the galaxy. Search for specific ring types (Ice, Metal Rich, Rocky, Metallic) within your desired distance to locate the best mining opportunities.  
+### 🎯 Hotspot Finder
+- **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
+- **Filter by Material** – Search for specific materials (Painite, Platinum, Low Temperature Diamonds, etc.)
+- **Pre-loaded Database** – 29,854+ hotspots with material types, ring densities, and overlap counts
+- **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
+- **Distance-Based Results** – Filter by jump range to find nearby opportunities
+- **Ring Composition Details** – View ring density and distance from arrival
+- **Smart Sorting** – Results ranked by distance, hotspot overlaps, and ring density
+
+Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="600"><br>  
+*Hotspot Finder showing search results with material filters and distance calculations.*
 
 ---
 

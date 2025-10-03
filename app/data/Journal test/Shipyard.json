@@ -1,0 +1,18 @@
+{ "timestamp":"2025-09-30T21:34:10Z", "event":"Shipyard", "MarketID":3706791680, "StationName":"V0W-W7T", "StarSystem":"Coalsack Sector RI-T c3-22", "Horizons":true, "AllowCobraMkIV":false, "PriceList":[ 
+{ "id":0, "ShipType":"type8", "ShipType_Localised":"Type-8 Transporter", "ShipPrice":7840699 }, 
+{ "id":0, "ShipType":"diamondbackxl", "ShipType_Localised":"Diamondback Explorer", "ShipPrice":11542746 }, 
+{ "id":0, "ShipType":"lakonminer", "ShipType_Localised":"Type-11 Prospector", "ShipPrice":15149760 }, 
+{ "id":0, "ShipType":"krait_light", "ShipType_Localised":"Krait Phantom", "ShipPrice":33588731 }, 
+{ "id":0, "ShipType":"mandalay", "ShipPrice":35318027 }, 
+{ "id":0, "ShipType":"panthermkii", "ShipType_Localised":"Panther Clipper Mk II", "ShipPrice":46095705 }, 
+{ "id":0, "ShipType":"krait_mkii", "ShipType_Localised":"Krait Mk II", "ShipPrice":49540174 }, 
+{ "id":0, "ShipType":"python", "ShipPrice":51118617 }, 
+{ "id":0, "ShipType":"type9", "ShipType_Localised":"Type-9 Heavy", "ShipPrice":72616741 }, 
+{ "id":0, "ShipType":"python", "ShipPrice":88174400 }, 
+{ "id":0, "ShipType":"python_nx", "ShipType_Localised":"Python Mk II", "ShipPrice":90019764 }, 
+{ "id":0, "ShipType":"corsair", "ShipPrice":96559987 }, 
+{ "id":0, "ShipType":"type9_military", "ShipType_Localised":"Type-10 Defender", "ShipPrice":97973055 }, 
+{ "id":0, "ShipType":"anaconda", "ShipPrice":255296699 }, 
+{ "id":0, "ShipType":"cutter", "ShipType_Localised":"Imperial Cutter", "ShipPrice":472403261 }, 
+{ "id":0, "ShipType":"federation_corvette", "ShipType_Localised":"Federal Corvette", "ShipPrice":704724637 }
+ ] }

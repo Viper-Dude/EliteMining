@@ -237,5 +237,27 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
         if "Non-Core Asteroids" not in last_settings:
             last_settings["Non-Core Asteroids"] = False
     
+    # Add Tritium to all presets and main announce/min_pct maps
+    if "announce_map" in config and "Tritium" not in config["announce_map"]:
+        config["announce_map"]["Tritium"] = True
+    if "min_pct_map" in config and "Tritium" not in config["min_pct_map"]:
+        config["min_pct_map"]["Tritium"] = 20.0
+    
+    # Add Tritium to all saved presets
+    for i in range(1, 6):
+        preset_key = f"announce_preset_{i}"
+        if preset_key in config:
+            if "announce_map" in config[preset_key] and "Tritium" not in config[preset_key]["announce_map"]:
+                config[preset_key]["announce_map"]["Tritium"] = True
+            if "min_pct_map" in config[preset_key] and "Tritium" not in config[preset_key]["min_pct_map"]:
+                config[preset_key]["min_pct_map"]["Tritium"] = 20.0
+    
+    # Add Tritium to last_material_settings
+    if "last_material_settings" in config:
+        if "announce_map" in config["last_material_settings"] and "Tritium" not in config["last_material_settings"]["announce_map"]:
+            config["last_material_settings"]["announce_map"]["Tritium"] = True
+        if "min_pct_map" in config["last_material_settings"] and "Tritium" not in config["last_material_settings"]["min_pct_map"]:
+            config["last_material_settings"]["min_pct_map"]["Tritium"] = 20.0
+    
     log.info(f"Config migrated to version {get_config_version()}")
     return config
