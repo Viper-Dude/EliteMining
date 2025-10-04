@@ -20,17 +20,18 @@ log = logging.getLogger(__name__)
 class IncrementalJournalScanner:
     """Scans journals incrementally since last run"""
     
-    def __init__(self, journal_dir: str, user_db: UserDatabase):
+    def __init__(self, journal_dir: str, user_db: UserDatabase, on_hotspot_added: Optional[Callable[[], None]] = None):
         """
         Initialize incremental scanner
         
         Args:
             journal_dir: Path to Elite Dangerous journal directory
             user_db: User database instance
+            on_hotspot_added: Optional callback when hotspot is added to database
         """
         self.journal_dir = journal_dir
         self.user_db = user_db
-        self.parser = JournalParser(journal_dir, user_db)
+        self.parser = JournalParser(journal_dir, user_db, on_hotspot_added)
         self.state = JournalScanState()
     
     def scan_new_entries(self, 

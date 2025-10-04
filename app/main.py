@@ -347,7 +347,7 @@ class TextOverlay:
             self.overlay_window.destroy()
             self.overlay_window = None
 
-APP_TITLE = "Elite Mining – Configuration"
+APP_TITLE = "EliteMining"
 APP_VERSION = "v4.1.5"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
@@ -3929,11 +3929,11 @@ class App(tk.Tk):
         r += 1
         
         # TTS Voice selection (moved from announcements panel)
-        voice_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
-        voice_frame.grid(row=r, column=0, sticky="ew", pady=(4, 4))
-        voice_frame.columnconfigure(1, weight=1)
+        tk.Label(scrollable_frame, text="TTS Voice:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).grid(row=r, column=0, sticky="w", pady=(4, 4))
+        r += 1
         
-        tk.Label(voice_frame, text="TTS Voice:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w")
+        voice_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        voice_frame.grid(row=r, column=0, sticky="w", pady=(0, 4))
         
         # Get voice list from announcer
         try:
@@ -3949,7 +3949,7 @@ class App(tk.Tk):
         self.voice_combo = ttk.Combobox(voice_frame, textvariable=self.voice_choice, 
                                        state="readonly", width=35, font=("Segoe UI", 8),
                                        values=voice_values)
-        self.voice_combo.grid(row=0, column=1, sticky="w", padx=(8, 0))
+        self.voice_combo.pack(side="left")
         
         # Test voice button
         def _test_voice_interface():
@@ -3962,10 +3962,14 @@ class App(tk.Tk):
                             bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                             activeforeground="#ffffff", relief="ridge", bd=1, 
                             font=("Segoe UI", 8, "normal"), cursor="hand2")
-        test_btn.grid(row=0, column=2, padx=(10, 0))
+        test_btn.pack(side="left", padx=(8, 0))
         
+        r += 1
         # Volume control
-        tk.Label(voice_frame, text="Volume:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=(6, 0))
+        vol_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        vol_frame.grid(row=r, column=0, sticky="w", pady=(6, 4))
+        
+        tk.Label(vol_frame, text="Volume:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Initialize voice volume variable if not exists
         if not hasattr(self, 'voice_volume'):
@@ -3983,12 +3987,12 @@ class App(tk.Tk):
             except Exception as e:
                 print(f"Error changing TTS volume: {e}")
         
-        vol_slider = tk.Scale(voice_frame, from_=0, to=100, orient="horizontal", 
+        vol_slider = tk.Scale(vol_frame, from_=0, to=100, orient="horizontal", 
                              variable=self.voice_volume, bg="#1e1e1e", fg="#ffffff",
                              activebackground="#444444", highlightthickness=0, 
                              troughcolor="#444444", font=("Segoe UI", 8),
                              command=_on_volume_change, length=200)
-        vol_slider.grid(row=1, column=1, sticky="w", pady=(6, 0), padx=(8, 0))
+        vol_slider.pack(side="left", padx=(8, 0))
         
         # TTS Fix button
         def _fix_tts_interface():
@@ -4007,12 +4011,13 @@ class App(tk.Tk):
             except Exception as e:
                 print(f"[INTERFACE] Error reinitializing TTS: {e}")
         
-        fix_tts_btn = tk.Button(voice_frame, text="Fix TTS", command=_fix_tts_interface,
+        fix_tts_btn = tk.Button(vol_frame, text="Reset Speech Recognition", command=_fix_tts_interface,
                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                activeforeground="#ffffff", relief="ridge", bd=1, 
                                font=("Segoe UI", 8, "normal"), cursor="hand2")
-        fix_tts_btn.grid(row=1, column=2, padx=(10, 0), pady=(6, 0))
+        fix_tts_btn.pack(side="left", padx=(8, 0), pady=(15, 0))
         ToolTip(fix_tts_btn, "Reinitialize Text-to-Speech engine.\nUse this if TTS stops working or after recycling Windows voices.")
+        r += 1
         
         # Load saved voice preference
         try:
@@ -6669,9 +6674,16 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
                 if cancel_requested['value']:
                     print(f"Import cancelled by user. Processed {files} files, {events} events (partial data kept)")
                     self.after(0, lambda e=events: self._set_status(f"Import cancelled - {e:,} events imported"))
+                    # Update counter even for partial import
+                    if hasattr(self, 'ring_finder'):
+                        self.after(0, self.ring_finder._update_database_info)
                 else:
                     print(f"✓ Import complete: {files} files, {events} events processed")
                     self.after(0, lambda e=events: self._set_status(f"Imported {e:,} journal entries"))
+                    # Update database counter after full import
+                    if hasattr(self, 'ring_finder'):
+                        print("[JOURNAL] Updating database counter after full import...")
+                        self.after(0, self.ring_finder._update_database_info)
                     
             except Exception as e:
                 print(f"Error during import: {e}")
@@ -6696,7 +6708,7 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
                 journal_dir = self.cargo_monitor.journal_dir
                 user_db = self.cargo_monitor.user_db
                 
-                # Create scanner
+                # Create scanner (callback per-hotspot would be too frequent from background thread)
                 scanner = IncrementalJournalScanner(journal_dir, user_db)
                 
                 # Scan new entries
@@ -6709,6 +6721,12 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
                     # Update status in UI thread using _set_status for auto-clear
                     event_count = events
                     self.after(0, lambda e=event_count: self._set_status(f"Scanned {e} new journal entries"))
+                    # Update database counter in Hotspots Finder tab
+                    if hasattr(self, 'ring_finder'):
+                        print("[JOURNAL] Scheduling database counter update...")
+                        self.after(0, self.ring_finder._update_database_info)
+                    else:
+                        print("[JOURNAL] WARNING: ring_finder not found, cannot update counter")
                 else:
                     print("[JOURNAL] ✓ Auto-scan complete: No new entries")
                     

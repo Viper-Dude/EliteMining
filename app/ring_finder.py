@@ -303,14 +303,21 @@ class RingFinder:
         
         # Search limitations info text (bottom of search controls)
         info_text = tk.Label(search_frame, 
-                            text="ℹ Search covers systems within the bubble  |  'No data' = Information not available",
+                            text="ℹ Search covers bubble systems. Data grows as you scan and import history  |  'No data' = Information not available",
                             fg="#cccccc", bg="#1e1e1e", font=("Segoe UI", 8, "italic"), 
                             justify="left")
-        info_text.grid(row=4, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 10))
+        info_text.grid(row=4, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
         
-        # Results section
-        results_frame = ttk.LabelFrame(self.scrollable_frame, text="Search Results")
-        results_frame.pack(fill="both", expand=True, padx=10, pady=(5, 2))
+        # Results section with help text in header
+        results_header = ttk.Frame(self.scrollable_frame)
+        results_header.pack(fill="x", padx=10, pady=(2, 0))
+        
+        ttk.Label(results_header, text="Search Results", font=("Segoe UI", 9, "bold")).pack(side="left")
+        ttk.Label(results_header, text="Right-click rows for options", 
+                 font=("Segoe UI", 8), foreground="#666666").pack(side="right", padx=(0, 5))
+        
+        results_frame = ttk.Frame(self.scrollable_frame)
+        results_frame.pack(fill="both", expand=True, padx=10, pady=(2, 2))
         
         # Create frame for treeview with scrollbars
         tree_frame = ttk.Frame(results_frame)
@@ -372,8 +379,8 @@ class RingFinder:
         
         # Update database info immediately and schedule a delayed update (use parent window's after method)
         self._update_database_info()
-        if hasattr(self.master, 'after'):
-            self.master.after(100, self._update_database_info)
+        if hasattr(self.parent, 'after'):
+            self.parent.after(100, self._update_database_info)
         
         # Store sort state
         self.sort_reverse = {}
@@ -1636,8 +1643,8 @@ class RingFinder:
                         # Show ALL rings of this type (one row per ring, combining hotspot info)
                         query = f'''
                             SELECT system_name, body_name, 
-                                   GROUP_CONCAT(material_name, ', ') as material_name,
-                                   SUM(hotspot_count) as hotspot_count,
+                                   GROUP_CONCAT(material_name || ' (' || hotspot_count || ')', ', ') as material_name,
+                                   1 as hotspot_count,
                                    x_coord, y_coord, z_coord, coord_source, 
                                    ls_distance, density, ring_type, inner_radius, outer_radius
                             FROM hotspot_data
@@ -1665,8 +1672,8 @@ class RingFinder:
                         # Show ALL rings of this type (one row per ring)
                         direct_search_query = '''
                             SELECT system_name, body_name, 
-                                   GROUP_CONCAT(material_name, ', ') as material_name,
-                                   SUM(hotspot_count) as hotspot_count,
+                                   GROUP_CONCAT(material_name || ' (' || hotspot_count || ')', ', ') as material_name,
+                                   1 as hotspot_count,
                                    x_coord, y_coord, z_coord, coord_source, 
                                    ls_distance, density, ring_type, inner_radius, outer_radius
                             FROM hotspot_data
@@ -2067,18 +2074,44 @@ class RingFinder:
                 if material_name == "LowTemperatureDiamond":
                     material_name = "Low Temperature Diamonds"
                 
-                hotspot_count = hotspot.get("count", 1)
-                hotspot_display = f"{material_name} ({hotspot_count})"
+                # Check if material_name already contains counts (from "All Materials" GROUP_CONCAT)
+                # Format: "Material (X)" or "Material1 (X), Material2 (Y)"
+                # Use regex to detect if string ends with "(number)"
+                import re
+                already_formatted = bool(re.search(r'\(\d+\)$', material_name.strip()))
                 
-                # Abbreviate material names ONLY when "All Materials" filter is selected
-                if self.specific_material_var.get() == "All Materials":
-                    hotspot_count_display = self._abbreviate_material_for_display(hotspot_display)
+                if already_formatted:
+                    # Already formatted with counts - just abbreviate if needed
+                    if self.specific_material_var.get() == "All Materials":
+                        hotspot_count_display = self._abbreviate_material_for_display(material_name)
+                    else:
+                        hotspot_count_display = material_name
                 else:
-                    # Show full name when a specific material is filtered
-                    hotspot_count_display = hotspot_display
+                    # Not formatted - add count wrapper
+                    hotspot_count = hotspot.get("count", 1)
+                    hotspot_display = f"{material_name} ({hotspot_count})"
+                    
+                    # Abbreviate material names ONLY when "All Materials" filter is selected
+                    if self.specific_material_var.get() == "All Materials":
+                        hotspot_count_display = self._abbreviate_material_for_display(hotspot_display)
+                    else:
+                        # Show full name when a specific material is filtered
+                        hotspot_count_display = hotspot_display
             elif "EDTools" in data_source:
-                # EDTools data - show the count
-                hotspot_count_display = str(hotspot.get("count", "-"))
+                # EDTools data - check if it's already formatted from GROUP_CONCAT
+                material_name = hotspot.get("type", "")
+                import re
+                already_formatted = bool(re.search(r'\(\d+\)$', material_name.strip()))
+                
+                if already_formatted:
+                    # Material name already contains counts from GROUP_CONCAT - use it directly
+                    if self.specific_material_var.get() == "All Materials":
+                        hotspot_count_display = self._abbreviate_material_for_display(material_name)
+                    else:
+                        hotspot_count_display = material_name
+                else:
+                    # Regular count display
+                    hotspot_count_display = str(hotspot.get("count", "-"))
             elif "count" in hotspot:
                 # User database hotspots - show the count  
                 hotspot_count_display = str(hotspot.get("count", "-"))

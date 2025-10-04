@@ -71,15 +71,17 @@ class JournalParser:
         'Osmium': 'Osmium',
     }
     
-    def __init__(self, journal_dir: str, user_db: Optional[UserDatabase] = None):
+    def __init__(self, journal_dir: str, user_db: Optional[UserDatabase] = None, on_hotspot_added: Optional[callable] = None):
         """Initialize the journal parser
         
         Args:
             journal_dir: Path to Elite Dangerous journal directory
             user_db: UserDatabase instance. If None, creates a new one.
+            on_hotspot_added: Optional callback function called when a hotspot is added to database
         """
         self.journal_dir = journal_dir
         self.user_db = user_db or UserDatabase()
+        self.on_hotspot_added = on_hotspot_added
         
         # Regex pattern to identify ring bodies from their names
         self.ring_pattern = re.compile(r'.* [A-Z]+ Ring$', re.IGNORECASE)
@@ -260,6 +262,12 @@ class JournalParser:
             body_name = event.get('BodyName', '')
             if not self.is_ring_body(body_name):
                 return
+            
+            # Filter out phantom rings that were removed by Frontier
+            # Paesia "2 C Ring" was removed but exists in old data
+            if current_system == 'Paesia' and '2 C Ring' in body_name:
+                log.info(f"Skipping phantom ring (removed by Frontier): {current_system} - {body_name}")
+                return
                 
             signals = event.get('Signals', [])
             if not signals:
@@ -296,9 +304,13 @@ class JournalParser:
                     ring_mass = ring_data.get('ring_mass')
                     log.debug(f"Found ring info for {body_name}: Class={ring_class}, LS={ls_distance}, Inner={inner_radius}, Outer={outer_radius}, Mass={ring_mass}")
                 else:
-                    # Ring info not found - log available keys for debugging
-                    log.warning(f"Ring info not found for key: {key}")
-                    log.warning(f"Available ring_info keys: {list(self.ring_info.keys())}")
+                    # Ring info not in cache - try to get LS distance from database
+                    log.debug(f"Ring info not in cache for: {key}, attempting database lookup")
+                    ls_distance = self.user_db.get_ls_distance(system_name, body_name)
+                    if ls_distance:
+                        log.info(f"Retrieved LS distance from database: {body_name} = {ls_distance} Ls")
+                    else:
+                        log.warning(f"LS distance not available for {system_name} - {body_name}")
             
             # Process each signal (material hotspot)
             for signal in signals:
@@ -330,6 +342,10 @@ class JournalParser:
                     )
                     
                     log.debug(f"Added hotspot: {system_name} - {body_name} - {material_name} ({count})")
+                    
+                    # Trigger callback if provided (for UI updates)
+                    if self.on_hotspot_added:
+                        self.on_hotspot_added()
                     
         except Exception as e:
             log.error(f"Error processing SAASignalsFound event: {e}")

@@ -229,15 +229,11 @@ class UserDatabase:
             if not body_name:
                 return body_name
         
-        # Fix malformed ring names with lowercase letters
-        # Pattern matches: "2 a A Ring", "ABC 8 a A Ring", "AB 10 a B Ring", etc.
-        # Replaces lowercase 'a', 'b', 'c' followed by space and uppercase letter with just uppercase
-        
-        # Fix patterns like "2 a A Ring" → "2 A Ring"
-        body_name = re.sub(r'\s+a\s+([A-Z])\s+Ring', r' \1 Ring', body_name, flags=re.IGNORECASE)
-        body_name = re.sub(r'\s+b\s+([A-Z])\s+Ring', r' \1 Ring', body_name, flags=re.IGNORECASE)
-        body_name = re.sub(r'\s+c\s+([A-Z])\s+Ring', r' \1 Ring', body_name, flags=re.IGNORECASE)
-        body_name = re.sub(r'\s+d\s+([A-Z])\s+Ring', r' \1 Ring', body_name, flags=re.IGNORECASE)
+        # IMPORTANT: Do NOT normalize lowercase letters in ring names!
+        # Names like "2 a A Ring" and "2 A Ring" are DIFFERENT physical rings.
+        # The lowercase letter (e.g., 'a', 'b', 'c') indicates the parent body designation.
+        # Example: "Paesia 2 a A Ring" is a ring around planet "2 a", NOT planet "2".
+        # These must remain distinct to prevent data corruption.
         
         # Ensure proper spacing
         body_name = ' '.join(body_name.split())
@@ -310,9 +306,9 @@ class UserDatabase:
                     update_reason = None
                     
                     # Check if we have ring_mass or density to add
-                    cursor.execute('SELECT ring_mass, density FROM hotspot_data WHERE id = ?', (existing_id,))
-                    mass_density_check = cursor.fetchone()
-                    existing_mass, existing_density = mass_density_check if mass_density_check else (None, None)
+                    cursor.execute('SELECT ring_mass, density, inner_radius, outer_radius FROM hotspot_data WHERE id = ?', (existing_id,))
+                    extra_data_check = cursor.fetchone()
+                    existing_mass, existing_density, existing_inner, existing_outer = extra_data_check if extra_data_check else (None, None, None, None)
                     
                     # Skip if trying to add journal data when EDTools data exists
                     # UNLESS we have new mass/density data to add
@@ -325,6 +321,27 @@ class UserDatabase:
                             # Journal trying to overwrite EDTools/unknown data - skip it
                             log.debug(f"Skipping journal duplicate: {system_name} - {body_name} - {material_name} (EDTools data exists)")
                             return
+                    
+                    # Count completeness of new vs existing data
+                    new_data_fields = [
+                        ls_distance is not None,
+                        ring_type is not None,
+                        inner_radius is not None,
+                        outer_radius is not None,
+                        ring_mass is not None,
+                        density is not None
+                    ]
+                    existing_data_fields = [
+                        existing_ls is not None,
+                        existing_ring_type is not None,
+                        existing_inner is not None,
+                        existing_outer is not None,
+                        existing_mass is not None,
+                        existing_density is not None
+                    ]
+                    
+                    new_data_count = sum(new_data_fields)
+                    existing_data_count = sum(existing_data_fields)
                     
                     # Update if journal has more complete information
                     if coord_source == "visited_systems":
@@ -339,9 +356,14 @@ class UserDatabase:
                         elif ring_type and not existing_ring_type:
                             should_update = True
                             update_reason = "adding ring type"
-                        elif scan_date > existing_date:
+                        elif scan_date > existing_date and new_data_count >= existing_data_count:
+                            # Only update if newer AND at least as complete
                             should_update = True
-                            update_reason = "newer scan date"
+                            update_reason = f"newer scan date with equal/better data ({new_data_count}/{len(new_data_fields)} fields vs {existing_data_count}/{len(existing_data_fields)} fields)"
+                        elif scan_date > existing_date and new_data_count < existing_data_count:
+                            # Newer but less complete - don't overwrite good data
+                            log.info(f"Skipping update for {system_name} - {body_name} - {material_name}: newer scan but less complete ({new_data_count} vs {existing_data_count} fields)")
+                            return
                         elif hotspot_count > existing_count:
                             should_update = True
                             update_reason = "higher hotspot count"
@@ -468,6 +490,37 @@ class UserDatabase:
         except Exception as e:
             log.error(f"Error getting body hotspots: {e}")
             return []
+    
+    def get_ls_distance(self, system_name: str, body_name: str) -> Optional[float]:
+        """Get LS distance for a body from database
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the celestial body (e.g., "2 A Ring")
+            
+        Returns:
+            LS distance in light-seconds if available, None otherwise
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT ls_distance 
+                    FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ?
+                      AND ls_distance IS NOT NULL
+                    LIMIT 1
+                ''', (system_name, body_name))
+                
+                result = cursor.fetchone()
+                if result:
+                    log.debug(f"Retrieved LS distance from database: {system_name} - {body_name} = {result[0]} Ls")
+                    return result[0]
+                return None
+                
+        except Exception as e:
+            log.error(f"Error getting LS distance for {system_name} - {body_name}: {e}")
+            return None
     
     def format_hotspots_for_display(self, system_name: str, body_name: str) -> str:
         """Format hotspots for display in Ring Finder table

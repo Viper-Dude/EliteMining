@@ -32,8 +32,10 @@ Source: "dist\Configurator.exe"; DestDir: "{app}\Apps\EliteMining\Configurator";
 Source: "app\data\galaxy_systems.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "app\data\database_metadata.json"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 
-; User database - use pre-populated database for new installs, preserve existing for updates
-Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: onlyifdoesntexist
+; v4.1.6: FORCE OVERWRITE user database to fix phantom ring data and update schema
+; WARNING: This will replace user's database! Only doing this once to fix critical data corruption.
+; IMPORTANT: Restore "onlyifdoesntexist" flag in next version to preserve user data!
+Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion
 
 ; Documentation, variables, profile
 Source: "Doc\*"; DestDir: "{app}\Apps\EliteMining\Doc"; Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
