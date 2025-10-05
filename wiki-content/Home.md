@@ -6,14 +6,14 @@
 
 ### Getting Started
 - **[Quick Start Guide](Quick-Start-Guide)** - Get up and running in 5 minutes
-- **[Installation Setup](Installation-Setup)** - Detailed installation instructions
+- **[Installation & Setup](Installation-&-Setup)** - Detailed installation instructions
 
 ### User Guides  
 - **[Hotspot Finder Guide](Hotspot-Finder-Guide)** - Find the best mining locations
 - **[VoiceAttack Integration](VoiceAttack-Integration)** - Voice-controlled mining automation
 
 ### Support
-- **[Troubleshooting FAQ](Troubleshooting-FAQ)** - Common issues and solutions
+- **[Troubleshooting & FAQ](Troubleshooting-&-FAQ)** - Common issues and solutions
 
 ## Usage Modes
 
