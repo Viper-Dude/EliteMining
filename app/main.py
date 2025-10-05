@@ -348,7 +348,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.1.5"
+APP_VERSION = "v4.1.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -2727,7 +2727,10 @@ cargo panel forces Elite to write detailed inventory data.
                 cargo_text = cargo_section_match.group(1)
                 existing_materials = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
                 for mat_name, quantity in existing_materials:
-                    updated_materials[mat_name.strip()] = float(quantity)
+                    # Filter out summary entries like "Total Cargo Collected"
+                    mat_name_clean = mat_name.strip()
+                    if mat_name_clean.lower() not in ['total cargo collected', 'total', 'cargo collected']:
+                        updated_materials[mat_name_clean] = float(quantity)
             
             # Add new refinery materials
             for material_name, quantity in refinery_materials.items():
