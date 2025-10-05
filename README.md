@@ -2,21 +2,7 @@
 
 [![Discord](https://img.shields.io/discord/DISCORD_SERVER_ID?label=Discord%20Community&logo=discord&logoColor=white&color=7289da&style=for-the-badge)](https://discord.gg/Yjtq2jpA)
 
-**EliteMining** optimizes your mining efficiency with live### ### ### 📋 Other Resources
-- **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
-- **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
-
-[⬆️ Back to Top](#-elitemining)
-
----sources
-- **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
-- **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
-
-[⬆️ Back to Top](#-elitemining)Resources
-- **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
-- **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
-
-[⬆️ Back to Top](#-elitemining)ing analytics, automated announcements, performance tracking, and comprehensive hotspot finder with 32,000+ mining locations as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.  
+**EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 32,000+ mining locations as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
 
 ---
 
@@ -82,7 +68,7 @@ The Configurator works independently for announcements, reports, and tracking. V
 
 ---
 
-## 🎯 Hotspot Finder
+## 🗺️ Hotspot Finder
 
 The Hotspot Finder provides access to a comprehensive database of 32,000+ confirmed mining hotspots with detailed location data, material information, and intelligent filtering capabilities.
 
@@ -221,7 +207,7 @@ Generate comprehensive HTML reports with interactive charts, mining analytics, a
 
 Right-click any mining session to generate a detailed report, add screenshots, or manage existing reports. All reports are saved with your session data and can be opened directly from the reports tab.
 
-#### �🔖 Bookmarks  
+#### 📑 Bookmarks  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_bookmarks.png" width="600"><br>  
 *Save, search, and manage mining spots.*  
 
@@ -380,13 +366,12 @@ TBA
 ## ❓ Contact  
 
 ### 💬 Community Support
-Join our Discord server for real-time help, mining tips, and community discussions:
+Join our Discord server for real-time help, mining tips, and community discussions:  
 [![Discord](https://img.shields.io/badge/EliteMining%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Yjtq2jpA)
 
-### � Other Resources
+### 📋 Other Resources
 - **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
 - **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
-
 
 [⬆️ Back to Top](#-elitemining)
 
