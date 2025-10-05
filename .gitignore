@@ -43,6 +43,11 @@ app/last_journal_scan.json
 app/EliteVA/Logs/
 app/EliteVA/Variables/
 
+# API Keys and sensitive data
+*api_key*
+*.key
+.env
+
 # VoiceAttack profile
 *.vap
 !EliteMining-Profile.vap
