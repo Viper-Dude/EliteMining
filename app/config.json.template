@@ -1,9 +1,9 @@
 {
   "config_version": "4.0.6",
   "tts_volume": 100,
-  "va_folder": "D:\\SteamLibrary\\steamapps\\common\\VoiceAttack 2\\Apps\\EliteMining",
+  "va_folder": "",
   "window": {
-    "geometry": "1100x680+2707+287",
+    "geometry": "1100x680+100+100",
     "zoomed": false
   },
   "text_overlay_enabled": true,
@@ -575,6 +575,6 @@
   "cargo_transparency": 90,
   "cargo_show_in_overlay": false,
   "edsm_api_key": "c79baf09df9808c93d6c8c656ce7ae690fccef08",
-  "journal_dir": "C:/Users/olmba/Saved Games/Frontier Developments/Elite Dangerous",
+  "journal_dir": "",
   "auto_scan_journals": true
 }

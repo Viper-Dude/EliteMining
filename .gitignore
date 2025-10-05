@@ -37,6 +37,12 @@ app/Reports/
 *.log
 backup_*
 
+# User-specific runtime files
+app/config.json
+app/last_journal_scan.json
+app/EliteVA/Logs/
+app/EliteVA/Variables/
+
 # VoiceAttack profile
 *.vap
 !EliteMining-Profile.vap
