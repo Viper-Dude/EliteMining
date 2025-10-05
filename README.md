@@ -193,7 +193,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 ---
 
-#### Interface Options Tab  
+#### Settings Tab  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-options.png" width="600" height="400"><br>  
 *UI and announcement preferences.*  
 
