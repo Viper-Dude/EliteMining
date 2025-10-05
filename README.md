@@ -387,9 +387,6 @@ Join our Discord server for real-time help, mining tips, and community discussio
 - **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
 - **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
 
-### 📬 Developer Contact
-For business/collaboration inquiries:  
-[![Discord](https://img.shields.io/badge/Discord-7Ven__MP-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/users/394827769378242560)  
 
 [⬆️ Back to Top](#-elitemining)
 
