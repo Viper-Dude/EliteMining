@@ -574,7 +574,6 @@
   "cargo_max_capacity": 224,
   "cargo_transparency": 90,
   "cargo_show_in_overlay": false,
-  "edsm_api_key": "",
   "journal_dir": "",
   "auto_scan_journals": true
 }
