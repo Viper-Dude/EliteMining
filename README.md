@@ -2,7 +2,13 @@
 
 [![Discord](https://img.shields.io/discord/DISCORD_SERVER_ID?label=Discord%20Community&logo=discord&logoColor=white&color=7289da&style=for-the-badge)](https://discord.gg/Yjtq2jpA)
 
-**EliteMining** optimizes your mining efficiency with live### ### 📋 Other Resources
+**EliteMining** optimizes your mining efficiency with live### ### ### 📋 Other Resources
+- **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
+- **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
+
+[⬆️ Back to Top](#-elitemining)
+
+---sources
 - **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
 - **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
 
