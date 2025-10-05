@@ -108,7 +108,7 @@ class ReleaseBuilder:
             print("Running PyInstaller directly from spec file")
             spec_file = self.script_dir / "Configurator.spec"
             if spec_file.exists():
-                return self.run_command(f"pyinstaller --clean {spec_file}", cwd=str(self.project_root))
+                return self.run_command(f"pyinstaller --clean --noupx {spec_file}", cwd=str(self.project_root))
             else:
                 print("❌ No spec file found")
                 return False
