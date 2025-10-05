@@ -54,5 +54,24 @@ Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\Apps\EliteMi
 ---
 
 ## Other Reminders
+
+### Config Version Updates
+⚠️ **CRITICAL:** When updating config.json for releases, you MUST update TWO files:
+1. **`app/config.json.template`** - This is what gets distributed to users
+2. **`app/version.py`** - Update `__config_version__` to match for code consistency
+
+**The template file is used by the build process, NOT config.json!**
+- Build process: `config.json.template` → becomes `config.json` in installer
+- Your dev `config.json` is NOT included in releases
+- Users receive the template file as their default config
+
+### Version Checking System (v4.1.6+)
+- Config and database now have smart version checking
+- Only updates when new version > existing version
+- Automatically preserves user settings during config updates
+- Creates backups before database updates
+
+---
+
+## Next Version TODOs
 - Add new reminders here as needed for the next release
-- 

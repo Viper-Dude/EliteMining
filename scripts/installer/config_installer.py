@@ -1,7 +1,7 @@
 """
-Config Migration Handler for EliteMining Installer
+Config and Database Migration Handler for EliteMining Installer
 
-This script determines whether to overwrite config.json during installation
+This script determines whether to overwrite config.json and user_data.db during installation
 based on breaking changes and provides migration capabilities.
 """
 
@@ -9,25 +9,48 @@ import os
 import sys
 import json
 import shutil
+import sqlite3
 from pathlib import Path
 
 def main():
     """
-    Main installer config handler
+    Main installer config and database handler
+    
+    Usage: 
+    config_installer.py config <source_config.json> <target_directory>
+    config_installer.py database <source_db> <target_directory> <new_db_version>
     
     Returns exit codes:
-    0: Success - config handled appropriately
+    0: Success - file handled appropriately
     1: Error occurred
-    2: User config preserved (no overwrite needed)
-    3: Config overwritten due to breaking changes
+    2: User file preserved (no overwrite needed)
+    3: File overwritten due to breaking changes
     """
     
-    if len(sys.argv) < 3:
-        print("Usage: config_installer.py <source_config.json> <target_directory>")
+    if len(sys.argv) < 4:
+        print("Usage:")
+        print("  config_installer.py config <source_config.json> <target_directory>")
+        print("  config_installer.py database <source_db> <target_directory> <new_db_version>")
         return 1
     
-    source_config = Path(sys.argv[1])
-    target_dir = Path(sys.argv[2])
+    operation = sys.argv[1].lower()
+    
+    if operation == "config":
+        return handle_config(sys.argv[2], sys.argv[3])
+    elif operation == "database":
+        if len(sys.argv) < 5:
+            print("Database operation requires version parameter")
+            return 1
+        return handle_database(sys.argv[2], sys.argv[3], sys.argv[4])
+    else:
+        print(f"Unknown operation: {operation}")
+        return 1
+
+
+def handle_config(source_config_path: str, target_directory: str) -> int:
+    """Handle config.json version checking and migration"""
+    source_config = Path(source_config_path)
+    target_dir = Path(target_directory)
     target_config = target_dir / "config.json"
     
     try:
@@ -80,6 +103,134 @@ def main():
     except Exception as e:
         print(f"Error handling config: {e}")
         return 1
+
+
+def handle_database(source_db_path: str, target_directory: str, new_version: str) -> int:
+    """Handle user_data.db version checking and replacement"""
+    source_db = Path(source_db_path)
+    target_dir = Path(target_directory)
+    target_db = target_dir / "user_data.db"
+    
+    try:
+        # Ensure target directory exists
+        target_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Check if existing database exists
+        if target_db.exists():
+            try:
+                existing_version = get_database_version(target_db)
+                print(f"Found existing database version: {existing_version}")
+                print(f"New database version: {new_version}")
+                
+                if compare_versions(new_version, existing_version) > 0:
+                    print("Database update required - backing up existing database")
+                    
+                    # Create backup
+                    backup_path = target_db.parent / f"user_data_backup_{existing_version}.db"
+                    shutil.copy2(target_db, backup_path)
+                    print(f"Backup created: {backup_path}")
+                    
+                    # Copy new database
+                    shutil.copy2(source_db, target_db)
+                    
+                    # Set new version in database
+                    set_database_version(target_db, new_version)
+                    
+                    print("Database updated successfully")
+                    return 3  # Overwritten
+                else:
+                    print("Database is current - no update needed")
+                    return 2  # Preserved
+                    
+            except Exception as e:
+                print(f"Error reading existing database version: {e}")
+                print("Installing new database as fallback")
+                # Fall through to new installation
+        
+        # New installation or fallback
+        print("Installing new database")
+        shutil.copy2(source_db, target_db)
+        set_database_version(target_db, new_version)
+        return 0  # Success
+        
+    except Exception as e:
+        print(f"Error handling database: {e}")
+        return 1
+
+
+def get_database_version(db_path: Path) -> str:
+    """Get version from database_version table"""
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Check if version table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='database_version'")
+        if not cursor.fetchone():
+            conn.close()
+            return "1.0.0"  # Default for databases without version table
+        
+        # Get version
+        cursor.execute("SELECT version FROM database_version ORDER BY version DESC LIMIT 1")
+        result = cursor.fetchone()
+        conn.close()
+        
+        return result[0] if result else "1.0.0"
+        
+    except Exception:
+        return "1.0.0"  # Default if any error
+
+
+def set_database_version(db_path: Path, version: str) -> None:
+    """Set version in database_version table"""
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Create version table if it doesn't exist
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS database_version (
+                version TEXT PRIMARY KEY,
+                updated_date TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Insert or update version
+        cursor.execute('''
+            INSERT OR REPLACE INTO database_version (version, updated_date) 
+            VALUES (?, datetime('now'))
+        ''', (version,))
+        
+        conn.commit()
+        conn.close()
+        
+    except Exception as e:
+        print(f"Warning: Could not set database version: {e}")
+
+
+def compare_versions(version1: str, version2: str) -> int:
+    """
+    Compare two version strings
+    Returns: 1 if version1 > version2, -1 if version1 < version2, 0 if equal
+    """
+    def normalize_version(v):
+        return [int(x) for x in v.split('.')]
+    
+    v1_parts = normalize_version(version1)
+    v2_parts = normalize_version(version2)
+    
+    # Pad shorter version with zeros
+    max_len = max(len(v1_parts), len(v2_parts))
+    v1_parts.extend([0] * (max_len - len(v1_parts)))
+    v2_parts.extend([0] * (max_len - len(v2_parts)))
+    
+    for v1, v2 in zip(v1_parts, v2_parts):
+        if v1 > v2:
+            return 1
+        elif v1 < v2:
+            return -1
+    
+    return 0
 
 
 def needs_migration(existing_config: dict, new_config: dict) -> bool:
