@@ -6437,9 +6437,11 @@ class App(tk.Tk):
         
         if not auto_scan_enabled:
             print("[JOURNAL] Auto-scan disabled by user preference")
+            self._set_status("Auto-scan disabled - enable in Settings if desired", 10000)
             return
         
         print("[JOURNAL] Starting auto-scan on startup...")
+        self._set_status("Checking journals for new mining data...", 3000)
         
         # Check if this is first run (no state file)
         state = JournalScanState()
@@ -6460,6 +6462,7 @@ class App(tk.Tk):
                 self._show_first_run_welcome_dialog(journal_count, all_journals)
             else:
                 print("No journal files found, skipping initial import")
+                self._set_status("No journal files found - check journal folder in Settings", 8000)
         else:
             # Not first run - do incremental auto-scan
             self._run_auto_scan_background()
@@ -6729,11 +6732,13 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
                         print("[JOURNAL] WARNING: ring_finder not found, cannot update counter")
                 else:
                     print("[JOURNAL] ✓ Auto-scan complete: No new entries")
+                    self.after(0, lambda: self._set_status("No new journal entries found"))
                     
             except Exception as e:
                 print(f"[JOURNAL] ERROR during auto-scan: {e}")
                 import traceback
                 traceback.print_exc()
+                self.after(0, lambda: self._set_status("Journal scan failed - check journal folder in Settings", 8000))
         
         # Run in background thread to not block UI
         thread = threading.Thread(target=scan_in_background, daemon=True)
