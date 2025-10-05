@@ -59,7 +59,7 @@ The Configurator works independently for announcements, reports, and tracking. V
 - Ship configuration management  
 - GUI for firegroups, timers, toggles, and announcements  
 - **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
-- **Hotspot Finder** – Search 29,854+ mining hotspots by material, ring type, and distance with detailed location data  
+- **Hotspot Finder** – Search 32,000+ mining hotspots by material, ring type, and distance with detailed location data  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports  
 
 [⬆️ Back to Top](#-elitemining)
