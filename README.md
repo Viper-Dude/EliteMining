@@ -2,7 +2,11 @@
 
 [![Discord](https://img.shields.io/discord/DISCORD_SERVER_ID?label=Discord%20Community&logo=discord&logoColor=white&color=7289da&style=for-the-badge)](https://discord.gg/Yjtq2jpA)
 
-**EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, performance tracking, and comprehensive hotspot finder with 32,000+ mining locations as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.  
+**EliteMining** optimizes your mining efficiency with live### 📋 Other Resources
+- **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
+- **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
+
+[⬆️ Back to Top](#-elitemining)ing analytics, automated announcements, performance tracking, and comprehensive hotspot finder with 32,000+ mining locations as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.  
 
 ---
 
