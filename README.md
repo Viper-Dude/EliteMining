@@ -1,6 +1,6 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 
-**EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, and performance tracking as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.  
+**EliteMining** optimizes your mining efficiency with live prospecting analytics, automated announcements, performance tracking, and comprehensive hotspot finder with 32,000+ mining locations as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.  
 
 ---
 
