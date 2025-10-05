@@ -204,7 +204,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 ### 🎯 Hotspot Finder
 - **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
 - **Filter by Material** – Search for specific materials (Painite, Platinum, Low Temperature Diamonds, etc.)
-- **Pre-loaded Database** – 29,854+ hotspots with material types, ring densities, and overlap counts
+- **Pre-loaded Database** – 32,000+ hotspots with material types, ring densities
 - **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
 - **Distance-Based Results** – Filter by jump range to find nearby opportunities
 - **Ring Composition Details** – View ring density and distance from arrival
