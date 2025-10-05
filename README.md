@@ -1,6 +1,6 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 
-[![Discord](https://img.shields.io/discord/DISCORD_SERVER_ID?label=Discord%20Community&logo=discord&logoColor=white&color=7289da&style=for-the-badge)](https://discord.gg/Yjtq2jpA)
+[![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Yjtq2jpA)
 
 **EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 32,000+ mining locations as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
 
