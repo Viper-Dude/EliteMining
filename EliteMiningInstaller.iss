@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.1.6
+AppVersion=v4.1.8
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetVAPath}
 AppendDefaultDirName=no
@@ -32,16 +32,20 @@ Source: "dist\Configurator.exe"; DestDir: "{app}\Apps\EliteMining\Configurator";
 Source: "app\data\galaxy_systems.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "app\data\database_metadata.json"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 
-; v4.1.6: FORCE OVERWRITE user database to fix phantom ring data and update schema
-; WARNING: This will replace user's database! Only doing this once to fix critical data corruption.
-; IMPORTANT: Restore "onlyifdoesntexist" flag in next version to preserve user data!
-Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion
+; v4.1.8+: Use smart version checking instead of forced overwrite
+; Database will only update if new version > existing version, with automatic backup
+Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: onlyifdoesntexist
+
+; Version checking utilities
+Source: "scripts\installer\config_installer.py"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "scripts\installer\check_db_version.py"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "scripts\installer\set_db_version.py"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 ; Documentation, variables, profile
 Source: "Doc\*"; DestDir: "{app}\Apps\EliteMining\Doc"; Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
 Source: "Variables\*"; DestDir: "{app}\Apps\EliteMining\Variables"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist
-; v4.1.5+: Never overwrite VoiceAttack profile - preserves user modifications
-Source: "EliteMining-Profile.vap"; DestDir: "{app}\Apps\EliteMining"; Flags: uninsneveruninstall skipifsourcedoesntexist onlyifdoesntexist
+; v4.1.9+: Force update VoiceAttack profile to apply command behavior corrections
+Source: "EliteMining-Profile.vap"; DestDir: "{app}\Apps\EliteMining"; Flags: uninsneveruninstall skipifsourcedoesntexist
 ; v4.1.5+: Never overwrite config.json - preserves user settings
 ; NOTE: Remove "onlyifdoesntexist" flag if critical config updates are needed in future versions
 Source: "app\config.json"; DestDir: "{app}\Apps\EliteMining"; Flags: onlyifdoesntexist

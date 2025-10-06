@@ -337,6 +337,8 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 - **There may be conflicts with HCS VoicePack commands, but these can be easily adjusted manually in the EliteMining Profile within VoiceAttack.**
 - **Works with EDCopilot**
 
+> **Note:** VoiceAttack startup warnings about EliteVA plugin bindings are normal due to recent Elite Dangerous changes and can be safely ignored - they don't impact EliteMining voice commands.
+
 [Back to Top](#elitemining)
 
 ---

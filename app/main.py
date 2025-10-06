@@ -348,7 +348,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.1.9"
+APP_VERSION = "v4.1.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1988,15 +1988,17 @@ cargo panel forces Elite to write detailed inventory data.
                 self.status_label.configure(text="❌ Journal monitoring error")
     
     def scan_journal_for_cargo_capacity(self, journal_file):
-        """Scan existing journal file for the most recent CargoCapacity and current system location"""
+        """Scan existing journal file for the most recent CargoCapacity, current system location, and ring metadata"""
         try:
             with open(journal_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             
             cargo_found = False
             location_found = False
+            scans_processed = 0
+            max_scans = 50  # Limit scan events to process (performance)
             
-            # Look for the most recent Loadout event with CargoCapacity and Location/FSDJump events
+            # Look for the most recent Loadout, Location/FSDJump, and Scan events
             for line in reversed(lines):  # Start from the end (most recent)
                 try:
                     event = json.loads(line.strip())
@@ -2033,17 +2035,22 @@ cargo panel forces Elite to write detailed inventory data.
                             cargo_found = True
                             continue
                     
-                    # Look for current system location (new logic)
+                    # Look for current system location (existing logic)
                     elif not location_found and event_type in ["FSDJump", "Location", "CarrierJump"]:
                         system_name = event.get("StarSystem", "")
                         if system_name:
                             self.current_system = system_name
-                            print(f"DEBUG: Startup scan found current system: {system_name}")
                             location_found = True
                             continue
                     
-                    # Stop scanning if we found both
-                    if cargo_found and location_found:
+                    # Process Scan events for ring metadata (new logic)
+                    elif event_type == "Scan" and scans_processed < max_scans:
+                        self.journal_parser.process_scan(event)
+                        scans_processed += 1
+                        continue
+                    
+                    # Stop scanning if we found cargo and location (but continue processing scans)
+                    if cargo_found and location_found and scans_processed >= max_scans:
                         break
                 except json.JSONDecodeError:
                     continue  # Skip invalid JSON lines
