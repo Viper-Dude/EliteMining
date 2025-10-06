@@ -348,7 +348,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.1.6"
+APP_VERSION = "v4.1.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -445,6 +445,25 @@ class RefineryDialog:
         # Center the dialog on parent window
         self.dialog.update_idletasks()
         
+        # Calculate dynamic width based on materials
+        material_count = len(self.current_cargo_items) if hasattr(self, 'current_cargo_items') and self.current_cargo_items else 0
+        
+        # Auto-width for up to 3-4 materials
+        if material_count <= 4:
+            # Calculate width based on longest material name
+            max_name_length = 0
+            if hasattr(self, 'current_cargo_items') and self.current_cargo_items:
+                max_name_length = max(len(name) for name in self.current_cargo_items.keys())
+            
+            # Base width + material name width + button space
+            base_width = 400
+            name_width = max_name_length * 8  # ~8 pixels per character
+            button_width = 200  # Space for quantity buttons
+            calculated_width = max(base_width, min(800, base_width + name_width + button_width))
+            dialog_width = calculated_width
+        else:
+            dialog_width = 600  # Default width for many materials
+        
         if parent:
             parent.update_idletasks()
             # Get parent window position and size
@@ -454,16 +473,15 @@ class RefineryDialog:
             parent_height = parent.winfo_height()
             
             # Calculate center position relative to parent
-            dialog_width = 600
             dialog_height = 650
             x = parent_x + (parent_width - dialog_width) // 2
             y = parent_y + (parent_height - dialog_height) // 2
         else:
             # Fallback to screen center
-            x = (self.dialog.winfo_screenwidth() // 2) - (600 // 2)
+            x = (self.dialog.winfo_screenwidth() // 2) - (dialog_width // 2)
             y = (self.dialog.winfo_screenheight() // 2) - (650 // 2)
         
-        self.dialog.geometry(f"600x650+{x}+{y}")
+        self.dialog.geometry(f"{dialog_width}x650+{x}+{y}")
         
         self._create_ui()
         
@@ -1970,16 +1988,22 @@ cargo panel forces Elite to write detailed inventory data.
                 self.status_label.configure(text="❌ Journal monitoring error")
     
     def scan_journal_for_cargo_capacity(self, journal_file):
-        """Scan existing journal file for the most recent CargoCapacity"""
+        """Scan existing journal file for the most recent CargoCapacity and current system location"""
         try:
             with open(journal_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             
-            # Look for the most recent Loadout event with CargoCapacity
+            cargo_found = False
+            location_found = False
+            
+            # Look for the most recent Loadout event with CargoCapacity and Location/FSDJump events
             for line in reversed(lines):  # Start from the end (most recent)
                 try:
                     event = json.loads(line.strip())
-                    if event.get("event") == "Loadout":
+                    event_type = event.get("event", "")
+                    
+                    # Look for cargo capacity (existing logic)
+                    if not cargo_found and event_type == "Loadout":
                         # Check for CargoCapacity at root level
                         if "CargoCapacity" in event:
                             old_capacity = self.max_cargo
@@ -1991,7 +2015,8 @@ cargo panel forces Elite to write detailed inventory data.
                             # Notify main app of capacity change
                             if old_capacity != self.max_cargo and self.capacity_changed_callback:
                                 self.capacity_changed_callback(self.max_cargo)
-                            return
+                            cargo_found = True
+                            continue
                         
                         # Check in Ship data as fallback
                         ship_data = event.get("Ship", {})
@@ -2005,7 +2030,21 @@ cargo panel forces Elite to write detailed inventory data.
                             # Notify main app of capacity change
                             if old_capacity != self.max_cargo and self.capacity_changed_callback:
                                 self.capacity_changed_callback(self.max_cargo)
-                            return
+                            cargo_found = True
+                            continue
+                    
+                    # Look for current system location (new logic)
+                    elif not location_found and event_type in ["FSDJump", "Location", "CarrierJump"]:
+                        system_name = event.get("StarSystem", "")
+                        if system_name:
+                            self.current_system = system_name
+                            print(f"DEBUG: Startup scan found current system: {system_name}")
+                            location_found = True
+                            continue
+                    
+                    # Stop scanning if we found both
+                    if cargo_found and location_found:
+                        break
                 except json.JSONDecodeError:
                     continue  # Skip invalid JSON lines
         except Exception as e:
