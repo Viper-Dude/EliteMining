@@ -124,6 +124,8 @@ EliteVA requires the `Custom.binds` file:
 - **Installer:** Run `EliteMiningSetup.exe` (includes VoiceAttack profile)  
 - **Portable:** Extract `EliteMining_3.9.0-beta.zip`  
 
+> **Antivirus Notice:** If your antivirus flags the application, this is a common false positive with Python-compiled apps - simply add an exclusion for the installation folder.
+
 ### Included Components  
 The installer bundles the **EliteVA plugin**. No separate download required.  
 
