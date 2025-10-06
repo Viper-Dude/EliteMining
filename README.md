@@ -7,32 +7,32 @@
 ---
 
 <details>
-<summary>📑 Table of Contents</summary>
+<summary>Table of Contents</summary>
 
-- [Usage Options](#-usage-options)  
-- [Features](#-features)  
-- [Requirements](#-requirements)  
-- [Installation](#-installation)  
-- [Configurator](#️-configurator)  
-  - [EliteMining GUI](#-elitemining-gui)  
-  - [Backup & Restore](#-backup--restore)  
-- [Hotspot Finder](#-hotspot-finder)  
-- [Getting Started](#-getting-started)  
-- [Commands](#-commands)  
-- [Mining Presets](#-mining-presets)  
-- [Usage Tips](#-usage-tips)  
-- [Known Limitations](#-known-limitations)  
-- [Training Speech Recognition](#-training-speech-recognition)  
-- [In Development](#-in-development)  
-- [Contact](#-contact)  
-- [License](#-license--third-party-notices)  
-- [Credits](#-credits)  
+- [Usage Options](#usage-options)  
+- [Features](#features)  
+- [Requirements](#requirements)  
+- [Installation](#installation)  
+- [Configurator](#configurator)  
+  - [EliteMining GUI](#elitemining-gui)  
+  - [Backup & Restore](#backup--restore)  
+- [Hotspot Finder](#hotspot-finder)  
+- [Getting Started](#getting-started)  
+- [Commands](#commands)  
+- [Mining Presets](#mining-presets)  
+- [Usage Tips](#usage-tips)  
+- [Known Limitations](#known-limitations)  
+- [Training Speech Recognition](#training-speech-recognition)  
+- [In Development](#in-development)  
+- [Contact](#contact)  
+- [License](#license--third-party-notices)  
+- [Credits](#credits)  
 
 </details>
 
 ---
 
-## 🎯 Usage Options
+## Usage Options
 
 ### VoiceAttack Integration (Full Automation)  
 Complete voice/hotkey-controlled mining with automated sequences and announcements.  
@@ -40,11 +40,11 @@ Complete voice/hotkey-controlled mining with automated sequences and announcemen
 ### Standalone Mode (Manual Control)  
 The Configurator works independently for announcements, reports, and tracking. VoiceAttack is not required.  
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## ✨ Features
+## Features
 
 ### With VoiceAttack (Full Experience)  
 - Voice/hotkey mining sequences  
@@ -64,11 +64,11 @@ The Configurator works independently for announcements, reports, and tracking. V
 - **Hotspot Finder** – Search 32,000+ mining hotspots by material, ring type, and distance with detailed location data  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports  
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 🗺️ Hotspot Finder
+## Hotspot Finder
 
 The Hotspot Finder provides access to a comprehensive database of 32,000+ confirmed mining hotspots with detailed location data, material information, and intelligent filtering capabilities.
 
@@ -86,11 +86,11 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="600"><br>  
 *Hotspot Finder showing search results with material filters and distance calculations.*
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 📦 Requirements
+## Requirements
 <details>
 <summary>Click to expand</summary>
 
@@ -102,7 +102,7 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 - **[VoiceAttack](https://voiceattack.com/)** – Paid version  
 - **Microphone** for voice commands  
 
-### 🔑 Keybind Requirement for EliteVA  
+### Keybind Requirement for EliteVA  
 EliteVA requires the `Custom.binds` file:  
 
 1. Open **Elite Dangerous → Options → Controls**  
@@ -113,11 +113,11 @@ EliteVA requires the `Custom.binds` file:
 
 </details>
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 💾 Installation
+## Installation
 <details>
 <summary>Click to expand</summary>
 
@@ -139,11 +139,11 @@ The installer bundles the **EliteVA plugin**. No separate download required.
 
 </details>
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 🖥️ Configurator  
+## Configurator  
 
 The **Configurator** lets you adjust firegroups, toggles, timers, and announcements via GUI. It can run standalone without VoiceAttack.  
 
@@ -152,11 +152,11 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 - Keyboard: **Right Ctrl + Right Shift + C**  
 - Direct: `\EliteMining\Configurator\Configurator.exe`  
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-### 📸 EliteMining GUI  
+### EliteMining GUI  
 
 #### Main Window (Dashboard) & Firegroups  
 <img src="Screenshot/configurator-main.png" width="600"><br>  
@@ -168,7 +168,7 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 
 ---
 
-### 🪓 Mining Session Tab  
+### Mining Session Tab  
 
 #### Announcement Panel  
 <img src="Screenshot/mining-announcement.png" width="600"><br>  
@@ -188,10 +188,10 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 <img src="Screenshot/mining-reports.png" width="600"><br>  
 *Detailed mining statistics and summaries.*  
 
-#### 📋 Detailed HTML Reports  
+#### Detailed HTML Reports  
 *HTML reports with charts and statistics.*  
 
-> **⚠️ Work in Progress:** The detailed HTML report system is under active development. New features and improvements are being added regularly. Report layouts, analytics calculations, and data presentation may change in future updates.
+> **Work in Progress:** The detailed HTML report system is under active development. New features and improvements are being added regularly. Report layouts, analytics calculations, and data presentation may change in future updates.
 
 Generate comprehensive HTML reports with interactive charts, mining analytics, and session comments. Features include:
 - **Dark/Light Theme Toggle** - Switch between themes with one click  
@@ -211,11 +211,11 @@ Generate comprehensive HTML reports with interactive charts, mining analytics, a
 
 Right-click any mining session to generate a detailed report, add screenshots, or manage existing reports. All reports are saved with your session data and can be opened directly from the reports tab.
 
-#### 📑 Bookmarks  
+#### Bookmarks  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_bookmarks.png" width="600"><br>  
 *Save, search, and manage mining spots.*  
 
-#### 📊 Comprehensive Analytics  
+#### Comprehensive Analytics  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_statistic.png" width="600"><br>  
 *Session statistics: yields, hit rates, and comparisons.*  
 
@@ -225,20 +225,20 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-options.png" width="600" height="400"><br>  
 *UI and announcement preferences.*  
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-### 💾 Backup & Restore 
+### Backup & Restore 
 - Easily save and restore your complete EliteMining setup including settings, bookmarks, and reports. Create timestamped backups before updates or quickly restore previous configurations with one click.  
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/backup.png" width="350"><br>  
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 <details>
 <summary>Click to expand</summary>
 
@@ -268,15 +268,15 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 </details>
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 🎙️ Commands
+## Commands
 <details>
 <summary>Click to expand</summary>
 
-### ✅ Status Checks  
+### Status Checks  
 | Spoken Command | Description |
 |----------------|-------------|
 | "Say firegroup for weapons" | Reports FG for weapons |
@@ -286,7 +286,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 | "Say toggle for cargo scoop" | Reports toggle status |
 | "Say timer for laser mining" | Reports active timer |
 
-### 🔧 Firegroup & Parameter Commands  
+### Firegroup & Parameter Commands  
 | Spoken Command | Description |
 |----------------|-------------|
 | "Set firegroup for Discovery Scanner to [A–H]" | Assigns Discovery Scanner |
@@ -296,7 +296,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 | "Set firegroup for SSDM to [A–H]" | Assigns SSDM |
 | "Set firegroup for weapons to [A–H]" | Assigns weapons |
 
-### 🎮 Miscellaneous  
+### Miscellaneous  
 | Spoken Command | Description |
 |----------------|-------------|
 | "Landing Request" | Requests docking |
@@ -304,11 +304,11 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 </details>
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## ⚡ Mining Presets
+## Mining Presets
 <details>
 <summary>Click to expand</summary>
 
@@ -323,29 +323,29 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 </details>
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 💡 Usage Tips
+## Usage Tips
 - **Short press** → Starts command  
 - **Long press** → Stops/resets command  
 - Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack  
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## ⚠️ Known Limitations
+## Known Limitations
 - **Only works with in-game keybinds (HOTAS setup manual)**
 - **There may be conflicts with HCS VoicePack commands, but these can be easily adjusted manually in the EliteMining Profile within VoiceAttack.**
 - **Works with EDCopilot**
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 🗣️ Training Speech Recognition
+## Training Speech Recognition
 <details>
 <summary>Click to expand</summary>
 
@@ -356,32 +356,32 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 </details>
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 🚧 In Development  
+## In Development  
 TBA  
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## ❓ Contact  
+## Contact  
 
-### 💬 Community Support
+### Community Support
 Join our Discord server for real-time help, mining tips, and community discussions:  
 [![Discord](https://img.shields.io/badge/EliteMining%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Yjtq2jpA)
 
-### 📋 Other Resources
+### Other Resources
 - **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
 - **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 📜 License & Third-Party Notices  
+## License & Third-Party Notices  
 
 **EliteMining** © 2025 CMDR ViperDude.  
 Distributed under the [MIT License](LICENSE.md).  
@@ -389,11 +389,11 @@ Distributed under the [MIT License](LICENSE.md).
 This project bundles:  
 - **ELITEVA** © 2023 Somfic – MIT License  
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
 
 ---
 
-## 👏 Credits  
+## Credits  
 - [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA  
 
-[⬆️ Back to Top](#-elitemining)
+[Back to Top](#elitemining)
