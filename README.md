@@ -118,8 +118,6 @@ EliteVA requires the `Custom.binds` file:
 ---
 
 ## Installation
-<details>
-<summary>Click to expand</summary>
 
 - **Installer:** Run `EliteMiningSetup.exe` (includes VoiceAttack profile)  
 - **Portable:** Extract `EliteMining_3.9.0-beta.zip`  
@@ -136,8 +134,6 @@ The installer bundles the **EliteVA plugin**. No separate download required.
 2. Extract into your VoiceAttack app folder  
 3. Open VoiceAttack → **Profile > Import Profile**  
 4. Select **EliteMining-Profile.vap**  
-
-</details>
 
 [Back to Top](#elitemining)
 
