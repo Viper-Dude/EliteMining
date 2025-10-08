@@ -348,7 +348,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.1.8"
+APP_VERSION = "v4.1.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1127,7 +1127,11 @@ class CargoMonitor:
         self.current_system = None  # Track current system for hotspot detection
         
         # Initialize JournalParser for proper Scan and SAASignalsFound processing
-        self.journal_parser = JournalParser(self.journal_dir, self.user_db)
+        # Add callback to notify Ring Finder when new hotspots are added
+        self.journal_parser = JournalParser(self.journal_dir, self.user_db, self._on_hotspot_added)
+        
+        # Flag to track pending Ring Finder refreshes
+        self._pending_ring_finder_refresh = False
         
         # Start journal monitoring regardless of window state
         self.start_journal_monitoring()
@@ -1138,6 +1142,49 @@ class CargoMonitor:
         # Try to initialize cargo capacity from Status.json on startup
         self.refresh_ship_capacity()
         logging.basicConfig(filename="debug_log.txt", level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
+    
+    def _on_hotspot_added(self):
+        """Callback triggered when new hotspot data is added to database"""
+        try:
+            # Access main app through main_app_ref if this is called from CargoMonitor
+            main_app = getattr(self, 'main_app_ref', self)
+            
+            # Check if Ring Finder exists and is properly initialized
+            ring_finder_ready = (hasattr(main_app, 'ring_finder') and 
+                                 main_app.ring_finder is not None and
+                                 hasattr(main_app.ring_finder, '_update_database_info'))
+            
+            if not ring_finder_ready:
+                main_app._pending_ring_finder_refresh = True
+                return
+                
+            # Ring Finder exists - refresh it now
+            main_app._refresh_ring_finder()
+                    
+        except Exception as e:
+            # Silent fail to avoid breaking other functionality
+            pass
+    
+    def _refresh_ring_finder(self):
+        """Helper method to refresh Ring Finder database info and cache"""
+        try:
+            # Access main app through main_app_ref if this is called from CargoMonitor
+            main_app = getattr(self, 'main_app_ref', self)
+            
+            if hasattr(main_app, 'ring_finder') and main_app.ring_finder:
+                # Update database info counter
+                if hasattr(main_app.ring_finder, '_update_database_info'):
+                    main_app.ring_finder._update_database_info()
+                
+                # Clear any cached results to ensure fresh data in next search
+                if hasattr(main_app.ring_finder, 'local_db') and hasattr(main_app.ring_finder.local_db, 'clear_cache'):
+                    main_app.ring_finder.local_db.clear_cache()
+                    
+                # Clear the pending refresh flag
+                if hasattr(main_app, '_pending_ring_finder_refresh'):
+                    main_app._pending_ring_finder_refresh = False
+        except Exception as e:
+            pass
     
     def create_window(self):
         """Create the cargo monitor as a separate window (not overlay)"""
@@ -2317,6 +2364,32 @@ cargo panel forces Elite to write detailed inventory data.
                     if hasattr(self, 'status_label'):
                         self.status_label.configure(text=f"💰 Sold {count}x {item_name}")
                         
+            elif event_type in ["ModuleBuy", "ModuleSell", "ModuleSwap", "ModuleRetrieve", "ModuleStore"]:
+                # Handle module changes that might affect cargo capacity
+                slot = event.get("Slot", "").lower()
+                item = event.get("Item", "").lower() if event.get("Item") else ""
+                stored_item = event.get("StoredItem", "").lower() if event.get("StoredItem") else ""
+                
+                # Check if cargo rack modules are involved
+                is_cargo_related = any(keyword in text for text in [slot, item, stored_item] 
+                                     for keyword in ["cargorack", "cargo", "internal"])
+                
+                if is_cargo_related:
+                    print(f"DEBUG: Cargo module change detected - Event: {event_type}, Slot: {slot}, Item: {item}")
+                    if hasattr(self, 'status_label'):
+                        self.status_label.configure(text="⚙️ Cargo module changed - updating capacity...")
+                    
+                    # Force immediate capacity refresh
+                    refresh_success = self.refresh_ship_capacity()
+                    
+                    # If Status.json doesn't have updated capacity yet, try journal scan
+                    if not refresh_success:
+                        self._force_loadout_scan()
+                    
+                    # Final fallback - force a delayed refresh to catch Status.json updates
+                    if hasattr(self, 'cargo_window') and self.cargo_window:
+                        self.cargo_window.after(1000, self._delayed_capacity_refresh)
+
             elif event_type in ["FSDJump", "Location", "CarrierJump"]:
                 # Track current system for hotspot detection
                 system_name = event.get("StarSystem", "")
@@ -6457,6 +6530,11 @@ class App(tk.Tk):
             # Only use va_root path in installer mode, None in dev mode for consistent database location
             app_dir = os.path.join(self.va_root, "app") if getattr(sys, 'frozen', False) and hasattr(self, 'va_root') and self.va_root else None
             self.ring_finder = RingFinder(parent_frame, self.prospector_panel, app_dir)
+            
+            # Check if there were any pending hotspot additions while Ring Finder was being created
+            if getattr(self, '_pending_ring_finder_refresh', False):
+                self._refresh_ring_finder()
+                
         except Exception as e:
             print(f"Ring finder setup failed: {e}")
 
