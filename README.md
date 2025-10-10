@@ -61,7 +61,7 @@ The Configurator works independently for announcements, reports, and tracking. V
 - Ship configuration management  
 - GUI for firegroups, timers, toggles, and announcements  
 - **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
-- **Hotspot Finder** – Search 32,000+ mining hotspots by material, ring type, and distance with detailed location data  
+- **Hotspot Finder** – Search 32,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports  
 
 [Back to Top](#elitemining)
@@ -70,12 +70,12 @@ The Configurator works independently for announcements, reports, and tracking. V
 
 ## Hotspot Finder
 
-The Hotspot Finder provides access to a comprehensive database of 32,000+ confirmed mining hotspots with detailed location data, material information, and intelligent filtering capabilities.
+The Hotspot Finder provides access to a comprehensive database of 32,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities.
 
 ### Key Features
 - **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
-- **Filter by Material** – Search for specific materials (Painite, Platinum, Low Temperature Diamonds, etc.)
-- **Pre-loaded Database** – 32,000+ hotspots with material types, ring densities
+- **Filter by Minerals** – Search for specific minerals (Painite, Platinum, Low Temperature Diamonds, etc.)
+- **Pre-loaded Database** – 32,000+ hotspots with minerals types, ring densities
 - **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
 - **Distance-Based Results** – Filter by jump range to find nearby opportunities
 - **Ring Composition Details** – View ring density and distance from arrival
@@ -84,7 +84,7 @@ The Hotspot Finder provides access to a comprehensive database of 32,000+ confir
 Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="600"><br>  
-*Hotspot Finder showing search results with material filters and distance calculations.*
+*Hotspot Finder showing search results with minerals filters and distance calculations.*
 
 [Back to Top](#elitemining)
 
@@ -172,13 +172,13 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 
 #### Mining Session  
 <img src="Screenshot/mining-session.png" width="600"><br>  
-*Tracks time, prospector reports, materials, and progress.*  
+*Tracks time, prospector reports, minerals, and progress.*  
 
 <img src="Screenshot/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>  
 *Yield comparisons across sessions.*  
 
-<img src="Screenshot/dashboard-graphs_material_comparison.png" width="600"><br>  
-*Material collection comparisons.*  
+<img src="Screenshot/dashboard-graphs_minerals_comparison.png" width="600"><br>  
+*Minerals collection comparisons.*  
 
 #### Reports 
 <img src="Screenshot/mining-reports.png" width="600"><br>  
@@ -192,7 +192,7 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 Generate comprehensive HTML reports with interactive charts, mining analytics, and session comments. Features include:
 - **Dark/Light Theme Toggle** - Switch between themes with one click  
 - **Session Comments** - Add notes and observations to your reports  
-- **Visual Charts** - Material breakdowns and performance graphs  
+- **Visual Charts** - Minerals breakdowns and performance graphs  
 - **Screenshot Integration** - Attach screenshots to document your sessions  
 - **Overall Statistics** - Compare current session to your mining history
 - **Analytics Tooltips** - Hover explanations for all efficiency metrics
