@@ -177,7 +177,7 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 <img src="Screenshot/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>  
 *Yield comparisons across sessions.*  
 
-<img src="Screenshot/dashboard-graphs_minerals_comparison.png" width="600"><br>  
+<img src="Screenshot/dashboard-graphs_material_comparison.png" width="600"><br>  
 *Minerals collection comparisons.*  
 
 #### Reports 
