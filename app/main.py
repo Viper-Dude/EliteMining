@@ -397,6 +397,7 @@ def detect_va_folder_interactive(parent: tk.Tk) -> Optional[str]:
         r"D:\SteamLibrary\steamapps\common\VoiceAttack 2\Apps\EliteMining",
         r"D:\SteamLibrary\steamapps\common\VoiceAttack\Apps\EliteMining",
         r"C:\Program Files (x86)\VoiceAttack\Apps\EliteMining",
+        r"C:\Program Files\VoiceAttack\Apps\EliteMining",
     ]
     for c in candidates:
         if os.path.isdir(c):
