@@ -2660,24 +2660,45 @@ class ProspectorPanel(ttk.Frame):
                     if prospector_match:
                         prospectors_used = prospector_match.group(1)
                     
-                    # Extract materials breakdown from cargo section first
-                    if not materials_breakdown:
-                        refined_section = re.search(r'=== REFINED MINERALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
-                        if refined_section:
-                            refined_text = refined_section.group(1)
-                            material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
-                            if material_lines:
-                                materials_breakdown = ', '.join([f"{mat.strip()}: {tons}t" for mat, tons in material_lines])
+                    # Extract materials breakdown - merge from multiple sources for complete data
+                    materials_dict = {}
                     
-                    # Try CARGO MATERIAL BREAKDOWN section for manual entries (if refined materials empty)
                     if not materials_breakdown:
+                        # First, get data from CARGO MATERIAL BREAKDOWN (session end data)
                         cargo_section = re.search(r'=== CARGO MATERIAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
                         if cargo_section:
                             cargo_text = cargo_section.group(1)
-                            # Look for "MaterialName: Xt" patterns
                             material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
-                            if material_lines:
-                                materials_breakdown = ', '.join([f"{mat.strip()}: {tons}t" for mat, tons in material_lines])
+                            for mat, tons in material_lines:
+                                mat_clean = mat.strip()
+                                materials_dict[mat_clean] = float(tons)
+                        
+                        # Then, merge with REFINED CARGO TRACKING (manually added materials during session)
+                        refined_cargo_section = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
+                        if refined_cargo_section:
+                            refined_cargo_text = refined_cargo_section.group(1)
+                            refined_material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', refined_cargo_text, re.MULTILINE)
+                            for mat, tons in refined_material_lines:
+                                mat_clean = mat.strip()
+                                if mat_clean in materials_dict:
+                                    # Add to existing quantity
+                                    materials_dict[mat_clean] += float(tons)
+                                else:
+                                    # New material from refinery
+                                    materials_dict[mat_clean] = float(tons)
+                        
+                        # Fallback to REFINED MINERALS section if no cargo data found
+                        if not materials_dict:
+                            refined_section = re.search(r'=== REFINED MINERALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
+                            if refined_section:
+                                refined_text = refined_section.group(1)
+                                material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
+                                for mat, tons in material_lines:
+                                    materials_dict[mat.strip()] = float(tons)
+                        
+                        # Convert dictionary to string format
+                        if materials_dict:
+                            materials_breakdown = ', '.join([f"{mat}: {tons:.1f}t" for mat, tons in materials_dict.items()])
                     
                     # If materials_tracked is empty but we have materials_breakdown, count the materials
                     if not materials_tracked and materials_breakdown:
@@ -2865,24 +2886,45 @@ class ProspectorPanel(ttk.Frame):
                     if prospector_match:
                         prospectors_used = prospector_match.group(1)
                     
-                    # Extract materials breakdown from cargo section first
-                    if not materials_breakdown:
-                        refined_section = re.search(r'=== REFINED MINERALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
-                        if refined_section:
-                            refined_text = refined_section.group(1)
-                            material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
-                            if material_lines:
-                                materials_breakdown = ', '.join([f"{mat.strip()}: {tons}t" for mat, tons in material_lines])
+                    # Extract materials breakdown - merge from multiple sources for complete data
+                    materials_dict = {}
                     
-                    # Try CARGO MATERIAL BREAKDOWN section for manual entries (if refined materials empty)
                     if not materials_breakdown:
+                        # First, get data from CARGO MATERIAL BREAKDOWN (session end data)
                         cargo_section = re.search(r'=== CARGO MATERIAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
                         if cargo_section:
                             cargo_text = cargo_section.group(1)
-                            # Look for "MaterialName: Xt" patterns
                             material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
-                            if material_lines:
-                                materials_breakdown = ', '.join([f"{mat.strip()}: {tons}t" for mat, tons in material_lines])
+                            for mat, tons in material_lines:
+                                mat_clean = mat.strip()
+                                materials_dict[mat_clean] = float(tons)
+                        
+                        # Then, merge with REFINED CARGO TRACKING (manually added materials during session)
+                        refined_cargo_section = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
+                        if refined_cargo_section:
+                            refined_cargo_text = refined_cargo_section.group(1)
+                            refined_material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', refined_cargo_text, re.MULTILINE)
+                            for mat, tons in refined_material_lines:
+                                mat_clean = mat.strip()
+                                if mat_clean in materials_dict:
+                                    # Add to existing quantity
+                                    materials_dict[mat_clean] += float(tons)
+                                else:
+                                    # New material from refinery
+                                    materials_dict[mat_clean] = float(tons)
+                        
+                        # Fallback to REFINED MINERALS section if no cargo data found
+                        if not materials_dict:
+                            refined_section = re.search(r'=== REFINED MINERALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
+                            if refined_section:
+                                refined_text = refined_section.group(1)
+                                material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
+                                for mat, tons in material_lines:
+                                    materials_dict[mat.strip()] = float(tons)
+                        
+                        # Convert dictionary to string format
+                        if materials_dict:
+                            materials_breakdown = ', '.join([f"{mat}: {tons:.1f}t" for mat, tons in materials_dict.items()])
                     
                     # If materials_tracked is empty but we have materials_breakdown, count the materials
                     if not materials_tracked and materials_breakdown:

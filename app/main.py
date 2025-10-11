@@ -2855,8 +2855,8 @@ cargo panel forces Elite to write detailed inventory data.
             updated_materials = {}
             total_added = 0.0
             
-            # Check if there's already a CARGO MINERAL BREAKDOWN section
-            cargo_section_match = re.search(r'=== CARGO MINERAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
+            # Check if there's already a REFINED CARGO TRACKING section
+            cargo_section_match = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
             if cargo_section_match:
                 # Parse existing materials
                 cargo_text = cargo_section_match.group(1)
@@ -2883,22 +2883,22 @@ cargo panel forces Elite to write detailed inventory data.
                 new_header = f"{header_match.group(1)}{new_total:.0f}t"
                 content = content.replace(header_match.group(0), new_header)
             
-            # Update or add CARGO MINERAL BREAKDOWN section
-            cargo_breakdown_text = "\n=== CARGO MINERAL BREAKDOWN ===\n"
+            # Update or add REFINED CARGO TRACKING section
+            cargo_breakdown_text = "\n=== REFINED CARGO TRACKING ===\n"
             prospectors_line = ""
             if "Prospector Limpets Used:" in content:
                 prospector_match = re.search(r'Prospector Limpets Used:\s*(\d+)', content)
                 if prospector_match:
                     cargo_breakdown_text += f"Prospector Limpets Used: {prospector_match.group(1)}\n"
             
-            cargo_breakdown_text += f"Minerals Collected: {len(updated_materials)} types\n\n"
+            cargo_breakdown_text += f"Refined Materials: {len(updated_materials)} types\n\n"
             
             # Sort materials by quantity (highest first)
             sorted_materials = sorted(updated_materials.items(), key=lambda x: x[1], reverse=True)
             for material_name, quantity in sorted_materials:
                 cargo_breakdown_text += f"{material_name}: {quantity:.1f}t\n"
             
-            cargo_breakdown_text += f"\nTotal Cargo Collected: {sum(updated_materials.values()):.1f}t"
+            cargo_breakdown_text += f"\nTotal Refined: {sum(updated_materials.values()):.1f}t"
             
             # Replace or add the cargo breakdown section
             if cargo_section_match:
@@ -5793,13 +5793,13 @@ class App(tk.Tk):
                 if match:
                     width, height, x, y = map(int, match.groups())
                     
-                    # Check if position is on screen
-                    screen_width = self.winfo_screenwidth()
-                    screen_height = self.winfo_screenheight()
-                    
-                    # If window is completely off-screen, center it
-                    if x < -width or x > screen_width or y < -height or y > screen_height:
-                        # Center on screen
+                    # For multi-monitor setups, allow negative and large positive coordinates
+                    # Only reset if window is EXTREMELY far off-screen (likely corrupt data)
+                    # Allow coordinates up to 10000 pixels in any direction for multi-monitor
+                    if x < -10000 or x > 10000 or y < -10000 or y > 10000:
+                        # Position is corrupt, center on primary screen
+                        screen_width = self.winfo_screenwidth()
+                        screen_height = self.winfo_screenheight()
                         x = (screen_width - width) // 2
                         y = (screen_height - height) // 2
                         geom = f"{width}x{height}+{x}+{y}"
