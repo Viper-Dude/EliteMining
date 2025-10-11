@@ -165,7 +165,14 @@ class ReportGenerator:
 <head>
     <meta charset="UTF-8">
     <title>EliteMining Session Report</title>
+    <meta name="color-scheme" content="light">
     <style>
+        * {{
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            color-adjust: exact;
+        }}
+        
         :root {{
             /* Light theme variables */
             --bg-color: #f5f5f5;
@@ -551,21 +558,82 @@ class ReportGenerator:
         }}
         
         @media print {{
+            /* Force light theme colors for printing */
+            * {{
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }}
+            
+            :root, [data-theme="dark"] {{
+                --bg-color: white !important;
+                --container-bg: white !important;
+                --text-color: black !important;
+                --header-color: #2c3e50 !important;
+                --section-bg: #f8f9fa !important;
+                --section-border: #3498db !important;
+                --card-bg: white !important;
+                --card-border: #dee2e6 !important;
+                --stat-value-color: #27ae60 !important;
+                --stat-label-color: #7f8c8d !important;
+                --table-header-bg: #34495e !important;
+                --table-header-color: white !important;
+                --table-even-row: #f8f9fa !important;
+                --comment-bg: #e8f4fd !important;
+                --comment-border: #0066cc !important;
+                --comment-text-bg: white !important;
+                --comment-text-border: #d1ecf1 !important;
+                --border-color: #dee2e6 !important;
+            }}
+            
             .theme-toggle {{
-                display: none;
+                display: none !important;
             }}
+            
             body {{
-                background-color: white;
-                color: black;
+                background-color: white !important;
+                color: black !important;
             }}
+            
             .container {{
-                box-shadow: none;
-                padding: 0;
-                background-color: white;
+                box-shadow: none !important;
+                padding: 0 !important;
+                background-color: white !important;
             }}
+            
             .section {{
                 page-break-inside: avoid;
-                background-color: #f8f9fa;
+                background-color: #f8f9fa !important;
+            }}
+            
+            .stat-card {{
+                page-break-inside: avoid;
+            }}
+            
+            .data-table th {{
+                background-color: #34495e !important;
+                color: white !important;
+            }}
+            
+            .data-table tr:nth-child(even) {{
+                background-color: #f8f9fa !important;
+            }}
+            
+            .header {{
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }}
+            
+            /* Preserve gradient colors for yield cards */
+            div[style*="linear-gradient"], div[style*="background:"] {{
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }}
+            
+            /* Preserve gradient colors for yield cards */
+            div[style*="linear-gradient"] {{
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }}
         }}
         
@@ -1468,20 +1536,45 @@ class ReportGenerator:
             # Yield Breakdown Section - Show both comprehensive and filtered yields
             individual_yields = session_data.get('individual_yields', {})
             filtered_yields = session_data.get('filtered_yields', {})
+            total_avg_yield = session_data.get('total_average_yield', 0.0)
             
-            if individual_yields or filtered_yields:
+            # Fallback: calculate from individual_yields if not stored
+            if not total_avg_yield and individual_yields:
+                total_avg_yield = sum(individual_yields.values()) / len(individual_yields)
+            
+            if individual_yields or filtered_yields or total_avg_yield:
                 analytics_html += """
                 <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
                     <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📊 Mineral Yield Analysis</h3>
                 """
                 
+                # Show Total Average Yield prominently at the top
+                if total_avg_yield and total_avg_yield > 0:
+                    # Color code based on yield quality
+                    if total_avg_yield >= 15.0:
+                        yield_color = "#4CAF50"
+                    elif total_avg_yield >= 10.0:
+                        yield_color = "#2196F3"
+                    elif total_avg_yield >= 5.0:
+                        yield_color = "#FF9800"
+                    else:
+                        yield_color = "#9E9E9E"
+                    
+                    analytics_html += f"""
+                    <div style="text-align: center; margin-bottom: 25px; padding: 20px; background: linear-gradient(135deg, {yield_color}, {yield_color}CC); border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="font-size: 48px; font-weight: bold; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">{self._safe_float(total_avg_yield):.1f}%</div>
+                        <div style="font-size: 18px; color: white; margin-top: 10px; font-weight: 600;">Total Average Yield</div>
+                        <div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 5px; font-style: italic;">Average yield across all selected materials and prospected asteroids</div>
+                    </div>
+                    """
+                
                 # Show filtered yields first if available (announcement threshold based)
                 if filtered_yields:
                     analytics_html += """
                     <div style="margin-bottom: 25px;">
-                        <h4 style="color: #4CAF50; margin-bottom: 15px; font-size: 16px;">🎯 Calculation based on thresholds set in announcement panel</h4>
+                        <h4 style="color: #4CAF50; margin-bottom: 15px; font-size: 16px;">🎯 Asteroids Above Announcement Thresholds</h4>
                         <p style="color: #cccccc; font-size: 14px; margin-bottom: 15px; font-style: italic;">
-                            Only asteroids that met your announcement thresholds - represents your "good finds" performance
+                            Selected materials that exceeded announcement panel thresholds - your premium finds
                         </p>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
                     """
@@ -1513,9 +1606,9 @@ class ReportGenerator:
                 if individual_yields:
                     analytics_html += """
                     <div style="margin-bottom: 15px;">
-                        <h4 style="color: #2196F3; margin-bottom: 15px; font-size: 16px;">🌍 Calculation based on all asteroids scanned</h4>
+                        <h4 style="color: #2196F3; margin-bottom: 15px; font-size: 16px;">🌍 All Asteroids Prospected</h4>
                         <p style="color: #cccccc; font-size: 14px; margin-bottom: 15px; font-style: italic;">
-                            Includes all asteroids prospected - represents your overall prospecting efficiency
+                            Selected materials across all prospected asteroids - overall efficiency
                         </p>
                     """
                     
@@ -1659,6 +1752,31 @@ class ReportGenerator:
                         tph = (total_tons / (duration_minutes / 60)) if duration_minutes > 0 else 0
                 else:
                     tph = tph_value
+                
+                # Total Average Yield - shows overall prospecting efficiency
+                total_avg_yield = session_data.get('total_average_yield', 0.0)
+                if not total_avg_yield and session_data.get('individual_yields'):
+                    total_avg_yield = sum(session_data['individual_yields'].values()) / len(session_data['individual_yields'])
+                
+                if total_avg_yield and total_avg_yield > 0:
+                    analytics_html += f"""
+                    <div class="stat-card" title="Your overall prospecting efficiency across all asteroids scanned. This is the average yield percentage of valuable minerals found in every asteroid you prospected. Higher values mean you're consistently finding rich asteroids.">
+                        <div class="stat-value">{self._safe_float(total_avg_yield):.1f}%</div>
+                        <div class="stat-label">Total Average Yield</div>
+                        <div class="stat-help">🎯 Overall prospecting efficiency</div>
+                    </div>
+                    """
+                
+                # Hit Rate - asteroid selection accuracy
+                hit_rate = session_data.get('hit_rate_percent', 0)
+                if hit_rate and hit_rate > 0:
+                    analytics_html += f"""
+                    <div class="stat-card" title="Percentage of asteroids that contained your target materials above announcement thresholds. Shows how accurate you are at selecting profitable asteroids. Higher rates mean better targeting skills and less wasted prospector limpets.">
+                        <div class="stat-value">{self._safe_float(hit_rate):.1f}%</div>
+                        <div class="stat-label">Hit Rate</div>
+                        <div class="stat-help">🎯 Asteroid selection accuracy</div>
+                    </div>
+                    """
                 
                 if prospectors_used > 0:
                     tons_per_prospector = total_tons / prospectors_used

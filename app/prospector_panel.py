@@ -2733,7 +2733,7 @@ class ProspectorPanel(ttk.Frame):
             if not sessions:
                 # If no session files exist, create empty CSV with headers
                 with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
+                    writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
                     writer.writeheader()
                 messagebox.showinfo("CSV Created", "Created new CSV file - ready for your first session")
                 parent_window.destroy()
@@ -2744,7 +2744,7 @@ class ProspectorPanel(ttk.Frame):
             
             # Write new CSV
             with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
+                writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
                 writer.writeheader()
                 writer.writerows(sessions)
             
@@ -2966,7 +2966,7 @@ class ProspectorPanel(ttk.Frame):
             if not sessions:
                 # If no session files exist, create empty CSV with headers
                 with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
+                    writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
                     writer.writeheader()
                 if not silent:
                     self._set_status("Created new CSV file - ready for first session")
@@ -2977,7 +2977,7 @@ class ProspectorPanel(ttk.Frame):
             
             # Write new CSV
             with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
+                writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
                 writer.writeheader()
                 writer.writerows(sessions)
             
@@ -3364,6 +3364,7 @@ class ProspectorPanel(ttk.Frame):
                 # NEW: Calculate yield from prospector reports data using selected materials only
                 raw_yields = {}
                 yield_display_string = ""
+                total_avg_yield = 0.0
                 try:
                     raw_yields = self._calculate_yield_from_prospector_reports()
                     if raw_yields:
@@ -3374,6 +3375,9 @@ class ProspectorPanel(ttk.Frame):
                     else:
                         avg_quality = 0.0
                         yield_display_string = "0.0"
+                    
+                    # Calculate total average yield across all asteroids
+                    total_avg_yield = self._calculate_total_average_yield()
                 except Exception as e:
                     # Fallback to old method if new calculation fails
                     all_percentages = []
@@ -3397,10 +3401,6 @@ class ProspectorPanel(ttk.Frame):
             if cargo_session_data:
                 materials_mined = cargo_session_data.get('materials_mined', {})
                 prospectors_used = cargo_session_data.get('prospectors_used', 0)
-                if materials_mined:
-                    material_list = [f"{name}:{qty}t" for name, qty in materials_mined.items()]
-                    materials_breakdown = "; ".join(material_list)
-            
             # New session data with Material Analysis metrics and cargo data
             new_session = {
                 'timestamp_utc': timestamp_local,  # Keep field name for compatibility but use local time
@@ -3413,6 +3413,7 @@ class ProspectorPanel(ttk.Frame):
                 'materials_tracked': materials_tracked,
                 'hit_rate_percent': round(hit_rate, 1),
                 'avg_quality_percent': yield_display_string,  # Store formatted string for display
+                'total_average_yield': round(total_avg_yield, 1) if total_avg_yield > 0 else 0.0,
                 'best_material': best_material,
                 'materials_breakdown': materials_breakdown,
                 'prospectors_used': prospectors_used,
@@ -3428,14 +3429,14 @@ class ProspectorPanel(ttk.Frame):
             
             # Add new session
             sessions.append(new_session)
-            
             # Write back to CSV with enhanced fields including cargo data
             with open(csv_path, 'w', newline='', encoding='utf-8') as f:
                 fieldnames = ['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 
                             'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 
-                            'avg_quality_percent', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment']
+                            'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment']
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
+                writer.writerows(sessions)
                 writer.writerows(sessions)
                 
         except Exception as e:
@@ -3494,6 +3495,24 @@ class ProspectorPanel(ttk.Frame):
                 yield_results[material_name] = sum(percentages) / len(percentages)
         
         return yield_results
+    
+    def _calculate_total_average_yield(self) -> float:
+        """
+        Calculate total average yield % across all prospected asteroids for all mined minerals.
+        This gives the overall prospecting efficiency.
+        """
+        if not hasattr(self, 'session_yield_data') or not self.session_yield_data:
+            return 0.0
+        
+        # Collect all individual yield percentages from all asteroids
+        all_yields = []
+        for material_name, percentages in self.session_yield_data.items():
+            all_yields.extend(percentages)
+        
+        if not all_yields:
+            return 0.0
+        
+        return sum(all_yields) / len(all_yields)
 
     def _format_yield_display(self, raw_yields: Dict[str, float]) -> str:
         """Format raw yields for display in reports"""
@@ -3550,7 +3569,7 @@ class ProspectorPanel(ttk.Frame):
                 with open(csv_path, 'w', newline='', encoding='utf-8') as f:
                     fieldnames = ['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 
                                 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 
-                                'avg_quality_percent', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment']
+                                'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment']
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writeheader()
                     writer.writerows(sessions)
@@ -9286,8 +9305,9 @@ class ProspectorPanel(ttk.Frame):
         
         # Parse individual yields from quality/avg_quality_percent field (format: "Pt: 30.5%, Os: 16.0%")
         if 'individual_yields' not in converted or not converted.get('individual_yields'):
-            quality_str = converted.get('quality', '') or converted.get('avg_quality_percent', '')
-            print(f"DEBUG YIELDS: Parsing quality_str: '{quality_str}'")
+            # IMPORTANT: Use detailed quality string first, not the simplified display value
+            quality_str = converted.get('avg_quality_percent', '') or converted.get('quality_detailed', '') or converted.get('quality', '')
+            print(f"✓ DEBUG YIELDS: Parsing quality_str: '{quality_str}'")
             if quality_str and isinstance(quality_str, str) and ':' in quality_str:
                 individual_yields = {}
                 try:
@@ -9304,10 +9324,15 @@ class ProspectorPanel(ttk.Frame):
                                     # Expand abbreviations to full names
                                     material_map = {
                                         'Pt': 'Platinum', 'Os': 'Osmium', 'Pd': 'Palladium',
-                                        'Pn': 'Painite', 'Rh': 'Rhodium', 'LTD': 'Low Temperature Diamonds',
-                                        'VO': 'Void Opals', 'Alex': 'Alexandrite', 'Ben': 'Benitoite',
-                                        'Grand': 'Grandidierite', 'Mus': 'Musgravite', 'Mon': 'Monazite',
-                                        'Brom': 'Bromellite', 'Seren': 'Serendibite'
+                                        'Pain': 'Painite', 'Pn': 'Painite', 'Rh': 'Rhodium', 
+                                        'LTD': 'Low Temperature Diamonds', 'VO': 'Void Opals', 
+                                        'Alex': 'Alexandrite', 'Beni': 'Benitoite', 'Ben': 'Benitoite',
+                                        'Grand': 'Grandidierite', 'Musg': 'Musgravite', 'Mus': 'Musgravite', 
+                                        'Monaz': 'Monazite', 'Mon': 'Monazite', 'Brom': 'Bromellite', 
+                                        'Ser': 'Serendibite', 'Seren': 'Serendibite', 'Au': 'Gold',
+                                        'Ag': 'Silver', 'Bert': 'Bertrandite', 'Ind': 'Indite',
+                                        'Ga': 'Gallium', 'Pr': 'Praseodymium', 'Sm': 'Samarium',
+                                        'Taaf': 'Taaffeite'
                                     }
                                     material_name = material_map.get(material_abbr, material_abbr)
                                     individual_yields[material_name] = percent_value
@@ -9353,11 +9378,15 @@ class ProspectorPanel(ttk.Frame):
             if tree == self.reports_tree_tab and hasattr(self, 'reports_tab_session_lookup'):
                 session_data = self.reports_tab_session_lookup.get(item)
                 if session_data:
+                    print(f"✓ DEBUG: Got session_data from reports_tab_session_lookup")
+                    print(f"✓ DEBUG: avg_quality_percent = '{session_data.get('avg_quality_percent', 'NOT FOUND')}'")
                     # Convert display format to report generator format
                     session_data = self._convert_session_data_for_report(session_data)
+                    print(f"✓ DEBUG: After conversion, individual_yields = {session_data.get('individual_yields', 'NOT FOUND')}")
             elif hasattr(self, 'reports_window_session_lookup'):
                 session_data = self.reports_window_session_lookup.get(item)
                 if session_data:
+                    print(f"✓ DEBUG: Got session_data from reports_window_session_lookup")
                     # Convert display format to report generator format
                     session_data = self._convert_session_data_for_report(session_data)
             
@@ -9477,6 +9506,7 @@ class ProspectorPanel(ttk.Frame):
                                         session_data.update({
                                             'hit_rate_percent': row.get('hit_rate_percent'),
                                             'avg_quality_percent': row.get('avg_quality_percent'),
+                                            'total_average_yield': row.get('total_average_yield'),
                                             'asteroids_prospected': row.get('asteroids_prospected'),
                                             'best_material': row.get('best_material'),
                                             'materials_tracked': row.get('materials_tracked')
@@ -9540,7 +9570,9 @@ class ProspectorPanel(ttk.Frame):
                                                             percentage_str = parts[1].strip().replace('%', '')
                                                             material_name = abbreviations.get(abbrev, abbrev)
                                                             individual_yields[material_name] = float(percentage_str)
-                                                session_data['individual_yields'] = individual_yields
+                                                if individual_yields:
+                                                    session_data['individual_yields'] = individual_yields
+                                                    print(f"✓ Parsed individual_yields from CSV: {individual_yields}")
                                         except Exception as e:
                                             print(f"Warning: Could not parse individual yields: {e}")
                                             pass
@@ -9574,7 +9606,8 @@ class ProspectorPanel(ttk.Frame):
                 'screenshots': [],
                 # Add analytics data from CSV for HTML reports
                 'hit_rate_percent': session_data.get('hit_rate_percent'),
-                'avg_quality_percent': session_data.get('avg_quality_percent'), 
+                'avg_quality_percent': session_data.get('avg_quality_percent'),
+                'total_average_yield': session_data.get('total_average_yield', 0.0),
                 'asteroids_prospected': session_data.get('asteroids_prospected'),
                 'best_material': session_data.get('best_material'),
                 'materials_tracked': session_data.get('materials_tracked'),

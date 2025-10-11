@@ -266,9 +266,9 @@ class RingFinder:
         
         # Max Results filter
         ttk.Label(search_frame, text="Max Results:").grid(row=2, column=2, sticky="w", padx=10, pady=5)
-        self.max_results_var = tk.StringVar(value="All")
+        self.max_results_var = tk.StringVar(value="50")
         max_results_combo = ttk.Combobox(search_frame, textvariable=self.max_results_var, width=8, state="readonly")
-        max_results_combo['values'] = ("10", "20", "30", "50", "All")
+        max_results_combo['values'] = ("10", "20", "30", "50", "100", "All")
         max_results_combo.grid(row=2, column=3, sticky="w", padx=5, pady=5)
         
         # Confirmed hotspots only checkbox - DISABLED FOR TESTING
@@ -1635,34 +1635,43 @@ class RingFinder:
                 
                 # Build optimized query based on whether we have a system filter
                 if systems_in_range:
-                    # Create placeholders for the IN clause
-                    placeholders = ','.join(['?'] * len(systems_in_range))
+                    # SQLite has a limit of 999 variables per query, so batch if needed
+                    BATCH_SIZE = 999
+                    all_results = []
                     
-                    # Different query for "All Materials" vs specific material
-                    if material_filter == "All Materials":
-                        # Show ALL rings of this type (one row per ring, combining hotspot info)
-                        query = f'''
-                            SELECT system_name, body_name, 
-                                   GROUP_CONCAT(material_name || ' (' || hotspot_count || ')', ', ') as material_name,
-                                   1 as hotspot_count,
-                                   x_coord, y_coord, z_coord, coord_source, 
-                                   ls_distance, density, ring_type, inner_radius, outer_radius
-                            FROM hotspot_data
-                            WHERE system_name IN ({placeholders})
-                            GROUP BY system_name, body_name
-                            ORDER BY system_name, body_name
-                        '''
-                    else:
-                        # Show only rings WITH this specific material (current behavior)
-                        query = f'''
-                            SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
-                                   x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type, inner_radius, outer_radius
-                            FROM hotspot_data
-                            WHERE system_name IN ({placeholders})
-                            ORDER BY 
-                                hotspot_count DESC, system_name, body_name
-                        '''
-                    cursor.execute(query, systems_in_range)
+                    for i in range(0, len(systems_in_range), BATCH_SIZE):
+                        batch = systems_in_range[i:i + BATCH_SIZE]
+                        placeholders = ','.join(['?'] * len(batch))
+                        
+                        # Different query for "All Materials" vs specific material
+                        if material_filter == "All Materials":
+                            # Show ALL rings of this type (one row per ring, combining hotspot info)
+                            query = f'''
+                                SELECT system_name, body_name, 
+                                       GROUP_CONCAT(material_name || ' (' || hotspot_count || ')', ', ') as material_name,
+                                       1 as hotspot_count,
+                                       x_coord, y_coord, z_coord, coord_source, 
+                                       ls_distance, density, ring_type, inner_radius, outer_radius
+                                FROM hotspot_data
+                                WHERE system_name IN ({placeholders})
+                                GROUP BY system_name, body_name
+                                ORDER BY system_name, body_name
+                            '''
+                        else:
+                            # Show only rings WITH this specific material (current behavior)
+                            query = f'''
+                                SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
+                                       x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type, inner_radius, outer_radius
+                                FROM hotspot_data
+                                WHERE system_name IN ({placeholders})
+                                ORDER BY 
+                                    hotspot_count DESC, system_name, body_name
+                            '''
+                        cursor.execute(query, batch)
+                        all_results.extend(cursor.fetchall())
+                    
+                    # Use results from batched queries
+                    results = all_results
                 else:
                     # If no systems in range found, try direct system name search first
                     search_pattern = f"%{reference_system}%"
@@ -1709,7 +1718,6 @@ class RingFinder:
                             pass
                         return []
                 
-                results = cursor.fetchall()
                 print(f" DEBUG: Found {len(results)} total hotspot entries, will filter by material using smart matching")
                 
                 material_matches = 0
@@ -1878,14 +1886,17 @@ class RingFinder:
                 z_min = reference_coords['z'] - max_distance
                 z_max = reference_coords['z'] + max_distance
                 
+                # Add LIMIT to prevent query timeout on large searches
                 cursor.execute("""
                     SELECT name, x, y, z FROM systems 
                     WHERE x BETWEEN ? AND ? 
                     AND y BETWEEN ? AND ? 
                     AND z BETWEEN ? AND ?
+                    LIMIT 50000
                 """, (x_min, x_max, y_min, y_max, z_min, z_max))
                 
                 results = cursor.fetchall()
+                print(f" DEBUG: Galaxy database returned {len(results)} systems from cube query")
                 
                 # Calculate actual distance and filter
                 for name, x, y, z in results:
