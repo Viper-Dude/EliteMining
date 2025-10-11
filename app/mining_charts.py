@@ -189,7 +189,7 @@ class MiningChartsPanel:
         
         # Bar Chart Tab - SMALLER size for better visibility
         bar_frame = ttk.Frame(charts_notebook, padding=5)
-        charts_notebook.add(bar_frame, text="Material Comparison")
+        charts_notebook.add(bar_frame, text="Minerals Comparison")
         
         self.bar_fig = Figure(figsize=(5, 3), dpi=100, facecolor='#2b2b2b')
         self.bar_ax = self.bar_fig.add_subplot(111, facecolor='#1e1e1e')
@@ -353,9 +353,9 @@ class MiningChartsPanel:
                                f'{height:.1f}%', ha='center', va='bottom',
                                fontsize=8, color='white', fontweight='normal')
         
-        self.bar_ax.set_xlabel('Materials', fontweight='normal', fontsize=10)
+        self.bar_ax.set_xlabel('Minerals', fontweight='normal', fontsize=10)
         self.bar_ax.set_ylabel('Yield (%)', fontweight='normal', fontsize=10)
-        self.bar_ax.set_title('Material Yield Comparison', fontweight='normal', fontsize=12)
+        self.bar_ax.set_title('Minerals Yield Comparison', fontweight='normal', fontsize=12)
         
         # Set Y-axis limits to provide space for labels above bars
         max_yield = max(max(best_yields) if best_yields else 0, max(avg_yields) if avg_yields else 0)

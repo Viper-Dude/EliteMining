@@ -209,7 +209,7 @@ class IncrementalJournalScanner:
                         continue
         
         except Exception as e:
-            log.error(f"Failed to process journal file {journal_path}: {e}")
+            log.error(f"Failed to process journal file {os.path.basename(journal_path)}: {e}")
         
         return events_processed
     
