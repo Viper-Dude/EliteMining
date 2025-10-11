@@ -14,6 +14,21 @@ import logging
 log = logging.getLogger(__name__)
 
 
+def _sanitize_path_for_logging(file_path: str) -> str:
+    """Sanitize file path for logging to remove usernames and sensitive info"""
+    if not file_path:
+        return "None"
+    
+    try:
+        # Extract just the filename for logging
+        filename = os.path.basename(file_path)
+        if filename:
+            return filename
+        return "Unknown"
+    except:
+        return "Invalid"
+
+
 class JournalScanState:
     """Manages persistent state for journal scanning"""
     
@@ -38,7 +53,9 @@ class JournalScanState:
         try:
             with open(self.state_file, 'r') as f:
                 state = json.load(f)
-                log.info(f"Loaded journal scan state: last file={state.get('last_journal_file')}, position={state.get('last_file_position')}")
+                # Sanitize path for logging - only show filename, not full path with username
+                safe_filename = _sanitize_path_for_logging(state.get('last_journal_file'))
+                log.info(f"Loaded journal scan state: last file={safe_filename}, position={state.get('last_file_position')}")
                 return state
         except Exception as e:
             log.error(f"Failed to load journal scan state: {e}")
@@ -66,7 +83,9 @@ class JournalScanState:
             
             with open(self.state_file, 'w') as f:
                 json.dump(self.state, f, indent=2)
-            log.debug(f"Saved journal scan state: {self.state}")
+            # Sanitize debug logging - don't expose full paths
+            safe_filename = _sanitize_path_for_logging(self.state.get('last_journal_file'))
+            log.debug(f"Saved journal scan state: file={safe_filename}, position={self.state.get('last_file_position')}")
         except Exception as e:
             log.error(f"Failed to save journal scan state: {e}")
     

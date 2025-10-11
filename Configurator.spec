@@ -11,7 +11,11 @@ a = Analysis(
         'requests.models', 'requests.sessions', 'requests.structures', 'urllib3', 
         'hotspot_finder', 'zlib',
         # Logging and journal scanning modules
-        'logging_setup', 'incremental_journal_scanner', 'journal_scan_state'
+        'logging_setup', 'incremental_journal_scanner', 'journal_scan_state',
+        # Matplotlib for charts and graphs
+        'matplotlib', 'matplotlib.pyplot', 'matplotlib.dates', 'matplotlib.backends.backend_tkagg',
+        # Additional dependencies
+        'ctypes', 'ctypes.wintypes'
     ],
     hookspath=[],
     hooksconfig={},

@@ -637,7 +637,7 @@ class ReportGenerator:
         {comment_section}
         
         <div class="section">
-            <h2>📋 Material Breakdown</h2>
+            <h2>📋 Mineral Breakdown</h2>
             {materials_table}
         </div>
         
@@ -839,7 +839,7 @@ class ReportGenerator:
         </div>
         <div class="stat-card">
             <div class="stat-value">{materials_count}</div>
-            <div class="stat-label">Material Types</div>
+            <div class="stat-label">Mineral Types</div>
         </div>
         """
         
@@ -972,8 +972,8 @@ class ReportGenerator:
                     if comparison_base64:
                         charts_html += f"""
                         <div class="chart-container">
-                            <h3>Material Comparison</h3>
-                            <img src="data:image/png;base64,{comparison_base64}" alt="Material Comparison Chart">
+                            <h3>Mineral Comparison</h3>
+                            <img src="data:image/png;base64,{comparison_base64}" alt="Mineral Comparison Chart">
                         </div>
                         """
             
@@ -1085,7 +1085,7 @@ class ReportGenerator:
                 autotext.set_color('white')
                 autotext.set_fontweight('bold')
             
-            ax.set_title('Material Breakdown by Quantity', fontsize=14, fontweight='bold', pad=20)
+            ax.set_title('Mineral Breakdown by Quantity', fontsize=14, fontweight='bold', pad=20)
             
             # Save to base64
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
@@ -1314,7 +1314,7 @@ class ReportGenerator:
                                 <p style="color: var(--text-color);"><strong>TPH:</strong> {session_data.get('tph', 0)}</p>
                                 <p style="color: var(--text-color);"><strong>Duration:</strong> {session_data.get('duration', 'Unknown')}</p>
                             </div>
-                            {"<div style='flex-shrink: 0;'><img src='data:image/png;base64," + pie_chart_base64 + "' alt='Material Breakdown Chart' style='max-width: 200px; height: auto; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer;'></div>" if pie_chart_base64 else ""}
+                            {"<div style='flex-shrink: 0;'><img src='data:image/png;base64," + pie_chart_base64 + "' alt='Mineral Breakdown Chart' style='max-width: 200px; height: auto; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer;'></div>" if pie_chart_base64 else ""}
                         </div>
                         """
                     except:
@@ -1472,7 +1472,7 @@ class ReportGenerator:
             if individual_yields or filtered_yields:
                 analytics_html += """
                 <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
-                    <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📊 Material Yield Analysis</h3>
+                    <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📊 Mineral Yield Analysis</h3>
                 """
                 
                 # Show filtered yields first if available (announcement threshold based)
@@ -2063,7 +2063,7 @@ class ReportGenerator:
                 ("Report Date", session_data.get('date', 'Unknown')),
                 ("Session Duration", session_data.get('duration', 'Unknown')),
                 ("Mining Location", f"{session_data.get('system', 'Unknown')} - {session_data.get('body', 'Unknown')}"),
-                ("Materials Found", f"{materials_count} types: {materials_list}"),
+                ("Minerals Found", f"{materials_count} types: {materials_list}"),
                 ("Data Source", "Report entry from mining log")
             ])
         else:

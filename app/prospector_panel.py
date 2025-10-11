@@ -238,16 +238,14 @@ def _extract_location_display(full_body_name: str, body_type: str = "", station_
     if len(parts) >= 2:
         last_part = parts[-1]
         
-        # Pattern: ends with single letter (like "3 a" -> "3A" or "3A Ring")
+        # Pattern: ends with single letter (like "3 a" -> "3A Ring")
         if len(last_part) == 1 and last_part.isalpha() and len(parts) >= 2:
             second_last = parts[-2]
             if second_last.isdigit():
                 body_designation = f"{second_last}{last_part.upper()}"
-                # Add "Ring" suffix if this is a planetary ring
-                if body_type == "PlanetaryRing" or "Ring" in full_body_name.lower():
-                    return f"{body_designation} Ring"
-                else:
-                    return body_designation
+                # For mining contexts, always add "Ring" suffix for number+letter patterns
+                # since these are almost always planetary rings in Elite Dangerous
+                return f"{body_designation} Ring"
         
         # Pattern: ends with number (like "System 2" -> "2" or "2 Ring")
         elif last_part.isdigit():
@@ -340,7 +338,7 @@ KNOWN_MATERIALS = [
 ]
 
 CORE_ONLY = [
-    "Alexandrite", "Benitoite", "Grandidierite", "Monazite", "Musgravite", "Serendibite",
+    "Alexandrite", "Benitoite", "Grandidierite", "Monazite", "Musgravite", "Rhodplumsite", "Serendibite",
     "Taaffeite", "Void Opals"
 ]
 
@@ -391,7 +389,17 @@ class ProspectorPanel(ttk.Frame):
             app_dir = os.path.dirname(os.path.abspath(__file__))
         
         self.reports_dir = os.path.join(app_dir, "Reports", "Mining Session")
-        os.makedirs(self.reports_dir, exist_ok=True)
+        try:
+            os.makedirs(self.reports_dir, exist_ok=True)
+        except PermissionError as e:
+            import tkinter.messagebox as mb
+            mb.showerror(
+                "Permission Error",
+                f"Cannot create Reports folder:\n{self.reports_dir}\n\n"
+                f"Error: {e}\n\n"
+                f"Please run EliteMining as Administrator or manually create the folder."
+            )
+            raise
         
         # Clear any cached session data to prevent stale data issues
         self.reports_tab_session_lookup = {}
@@ -932,9 +940,40 @@ class ProspectorPanel(ttk.Frame):
         self._save_cfg(cfg)
 
     def _detect_journal_dir_default(self) -> Optional[str]:
+        """Detect Elite Dangerous journal directory - works on all Windows languages"""
         home = os.environ.get("USERPROFILE") or os.path.expanduser("~")
-        path = os.path.join(home, "Saved Games", "Frontier Developments", "Elite Dangerous")
-        return path if os.path.isdir(path) else None
+        
+        # Try to get Saved Games folder using Windows Shell API (works on all languages)
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            # FOLDERID_SavedGames = {4C5C32FF-BB9D-43b0-B5B4-2D72E54EAAA4}
+            FOLDERID_SavedGames = ctypes.c_char_p(b'{4C5C32FF-BB9D-43b0-B5B4-2D72E54EAAA4}')
+            
+            # Try SHGetKnownFolderPath (Vista+)
+            SHGetKnownFolderPath = ctypes.windll.shell32.SHGetKnownFolderPath
+            SHGetKnownFolderPath.argtypes = [ctypes.c_char_p, wintypes.DWORD, wintypes.HANDLE, ctypes.POINTER(wintypes.LPWSTR)]
+            
+            path_ptr = wintypes.LPWSTR()
+            result = SHGetKnownFolderPath(FOLDERID_SavedGames, 0, 0, ctypes.byref(path_ptr))
+            
+            if result == 0:
+                saved_games_path = path_ptr.value
+                ctypes.windll.ole32.CoTaskMemFree(path_ptr)
+                path = os.path.join(saved_games_path, "Frontier Developments", "Elite Dangerous")
+                if os.path.isdir(path):
+                    return path
+        except Exception as e:
+            log.debug(f"Shell API method failed: {e}")
+        
+        # Fallback: try common language variants
+        for saved_games_name in ["Saved Games", "Gespeicherte Spiele", "Opgeslagen spellen", "Guardado juegos"]:
+            path = os.path.join(home, saved_games_name, "Frontier Developments", "Elite Dangerous")
+            if os.path.isdir(path):
+                return path
+        
+        return None
 
     def _get_csv_path(self) -> str:
         """Get the consistent path to sessions_index.csv"""
@@ -1152,7 +1191,7 @@ class ProspectorPanel(ttk.Frame):
 
         self.tree = ttk.Treeview(rep, columns=("materials", "content", "time"), show="headings", height=12)
         self.tree.tag_configure("darkrow", background="#1e1e1e", foreground="#e6e6e6")
-        self.tree.heading("materials", text="Materials", anchor="center")
+        self.tree.heading("materials", text="Minerals", anchor="center")
         self.tree.heading("content", text="Asteroid Content", anchor="center")
         self.tree.heading("time", text="Time")
         self.tree.column("materials", width=400, anchor="w", stretch=True)
@@ -1164,28 +1203,33 @@ class ProspectorPanel(ttk.Frame):
         yscroll.grid(row=3, column=1, sticky="ns")
 
         # --- Live Mining Statistics Section ---
-        ttk.Label(rep, text="Material Analysis:", font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky="w", pady=(10, 4))
+        ttk.Label(rep, text="Mineral Analysis:", font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky="w", pady=(10, 4))
         stats_frame = ttk.Frame(rep)
         stats_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(0, 0))
         stats_frame.columnconfigure(0, weight=1)
         
         # Statistics tree for live percentage yields
-        self.stats_tree = ttk.Treeview(stats_frame, columns=("material", "avg_pct", "best_pct", "latest_pct", "count"), 
+        self.stats_tree = ttk.Treeview(stats_frame, columns=("material", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"), 
                                        show="headings", height=6)
-        self.stats_tree.heading("material", text="Material", anchor="center")
-        self.stats_tree.heading("avg_pct", text="Avg %", anchor="center")
+        self.stats_tree.heading("material", text="Mineral", anchor="center")
+        self.stats_tree.heading("avg_all", text="Avg % (All)", anchor="center")
+        self.stats_tree.heading("avg_pct", text="Avg % (≥Threshold)", anchor="center")
         self.stats_tree.heading("best_pct", text="Best %", anchor="center")
         self.stats_tree.heading("latest_pct", text="Latest %", anchor="center")
         self.stats_tree.heading("count", text="Hits", anchor="center")
         
-        self.stats_tree.column("material", width=220, anchor="w", stretch=True)
-        self.stats_tree.column("avg_pct", width=105, anchor="center", stretch=False)
+        self.stats_tree.column("material", width=160, anchor="w", stretch=True)
+        self.stats_tree.column("avg_all", width=95, anchor="center", stretch=False)
+        self.stats_tree.column("avg_pct", width=130, anchor="center", stretch=False)
         self.stats_tree.column("best_pct", width=105, anchor="center", stretch=False)
         self.stats_tree.column("latest_pct", width=105, anchor="center", stretch=False)
         self.stats_tree.column("count", width=105, anchor="center", stretch=False)
         
         self.stats_tree.tag_configure("darkrow", background="#1e1e1e", foreground="#e6e6e6")
         self.stats_tree.grid(row=0, column=0, sticky="ew")
+        
+        # Add tooltip for Material Analysis table
+        self._setup_stats_tree_tooltips(self.stats_tree)
         
         # Session summary labels
         summary_frame = ttk.Frame(stats_frame)
@@ -1302,12 +1346,12 @@ class ProspectorPanel(ttk.Frame):
         self.ToolTip(set_all_btn, "Set all materials to the minimum threshold percentage")
         ttk.Label(thr, text="%").pack(side="left")
 
-        ttk.Label(ann, text="Select materials and set minimum percentages:",
+        ttk.Label(ann, text="Select minerals and set minimum percentages:",
                   font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", pady=(8, 4))
 
         self.mat_tree = ttk.Treeview(ann, columns=("announce", "material", "minpct"), show="headings", height=14)
         self.mat_tree.heading("announce", text="Announce")
-        self.mat_tree.heading("material", text="Material")
+        self.mat_tree.heading("material", text="Mineral")
         self.mat_tree.heading("minpct", text="Minimal %")
         self.mat_tree.column("announce", width=90, anchor="center", stretch=False)
         self.mat_tree.column("material", width=300, anchor="center", stretch=True)
@@ -1627,7 +1671,7 @@ class ProspectorPanel(ttk.Frame):
         tree.heading("materials", text="Mat Types")
         tree.heading("hit_rate", text="Hit Rate %")
         tree.heading("quality", text="Average Yield %")
-        tree.heading("cargo", text="Materials (Tonnage & Yields)")
+        tree.heading("cargo", text="Minerals (Tonnage & Yields)")
         tree.heading("prospectors", text="Prospectors")
         tree.heading("comment", text="Comment")
         tree.heading("enhanced", text="Detail Report")
@@ -1775,9 +1819,14 @@ class ProspectorPanel(ttk.Frame):
                         'quality': quality_str,
                         'cargo': materials_breakdown,
                         'cargo_raw': materials_breakdown_raw,  # Store original for tooltip
-                        'prospectors': prospectors_used,
+                        'prospects': prospectors_used,  # Use 'prospects' to match Reports Tab
+                        'comment': row.get('comment', ''),  # Include comment data
                         'timestamp_raw': row['timestamp_utc']  # For sorting
                     })
+                    
+                    # Debug: Log if comment was loaded
+                    if row.get('comment', '').strip():
+                        log.debug(f"Loaded comment for session {date_str}: {row.get('comment', '')[:30]}...")
                         
         except Exception as e:
             log.exception("Loading CSV failed: %s", e)
@@ -2217,9 +2266,9 @@ class ProspectorPanel(ttk.Frame):
                     # Create a session dict directly from tree values and find timestamp from CSV
                     session_data = {
                         'date': values[0],
-                        'system': values[1], 
-                        'body': values[2],
-                        'duration': values[3],
+                        'duration': values[1], 
+                        'system': values[2],
+                        'body': values[3],
                         'tons': values[4],
                         'tph': values[5],
                         'materials': values[6],
@@ -2586,8 +2635,8 @@ class ProspectorPanel(ttk.Frame):
                     if asteroids_match:
                         asteroids_prospected = asteroids_match.group(1)
                     
-                    # Extract materials tracked  
-                    materials_match = re.search(r'Materials Tracked:\s*(\d+)', content)
+                    # Extract Minerals tracked  
+                    materials_match = re.search(r'Minerals Tracked:\s*(\d+)', content)
                     if materials_match:
                         materials_tracked = materials_match.group(1)
                     
@@ -2613,7 +2662,7 @@ class ProspectorPanel(ttk.Frame):
                     
                     # Extract materials breakdown from cargo section first
                     if not materials_breakdown:
-                        refined_section = re.search(r'=== REFINED MATERIALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
+                        refined_section = re.search(r'=== REFINED MINERALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
                         if refined_section:
                             refined_text = refined_section.group(1)
                             material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
@@ -2791,8 +2840,8 @@ class ProspectorPanel(ttk.Frame):
                     if asteroids_match:
                         asteroids_prospected = asteroids_match.group(1)
                     
-                    # Extract materials tracked  
-                    materials_match = re.search(r'Materials Tracked:\s*(\d+)', content)
+                    # Extract Minerals tracked  
+                    materials_match = re.search(r'Minerals Tracked:\s*(\d+)', content)
                     if materials_match:
                         materials_tracked = materials_match.group(1)
                     
@@ -2818,7 +2867,7 @@ class ProspectorPanel(ttk.Frame):
                     
                     # Extract materials breakdown from cargo section first
                     if not materials_breakdown:
-                        refined_section = re.search(r'=== REFINED MATERIALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
+                        refined_section = re.search(r'=== REFINED MINERALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
                         if refined_section:
                             refined_text = refined_section.group(1)
                             material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
@@ -3115,18 +3164,18 @@ class ProspectorPanel(ttk.Frame):
         
         # Add refined materials section
         if lines:
-            parts.append("\n=== REFINED MATERIALS ===")
+            parts.append("\n=== REFINED MINERALS ===")
             parts += [f" - {line}" for line in lines]
         else:
-            parts.append("\n=== REFINED MATERIALS ===")
-            parts.append(" - No refined materials.")
+            parts.append("\n=== REFINED MINERALS ===")
+            parts.append(" - No refined minerals.")
         
-        # Add Material Analysis section if we have prospecting data
+        # Add Mineral Analysis section if we have prospecting data
         material_summary = self.session_analytics.get_live_summary()
         session_info = self.session_analytics.get_session_info()
         
         if material_summary and session_info['asteroids_prospected'] > 0:
-            parts.append("\n=== MATERIAL ANALYSIS ===")
+            parts.append("\n=== MINERAL ANALYSIS ===")
             
             # Prospecting summary
             asteroids_count = session_info['asteroids_prospected']
@@ -3134,22 +3183,22 @@ class ProspectorPanel(ttk.Frame):
             total_finds = session_info['total_finds']
             
             parts.append(f"Asteroids Prospected: {asteroids_count}")
-            parts.append(f"Materials Tracked: {materials_tracked}")
+            parts.append(f"Minerals Tracked: {materials_tracked}")
             parts.append(f"Total Material Finds: {total_finds}")
             
             if asteroids_count > 0:
                 # Hit rate = percentage of asteroids that contained tracked materials
                 asteroids_with_materials = session_info.get('asteroids_with_materials', 0)
                 hit_rate = (asteroids_with_materials / asteroids_count) * 100.0
-                parts.append(f"Hit Rate: {hit_rate:.1f}% (asteroids with valuable materials)")
+                parts.append(f"Hit Rate: {hit_rate:.1f}% (asteroids with valuable minerals)")
             
             # Session efficiency
             active_minutes = max(self._active_seconds() / 60.0, 0.1)
             asteroids_per_min = asteroids_count / active_minutes
             parts.append(f"Prospecting Speed: {asteroids_per_min:.1f} asteroids/minute")
             
-            # Material performance details
-            parts.append("\n--- Material Performance ---")
+            # Mineral performance details
+            parts.append("\n--- Mineral Performance ---")
             
             # Sort materials by average percentage (best first)
             sorted_materials = sorted(material_summary.items(), 
@@ -3265,7 +3314,7 @@ class ProspectorPanel(ttk.Frame):
             best_material = ""
             
             if material_summary and asteroids_prospected > 0:
-                # Hit rate: percentage of asteroids with valuable materials
+                # Hit rate: percentage of asteroids with valuable minerals
                 session_info = self.session_analytics.get_session_info()
                 asteroids_with_materials = session_info.get('asteroids_with_materials', 0)
                 hit_rate = (asteroids_with_materials / asteroids_prospected) * 100.0
@@ -3545,6 +3594,58 @@ class ProspectorPanel(ttk.Frame):
         self.reports_window = None
         self.reports_tree = None
 
+    def _setup_stats_tree_tooltips(self, tree: ttk.Treeview) -> None:
+        """Setup tooltip for Material Analysis table header"""
+        tooltip_window = None
+        
+        def show_tooltip(event):
+            nonlocal tooltip_window
+            
+            # Hide existing tooltip first
+            if tooltip_window:
+                tooltip_window.destroy()
+                tooltip_window = None
+            
+            # Check if hovering over header
+            region = tree.identify_region(event.x, event.y)
+            if region == "heading":
+                column = tree.identify_column(event.x)
+                
+                tooltips = {
+                    "#1": "Mineral name with announcement threshold\nExample: Platinum (20%)",
+                    "#2": "Average % across ALL prospected asteroids\n(includes below-threshold results)",
+                    "#3": "Average % for asteroids meeting threshold\n(only quality finds)",
+                    "#4": "Highest percentage found this session",
+                    "#5": "Most recent prospector result",
+                    "#6": "Number of asteroids meeting threshold"
+                }
+                
+                tooltip_text = tooltips.get(column)
+                if tooltip_text:
+                    
+                    x = event.x_root + 10
+                    y = event.y_root + 10
+                    
+                    tooltip_window = tk.Toplevel(tree)
+                    tooltip_window.wm_overrideredirect(True)
+                    tooltip_window.wm_geometry(f"+{x}+{y}")
+                    tooltip_window.configure(background="#ffffe0")
+                    
+                    label = tk.Label(tooltip_window, text=tooltip_text,
+                                   background="#ffffe0", relief=tk.SOLID, borderwidth=1,
+                                   font=("Segoe UI", 9), justify=tk.LEFT, wraplength=300)
+                    label.pack(ipadx=5, ipady=3)
+        
+        def hide_tooltip(event):
+            nonlocal tooltip_window
+            if tooltip_window:
+                tooltip_window.destroy()
+                tooltip_window = None
+        
+        tree.bind("<Motion>", show_tooltip)
+        tree.bind("<Leave>", hide_tooltip)
+        tree.bind("<Button-1>", hide_tooltip)
+
     def _setup_reports_tooltips_with_wordwrap(self, tree: ttk.Treeview, word_wrap_enabled: tk.BooleanVar) -> None:
         """Setup tooltip functionality with word wrapping for all cells in reports treeview"""
         tooltip_window = None
@@ -3666,11 +3767,11 @@ class ProspectorPanel(ttk.Frame):
                 "#4": "Planet/body/ring that was mined",
                 "#5": "Total tons of materials mined",
                 "#6": "Tons per hour mining rate",
-                "#7": "Number of different material types found",
+                "#7": "Number of different mineral types found",
                 "#8": "Total asteroids scanned during the session",
-                "#9": "Percentage of asteroids that had valuable materials",
-                "#10": "Average quality/yield percentage of materials found",
-                "#11": "Materials mined with quantities (hover for full names)",
+                "#9": "Percentage of asteroids that had valuable minerals",
+                "#10": "Average quality/yield percentage of minerals found",
+                "#11": "Minerals mined with quantities (hover for full names)",
                 "#12": "Number of limpets used during mining session"
             }
             
@@ -3919,25 +4020,7 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab = ttk.Treeview(main_frame, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospects", "comment", "enhanced"), show="headings", height=16, selectmode="extended")
         self.reports_tree_tab.grid(row=1, column=0, sticky="nsew")
         
-        # Bind tooltip immediately after creation
-        def tooltip_handler(event):
-            region = self.reports_tree_tab.identify_region(event.x, event.y)
-            column = self.reports_tree_tab.identify_column(event.x)
-            if region == "heading":
-                tooltips = {"#1": "Date/Time", "#2": "Duration", "#3": "System", "#4": "Body", "#5": "Total Tons", "#6": "TPH", "#7": "Mat Types", "#8": "Prospected", "#9": "Hit Rate %", "#10": "Avg Yield %", "#11": "Materials", "#12": "Limpets", "#13": "Comments", "#14": "Report"}
-                text = tooltips.get(column, "")
-                if text and hasattr(self, 'ToolTip') and self.ToolTip:
-                    if hasattr(self, '_tt') and self._tt: self._tt.destroy()
-                    self._tt = tk.Toplevel()
-                    self._tt.wm_overrideredirect(True)
-                    self._tt.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
-                    self._tt.configure(bg="#ffffe0")
-                    tk.Label(self._tt, text=text, bg="#ffffe0", relief=tk.SOLID, bd=1).pack()
-            else:
-                if hasattr(self, '_tt') and self._tt: self._tt.destroy(); self._tt = None
-        self.reports_tree_tab.bind("<Motion>", tooltip_handler)
-        self.reports_tree_tab.bind("<Leave>", lambda e: hasattr(self, '_tt') and self._tt and self._tt.destroy())
-        self._tt = None
+        # Note: Tooltip bindings are set up later with the combined_motion_handler
         
         # Remove custom styling - use default treeview appearance
         
@@ -3945,16 +4028,16 @@ class ProspectorPanel(ttk.Frame):
         
         # Configure column headings
         self.reports_tree_tab.heading("date", text="Date/Time")
-        self.reports_tree_tab.heading("system", text="System")
-        self.reports_tree_tab.heading("body", text="Body")
         self.reports_tree_tab.heading("duration", text="Duration")
+        self.reports_tree_tab.heading("system", text="System")
+        self.reports_tree_tab.heading("body", text="Planet/Ring")
         self.reports_tree_tab.heading("tons", text="Total Tons")
         self.reports_tree_tab.heading("tph", text="TPH")
         self.reports_tree_tab.heading("asteroids", text="Prospected")
         self.reports_tree_tab.heading("materials", text="Mat Types")
         self.reports_tree_tab.heading("hit_rate", text="Hit Rate %")
         self.reports_tree_tab.heading("quality", text="Average Yield %")
-        self.reports_tree_tab.heading("cargo", text="Materials (Tonnage & Yields)")
+        self.reports_tree_tab.heading("cargo", text="Minerals (Tonnage & Yields)")
         self.reports_tree_tab.heading("prospects", text="Limpets")
         self.reports_tree_tab.heading("comment", text="Comment")
         self.reports_tree_tab.heading("enhanced", text="Detail Report")
@@ -3969,10 +4052,10 @@ class ProspectorPanel(ttk.Frame):
                 # Smart sorting based on column type  
                 numeric_cols = {"tons", "tph", "hit_rate", "quality", "materials", "asteroids", "prospects"}
                 if col in numeric_cols:
-                    # Numeric sorting - handle "—" and empty values
+                    # Numeric sorting - handle "—", empty values, and percentages
                     def safe_float(x):
                         try:
-                            val = str(x).replace("—", "0").strip()
+                            val = str(x).replace("—", "0").replace("%", "").strip()
                             return float(val) if val else 0.0
                         except:
                             return 0.0
@@ -3986,6 +4069,8 @@ class ProspectorPanel(ttk.Frame):
                 tab_sort_dirs[col] = not reverse
             except Exception as e:
                 print(f"Tab sorting error for column {col}: {e}")
+                import traceback
+                traceback.print_exc()
                 # Fallback to simple string sort
                 try:
                     items = [(self.reports_tree_tab.set(item, col), item) for item in self.reports_tree_tab.get_children('')]
@@ -4007,9 +4092,9 @@ class ProspectorPanel(ttk.Frame):
                     # Find the original session data that matches these values using backup
                     for orig_session in original_sessions_backup:
                         if (orig_session.get('date') == values[0] and 
-                            orig_session.get('system') == values[1] and 
-                            orig_session.get('body') == values[2] and
-                            orig_session.get('duration') == values[3]):
+                            orig_session.get('duration') == values[1] and 
+                            orig_session.get('system') == values[2] and
+                            orig_session.get('body') == values[3]):
                             new_tab_lookup[item_id] = orig_session
                             break
                 
@@ -4018,9 +4103,9 @@ class ProspectorPanel(ttk.Frame):
         
         # Set commands for all tab treeview columns
         self.reports_tree_tab.heading("date", command=lambda: sort_tab_col("date"))
+        self.reports_tree_tab.heading("duration", command=lambda: sort_tab_col("duration"))
         self.reports_tree_tab.heading("system", command=lambda: sort_tab_col("system"))
         self.reports_tree_tab.heading("body", command=lambda: sort_tab_col("body"))
-        self.reports_tree_tab.heading("duration", command=lambda: sort_tab_col("duration"))
         self.reports_tree_tab.heading("tons", command=lambda: sort_tab_col("tons"))
         self.reports_tree_tab.heading("tph", command=lambda: sort_tab_col("tph"))
         self.reports_tree_tab.heading("materials", command=lambda: sort_tab_col("materials"))
@@ -4030,7 +4115,7 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.heading("cargo", command=lambda: sort_tab_col("cargo"))
         self.reports_tree_tab.heading("prospects", command=lambda: sort_tab_col("prospects"))
         self.reports_tree_tab.heading("comment", command=lambda: sort_tab_col("comment"))
-        
+        # Note: enhanced column intentionally has no sort command as it's just a status indicator
 
         
         # Configure column widths - locked at startup size, no resizing allowed
@@ -4269,7 +4354,7 @@ class ProspectorPanel(ttk.Frame):
                     self._set_status("Invalid report data")
                     return
                 
-                # System name is in column index 2 (date, duration, system...)
+                # System name is in column index 2 (date, duration, system, body...)
                 system_name = values[2]
                 if system_name:
                     # Copy to clipboard
@@ -4345,6 +4430,7 @@ class ProspectorPanel(ttk.Frame):
             if hasattr(self, '_reports_tooltip_window') and self._reports_tooltip_window:
                 self._reports_tooltip_window.destroy()
                 self._reports_tooltip_window = None
+                self._current_tooltip_column = None
         
         self.reports_tree_tab.bind("<Leave>", hide_tooltip)
         
@@ -4605,35 +4691,52 @@ class ProspectorPanel(ttk.Frame):
     def _show_header_tooltip(self, event, tree):
         """Show tooltip for reports tab column headers"""
         try:
-            # Hide existing tooltip
-            if hasattr(self, '_reports_tooltip_window') and self._reports_tooltip_window:
-                self._reports_tooltip_window.destroy()
-                self._reports_tooltip_window = None
-            
-            # Don't show if tooltips are disabled
-            if not hasattr(self, 'ToolTip') or not self.ToolTip:
+            # Don't show if tooltips are disabled (check the class variable)
+            if not hasattr(self, 'ToolTip') or not self.ToolTip or not self.ToolTip.tooltips_enabled:
+                # Hide any existing tooltip
+                if hasattr(self, '_reports_tooltip_window') and self._reports_tooltip_window:
+                    self._reports_tooltip_window.destroy()
+                    self._reports_tooltip_window = None
+                    self._current_tooltip_column = None
                 return
             
             # Check if hovering over column header
             region = tree.identify_region(event.x, event.y)
             column = tree.identify_column(event.x)
             
+            # If not over a heading, hide tooltip and return
+            if region != "heading" or not column:
+                if hasattr(self, '_reports_tooltip_window') and self._reports_tooltip_window:
+                    self._reports_tooltip_window.destroy()
+                    self._reports_tooltip_window = None
+                    self._current_tooltip_column = None
+                return
+            
+            # Only recreate tooltip if we're over a different column
+            if hasattr(self, '_current_tooltip_column') and self._current_tooltip_column == column:
+                return
+            
+            # Hide existing tooltip before creating new one
+            if hasattr(self, '_reports_tooltip_window') and self._reports_tooltip_window:
+                self._reports_tooltip_window.destroy()
+                self._reports_tooltip_window = None
+            
             if region == "heading" and column:
                 column_tooltips = {
                     "#1": "Date and time when the mining session ended",
                     "#2": "Total duration of the mining session", 
                     "#3": "Star system where mining took place",
-                    "#4": "Planet/body/ring that was mined",
+                    "#4": "Planet, ring, or celestial body that was mined",
                     "#5": "Total tons of materials mined",
                     "#6": "Tons per hour mining rate",
-                    "#7": "Number of different material types found",
+                    "#7": "Number of different mineral types found",
                     "#8": "Total asteroids scanned during the session",
-                    "#9": "Percentage of asteroids that had valuable materials",
-                    "#10": "Average quality/yield percentage of materials found",
-                    "#11": "Materials mined with quantities and individual yields",
+                    "#9": "Percentage of asteroids that had valuable minerals",
+                    "#10": "Average quality/yield percentage of minerals found",
+                    "#11": "Minerals mined with quantities and individual yields",
                     "#12": "Number of prospector limpets used during mining session",
                     "#13": "Session comments and notes",
-                    "#14": "Generate detailed HTML report for this session"
+                    "#14": "Detailed report for this session"
                 }
                 
                 tooltip_text = column_tooltips.get(column)
@@ -4646,10 +4749,16 @@ class ProspectorPanel(ttk.Frame):
                     self._reports_tooltip_window.wm_geometry(f"+{x}+{y}")
                     self._reports_tooltip_window.configure(background="#ffffe0")
                     
+                    # Make sure tooltip stays on top
+                    self._reports_tooltip_window.wm_attributes("-topmost", True)
+                    
                     label = tk.Label(self._reports_tooltip_window, text=tooltip_text,
                                    background="#ffffe0", relief=tk.SOLID, borderwidth=1,
                                    font=("Segoe UI", 9), justify=tk.LEFT, wraplength=300)
                     label.pack(ipadx=5, ipady=3)
+                    
+                    # Track which column we're showing tooltip for
+                    self._current_tooltip_column = column
         except Exception as e:
             print(f"Tooltip error: {e}")
 
@@ -4796,7 +4905,10 @@ class ProspectorPanel(ttk.Frame):
                         except:
                             hit_rate_str = "—"
                         
-                        # Format quality (yield %) - convert to average yield instead of individual percentages
+                        # Format quality (yield %) - convert to average yield instead of individual percentages for display
+                        # BUT keep the original detailed string for report generation
+                        quality_str = "—"
+                        quality_detailed = avg_quality  # Keep original for report generation
                         try:
                             # Check if it's already a formatted string with individual materials (contains letters and colons)
                             if any(c.isalpha() for c in avg_quality) and ':' in avg_quality:
@@ -4813,7 +4925,7 @@ class ProspectorPanel(ttk.Frame):
                                             except ValueError:
                                                 continue
                                 
-                                # Calculate simple average (same as HTML report logic)
+                                # Calculate simple average (same as HTML report logic) for display
                                 if individual_yields:
                                     avg_yield = sum(individual_yields) / len(individual_yields)
                                     quality_str = f"{avg_yield:.1f}%"
@@ -4823,8 +4935,10 @@ class ProspectorPanel(ttk.Frame):
                                 # Old numerical format - keep as is
                                 quality_val = float(avg_quality) if avg_quality and avg_quality != '0' else 0
                                 quality_str = f"{quality_val:.1f}%" if quality_val > 0 else "—"
+                                quality_detailed = quality_str  # No detailed data available
                         except:
                             quality_str = "—"
+                            quality_detailed = ""
                         
                         # Get comment data from CSV
                         comment_from_csv = row.get('comment', '').strip()
@@ -4840,6 +4954,8 @@ class ProspectorPanel(ttk.Frame):
                             'materials': materials_str,
                             'hit_rate': hit_rate_str,
                             'quality': quality_str,
+                            'quality_detailed': quality_detailed,  # Keep detailed breakdown for reports
+                            'avg_quality_percent': quality_detailed,  # Also store as avg_quality_percent for compatibility
                             'cargo': materials_breakdown,
                             'cargo_raw': materials_breakdown_raw,  # Store original for tooltip
                             'prospects': prospectors_used,
@@ -5119,9 +5235,9 @@ class ProspectorPanel(ttk.Frame):
             
             if total_asteroids > 0 or live_tons > 0:
                 if live_tons > 0:
-                    summary_text = f"Asteroids scanned: {total_asteroids} | Materials tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
+                    summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
                 else:
-                    summary_text = f"Asteroids scanned: {total_asteroids} | Materials tracked/hits: {tracked_materials}/{total_hits}"
+                    summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits}"
                 self.stats_summary_label.config(text=summary_text, foreground="#e6e6e6")
             else:
                 self.stats_summary_label.config(text="No data yet", foreground="#888888")
@@ -5665,14 +5781,26 @@ class ProspectorPanel(ttk.Frame):
             
             # Update statistics tree with material data
             for material_name, stats in summary_data.items():
+                # Get "Avg % (All)" from material_stats_all (all prospected asteroids)
+                avg_all_pct = "0.0%"
+                material_stats_all = self.session_analytics.material_stats_all.get(material_name)
+                if material_stats_all:
+                    avg_all = material_stats_all.get_average_percentage()
+                    avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
+                
+                # Get "Avg % (≥Threshold)" from regular stats (threshold-filtered)
                 avg_pct = f"{stats['avg_percentage']:.1f}%" if stats['avg_percentage'] > 0 else "0.0%"
                 best_pct = f"{stats['best_percentage']:.1f}%" if stats['best_percentage'] > 0 else "0.0%"
                 latest_pct = f"{stats['latest_percentage']:.1f}%" if stats['latest_percentage'] > 0 else "0.0%"
                 # Use quality_hits instead of raw find_count
                 quality_hits = str(stats['quality_hits'])
                 
+                # Get threshold for this material and append to name
+                threshold = self.min_pct_map.get(material_name, self.threshold.get())
+                material_display = f"{material_name} ({threshold:.1f}%)"
+                
                 self.stats_tree.insert("", "end", values=(
-                    material_name, avg_pct, best_pct, latest_pct, quality_hits
+                    material_display, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits
                 ), tags=("darkrow",))
             
             # Update session summary with live tracking
@@ -5704,9 +5832,9 @@ class ProspectorPanel(ttk.Frame):
             
             if total_asteroids > 0 or live_tons > 0:
                 if live_tons > 0:
-                    summary_text = f"Asteroids scanned: {total_asteroids} | Materials tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
+                    summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
                 else:
-                    summary_text = f"Asteroids scanned: {total_asteroids} | Materials tracked/hits: {tracked_materials}/{total_hits}"
+                    summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits}"
                 self.stats_summary_label.config(text=summary_text, foreground="#e6e6e6")
             else:
                 self.stats_summary_label.config(text="No data yet", foreground="#888888")
@@ -5720,7 +5848,7 @@ class ProspectorPanel(ttk.Frame):
             try:
                 total_asteroids = self.session_analytics.get_total_asteroids()
                 if total_asteroids > 0:
-                    self.stats_summary_label.config(text=f"Asteroids scanned: {total_asteroids} | Materials tracked/hits: 0/0", foreground="#e6e6e6")
+                    self.stats_summary_label.config(text=f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: 0/0", foreground="#e6e6e6")
                 else:
                     self.stats_summary_label.config(text="No data yet", foreground="#888888")
             except:
@@ -5823,7 +5951,7 @@ class ProspectorPanel(ttk.Frame):
             
         # Get clicked column
         column = self.reports_tree_tab.identify_column(event.x)
-        if column == "#4":  # Body column
+        if column == "#4":  # Body column (date, duration, system, body)
             self._edit_body(self.reports_tree_tab, item)
         elif column == "#13":  # Comment column
             self._edit_comment(self.reports_tree_tab, item)
@@ -5852,8 +5980,8 @@ class ProspectorPanel(ttk.Frame):
             session_data = self.reports_tab_session_lookup.get(item)
             if session_data:
                 current_comment = session_data.get('comment', '')
-        elif tree == self.reports_tree and hasattr(self, 'session_lookup'):
-            session_data = self.session_lookup.get(item)
+        elif tree == self.reports_tree and hasattr(self, 'reports_window_session_lookup'):
+            session_data = self.reports_window_session_lookup.get(item)
             if session_data:
                 current_comment = session_data.get('comment', '')
         
@@ -5888,8 +6016,8 @@ class ProspectorPanel(ttk.Frame):
                 session_data = self.reports_tab_session_lookup.get(item)
                 if session_data:
                     raw_timestamp = session_data.get('timestamp_raw')
-            elif tree == self.reports_tree and hasattr(self, 'session_lookup'):
-                session_data = self.session_lookup.get(item)
+            elif tree == self.reports_tree and hasattr(self, 'reports_window_session_lookup'):
+                session_data = self.reports_window_session_lookup.get(item)
                 if session_data:
                     raw_timestamp = session_data.get('timestamp_raw')
             
@@ -5900,6 +6028,17 @@ class ProspectorPanel(ttk.Frame):
             # Update both CSV file and text file for data consistency
             csv_updated = self._update_comment_in_csv(raw_timestamp, new_comment)
             text_updated = self._update_comment_in_text_file(raw_timestamp, new_comment)
+            
+            # Update the session lookup cache with the new comment
+            if csv_updated and text_updated:
+                if tree == self.reports_tree_tab and hasattr(self, 'reports_tab_session_lookup'):
+                    session_data = self.reports_tab_session_lookup.get(item)
+                    if session_data:
+                        session_data['comment'] = new_comment
+                elif tree == self.reports_tree and hasattr(self, 'reports_window_session_lookup'):
+                    session_data = self.reports_window_session_lookup.get(item)
+                    if session_data:
+                        session_data['comment'] = new_comment
             
             # Check if updates were successful
             if not csv_updated or not text_updated:
@@ -5928,24 +6067,35 @@ class ProspectorPanel(ttk.Frame):
                     tree.item(item, values=new_values)
     
     def _get_comment_by_timestamp(self, timestamp):
-        """Get comment by timestamp from session files as fallback"""
+        """Get comment by timestamp from CSV file as fallback"""
         try:
-            import os
-            import json
-            reports_dir = "Reports/Mining Session"
-            if os.path.exists(reports_dir):
-                for filename in os.listdir(reports_dir):
-                    if filename.endswith('.json'):
-                        filepath = os.path.join(reports_dir, filename)
+            import csv
+            csv_path = self._get_csv_path()
+            if os.path.exists(csv_path):
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        raw_timestamp = row['timestamp_utc']
+                        
+                        # Try direct match first
+                        if raw_timestamp == timestamp:
+                            return row.get('comment', '')
+                        
+                        # Try display format match
                         try:
-                            with open(filepath, 'r', encoding='utf-8') as f:
-                                data = json.load(f)
-                                if data.get('date') == timestamp:
-                                    return data.get('comment', '')
+                            if raw_timestamp.endswith('Z'):
+                                csv_dt = dt.datetime.fromisoformat(raw_timestamp.replace('Z', '+00:00'))
+                                csv_dt = csv_dt.replace(tzinfo=dt.timezone.utc).astimezone()
+                            else:
+                                csv_dt = dt.datetime.fromisoformat(raw_timestamp)
+                            
+                            display_time = csv_dt.strftime("%Y-%m-%d %H:%M")
+                            if display_time == timestamp:
+                                return row.get('comment', '')
                         except:
                             continue
-        except:
-            pass
+        except Exception as e:
+            log.warning(f"Error getting comment by timestamp: {e}")
         return ""
     
     def _edit_body(self, tree, item):
@@ -5974,8 +6124,8 @@ class ProspectorPanel(ttk.Frame):
                 session_data = self.reports_tab_session_lookup.get(item)
                 if session_data:
                     raw_timestamp = session_data.get('timestamp_raw')
-            elif tree == self.reports_tree and hasattr(self, 'session_lookup'):
-                session_data = self.session_lookup.get(item)
+            elif tree == self.reports_tree and hasattr(self, 'reports_window_session_lookup'):
+                session_data = self.reports_window_session_lookup.get(item)
                 if session_data:
                     raw_timestamp = session_data.get('timestamp_raw')
             
@@ -6045,10 +6195,10 @@ class ProspectorPanel(ttk.Frame):
                     else:
                         csv_dt = dt.datetime.fromisoformat(raw_timestamp)
                     
-                    # Convert CSV timestamp to display format (mm/dd HH:MM)
-                    display_time = csv_dt.strftime("%m/%d %H:%M")
+                    # Convert CSV timestamp to display format (YYYY-MM-DD HH:MM)
+                    display_time = csv_dt.strftime("%Y-%m-%d %H:%M")
                     
-                    # Compare with the display timestamp (e.g., "09/08 18:20")
+                    # Compare with the display timestamp (e.g., "2025-10-10 18:20")
                     if display_time == timestamp:
                         row['comment'] = new_comment
                         updated = True
@@ -6066,9 +6216,10 @@ class ProspectorPanel(ttk.Frame):
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(sessions)
+            log.debug(f"Successfully updated comment in CSV for timestamp: {timestamp}")
             return True
         else:
-            
+            log.warning(f"Failed to find matching session in CSV for timestamp: {timestamp}")
             return False
 
     def _update_comment_in_text_file(self, timestamp, new_comment):
@@ -6103,7 +6254,7 @@ class ProspectorPanel(ttk.Frame):
                                 else:
                                     csv_dt = dt.datetime.fromisoformat(raw_timestamp)
                                 
-                                display_time = csv_dt.strftime("%m/%d %H:%M")
+                                display_time = csv_dt.strftime("%Y-%m-%d %H:%M")
                                 if display_time == timestamp:
                                     # Found matching CSV entry, use its raw timestamp
                                     dt_obj = dt.datetime.fromisoformat(raw_timestamp.replace('Z', ''))
@@ -6186,7 +6337,7 @@ class ProspectorPanel(ttk.Frame):
                         else:
                             csv_dt = dt.datetime.fromisoformat(raw_timestamp)
                         
-                        display_time = csv_dt.strftime("%m/%d %H:%M")
+                        display_time = csv_dt.strftime("%Y-%m-%d %H:%M")
                         if display_time == timestamp:
                             row['body'] = new_body
                             updated = True
@@ -6241,7 +6392,7 @@ class ProspectorPanel(ttk.Frame):
                                 else:
                                     csv_dt = dt.datetime.fromisoformat(raw_timestamp)
                                 
-                                display_time = csv_dt.strftime("%m/%d %H:%M")
+                                display_time = csv_dt.strftime("%Y-%m-%d %H:%M")
                                 if display_time == timestamp:
                                     # Found matching CSV entry, use its raw timestamp
                                     dt_obj = dt.datetime.fromisoformat(raw_timestamp.replace('Z', ''))
@@ -6675,7 +6826,7 @@ class ProspectorPanel(ttk.Frame):
         
         self.bookmark_filter_var = tk.StringVar(value="All Locations")
         filter_combo = ttk.Combobox(filter_frame, textvariable=self.bookmark_filter_var, 
-                                   values=["All Locations", "High Yield (>350 T/hr)", "Medium Yield (250-350 T/hr)", "Low Yield (100-250 T/hr)", "Recent (Last 30 Days)", "Hotspot Locations"], 
+                                   values=["All Locations", "High Yield (>350 T/hr)", "Medium Yield (250-350 T/hr)", "Low Yield (100-250 T/hr)", "Recent (Last 30 Days)", "Hotspot Locations", "No Overlap", "2x Overlap", "3x Overlap"], 
                                    state="readonly", width=28)
         filter_combo.pack(side="left", padx=(0, 10))
         filter_combo.bind("<<ComboboxSelected>>", self._on_bookmark_filter_changed)
@@ -6691,7 +6842,7 @@ class ProspectorPanel(ttk.Frame):
         self.ToolTip(search_entry, "Search bookmarks by system, body, or materials")
 
         # Create bookmarks treeview with multiple selection enabled
-        self.bookmarks_tree = ttk.Treeview(main_frame, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "notes"), show="headings", height=16, selectmode="extended")
+        self.bookmarks_tree = ttk.Treeview(main_frame, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "target_material", "overlap", "notes"), show="headings", height=16, selectmode="extended")
         self.bookmarks_tree.grid(row=1, column=0, sticky="nsew")
         
         # Ensure multiple selection is properly configured
@@ -6703,10 +6854,12 @@ class ProspectorPanel(ttk.Frame):
         # Configure column headings
         self.bookmarks_tree.heading("last_mined", text="Last Mined")
         self.bookmarks_tree.heading("system", text="System")
-        self.bookmarks_tree.heading("body", text="Body/Ring")
-        self.bookmarks_tree.heading("hotspot", text="Hotspot")
-        self.bookmarks_tree.heading("materials", text="Materials Found")
+        self.bookmarks_tree.heading("body", text="Planet/Ring")
+        self.bookmarks_tree.heading("hotspot", text="Ring Type")
+        self.bookmarks_tree.heading("materials", text="Minerals Found")
         self.bookmarks_tree.heading("avg_yield", text="Avg Yield %")
+        self.bookmarks_tree.heading("target_material", text="Overlap Minerals")
+        self.bookmarks_tree.heading("overlap", text="Overlap")
         self.bookmarks_tree.heading("notes", text="Notes")
         
         # Configure column widths
@@ -6716,6 +6869,8 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.column("hotspot", width=100, stretch=False, anchor="w")
         self.bookmarks_tree.column("materials", width=200, stretch=False, anchor="w")
         self.bookmarks_tree.column("avg_yield", width=80, stretch=False, anchor="center")
+        self.bookmarks_tree.column("target_material", width=120, stretch=False, anchor="w")
+        self.bookmarks_tree.column("overlap", width=70, stretch=False, anchor="center")
         self.bookmarks_tree.column("notes", width=50, stretch=False, anchor="center")  # Narrower for emoji
 
         # Add vertical scrollbar
@@ -6763,7 +6918,7 @@ class ProspectorPanel(ttk.Frame):
                 print(f"Bookmark sorting error for column {col}: {e}")
 
         # Bind column headers to sorting
-        for col in ("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "notes"):
+        for col in ("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "target_material", "overlap", "notes"):
             self.bookmarks_tree.heading(col, command=lambda c=col: sort_bookmark_col(c))
 
         # Buttons frame
@@ -6873,6 +7028,18 @@ class ProspectorPanel(ttk.Frame):
                 hotspot = bookmark.get('hotspot', '').lower()
                 if not hotspot or hotspot == '':
                     continue
+            elif filter_value == "No Overlap":
+                overlap_type = bookmark.get('overlap_type', '')
+                if overlap_type != '':
+                    continue
+            elif filter_value == "2x Overlap":
+                overlap_type = bookmark.get('overlap_type', '')
+                if overlap_type != '2x':
+                    continue
+            elif filter_value == "3x Overlap":
+                overlap_type = bookmark.get('overlap_type', '')
+                if overlap_type != '3x':
+                    continue
             
             # Apply search filter
             if search_text:
@@ -6884,6 +7051,9 @@ class ProspectorPanel(ttk.Frame):
             notes = bookmark.get('notes', '')
             notes_display = '💬' if notes.strip() else ''  # Show emoji if notes exist
             
+            overlap_type = bookmark.get('overlap_type', '')
+            overlap_display = {'': '', '2x': '⭐⭐', '3x': '⭐⭐⭐'}.get(overlap_type, '')
+            
             self.bookmarks_tree.insert("", "end", values=(
                 bookmark.get('last_mined', ''),
                 bookmark.get('system', ''),
@@ -6891,6 +7061,8 @@ class ProspectorPanel(ttk.Frame):
                 bookmark.get('hotspot', ''),
                 bookmark.get('materials', ''),
                 bookmark.get('avg_yield', ''),
+                bookmark.get('target_material', ''),
+                overlap_display,
                 notes_display
             ))
 
@@ -6908,7 +7080,7 @@ class ProspectorPanel(ttk.Frame):
         column = self.bookmarks_tree.identify('column', event.x, event.y)
         
         # Check if clicking on Notes column and there's a valid item
-        if item and column == '#7':  # Notes column is the 7th column (0-indexed: #7)
+        if item and column == '#9':  # Notes column is now the 9th column (0-indexed: #9)
             # Select the clicked item first
             self.bookmarks_tree.selection_set(item)
             self.bookmarks_tree.focus(item)
@@ -6958,9 +7130,9 @@ class ProspectorPanel(ttk.Frame):
         except Exception:
             pass
         
-        # Reduce height and position relative to main window
-        dialog_width = 500
-        dialog_height = 320  # Reduced from 400
+        # Optimize dialog size for better fit
+        dialog_width = 480
+        dialog_height = 340
         
         # Center the dialog relative to the main window
         main_window = self.winfo_toplevel()
@@ -6994,47 +7166,67 @@ class ProspectorPanel(ttk.Frame):
         dialog.rowconfigure(0, weight=1)
         
         # System field
-        ttk.Label(frame, text="System:").grid(row=0, column=0, sticky="w", pady=(0, 5))
+        ttk.Label(frame, text="System:").grid(row=0, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         system_var = tk.StringVar(value=bookmark_data.get('system', '') if bookmark_data else '')
-        system_entry = ttk.Entry(frame, textvariable=system_var, width=40)
-        system_entry.grid(row=0, column=1, sticky="ew", pady=(0, 5))
+        system_entry = ttk.Entry(frame, textvariable=system_var, width=35)
+        system_entry.grid(row=0, column=1, sticky="w", pady=(0, 5))
         
         # Body field
-        ttk.Label(frame, text="Body/Ring:").grid(row=1, column=0, sticky="w", pady=(0, 5))
+        ttk.Label(frame, text="Body/Ring:").grid(row=1, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         body_var = tk.StringVar(value=bookmark_data.get('body', '') if bookmark_data else '')
-        body_entry = ttk.Entry(frame, textvariable=body_var, width=40)
-        body_entry.grid(row=1, column=1, sticky="ew", pady=(0, 5))
+        body_entry = ttk.Entry(frame, textvariable=body_var, width=35)
+        body_entry.grid(row=1, column=1, sticky="w", pady=(0, 5))
         
-        # Hotspot field
-        ttk.Label(frame, text="Hotspot:").grid(row=2, column=0, sticky="w", pady=(0, 5))
+        # Hotspot field - Ring Type text entry
+        ttk.Label(frame, text="Ring Type:").grid(row=2, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         hotspot_var = tk.StringVar(value=bookmark_data.get('hotspot', '') if bookmark_data else '')
-        hotspot_entry = ttk.Entry(frame, textvariable=hotspot_var, width=40)
-        hotspot_entry.grid(row=2, column=1, sticky="ew", pady=(0, 5))
+        hotspot_entry = ttk.Entry(frame, textvariable=hotspot_var, width=35)
+        hotspot_entry.grid(row=2, column=1, sticky="w", pady=(0, 5))
         
         # Materials field
-        ttk.Label(frame, text="Materials Found:").grid(row=3, column=0, sticky="w", pady=(0, 5))
+        ttk.Label(frame, text="Minerals Found:").grid(row=3, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         materials_var = tk.StringVar(value=bookmark_data.get('materials', '') if bookmark_data else '')
-        materials_entry = ttk.Entry(frame, textvariable=materials_var, width=40)
-        materials_entry.grid(row=3, column=1, sticky="ew", pady=(0, 5))
+        materials_entry = ttk.Entry(frame, textvariable=materials_var, width=35)
+        materials_entry.grid(row=3, column=1, sticky="w", pady=(0, 5))
         
         # Average Yield field
-        ttk.Label(frame, text="Average Yield %:").grid(row=4, column=0, sticky="w", pady=(0, 5))
+        ttk.Label(frame, text="Average Yield %:").grid(row=4, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         yield_var = tk.StringVar(value=bookmark_data.get('avg_yield', '') if bookmark_data else '')
-        yield_entry = ttk.Entry(frame, textvariable=yield_var, width=40)
-        yield_entry.grid(row=4, column=1, sticky="ew", pady=(0, 5))
+        yield_entry = ttk.Entry(frame, textvariable=yield_var, width=35)
+        yield_entry.grid(row=4, column=1, sticky="w", pady=(0, 5))
+        
+        # Target Material dropdown field
+        ttk.Label(frame, text="Overlap Minerals:").grid(row=5, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        target_material_var = tk.StringVar(value=bookmark_data.get('target_material', '') if bookmark_data else '')
+        
+        # Specific materials list as requested
+        target_materials = ['', 'Alexandrite', 'Benitoite', 'Bromellite', 'Grandidierite', 'Low-Temperature Diamonds', 
+                           'Monazite', 'Musgravite', 'Painite', 'Platinum', 'Void Opals', 'Tritium']
+        
+        target_material_combo = ttk.Combobox(frame, textvariable=target_material_var, width=32, state="readonly")
+        target_material_combo['values'] = tuple(target_materials)
+        target_material_combo.grid(row=5, column=1, sticky="w", pady=(0, 5))
+        
+        # Overlap field
+        ttk.Label(frame, text="Overlap Type:").grid(row=6, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        overlap_var = tk.StringVar(value=bookmark_data.get('overlap_type', '') if bookmark_data else '')
+        overlap_combo = ttk.Combobox(frame, textvariable=overlap_var, width=32, state="readonly")
+        overlap_combo['values'] = ('', '2x', '3x')
+        overlap_combo.grid(row=6, column=1, sticky="w", pady=(0, 5))
         
         # Notes field
-        ttk.Label(frame, text="Notes:").grid(row=5, column=0, sticky="nw", pady=(0, 5))
-        notes_text = tk.Text(frame, width=40, height=4, insertbackground="#ffffff")  # White cursor for visibility
-        notes_text.grid(row=5, column=1, sticky="ew", pady=(0, 10))
+        ttk.Label(frame, text="Notes:").grid(row=7, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
+        notes_text = tk.Text(frame, width=35, height=4, insertbackground="#ffffff")  # White cursor for visibility
+        notes_text.grid(row=7, column=1, sticky="w", pady=(0, 10))
         if bookmark_data:
             notes_text.insert("1.0", bookmark_data.get('notes', ''))
         
-        frame.columnconfigure(1, weight=1)
+        # Remove the column weight so fields don't expand
+        # frame.columnconfigure(1, weight=1)  # Commented out to prevent expansion
         
         # Buttons
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=6, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=8, column=0, columnspan=2, pady=(10, 0))
         
         def save_bookmark():
             system = system_var.get().strip()
@@ -7050,6 +7242,8 @@ class ProspectorPanel(ttk.Frame):
                 'hotspot': hotspot_var.get().strip(),
                 'materials': materials_var.get().strip(),
                 'avg_yield': yield_var.get().strip(),
+                'target_material': target_material_var.get(),
+                'overlap_type': overlap_var.get(),
                 'last_mined': bookmark_data.get('last_mined', '') if bookmark_data else '',
                 'notes': notes_text.get("1.0", "end-1c").strip(),
                 'date_added': bookmark_data.get('date_added', dt.datetime.now().strftime('%Y-%m-%d')) if bookmark_data else dt.datetime.now().strftime('%Y-%m-%d')
@@ -7148,6 +7342,8 @@ class ProspectorPanel(ttk.Frame):
             'body': body,
             'materials': materials,
             'avg_yield': avg_yield,
+            'target_material': '',
+            'overlap_type': '',
             'last_mined': dt.datetime.now().strftime('%Y-%m-%d'),
             'notes': '',
             'date_added': dt.datetime.now().strftime('%Y-%m-%d')
@@ -7276,7 +7472,7 @@ class ProspectorPanel(ttk.Frame):
             ("System:", "best_session_system"),
             ("Session(t):", "best_tonnage"),
             ("Most Mined System:", "most_mined_system"),
-            ("Material:", "most_collected_material")
+            ("Minerals:", "most_collected_material")
         ]
         
         for i, (label_text, key) in enumerate(performers_data):
@@ -8974,6 +9170,118 @@ class ProspectorPanel(ttk.Frame):
             import traceback
             traceback.print_exc()
             
+    def _convert_session_data_for_report(self, session_data):
+        """Convert session data from display format to report generator format"""
+        try:
+            converted = session_data.copy()
+        except Exception as e:
+            log.error(f"Error copying session_data: {e}")
+            return session_data
+        
+        # Convert tons from string "15.2t" to float
+        if 'tons' in converted and isinstance(converted['tons'], str):
+            try:
+                tons_str = converted['tons'].replace('t', '').strip()
+                converted['tons'] = float(tons_str)
+                converted['total_tons_mined'] = converted['tons']
+            except:
+                converted['tons'] = 0.0
+                converted['total_tons_mined'] = 0.0
+        
+        # Convert prospectors from string to int (field might be 'prospects' or 'prospectors')
+        prosp_field = 'prospects' if 'prospects' in converted else 'prospectors'
+        if prosp_field in converted and isinstance(converted[prosp_field], str):
+            try:
+                prosp_str = converted[prosp_field].replace('—', '0').strip()
+                prosp_value = int(float(prosp_str)) if prosp_str else 0
+                converted['prospectors'] = prosp_value  # Report generator expects 'prospectors'
+                converted['prospects'] = prosp_value    # Keep original too
+            except:
+                converted['prospectors'] = 0
+                converted['prospects'] = 0
+        
+        # Convert materials from string count to int (will be recalculated after parsing materials_mined)
+        if 'materials' in converted and isinstance(converted['materials'], str):
+            try:
+                mat_str = converted['materials'].replace('—', '0').strip()
+                converted['materials'] = int(mat_str) if mat_str else 0
+            except:
+                converted['materials'] = 0
+        
+        # Parse materials_mined from cargo string if not already a dict
+        if 'materials_mined' not in converted or not isinstance(converted.get('materials_mined'), dict):
+            cargo_str = converted.get('cargo', '') or converted.get('cargo_raw', '')
+            if cargo_str and isinstance(cargo_str, str):
+                materials_mined = {}
+                try:
+                    # Parse "Painite: 13.5t, Platinum: 15.2t" or "Platinum: 259t (30.5%); Osmium: 3t (16.0%)" format
+                    # Check if it uses semicolons or commas as separator
+                    if ';' in cargo_str:
+                        pairs = [p.strip() for p in cargo_str.split(';')]
+                    else:
+                        pairs = [p.strip() for p in cargo_str.split(',')]
+                    for pair in pairs:
+                        if ':' in pair:
+                            parts = pair.split(':')
+                            if len(parts) >= 2:
+                                material_name = parts[0].strip()
+                                tonnage_text = parts[1].strip()
+                                # Extract numeric value from "13.5t" format
+                                tonnage_match = re.search(r'([\d.]+)', tonnage_text)
+                                if tonnage_match:
+                                    tonnage = float(tonnage_match.group(1))
+                                    materials_mined[material_name] = tonnage
+                    converted['materials_mined'] = materials_mined
+                except Exception as e:
+                    log.warning(f"Error parsing cargo for materials_mined: {e}")
+                    converted['materials_mined'] = {}
+            else:
+                converted['materials_mined'] = {}
+        
+        # Recalculate materials count from materials_mined dictionary for accuracy
+        if 'materials_mined' in converted and isinstance(converted['materials_mined'], dict):
+            converted['materials'] = len(converted['materials_mined'])
+        
+        # Parse individual yields from quality/avg_quality_percent field (format: "Pt: 30.5%, Os: 16.0%")
+        if 'individual_yields' not in converted or not converted.get('individual_yields'):
+            quality_str = converted.get('quality', '') or converted.get('avg_quality_percent', '')
+            print(f"DEBUG YIELDS: Parsing quality_str: '{quality_str}'")
+            if quality_str and isinstance(quality_str, str) and ':' in quality_str:
+                individual_yields = {}
+                try:
+                    # Parse "Pt: 30.5%, Os: 16.0%" format
+                    pairs = [p.strip() for p in quality_str.split(',')]
+                    for pair in pairs:
+                        if ':' in pair:
+                            parts = pair.split(':')
+                            if len(parts) >= 2:
+                                material_abbr = parts[0].strip()
+                                percent_text = parts[1].strip().replace('%', '')
+                                try:
+                                    percent_value = float(percent_text)
+                                    # Expand abbreviations to full names
+                                    material_map = {
+                                        'Pt': 'Platinum', 'Os': 'Osmium', 'Pd': 'Palladium',
+                                        'Pn': 'Painite', 'Rh': 'Rhodium', 'LTD': 'Low Temperature Diamonds',
+                                        'VO': 'Void Opals', 'Alex': 'Alexandrite', 'Ben': 'Benitoite',
+                                        'Grand': 'Grandidierite', 'Mus': 'Musgravite', 'Mon': 'Monazite',
+                                        'Brom': 'Bromellite', 'Seren': 'Serendibite'
+                                    }
+                                    material_name = material_map.get(material_abbr, material_abbr)
+                                    individual_yields[material_name] = percent_value
+                                except ValueError:
+                                    continue
+                    if individual_yields:
+                        print(f"DEBUG YIELDS: Parsed individual_yields: {individual_yields}")
+                        converted['individual_yields'] = individual_yields
+                    else:
+                        print("DEBUG YIELDS: No individual_yields parsed")
+                except Exception as e:
+                    log.warning(f"Error parsing individual yields from quality string: {e}")
+                    print(f"DEBUG YIELDS: Exception: {e}")
+        
+        return converted
+    
     def _generate_enhanced_report_from_menu(self, tree):
         """Generate detailed HTML report for selected report from context menu"""
         try:
@@ -8998,11 +9306,22 @@ class ProspectorPanel(ttk.Frame):
             
             # Try to get detailed session data first
             session_data = None
-            if hasattr(self, 'reports_window_session_lookup'):
+            
+            # Check which tree we're using and get the appropriate lookup
+            if tree == self.reports_tree_tab and hasattr(self, 'reports_tab_session_lookup'):
+                session_data = self.reports_tab_session_lookup.get(item)
+                if session_data:
+                    # Convert display format to report generator format
+                    session_data = self._convert_session_data_for_report(session_data)
+            elif hasattr(self, 'reports_window_session_lookup'):
                 session_data = self.reports_window_session_lookup.get(item)
+                if session_data:
+                    # Convert display format to report generator format
+                    session_data = self._convert_session_data_for_report(session_data)
             
             # If no detailed session data, create basic data from tree item
             if not session_data:
+                log.warning("No session_data from lookup - falling back to tree parsing")
                 values = tree.item(item, 'values')
                 if len(values) >= 6:  # Ensure we have basic data
                     # Try to parse materials from the "Materials" column if available
@@ -9053,17 +9372,30 @@ class ProspectorPanel(ttk.Frame):
                         except (ValueError, TypeError):
                             prospectors_used = 0
                     
-                    # Create basic session data from tree values
+                    # Get the actual comment text (not the emoji from tree display)
+                    actual_comment = ""
+                    if len(values) > 12 and values[12] == '💬':
+                        # Comment exists - need to retrieve actual text from CSV
+                        log.debug(f"Fetching comment for timestamp: {values[0]}")
+                        actual_comment = self._get_comment_by_timestamp(values[0])
+                        log.debug(f"Retrieved comment: {actual_comment[:50] if actual_comment else 'EMPTY'}")
+                    
+                    # Create basic session data from tree values matching report generator expectations
+                    tons_value = float(values[4]) if values[4] else 0.0
                     session_data = {
                         'date': values[0],
                         'duration': values[1],
                         'system': values[2],
                         'body': values[3],
-                        'tonnage': float(values[4]) if values[4] else 0.0,
+                        'tons': tons_value,  # Report generator expects 'tons'
+                        'tonnage': tons_value,  # Keep for compatibility
                         'tph': float(values[5]) if values[5] else 0.0,
                         'materials_mined': materials_mined,
-                        'prospectors_used': prospectors_used,
-                        'comment': values[12] if len(values) > 12 else ""
+                        'materials': len(materials_mined),  # Count of material types
+                        'prospectors': prospectors_used,  # Report generator expects 'prospectors'
+                        'prospectors_used': prospectors_used,  # Keep for compatibility
+                        'total_tons_mined': tons_value,  # For advanced analytics
+                        'comment': actual_comment
                     }
                     
                     # Load detailed analytics from CSV if available
@@ -9190,11 +9522,11 @@ class ProspectorPanel(ttk.Frame):
                 'system': session_data.get('system', 'Unknown'),
                 'body': session_data.get('body', 'Unknown'),
                 'date': session_data.get('date', 'Unknown'),
-                'duration': session_data.get('duration', '00:00'),  # Keep as formatted string
-                'tons': str(session_data.get('tonnage', 0)),        # Keep as string for consistency
-                'tph': str(session_data.get('tph', 0)),             # Keep as string for consistency
-                'materials': str(len(session_data.get('materials_mined', {}))),  # Material count as string
-                'prospectors': str(session_data.get('prospectors_used', 0)),     # Keep as string
+                'duration': session_data.get('duration', '00:00'),
+                'tons': session_data.get('tons', session_data.get('tonnage', 0)),  # Try both field names
+                'tph': session_data.get('tph', 0),
+                'materials': session_data.get('materials', len(session_data.get('materials_mined', {}))),
+                'prospectors': session_data.get('prospectors', session_data.get('prospects', session_data.get('prospectors_used', 0))),  # Try all field names
                 'materials_mined': session_data.get('materials_mined', {}),
                 'comment': session_data.get('comment', ''),
                 'screenshots': [],
@@ -9375,12 +9707,14 @@ class ProspectorPanel(ttk.Frame):
             with open(session_file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # Look for "Material Performance" section
-            if "--- Material Performance ---" not in content:
+            # Look for "Mineral Performance" section (check both old and new names for compatibility)
+            if "--- Mineral Performance ---" not in content and "--- Material Performance ---" not in content:
                 return {}
             
-            # Extract the Material Performance section
-            performance_start = content.find("--- Material Performance ---")
+            # Extract the Mineral Performance section (support both old and new names)
+            performance_start = content.find("--- Mineral Performance ---")
+            if performance_start == -1:
+                performance_start = content.find("--- Material Performance ---")
             performance_section = content[performance_start:]
             
             # Parse each material's average percentage
@@ -9638,3 +9972,8 @@ class ProspectorPanel(ttk.Frame):
         except Exception as e:
             print(f"Error opening batch reports dialog: {e}")
             messagebox.showerror("Dialog Error", f"Could not open batch reports dialog: {e}", parent=parent_window)
+
+
+
+
+

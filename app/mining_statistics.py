@@ -76,6 +76,7 @@ class SessionAnalytics:
     
     def __init__(self):
         self.material_stats: Dict[str, MaterialStatistics] = {}
+        self.material_stats_all: Dict[str, MaterialStatistics] = {}  # Track ALL finds (regardless of threshold)
         self.session_active = False
         self.session_start_time: Optional[datetime] = None
         self.total_asteroids_prospected = 0
@@ -96,6 +97,8 @@ class SessionAnalytics:
     def reset_session(self) -> None:
         """Reset all session statistics"""
         for stats in self.material_stats.values():
+            stats.reset()
+        for stats in self.material_stats_all.values():
             stats.reset()
         self.total_asteroids_prospected = 0
         self.asteroids_with_materials = 0
@@ -119,6 +122,17 @@ class SessionAnalytics:
         
         # Check if this asteroid has any valuable materials that meet thresholds
         has_valuable_materials = False
+        
+        # Track ALL materials found (for "Avg % All" column)
+        for material_name, percentage in materials_found.items():
+            material_selected = any(sel.lower() == material_name.lower() for sel in selected_materials)
+            if material_selected:
+                threshold_key = next((sel for sel in selected_materials if sel.lower() == material_name.lower()), material_name)
+                
+                # Track in material_stats_all (ALL finds regardless of threshold)
+                if threshold_key not in self.material_stats_all:
+                    self.material_stats_all[threshold_key] = MaterialStatistics(threshold_key)
+                self.material_stats_all[threshold_key].add_find(percentage, timestamp)
         
         # Only track materials that are selected for announcements AND meet thresholds
         for material_name, percentage in materials_found.items():

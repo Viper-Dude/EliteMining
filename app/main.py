@@ -348,7 +348,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.1.9"
+APP_VERSION = "v4.2.2"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -500,7 +500,7 @@ class RefineryDialog:
         title_label.pack(pady=(0, 15))
         
         # Manual add section (moved to top for dropdown space)
-        manual_frame = tk.LabelFrame(main_frame, text="🔍 Add Other Materials", 
+        manual_frame = tk.LabelFrame(main_frame, text="🔍 Add Other Minerals", 
                                    bg="#1e1e1e", fg="#ffffff", 
                                    font=("Segoe UI", 10, "bold"))
         manual_frame.pack(fill="x", pady=(0, 15))
@@ -1090,12 +1090,16 @@ class CargoMonitor:
         # Elite Dangerous journal directory - load from config or use default
         cfg = _load_cfg()
         saved_dir = cfg.get("journal_dir", None)
-        default_dir = os.path.expanduser("~\\Saved Games\\Frontier Developments\\Elite Dangerous")
         
         if saved_dir and os.path.exists(saved_dir):
             self.journal_dir = saved_dir
+        elif hasattr(self, 'prospector_panel'):
+            # Use prospector panel's language-aware detection
+            detected = self.prospector_panel._detect_journal_dir_default()
+            self.journal_dir = detected if detected else os.path.expanduser("~\\Saved Games\\Frontier Developments\\Elite Dangerous")
         else:
-            self.journal_dir = default_dir
+            # Fallback to English path
+            self.journal_dir = os.path.expanduser("~\\Saved Games\\Frontier Developments\\Elite Dangerous")
         
         # Cargo.json file path for detailed cargo data
         self.cargo_json_path = os.path.join(self.journal_dir, "Cargo.json")
@@ -1156,35 +1160,16 @@ class CargoMonitor:
             
             if not ring_finder_ready:
                 main_app._pending_ring_finder_refresh = True
+                print("✓ Hotspot added to database (Ring Finder refresh pending)")
                 return
                 
             # Ring Finder exists - refresh it now
+            print("✓ Hotspot added - refreshing Ring Finder database info")
             main_app._refresh_ring_finder()
                     
         except Exception as e:
-            # Silent fail to avoid breaking other functionality
-            pass
-    
-    def _refresh_ring_finder(self):
-        """Helper method to refresh Ring Finder database info and cache"""
-        try:
-            # Access main app through main_app_ref if this is called from CargoMonitor
-            main_app = getattr(self, 'main_app_ref', self)
-            
-            if hasattr(main_app, 'ring_finder') and main_app.ring_finder:
-                # Update database info counter
-                if hasattr(main_app.ring_finder, '_update_database_info'):
-                    main_app.ring_finder._update_database_info()
-                
-                # Clear any cached results to ensure fresh data in next search
-                if hasattr(main_app.ring_finder, 'local_db') and hasattr(main_app.ring_finder.local_db, 'clear_cache'):
-                    main_app.ring_finder.local_db.clear_cache()
-                    
-                # Clear the pending refresh flag
-                if hasattr(main_app, '_pending_ring_finder_refresh'):
-                    main_app._pending_ring_finder_refresh = False
-        except Exception as e:
-            pass
+            # Log error but don't break other functionality
+            print(f"Warning: Failed to refresh Ring Finder after hotspot add: {e}")
     
     def create_window(self):
         """Create the cargo monitor as a separate window (not overlay)"""
@@ -2208,19 +2193,40 @@ cargo panel forces Elite to write detailed inventory data.
         self.session_end_dialog_shown = False  # Reset dialog flag if activity resumes
     
     def read_new_journal_entries(self):
-        """Read new entries from the journal file"""
-        try:
-            with open(self.last_journal_file, 'r', encoding='utf-8') as f:
-                f.seek(self.last_file_size)  # Start from where we left off
-                new_lines = f.readlines()
-                
-            for line in new_lines:
-                line = line.strip()
-                if line:
-                    self.process_journal_event(line)
+        """Read new entries from the journal file with retry logic for file locking issues"""
+        max_retries = 3
+        retry_delay = 0.1  # 100ms delay between retries
+        
+        for attempt in range(max_retries):
+            try:
+                with open(self.last_journal_file, 'r', encoding='utf-8') as f:
+                    f.seek(self.last_file_size)  # Start from where we left off
+                    new_lines = f.readlines()
                     
-        except Exception as e:
-            print(f"Error reading journal entries: {e}")
+                for line in new_lines:
+                    line = line.strip()
+                    if line:
+                        self.process_journal_event(line)
+                
+                # Success - exit retry loop
+                return
+                        
+            except PermissionError as e:
+                # File is locked by another application - retry
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    print(f"Journal file locked by another application after {max_retries} retries (other apps scanning journals?)")
+            except FileNotFoundError:
+                # Journal file was deleted/rotated - this is normal, find new journal
+                print(f"Journal file not found (rotated to new file): {self.last_journal_file}")
+                self.find_latest_journal()
+                return
+            except Exception as e:
+                print(f"Error reading journal entries: {e}")
+                return
     
     def process_journal_event(self, line: str):
         """Process a single journal event"""
@@ -2427,23 +2433,33 @@ cargo panel forces Elite to write detailed inventory data.
                         
             elif event_type == "Scan":
                 # Process Scan events through JournalParser to store ring info
-                self.journal_parser.process_scan(event)
+                try:
+                    self.journal_parser.process_scan(event)
+                except Exception as scan_err:
+                    print(f"Warning: Failed to process Scan event: {scan_err}")
                         
             elif event_type == "SAASignalsFound":
                 # Process ring scans through JournalParser for complete hotspot data with ring info
-                self.journal_parser.process_saa_signals_found(event, self.current_system)
-                
-                # Show notification in status (if available)
-                body_name = event.get("BodyName", "")
-                if hasattr(self, 'status_label') and body_name:
-                    signals = event.get("Signals", [])
-                    if signals:
-                        first_signal = signals[0]
-                        material_name = first_signal.get("Type_Localised", first_signal.get("Type", ""))
-                        count = first_signal.get("Count", 0)
-                        self.status_label.configure(
-                            text=f"🔍 Ring scan: {material_name} ({count}) in {body_name}"
-                        )
+                try:
+                    body_name = event.get("BodyName", "")
+                    print(f"🔍 Processing SAASignalsFound: {body_name} in {self.current_system}")
+                    
+                    self.journal_parser.process_saa_signals_found(event, self.current_system)
+                    
+                    # Show notification in status (if available)
+                    if hasattr(self, 'status_label') and body_name:
+                        signals = event.get("Signals", [])
+                        if signals:
+                            first_signal = signals[0]
+                            material_name = first_signal.get("Type_Localised", first_signal.get("Type", ""))
+                            count = first_signal.get("Count", 0)
+                            self.status_label.configure(
+                                text=f"🔍 Ring scan: {material_name} ({count}) in {body_name}"
+                            )
+                    
+                    print(f"✓ SAASignalsFound processed successfully")
+                except Exception as saa_err:
+                    print(f"Warning: Failed to process SAASignalsFound event: {saa_err}")
                         
         except json.JSONDecodeError:
             pass  # Skip invalid JSON lines
@@ -2839,8 +2855,8 @@ cargo panel forces Elite to write detailed inventory data.
             updated_materials = {}
             total_added = 0.0
             
-            # Check if there's already a CARGO MATERIAL BREAKDOWN section
-            cargo_section_match = re.search(r'=== CARGO MATERIAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
+            # Check if there's already a CARGO MINERAL BREAKDOWN section
+            cargo_section_match = re.search(r'=== CARGO MINERAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
             if cargo_section_match:
                 # Parse existing materials
                 cargo_text = cargo_section_match.group(1)
@@ -2867,15 +2883,15 @@ cargo panel forces Elite to write detailed inventory data.
                 new_header = f"{header_match.group(1)}{new_total:.0f}t"
                 content = content.replace(header_match.group(0), new_header)
             
-            # Update or add CARGO MATERIAL BREAKDOWN section
-            cargo_breakdown_text = "\n=== CARGO MATERIAL BREAKDOWN ===\n"
+            # Update or add CARGO MINERAL BREAKDOWN section
+            cargo_breakdown_text = "\n=== CARGO MINERAL BREAKDOWN ===\n"
             prospectors_line = ""
             if "Prospector Limpets Used:" in content:
                 prospector_match = re.search(r'Prospector Limpets Used:\s*(\d+)', content)
                 if prospector_match:
                     cargo_breakdown_text += f"Prospector Limpets Used: {prospector_match.group(1)}\n"
             
-            cargo_breakdown_text += f"Materials Collected: {len(updated_materials)} types\n\n"
+            cargo_breakdown_text += f"Minerals Collected: {len(updated_materials)} types\n\n"
             
             # Sort materials by quantity (highest first)
             sorted_materials = sorted(updated_materials.items(), key=lambda x: x[1], reverse=True)
@@ -2947,10 +2963,36 @@ from prospector_panel import ProspectorPanel
 
 class App(tk.Tk):
     def __init__(self) -> None:
-        super().__init__()
+        try:
+            super().__init__()
 
-        # Check and migrate config if needed on startup
-        self._check_config_migration()
+            # Check and migrate config if needed on startup
+            self._check_config_migration()
+        except Exception as e:
+            # Log error to file BEFORE showing dialog
+            import traceback
+            error_details = traceback.format_exc()
+            try:
+                crash_log_path = os.path.join(app_dir, "init_crash_log.txt")
+                with open(crash_log_path, "w", encoding="utf-8") as f:
+                    f.write(f"EliteMining Initialization Crash\n")
+                    f.write(f"Time: {dt.datetime.now()}\n")
+                    f.write(f"Error: {str(e)}\n\n")
+                    f.write(error_details)
+            except:
+                pass
+            
+            # Try to show error dialog
+            try:
+                messagebox.showerror(
+                    "EliteMining - Initialization Error",
+                    f"Failed to initialize EliteMining:\n\n{str(e)}\n\n"
+                    f"Crash log saved to:\n{crash_log_path}\n\n"
+                    f"Please report this error."
+                )
+            except:
+                pass
+            raise
 
         # --- Force clam theme for Treeview so dark styling works on Windows ---
         style = ttk.Style(self)
@@ -3555,6 +3597,24 @@ class App(tk.Tk):
         except Exception as e:
             pass  # Silently handle any update errors
 
+    def _refresh_ring_finder(self):
+        """Refresh Ring Finder database info and cache after hotspot added"""
+        try:
+            if hasattr(self, 'ring_finder') and self.ring_finder:
+                # Update database info counter
+                if hasattr(self.ring_finder, '_update_database_info'):
+                    self.ring_finder._update_database_info()
+                
+                # Clear any cached results to ensure fresh data in next search
+                if hasattr(self.ring_finder, 'local_db') and hasattr(self.ring_finder.local_db, 'clear_cache'):
+                    self.ring_finder.local_db.clear_cache()
+                    
+                # Clear the pending refresh flag
+                if hasattr(self, '_pending_ring_finder_refresh'):
+                    self._pending_ring_finder_refresh = False
+        except Exception as e:
+            print(f"Warning: Ring Finder refresh failed: {e}")
+
     def reset_cargo_hold(self):
         """
         Reset cargo hold to actual game state by calling cargo monitor reset.
@@ -3622,8 +3682,32 @@ class App(tk.Tk):
         frame.rowconfigure(0, weight=1)
         
         # Create the ProspectorPanel within this frame
-        self.prospector_panel = ProspectorPanel(frame, self.va_root, self._set_status, self.toggle_vars, self.text_overlay, self, self.announcement_vars, self.main_announcement_enabled, ToolTip)
-        self.prospector_panel.grid(row=0, column=0, sticky="nsew")
+        try:
+            self.prospector_panel = ProspectorPanel(frame, self.va_root, self._set_status, self.toggle_vars, self.text_overlay, self, self.announcement_vars, self.main_announcement_enabled, ToolTip)
+            self.prospector_panel.grid(row=0, column=0, sticky="nsew")
+        except Exception as e:
+            # Log detailed error
+            import traceback
+            error_details = traceback.format_exc()
+            crash_log_path = os.path.join(app_dir, "prospector_init_crash.txt")
+            try:
+                with open(crash_log_path, "w", encoding="utf-8") as f:
+                    f.write(f"ProspectorPanel Initialization Crash\n")
+                    f.write(f"Time: {dt.datetime.now()}\n")
+                    f.write(f"VoiceAttack Root: {self.va_root}\n")
+                    f.write(f"Error: {str(e)}\n\n")
+                    f.write(error_details)
+            except:
+                pass
+            
+            # Show error to user
+            messagebox.showerror(
+                "EliteMining - Mining Session Error",
+                f"Failed to initialize Mining Session tab:\n\n{str(e)}\n\n"
+                f"Log file: {crash_log_path}\n\n"
+                f"Try running as Administrator."
+            )
+            raise
         
         # Set default journal folder and update label after a short delay to ensure prospector panel is fully initialized
         self.after(50, self._set_default_journal_folder)
@@ -5700,15 +5784,46 @@ class App(tk.Tk):
         wcfg = load_window_geometry()
         geom = wcfg.get("geometry")
         zoomed = wcfg.get("zoomed", False)
+        
         if geom:
             try:
+                # Parse geometry string: WIDTHxHEIGHT+X+Y
+                import re
+                match = re.match(r'(\d+)x(\d+)\+(-?\d+)\+(-?\d+)', geom)
+                if match:
+                    width, height, x, y = map(int, match.groups())
+                    
+                    # Check if position is on screen
+                    screen_width = self.winfo_screenwidth()
+                    screen_height = self.winfo_screenheight()
+                    
+                    # If window is completely off-screen, center it
+                    if x < -width or x > screen_width or y < -height or y > screen_height:
+                        # Center on screen
+                        x = (screen_width - width) // 2
+                        y = (screen_height - height) // 2
+                        geom = f"{width}x{height}+{x}+{y}"
+                
                 self.geometry(geom)
-            except Exception:
-                # If saved geometry fails, use smaller default size
+            except Exception as e:
+                # If saved geometry fails, center on screen with default size
                 self.geometry("1100x650")
+                self.update_idletasks()
+                screen_width = self.winfo_screenwidth()
+                screen_height = self.winfo_screenheight()
+                x = (screen_width - 1100) // 2
+                y = (screen_height - 650) // 2
+                self.geometry(f"1100x650+{x}+{y}")
         else:
-            # No saved geometry, use smaller default size
+            # No saved geometry, center on screen with default size
             self.geometry("1100x650")
+            self.update_idletasks()
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight()
+            x = (screen_width - 1100) // 2
+            y = (screen_height - 650) // 2
+            self.geometry(f"1100x650+{x}+{y}")
+        
         self.after(50, lambda: self.state("zoomed") if zoomed else None)
 
     def _check_config_migration(self):
@@ -6872,5 +6987,31 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         thread.start()
 
 if __name__ == "__main__":
-    app = App()
-    app.mainloop()
+    try:
+        app = App()
+        app.mainloop()
+    except Exception as e:
+        # Show error dialog with full traceback
+        import traceback
+        error_details = traceback.format_exc()
+        
+        # Log to file
+        try:
+            with open(os.path.join(app_dir, "crash_log.txt"), "w") as f:
+                f.write(f"EliteMining Crash Report\n")
+                f.write(f"Time: {dt.datetime.now()}\n")
+                f.write(f"Error: {str(e)}\n\n")
+                f.write(error_details)
+        except:
+            pass
+        
+        # Show error to user
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror(
+            "EliteMining - Critical Error",
+            f"EliteMining failed to start:\n\n{str(e)}\n\n"
+            f"A crash log has been saved to:\n{os.path.join(app_dir, 'crash_log.txt')}\n\n"
+            f"Please report this error to the developer."
+        )
+        sys.exit(1)

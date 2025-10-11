@@ -120,7 +120,7 @@ class JournalParser:
             List of journal file paths sorted by modification time (oldest first)
         """
         if not os.path.exists(self.journal_dir):
-            log.warning(f"Journal directory does not exist: {self.journal_dir}")
+            log.warning("Journal directory does not exist")
             return []
             
         pattern = os.path.join(self.journal_dir, "Journal.*.log")
@@ -129,7 +129,7 @@ class JournalParser:
         # Sort by modification time (oldest first) for chronological processing
         files.sort(key=os.path.getmtime)
         
-        log.info(f"Found {len(files)} journal files in {self.journal_dir}")
+        log.info(f"Found {len(files)} journal files")
         return files
     
     def parse_journal_file(self, file_path: str) -> Generator[Dict[str, Any], None, None]:
@@ -152,11 +152,11 @@ class JournalParser:
                         event = json.loads(line)
                         yield event
                     except json.JSONDecodeError as e:
-                        log.warning(f"Invalid JSON in {file_path}:{line_num}: {e}")
+                        log.warning(f"Invalid JSON in {os.path.basename(file_path)}:{line_num}: {e}")
                         continue
                         
         except Exception as e:
-            log.error(f"Error reading journal file {file_path}: {e}")
+            log.error(f"Error reading journal file {os.path.basename(file_path)}: {e}")
     
     def is_ring_body(self, body_name: str) -> bool:
         """Check if a body name represents a ring

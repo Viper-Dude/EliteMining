@@ -259,14 +259,14 @@ class RingFinder:
         
         # Distance filter (now a dropdown)
         ttk.Label(search_frame, text="Max Distance (LY):").grid(row=1, column=2, sticky="w", padx=10, pady=5)
-        self.distance_var = tk.StringVar(value="50")
+        self.distance_var = tk.StringVar(value="100")
         distance_combo = ttk.Combobox(search_frame, textvariable=self.distance_var, width=8, state="readonly")
-        distance_combo['values'] = ("10", "50", "100")
+        distance_combo['values'] = ("10", "50", "100", "150", "200")
         distance_combo.grid(row=1, column=3, sticky="w", padx=5, pady=5)
         
         # Max Results filter
         ttk.Label(search_frame, text="Max Results:").grid(row=2, column=2, sticky="w", padx=10, pady=5)
-        self.max_results_var = tk.StringVar(value="20")
+        self.max_results_var = tk.StringVar(value="All")
         max_results_combo = ttk.Combobox(search_frame, textvariable=self.max_results_var, width=8, state="readonly")
         max_results_combo['values'] = ("10", "20", "30", "50", "All")
         max_results_combo.grid(row=2, column=3, sticky="w", padx=5, pady=5)
@@ -299,7 +299,7 @@ class RingFinder:
             print(f"Warning: Failed to initialize material change handler: {e}")
         
         # Add tooltip for distance limitation
-        ToolTip(distance_combo, "Maximum search radius in light years\nSearches are limited to 100 LY maximum\nRecommended: 10-50 LY for better performance")
+        ToolTip(distance_combo, "Maximum search radius in light years\nRecommended: 10-50 LY for better performance\nLarger distances may take longer to search")
         
         # Search limitations info text (bottom of search controls)
         info_text = tk.Label(search_frame, 
@@ -324,15 +324,15 @@ class RingFinder:
         tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Visited", "Ring", "Ring Type", "Hotspots", "Density")
+        columns = ("Distance", "LS", "System", "Visited", "Planet/Ring", "Ring Type", "Hotspots", "Density")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
         
         # Set column widths - similar to EDTOOLS layout
         column_widths = {
-            "Distance": 50,
+            "Distance": 60,
             "LS": 80,
-            "System": 220,
-            "Ring": 100,
+            "System": 170,
+            "Planet/Ring": 100,
             "Ring Type": 120,
             "Hotspots": 200,
             "Visited": 60,
@@ -344,15 +344,15 @@ class RingFinder:
             
             # Configure columns with minwidth and stretch like reports tab
             if col == "Distance":
-                self.results_tree.column(col, width=column_widths[col], minwidth=70, anchor="center", stretch=True)
+                self.results_tree.column(col, width=column_widths[col], minwidth=50, anchor="center", stretch=False)
             elif col == "System":
-                self.results_tree.column(col, width=column_widths[col], minwidth=230, anchor="w", stretch=True)
-            elif col == "Ring":
+                self.results_tree.column(col, width=column_widths[col], minwidth=100, anchor="w", stretch=False)
+            elif col == "Planet/Ring":
                 self.results_tree.column(col, width=column_widths[col], minwidth=100, anchor="center", stretch=False)
             elif col == "Ring Type":
                 self.results_tree.column(col, width=column_widths[col], minwidth=80, anchor="center", stretch=False)
             elif col == "Hotspots":
-                self.results_tree.column(col, width=column_widths[col], minwidth=320, anchor="center", stretch=True)
+                self.results_tree.column(col, width=column_widths[col], minwidth=100, anchor="center", stretch=False)
             elif col == "Visited":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
             elif col == "LS":
@@ -676,7 +676,7 @@ class RingFinder:
             print("Warning: confirmed_only_var not found, defaulting to False")
             confirmed_only = False
             
-        max_distance = min(float(self.distance_var.get() or "100"), 100.0)
+        max_distance = float(self.distance_var.get() or "100")
         max_results_str = self.max_results_var.get()
         max_results = None if max_results_str == "All" else int(max_results_str)
         
@@ -1106,7 +1106,7 @@ class RingFinder:
                     reference_coords['y'], 
                     reference_coords['z'], 
                     max_distance, 
-                    limit=100,
+                    limit=500,
                     cache_context=cache_context
                 )
                 
@@ -1919,10 +1919,10 @@ class RingFinder:
                                 user_systems_in_range += 1
                         
                         if user_systems_in_range > 0:
-                            print(f"ðŸ' DEBUG: Added {user_systems_in_range} systems from user database (visited systems)")
+                            print(f" DEBUG: Added {user_systems_in_range} systems from user database (visited systems)")
                             
                 except Exception as user_e:
-                    print(f"âš  DEBUG: Error checking user database for systems in range: {user_e}")
+                    print(f" DEBUG: Error checking user database for systems in range: {user_e}")
                 
                 return systems_in_range
                         
@@ -2318,7 +2318,7 @@ class RingFinder:
                     'materials': materials,
                     'avg_yield': '',  # No yield data from ring finder
                     'last_mined': '',  # No mining date from ring finder
-                    'notes': f'Ring Finder bookmark - {ring_type}' if ring_type else 'Ring Finder bookmark'
+                    'notes': ''  # Empty notes by default
                 })
                 self.status_var.set(f"Bookmark dialog opened for {system_name} - {ring_name}")
             else:
