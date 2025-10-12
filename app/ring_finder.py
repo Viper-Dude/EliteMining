@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Hotspot Finder Module for EliteMining
 Provides mining hotspot location services with live API data integration
@@ -95,6 +95,8 @@ class ToolTip:
 
 class RingFinder:
     """Mining hotspot finder with EDDB API integration"""
+    
+    ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter
     
     def __init__(self, parent_frame: ttk.Frame, prospector_panel=None, app_dir: Optional[str] = None):
         self.parent = parent_frame
@@ -252,8 +254,8 @@ class RingFinder:
         material_combo.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         
         # Material filter (new - specific materials) - dynamically populated from database
-        ttk.Label(search_frame, text="Material:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.specific_material_var = tk.StringVar(value="All Materials")
+        ttk.Label(search_frame, text="Mineral:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        self.specific_material_var = tk.StringVar(value=RingFinder.ALL_MINERALS)
         specific_material_combo = ttk.Combobox(search_frame, textvariable=self.specific_material_var, width=22, state="readonly")
         
         # Get materials from database and sort alphabetically
@@ -471,7 +473,7 @@ class RingFinder:
         """Get alphabetically sorted list of available materials from database"""
         try:
             import sqlite3
-            materials = ["All Materials"]  # Always start with "All Materials"
+            materials = [RingFinder.ALL_MINERALS]  # Always start with RingFinder.ALL_MINERALS
             
             with sqlite3.connect(self.user_db.db_path) as conn:
                 cursor = conn.cursor()
@@ -495,7 +497,7 @@ class RingFinder:
         except Exception as e:
             print(f"Warning: Could not load materials from database: {e}")
             # Fallback to hardcoded sorted list
-            return ("All Materials", "Alexandrite", "Benitoite", "Bromellite", "Grandidierite", 
+            return (RingFinder.ALL_MINERALS, "Alexandrite", "Benitoite", "Bromellite", "Grandidierite", 
                    "Low Temp Diamonds", "Monazite", "Musgravite", "Painite", 
                    "Platinum", "Rhodplumsite", "Serendibite", "Tritium", "Void Opals")
     
@@ -641,7 +643,7 @@ class RingFinder:
         """Update confirmed hotspots checkbox when material filter changes"""
         try:
             specific_material = self.specific_material_var.get()
-            if specific_material != "All Materials":
+            if specific_material != RingFinder.ALL_MINERALS:
                 # Material selected - force confirmed hotspots and disable checkbox
                 self.confirmed_only_var.set(True)
                 if self.confirmed_checkbox:
@@ -719,7 +721,7 @@ class RingFinder:
         max_results = None if max_results_str == "All" else int(max_results_str)
         
         # Auto-enable confirmed hotspots when filtering by specific material
-        if specific_material != "All Materials":
+        if specific_material != RingFinder.ALL_MINERALS:
             confirmed_only = True
             print(f" DEBUG: Material filter active - auto-enabling confirmed hotspots only")
 
@@ -843,7 +845,7 @@ class RingFinder:
                 hotspot_count = hotspot.get('count', 1)
                 
                 # Skip if specific material filter doesn't match
-                if specific_material != "All Materials" and not self._material_matches(specific_material, material_name):
+                if specific_material != RingFinder.ALL_MINERALS and not self._material_matches(specific_material, material_name):
                     continue
                 
                 # Get distance (already calculated in user_hotspots)
@@ -1105,7 +1107,7 @@ class RingFinder:
                                     continue
                                     
                             # If specific material is selected, check if this ring type can produce it
-                            if specific_material != "All Materials":
+                            if specific_material != RingFinder.ALL_MINERALS:
                                 if specific_material not in all_materials:
                                     continue
                             
@@ -1132,7 +1134,7 @@ class RingFinder:
         
         return []
 
-    def _get_nearby_systems(self, reference_system: str, max_distance: float, specific_material: str = "All Materials") -> List[Dict]:
+    def _get_nearby_systems(self, reference_system: str, max_distance: float, specific_material: str = "All Minerals") -> List[Dict]:
         """Get systems within specified distance from reference system using local database or EDSM APIs"""
         
         reference_coords = self.current_system_coords
@@ -1555,7 +1557,7 @@ class RingFinder:
                 cursor = conn.cursor()
                 
                 # Search for hotspots matching the material filter
-                if material_filter == "All Materials":
+                if material_filter == RingFinder.ALL_MINERALS:
                     cursor.execute('''
                         SELECT DISTINCT system_name, body_name, material_name, hotspot_count, ring_type
                         FROM hotspot_data
@@ -1690,8 +1692,8 @@ class RingFinder:
                         batch = systems_in_range[i:i + BATCH_SIZE]
                         placeholders = ','.join(['?'] * len(batch))
                         
-                        # Different query for "All Materials" vs specific material
-                        if material_filter == "All Materials":
+                        # Different query for RingFinder.ALL_MINERALS vs specific material
+                        if material_filter == RingFinder.ALL_MINERALS:
                             # Show ALL rings of this type (one row per ring, combining hotspot info)
                             query = f'''
                                 SELECT system_name, body_name, 
@@ -1723,8 +1725,8 @@ class RingFinder:
                     # If no systems in range found, try direct system name search first
                     search_pattern = f"%{reference_system}%"
                     
-                    # Different query for "All Materials" vs specific material
-                    if material_filter == "All Materials":
+                    # Different query for RingFinder.ALL_MINERALS vs specific material
+                    if material_filter == RingFinder.ALL_MINERALS:
                         # Show ALL rings of this type (one row per ring)
                         direct_search_query = '''
                             SELECT system_name, body_name, 
@@ -1774,7 +1776,7 @@ class RingFinder:
                 for system_name, body_name, material_name, hotspot_count, x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type_db, inner_radius, outer_radius in results:
                     try:
                         # Filter by specific material using our smart material matching
-                        if specific_material != "All Materials" and not self._material_matches(specific_material, material_name):
+                        if specific_material != RingFinder.ALL_MINERALS and not self._material_matches(specific_material, material_name):
                             continue
                         
                         # Use ring type from database - no fallback needed
@@ -1855,11 +1857,11 @@ class RingFinder:
                         continue
                 
                 # Sort by hotspot quality first, then distance
-                if material_filter != "All Materials":
+                if material_filter != RingFinder.ALL_MINERALS:
                     # For specific materials, prioritize by hotspot count, then distance
                     user_hotspots.sort(key=lambda x: (-x['count'], x['distance']))
                 else:
-                    # For "All Materials", sort by distance if available, otherwise by count
+                    # For RingFinder.ALL_MINERALS, sort by distance if available, otherwise by count
                     user_hotspots.sort(key=lambda x: (x['distance'], -x['count']))
                 
                 print(f" DEBUG: Material matches: {material_matches}")
@@ -2151,7 +2153,7 @@ class RingFinder:
                 if material_name == "LowTemperatureDiamond":
                     material_name = "Low Temperature Diamonds"
                 
-                # Check if material_name already contains counts (from "All Materials" GROUP_CONCAT)
+                # Check if material_name already contains counts (from RingFinder.ALL_MINERALS GROUP_CONCAT)
                 # Format: "Material (X)" or "Material1 (X), Material2 (Y)"
                 # Use regex to detect if string ends with "(number)"
                 import re
@@ -2159,7 +2161,7 @@ class RingFinder:
                 
                 if already_formatted:
                     # Already formatted with counts - just abbreviate if needed
-                    if self.specific_material_var.get() == "All Materials":
+                    if self.specific_material_var.get() == RingFinder.ALL_MINERALS:
                         hotspot_count_display = self._abbreviate_material_for_display(material_name)
                     else:
                         hotspot_count_display = material_name
@@ -2168,8 +2170,8 @@ class RingFinder:
                     hotspot_count = hotspot.get("count", 1)
                     hotspot_display = f"{material_name} ({hotspot_count})"
                     
-                    # Abbreviate material names ONLY when "All Materials" filter is selected
-                    if self.specific_material_var.get() == "All Materials":
+                    # Abbreviate material names ONLY when RingFinder.ALL_MINERALS filter is selected
+                    if self.specific_material_var.get() == RingFinder.ALL_MINERALS:
                         hotspot_count_display = self._abbreviate_material_for_display(hotspot_display)
                     else:
                         # Show full name when a specific material is filtered
@@ -2182,7 +2184,7 @@ class RingFinder:
                 
                 if already_formatted:
                     # Material name already contains counts from GROUP_CONCAT - use it directly
-                    if self.specific_material_var.get() == "All Materials":
+                    if self.specific_material_var.get() == RingFinder.ALL_MINERALS:
                         hotspot_count_display = self._abbreviate_material_for_display(material_name)
                     else:
                         hotspot_count_display = material_name
