@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.2.4
+AppVersion=v4.2.6
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetVAPath}
 AppendDefaultDirName=no

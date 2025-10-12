@@ -1175,7 +1175,7 @@ class ProspectorPanel(ttk.Frame):
         self.system_entry.grid(row=0, column=1, sticky="w", padx=(0, 5))
         self.ToolTip(self.system_entry, "Current system name. (Can also be entered manually)")
 
-        ttk.Label(sysbody_row, text="Ring/Location:", font=("Segoe UI", 9)).grid(row=0, column=2, sticky="w", padx=(0, 2))
+        ttk.Label(sysbody_row, text="Planet/Ring:", font=("Segoe UI", 9)).grid(row=0, column=2, sticky="w", padx=(0, 2))
         self.body_entry = ttk.Entry(sysbody_row, textvariable=self.session_body, width=35)
         self.body_entry.grid(row=0, column=3, sticky="w")
         self.ToolTip(self.body_entry, "Current location: rings, planets, stations, or carriers. (Can also be entered manually)")
