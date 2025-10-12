@@ -2789,7 +2789,7 @@ class ProspectorPanel(ttk.Frame):
                                     'hit_rate_percent': row.get('hit_rate_percent', ''),
                                     'avg_quality_percent': row.get('avg_quality_percent', ''),
                                     'best_material': row.get('best_material', ''),
-                                    'materials_breakdown': row.get('materials_breakdown', ''),
+                                    # 'materials_breakdown': Removed - always parse fresh from text files to apply filtering
                                     'prospectors_used': row.get('prospectors_used', '')
                                     # Note: Removed comment preservation - will extract from text files
                                 }
