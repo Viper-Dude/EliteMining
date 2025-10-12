@@ -1624,9 +1624,9 @@ class RingFinder:
             print(f" DEBUG: User database search failed: {e}")
             return []
     
-    def _get_user_database_hotspots(self, reference_system: str, ring_type_filter: str, material_filter: str, max_distance: float) -> List[Dict]:
+    def _get_user_database_hotspots(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float) -> List[Dict]:
         """Search user database for hotspots - pure user database approach without EDSM"""
-        print(f"DEBUG: Searching user database only for ring type '{ring_type_filter}' with material '{material_filter}'")
+        print(f"DEBUG: Searching user database only for ring type '{material_filter}' with material '{specific_material}'")
         
         try:
             import sqlite3
@@ -1774,14 +1774,18 @@ class RingFinder:
                 for system_name, body_name, material_name, hotspot_count, x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type_db, inner_radius, outer_radius in results:
                     try:
                         # Filter by specific material using our smart material matching
-                        if material_filter != "All Materials" and not self._material_matches(material_filter, material_name):
+                        if specific_material != "All Materials" and not self._material_matches(specific_material, material_name):
                             continue
                         
                         # Use ring type from database - no fallback needed
                         ring_type = ring_type_db if ring_type_db else "No data"
                         
+                        # Normalize ring type spelling (handle typo in database)
+                        if ring_type == "Metalic":
+                            ring_type = "Metallic"
+                        
                         # Filter by ring type
-                        if ring_type_filter != "All" and ring_type != ring_type_filter:
+                        if material_filter != "All" and ring_type != material_filter:
                             continue
                         
                         material_matches += 1
@@ -1859,7 +1863,7 @@ class RingFinder:
                     user_hotspots.sort(key=lambda x: (x['distance'], -x['count']))
                 
                 print(f" DEBUG: Material matches: {material_matches}")
-                print(f" DEBUG: Applied filters - Ring Type: '{ring_type_filter}', Material: '{material_filter}'")
+                print(f" DEBUG: Applied filters - Ring Type: '{material_filter}', Material: '{specific_material}'")
                 print(f" DEBUG: Systems with coordinates: {systems_with_coords}, without coordinates: {systems_without_coords}")
                 print(f" DEBUG: Distance filter: {max_distance} LY from {reference_system or 'current system'}")
                 print(f" DEBUG: Returning {len(user_hotspots)} user database hotspots after filtering")
