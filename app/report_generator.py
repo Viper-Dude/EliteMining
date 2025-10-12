@@ -2104,6 +2104,13 @@ class ReportGenerator:
         materials_mined = session_data.get('materials_mined', {})
         if not materials_mined:
             return "<p>No materials mined this session</p>"
+        
+        # Filter out summary entries like "Total Cargo Collected"
+        filtered_materials = {k: v for k, v in materials_mined.items() 
+                             if k.lower() not in ['total cargo collected', 'total', 'cargo collected', 'total refined']}
+        
+        if not filtered_materials:
+            return "<p>No materials mined this session</p>"
             
         table_html = """
         <table class="data-table">
@@ -2117,8 +2124,8 @@ class ReportGenerator:
             <tbody>
         """
         
-        total_tons = sum(materials_mined.values())
-        for material, quantity in sorted(materials_mined.items(), key=lambda x: x[1], reverse=True):
+        total_tons = sum(filtered_materials.values())
+        for material, quantity in sorted(filtered_materials.items(), key=lambda x: x[1], reverse=True):
             percentage = (quantity / total_tons * 100) if total_tons > 0 else 0
             table_html += f"""
                 <tr>
