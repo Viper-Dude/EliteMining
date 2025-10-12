@@ -2685,12 +2685,13 @@ class ProspectorPanel(ttk.Frame):
                             refined_material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', refined_cargo_text, re.MULTILINE)
                             for mat, tons in refined_material_lines:
                                 mat_clean = mat.strip()
-                                if mat_clean in materials_dict:
-                                    # Add to existing quantity
-                                    materials_dict[mat_clean] += float(tons)
-                                else:
-                                    # New material from refinery
-                                    materials_dict[mat_clean] = float(tons)
+                                if not self._is_summary_entry(mat_clean):
+                                    if mat_clean in materials_dict:
+                                        # Add to existing quantity
+                                        materials_dict[mat_clean] += float(tons)
+                                    else:
+                                        # New material from refinery
+                                        materials_dict[mat_clean] = float(tons)
                         
                         # Fallback to REFINED MINERALS section if no cargo data found
                         if not materials_dict:
@@ -2914,12 +2915,13 @@ class ProspectorPanel(ttk.Frame):
                             refined_material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', refined_cargo_text, re.MULTILINE)
                             for mat, tons in refined_material_lines:
                                 mat_clean = mat.strip()
-                                if mat_clean in materials_dict:
-                                    # Add to existing quantity
-                                    materials_dict[mat_clean] += float(tons)
-                                else:
-                                    # New material from refinery
-                                    materials_dict[mat_clean] = float(tons)
+                                if not self._is_summary_entry(mat_clean):
+                                    if mat_clean in materials_dict:
+                                        # Add to existing quantity
+                                        materials_dict[mat_clean] += float(tons)
+                                    else:
+                                        # New material from refinery
+                                        materials_dict[mat_clean] = float(tons)
                         
                         # Fallback to REFINED MINERALS section if no cargo data found
                         if not materials_dict:
