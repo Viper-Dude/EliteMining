@@ -71,14 +71,42 @@ SelectDirDesc=Setup will install [name] into the VoiceAttack folder.\n\nIf your 
 
 [Code]
 function GetVAPath(Default: String): String;
+var
+  SteamPath, LibraryFolders, VAPath: String;
 begin
-  { Auto-detect VoiceAttack installation root (without \Apps) }
+  { Try registry first - VoiceAttack installation }
+  if RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\VoiceAttack_is1', 'InstallLocation', VAPath) then
+  begin
+    Result := VAPath;
+    Exit;
+  end;
+  
+  { Try Steam registry - get Steam path }
+  if RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Valve\Steam', 'InstallPath', SteamPath) or
+     RegQueryStringValue(HKLM, 'SOFTWARE\Valve\Steam', 'InstallPath', SteamPath) then
+  begin
+    { Check default Steam library }
+    if DirExists(SteamPath + '\steamapps\common\VoiceAttack 2') then
+    begin
+      Result := SteamPath + '\steamapps\common\VoiceAttack 2';
+      Exit;
+    end
+    else if DirExists(SteamPath + '\steamapps\common\VoiceAttack') then
+    begin
+      Result := SteamPath + '\steamapps\common\VoiceAttack';
+      Exit;
+    end;
+  end;
+  
+  { Fallback to hardcoded paths }
   if DirExists('D:\SteamLibrary\steamapps\common\VoiceAttack 2') then
     Result := 'D:\SteamLibrary\steamapps\common\VoiceAttack 2'
   else if DirExists('D:\SteamLibrary\steamapps\common\VoiceAttack') then
     Result := 'D:\SteamLibrary\steamapps\common\VoiceAttack'
   else if DirExists('C:\Program Files (x86)\VoiceAttack') then
     Result := 'C:\Program Files (x86)\VoiceAttack'
+  else if DirExists(ExpandConstant('{pf}\VoiceAttack')) then
+    Result := ExpandConstant('{pf}\VoiceAttack')
   else
     Result := ExpandConstant('{pf}\VoiceAttack');
 end;
