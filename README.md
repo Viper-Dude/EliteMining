@@ -170,6 +170,9 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 <img src="Screenshot/mining-announcement.png" width="600"><br>  
 *Controls announcements, thresholds, and filters.*  
 
+<img src="Screenshot/txt_overlay.png" width="600"><br>  
+*Text overlay showing real-time mining announcements in-game.*  
+
 #### Mining Session  
 <img src="Screenshot/mining-session.png" width="600"><br>  
 *Tracks time, prospector reports, minerals, and progress.*  
