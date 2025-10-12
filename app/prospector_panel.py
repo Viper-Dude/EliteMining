@@ -2533,6 +2533,10 @@ class ProspectorPanel(ttk.Frame):
         close_btn.grid(row=0, column=6, sticky="e", padx=(20, 0))
         self.ToolTip(close_btn, "Close the reports window.")
 
+    def _is_summary_entry(self, material_name: str) -> bool:
+        """Check if material name is a summary entry that should be filtered out"""
+        return material_name.lower() in ['total cargo collected', 'total', 'cargo collected', 'total refined']
+
     def _rebuild_csv_from_files(self, csv_path: str, parent_window) -> None:
         """Rebuild the CSV index from existing text files"""
         try:
@@ -2671,7 +2675,8 @@ class ProspectorPanel(ttk.Frame):
                             material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
                             for mat, tons in material_lines:
                                 mat_clean = mat.strip()
-                                materials_dict[mat_clean] = float(tons)
+                                if not self._is_summary_entry(mat_clean):
+                                    materials_dict[mat_clean] = float(tons)
                         
                         # Then, merge with REFINED CARGO TRACKING (manually added materials during session)
                         refined_cargo_section = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
@@ -2694,7 +2699,9 @@ class ProspectorPanel(ttk.Frame):
                                 refined_text = refined_section.group(1)
                                 material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
                                 for mat, tons in material_lines:
-                                    materials_dict[mat.strip()] = float(tons)
+                                    mat_clean = mat.strip()
+                                    if not self._is_summary_entry(mat_clean):
+                                        materials_dict[mat_clean] = float(tons)
                         
                         # Convert dictionary to string format
                         if materials_dict:
@@ -2897,7 +2904,8 @@ class ProspectorPanel(ttk.Frame):
                             material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
                             for mat, tons in material_lines:
                                 mat_clean = mat.strip()
-                                materials_dict[mat_clean] = float(tons)
+                                if not self._is_summary_entry(mat_clean):
+                                    materials_dict[mat_clean] = float(tons)
                         
                         # Then, merge with REFINED CARGO TRACKING (manually added materials during session)
                         refined_cargo_section = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
@@ -2920,7 +2928,9 @@ class ProspectorPanel(ttk.Frame):
                                 refined_text = refined_section.group(1)
                                 material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
                                 for mat, tons in material_lines:
-                                    materials_dict[mat.strip()] = float(tons)
+                                    mat_clean = mat.strip()
+                                    if not self._is_summary_entry(mat_clean):
+                                        materials_dict[mat_clean] = float(tons)
                         
                         # Convert dictionary to string format
                         if materials_dict:
@@ -3314,10 +3324,8 @@ class ProspectorPanel(ttk.Frame):
             for material_name, quantity in sorted_materials:
                 parts.append(f"{material_name}: {quantity}t")
             
-            # Add total tons from cargo tracking
-            total_cargo_tons = cargo_session_data.get('total_tons_mined', 0)
-            if total_cargo_tons > 0:
-                parts.append(f"\nTotal Cargo Collected: {total_cargo_tons}t")
+            # Note: Total cargo collected is calculated from individual materials above
+            # Don't add a separate "Total Cargo Collected" line as it's redundant
         
         # Add comment if provided
         if comment.strip():
