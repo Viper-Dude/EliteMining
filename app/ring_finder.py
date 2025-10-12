@@ -102,8 +102,11 @@ class RingFinder:
         self.systems_data = {}  # System coordinates cache
         self.current_system_coords = None
         self.app_dir = app_dir  # Store app_dir for galaxy database access
+        self.db_ready = False  # Track database initialization status
+        
         # Initialize local database manager
         self.local_db = LocalSystemsDatabase()
+        
         # Initialize user database for hotspot data with correct app directory
         if app_dir:
             # Use provided app directory to construct database path
@@ -117,9 +120,14 @@ class RingFinder:
             print("DEBUG: RingFinder using default database path resolution")
             self.user_db = UserDatabase()
             print(f"DEBUG: RingFinder actual database path: {self.user_db.db_path}")
+        
+        # Verify database is accessible
+        self._verify_database_ready()
+        
         # Always use local database since it's now bundled with the application
         self.use_local_db = True
         self.setup_ui()
+        
         # Load initial data in background
         threading.Thread(target=self._preload_data, daemon=True).start()
         
@@ -594,6 +602,36 @@ class RingFinder:
         
         return None
     
+    def _verify_database_ready(self, max_retries=3):
+        """Verify database is accessible with retry logic"""
+        import time
+        
+        for attempt in range(max_retries):
+            try:
+                # Test database connection
+                import sqlite3
+                with sqlite3.connect(self.user_db.db_path, timeout=5.0) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM hotspot_data LIMIT 1")
+                    cursor.fetchone()
+                
+                print(f"✓ Database verification successful on attempt {attempt + 1}")
+                self.db_ready = True
+                return True
+                
+            except sqlite3.OperationalError as e:
+                print(f"⚠ Database not ready (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)  # Wait before retry
+                else:
+                    print(f"❌ Database verification failed after {max_retries} attempts")
+                    self.db_ready = False
+                    return False
+            except Exception as e:
+                print(f"❌ Unexpected database error: {e}")
+                self.db_ready = False
+                return False
+    
     def _load_systems_cache(self):
         """Initialize empty systems cache for coordinate lookups"""
         # Start with empty cache - coordinates will be fetched from EDSM as needed
@@ -744,6 +782,15 @@ class RingFinder:
     def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results):
         """Background worker for hotspot search"""
         try:
+            # Wait for database to be ready (with timeout)
+            import time
+            wait_start = time.time()
+            while not self.db_ready and (time.time() - wait_start) < 5.0:
+                time.sleep(0.1)
+            
+            if not self.db_ready:
+                print("⚠ Database not ready, search may return incomplete results")
+            
             # Set the reference system coords for this worker thread
             self.current_system_coords = reference_coords
             hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results)
@@ -1834,25 +1881,40 @@ class RingFinder:
         return math.sqrt(dx*dx + dy*dy + dz*dz)
     
     def _get_system_coords_from_galaxy_db(self, system_name: str) -> Optional[Dict]:
-        """Get system coordinates from galaxy_systems.db"""
+        """Get system coordinates from galaxy_systems.db with retry logic"""
         try:
             import sqlite3
             from pathlib import Path
+            import time
             
             # Use bundled galaxy database
             script_dir = Path(self.app_dir) if self.app_dir else Path(__file__).parent
             galaxy_db_path = script_dir / "data" / "galaxy_systems.db"
             
             if not galaxy_db_path.exists():
+                print(f" DEBUG: Galaxy database not found at {galaxy_db_path}")
                 return None
-                
-            with sqlite3.connect(str(galaxy_db_path)) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT x, y, z FROM systems WHERE name = ? COLLATE NOCASE LIMIT 1", (system_name,))
-                result = cursor.fetchone()
-                
-                if result:
-                    return {'x': result[0], 'y': result[1], 'z': result[2]}
+            
+            # Retry logic for database access (may be locked after restart)
+            max_retries = 2
+            for attempt in range(max_retries):
+                try:
+                    with sqlite3.connect(str(galaxy_db_path), timeout=5.0) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT x, y, z FROM systems WHERE name = ? COLLATE NOCASE LIMIT 1", (system_name,))
+                        result = cursor.fetchone()
+                        
+                        if result:
+                            return {'x': result[0], 'y': result[1], 'z': result[2]}
+                        return None  # System not found
+                        
+                except sqlite3.OperationalError as e:
+                    if attempt < max_retries - 1:
+                        print(f" DEBUG: Galaxy DB locked, retrying... (attempt {attempt + 1})")
+                        time.sleep(0.3)
+                    else:
+                        print(f" DEBUG: Galaxy DB access failed after retries: {e}")
+                        return None
                     
         except Exception as e:
             print(f" DEBUG: Error accessing galaxy database: {e}")
