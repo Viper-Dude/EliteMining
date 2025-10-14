@@ -1,9 +1,8 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.2.6
+AppVersion=v4.2.8
 AppPublisher=CMDR ViperDude
-DefaultDirName={code:GetVAPath}
-AppendDefaultDirName=no
+DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
 DefaultGroupName=EliteMining
 OutputBaseFilename=EliteMiningSetup
@@ -14,28 +13,28 @@ CloseApplications=force
 RestartApplications=no
 CloseApplicationsFilter=*.exe
 
-; Place uninstaller in Apps folder
-UninstallFilesDir={app}\Apps
+; Place uninstaller in app folder
+UninstallFilesDir={app}
 UninstallDisplayName=EliteMining
-UninstallDisplayIcon={app}\Apps\EliteMining\Configurator\Configurator.exe
+UninstallDisplayIcon={app}\Configurator\Configurator.exe
 
 [Files]
 ; Only include specific file types from needed subfolders (exclude .py files)
-Source: "app\Images\*";    DestDir: "{app}\Apps\EliteMining\app\Images";    Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.py,*.pyc,__pycache__"
+Source: "app\Images\*";    DestDir: "{app}\app\Images";    Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.py,*.pyc,__pycache__"
 ; VoiceAttack-specific files (only installed if VA detected)
-Source: "app\Ship Presets\*";  DestDir: "{app}\Apps\EliteMining\app\Ship Presets";  Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "*.py,*.pyc,__pycache__"; Check: IsVADetected
+Source: "app\Ship Presets\*";  DestDir: "{app}\app\Ship Presets";  Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "*.py,*.pyc,__pycache__"; Check: IsVADetected
 ; Reports folder intentionally excluded - users must earn their reports by mining! 😉
 
 ; New Configurator executable
-Source: "dist\Configurator.exe"; DestDir: "{app}\Apps\EliteMining\Configurator"; Flags: ignoreversion
+Source: "dist\Configurator.exe"; DestDir: "{app}\Configurator"; Flags: ignoreversion
 
 ; Local systems database (~14 MB) - populated systems within the bubble for fast searches
-Source: "app\data\galaxy_systems.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "app\data\database_metadata.json"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "app\data\galaxy_systems.db"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "app\data\database_metadata.json"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; v4.1.8+: Use smart version checking instead of forced overwrite
 ; Database will only update if new version > existing version, with automatic backup
-Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\Apps\EliteMining\app\data"; Flags: onlyifdoesntexist
+Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\app\data"; Flags: onlyifdoesntexist
 
 ; Version checking utilities
 Source: "scripts\installer\config_installer.py"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -43,17 +42,17 @@ Source: "scripts\installer\check_db_version.py"; DestDir: "{tmp}"; Flags: delete
 Source: "scripts\installer\set_db_version.py"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 ; Documentation (always installed)
-Source: "Doc\*"; DestDir: "{app}\Apps\EliteMining\Doc"; Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
+Source: "Doc\*"; DestDir: "{app}\Doc"; Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
 ; VoiceAttack-specific files (only installed if VA detected)
-Source: "Variables\*"; DestDir: "{app}\Apps\EliteMining\Variables"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Check: IsVADetected
+Source: "Variables\*"; DestDir: "{app}\Variables"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Check: IsVADetected
 ; v4.1.9+: Force update VoiceAttack profile to apply command behavior corrections
-Source: "EliteMining-Profile.vap"; DestDir: "{app}\Apps\EliteMining"; Flags: uninsneveruninstall skipifsourcedoesntexist; Check: IsVADetected
+Source: "EliteMining-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninstall skipifsourcedoesntexist; Check: IsVADetected
 ; v4.1.5+: Never overwrite config.json - preserves user settings
 ; NOTE: Use template file to avoid including developer's personal paths
-Source: "app\config.json.template"; DestDir: "{app}\Apps\EliteMining"; DestName: "config.json"; Flags: onlyifdoesntexist
-Source: "app\mining_bookmarks.json"; DestDir: "{app}\Apps\EliteMining\app"; Flags: onlyifdoesntexist skipifsourcedoesntexist
-Source: "app\EliteVA\*"; DestDir: "{app}\Apps\EliteVA"; Flags: recursesubdirs createallsubdirs; Check: IsVADetected
-Source: "LICENSE.txt"; DestDir: "{app}\Apps\EliteMining"
+Source: "app\config.json.template"; DestDir: "{app}"; DestName: "config.json"; Flags: onlyifdoesntexist
+Source: "app\mining_bookmarks.json"; DestDir: "{app}\app"; Flags: onlyifdoesntexist skipifsourcedoesntexist
+Source: "app\EliteVA\*"; DestDir: "{app}\..\EliteVA"; Flags: recursesubdirs createallsubdirs; Check: IsVADetected
+Source: "LICENSE.txt"; DestDir: "{app}"
 
 [Tasks]
 ; Offer optional desktop icon
@@ -61,9 +60,9 @@ Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "A
 
 [Icons]
 ; Start Menu shortcut
-Name: "{group}\EliteMining"; Filename: "{app}\Apps\EliteMining\Configurator\Configurator.exe"; WorkingDir: "{app}\Apps\EliteMining\Configurator"
+Name: "{group}\EliteMining"; Filename: "{app}\Configurator\Configurator.exe"; WorkingDir: "{app}\Configurator"
 ; Desktop shortcut (optional)
-Name: "{commondesktop}\EliteMining"; Filename: "{app}\Apps\EliteMining\Configurator\Configurator.exe"; WorkingDir: "{app}\Apps\EliteMining\Configurator"; Tasks: desktopicon
+Name: "{commondesktop}\EliteMining"; Filename: "{app}\Configurator\Configurator.exe"; WorkingDir: "{app}\Configurator"; Tasks: desktopicon
 ; Uninstall shortcut
 Name: "{group}\Uninstall EliteMining"; Filename: "{app}\Apps\unins000.exe"
 
@@ -76,7 +75,7 @@ Filename: "{cmd}"; Parameters: "/C if exist ""C:\Program Files\Elite Mining"" rm
 Filename: "{cmd}"; Parameters: "/C if exist ""C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Elite Mining"" rmdir /s /q ""C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Elite Mining"""; Description: "Cleaning up old shortcuts"; Flags: runhidden skipifdoesntexist
 
 ; Launch application after installation
-Filename: "{app}\Apps\EliteMining\Configurator\Configurator.exe"; Description: "&Launch EliteMining"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\Configurator\Configurator.exe"; Description: "&Launch EliteMining"; Flags: nowait postinstall skipifsilent unchecked
 
 [UninstallRun]
 ; Remove symbolic link on uninstall
@@ -84,7 +83,7 @@ Filename: "{cmd}"; Parameters: "/C del ""{app}\Apps\Uninstall_EliteMining.exe"""
 
 [Messages]
 SelectDirDesc=Install EliteMining to your VoiceAttack folder. If auto-detection failed, click Browse and select your VoiceAttack root folder (contains VoiceAttack.exe).
-UninstalledAll=EliteMining has been successfully uninstalled.%n%nNOTE: Some files have been intentionally left behind to preserve your data:%n• Mining reports and detailed reports%n• Configuration files (config.json, mining_bookmarks.json)%n• Settings folder%n• Variables folder%n• Documentation folder%n• VoiceAttack profile (EliteMining-Profile.vap)%n%nTo completely remove all EliteMining data, manually delete the folder:%n%1\Apps\EliteMining
+UninstalledAll=EliteMining has been successfully uninstalled.%n%nNOTE: Some files have been intentionally left behind to preserve your data:%n• Mining reports and detailed reports%n• Configuration files (config.json, mining_bookmarks.json)%n• Settings folder%n• Variables folder%n• Documentation folder%n• VoiceAttack profile (EliteMining-Profile.vap)%n%nTo completely remove all EliteMining data, manually delete the folder:%n%1
 
 [Code]
 var
@@ -95,7 +94,7 @@ begin
   Result := VADetected;
 end;
 
-function GetVAPath(Default: String): String;
+function GetDefaultInstallDir(Default: String): String;
 var
   SteamPath: String;
   Drive: String;
@@ -110,6 +109,7 @@ begin
     if DirExists(Result) and FileExists(Result + '\VoiceAttack.exe') then
     begin
       VADetected := True;
+      Result := Result + '\Apps';
       Exit;
     end;
   end;
@@ -119,6 +119,7 @@ begin
     if DirExists(Result) and FileExists(Result + '\VoiceAttack.exe') then
     begin
       VADetected := True;
+      Result := Result + '\Apps';
       Exit;
     end;
   end;
@@ -130,13 +131,13 @@ begin
     if DirExists(SteamPath + '\steamapps\common\VoiceAttack 2') then
     begin
       VADetected := True;
-      Result := SteamPath + '\steamapps\common\VoiceAttack 2';
+      Result := SteamPath + '\steamapps\common\VoiceAttack 2\Apps';
       Exit;
     end
     else if DirExists(SteamPath + '\steamapps\common\VoiceAttack') then
     begin
       VADetected := True;
-      Result := SteamPath + '\steamapps\common\VoiceAttack';
+      Result := SteamPath + '\steamapps\common\VoiceAttack\Apps';
       Exit;
     end;
   end;
@@ -155,37 +156,37 @@ begin
     if DirExists(Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack 2') then
     begin
       VADetected := True;
-      Result := Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack 2';
+      Result := Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack 2\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack 2') then
     begin
       VADetected := True;
-      Result := Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack 2';
+      Result := Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack 2\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\SteamLibrary\steamapps\common\VoiceAttack 2') then
     begin
       VADetected := True;
-      Result := Drive + ':\SteamLibrary\steamapps\common\VoiceAttack 2';
+      Result := Drive + ':\SteamLibrary\steamapps\common\VoiceAttack 2\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack') then
     begin
       VADetected := True;
-      Result := Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack';
+      Result := Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack') then
     begin
       VADetected := True;
-      Result := Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack';
+      Result := Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\SteamLibrary\steamapps\common\VoiceAttack') then
     begin
       VADetected := True;
-      Result := Drive + ':\SteamLibrary\steamapps\common\VoiceAttack';
+      Result := Drive + ':\SteamLibrary\steamapps\common\VoiceAttack\Apps';
       Exit;
     end;
   end;
@@ -194,48 +195,34 @@ begin
   if DirExists(ExpandConstant('{pf}\VoiceAttack 2')) then
   begin
     VADetected := True;
-    Result := ExpandConstant('{pf}\VoiceAttack 2');
+    Result := ExpandConstant('{pf}\VoiceAttack 2\Apps');
   end
   else if DirExists(ExpandConstant('{pf32}\VoiceAttack 2')) then
   begin
     VADetected := True;
-    Result := ExpandConstant('{pf32}\VoiceAttack 2');
+    Result := ExpandConstant('{pf32}\VoiceAttack 2\Apps');
   end
   else if DirExists(ExpandConstant('{pf}\VoiceAttack')) then
   begin
     VADetected := True;
-    Result := ExpandConstant('{pf}\VoiceAttack');
+    Result := ExpandConstant('{pf}\VoiceAttack\Apps');
   end
   else if DirExists(ExpandConstant('{pf32}\VoiceAttack')) then
   begin
     VADetected := True;
-    Result := ExpandConstant('{pf32}\VoiceAttack');
+    Result := ExpandConstant('{pf32}\VoiceAttack\Apps');
   end
   else
   begin
     { Fallback to standalone installation in Program Files }
     VADetected := False;
-    Result := ExpandConstant('{commonpf}\EliteMining');
+    Result := ExpandConstant('{pf}');
   end;
 end;
 
 procedure InitializeWizard;
-var
-  VAPath: String;
 begin
-  VAPath := GetVAPath('');
-  WizardForm.DirEdit.Text := VAPath;
-  
-  { Show warning if VoiceAttack was not detected }
-  if Pos('EliteMining', VAPath) > 0 then
-  begin
-    MsgBox('VoiceAttack installation not detected on your system.' + #13#13 +
-           'EliteMining can be installed as a standalone application, but voice command features will not be available without VoiceAttack.' + #13#13 +
-           'All other features (Ring Finder, Mining Session tracking, Reports, etc.) will work normally.' + #13#13 +
-           'Installation will continue to: ' + VAPath + #13#13 +
-           'If you have VoiceAttack installed in a custom location, click Browse on the next screen to select your VoiceAttack folder (the folder containing VoiceAttack.exe).',
-           mbInformation, MB_OK);
-  end;
+  { Installer automatically appends \EliteMining to base directory }
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -247,18 +234,16 @@ begin
   begin
     SelectedPath := WizardForm.DirEdit.Text;
     
-    { Ensure path doesn't include duplicate \Apps\EliteMining }
-    if Pos('\Apps\EliteMining', SelectedPath) > 0 then
-    begin
-      SelectedPath := Copy(SelectedPath, 1, Pos('\Apps\EliteMining', SelectedPath) - 1);
-      WizardForm.DirEdit.Text := SelectedPath;
-    end;
-    
     { Validate if user selected a VoiceAttack folder }
     if FileExists(SelectedPath + '\VoiceAttack.exe') then
     begin
       { Valid VoiceAttack installation - update detection flag }
       VADetected := True;
+    end
+    else if (Pos('VoiceAttack', SelectedPath) > 0) and (Pos('\Apps\EliteMining', SelectedPath) > 0) then
+    begin
+      { VA install path detected - keep VA flag as-is }
+      { VADetected already set by GetDefaultInstallDir }
     end
     else if Pos('EliteMining', SelectedPath) > 0 then
     begin
@@ -313,7 +298,7 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    LeftoverPath := ExpandConstant('{app}\Apps\EliteMining');
+    LeftoverPath := ExpandConstant('{app}');
     
     { Only show message if the directory still exists (contains preserved files) }
     if DirExists(LeftoverPath) then

@@ -348,7 +348,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.2.6"
+APP_VERSION = "v4.2.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -393,6 +393,18 @@ def detect_va_folder_interactive(parent: tk.Tk) -> Optional[str]:
     saved = load_saved_va_folder()
     if saved:
         return saved
+    
+    # For installer/frozen mode, use executable location
+    if getattr(sys, 'frozen', False):
+        exe_dir = os.path.dirname(sys.executable)
+        # Structure: ...\EliteMining\Configurator\Configurator.exe
+        # Need: ...\EliteMining
+        if os.path.basename(exe_dir).lower() == 'configurator':
+            app_root = os.path.dirname(exe_dir)  # Go up to EliteMining folder
+            save_va_folder(app_root)
+            return app_root
+    
+    # Try VA install locations
     candidates = [
         r"D:\SteamLibrary\steamapps\common\VoiceAttack 2\Apps\EliteMining",
         r"D:\SteamLibrary\steamapps\common\VoiceAttack\Apps\EliteMining",
@@ -402,7 +414,9 @@ def detect_va_folder_interactive(parent: tk.Tk) -> Optional[str]:
         if os.path.isdir(c):
             save_va_folder(c)
             return c
-    folder = filedialog.askdirectory(parent=parent, title="Select your VoiceAttack Apps\\EliteMining folder")
+    
+    # Ask user to select folder
+    folder = filedialog.askdirectory(parent=parent, title="Select your EliteMining installation folder")
     if folder and os.path.isdir(folder):
         save_va_folder(folder)
         return folder
@@ -3100,7 +3114,7 @@ class App(tk.Tk):
 
         # --- Dark theme setup with custom Dark.TButton style ---
         try:
-            self.tk.call("source", os.path.join(self.va_root, "app", "sun-valley.tcl"))
+            self.tk.call("source", os.path.join(get_app_data_dir(), "sun-valley.tcl"))
             self.tk.call("set_theme", "dark")
         except Exception:
             dark_bg = "#1e1e1e"
@@ -3162,10 +3176,10 @@ class App(tk.Tk):
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=0)      # Status bar
 
-        # Resolve VA folder
+        # Resolve installation folder (VA or standalone)
         self.va_root = detect_va_folder_interactive(self)
         if not self.va_root:
-            messagebox.showerror("VoiceAttack folder not found", "No VoiceAttack Apps\\EliteMining folder selected.")
+            messagebox.showerror("Installation folder not found", "No EliteMining installation folder selected.")
             self.destroy()
             return
         self.vars_dir = os.path.join(self.va_root, "Variables")
@@ -3175,13 +3189,17 @@ class App(tk.Tk):
         self.settings_dir = get_ship_presets_dir()
             
         # Initialize cargo monitor with correct app directory (after va_root is set)
-        app_dir = os.path.join(self.va_root, "app") if getattr(sys, 'frozen', False) else None
+        app_dir = get_app_data_dir() if getattr(sys, 'frozen', False) else None
         self.cargo_monitor = CargoMonitor(update_callback=self._on_cargo_changed, 
                                         capacity_changed_callback=self._on_cargo_capacity_detected,
                                         app_dir=app_dir)
         # Set the main app reference so cargo monitor can access prospector panel later
         self.cargo_monitor.main_app_ref = self
-        os.makedirs(self.vars_dir, exist_ok=True)
+        
+        # Only create Variables folder if it's in a VA installation path
+        if 'VoiceAttack' in self.va_root or os.path.exists(os.path.join(self.va_root, '..', 'VoiceAttack.exe')):
+            os.makedirs(self.vars_dir, exist_ok=True)
+        
         os.makedirs(self.settings_dir, exist_ok=True)
 
         # Set window icon using centralized function
@@ -3297,12 +3315,7 @@ class App(tk.Tk):
         self._setup_keyboard_shortcuts()
         
         # Initialize update checker with app directory (not settings dir)
-        if getattr(sys, 'frozen', False):
-            # Installer - use VA app directory
-            update_dir = os.path.join(self.va_root, "app")
-        else:
-            # Dev - use local app directory
-            update_dir = os.path.dirname(os.path.abspath(__file__))
+        update_dir = get_app_data_dir()
         self.update_checker = UpdateChecker(get_version(), UPDATE_CHECK_URL, update_dir)
 
         # Build UI
@@ -3403,7 +3416,7 @@ class App(tk.Tk):
         actions.grid_columnconfigure(2, weight=1)  # Expandable space
 
         # Status bar - span both columns
-        self.status = tk.StringVar(value=f"{APP_TITLE} {APP_VERSION} | Using VoiceAttack folder: {self.va_root}")
+        self.status = tk.StringVar(value=f"{APP_TITLE} {APP_VERSION} | Installation: {self.va_root}")
         sb = ttk.Label(self, textvariable=self.status, relief=tk.SUNKEN, anchor="w")
         sb.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 6))
 
@@ -3925,7 +3938,7 @@ class App(tk.Tk):
         # --- PayPal donate button on the right ---
         import webbrowser
         try:
-            paypal_img = tk.PhotoImage(file=os.path.join(self.va_root, "app", "Images", "paypal.png"))
+            paypal_img = tk.PhotoImage(file=os.path.join(get_app_data_dir(), "Images", "paypal.png"))
             if paypal_img.width() > 50:
                 scale = max(1, paypal_img.width() // 50)
                 paypal_img = paypal_img.subsample(scale, scale)
