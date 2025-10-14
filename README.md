@@ -46,17 +46,19 @@ The Configurator works independently for announcements, reports, and tracking. V
 
 ## Features
 
-### With VoiceAttack (Full Experience)  
+### With VoiceAttack Integration
 - Voice/hotkey mining sequences  
 - Automated collector & prospector deployment  
 - Smart targeting & laser management  
 - Real-time mining statistics  
 - Cargo management automation  
-- Custom commands & presets  
-- Compatible with [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva)  
+- Custom commands & presets
+- Ship presets
+- Includes [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) (bundled with installer)
 
-### Standalone Features (No VoiceAttack Required)  
+### Standalone (Without VoiceAttack)
 - Mining announcements & notifications  
+- **Engineering materials tracking** – Monitor raw materials by grade
 - Session tracking & history  
 - Ship configuration management  
 - GUI for firegroups, timers, toggles, and announcements  
