@@ -557,6 +557,83 @@ class ReportGenerator:
             color: var(--no-comment-color);
         }}
         
+        /* Engineering Materials Styles */
+        .materials-summary-box {{
+            background: linear-gradient(135deg, var(--section-bg) 0%, var(--card-bg) 100%);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--section-border);
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+        
+        .materials-summary-box h3 {{
+            color: var(--header-color);
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }}
+        
+        .summary-text {{
+            font-size: 1.1em;
+            color: var(--text-color);
+            margin: 10px 0;
+            line-height: 1.6;
+        }}
+        
+        .summary-total {{
+            font-size: 1.2em;
+            color: var(--stat-value-color);
+            margin: 15px 0 0 0;
+        }}
+        
+        .grade-cell {{
+            font-weight: bold;
+            vertical-align: middle;
+            text-align: center;
+            border-right: 2px solid var(--border-color);
+        }}
+        
+        .grade-1 {{
+            background-color: #d4edda;
+            color: #155724;
+        }}
+        
+        .grade-2 {{
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }}
+        
+        .grade-3 {{
+            background-color: #fff3cd;
+            color: #856404;
+        }}
+        
+        .grade-4 {{
+            background-color: #f8d7da;
+            color: #721c24;
+        }}
+        
+        [data-theme="dark"] .grade-1 {{
+            background-color: #2d5a3d;
+            color: #a8d5ba;
+        }}
+        
+        [data-theme="dark"] .grade-2 {{
+            background-color: #1c4a5e;
+            color: #8fd4e8;
+        }}
+        
+        [data-theme="dark"] .grade-3 {{
+            background-color: #5e4e1c;
+            color: #f0d896;
+        }}
+        
+        [data-theme="dark"] .grade-4 {{
+            background-color: #5e1c24;
+            color: #f5a5ae;
+        }}
+        
         @media print {{
             /* Force light theme colors for printing */
             * {{
@@ -709,6 +786,8 @@ class ReportGenerator:
             {materials_table}
         </div>
         
+        {engineering_materials_section}
+        
         <div class="section">
             <h2>🔢 Raw Session Data</h2>
             {raw_data_table}
@@ -815,6 +894,9 @@ class ReportGenerator:
             # Generate materials table
             materials_table = self._generate_materials_table(session_data)
             
+            # Generate engineering materials section
+            engineering_materials_section = self._generate_engineering_materials_section(session_data)
+            
             # Generate raw data table
             raw_data_table = self._generate_raw_data_table(session_data)
             
@@ -829,6 +911,7 @@ class ReportGenerator:
                 advanced_analytics_section=advanced_analytics_section,
                 comment_section=comment_section,
                 materials_table=materials_table,
+                engineering_materials_section=engineering_materials_section,
                 raw_data_table=raw_data_table
             )
             
@@ -2141,6 +2224,96 @@ class ReportGenerator:
         """
         
         return table_html
+    
+    def _generate_engineering_materials_section(self, session_data):
+        """Generate engineering materials section (Option 1 + 2: Summary box + Detailed table)"""
+        engineering_materials = session_data.get('engineering_materials', {})
+        
+        if not engineering_materials:
+            return ""  # Return empty if no materials
+        
+        # Material grades mapping
+        MATERIAL_GRADES = {
+            "Antimony": 2, "Arsenic": 2, "Boron": 3, "Cadmium": 3,
+            "Carbon": 1, "Chromium": 2, "Germanium": 2, "Iron": 1,
+            "Lead": 1, "Manganese": 2, "Nickel": 1, "Niobium": 3,
+            "Phosphorus": 1, "Polonium": 4, "Rhenium": 1, "Selenium": 4,
+            "Sulphur": 1, "Tin": 3, "Tungsten": 3, "Vanadium": 2,
+            "Zinc": 2, "Zirconium": 2
+        }
+        
+        grade_names = {
+            1: "Very Common",
+            2: "Common",
+            3: "Standard",
+            4: "Rare"
+        }
+        
+        # Group materials by grade
+        materials_by_grade = {}
+        total_pieces = 0
+        for material_name, quantity in engineering_materials.items():
+            grade = MATERIAL_GRADES.get(material_name, 0)
+            if grade not in materials_by_grade:
+                materials_by_grade[grade] = []
+            materials_by_grade[grade].append((material_name, quantity))
+            total_pieces += quantity
+        
+        # Generate summary box (compact overview)
+        summary_materials = sorted(engineering_materials.items(), key=lambda x: x[1], reverse=True)[:3]
+        summary_text = ", ".join([f"{mat} ({qty}) G{MATERIAL_GRADES.get(mat, 0)}" for mat, qty in summary_materials])
+        if len(engineering_materials) > 3:
+            summary_text += f" +{len(engineering_materials)-3} more"
+        
+        html = f"""
+        <div class="materials-summary-box">
+            <h3>🔩 Engineering Materials Collected</h3>
+            <p class="summary-text">{summary_text}</p>
+            <p class="summary-total"><strong>Total: {total_pieces} pieces</strong></p>
+        </div>
+        
+        <h3>Engineering Materials by Grade</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Grade</th>
+                    <th>Material</th>
+                    <th>Quantity</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
+        
+        # Generate table rows grouped by grade
+        for grade in sorted(materials_by_grade.keys()):
+            grade_label = f"Grade {grade} ({grade_names.get(grade, 'Unknown')})"
+            materials = sorted(materials_by_grade[grade])
+            
+            for idx, (material_name, quantity) in enumerate(materials):
+                if idx == 0:
+                    # First material in grade - show grade label
+                    html += f"""
+                <tr>
+                    <td rowspan="{len(materials)}" class="grade-cell grade-{grade}">{grade_label}</td>
+                    <td>{material_name}</td>
+                    <td>{quantity}</td>
+                </tr>
+                    """
+                else:
+                    # Subsequent materials - no grade label
+                    html += f"""
+                <tr>
+                    <td>{material_name}</td>
+                    <td>{quantity}</td>
+                </tr>
+                    """
+        
+        html += """
+            </tbody>
+        </table>
+        """
+        
+        return html
         
     def _generate_raw_data_table(self, session_data):
         """Generate raw session data table"""
