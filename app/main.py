@@ -2832,6 +2832,15 @@ cargo panel forces Elite to write detailed inventory data.
         # Clear the session tracking
         self.session_start_snapshot = None
         
+        # Reset engineering materials after session ends (data already saved to session_data)
+        self.materials_collected.clear()
+        
+        # Update display to show materials cleared
+        if hasattr(self, 'cargo_window') and self.cargo_window:
+            self.update_display()
+        if self.update_callback:
+            self.update_callback()
+        
         return session_data
 
     def get_live_session_tons(self):
