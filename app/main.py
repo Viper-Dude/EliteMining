@@ -1072,11 +1072,24 @@ class CargoMonitor:
     """
     Cargo monitoring system that reads Elite Dangerous game data.
     
-    This class provides the core cargo tracking functionality and can display in two ways:
-    1. Popup Window Mode: Separate always-on-top window (optional)
-    2. Integrated Mode: Built into main app interface (always present)
+    ⚠️ CRITICAL: This class has TWO SEPARATE DISPLAY METHODS:
     
-    Both modes share the same underlying data and functionality.
+    1. POPUP WINDOW (Optional, rarely used):
+       - Method: update_display() - line ~1850
+       - Widgets: self.cargo_text, self.cargo_summary
+       - Used only when popup window is opened
+    
+    2. INTEGRATED DISPLAY (PRIMARY - Default in main app):
+       - Method: _update_integrated_cargo_display() - line ~3570
+       - Widgets: self.integrated_cargo_text, self.integrated_cargo_summary
+       - Located in: EliteMiningApp._create_integrated_cargo_monitor()
+       - THIS IS THE ONE USERS SEE BY DEFAULT!
+    
+    ⚠️ WHEN MODIFYING DISPLAY: Update BOTH methods to keep them in sync!
+    
+    Both modes share the same underlying data:
+    - self.cargo_items: Refined minerals/cargo
+    - self.materials_collected: Engineering materials (Raw)
     """
     def __init__(self, update_callback=None, capacity_changed_callback=None, app_dir=None):
         self.cargo_window = None
@@ -1088,8 +1101,35 @@ class CargoMonitor:
         self.current_cargo = 0
         self.cargo_items = {}  # Dict of item_name: quantity
         self.refinery_contents = {}  # Dict of refinery material adjustments
+        self.materials_collected = {}  # Dict of engineering material_name: quantity (Raw materials only)
         self.update_callback = update_callback  # Callback to notify main app of changes
         self.capacity_changed_callback = capacity_changed_callback  # Callback when cargo capacity changes
+        
+        # Engineering materials grade mapping (Raw materials from mining only)
+        self.MATERIAL_GRADES = {
+            "Antimony": 2,
+            "Arsenic": 2,
+            "Boron": 3,
+            "Cadmium": 3,
+            "Carbon": 1,
+            "Chromium": 2,
+            "Germanium": 2,
+            "Iron": 1,
+            "Lead": 1,
+            "Manganese": 2,
+            "Nickel": 1,
+            "Niobium": 3,
+            "Phosphorus": 1,
+            "Polonium": 4,
+            "Rhenium": 1,
+            "Selenium": 4,
+            "Sulphur": 1,
+            "Tin": 3,
+            "Tungsten": 3,
+            "Vanadium": 2,
+            "Zinc": 2,
+            "Zirconium": 2
+        }
         
         # Load saved window position
         saved_pos = load_cargo_window_position()
@@ -1776,7 +1816,13 @@ cargo panel forces Elite to write detailed inventory data.
             self.update_callback()
     
     def update_display(self):
-        """Update the display with exact cargo contents"""
+        """
+        Update the POPUP WINDOW display with exact cargo contents.
+        
+        ⚠️ WARNING: This is for the OPTIONAL popup window, NOT the main app display!
+        ⚠️ Most users use the INTEGRATED display instead (see _update_integrated_cargo_display)
+        ⚠️ When modifying display logic, update BOTH methods!
+        """
         if not hasattr(self, 'cargo_summary') or not hasattr(self, 'cargo_text'):
             return
             
@@ -1798,8 +1844,9 @@ cargo panel forces Elite to write detailed inventory data.
         self.cargo_text.configure(state="normal")  # Enable editing temporarily
         self.cargo_text.delete(1.0, tk.END)
         
+        # Display Cargo Hold section
         if not self.cargo_items:
-            self.cargo_text.insert(tk.END, "� CARGO DETECTED BUT NO ITEM DETAILS\n\n")
+            self.cargo_text.insert(tk.END, "CARGO DETECTED BUT NO ITEM DETAILS\n\n")
             
             if self.current_cargo > 0:
                 self.cargo_text.insert(tk.END, f"🔍 Total cargo detected: {self.current_cargo} tons\n")
@@ -1852,6 +1899,30 @@ cargo panel forces Elite to write detailed inventory data.
             self.cargo_text.insert(tk.END, f"Total Items: {len(self.cargo_items)}\n")
             self.cargo_text.insert(tk.END, f"Total Weight: {self.current_cargo} tons")
         
+        # Display Engineering Materials section
+        if self.materials_collected:
+            self.cargo_text.insert(tk.END, "\n\n")
+            self.cargo_text.insert(tk.END, "Engineering Materials 🔩\n")
+            self.cargo_text.insert(tk.END, "─" * 30 + "\n")
+            
+            # Sort materials alphabetically
+            sorted_materials = sorted(self.materials_collected.items(), key=lambda x: x[0])
+            
+            for material_name, quantity in sorted_materials:
+                # Get grade for this material
+                grade = self.MATERIAL_GRADES.get(material_name, 0)
+                
+                # Format: Material Name (GX)  quantity
+                # Limit name length for alignment
+                display_name = material_name[:20]
+                line = f"{display_name} (G{grade}){' ' * (24 - len(display_name))}{quantity:>4}"
+                self.cargo_text.insert(tk.END, f"{line}\n")
+            
+            # Add materials total
+            self.cargo_text.insert(tk.END, "─" * 30 + "\n")
+            self.cargo_text.insert(tk.END, f"Total Materials: {len(self.materials_collected)}\n")
+            self.cargo_text.insert(tk.END, f"Total Pieces: {sum(self.materials_collected.values())}")
+        
         # Make text widget read-only
         self.cargo_text.configure(state="disabled")
         
@@ -1875,6 +1946,13 @@ cargo panel forces Elite to write detailed inventory data.
         self.cargo_items.clear()
         self.current_cargo = 0
         self.update_display()
+    
+    def reset_materials(self):
+        """Reset engineering materials counter (called when mining session starts)"""
+        self.materials_collected.clear()
+        if hasattr(self, 'cargo_window') and self.cargo_window:
+            self.update_display()
+        print("[CargoMonitor] Engineering materials counter reset")
     
     def start_journal_monitoring(self):
         """Start monitoring Elite Dangerous journal files"""
@@ -2474,6 +2552,31 @@ cargo panel forces Elite to write detailed inventory data.
                     print(f"✓ SAASignalsFound processed successfully")
                 except Exception as saa_err:
                     print(f"Warning: Failed to process SAASignalsFound event: {saa_err}")
+            
+            elif event_type == "MaterialCollected":
+                # Track engineering materials collected (Raw materials only)
+                try:
+                    category = event.get("Category", "")
+                    material_name_raw = event.get("Name_Localised", event.get("Name", "")).strip()
+                    count = event.get("Count", 1)
+                    
+                    if category == "Raw":
+                        # Normalize material name to Title Case for matching
+                        material_name = material_name_raw.title()
+                        
+                        # Only track materials in our predefined list
+                        if material_name in self.MATERIAL_GRADES:
+                            self.materials_collected[material_name] = self.materials_collected.get(material_name, 0) + count
+                            
+                            # Update popup window display if it exists
+                            if hasattr(self, 'cargo_window') and self.cargo_window:
+                                self.update_display()
+                            
+                            # Notify main app to update integrated display
+                            if self.update_callback:
+                                self.update_callback()
+                except Exception as mat_err:
+                    print(f"Warning: Failed to process MaterialCollected event: {mat_err}")
                         
         except json.JSONDecodeError:
             pass  # Skip invalid JSON lines
@@ -2715,6 +2818,7 @@ cargo panel forces Elite to write detailed inventory data.
             'start_snapshot': self.session_start_snapshot,
             'end_snapshot': end_snapshot,
             'materials_mined': materials_mined,
+            'engineering_materials': self.materials_collected.copy(),  # Add engineering materials
             'prospectors_used': prospectors_used,
             'total_tons_mined': sum(materials_mined.values()),
             'session_duration': end_snapshot['timestamp'] - self.session_start_snapshot['timestamp']
@@ -3435,7 +3539,15 @@ class App(tk.Tk):
         self.after(50, lambda: self.geometry("1100x650"))
 
     def _create_integrated_cargo_monitor(self, parent_frame):
-        """Create integrated cargo monitor in the bottom pane"""
+        """
+        Create integrated cargo monitor in the bottom pane.
+        
+        ✅ THIS IS THE PRIMARY CARGO DISPLAY - Default view in main app window!
+        
+        Display method: _update_integrated_cargo_display()
+        Data source: self.cargo_monitor (CargoMonitor instance)
+        Location: Bottom pane of main EliteMining window
+        """
         parent_frame.columnconfigure(0, weight=1)
         parent_frame.rowconfigure(0, weight=1)
         
@@ -3499,7 +3611,15 @@ class App(tk.Tk):
         self.after(1000, self._periodic_integrated_cargo_update)
         
     def _update_integrated_cargo_display(self):
-        """Update the integrated cargo display with data from cargo monitor"""
+        """
+        Update the INTEGRATED cargo display with data from cargo monitor.
+        
+        ✅ PRIMARY DISPLAY METHOD - This is what users see in the main app window!
+        ⚠️ When modifying display logic, also update update_display() for popup window!
+        
+        Location: Bottom pane of main EliteMining window
+        Widgets: self.integrated_cargo_text, self.integrated_cargo_summary
+        """
         if not hasattr(self, 'integrated_cargo_summary'):
             return
             
@@ -3557,7 +3677,28 @@ class App(tk.Tk):
                 # Add newline for all but the last item
                 if i < len(sorted_items) - 1:
                     self.integrated_cargo_text.insert(tk.END, "\n")
+        
+        # Display Engineering Materials section
+        if cargo.materials_collected:
+            self.integrated_cargo_text.insert(tk.END, "\n\n" + "─" * 25)
+            self.integrated_cargo_text.insert(tk.END, "\nEngineering Materials 🔩\n")
             
+            # Sort materials alphabetically
+            sorted_materials = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
+            
+            for i, (material_name, quantity) in enumerate(sorted_materials):
+                # Get grade for this material
+                grade = cargo.MATERIAL_GRADES.get(material_name, 0)
+                
+                # Format: Material (GX)  quantity
+                display_name = material_name[:13]
+                grade_text = f"(G{grade})"
+                line = f"{display_name:<13} {grade_text} {quantity:>4}"
+                self.integrated_cargo_text.insert(tk.END, line)
+                
+                # Add newline for all but the last item
+                if i < len(sorted_materials) - 1:
+                    self.integrated_cargo_text.insert(tk.END, "\n")
         
         
         # Add refinery note at the very bottom with proper spacing

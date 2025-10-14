@@ -2939,6 +2939,16 @@ class ProspectorPanel(ttk.Frame):
                     if comment_match:
                         session_comment = comment_match.group(1).strip()
                     
+                    # Extract engineering materials from text file
+                    engineering_materials_str = ""
+                    eng_section = re.search(r'=== ENGINEERING MATERIALS COLLECTED ===(.*?)(?:===|\Z)', content, re.DOTALL)
+                    if eng_section:
+                        eng_text = eng_section.group(1)
+                        # Parse materials like "Iron: 45" and convert to "Iron:45" format
+                        material_lines = re.findall(r'^\s+([A-Za-z]+):\s*(\d+)\s*$', eng_text, re.MULTILINE)
+                        if material_lines:
+                            engineering_materials_str = ",".join([f"{mat}:{qty}" for mat, qty in material_lines])
+                    
                     # Get preserved data for this timestamp (prioritize CSV data for analysis fields)
                     existing_data = existing_analysis_data.get(timestamp_local, {})
                     
@@ -2957,6 +2967,7 @@ class ProspectorPanel(ttk.Frame):
                         'best_material': existing_data.get('best_material', '') or best_material,
                         'materials_breakdown': existing_data.get('materials_breakdown', '') or materials_breakdown,
                         'prospectors_used': existing_data.get('prospectors_used', '') or prospectors_used,
+                        'engineering_materials': engineering_materials_str,  # Add engineering materials
                         'comment': session_comment  # Extract comment from text file content
                     })
                     
@@ -2967,7 +2978,7 @@ class ProspectorPanel(ttk.Frame):
             if not sessions:
                 # If no session files exist, create empty CSV with headers
                 with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
+                    writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'engineering_materials', 'comment'])
                     writer.writeheader()
                 if not silent:
                     self._set_status("Created new CSV file - ready for first session")
@@ -2978,7 +2989,7 @@ class ProspectorPanel(ttk.Frame):
             
             # Write new CSV
             with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment'])
+                writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'engineering_materials', 'comment'])
                 writer.writeheader()
                 writer.writerows(sessions)
             
@@ -3318,6 +3329,48 @@ class ProspectorPanel(ttk.Frame):
             # Note: Total cargo collected is calculated from individual materials above
             # Don't add a separate "Total Cargo Collected" line as it's redundant
         
+        # Add engineering materials section if available (Option 2: Grouped by grade)
+        if cargo_session_data and cargo_session_data.get('engineering_materials'):
+            eng_materials = cargo_session_data['engineering_materials']
+            
+            if eng_materials:
+                parts.append("\n=== ENGINEERING MATERIALS COLLECTED ===")
+                parts.append("")
+                
+                # Get material grades from cargo monitor
+                material_grades = {}
+                if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
+                    material_grades = self.main_app.cargo_monitor.MATERIAL_GRADES
+                
+                # Group materials by grade
+                materials_by_grade = {}
+                for material_name, quantity in eng_materials.items():
+                    grade = material_grades.get(material_name, 0)
+                    if grade not in materials_by_grade:
+                        materials_by_grade[grade] = []
+                    materials_by_grade[grade].append((material_name, quantity))
+                
+                # Grade descriptions
+                grade_names = {
+                    1: "Grade 1 (Very Common)",
+                    2: "Grade 2 (Common)",
+                    3: "Grade 3 (Standard)",
+                    4: "Grade 4 (Rare)"
+                }
+                
+                # Output grouped by grade
+                total_pieces = 0
+                for grade in sorted(materials_by_grade.keys()):
+                    parts.append(grade_names.get(grade, f"Grade {grade}") + ":")
+                    
+                    # Sort materials alphabetically within each grade
+                    for material_name, quantity in sorted(materials_by_grade[grade]):
+                        parts.append(f"  {material_name}: {quantity}")
+                        total_pieces += quantity
+                    parts.append("")  # Empty line between grades
+                
+                parts.append(f"Total Engineering Materials: {total_pieces} pieces")
+        
         # Add comment if provided
         if comment.strip():
             parts.append(f"\n=== SESSION COMMENT ===")
@@ -3397,9 +3450,16 @@ class ProspectorPanel(ttk.Frame):
             # Add cargo tracking data if available
             materials_breakdown = ""
             prospectors_used = 0
+            engineering_materials_str = ""  # New field for engineering materials
             if cargo_session_data:
                 materials_mined = cargo_session_data.get('materials_mined', {})
                 prospectors_used = cargo_session_data.get('prospectors_used', 0)
+                
+                # Format engineering materials as "Iron:45,Nickel:23,Carbon:89"
+                eng_materials = cargo_session_data.get('engineering_materials', {})
+                if eng_materials:
+                    engineering_materials_str = ",".join([f"{mat}:{qty}" for mat, qty in sorted(eng_materials.items())])
+            
             # New session data with Material Analysis metrics and cargo data
             new_session = {
                 'timestamp_utc': timestamp_local,  # Keep field name for compatibility but use local time
@@ -3416,6 +3476,7 @@ class ProspectorPanel(ttk.Frame):
                 'best_material': best_material,
                 'materials_breakdown': materials_breakdown,
                 'prospectors_used': prospectors_used,
+                'engineering_materials': engineering_materials_str,  # Add engineering materials
                 'comment': comment
             }
             
@@ -3426,16 +3487,21 @@ class ProspectorPanel(ttk.Frame):
                     reader = csv.DictReader(f)
                     sessions = list(reader)
             
+            # Ensure old sessions have the engineering_materials field (backward compatibility)
+            for session in sessions:
+                if 'engineering_materials' not in session:
+                    session['engineering_materials'] = ''
+            
             # Add new session
             sessions.append(new_session)
+            
             # Write back to CSV with enhanced fields including cargo data
             with open(csv_path, 'w', newline='', encoding='utf-8') as f:
                 fieldnames = ['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 
                             'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 
-                            'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'comment']
+                            'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'prospectors_used', 'engineering_materials', 'comment']
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
-                writer.writerows(sessions)
                 writer.writerows(sessions)
                 
         except Exception as e:
@@ -4077,7 +4143,7 @@ class ProspectorPanel(ttk.Frame):
         self.ToolTip(date_filter_combo, "Filter sessions by date, yield performance, hit rate, or materials")
 
         # Create sortable treeview with Material Analysis columns
-        self.reports_tree_tab = ttk.Treeview(main_frame, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospects", "comment", "enhanced"), show="headings", height=16, selectmode="extended")
+        self.reports_tree_tab = ttk.Treeview(main_frame, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"), show="headings", height=16, selectmode="extended")
         self.reports_tree_tab.grid(row=1, column=0, sticky="nsew")
         
         # Note: Tooltip bindings are set up later with the combined_motion_handler
@@ -4099,6 +4165,7 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.heading("quality", text="Average Yield %")
         self.reports_tree_tab.heading("cargo", text="Minerals (Tonnage & Yields)")
         self.reports_tree_tab.heading("prospects", text="Limpets")
+        self.reports_tree_tab.heading("eng_materials", text="Eng Materials")
         self.reports_tree_tab.heading("comment", text="Comment")
         self.reports_tree_tab.heading("enhanced", text="Detail Report")
         
@@ -4174,6 +4241,7 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.heading("quality", command=lambda: sort_tab_col("quality"))
         self.reports_tree_tab.heading("cargo", command=lambda: sort_tab_col("cargo"))
         self.reports_tree_tab.heading("prospects", command=lambda: sort_tab_col("prospects"))
+        self.reports_tree_tab.heading("eng_materials", command=lambda: sort_tab_col("eng_materials"))
         self.reports_tree_tab.heading("comment", command=lambda: sort_tab_col("comment"))
         # Note: enhanced column intentionally has no sort command as it's just a status indicator
 
@@ -4192,6 +4260,7 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.column("quality", width=120, stretch=False, anchor="center")
         self.reports_tree_tab.column("cargo", width=350, stretch=False, anchor="w")
         self.reports_tree_tab.column("prospects", width=70, stretch=False, anchor="center")
+        self.reports_tree_tab.column("eng_materials", width=250, stretch=False, anchor="w")
         self.reports_tree_tab.column("comment", width=80, stretch=False, anchor="center")  # Wider to show header text
         self.reports_tree_tab.column("enhanced", width=100, stretch=False, anchor="center")
 
@@ -4998,6 +5067,9 @@ class ProspectorPanel(ttk.Frame):
                         # Get comment data from CSV
                         comment_from_csv = row.get('comment', '').strip()
                         
+                        # Get engineering materials from CSV
+                        engineering_materials = row.get('engineering_materials', '').strip()
+                        
                         sessions_data.append({
                             'date': date_str,
                             'system': row['system'],
@@ -5014,6 +5086,7 @@ class ProspectorPanel(ttk.Frame):
                             'cargo': materials_breakdown,
                             'cargo_raw': materials_breakdown_raw,  # Store original for tooltip
                             'prospects': prospectors_used,
+                            'engineering_materials': engineering_materials,  # Add engineering materials field
                             'comment': comment_from_csv,
                             'timestamp_raw': row['timestamp_utc']
                         })
@@ -5194,6 +5267,30 @@ class ProspectorPanel(ttk.Frame):
                 # Check if this report has detailed reports (keep screenshots functionality but don't show column)
                 # Use tree values for consistent report_id matching
                 
+                # Format engineering materials for display: "Iron (45) G1, Nickel (23) G1"
+                eng_materials_display = ""
+                eng_materials_raw = session.get('engineering_materials', '')
+                if eng_materials_raw and eng_materials_raw.strip():
+                    try:
+                        # Parse "Iron:45,Nickel:23" format
+                        mat_pairs = eng_materials_raw.split(',')
+                        formatted_mats = []
+                        for pair in mat_pairs[:3]:  # Show max 3 materials
+                            if ':' in pair:
+                                mat_name, qty = pair.split(':', 1)
+                                # Get grade from cargo monitor
+                                grade = 0
+                                if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
+                                    grade = self.main_app.cargo_monitor.MATERIAL_GRADES.get(mat_name.strip(), 0)
+                                formatted_mats.append(f"{mat_name.strip()} ({qty}) G{grade}")
+                        
+                        if len(mat_pairs) > 3:
+                            eng_materials_display = ", ".join(formatted_mats) + f" +{len(mat_pairs)-3} more"
+                        else:
+                            eng_materials_display = ", ".join(formatted_mats)
+                    except Exception as e:
+                        eng_materials_display = eng_materials_raw  # Fallback to raw string
+                
                 item_id = self.reports_tree_tab.insert("", "end", values=(
                     session['date'],
                     session['duration'],
@@ -5207,6 +5304,7 @@ class ProspectorPanel(ttk.Frame):
                     session['quality'],
                     session['cargo'],
                     session['prospects'],
+                    eng_materials_display,  # Engineering materials column
                     '💬' if session.get('comment', '').strip() else '',  # Show emoji if comment exists
                     ""  # Enhanced column placeholder
                 ))
@@ -5978,6 +6076,9 @@ class ProspectorPanel(ttk.Frame):
         # Start cargo tracking for material breakdown
         if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
             self.main_app.cargo_monitor.start_session_tracking()
+            # Reset engineering materials counter for new session
+            if hasattr(self.main_app.cargo_monitor, 'reset_materials'):
+                self.main_app.cargo_monitor.reset_materials()
 
         self.start_btn.config(state="disabled")
         self.pause_resume_btn.config(state="normal", text="Pause")
@@ -9560,6 +9661,21 @@ class ProspectorPanel(ttk.Frame):
             generator = ReportGenerator(self.main_app)
             
             # Prepare session data for HTML report
+            # Parse engineering_materials if in encoded format
+            engineering_materials_dict = {}
+            eng_materials_raw = session_data.get('engineering_materials', '')
+            if eng_materials_raw and isinstance(eng_materials_raw, str):
+                # Parse "Iron:45,Nickel:23" format
+                try:
+                    for pair in eng_materials_raw.split(','):
+                        if ':' in pair:
+                            mat_name, qty = pair.split(':', 1)
+                            engineering_materials_dict[mat_name.strip()] = int(qty.strip())
+                except Exception as e:
+                    print(f"Warning: Could not parse engineering_materials: {e}")
+            elif isinstance(eng_materials_raw, dict):
+                engineering_materials_dict = eng_materials_raw
+            
             enhanced_session_data = {
                 'system': session_data.get('system', 'Unknown'),
                 'body': session_data.get('body', 'Unknown'),
@@ -9570,6 +9686,7 @@ class ProspectorPanel(ttk.Frame):
                 'materials': session_data.get('materials', len(session_data.get('materials_mined', {}))),
                 'prospectors': session_data.get('prospectors', session_data.get('prospects', session_data.get('prospectors_used', 0))),  # Try all field names
                 'materials_mined': session_data.get('materials_mined', {}),
+                'engineering_materials': engineering_materials_dict,  # Add engineering materials
                 'comment': session_data.get('comment', ''),
                 'screenshots': [],
                 # Add analytics data from CSV for HTML reports
