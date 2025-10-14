@@ -212,6 +212,15 @@ Generate comprehensive HTML reports with interactive charts, mining analytics, a
 
 Right-click any mining session to generate a detailed report, add screenshots, or manage existing reports. All reports are saved with your session data and can be opened directly from the reports tab.
 
+<details>
+<summary>📸 View HTML Report Screenshots</summary>
+
+<img src="Screenshot/html_report_1.png" width="250"> <img src="Screenshot/html_report_2.png" width="250"> <img src="Screenshot/html_report_3.png" width="250">
+
+*Click images to view full size*
+
+</details>
+
 #### Bookmarks  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_bookmarks.png" width="600"><br>  
 *Save, search, and manage mining spots.*  
