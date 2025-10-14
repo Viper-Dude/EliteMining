@@ -214,9 +214,9 @@ begin
   end
   else
   begin
-    { Fallback to standalone installation in Program Files }
+    { Fallback to standalone installation in user AppData (no admin rights required) }
     VADetected := False;
-    Result := ExpandConstant('{pf}');
+    Result := ExpandConstant('{localappdata}');
   end;
 end;
 
