@@ -24,6 +24,7 @@ from pathlib import Path
 import tempfile
 from PIL import ImageGrab
 from core.constants import MENU_COLORS
+from app_utils import get_app_data_dir, get_reports_dir
 
 def get_app_icon_path() -> str:
     """Get the path to the application icon, handling both development and compiled environments"""
@@ -380,15 +381,8 @@ class ProspectorPanel(ttk.Frame):
         self.vars_dir = os.path.join(self.va_root, "Variables")
         os.makedirs(self.vars_dir, exist_ok=True)
         
-        # Get the app directory - handle PyInstaller bundled app
-        if getattr(sys, 'frozen', False):
-            # Running as compiled executable
-            app_dir = os.path.join(self.va_root, "app")
-        else:
-            # Running in development mode
-            app_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        self.reports_dir = os.path.join(app_dir, "Reports", "Mining Session")
+        # Get reports directory using centralized path utilities
+        self.reports_dir = get_reports_dir()
         try:
             os.makedirs(self.reports_dir, exist_ok=True)
         except PermissionError as e:
@@ -2387,13 +2381,8 @@ class ProspectorPanel(ttk.Frame):
                         
                         # Delete corresponding graph files
                         try:
-                            # Get graphs directory using same logic as auto_save_graphs
-                            if getattr(sys, 'frozen', False):
-                                app_dir = os.path.join(self.va_root, "app")
-                            else:
-                                app_dir = os.path.dirname(os.path.abspath(__file__))
-                            
-                            graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
+                            # Get graphs directory using centralized path utility
+                            graphs_dir = os.path.join(get_reports_dir(), "Graphs")
                             
                             if os.path.exists(graphs_dir):
                                 # Create session ID to match graph files - use EXACT same logic as auto_save_graphs
@@ -4657,13 +4646,8 @@ class ProspectorPanel(ttk.Frame):
                             
                             # Delete corresponding graph files
                             try:
-                                # Get graphs directory using same logic as auto_save_graphs
-                                if getattr(sys, 'frozen', False):
-                                    app_dir = os.path.join(self.va_root, "app")
-                                else:
-                                    app_dir = os.path.dirname(os.path.abspath(__file__))
-                                
-                                graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
+                                # Get graphs directory using centralized path utility
+                                graphs_dir = os.path.join(get_reports_dir(), "Graphs")
                                 
                                 if os.path.exists(graphs_dir):
                                     # Create session prefix using same logic as auto_save_graphs
@@ -7891,14 +7875,7 @@ class ProspectorPanel(ttk.Frame):
             
             if selected_files:
                 # Create screenshots directory if it doesn't exist - use consistent app_dir logic
-                if getattr(sys, 'frozen', False):
-                    # Running as executable (installer version)
-                    app_dir = os.path.join(self.va_root, "app")
-                else:
-                    # Running as script (development version)
-                    app_dir = os.path.dirname(os.path.abspath(__file__))
-                    
-                screenshots_dir = os.path.join(app_dir, "Reports", "Mining Session", "Detailed Reports", "Screenshots")
+                screenshots_dir = os.path.join(get_reports_dir(), "Detailed Reports", "Screenshots")
                 os.makedirs(screenshots_dir, exist_ok=True)
                 
                 # Copy selected files to screenshots directory
@@ -7970,14 +7947,7 @@ class ProspectorPanel(ttk.Frame):
             
             if selected_files:
                 # Create screenshots directory if it doesn't exist - use consistent app_dir logic
-                if getattr(sys, 'frozen', False):
-                    # Running as executable (installer version)
-                    app_dir = os.path.join(self.va_root, "app")
-                else:
-                    # Running as script (development version)
-                    app_dir = os.path.dirname(os.path.abspath(__file__))
-                    
-                screenshots_dir = os.path.join(app_dir, "Reports", "Mining Session", "Detailed Reports", "Screenshots")
+                screenshots_dir = os.path.join(get_reports_dir(), "Detailed Reports", "Screenshots")
                 os.makedirs(screenshots_dir, exist_ok=True)
                 
                 # Copy selected files to screenshots directory
@@ -8030,14 +8000,8 @@ class ProspectorPanel(ttk.Frame):
         """Store screenshot associations for a specific report"""
         try:
             import json
-            if getattr(sys, 'frozen', False):
-                # Running as executable (installer version)
-                app_dir = os.path.join(self.va_root, "app")
-            else:
-                # Running as script (development version)
-                app_dir = os.path.dirname(os.path.abspath(__file__))
-                
-            screenshots_map_file = os.path.join(app_dir, "Reports", "Mining Session", "Detailed Reports", "screenshot_mappings.json")
+            # Use centralized path utility for screenshots mapping file
+            screenshots_map_file = os.path.join(get_reports_dir(), "Detailed Reports", "screenshot_mappings.json")
             
             # Load existing mappings
             mappings = {}
@@ -8068,14 +8032,8 @@ class ProspectorPanel(ttk.Frame):
         """Get screenshots associated with a specific report"""
         try:
             import json
-            if getattr(sys, 'frozen', False):
-                # Running as executable (installer version)
-                app_dir = os.path.join(self.va_root, "app")
-            else:
-                # Running as script (development version)
-                app_dir = os.path.dirname(os.path.abspath(__file__))
-                
-            screenshots_map_file = os.path.join(app_dir, "Reports", "Mining Session", "Detailed Reports", "screenshot_mappings.json")
+            # Use centralized path utility for screenshots mapping file
+            screenshots_map_file = os.path.join(get_reports_dir(), "Detailed Reports", "screenshot_mappings.json")
             
             if not os.path.exists(screenshots_map_file):
                 return []
@@ -10057,6 +10015,7 @@ class ProspectorPanel(ttk.Frame):
         except Exception as e:
             print(f"Error opening batch reports dialog: {e}")
             messagebox.showerror("Dialog Error", f"Could not open batch reports dialog: {e}", parent=parent_window)
+
 
 
 
