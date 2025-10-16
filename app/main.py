@@ -38,7 +38,7 @@ from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
 from update_checker import UpdateChecker
 from user_database import UserDatabase
 from journal_parser import JournalParser
-from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir
+from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir, get_variables_dir, get_ship_presets_dir
 from path_utils import get_ship_presets_dir, get_reports_dir
 
 # --- Simple Tooltip class with global enable/disable ---
@@ -239,6 +239,23 @@ class TextOverlay:
         # Schedule hide after display duration
         self.fade_timer = self.overlay_window.after(self.display_duration, self.hide_overlay)
         
+    def show_persistent_message(self, message: str):
+        """Display a message that stays visible until manually hidden (for cargo full prompt)"""
+        if not self.overlay_enabled:
+            return
+            
+        if not self.overlay_window:
+            self.create_overlay()
+            
+        # Update text and show window
+        self.text_label.config(text=message)
+        self.overlay_window.deiconify()
+        
+        # Cancel any existing timer - this message stays until manually hidden
+        if self.fade_timer:
+            self.overlay_window.after_cancel(self.fade_timer)
+            self.fade_timer = None
+    
     def hide_overlay(self):
         """Hide the overlay window"""
         if self.overlay_window:
@@ -348,7 +365,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.2.8"
+APP_VERSION = "v4.3.0"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -470,13 +487,13 @@ class RefineryDialog:
                 max_name_length = max(len(name) for name in self.current_cargo_items.keys())
             
             # Base width + material name width + button space
-            base_width = 400
+            base_width = 450
             name_width = max_name_length * 8  # ~8 pixels per character
-            button_width = 200  # Space for quantity buttons
+            button_width = 220  # Space for quantity buttons
             calculated_width = max(base_width, min(800, base_width + name_width + button_width))
             dialog_width = calculated_width
         else:
-            dialog_width = 600  # Default width for many materials
+            dialog_width = 750  # Default width for many materials
         
         if parent:
             parent.update_idletasks()
@@ -486,16 +503,29 @@ class RefineryDialog:
             parent_width = parent.winfo_width()
             parent_height = parent.winfo_height()
             
-            # Calculate center position relative to parent
-            dialog_height = 650
+            # Calculate dynamic height based on material count
+            base_height = 650
+            if material_count > 2:
+                # Add 60px for each row of materials (2 materials per row)
+                extra_rows = (material_count - 2 + 1) // 2  # Round up
+                dialog_height = min(850, base_height + (extra_rows * 60))
+            else:
+                dialog_height = base_height
+            
             x = parent_x + (parent_width - dialog_width) // 2
             y = parent_y + (parent_height - dialog_height) // 2
         else:
             # Fallback to screen center
+            base_height = 650
+            if material_count > 2:
+                extra_rows = (material_count - 2 + 1) // 2
+                dialog_height = min(850, base_height + (extra_rows * 60))
+            else:
+                dialog_height = base_height
             x = (self.dialog.winfo_screenwidth() // 2) - (dialog_width // 2)
-            y = (self.dialog.winfo_screenheight() // 2) - (650 // 2)
+            y = (self.dialog.winfo_screenheight() // 2) - (dialog_height // 2)
         
-        self.dialog.geometry(f"{dialog_width}x650+{x}+{y}")
+        self.dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         
         self._create_ui()
         
@@ -599,12 +629,11 @@ class RefineryDialog:
                     
                     # Quick add buttons
                     for amount in [1, 4, 6, 8, 10]:
-                        if amount <= quantity:  # Only show realistic amounts
-                            btn = tk.Button(material_frame, text=f"+{amount}t", 
-                                          command=lambda m=material, a=amount: self._quick_add_material(m, a),
-                                          bg="#404040", fg="#ffffff", 
-                                          font=("Segoe UI", 8), width=6)
-                            btn.pack(side="left", padx=2)
+                        btn = tk.Button(material_frame, text=f"+{amount}t", 
+                                      command=lambda m=material, a=amount: self._quick_add_material(m, a),
+                                      bg="#404040", fg="#ffffff", 
+                                      font=("Segoe UI", 8), width=6)
+                        btn.pack(side="left", padx=2)
                     
                     col += 1
                     if col > 1:  # 2 columns
@@ -1168,6 +1197,67 @@ class CargoMonitor:
         # Status.json file path for current ship data  
         self.status_json_path = os.path.join(self.journal_dir, "Status.json")
         
+        # Ship information tracking (from LoadGame/Loadout events)
+        self.ship_name = ""  # User-defined ship name (e.g., "Jewel of Parhoon")
+        self.ship_ident = ""  # User-defined ship ID (e.g., "HR-17F")
+        self.ship_type = ""  # Ship type (e.g., "Type_9_Heavy", "Python")
+        
+        # Elite Dangerous ship type mapping (journal code → proper display name)
+        self.ship_type_map = {
+            # Lakon ships
+            "type6": "Type-6 Transporter",
+            "type7": "Type-7 Transporter",
+            "type9": "Type-9 Heavy",
+            "type9_military": "Type-9 Military",
+            "type10": "Type-10 Defender",
+            "type11": "Type-11 Prospector",
+            "type11_mining": "Type-11 Prospector",
+            "lakonminer": "Type-11 Prospector",
+            "asp": "Asp Explorer",
+            "asp_scout": "Asp Scout",
+            # Core Dynamics ships
+            "python": "Python",
+            "python_nx": "Python Mk II",
+            "anaconda": "Anaconda",
+            # Faulcon DeLacy ships
+            "cobramkiii": "Cobra Mk III",
+            "cobramkiv": "Cobra Mk IV",
+            "sidewinder": "Sidewinder",
+            "viper": "Viper Mk III",
+            "viper_mkiv": "Viper Mk IV",
+            # Zorgon Peterson ships
+            "adder": "Adder",
+            "hauler": "Hauler",
+            "fer_de_lance": "Fer-de-Lance",
+            # Gutamaya ships
+            "empire_trader": "Imperial Clipper",
+            "empire_courier": "Imperial Courier",
+            "empire_eagle": "Imperial Eagle",
+            "cutter": "Imperial Cutter",
+            # Saud Kruger ships
+            "dolphin": "Dolphin",
+            "belugaliner": "Beluga Liner",
+            "orca": "Orca",
+            # Other manufacturers
+            "diamondback": "Diamondback Scout",
+            "diamondbackxl": "Diamondback Explorer",
+            "eagle": "Eagle",
+            "federation_dropship": "Federal Dropship",
+            "federation_dropship_mkii": "Federal Assault Ship",
+            "federation_gunship": "Federal Gunship",
+            "federation_corvette": "Federal Corvette",
+            "vulture": "Vulture",
+            "krait_mkii": "Krait Mk II",
+            "krait_light": "Krait Phantom",
+            "mamba": "Mamba",
+            "chieftain": "Alliance Chieftain",
+            "crusader": "Alliance Crusader",
+            "challenger": "Alliance Challenger",
+            "typex": "Alliance Type-X",
+            "typex_2": "Alliance Type-X Mk II",
+            "typex_3": "Alliance Type-X Mk III",
+        }
+        
         # Initialize user database and journal parser for real-time hotspot tracking
         if app_dir:
             # Use provided app directory to construct database path
@@ -1224,6 +1314,49 @@ class CargoMonitor:
         except Exception as e:
             # Log error but don't break other functionality
             print(f"Warning: Failed to refresh Ring Finder after hotspot add: {e}")
+    
+    def get_ship_info_string(self) -> str:
+        """
+        Get formatted ship information string for display.
+        
+        Returns:
+            Formatted ship info (e.g., "Jewel of Parhoon (HR-17F) - Type-9 Heavy")
+            or empty string if no ship data available
+        """
+        if not self.ship_name and not self.ship_type:
+            return ""
+        
+        # Format ship type with proper Elite Dangerous names
+        ship_type_display = ""
+        if self.ship_type:
+            # Use mapping dictionary if available, otherwise format manually
+            ship_key = self.ship_type.lower()
+            if ship_key in self.ship_type_map:
+                ship_type_display = self.ship_type_map[ship_key]
+            else:
+                # Fallback: Clean up ship type name manually
+                display = self.ship_type.replace("_", " ")
+                
+                # Handle common ship name patterns
+                # MkII, MkIII, etc. should be "Mk II", "Mk III"
+                display = display.replace("mkii", "Mk II").replace("mkiii", "Mk III")
+                display = display.replace("mkiv", "Mk IV").replace("mkv", "Mk V")
+                display = display.replace("mkvi", "Mk VI").replace("mkvii", "Mk VII")
+                
+                # Capitalize each word properly
+                ship_type_display = display.title()
+        
+        # Build ship info string
+        parts = []
+        if self.ship_name:
+            # Capitalize ship name properly
+            parts.append(self.ship_name.title())
+        # Ship ident (ID) removed from display - not needed for analytics
+        # Users don't need to see (VIPD68) style IDs in reports/analytics
+        if ship_type_display and ship_type_display not in ["", "Unknown"]:
+            parts.append(f"- {ship_type_display}")
+        
+        return " ".join(parts) if parts else ""
     
     def create_window(self):
         """Create the cargo monitor as a separate window (not overlay)"""
@@ -2122,11 +2255,18 @@ cargo panel forces Elite to write detailed inventory data.
             scans_processed = 0
             max_scans = 50  # Limit scan events to process (performance)
             
-            # Look for the most recent Loadout, Location/FSDJump, and Scan events
+            # Look for the most recent Loadout, LoadGame, Location/FSDJump, and Scan events
             for line in reversed(lines):  # Start from the end (most recent)
                 try:
                     event = json.loads(line.strip())
                     event_type = event.get("event", "")
+                    
+                    # Capture ship info from LoadGame or Loadout events
+                    if event_type in ["LoadGame", "Loadout"]:
+                        if not self.ship_name:  # Only capture if not already set
+                            self.ship_name = event.get("ShipName", "")
+                            self.ship_ident = event.get("ShipIdent", "")
+                            self.ship_type = event.get("Ship", "")
                     
                     # Look for cargo capacity (existing logic)
                     if not cargo_found and event_type == "Loadout":
@@ -2325,6 +2465,17 @@ cargo panel forces Elite to write detailed inventory data.
         try:
             event = json.loads(line)
             event_type = event.get("event", "")
+            
+            # Track ship information from LoadGame and Loadout events
+            if event_type in ["LoadGame", "Loadout"]:
+                # Extract ship name, ident, and type
+                self.ship_name = event.get("ShipName", "")
+                self.ship_ident = event.get("ShipIdent", "")
+                self.ship_type = event.get("Ship", "")
+                
+                # Notify main app to update ship info display
+                if self.update_callback:
+                    self.update_callback()
             
             if event_type == "Loadout":
                 # Get ship cargo capacity from loadout
@@ -2882,6 +3033,42 @@ cargo panel forces Elite to write detailed inventory data.
         
         return round(materials_mined, 1)
 
+    def get_live_session_materials(self):
+        """Get per-material tons mined so far in current session
+        
+        Returns:
+            dict: Material name -> tons mined (e.g., {'Platinum': 12.3, 'Painite': 8.5})
+        """
+        if not self.session_start_snapshot:
+            return {}
+            
+        materials_mined = {}
+        start_items = self.session_start_snapshot['cargo_items']
+        current_items = self.cargo_items
+        
+        # Calculate materials that increased during the session
+        for item_name, current_qty in current_items.items():
+            # Skip limpets and non-materials
+            if ("limpet" in item_name.lower() or 
+                "scrap" in item_name.lower() or 
+                "data" in item_name.lower()):
+                continue
+                
+            start_qty = start_items.get(item_name, 0)
+            if current_qty > start_qty:
+                materials_mined[item_name] = round(current_qty - start_qty, 1)
+        
+        # Add refinery contents per material
+        if hasattr(self, 'refinery_contents') and self.refinery_contents:
+            for material_name, refinery_qty in self.refinery_contents.items():
+                if material_name in materials_mined:
+                    materials_mined[material_name] += refinery_qty
+                else:
+                    materials_mined[material_name] = refinery_qty
+                materials_mined[material_name] = round(materials_mined[material_name], 1)
+        
+        return materials_mined
+
     def _get_prospector_count(self):
         """Get current limpet count from cargo"""
         limpet_count = 0
@@ -3295,11 +3482,10 @@ class App(tk.Tk):
             messagebox.showerror("Installation folder not found", "No EliteMining installation folder selected.")
             self.destroy()
             return
-        self.vars_dir = os.path.join(self.va_root, "Variables")
         
-        # Use centralized path utility for Ship Presets - ensures consistency
-        # This prevents writing to wrong folder in installer vs dev mode
-        self.settings_dir = get_ship_presets_dir()
+        # Use centralized path utilities for consistent dev/installer handling
+        self.vars_dir = get_variables_dir()  # Variables folder (dev-aware)
+        self.settings_dir = get_ship_presets_dir()  # Ship Presets (dev-aware)
             
         # Initialize cargo monitor with correct app directory (after va_root is set)
         app_dir = get_app_data_dir() if getattr(sys, 'frozen', False) else None
@@ -3359,6 +3545,16 @@ class App(tk.Tk):
         self.auto_scan_journals = tk.IntVar(value=1)  # Default enabled
         self._load_auto_scan_preference()
         self.auto_scan_journals.trace('w', self._on_auto_scan_toggle)
+        
+        # Auto-start session on first prospector launch
+        self.auto_start_session = tk.IntVar(value=1)  # Default enabled
+        self._load_auto_start_preference()
+        self.auto_start_session.trace('w', self._on_auto_start_toggle)
+        
+        # Prompt to end session when cargo full and idle
+        self.prompt_on_cargo_full = tk.IntVar(value=1)  # Default enabled
+        self._load_prompt_on_full_preference()
+        self.prompt_on_cargo_full.trace('w', self._on_prompt_on_full_toggle)
         
         # Text overlay enable/disable, transparency, and color
         self.text_overlay_enabled = tk.IntVar(value=0)  # Default disabled
@@ -3757,8 +3953,18 @@ class App(tk.Tk):
         """Callback when cargo monitor data changes - update integrated display"""
         try:
             self._update_integrated_cargo_display()
+            
+            # Also refresh prospector panel statistics and ship info
+            if hasattr(self, 'prospector_panel') and self.prospector_panel:
+                if hasattr(self.prospector_panel, '_refresh_statistics_display'):
+                    self.prospector_panel._refresh_statistics_display()
+                # Update ship info display when ship data changes
+                if hasattr(self.prospector_panel, '_update_ship_info_display'):
+                    self.prospector_panel._update_ship_info_display()
         except Exception as e:
-            pass  # Silently handle any update errors
+            print(f"[DEBUG] Error in _on_cargo_changed: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _refresh_ring_finder(self):
         """Refresh Ring Finder database info and cache after hotspot added"""
@@ -3848,6 +4054,20 @@ class App(tk.Tk):
         try:
             self.prospector_panel = ProspectorPanel(frame, self.va_root, self._set_status, self.toggle_vars, self.text_overlay, self, self.announcement_vars, self.main_announcement_enabled, ToolTip)
             self.prospector_panel.grid(row=0, column=0, sticky="nsew")
+            
+            # Set auto-start preference after panel is created
+            enabled = bool(self.auto_start_session.get())
+            self.prospector_panel.auto_start_on_prospector = enabled
+            # Sync checkbox in Mining Analytics tab
+            if hasattr(self.prospector_panel, 'auto_start_var'):
+                self.prospector_panel.auto_start_var.set(1 if enabled else 0)
+            
+            # Set prompt on cargo full preference after panel is created
+            prompt_enabled = bool(self.prompt_on_cargo_full.get())
+            self.prospector_panel.prompt_on_cargo_full = prompt_enabled
+            # Sync checkbox in Mining Analytics tab
+            if hasattr(self.prospector_panel, 'prompt_on_full_var'):
+                self.prospector_panel.prompt_on_full_var.set(1 if prompt_enabled else 0)
         except Exception as e:
             # Log detailed error
             import traceback
@@ -3954,15 +4174,18 @@ class App(tk.Tk):
         def open_elite_miners_reddit():
             webbrowser.open("https://www.reddit.com/r/EliteMiners/")
         
+        def open_discord():
+            webbrowser.open("https://discord.gg/2SCXZsEu")
+        
         # Miners Tool link
         miners_link = tk.Label(
             card,
             text="• Miners Tool (edtools.cc/miner) - Mining optimization tools",
             wraplength=600,
             justify="left",
-            fg="#4da6ff",  # Light blue for link appearance
+            fg="#e0e0e0",
             bg="#1e1e1e",
-            font=("Segoe UI", 9),
+            font=("Segoe UI", 9, "italic"),
             cursor="hand2"
         )
         miners_link.grid(row=r, column=0, sticky="w", padx=16, pady=1)
@@ -3976,9 +4199,9 @@ class App(tk.Tk):
             text="• EDMining (edmining.com) - Mining database and tools",
             wraplength=600,
             justify="left",
-            fg="#4da6ff",  # Light blue for link appearance
+            fg="#e0e0e0",
             bg="#1e1e1e",
-            font=("Segoe UI", 9),
+            font=("Segoe UI", 9, "italic"),
             cursor="hand2"
         )
         edmining_link.grid(row=r, column=0, sticky="w", padx=16, pady=1)
@@ -3992,14 +4215,81 @@ class App(tk.Tk):
             text="• Elite Miners Reddit (r/EliteMiners) - Mining community",
             wraplength=600,
             justify="left",
-            fg="#4da6ff",  # Light blue for link appearance
+            fg="#e0e0e0",
             bg="#1e1e1e",
-            font=("Segoe UI", 9),
+            font=("Segoe UI", 9, "italic"),
             cursor="hand2"
         )
         reddit_link.grid(row=r, column=0, sticky="w", padx=16, pady=1)
         reddit_link.bind("<Button-1>", lambda e: open_elite_miners_reddit())
         ToolTip(reddit_link, "Click to open Elite Miners Reddit community\nDiscussions, tips, and support from fellow miners")
+        r += 1
+        
+        # EliteMining Discord link with icon
+        discord_frame = tk.Frame(card, bg="#1e1e1e")
+        discord_frame.grid(row=r, column=0, sticky="w", padx=16, pady=1)
+        
+        try:
+            discord_icon_path = os.path.join(get_app_data_dir(), "Images", "Discord-Symbol-Blurple.png")
+            if os.path.exists(discord_icon_path):
+                from PIL import Image, ImageTk
+                discord_img = Image.open(discord_icon_path)
+                discord_img = discord_img.resize((16, 16), Image.Resampling.LANCZOS)
+                discord_photo = ImageTk.PhotoImage(discord_img)
+                
+                discord_icon = tk.Label(discord_frame, image=discord_photo, bg="#1e1e1e", cursor="hand2")
+                discord_icon.image = discord_photo  # Keep a reference
+                discord_icon.grid(row=0, column=0, sticky="w")
+                discord_icon.bind("<Button-1>", lambda e: open_discord())
+                ToolTip(discord_icon, "Click to join EliteMining Discord server\nCommunity chat, support, and mining discussions")
+                
+                discord_text = tk.Label(
+                    discord_frame,
+                    text=" EliteMining Discord - Join our community chat",
+                    wraplength=580,
+                    justify="left",
+                    fg="#e0e0e0",
+                    bg="#1e1e1e",
+                    font=("Segoe UI", 9, "italic"),
+                    cursor="hand2"
+                )
+                discord_text.grid(row=0, column=1, sticky="w")
+                discord_text.bind("<Button-1>", lambda e: open_discord())
+                ToolTip(discord_text, "Click to join EliteMining Discord server\nCommunity chat, support, and mining discussions")
+            else:
+                # Fallback to text-only link if icon not found
+                discord_text_only = tk.Label(
+                    card,
+                    text="• EliteMining Discord - Join our community chat",
+                    wraplength=600,
+                    justify="left",
+                    fg="#e0e0e0",
+                    bg="#1e1e1e",
+                    font=("Segoe UI", 9, "italic"),
+                    cursor="hand2"
+                )
+                discord_text_only.grid(row=r, column=0, sticky="w", padx=16, pady=1)
+                discord_text_only.bind("<Button-1>", lambda e: open_discord())
+                ToolTip(discord_text_only, "Click to join EliteMining Discord server\nCommunity chat, support, and mining discussions")
+        except Exception as e:
+            # Fallback to text-only link if any error occurs
+            print(f"[DEBUG] Discord icon loading failed: {e}")
+            import traceback
+            traceback.print_exc()
+            discord_text_only = tk.Label(
+                card,
+                text="• EliteMining Discord - Join our community chat",
+                wraplength=600,
+                justify="left",
+                fg="#e0e0e0",
+                bg="#1e1e1e",
+                font=("Segoe UI", 9, "italic"),
+                cursor="hand2"
+            )
+            discord_text_only.grid(row=r, column=0, sticky="w", padx=16, pady=1)
+            discord_text_only.bind("<Button-1>", lambda e: open_discord())
+            ToolTip(discord_text_only, "Click to join EliteMining Discord server\nCommunity chat, support, and mining discussions")
+        
         r += 1
 
         # --- Add spacer row to push logos section to bottom of Tip card ---
@@ -4495,6 +4785,28 @@ class App(tk.Tk):
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text="Automatically check for new mining data in Elite Dangerous journals when the app starts. Disable if you prefer manual imports via Settings → Import History", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+        
+        # Auto-start session on first prospector checkbox
+        tk.Checkbutton(scrollable_frame, text="Auto-start Session on First Prospector Launch", variable=self.auto_start_session, 
+                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
+                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+        r += 1
+        tk.Label(scrollable_frame, text="Automatically start a mining session when you fire your first prospector limpet. The session will only auto-start if no session is currently active.", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+
+        # Prompt when cargo full checkbox
+        tk.Checkbutton(scrollable_frame, text="Prompt when cargo full (idle 1 min)", variable=self.prompt_on_cargo_full, 
+                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
+                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+        r += 1
+        tk.Label(scrollable_frame, text="Shows a prompt to end the session when cargo is 100% full and has been idle (no cargo changes) for 1 minute. Helps you remember to save your session before unloading cargo.", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -5424,6 +5736,56 @@ class App(tk.Tk):
         enabled = bool(self.auto_scan_journals.get())
         self._save_auto_scan_preference()
         self._set_status(f"Auto-scan on startup {'enabled' if enabled else 'disabled'}")
+    
+    def _load_auto_start_preference(self) -> None:
+        """Load auto-start session preference from config"""
+        cfg = _load_cfg()
+        enabled = cfg.get("auto_start_session", False)  # Default to disabled
+        self.auto_start_session.set(1 if enabled else 0)
+        print(f"Loaded auto-start session preference: {enabled}")
+    
+    def _save_auto_start_preference(self) -> None:
+        """Save auto-start session preference to config"""
+        from config import update_config_value
+        update_config_value("auto_start_session", bool(self.auto_start_session.get()))
+        print(f"Saved auto-start session preference: {bool(self.auto_start_session.get())}")
+    
+    def _on_auto_start_toggle(self, *args) -> None:
+        """Called when auto-start session checkbox is toggled"""
+        enabled = bool(self.auto_start_session.get())
+        self._save_auto_start_preference()
+        # Pass setting to prospector panel
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            self.prospector_panel.auto_start_on_prospector = enabled
+            # Also sync the checkbox in Mining Analytics tab
+            if hasattr(self.prospector_panel, 'auto_start_var'):
+                self.prospector_panel.auto_start_var.set(1 if enabled else 0)
+        self._set_status(f"Auto-start session on first prospector {'enabled' if enabled else 'disabled'}")
+
+    def _load_prompt_on_full_preference(self) -> None:
+        """Load prompt on cargo full preference from config"""
+        cfg = _load_cfg()
+        enabled = cfg.get("prompt_on_cargo_full", False)  # Default to disabled
+        self.prompt_on_cargo_full.set(1 if enabled else 0)
+        print(f"Loaded prompt on cargo full preference: {enabled}")
+    
+    def _save_prompt_on_full_preference(self) -> None:
+        """Save prompt on cargo full preference to config"""
+        from config import update_config_value
+        update_config_value("prompt_on_cargo_full", bool(self.prompt_on_cargo_full.get()))
+        print(f"Saved prompt on cargo full preference: {bool(self.prompt_on_cargo_full.get())}")
+    
+    def _on_prompt_on_full_toggle(self, *args) -> None:
+        """Called when prompt on cargo full checkbox is toggled"""
+        enabled = bool(self.prompt_on_cargo_full.get())
+        self._save_prompt_on_full_preference()
+        # Pass setting to prospector panel
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            self.prospector_panel.prompt_on_cargo_full = enabled
+            # Also sync the checkbox in Mining Analytics tab
+            if hasattr(self.prospector_panel, 'prompt_on_full_var'):
+                self.prospector_panel.prompt_on_full_var.set(1 if enabled else 0)
+        self._set_status(f"Prompt when cargo full {'enabled' if enabled else 'disabled'}")
 
     # ---------- Journal folder preference handling ----------
     def _import_journal_history(self):
@@ -6097,7 +6459,7 @@ class App(tk.Tk):
         try:
             dialog = tk.Toplevel(self)
             dialog.title("Create Backup")
-            dialog.geometry("450x400")
+            dialog.geometry("450x480")
             dialog.resizable(False, False)
             dialog.configure(bg="#2c3e50")
             dialog.transient(self)
@@ -6141,6 +6503,7 @@ class App(tk.Tk):
             backup_reports = tk.IntVar(value=1)
             backup_bookmarks = tk.IntVar(value=1)
             backup_va_profile = tk.IntVar(value=1)
+            backup_userdb = tk.IntVar(value=0)
             backup_journals = tk.IntVar(value=0)
             backup_all = tk.IntVar(value=0)
             
@@ -6150,12 +6513,14 @@ class App(tk.Tk):
                     backup_reports.set(1)
                     backup_bookmarks.set(1)
                     backup_va_profile.set(1)
+                    backup_userdb.set(1)
                     backup_journals.set(1)
                     # Disable individual checkboxes
                     presets_cb.config(state="disabled")
                     reports_cb.config(state="disabled")
                     bookmarks_cb.config(state="disabled")
                     va_profile_cb.config(state="disabled")
+                    userdb_cb.config(state="disabled")
                     journals_cb.config(state="disabled")
                 else:
                     # Enable individual checkboxes
@@ -6163,6 +6528,7 @@ class App(tk.Tk):
                     reports_cb.config(state="normal")
                     bookmarks_cb.config(state="normal")
                     va_profile_cb.config(state="normal")
+                    userdb_cb.config(state="normal")
                     journals_cb.config(state="normal")
             
             # All checkbox
@@ -6217,6 +6583,15 @@ class App(tk.Tk):
                                          font=("Segoe UI", 10))
             va_profile_cb.pack(anchor="w", pady=2)
             
+            userdb_cb = tk.Checkbutton(options_frame, text="💾 User Database (Hotspots)",
+                                       variable=backup_userdb,
+                                       bg="#2c3e50", fg="#ecf0f1",
+                                       selectcolor="#34495e",
+                                       activebackground="#34495e",
+                                       activeforeground="#ecf0f1",
+                                       font=("Segoe UI", 10))
+            userdb_cb.pack(anchor="w", pady=2)
+            
             journals_cb = tk.Checkbutton(options_frame, text="📝 Journal Files",
                                         variable=backup_journals,
                                         bg="#2c3e50", fg="#ecf0f1",
@@ -6236,14 +6611,15 @@ class App(tk.Tk):
                 include_reports = backup_reports.get() or backup_all.get()
                 include_bookmarks = backup_bookmarks.get() or backup_all.get()
                 include_va_profile = backup_va_profile.get() or backup_all.get()
+                include_userdb = backup_userdb.get() or backup_all.get()
                 include_journals = backup_journals.get() or backup_all.get()
                 
-                if not (include_presets or include_reports or include_bookmarks or include_va_profile or include_journals):
+                if not (include_presets or include_reports or include_bookmarks or include_va_profile or include_userdb or include_journals):
                     messagebox.showwarning("No Selection", "Please select at least one item to backup.")
                     return
                 
                 dialog.destroy()
-                self._create_backup(include_presets, include_reports, include_bookmarks, include_va_profile, include_journals)
+                self._create_backup(include_presets, include_reports, include_bookmarks, include_va_profile, include_userdb, include_journals)
             
             def on_cancel():
                 dialog.destroy()
@@ -6266,7 +6642,7 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showerror("Backup Dialog Error", f"Failed to show backup dialog: {str(e)}")
 
-    def _create_backup(self, include_presets: bool, include_reports: bool, include_bookmarks: bool, include_va_profile: bool, include_journals: bool = False) -> None:
+    def _create_backup(self, include_presets: bool, include_reports: bool, include_bookmarks: bool, include_va_profile: bool, include_userdb: bool = False, include_journals: bool = False) -> None:
         """Create backup zip file with selected data"""
         try:
             # Ask for backup location
@@ -6282,10 +6658,12 @@ class App(tk.Tk):
                 parts.append("Bookmarks")
             if include_va_profile:
                 parts.append("VA Profile")
+            if include_userdb:
+                parts.append("UserDB")
             if include_journals:
                 parts.append("Journals")
             
-            if len(parts) == 5:
+            if len(parts) == 6:
                 content_desc = "Full"
             else:
                 content_desc = "_".join(parts)
@@ -6410,6 +6788,12 @@ class App(tk.Tk):
                         if not getattr(sys, 'frozen', False):  # Only show debug in development
                             print(f"DEBUG: VoiceAttack profile not found at expected location")
                 
+                # Add user database
+                if include_userdb:
+                    userdb_path = os.path.join(app_data_dir, "data", "user_data.db")
+                    if os.path.exists(userdb_path):
+                        zipf.write(userdb_path, "data/user_data.db")
+                
                 # Add journal files
                 if include_journals:
                     # Get journal folder from prospector panel
@@ -6449,6 +6833,7 @@ class App(tk.Tk):
                         "mining_reports": include_reports,
                         "mining_bookmarks": include_bookmarks,
                         "va_profile": include_va_profile,
+                        "user_database": include_userdb,
                         "journal_files": include_journals
                     }
                 }
@@ -6489,13 +6874,14 @@ class App(tk.Tk):
                     has_reports = any(f.startswith("Reports/") for f in file_list)
                     has_bookmarks = "mining_bookmarks.json" in file_list
                     has_va_profile = "EliteMining-Profile.vap" in file_list
+                    has_userdb = "data/user_data.db" in file_list
                     has_journals = any(f.startswith("Journals/") and f.endswith(".log") for f in file_list)
                     
-                    if not (has_presets or has_reports or has_bookmarks or has_va_profile or has_journals):
+                    if not (has_presets or has_reports or has_bookmarks or has_va_profile or has_userdb or has_journals):
                         messagebox.showerror("Invalid Backup", "This doesn't appear to be a valid EliteMining backup file.")
                         return
                     
-                    self._show_restore_options_dialog(backup_path, has_presets, has_reports, has_bookmarks, has_va_profile, has_journals, manifest)
+                    self._show_restore_options_dialog(backup_path, has_presets, has_reports, has_bookmarks, has_va_profile, has_userdb, has_journals, manifest)
                     
             except zipfile.BadZipFile:
                 messagebox.showerror("Invalid File", "Selected file is not a valid ZIP archive.")
@@ -6506,7 +6892,7 @@ class App(tk.Tk):
             messagebox.showerror("Restore Dialog Error", f"Failed to show restore dialog: {str(e)}")
 
     def _show_restore_options_dialog(self, backup_path: str, has_presets: bool, has_reports: bool, 
-                                   has_bookmarks: bool, has_va_profile: bool, has_journals: bool = False, manifest: Optional[Dict] = None) -> None:
+                                   has_bookmarks: bool, has_va_profile: bool, has_userdb: bool = False, has_journals: bool = False, manifest: Optional[Dict] = None) -> None:
         """Show dialog to select what to restore from backup"""
         try:
             dialog = tk.Toplevel(self)
@@ -6568,6 +6954,7 @@ class App(tk.Tk):
             restore_reports = tk.IntVar(value=1 if has_reports else 0)
             restore_bookmarks = tk.IntVar(value=1 if has_bookmarks else 0)
             restore_va_profile = tk.IntVar(value=1 if has_va_profile else 0)
+            restore_userdb = tk.IntVar(value=0)  # Default to unchecked for safety
             restore_journals = tk.IntVar(value=0)  # Default to unchecked for safety
             
             # Checkboxes for available items
@@ -6611,6 +6998,16 @@ class App(tk.Tk):
                                              font=("Segoe UI", 10))
                 va_profile_cb.pack(anchor="w", pady=2)
             
+            if has_userdb:
+                userdb_cb = tk.Checkbutton(options_frame, text="💾 User Database (Hotspots)",
+                                          variable=restore_userdb,
+                                          bg="#2c3e50", fg="#ecf0f1",
+                                          selectcolor="#34495e",
+                                          activebackground="#34495e",
+                                          activeforeground="#ecf0f1",
+                                          font=("Segoe UI", 10))
+                userdb_cb.pack(anchor="w", pady=2)
+            
             if has_journals:
                 journals_cb = tk.Checkbutton(options_frame, text="📝 Journal Files",
                                            variable=restore_journals,
@@ -6626,7 +7023,14 @@ class App(tk.Tk):
                                    text="⚠️ Warning: This will overwrite existing files!",
                                    font=("Segoe UI", 9, "bold"),
                                    bg="#2c3e50", fg="#e74c3c")
-            warning_label.pack(pady=(20, 10))
+            warning_label.pack(pady=(20, 5))
+            
+            # Restart info label
+            restart_label = tk.Label(dialog, 
+                                   text="ℹ️ Restart the app after restoring backups",
+                                   font=("Segoe UI", 9),
+                                   bg="#2c3e50", fg="#95a5a6")
+            restart_label.pack(pady=(0, 10))
             
             # Buttons frame
             btn_frame = tk.Frame(dialog, bg="#2c3e50")
@@ -6642,6 +7046,8 @@ class App(tk.Tk):
                 if has_bookmarks and restore_bookmarks.get():
                     restore_any = True
                 if has_va_profile and restore_va_profile.get():
+                    restore_any = True
+                if has_userdb and restore_userdb.get():
                     restore_any = True
                 if has_journals and restore_journals.get():
                     restore_any = True
@@ -6663,6 +7069,7 @@ class App(tk.Tk):
                                         restore_reports.get() if has_reports else False,
                                         restore_bookmarks.get() if has_bookmarks else False,
                                         restore_va_profile.get() if has_va_profile else False,
+                                        restore_userdb.get() if has_userdb else False,
                                         restore_journals.get() if has_journals else False)
             
             def on_cancel():
@@ -6687,7 +7094,7 @@ class App(tk.Tk):
             messagebox.showerror("Restore Options Error", f"Failed to show restore options: {str(e)}")
 
     def _restore_from_backup(self, backup_path: str, restore_presets: bool, 
-                           restore_reports: bool, restore_bookmarks: bool, restore_va_profile: bool, restore_journals: bool = False) -> None:
+                           restore_reports: bool, restore_bookmarks: bool, restore_va_profile: bool, restore_userdb: bool = False, restore_journals: bool = False) -> None:
         """Restore selected items from backup zip file"""
         try:
             app_data_dir = self._get_app_data_dir()
@@ -6756,6 +7163,15 @@ class App(tk.Tk):
                     with open(va_profile_path, 'wb') as f:
                         f.write(zipf.read("EliteMining-Profile.vap"))
                     restored_items.append("VoiceAttack Profile")
+                
+                # Restore user database
+                if restore_userdb and "data/user_data.db" in zipf.namelist():
+                    userdb_dir = os.path.join(app_data_dir, "data")
+                    os.makedirs(userdb_dir, exist_ok=True)
+                    target_path = os.path.join(userdb_dir, "user_data.db")
+                    with open(target_path, 'wb') as f:
+                        f.write(zipf.read("data/user_data.db"))
+                    restored_items.append("User Database")
                 
                 # Restore journal files
                 if restore_journals:
