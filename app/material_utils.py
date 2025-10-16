@@ -55,7 +55,7 @@ MATERIAL_ABBREVIATIONS = {
     "Liquid Oxygen": "LOX",
     "Tritium": "T",
     "Rutile": "Rt",
-    "Bromelite": "Br"
+    "Bromellite": "Br"
 }
 
 def abbreviate_materials_breakdown(materials_breakdown: str, use_abbreviations: bool = True) -> str:
