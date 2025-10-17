@@ -4175,7 +4175,7 @@ class App(tk.Tk):
             webbrowser.open("https://www.reddit.com/r/EliteMiners/")
         
         def open_discord():
-            webbrowser.open("https://discord.gg/2SCXZsEu")
+            webbrowser.open("https://discord.gg/8fmpUpn5HJ")
         
         # Miners Tool link
         miners_link = tk.Label(
