@@ -41,7 +41,7 @@
   },
   "Announcements": {},
   "Timers": {
-    "Cargo Scoop Delay": 8,
+    "Cargo Scoop Delay": 14,
     "Laser Mining Extra Delay": 9,
     "Laser Mining Duration": 24,
     "Pause Duration": 1,

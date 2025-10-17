@@ -82,6 +82,29 @@ def get_data_dir() -> str:
     return os.path.join(get_app_data_dir(), "data")
 
 
+def get_variables_dir() -> str:
+    """
+    Get the Variables directory for VoiceAttack integration.
+    
+    In installer mode: Uses VA_ROOT from environment (VoiceAttack installation)
+    In dev mode: Uses local Variables folder in dev directory
+    
+    Returns:
+        Path to the Variables directory
+    """
+    if getattr(sys, 'frozen', False):
+        # Installer version - use VA root from environment
+        va_root = os.environ.get('VA_ROOT')
+        if va_root:
+            return os.path.join(va_root, "Variables")
+        # Fallback: construct from app dir
+        return os.path.join(os.path.dirname(get_app_data_dir()), "Variables")
+    else:
+        # Development version - use local Variables folder
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(app_dir, "Variables")
+
+
 # ==================== ICON UTILITIES ====================
 
 def get_app_icon_path() -> Optional[str]:
