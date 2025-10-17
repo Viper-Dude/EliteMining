@@ -1,5 +1,5 @@
 {
-  "config_version": "4.1.6",
+  "config_version": "4.1.7",
   "tts_volume": 100,
   "va_folder": "",
   "window": {
@@ -21,6 +21,7 @@
     "Bertrandite": true,
     "Bromellite": true,
     "Cobalt": true,
+    "Coltan": true,
     "Gallite": true,
     "Gold": true,
     "Goslarite": true,
@@ -59,6 +60,7 @@
     "Bertrandite": 20.0,
     "Bromellite": 14.0,
     "Cobalt": 20.0,
+    "Coltan": 20.0,
     "Gallite": 20.0,
     "Gold": 20.0,
     "Goslarite": 20.0,
