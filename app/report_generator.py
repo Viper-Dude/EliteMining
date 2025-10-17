@@ -2195,12 +2195,16 @@ class ReportGenerator:
         if not filtered_materials:
             return "<p>No materials mined this session</p>"
             
+        # Calculate session duration for TPH
+        session_duration_hours = session_data.get('session_duration', 0) / 3600.0
+        
         table_html = """
         <table class="data-table">
             <thead>
                 <tr>
                     <th>Material</th>
                     <th>Quantity (tons)</th>
+                    <th>T/hr</th>
                     <th>Percentage</th>
                 </tr>
             </thead>
@@ -2210,10 +2214,12 @@ class ReportGenerator:
         total_tons = sum(filtered_materials.values())
         for material, quantity in sorted(filtered_materials.items(), key=lambda x: x[1], reverse=True):
             percentage = (quantity / total_tons * 100) if total_tons > 0 else 0
+            mat_tph = (quantity / session_duration_hours) if session_duration_hours > 0 else 0
             table_html += f"""
                 <tr>
                     <td>{material}</td>
                     <td>{quantity:.1f}</td>
+                    <td>{mat_tph:.1f}</td>
                     <td>{percentage:.1f}%</td>
                 </tr>
             """
@@ -2357,13 +2363,32 @@ class ReportGenerator:
             materials_count = len(session_data.get('materials_mined', {}))
             materials_list = ', '.join(session_data.get('materials_mined', {}).keys()) if materials_count > 0 else 'None recorded'
             
-            properties.extend([
+            base_props = [
                 ("Report Date", session_data.get('date', 'Unknown')),
                 ("Session Duration", session_data.get('duration', 'Unknown')),
+            ]
+            
+            # Add ship name if available
+            ship_name = session_data.get('ship_name', '').strip()
+            if ship_name:
+                base_props.append(("Ship", ship_name))
+            
+            base_props.extend([
                 ("Mining Location", f"{session_data.get('system', 'Unknown')} - {session_data.get('body', 'Unknown')}"),
                 ("Minerals Found", f"{materials_count} types: {materials_list}"),
-                ("Data Source", "Report entry from mining log")
             ])
+            
+            properties.extend(base_props)
+            
+            # Add engineering materials if any were collected
+            engineering_materials = session_data.get('engineering_materials', {})
+            if engineering_materials:
+                # Format: "Iron (45), Nickel (23), Carbon (89) - Total: 157 pieces"
+                eng_list = ', '.join([f"{mat} ({qty})" for mat, qty in sorted(engineering_materials.items())])
+                total_pieces = sum(engineering_materials.values())
+                properties.append(("Engineering Materials", f"{eng_list} - Total: {total_pieces} pieces"))
+            
+            properties.append(("Data Source", "Report entry from mining log"))
         else:
             # Original detailed session data - only show cargo if we have meaningful data
             cargo_available = (start_snapshot.get('total_cargo', 0) > 0 or 
@@ -2373,7 +2398,6 @@ class ReportGenerator:
             properties.extend([
                 ("Session Start", session_start),
                 ("Session End", session_end),
-                ("Data Source", "Detailed mining session data")
             ])
             
             # Only add cargo information if we have meaningful data
@@ -2385,6 +2409,16 @@ class ReportGenerator:
                 ])
             else:
                 properties.append(("Cargo Tracking", "Not available for this session"))
+            
+            # Add engineering materials if any were collected
+            engineering_materials = session_data.get('engineering_materials', {})
+            if engineering_materials:
+                # Format: "Iron (45), Nickel (23), Carbon (89) - Total: 157 pieces"
+                eng_list = ', '.join([f"{mat} ({qty})" for mat, qty in sorted(engineering_materials.items())])
+                total_pieces = sum(engineering_materials.values())
+                properties.append(("Engineering Materials", f"{eng_list} - Total: {total_pieces} pieces"))
+            
+            properties.append(("Data Source", "Detailed mining session data"))
         
         for prop, value in properties:
             table_html += f"""
