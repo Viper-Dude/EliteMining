@@ -9,8 +9,7 @@
 <details>
 <summary>Table of Contents</summary>
 
-- [Usage Options](#usage-options)  
-- [Features](#features)  
+- [Features and Usage Options](#features-and-usage-options)  
 - [Requirements](#requirements)  
 - [Installation](#installation)  
 - [EliteMining App](#elitemining-app)  
@@ -32,19 +31,7 @@
 
 ---
 
-## Usage Options
-
-### VoiceAttack Integration (Full Automation)  
-Complete voice/hotkey-controlled mining with automated sequences and announcements.  
-
-### Standalone Mode (Manual Control)  
-The EliteMining App works independently for announcements, reports, and tracking. VoiceAttack is not required.  
-
-[Back to Top](#elitemining)
-
----
-
-## Features
+## Features and Usage Options
 
 ### With VoiceAttack Integration
 All features below **plus** voice/hotkey automation:
@@ -194,6 +181,8 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 ---
 
 ### EliteMining GUI  
+<details open>
+<summary>Click to expand</summary>
 
 #### Main Window (Dashboard) & Firegroups  
 <img src="Screenshot/configurator-main.png" width="600"><br>  
@@ -273,6 +262,8 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 #### Settings Tab  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-options.png" width="600" height="400"><br>  
 *UI and announcement preferences.*  
+
+</details>
 
 [Back to Top](#elitemining)
 
