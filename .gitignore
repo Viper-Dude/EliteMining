@@ -47,6 +47,7 @@ app/EliteVA/Variables/
 *api_key*
 *.key
 .env
+credentials.json
 
 # VoiceAttack profile
 *.vap

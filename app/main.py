@@ -1205,58 +1205,56 @@ class CargoMonitor:
         
         # Elite Dangerous ship type mapping (journal code → proper display name)
         self.ship_type_map = {
-            # Lakon ships
-            "type6": "Type-6 Transporter",
-            "type7": "Type-7 Transporter",
-            "type9": "Type-9 Heavy",
-            "type9_military": "Type-9 Military",
-            "type10": "Type-10 Defender",
-            "type11": "Type-11 Prospector",
-            "type11_mining": "Type-11 Prospector",
-            "lakonminer": "Type-11 Prospector",
-            "asp": "Asp Explorer",
-            "asp_scout": "Asp Scout",
-            # Core Dynamics ships
-            "python": "Python",
-            "python_nx": "Python Mk II",
-            "anaconda": "Anaconda",
-            # Faulcon DeLacy ships
+            # Small ships
+            "adder": "Adder",
             "cobramkiii": "Cobra Mk III",
             "cobramkiv": "Cobra Mk IV",
+            "cobramkv": "Cobra Mk V",
+            "diamondbackxl": "Diamondback Explorer",
+            "diamondback": "Diamondback Scout",
+            "eagle": "Eagle",
+            "empire_eagle": "Imperial Eagle",
+            "empire_courier": "Imperial Courier",
+            "hauler": "Hauler",
             "sidewinder": "Sidewinder",
             "viper": "Viper Mk III",
             "viper_mkiv": "Viper Mk IV",
-            # Zorgon Peterson ships
-            "adder": "Adder",
-            "hauler": "Hauler",
-            "fer_de_lance": "Fer-de-Lance",
-            # Gutamaya ships
-            "empire_trader": "Imperial Clipper",
-            "empire_courier": "Imperial Courier",
-            "empire_eagle": "Imperial Eagle",
-            "cutter": "Imperial Cutter",
-            # Saud Kruger ships
-            "dolphin": "Dolphin",
-            "belugaliner": "Beluga Liner",
-            "orca": "Orca",
-            # Other manufacturers
-            "diamondback": "Diamondback Scout",
-            "diamondbackxl": "Diamondback Explorer",
-            "eagle": "Eagle",
-            "federation_dropship": "Federal Dropship",
+            
+            # Medium ships
+            "asp": "Asp Explorer",
+            "asp_scout": "Asp Scout",
             "federation_dropship_mkii": "Federal Assault Ship",
+            "federation_dropship": "Federal Dropship",
             "federation_gunship": "Federal Gunship",
-            "federation_corvette": "Federal Corvette",
-            "vulture": "Vulture",
+            "ferdelance": "Fer-de-Lance",
+            "independant_trader": "Keelback",
             "krait_mkii": "Krait Mk II",
             "krait_light": "Krait Phantom",
             "mamba": "Mamba",
-            "chieftain": "Alliance Chieftain",
-            "crusader": "Alliance Crusader",
-            "challenger": "Alliance Challenger",
-            "typex": "Alliance Type-X",
-            "typex_2": "Alliance Type-X Mk II",
-            "typex_3": "Alliance Type-X Mk III",
+            "python": "Python",
+            "python_nx": "Python Mk II",
+            "type6": "Type-6 Transporter",
+            "type7": "Type-7 Transporter",
+            "typex": "Alliance Chieftain",
+            "typex_2": "Alliance Crusader",
+            "typex_3": "Alliance Challenger",
+            "vulture": "Vulture",
+            
+            # Large ships
+            "anaconda": "Anaconda",
+            "belugaliner": "Beluga Liner",
+            "cutter": "Imperial Cutter",
+            "dolphin": "Dolphin",
+            "empire_trader": "Imperial Clipper",
+            "federation_corvette": "Federal Corvette",
+            "mandalay": "Mandalay",
+            "orca": "Orca",
+            "panthermkii": "Panther Clipper Mk II",
+            "type8": "Type-8 Transporter",
+            "type9": "Type-9 Heavy",
+            "type9_military": "Type-10 Defender",
+            "lakonminer": "Type-11 Prospector",
+            "corsair": "Corsair",
         }
         
         # Initialize user database and journal parser for real-time hotspot tracking
@@ -2254,7 +2252,12 @@ cargo panel forces Elite to write detailed inventory data.
                         if not self.ship_name:  # Only capture if not already set
                             self.ship_name = event.get("ShipName", "")
                             self.ship_ident = event.get("ShipIdent", "")
-                            self.ship_type = event.get("Ship_Localised", event.get("Ship", ""))
+                            # Prefer Ship_Localised, use mapping for Ship field if needed
+                            if "Ship_Localised" in event:
+                                self.ship_type = event["Ship_Localised"]
+                            elif "Ship" in event:
+                                ship_id = event["Ship"].lower()
+                                self.ship_type = self.ship_type_map.get(ship_id, event["Ship"].replace("_", " ").title())
                     
                     # Look for cargo capacity (existing logic)
                     if not cargo_found and event_type == "Loadout":
@@ -2459,12 +2462,12 @@ cargo panel forces Elite to write detailed inventory data.
                 # Extract ship name, ident, and type
                 self.ship_name = event.get("ShipName", "")
                 self.ship_ident = event.get("ShipIdent", "")
-                # Use Ship_Localised if available, otherwise use Ship but only if we don't already have a good value
+                # Prefer Ship_Localised, use mapping for Ship field if needed
                 if "Ship_Localised" in event:
                     self.ship_type = event["Ship_Localised"]
-                elif not self.ship_type or "_" in self.ship_type or self.ship_type.islower():
-                    # Only overwrite with Ship field if current value is bad (internal ID format)
-                    self.ship_type = event.get("Ship", "")
+                elif "Ship" in event:
+                    ship_id = event["Ship"].lower()
+                    self.ship_type = self.ship_type_map.get(ship_id, event["Ship"].replace("_", " ").title())
                 
                 # Notify main app to update ship info display
                 if self.update_callback:
