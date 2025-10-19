@@ -474,7 +474,88 @@ class JournalParser:
                 f"{stats['events_processed']} events, {stats['hotspots_found']} hotspots, "
                 f"{stats['systems_visited']} systems visited")
         
+        # Fix missing coordinates for rings in the same system
+        fixed_count = self._fix_missing_ring_coordinates()
+        if fixed_count > 0:
+            log.info(f"Fixed missing coordinates for {fixed_count} hotspot entries")
+        
         return stats
+    
+    def _fix_missing_ring_coordinates(self) -> int:
+        """Fix missing coordinates for rings in the same system by copying from other rings
+        
+        This ensures that all rings in a system share the same system-level coordinates,
+        which is needed for proper distance calculations in ring searches.
+        
+        Returns:
+            Number of hotspot entries updated with coordinates
+        """
+        try:
+            import sqlite3
+            
+            total_updated = 0
+            
+            # Find systems with mixed coordinate data
+            with sqlite3.connect(self.user_db.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Get systems that have BOTH rings with coords AND rings without coords
+                cursor.execute("""
+                    SELECT DISTINCT system_name
+                    FROM hotspot_data
+                    WHERE system_name IN (
+                        SELECT system_name FROM hotspot_data WHERE x_coord IS NOT NULL
+                    )
+                    AND system_name IN (
+                        SELECT system_name FROM hotspot_data WHERE x_coord IS NULL
+                    )
+                    ORDER BY system_name
+                """)
+                
+                systems_to_fix = [row[0] for row in cursor.fetchall()]
+                
+                if not systems_to_fix:
+                    return 0
+                
+                log.info(f"Found {len(systems_to_fix)} systems with missing ring coordinates")
+                
+                # Fix each system
+                for system_name in systems_to_fix:
+                    # Get coordinates from any ring in this system that HAS coordinates
+                    cursor.execute("""
+                        SELECT x_coord, y_coord, z_coord, coord_source
+                        FROM hotspot_data
+                        WHERE system_name = ? AND x_coord IS NOT NULL
+                        LIMIT 1
+                    """, (system_name,))
+                    
+                    coord_data = cursor.fetchone()
+                    
+                    if coord_data:
+                        x, y, z, source = coord_data
+                        
+                        # Update all rings in this system that are missing coordinates
+                        cursor.execute("""
+                            UPDATE hotspot_data
+                            SET x_coord = ?,
+                                y_coord = ?,
+                                z_coord = ?,
+                                coord_source = ?
+                            WHERE system_name = ? AND x_coord IS NULL
+                        """, (x, y, z, source, system_name))
+                        
+                        updated = cursor.rowcount
+                        total_updated += updated
+                        
+                        log.debug(f"Fixed {system_name}: Updated {updated} entries with coords ({x}, {y}, {z})")
+                
+                conn.commit()
+                
+            return total_updated
+            
+        except Exception as e:
+            log.error(f"Error fixing missing ring coordinates: {e}")
+            return 0
     
     def get_recent_ring_scans(self, days: int = 30) -> List[Dict[str, Any]]:
         """Get recent ring scans from the database
