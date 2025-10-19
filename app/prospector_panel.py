@@ -505,8 +505,9 @@ class ProspectorPanel(ttk.Frame):
         # Check Status.json once after startup to get current location and override stale journal data
         self.after(2500, self._startup_sync_with_status)
         
-        # Update ship info display after startup (give cargo monitor time to read journals)
-        self.after(3000, self._update_ship_info_display)
+        # Update ship info display every 2 seconds for first 10 seconds after startup
+        for delay in [2000, 4000, 6000, 8000, 10000]:
+            self.after(delay, self._update_ship_info_display)
 
 
     # --- CFG passthrough ---

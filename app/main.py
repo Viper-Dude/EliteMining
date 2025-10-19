@@ -1120,7 +1120,7 @@ class CargoMonitor:
     - self.cargo_items: Refined minerals/cargo
     - self.materials_collected: Engineering materials (Raw)
     """
-    def __init__(self, update_callback=None, capacity_changed_callback=None, app_dir=None):
+    def __init__(self, update_callback=None, capacity_changed_callback=None, ship_info_changed_callback=None, app_dir=None):
         self.cargo_window = None
         self.cargo_label = None
         self.position = "upper_right"
@@ -1133,6 +1133,7 @@ class CargoMonitor:
         self.materials_collected = {}  # Dict of engineering material_name: quantity (Raw materials only)
         self.update_callback = update_callback  # Callback to notify main app of changes
         self.capacity_changed_callback = capacity_changed_callback  # Callback when cargo capacity changes
+        self.ship_info_changed_callback = ship_info_changed_callback  # Callback when ship info changes
         
         # Engineering materials grade mapping (Raw materials from mining only)
         self.MATERIAL_GRADES = {
@@ -1326,31 +1327,18 @@ class CargoMonitor:
         if not self.ship_name and not self.ship_type:
             return ""
         
-        # Format ship type with proper Elite Dangerous names
-        ship_type_display = ""
-        if self.ship_type:
-            # Use mapping dictionary if available, otherwise format manually
-            ship_key = self.ship_type.lower()
-            if ship_key in self.ship_type_map:
-                ship_type_display = self.ship_type_map[ship_key]
-            else:
-                # Fallback: Clean up ship type name manually
-                display = self.ship_type.replace("_", " ")
-                
-                # Handle common ship name patterns
-                # MkII, MkIII, etc. should be "Mk II", "Mk III"
-                display = display.replace("mkii", "Mk II").replace("mkiii", "Mk III")
-                display = display.replace("mkiv", "Mk IV").replace("mkv", "Mk V")
-                display = display.replace("mkvi", "Mk VI").replace("mkvii", "Mk VII")
-                
-                # Capitalize each word properly
-                ship_type_display = display.title()
+        # Ship type is already formatted if it came from Ship_Localised
+        ship_type_display = self.ship_type if self.ship_type else ""
         
         # Build ship info string
         parts = []
         if self.ship_name:
-            # Capitalize ship name properly
-            parts.append(self.ship_name.title())
+            # Capitalize properly and fix Mk II formatting
+            formatted_name = self.ship_name.title()
+            formatted_name = formatted_name.replace("Mk Ii", "Mk II").replace("Mk Iii", "Mk III")
+            formatted_name = formatted_name.replace("Mk Iv", "Mk IV").replace("Mk V", "Mk V")
+            formatted_name = formatted_name.replace("Mk Vi", "Mk VI").replace("Mk Vii", "Mk VII")
+            parts.append(formatted_name)
         # Ship ident (ID) removed from display - not needed for analytics
         # Users don't need to see (VIPD68) style IDs in reports/analytics
         if ship_type_display and ship_type_display not in ["", "Unknown"]:
@@ -2266,7 +2254,7 @@ cargo panel forces Elite to write detailed inventory data.
                         if not self.ship_name:  # Only capture if not already set
                             self.ship_name = event.get("ShipName", "")
                             self.ship_ident = event.get("ShipIdent", "")
-                            self.ship_type = event.get("Ship", "")
+                            self.ship_type = event.get("Ship_Localised", event.get("Ship", ""))
                     
                     # Look for cargo capacity (existing logic)
                     if not cargo_found and event_type == "Loadout":
@@ -2471,11 +2459,20 @@ cargo panel forces Elite to write detailed inventory data.
                 # Extract ship name, ident, and type
                 self.ship_name = event.get("ShipName", "")
                 self.ship_ident = event.get("ShipIdent", "")
-                self.ship_type = event.get("Ship", "")
+                # Use Ship_Localised if available, otherwise use Ship but only if we don't already have a good value
+                if "Ship_Localised" in event:
+                    self.ship_type = event["Ship_Localised"]
+                elif not self.ship_type or "_" in self.ship_type or self.ship_type.islower():
+                    # Only overwrite with Ship field if current value is bad (internal ID format)
+                    self.ship_type = event.get("Ship", "")
                 
                 # Notify main app to update ship info display
                 if self.update_callback:
                     self.update_callback()
+                
+                # Notify ship info changed callback
+                if self.ship_info_changed_callback:
+                    self.ship_info_changed_callback()
             
             if event_type == "Loadout":
                 # Get ship cargo capacity from loadout
@@ -3491,6 +3488,7 @@ class App(tk.Tk):
         app_dir = get_app_data_dir() if getattr(sys, 'frozen', False) else None
         self.cargo_monitor = CargoMonitor(update_callback=self._on_cargo_changed, 
                                         capacity_changed_callback=self._on_cargo_capacity_detected,
+                                        ship_info_changed_callback=self._on_ship_info_changed,
                                         app_dir=app_dir)
         # Set the main app reference so cargo monitor can access prospector panel later
         self.cargo_monitor.main_app_ref = self
@@ -6297,6 +6295,11 @@ class App(tk.Tk):
             # Save the detected capacity to config
             self._save_cargo_preferences()
             print(f"🔄 Auto-updated cargo capacity: {current_capacity}t → {detected_capacity}t")
+    
+    def _on_ship_info_changed(self) -> None:
+        """Called when CargoMonitor detects ship info change (LoadGame/Loadout events)"""
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            self.prospector_panel._update_ship_info_display()
     
     def _on_cargo_transparency_change(self, *args) -> None:
         """Called when cargo transparency is changed"""
