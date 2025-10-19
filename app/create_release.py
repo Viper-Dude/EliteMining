@@ -133,10 +133,10 @@ class ReleaseBuilder:
             
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 # Add the main executable in EliteMining/Configurator/ folder
-                exe_path = self.project_root / "dist" / "Configurator.exe"
+                exe_path = self.project_root / "dist" / "EliteMining.exe"
                 if exe_path.exists():
-                    zipf.write(exe_path, "EliteMining/Configurator/Configurator.exe")
-                    print(f"✅ Added: EliteMining/Configurator/Configurator.exe")
+                    zipf.write(exe_path, "EliteMining/Configurator/EliteMining.exe")
+                    print(f"✅ Added: EliteMining/Configurator/EliteMining.exe")
                 else:
                     print(f"❌ Missing: {exe_path}")
                     return False
@@ -246,7 +246,7 @@ class ReleaseBuilder:
             return True
         
         # Verify the executable exists and show its timestamp
-        exe_path = self.project_root / "dist" / "Configurator.exe"
+        exe_path = self.project_root / "dist" / "EliteMining.exe"
         if exe_path.exists():
             import datetime
             mod_time = datetime.datetime.fromtimestamp(exe_path.stat().st_mtime)

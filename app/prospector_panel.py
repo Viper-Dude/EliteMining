@@ -5341,9 +5341,15 @@ class ProspectorPanel(ttk.Frame):
         self._edit_comment(self.reports_tree_tab, item)
 
     def _get_ship_name_from_session(self, system: str, body: str, timestamp_raw: str) -> str:
-        """Parse ship name from miningSessionSummary.txt - only for sessions from today onwards"""
+        """Parse ship name from session TXT file"""
         try:
-            # Only show ship name for sessions from today onwards (to avoid filling historical data)
+            # Build the filename from session metadata
+            # Format: Session_YYYY-MM-DD_HH-MM-SS_System_Body.txt
+            # NOTE: Spaces in system/body names are replaced with underscores in filenames
+            if not timestamp_raw:
+                return ""
+            
+            # Parse timestamp to get date/time parts for filename
             import datetime as dt
             try:
                 if timestamp_raw.endswith('Z'):
@@ -5352,21 +5358,25 @@ class ProspectorPanel(ttk.Frame):
                 else:
                     session_time = dt.datetime.fromisoformat(timestamp_raw)
                 
-                # If session is before today, don't show ship name
-                today_start = dt.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                if session_time < today_start:
-                    return ""  # Blank for old sessions
+                # Format timestamp for filename: YYYY-MM-DD_HH-MM-SS
+                date_str = session_time.strftime("%Y-%m-%d")
+                time_str = session_time.strftime("%H-%M-%S")
             except:
-                return ""  # Blank if we can't parse the date
-            
-            # For today's sessions, read ship name from miningSessionSummary.txt
-            summary_path = os.path.join(self.vars_dir, "miningSessionSummary.txt")
-            
-            if not os.path.exists(summary_path):
                 return ""
             
-            # Read the summary file
-            with open(summary_path, 'r', encoding='utf-8') as f:
+            # Replace spaces with underscores in system and body names to match filename format
+            system_filename = system.replace(" ", "_")
+            body_filename = body.replace(" ", "_")
+            
+            # Build filename pattern
+            filename_base = f"Session_{date_str}_{time_str}_{system_filename}_{body_filename}.txt"
+            txt_path = os.path.join(self.reports_dir, filename_base)
+            
+            if not os.path.exists(txt_path):
+                return ""
+            
+            # Read the TXT file
+            with open(txt_path, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
             
             # Format: "Session: SYSTEM — BODY — DURATION — Total XXXt\nShip: SHIP_NAME | materials..."

@@ -13,7 +13,7 @@
 - [Features](#features)  
 - [Requirements](#requirements)  
 - [Installation](#installation)  
-- [Configurator](#configurator)  
+- [EliteMining App](#elitemining-app)  
   - [EliteMining GUI](#elitemining-gui)  
   - [Backup & Restore](#backup--restore)  
 - [Hotspot Finder](#hotspot-finder)  
@@ -38,7 +38,7 @@
 Complete voice/hotkey-controlled mining with automated sequences and announcements.  
 
 ### Standalone Mode (Manual Control)  
-The Configurator works independently for announcements, reports, and tracking. VoiceAttack is not required.  
+The EliteMining App works independently for announcements, reports, and tracking. VoiceAttack is not required.  
 
 [Back to Top](#elitemining)
 
@@ -111,7 +111,10 @@ EliteVA requires the `Custom.binds` file:
 2. Set preset to **Custom**  
 3. Save — this creates/updates `Custom.binds`  
 
-**Note:** VoiceAttack is optional. Configurator can run standalone.  
+### Custom Keybinds for Mining Control  
+VoiceAttack profile includes a dedicated **"Custom Keybinds for Mining Control"** category. Configure your mining hotkeys here instead of searching through the entire profile.
+
+**Note:** VoiceAttack is optional. EliteMining App can run standalone.  
 
 </details>
 
@@ -122,7 +125,6 @@ EliteVA requires the `Custom.binds` file:
 ## Installation
 
 - **Installer:** Run `EliteMiningSetup.exe` (includes VoiceAttack profile)  
-- **Portable:** Extract `EliteMining_3.9.0-beta.zip`  
 
 > **Antivirus Notice:** If your antivirus flags the application, this is a common false positive with Python-compiled apps - simply add an exclusion for the installation folder.
 > 
@@ -131,24 +133,23 @@ EliteVA requires the `Custom.binds` file:
 ### Included Components  
 The installer bundles the **EliteVA plugin**. No separate download required.  
 
-### Manual Installation  
-1. Download the latest `.zip` from [Releases](https://github.com/Viper-Dude/EliteMining/releases)  
-2. Extract into your VoiceAttack app folder  
-3. Open VoiceAttack → **Profile > Import Profile**  
-4. Select **EliteMining-Profile.vap**  
+### VoiceAttack Profile Installation  
+1. Open VoiceAttack → **Profile > Import Profile**  
+2. Select **EliteMining-Profile.vap**  
+3. Configure your mining hotkeys in the **"Custom Keybinds for Mining Control"** category
 
 [Back to Top](#elitemining)
 
 ---
 
-## Configurator  
+## EliteMining App  
 
-The **Configurator** lets you adjust firegroups, toggles, timers, and announcements via GUI. It can run standalone without VoiceAttack.  
+The **EliteMining App** lets you adjust firegroups, toggles, timers, and announcements via GUI. It can run standalone without VoiceAttack.  
 
 ### Launching  
-- VoiceAttack: **"Open Configurator"**  
-- Keyboard: **Right Ctrl + Right Shift + C**  
-- Direct: `\EliteMining\Configurator\Configurator.exe`  
+- VoiceAttack: **"Open EliteMining"**  
+- Keyboard: **Right Alt + Right Shift + C**  
+- Direct: `\EliteMining\Configurator\EliteMining.exe` or desktop icon (if installed)  
 
 [Back to Top](#elitemining)
 
@@ -158,7 +159,7 @@ The **Configurator** lets you adjust firegroups, toggles, timers, and announceme
 
 #### Main Window (Dashboard) & Firegroups  
 <img src="Screenshot/configurator-main.png" width="600"><br>  
-*Configurator layout with firegroups & buttons.*  
+*EliteMining App layout with firegroups & buttons.*  
 
 #### Timers/Toggles Tab  
 <img src="Screenshot/configurator-timers_toggles.png" width="600"><br>  

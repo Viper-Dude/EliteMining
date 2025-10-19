@@ -28,7 +28,7 @@ def get_app_data_dir():
         else:
             # Fallback: use executable directory
             # In PyInstaller, sys.executable points to the .exe file
-            # Structure: ...\EliteMining\Configurator\Configurator.exe
+            # Structure: ...\EliteMining\Configurator\EliteMining.exe
             # We need: ...\EliteMining\app\
             exe_dir = os.path.dirname(sys.executable)
             

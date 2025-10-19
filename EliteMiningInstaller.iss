@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.3.1
+AppVersion=v4.3.2
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -11,12 +11,17 @@ SolidCompression=yes
 SetupIconFile=app\Images\logo_multi.ico
 CloseApplications=force
 RestartApplications=no
+; Close running EliteMining processes (handles both old Configurator.exe and new EliteMining.exe)
 CloseApplicationsFilter=*.exe
 
 ; Place uninstaller in app folder
 UninstallFilesDir={app}
 UninstallDisplayName=EliteMining
-UninstallDisplayIcon={app}\Configurator\Configurator.exe
+UninstallDisplayIcon={app}\Configurator\EliteMining.exe
+
+[InstallDelete]
+; Delete old Configurator.exe before installing new EliteMining.exe (v4.3.2+ rename)
+Type: files; Name: "{app}\Configurator\Configurator.exe"
 
 [Files]
 ; Only include specific file types from needed subfolders (exclude .py files)
@@ -26,7 +31,7 @@ Source: "app\Ship Presets\*";  DestDir: "{app}\app\Ship Presets";  Flags: recurs
 ; Reports folder intentionally excluded - users must earn their reports by mining! 😉
 
 ; New Configurator executable
-Source: "dist\Configurator.exe"; DestDir: "{app}\Configurator"; Flags: ignoreversion
+Source: "dist\EliteMining.exe"; DestDir: "{app}\Configurator"; Flags: ignoreversion
 
 ; Local systems database (~14 MB) - populated systems within the bubble for fast searches
 Source: "app\data\galaxy_systems.db"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
@@ -60,9 +65,9 @@ Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "A
 
 [Icons]
 ; Start Menu shortcut
-Name: "{group}\EliteMining"; Filename: "{app}\Configurator\Configurator.exe"; WorkingDir: "{app}\Configurator"
+Name: "{group}\EliteMining"; Filename: "{app}\Configurator\EliteMining.exe"; WorkingDir: "{app}\Configurator"
 ; Desktop shortcut (optional)
-Name: "{commondesktop}\EliteMining"; Filename: "{app}\Configurator\Configurator.exe"; WorkingDir: "{app}\Configurator"; Tasks: desktopicon
+Name: "{commondesktop}\EliteMining"; Filename: "{app}\Configurator\EliteMining.exe"; WorkingDir: "{app}\Configurator"; Tasks: desktopicon
 ; Uninstall shortcut
 Name: "{group}\Uninstall EliteMining"; Filename: "{app}\Apps\unins000.exe"
 
@@ -75,7 +80,7 @@ Filename: "{cmd}"; Parameters: "/C if exist ""C:\Program Files\Elite Mining"" rm
 Filename: "{cmd}"; Parameters: "/C if exist ""C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Elite Mining"" rmdir /s /q ""C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Elite Mining"""; Description: "Cleaning up old shortcuts"; Flags: runhidden skipifdoesntexist
 
 ; Launch application after installation
-Filename: "{app}\Configurator\Configurator.exe"; Description: "&Launch EliteMining"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\Configurator\EliteMining.exe"; Description: "&Launch EliteMining"; Flags: nowait postinstall skipifsilent unchecked
 
 [UninstallRun]
 ; Remove symbolic link on uninstall

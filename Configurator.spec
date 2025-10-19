@@ -32,7 +32,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Configurator',
+    name='EliteMining',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

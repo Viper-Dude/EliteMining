@@ -365,7 +365,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.3.1"
+APP_VERSION = "v4.3.2"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -414,7 +414,7 @@ def detect_va_folder_interactive(parent: tk.Tk) -> Optional[str]:
     # For installer/frozen mode, use executable location
     if getattr(sys, 'frozen', False):
         exe_dir = os.path.dirname(sys.executable)
-        # Structure: ...\EliteMining\Configurator\Configurator.exe
+        # Structure: ...\EliteMining\Configurator\EliteMining.exe
         # Need: ...\EliteMining
         if os.path.basename(exe_dir).lower() == 'configurator':
             app_root = os.path.dirname(exe_dir)  # Go up to EliteMining folder
