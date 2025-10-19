@@ -14,10 +14,10 @@
 - [Requirements](#requirements)  
 - [Installation](#installation)  
 - [EliteMining App](#elitemining-app)  
+- [Hotspot Finder](#hotspot-finder)  
 - [Getting Started](#getting-started)  
   - [EliteMining GUI](#elitemining-gui)  
   - [Backup & Restore](#backup--restore)  
-- [Hotspot Finder](#hotspot-finder)  
 - [Commands](#commands)  
 - [Mining Presets](#mining-presets)  
 - [Usage Tips](#usage-tips)  
@@ -47,16 +47,18 @@ The EliteMining App works independently for announcements, reports, and tracking
 ## Features
 
 ### With VoiceAttack Integration
+All features below **plus** voice/hotkey automation:
 - Voice/hotkey mining sequences  
 - Automated collector & prospector deployment  
 - Smart targeting & laser management  
-- Real-time mining statistics  
-- Cargo management automation  
 - Custom commands & presets
 - Ship presets
 - Includes [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) (bundled with installer)
 
 ### Standalone (Without VoiceAttack)
+Full-featured mining companion with GUI controls:
+- Real-time mining statistics  
+- Automated cargo monitoring  
 - Mining announcements & notifications  
 - **Engineering materials tracking** – Monitor raw materials by grade
 - Session tracking & history  
@@ -65,28 +67,6 @@ The EliteMining App works independently for announcements, reports, and tracking
 - **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
 - **Hotspot Finder** – Search 32,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports  
-
-[Back to Top](#elitemining)
-
----
-
-## Hotspot Finder
-
-The Hotspot Finder provides access to a comprehensive database of 32,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities.
-
-### Key Features
-- **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
-- **Filter by Minerals** – Search for specific minerals (Painite, Platinum, Low Temperature Diamonds, etc.)
-- **Pre-loaded Database** – 32,000+ hotspots with minerals types, ring densities
-- **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
-- **Distance-Based Results** – Filter by jump range to find nearby opportunities
-- **Ring Composition Details** – View ring density and distance from arrival
-- **Smart Sorting** – Results ranked by distance, hotspot overlaps, and ring density
-
-Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.
-
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="600"><br>  
-*Hotspot Finder showing search results with minerals filters and distance calculations.*
 
 [Back to Top](#elitemining)
 
@@ -155,8 +135,30 @@ The **EliteMining App** lets you adjust firegroups, toggles, timers, and announc
 
 ---
 
+## Hotspot Finder
+
+The Hotspot Finder provides access to a comprehensive database of 32,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities.
+
+### Key Features
+- **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
+- **Filter by Minerals** – Search for specific minerals (Painite, Platinum, Low Temperature Diamonds, etc.)
+- **Pre-loaded Database** – 32,000+ hotspots with minerals types, ring densities
+- **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
+- **Distance-Based Results** – Filter by jump range to find nearby opportunities
+- **Ring Composition Details** – View ring density and distance from arrival
+- **Smart Sorting** – Results ranked by distance, hotspot overlaps, and ring density
+
+Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="600"><br>  
+*Hotspot Finder showing search results with minerals filters and distance calculations.*
+
+[Back to Top](#elitemining)
+
+---
+
 ## Getting Started
-<details>
+<details open>
 <summary>Click to expand</summary>
 
 ### Firegroup (FG) Setup  
