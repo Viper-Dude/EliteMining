@@ -160,6 +160,12 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 | Sub-surface Displ Missile | Preset/Command | – | – |
 | Collector Limpet Controller | Preset/Command | – | Must set manually |
 
+> **⚠️ Important for Automated Firegroup Switching:**  
+> For the mining sequence automation to work correctly, **ALL firegroups (A through H) must be populated** in Elite Dangerous, even if you don't actively use them. Not populated firegroups will prevent automatic switching.
+> 
+> ![Firegroup Configuration Example](Screenshot/fg_all.png)  
+> *Example: All 8 firegroups configured (A-H). Unused groups can have any weapon assigned.*
+
 ### Key / HOTAS Bindings  
 | Action | Description |
 |--------|-------------|
