@@ -256,13 +256,14 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 ### Firegroup (FG) Setup  
 | Component | FG | Fire Button | Notes |
 |-----------|----|-------------|-------|
+| Mining Lasers (MVR) | Preset/Command | Primary | – |
 | Discovery Scanner | Preset/Command | Secondary | – |
-| Surface Scanner | A | Primary | – |
-| Mining Lasers | Preset/Command | Primary | – |
-| Collector Limpet Controller | Preset/Command | Same as Mining Lasers | Must set manually |
-| Pulse Wave Analyser | Preset/Command | Primary | – |
-| SSDM | Preset/Command | Primary | – |
 | Prospector Limpet Controller | Same as PWA | Secondary | Must set manually |
+| Pulse Wave Analyser | Preset/Command | Primary | – |
+| Seismic Charge Launcher | Preset/Command | – | – |
+| Weapons | Preset/Command | – | – |
+| Sub-surface Displ Missile | Preset/Command | – | – |
+| Collector Limpet Controller | Preset/Command | – | Must set manually |
 
 ### Key / HOTAS Bindings  
 | Action | Description |
@@ -271,6 +272,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 | Start Mining Sequence | Starts laser mining |
 | Reset Mining Sequence | Stops/resets mining |
 | Deploy Seismic Charge Launcher | Switch to launcher |
+| Deploy Sub-surface Displ Missile | Switch to SSDM |
 | Deploy Weapons | Switch to weapons |
 | Start Scanning for Cores | Scanning sequence |
 | Stop Scanning for Cores | Stops scanning |
