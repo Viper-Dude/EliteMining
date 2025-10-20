@@ -36,23 +36,24 @@ ANNOUNCEMENT_TOGGLES = {
 
 # Toggles and Timers
 TOGGLES = {
-    "Cargo Scoop": ("cargoScoopToggle.txt", "Retracts the cargo scoop when laser mining is completed."),
-    "Pulse Wave Analyser": ("Pulsewavetoggle.txt", "Switch back to the Pulse Wave Analyser firegroup when laser mining is completed."),
-    "Laser Mining Extra": ("laserminingextraToggle.txt", "Adds a second period of laser mining after a pause (see Pause timer)."),
-    "Prospector Sequence": ("miningToggle.txt", "Automatically target the prospector after launching it."),
-    "Power Settings": ("powersettingsToggle.txt", "Enable = Max power to engines, disable = balance power when laser mining is completed."),
-    "Target": ("targetToggle.txt", "Deselect prospector when laser mining is completed."),
     "Auto Honk": ("toggleHonk.txt", "Enable/disable automatic system honk on entering a new system."),
+    "Cargo Scoop": ("cargoScoopToggle.txt", "Retracts the cargo scoop when laser mining is completed."),
     "Headtracker Docking Control": ("toggleHeadtracker.txt", "Enable/disable automatic headtracker docking control (toggles the F9 key)."),
+    "Laser Mining Extra": ("laserminingextraToggle.txt", "Adds a second period of laser mining after a pause (see Pause timer)."),
+    "Night Vision": ("nightvisionToggle.txt", "Automatically turn on night vision when starting or resetting mining sequence."),
+    "Power Settings": ("powersettingsToggle.txt", "Enable = Max power to engines, disable = balance power when laser mining is completed."),
+    "Prospector Sequence": ("miningToggle.txt", "Automatically target the prospector after launching it."),
+    "Pulse Wave Analyser": ("Pulsewavetoggle.txt", "Switch back to the Pulse Wave Analyser firegroup when laser mining is completed."),
+    "Target": ("targetToggle.txt", "Deselect prospector when laser mining is completed."),
 }
 
 TIMERS = {
+    "Boost Interval": ("boostintervalValue.txt", 1, 30, "Interval between boosts when scanning for cores."),
     "Cargo Scoop Delay": ("delayCargoscoop.txt", 1, 50, "Time before retracting cargo scoop after a mining sequence."),
-    "Laser Mining Extra Delay": ("delayLaserminingExtra.txt", 1, 50, "Timer for the second period of laser mining extra is enabled."),
     "Laser Mining Duration": ("delayLaserMining.txt", 1, 50, "Duration for firing mining lasers."),
+    "Laser Mining Extra Delay": ("delayLaserminingExtra.txt", 1, 50, "Timer for the second period of laser mining extra is enabled."),
     "Pause Duration": ("delayPause.txt", 1, 50, "Pause to recharge weapons before the second period of laser mining."),
     "Target Delay": ("delayTarget.txt", 1, 50, "Delay before selecting the prospector as target after lasers fire."),
-    "Boost Interval": ("boostintervalValue.txt", 1, 30, "Interval between boosts when scanning for cores."),
 }
 
 # UI Color Schemes

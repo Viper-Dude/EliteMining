@@ -365,7 +365,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.3.2"
+APP_VERSION = "v4.3.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5053,6 +5053,7 @@ class App(tk.Tk):
     # ---------- Timers/Toggles tab ----------
     def _build_timers_tab(self, frame: ttk.Frame) -> None:
         frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(100, weight=1)  # Allow bottom content to expand
         
         # Timers section
         ttk.Label(frame, text="Timers", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
@@ -5079,8 +5080,8 @@ class App(tk.Tk):
         ttk.Separator(frame, orient='horizontal').grid(row=r, column=0, sticky="ew", pady=(20, 10))
         r += 1
         
-        # Mining Sequence Controls section
-        ttk.Label(frame, text="Mining Sequence Controls", font=("Segoe UI", 11, "bold")).grid(row=r, column=0, sticky="w")
+        # Toggles section
+        ttk.Label(frame, text="Toggles", font=("Segoe UI", 11, "bold")).grid(row=r, column=0, sticky="w")
         r += 1
         
         for name, (_fname, helptext) in TOGGLES.items():
@@ -5094,6 +5095,55 @@ class App(tk.Tk):
             # Add tooltip to checkbox
             ToolTip(checkbox, helptext)
             r += 1
+        
+        # Add logo at bottom right
+        r += 1
+        logo_frame = tk.Frame(frame, bg="#1e1e1e")
+        logo_frame.grid(row=r, column=0, sticky="se", pady=(40, 5), padx=(0, 10))
+        
+        import sys
+        
+        # Use consistent path detection like config.py
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable - images are in app folder
+            exe_dir = os.path.dirname(sys.executable)
+            parent_dir = os.path.dirname(exe_dir)
+            logo_path = os.path.join(parent_dir, 'app', 'Images', 'EliteMining_txt_logo_transp_resize.png')
+        else:
+            # Running in development mode
+            logo_path = os.path.join(os.path.dirname(__file__), 'Images', 'EliteMining_txt_logo_transp_resize.png')
+        
+        try:
+            from PIL import Image, ImageTk
+            if os.path.exists(logo_path):
+                img = Image.open(logo_path)
+                # Resize with much smaller height for compact appearance
+                img = img.resize((200, 35), Image.Resampling.LANCZOS)
+                self.timers_logo_photo = ImageTk.PhotoImage(img)
+                logo_label = tk.Label(logo_frame, image=self.timers_logo_photo, bg="#1e1e1e", cursor="hand2")
+                logo_label.pack()
+                
+                # Make logo clickable to open GitHub
+                def open_github(event=None):
+                    import webbrowser
+                    webbrowser.open("https://github.com/Viper-Dude/EliteMining")
+                logo_label.bind("<Button-1>", open_github)
+        except ImportError:
+            # Fallback to tkinter PhotoImage with subsample for resizing
+            if os.path.exists(logo_path):
+                self.timers_logo_photo = tk.PhotoImage(file=logo_path)
+                # Subsample to make it smaller
+                self.timers_logo_photo = self.timers_logo_photo.subsample(2, 2)
+                logo_label = tk.Label(logo_frame, image=self.timers_logo_photo, bg="#1e1e1e", cursor="hand2")
+                logo_label.pack()
+                
+                def open_github(event=None):
+                    import webbrowser
+                    webbrowser.open("https://github.com/Viper-Dude/EliteMining")
+                logo_label.bind("<Button-1>", open_github)
+        except Exception as e:
+            # Silently fail if logo can't be loaded
+            pass
 
     # ---------- Status helper ----------
     def _set_status(self, msg: str, clear_after: int = 5000) -> None:
