@@ -11,7 +11,7 @@ Run EliteMiningSetup.exe and follow the installer.
 <details>
 <summary><b>Can I use EliteMining without VoiceAttack?</b></summary>
 
-Yes. The app works fully in standalone mode.
+Yes. All features work in standalone mode except automated mining sequence control.
 </details>
 
 <details>
