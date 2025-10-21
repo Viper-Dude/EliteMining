@@ -365,7 +365,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.3.3"
+APP_VERSION = "v4.3.4"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5055,6 +5055,10 @@ class App(tk.Tk):
         frame.columnconfigure(0, weight=1)
         frame.rowconfigure(100, weight=1)  # Allow bottom content to expand
         
+        # DEBUG: Print TIMERS order
+        print("DEBUG: TIMERS keys order:", list(TIMERS.keys()))
+        print("DEBUG: timer_vars keys order:", list(self.timer_vars.keys()))
+        
         # Timers section
         ttk.Label(frame, text="Timers", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
         r = 1
@@ -5068,7 +5072,7 @@ class App(tk.Tk):
             sp.pack(side="left")
             
             # Label second with tooltip
-            label = ttk.Label(rowf, text=f"Set timer for {name} [{lo}..{hi}] seconds")
+            label = ttk.Label(rowf, text=f"{name} [{lo}..{hi}] seconds")
             label.pack(side="left", padx=(6, 0))
             
             # Add tooltip with the help text

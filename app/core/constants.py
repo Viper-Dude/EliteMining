@@ -48,12 +48,12 @@ TOGGLES = {
 }
 
 TIMERS = {
-    "Laser Mining Duration": ("delayLaserMining.txt", 1, 50, "Duration for firing mining lasers (first period)."),
-    "Pause Duration": ("delayPause.txt", 1, 50, "Pause between laser periods for weapon recharge (when Laser Mining Extra is enabled)."),
-    "Laser Mining Extra Delay": ("delayLaserminingExtra.txt", 1, 50, "Duration for second laser period (when Laser Mining Extra is enabled)."),
-    "Target Delay": ("delayTarget.txt", 1, 50, "Delay before selecting prospector target after laser mining."),
-    "Cargo Scoop Delay": ("delayCargoscoop.txt", 1, 50, "Delay before retracting cargo scoop after mining sequence."),
-    "Boost Interval": ("boostintervalValue.txt", 1, 30, "Interval between boosts when scanning for cores."),
+    "Duration for firing mining lasers (first period)": ("delayLaserMining.txt", 1, 50, "Duration for firing mining lasers (first period)."),
+    "Pause between laser periods for weapon recharge/cooldown": ("delayPause.txt", 1, 50, "Pause between laser periods for weapon recharge/cooldown (when Laser Mining Extra is enabled)."),
+    "Duration for second laser period (If Laser Mining Extra is enabled)": ("delayLaserminingExtra.txt", 1, 50, "Duration for second laser period (when Laser Mining Extra is enabled)."),
+    "Delay before selecting prospector target after laser mining": ("delayTarget.txt", 1, 50, "Delay before selecting prospector target after laser mining."),
+    "Delay before retracting cargo scoop after mining sequence": ("delayCargoscoop.txt", 1, 50, "Delay before retracting cargo scoop after mining sequence."),
+    "Boost Interval (For Core Mining Boost sequense )": ("boostintervalValue.txt", 1, 30, "Interval between boosts when scanning for cores."),
 }
 
 # UI Color Schemes
