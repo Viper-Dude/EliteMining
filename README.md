@@ -116,10 +116,8 @@ The installer bundles the **EliteVA plugin**. No separate download required.
 
 The **EliteMining App** lets you adjust firegroups, toggles, timers, and announcements via GUI. It can run standalone without VoiceAttack.  
 
-### Launching  
-- VoiceAttack: **"Open EliteMining"**  
-- Keyboard: **Right Alt + Right Shift + C**  
-- Direct: `\EliteMining\Configurator\EliteMining.exe` or desktop icon (if installed)  
+### Start EliteMining  
+- EliteMining Desktop icon or direct: `\EliteMining\Configurator\EliteMining.exe`
 
 [Back to Top](#top)
 
