@@ -23,7 +23,7 @@
 - [Known Limitations](#known-limitations)  
 - [Training Speech Recognition](#training-speech-recognition)  
 - [In Development](#in-development)  
-- [FAQ](#faq)  
+- [FAQ](FAQ.md)  
 - [Contact](#contact)  
 - [License](#license--third-party-notices)  
 - [Credits](#credits)  
