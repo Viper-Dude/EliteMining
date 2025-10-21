@@ -75,7 +75,7 @@ Run the app as Administrator. Add an antivirus exclusion for the install folder.
 <details>
 <summary><b>Automatic firegroup switching does not work.</b></summary>
 
-Make sure all firegroups A–H are populated in Elite Dangerous.
+Make sure all firegroups A–H are populated in Elite Dangerous. Empty firegroups prevent automated switching even if you don't use them.
 </details>
 
 <details>
