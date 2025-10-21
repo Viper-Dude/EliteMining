@@ -1,3 +1,5 @@
+<a name="top"></a>
+
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/8fmpUpn5HJ)
@@ -23,7 +25,7 @@
 - [Known Limitations](#known-limitations)  
 - [Training Speech Recognition](#training-speech-recognition)  
 - [In Development](#in-development)  
-- [FAQ](FAQ.md)  
+- [FAQ](#faq)  
 - [Contact](#contact)  
 - [License](#license--third-party-notices)  
 - [Credits](#credits)  
@@ -56,7 +58,7 @@ Full-featured mining companion with GUI controls:
 - **Hotspot Finder** – Search 32,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports  
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -86,7 +88,7 @@ VoiceAttack profile includes a dedicated **"Custom Keybinds for Mining Control"*
 
 </details>
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -106,7 +108,7 @@ The installer bundles the **EliteVA plugin**. No separate download required.
 2. Select **EliteMining-Profile.vap**  
 3. Configure your mining hotkeys in the **"Custom Keybinds for Mining Control"** category
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -119,7 +121,7 @@ The **EliteMining App** lets you adjust firegroups, toggles, timers, and announc
 - Keyboard: **Right Alt + Right Shift + C**  
 - Direct: `\EliteMining\Configurator\EliteMining.exe` or desktop icon (if installed)  
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -141,7 +143,7 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="600"><br>  
 *Hotspot Finder showing search results with minerals filters and distance calculations.*
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -183,7 +185,7 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 
 </details>
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -272,7 +274,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 </details>
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -281,7 +283,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/backup.png" width="350"><br>  
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -317,7 +319,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 </details>
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -336,7 +338,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 </details>
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -345,7 +347,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 - **Long press** → Stops/resets command  
 - Enable **"Shortcut is invoked when long-pressed"** in VoiceAttack  
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -356,7 +358,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 > **Note:** VoiceAttack startup warnings about EliteVA plugin bindings are normal due to recent Elite Dangerous changes and can be safely ignored - they don't impact EliteMining voice commands.
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -371,14 +373,14 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 </details>
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
 ## In Development  
 TBA  
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -392,7 +394,7 @@ Join our Discord server for real-time help, mining tips, and community discussio
 - **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
 - **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
@@ -404,15 +406,20 @@ Distributed under the [MIT License](LICENSE.md).
 This project bundles:  
 - **ELITEVA** © 2023 Somfic – MIT License  
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
 ## Credits  
 - [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA  
 
-[Back to Top](#elitemining)
+[Back to Top](#top)
 
 ---
 
-For common questions and troubleshooting see the [FAQ](FAQ.md).
+## FAQ
+
+For detailed answers to common questions, see our [FAQ page](FAQ.md).
+
+[Back to Top](#top)
+
