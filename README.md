@@ -414,6 +414,4 @@ This project bundles:
 
 ---
 
-For common questions and troubleshooting see the [FAQ](FAQ.md).// ...existing code...
-
-// ...existing code...// ...existing code...
+For common questions and troubleshooting see the [FAQ](FAQ.md).
