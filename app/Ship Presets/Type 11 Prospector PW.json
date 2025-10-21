@@ -9,7 +9,7 @@
       "btn": 2
     },
     "Prospector limpet:": {
-      "fg": "F",
+      "fg": "B",
       "btn": 2
     },
     "Pulse wave analyser:": {
@@ -33,18 +33,18 @@
     "Cargo Scoop": 1,
     "Pulse Wave Analyser": 1,
     "Laser Mining Extra": 0,
-    "Prospector Sequence": 0,
-    "Power Settings": 1,
+    "Prospector Sequence": 1,
+    "Power Settings": 0,
     "Target": 0,
     "Auto Honk": 1,
     "Headtracker Docking Control": 1
   },
   "Announcements": {},
   "Timers": {
-    "Cargo Scoop Delay": 8,
+    "Cargo Scoop Delay": 14,
     "Laser Mining Extra Delay": 9,
-    "Laser Mining Duration": 25,
-    "Pause Duration": 4,
+    "Laser Mining Duration": 27,
+    "Pause Duration": 1,
     "Target Delay": 10,
     "Boost Interval": 5
   }

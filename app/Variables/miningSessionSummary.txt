@@ -1,2 +1,2 @@
-Session: Praea Euq JF-Q b5-4 — 11 — 00:00:00 — Total 0t
-Ship: Panther Grabber - panthermkii | No refined materials.
+Session: Praea Euq JF-Q b5-4 — 11 — 01:05:23 — Total 169t
+Ship: Mega Bumper - Type-11 Prospector | Bromellite 169t (155.06 t/hr)
