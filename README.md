@@ -411,3 +411,47 @@ This project bundles:
 - [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA  
 
 [Back to Top](#elitemining)
+
+---
+
+For common questions and troubleshooting see the [FAQ](FAQ.md).// ...existing code...
+
+## FAQ
+
+**How do I install the app?**  
+Run EliteMiningSetup.exe and follow the installer.
+
+**Can I use the app without VoiceAttack?**  
+Yes. The app works fully in standalone mode.
+
+**How do I import the VoiceAttack profile?**  
+Open VoiceAttack → Profile → Import Profile. Choose EliteMining-Profile.vap from the install folder.
+
+**Where are reports stored?**  
+Reports are saved in the app Reports/Mining Session/ folder inside the install folder.
+
+**How do I back up or restore my setup?**  
+Open the app → Backup & Restore. Use the GUI to create or restore backups. You can also copy the install folder to a safe location.
+
+**App will not start. What should I try?**  
+Run the app as Administrator. Add an antivirus exclusion for the install folder. Reboot and try again.
+
+**Firegroup switching does not work.**  
+Ensure all firegroups A–H are populated in Elite Dangerous. Empty firegroups block automatic switching.
+
+**Hotspot finder shows no data.**  
+Log out and back into Elite Dangerous once. Make sure the game journal files are accessible to the app.
+
+**How do I change TTS voice or volume?**  
+Open the app → Settings → Interface → Text-to-Speech. Pick a voice and set volume.
+
+**How do I report bugs or get help?**  
+Join the Discord server or open a GitHub issue. Provide steps to reproduce and any log files from the install folder.
+
+**Where can I find the EliteVA requirement for VoiceAttack?**  
+Set Controls in Elite Dangerous to a saved Custom preset. This creates Custom.binds required by EliteVA.
+
+**Any other tips?**  
+Keep the app updated. Create backups before major changes or updates.
+
+// ...existing code...// ...existing code...
