@@ -39,7 +39,6 @@
 ### With VoiceAttack Integration
 All features below **plus** voice/hotkey automation:
 - Voice/hotkey mining sequences  
-- Automated collector & prospector deployment  
 - Smart targeting & laser management  
 - Custom commands & presets
 - Ship presets
