@@ -36,26 +36,29 @@
 
 ## Features and Usage Options
 
-### With VoiceAttack Integration
-All features below **plus** voice/hotkey automation:
-- Voice/hotkey mining sequences  
-- Smart targeting & laser management  
-- Custom commands & presets
-- Ship presets
-- Includes [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) (bundled with installer)
-
 ### Standalone (Without VoiceAttack)
 Full-featured mining companion with GUI controls:
 - Real-time mining statistics  
 - Automated cargo monitoring  
 - Mining announcements & notifications  
 - **Engineering materials tracking** – Monitor raw materials by grade
+- **Auto-start mining session** – Automatically begins tracking when you fire your first prospector limpet
+- **Cargo full notification** – Prompts you to end session when cargo hold is 100% full and idle for 1 minute
 - Session tracking & history  
 - Ship configuration management  
 - GUI for firegroups, timers, toggles, and announcements  
 - **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
 - **Hotspot Finder** – Search 32,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
-- **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports  
+- **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports
+
+### With VoiceAttack Integration (Optional)
+All standalone features **plus** voice/hotkey automation:
+- Voice/hotkey mining sequences  
+- Automated collector & prospector deployment  
+- Smart targeting & laser management  
+- Custom commands & presets
+- Ship presets
+- Includes [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) (bundled with installer)  
 
 [Back to Top](#top)
 

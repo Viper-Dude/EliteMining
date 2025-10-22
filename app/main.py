@@ -2082,10 +2082,17 @@ cargo panel forces Elite to write detailed inventory data.
         """Start background monitoring that works without cargo window"""
         self.last_status_mtime = 0
         self.last_capacity_check = 0
+        self.last_heartbeat = time.time()  # Track thread health
         
         def background_monitor():
             while self.journal_monitor_active:
                 try:
+                    # Heartbeat: Log every 60 seconds to verify thread is alive
+                    current_time = time.time()
+                    if current_time - self.last_heartbeat > 60:
+                        self.last_heartbeat = current_time
+                        logging.info(f"[HEARTBEAT] Background monitor alive - Materials: {len(self.materials_collected)}")
+                    
                     # Check Status.json first for ship changes (faster than journal)
                     self._check_status_for_ship_changes()
                     
@@ -2101,9 +2108,20 @@ cargo panel forces Elite to write detailed inventory data.
                     # Check for Cargo.json updates (most accurate)
                     self.read_cargo_json()
                     
-                    # Check if journal file has grown (new entries)
+                    # Check if journal file has grown (new entries) OR if a newer journal file exists
                     if self.last_journal_file and os.path.exists(self.last_journal_file):
                         current_size = os.path.getsize(self.last_journal_file)
+                        
+                        # Also check if there's a NEWER journal file (daily rotation)
+                        journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
+                        if journal_files:
+                            latest_file = max(journal_files, key=os.path.getmtime)
+                            if latest_file != self.last_journal_file:
+                                logging.info(f"[JOURNAL_ROTATION] Detected new journal file: {os.path.basename(latest_file)}")
+                                self.last_journal_file = latest_file
+                                self.last_file_size = 0  # Start reading from beginning of new file
+                                continue  # Skip to next iteration to process new file
+                        
                         if current_size > self.last_file_size:
                             self.read_new_journal_entries()
                             self.last_file_size = current_size
@@ -2112,7 +2130,9 @@ cargo panel forces Elite to write detailed inventory data.
                         self.find_latest_journal()
                         
                 except Exception as e:
-                    pass  # Silently handle errors in background
+                    logging.error(f"[BACKGROUND_MONITOR] ERROR: {e}")
+                    import traceback
+                    logging.error(traceback.format_exc())
                 
                 time.sleep(0.5)  # Keep standard 0.5s interval
         
@@ -2711,23 +2731,39 @@ cargo panel forces Elite to write detailed inventory data.
                     material_name_raw = event.get("Name_Localised", event.get("Name", "")).strip()
                     count = event.get("Count", 1)
                     
+                    logging.info(f"[MaterialCollected] Raw event data: Category={category}, Name={material_name_raw}, Count={count}")
+                    
                     if category == "Raw":
                         # Normalize material name to Title Case for matching
                         material_name = material_name_raw.title()
                         
+                        logging.debug(f"[MaterialCollected] Checking material: '{material_name}' (after title())")
+                        
                         # Only track materials in our predefined list
                         if material_name in self.MATERIAL_GRADES:
                             self.materials_collected[material_name] = self.materials_collected.get(material_name, 0) + count
+                            logging.info(f"[MaterialCollected] ✓ Added {count}x {material_name} (Total: {self.materials_collected[material_name]})")
+                            logging.debug(f"[MaterialCollected] Current materials_collected: {self.materials_collected}")
                             
                             # Update popup window display if it exists
                             if hasattr(self, 'cargo_window') and self.cargo_window:
                                 self.update_display()
+                                logging.debug("[MaterialCollected] Updated popup window display")
                             
                             # Notify main app to update integrated display
                             if self.update_callback:
                                 self.update_callback()
+                                logging.debug("[MaterialCollected] Called update_callback for integrated display")
+                            else:
+                                logging.warning("[MaterialCollected] WARNING: No update_callback registered!")
+                        else:
+                            logging.warning(f"[MaterialCollected] ✗ Material '{material_name}' not in tracked list. Available: {list(self.MATERIAL_GRADES.keys())[:5]}...")
+                    else:
+                        logging.debug(f"[MaterialCollected] ✗ Skipping non-Raw category: {category}")
                 except Exception as mat_err:
-                    print(f"Warning: Failed to process MaterialCollected event: {mat_err}")
+                    logging.error(f"[MaterialCollected] Failed to process event: {mat_err}")
+                    import traceback
+                    logging.error(traceback.format_exc())
                         
         except json.JSONDecodeError:
             pass  # Skip invalid JSON lines
