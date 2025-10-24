@@ -19,6 +19,7 @@ import re
 from core.constants import MENU_COLORS
 from local_database import LocalSystemsDatabase
 from user_database import UserDatabase
+from edsm_integration import EDSMIntegration
 
 # ToolTip class for showing helpful information
 class ToolTip:
@@ -117,11 +118,17 @@ class RingFinder:
             print(f"DEBUG: RingFinder using explicit database path: {db_path}")
             print(f"DEBUG: Current working directory: {os.getcwd()}")
             self.user_db = UserDatabase(db_path)
+            
+            # Initialize EDSM integration for automatic metadata fallback
+            self.edsm = EDSMIntegration(db_path)
         else:
             # Fall back to default path resolution
             print("DEBUG: RingFinder using default database path resolution")
             self.user_db = UserDatabase()
             print(f"DEBUG: RingFinder actual database path: {self.user_db.db_path}")
+            
+            # Initialize EDSM integration with default path
+            self.edsm = EDSMIntegration(self.user_db.db_path)
         
         # Verify database is accessible
         self._verify_database_ready()
@@ -797,6 +804,11 @@ class RingFinder:
             self.current_system_coords = reference_coords
             hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results)
             
+            # EDSM FALLBACK: Automatically fill missing ring metadata before displaying
+            # This runs silently in background - users only see complete data
+            if hotspots:
+                self._fill_missing_metadata_edsm(hotspots)
+            
             # Update UI in main thread
             self.parent.after(0, self._update_results, hotspots)
             
@@ -806,6 +818,88 @@ class RingFinder:
         finally:
             # Re-enable search button
             self.parent.after(0, lambda: self.search_btn.configure(state="normal", text="Search"))
+    
+    def _fill_missing_metadata_edsm(self, hotspots: List[Dict]):
+        """
+        Automatically fill missing ring metadata using EDSM fallback.
+        
+        This runs silently in background thread before displaying results.
+        Only queries EDSM for systems that have incomplete rings in THIS result set.
+        
+        Args:
+            hotspots: List of hotspot dicts to check and potentially update
+        """
+        try:
+            # Build set of systems with incomplete rings in THIS result set only
+            systems_needing_data = set()
+            for hotspot in hotspots:
+                if hotspot.get('ring_type') is None or hotspot.get('ls_distance') is None:
+                    system_name = hotspot.get('systemName')
+                    if system_name:
+                        systems_needing_data.add(system_name)
+            
+            if not systems_needing_data:
+                # All metadata complete in this result set
+                return
+            
+            print(f"[EDSM] {len(systems_needing_data)} systems in results need metadata, querying EDSM...")
+            
+            # Query only systems in current result set
+            stats = self.edsm.fill_missing_metadata_for_systems(list(systems_needing_data))
+            
+            if stats.get('materials_updated', 0) > 0:
+                print(f"[EDSM] ✓ Filled {stats['rings_updated']} rings ({stats['materials_updated']} materials)")
+                
+                # Refresh hotspot data from database to get updated metadata
+                self._refresh_hotspot_metadata_from_db(hotspots)
+            else:
+                print(f"[EDSM] ℹ No updates applied (rings may not exist in EDSM)")
+                
+        except Exception as e:
+            # EDSM fallback failure is non-critical - just log and continue
+            print(f"[EDSM] ⚠ Fallback failed (non-critical): {e}")
+    
+    def _refresh_hotspot_metadata_from_db(self, hotspots: List[Dict]):
+        """
+        Refresh metadata for hotspots from database after EDSM update.
+        
+        Modifies hotspot dicts in-place to include updated metadata.
+        """
+        try:
+            import sqlite3
+            conn = sqlite3.connect(self.user_db.db_path)
+            cursor = conn.cursor()
+            
+            for hotspot in hotspots:
+                system_name = hotspot.get('systemName')
+                body_name = hotspot.get('bodyName')
+                material_name = hotspot.get('type')
+                
+                if not all([system_name, body_name, material_name]):
+                    continue
+                
+                # Query updated metadata for this specific hotspot
+                cursor.execute("""
+                    SELECT ring_type, ls_distance, inner_radius, outer_radius, ring_mass, density
+                    FROM hotspot_data
+                    WHERE system_name = ? AND body_name LIKE ? AND material_name = ?
+                    LIMIT 1
+                """, (system_name, f"%{body_name}%", material_name))
+                
+                row = cursor.fetchone()
+                if row:
+                    # Update hotspot dict with fresh metadata
+                    hotspot['ring_type'] = row[0] if row[0] else hotspot.get('ring_type')
+                    hotspot['ls_distance'] = row[1] if row[1] else hotspot.get('ls_distance')
+                    hotspot['inner_radius'] = row[2] if row[2] else hotspot.get('inner_radius')
+                    hotspot['outer_radius'] = row[3] if row[3] else hotspot.get('outer_radius')
+                    hotspot['ring_mass'] = row[4] if row[4] else hotspot.get('ring_mass')
+                    hotspot['density'] = row[5] if row[5] else hotspot.get('density')
+            
+            conn.close()
+            
+        except Exception as e:
+            print(f"[EDSM] ⚠ Error refreshing metadata: {e}")
     
     def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None) -> List[Dict]:
         """Get hotspot data using user database only - no EDSM dependencies"""
@@ -1557,25 +1651,58 @@ class RingFinder:
                 cursor = conn.cursor()
                 
                 # Search for hotspots matching the material filter
+                # Use subquery to get ring metadata from ANY material in same ring, then join with specific materials
                 if material_filter == RingFinder.ALL_MINERALS:
                     cursor.execute('''
-                        SELECT DISTINCT system_name, body_name, material_name, hotspot_count, ring_type
-                        FROM hotspot_data
-                        ORDER BY hotspot_count DESC, system_name, body_name
+                        SELECT h.system_name, h.body_name, h.material_name, h.hotspot_count,
+                               COALESCE(h.ring_type, m.ring_type) as ring_type,
+                               COALESCE(h.ls_distance, m.ls_distance) as ls_distance,
+                               COALESCE(h.density, m.density) as density,
+                               COALESCE(h.inner_radius, m.inner_radius) as inner_radius,
+                               COALESCE(h.outer_radius, m.outer_radius) as outer_radius
+                        FROM hotspot_data h
+                        LEFT JOIN (
+                            SELECT system_name, body_name,
+                                   MAX(ring_type) as ring_type, MAX(ls_distance) as ls_distance,
+                                   MAX(density) as density, MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
+                            FROM hotspot_data
+                            WHERE ring_type IS NOT NULL OR ls_distance IS NOT NULL
+                            GROUP BY system_name, body_name
+                        ) m ON h.system_name = m.system_name AND h.body_name = m.body_name
+                        ORDER BY h.hotspot_count DESC, h.system_name, h.body_name
                     ''')
                 else:
                     cursor.execute('''
-                        SELECT DISTINCT system_name, body_name, material_name, hotspot_count, ring_type
-                        FROM hotspot_data
-                        WHERE material_name = ?
-                        ORDER BY hotspot_count DESC, system_name, body_name
+                        SELECT h.system_name, h.body_name, h.material_name, h.hotspot_count,
+                               COALESCE(h.ring_type, m.ring_type) as ring_type,
+                               COALESCE(h.ls_distance, m.ls_distance) as ls_distance,
+                               COALESCE(h.density, m.density) as density,
+                               COALESCE(h.inner_radius, m.inner_radius) as inner_radius,
+                               COALESCE(h.outer_radius, m.outer_radius) as outer_radius
+                        FROM hotspot_data h
+                        LEFT JOIN (
+                            SELECT system_name, body_name,
+                                   MAX(ring_type) as ring_type, MAX(ls_distance) as ls_distance,
+                                   MAX(density) as density, MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
+                            FROM hotspot_data
+                            WHERE ring_type IS NOT NULL OR ls_distance IS NOT NULL
+                            GROUP BY system_name, body_name
+                        ) m ON h.system_name = m.system_name AND h.body_name = m.body_name
+                        WHERE h.material_name = ?
+                        ORDER BY h.hotspot_count DESC, h.system_name, h.body_name
                     ''', (material_filter,))
                 
                 results = cursor.fetchall()
                 print(f" DEBUG: Found {len(results)} hotspot entries in user database")
                 
+                # DEBUG: Print first few results to see what data we're getting
+                if results:
+                    print(f" DEBUG: First result sample:")
+                    for i, row in enumerate(results[:3]):
+                        print(f"   Row {i}: system={row[0]}, body={row[1]}, material={row[2]}, count={row[3]}, ring_type={row[4]}, ls={row[5]}, density={row[6]}")
+                
                 # Process each hotspot result
-                for system_name, body_name, material_name, hotspot_count, ring_type_db in results:
+                for system_name, body_name, material_name, hotspot_count, ring_type_db, ls_distance, density, inner_radius, outer_radius in results:
                     try:
                         # Try to get coordinates for distance, but don't fail if unavailable
                         distance = 999.9  # Default for unknown distance
@@ -1601,6 +1728,10 @@ class RingFinder:
                             'data_source': 'EDTools.cc Community Data',
                             'ring_mass': 0,  # Default values for compatibility
                             'ring_type': ring_type_db if ring_type_db else 'No data',  # Use ring_type from database
+                            'ls_distance': ls_distance,  # Include LS distance from database
+                            'density': density,  # Include density from database
+                            'inner_radius': inner_radius,  # Include inner radius from database
+                            'outer_radius': outer_radius,  # Include outer radius from database
                             'debug_id': 'SECTION_1'  # Track which section created this entry
                         }
                         
@@ -1699,8 +1830,9 @@ class RingFinder:
                                 SELECT system_name, body_name, 
                                        GROUP_CONCAT(material_name || ' (' || hotspot_count || ')', ', ') as material_name,
                                        1 as hotspot_count,
-                                       x_coord, y_coord, z_coord, coord_source, 
-                                       ls_distance, density, ring_type, inner_radius, outer_radius
+                                       MAX(x_coord) as x_coord, MAX(y_coord) as y_coord, MAX(z_coord) as z_coord, MAX(coord_source) as coord_source, 
+                                       MAX(ls_distance) as ls_distance, MAX(density) as density, MAX(ring_type) as ring_type, 
+                                       MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
                                 FROM hotspot_data
                                 WHERE system_name IN ({placeholders})
                                 GROUP BY system_name, body_name
@@ -1732,8 +1864,9 @@ class RingFinder:
                             SELECT system_name, body_name, 
                                    GROUP_CONCAT(material_name || ' (' || hotspot_count || ')', ', ') as material_name,
                                    1 as hotspot_count,
-                                   x_coord, y_coord, z_coord, coord_source, 
-                                   ls_distance, density, ring_type, inner_radius, outer_radius
+                                   MAX(x_coord) as x_coord, MAX(y_coord) as y_coord, MAX(z_coord) as z_coord, MAX(coord_source) as coord_source, 
+                                   MAX(ls_distance) as ls_distance, MAX(density) as density, MAX(ring_type) as ring_type, 
+                                   MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
                             FROM hotspot_data
                             WHERE system_name LIKE ? OR system_name = ?
                             GROUP BY system_name, body_name

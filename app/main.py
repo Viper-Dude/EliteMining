@@ -365,7 +365,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.3.4"
+APP_VERSION = "v4.3.5"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -463,14 +463,20 @@ class RefineryDialog:
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
+        # Force window to appear on top
+        self.dialog.attributes('-topmost', True)
+        self.dialog.lift()
+        self.dialog.focus_force()
+        
         # Set icon using the same method as main app
         try:
             icon_path = get_app_icon_path()
             if icon_path and icon_path.endswith('.ico'):
                 self.dialog.iconbitmap(icon_path)
-            elif icon_path:
+            elif icon_path and os.path.exists(icon_path):
                 self.dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
-        except:
+        except Exception as e:
+            print(f"[RefineryDialog] Could not set icon: {e}")
             pass  # Silently handle icon loading errors
         
         # Center the dialog on parent window
@@ -1128,9 +1134,14 @@ class CargoMonitor:
         self.transparency = 90
         self.max_cargo = 200  # Will be auto-detected from journal
         self.current_cargo = 0
-        self.cargo_items = {}  # Dict of item_name: quantity
+        self.cargo_items = {}  # Dict of item_name: quantity (current cargo hold)
         self.refinery_contents = {}  # Dict of refinery material adjustments
         self.materials_collected = {}  # Dict of engineering material_name: quantity (Raw materials only)
+        
+        # Multi-session cumulative tracking (for accurate reports when cargo is transferred)
+        self.session_minerals_mined = {}  # Dict of refined material: total tons mined (includes transferred)
+        self.session_materials_collected = {}  # Dict of engineering material: total pieces collected (includes discarded)
+        
         self.update_callback = update_callback  # Callback to notify main app of changes
         self.capacity_changed_callback = capacity_changed_callback  # Callback when cargo capacity changes
         self.ship_info_changed_callback = ship_info_changed_callback  # Callback when ship info changes
@@ -1194,6 +1205,10 @@ class CargoMonitor:
         self.last_mining_activity = None
         self.session_end_dialog_shown = False
         self.mining_activity_timeout = 300  # 5 minutes of inactivity to trigger session end
+        
+        # Multi-session refinery tracking - prevent multiple prompts for same cargo empty
+        self.refinery_prompt_shown_for_this_transfer = False
+        self.last_emptied_materials = {}  # Track materials that were just emptied for refinery quick-add
         
         # Status.json file path for current ship data  
         self.status_json_path = os.path.join(self.journal_dir, "Status.json")
@@ -1620,8 +1635,8 @@ class CargoMonitor:
             count = cargo_data.get("Count", 0)
             inventory = cargo_data.get("Inventory", [])
             
-            # Clear and update cargo items
-            self.cargo_items.clear()
+            # Build new cargo dict and track changes
+            new_cargo = {}
             for item in inventory:
                 name = item.get("Name", "").lower()
                 name_localized = item.get("Name_Localised", "")
@@ -1629,14 +1644,28 @@ class CargoMonitor:
                 stolen = item.get("Stolen", 0)
                 
                 # Use localized name if available, otherwise clean up internal name
+                # ALWAYS normalize to Title Case to prevent duplicates from capitalization variations
                 if name_localized:
-                    display_name = name_localized
+                    display_name = name_localized.title()
                 else:
                     display_name = name.replace("_", " ").title()
                 
                 if display_name and item_count > 0:
-                    self.cargo_items[display_name] = item_count
+                    new_cargo[display_name] = item_count
+                    
+                    # Track session minerals for multi-session mode
+                    # Only track if a mining session is active and quantity increased
+                    if (self.session_start_snapshot and 
+                        "limpet" not in display_name.lower() and 
+                        "drone" not in display_name.lower()):
+                        old_qty = self.cargo_items.get(display_name, 0)
+                        if item_count > old_qty:
+                            added = item_count - old_qty
+                            self.session_minerals_mined[display_name] = self.session_minerals_mined.get(display_name, 0) + added
+                            print(f"[DEBUG] Cargo.json tracked {added}t of {display_name}, session total: {self.session_minerals_mined[display_name]}t")
             
+            # Update cargo items
+            self.cargo_items = new_cargo
             self.current_cargo = count
             self.update_display()
             
@@ -1909,11 +1938,28 @@ cargo panel forces Elite to write detailed inventory data.
         self.update_display()
     
     def update_cargo(self, item_name: str, quantity: int):
-        """Update cargo item quantity"""
+        """Update cargo item quantity and track session minerals"""
+        old_quantity = self.cargo_items.get(item_name, 0)
+        
         if quantity <= 0:
             self.cargo_items.pop(item_name, None)
         else:
             self.cargo_items[item_name] = quantity
+            
+            # Track session cumulative total for multi-session mode
+            # Only count increases (mining), not decreases (selling/transferring)
+            # Only track if a mining session is active
+            if (self.session_start_snapshot and 
+                quantity > old_quantity and 
+                "limpet" not in item_name.lower() and 
+                "drone" not in item_name.lower()):
+                added = quantity - old_quantity
+                self.session_minerals_mined[item_name] = self.session_minerals_mined.get(item_name, 0) + added
+                print(f"[DEBUG] Tracked {added}t of {item_name}, session total now: {self.session_minerals_mined[item_name]}t")
+                print(f"[DEBUG] Full session_minerals_mined: {self.session_minerals_mined}")
+                
+                # Reset refinery prompt flag when mining resumes (cargo increasing)
+                self.refinery_prompt_shown_for_this_transfer = False
         
         self.current_cargo = sum(self.cargo_items.values())
         self.update_display()
@@ -2067,11 +2113,19 @@ cargo panel forces Elite to write detailed inventory data.
         self.update_display()
     
     def reset_materials(self):
-        """Reset engineering materials counter (called when mining session starts)"""
+        """Reset materials counters and session tracking (called when mining session starts)"""
         self.materials_collected.clear()
+        self.session_minerals_mined.clear()
+        self.session_materials_collected.clear()
+        
+        # Take snapshot of current cargo as baseline - don't count pre-existing cargo
+        # This ensures only NEW materials mined after session start are tracked
+        # (Already handled by cargo_items being preserved, tracking only counts increases)
+        
         if hasattr(self, 'cargo_window') and self.cargo_window:
             self.update_display()
-        print("[CargoMonitor] Engineering materials counter reset")
+        print("[CargoMonitor] Materials counters and session tracking reset")
+        print(f"[CargoMonitor] Session baseline: {len(self.cargo_items)} items, {self.current_cargo}t total")
     
     def start_journal_monitoring(self):
         """Start monitoring Elite Dangerous journal files"""
@@ -2366,6 +2420,16 @@ cargo panel forces Elite to write detailed inventory data.
         import time
         from tkinter import messagebox
         
+        # Check if multi-session mode is enabled
+        is_multi_session = False
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            is_multi_session = bool(self.prospector_panel.multi_session_var.get())
+        
+        # Skip session-end refinery prompt in multi-session mode
+        # (refinery materials are already captured after each transfer/sale)
+        if is_multi_session:
+            return
+        
         # Only check if we have had mining activity and enough time has passed
         if (self.last_mining_activity and 
             not self.session_end_dialog_shown and 
@@ -2378,10 +2442,17 @@ cargo panel forces Elite to write detailed inventory data.
             if time_since_activity >= self.mining_activity_timeout:
                 self.session_end_dialog_shown = True
                 
+                # Get parent window (prefer main app over cargo window for proper positioning)
+                parent_window = None
+                if hasattr(self, 'prospector_panel') and self.prospector_panel:
+                    parent_window = self.prospector_panel.winfo_toplevel()
+                elif self.cargo_window:
+                    parent_window = self.cargo_window
+                
                 # Show refinery dialog
                 try:
                     dialog = RefineryDialog(
-                        parent=self.cargo_window if self.cargo_window else None,
+                        parent=parent_window,
                         cargo_monitor=self,
                         current_cargo_items=self.cargo_items.copy()
                     )
@@ -2424,7 +2495,8 @@ cargo panel forces Elite to write detailed inventory data.
                         messagebox.showinfo("Refinery Contents Added", 
                                           f"Added {refinery_total} tons from refinery.\n"
                                           f"New total: {self.current_cargo} tons\n\n"
-                                          f"These materials will be included in mining reports and statistics.")
+                                          f"These materials will be included in mining reports and statistics.",
+                                          parent=parent_window)
                     
                 except Exception as e:
                     print(f"Error showing refinery dialog: {e}")
@@ -2434,6 +2506,100 @@ cargo panel forces Elite to write detailed inventory data.
         import time
         self.last_mining_activity = time.time()
         self.session_end_dialog_shown = False  # Reset dialog flag if activity resumes
+    
+    def _prompt_for_refinery_contents_multi_session(self):
+        """
+        Prompt user to add refinery contents when cargo is emptied in multi-session mode.
+        Called after CargoTransfer or MarketSell events that empty the cargo hold.
+        """
+        print(f"[DEBUG] _prompt_for_refinery_contents_multi_session called")
+        print(f"[DEBUG] refinery_prompt_shown_for_this_transfer: {self.refinery_prompt_shown_for_this_transfer}")
+        print(f"[DEBUG] session_start_snapshot: {self.session_start_snapshot is not None}")
+        print(f"[DEBUG] current_cargo: {self.current_cargo}")
+        
+        # Check if multi-session mode is enabled
+        is_multi_session = False
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            is_multi_session = bool(self.prospector_panel.multi_session_var.get())
+        
+        # Only show during multi-session mode, not at session end
+        if not is_multi_session:
+            print("[DEBUG] Skipping - not in multi-session mode")
+            return
+        
+        # Prevent multiple prompts for the same cargo empty event
+        if self.refinery_prompt_shown_for_this_transfer:
+            print("[DEBUG] Skipping - already shown prompt for this transfer")
+            return
+        
+        # Don't show prompt if no mining session active
+        if not self.session_start_snapshot:
+            print("[DEBUG] Skipping - no active mining session")
+            return
+        
+        print("[DEBUG] Showing refinery prompt...")
+        try:
+            from tkinter import messagebox
+            import tkinter as tk
+            
+            # Get main app window (NOT prospector_panel subframe!)
+            parent_window = None
+            if hasattr(self, 'prospector_panel') and self.prospector_panel:
+                # Get the actual top-level window, not the panel widget
+                parent_window = self.prospector_panel.winfo_toplevel()
+            elif self.cargo_window:
+                parent_window = self.cargo_window
+            
+            # Ask if user wants to add refinery materials - use parent directly
+            add_refinery = messagebox.askyesno(
+                "Refinery Materials", 
+                "Do you have any additional materials in your refinery that you want to add to this session?",
+                parent=parent_window
+            )
+            
+            # Mark that we've shown the prompt for this transfer
+            self.refinery_prompt_shown_for_this_transfer = True
+            
+            if add_refinery:
+                try:
+                    # Open refinery dialog with materials that were just emptied
+                    dialog = RefineryDialog(
+                        parent=parent_window,
+                        cargo_monitor=self,
+                        current_cargo_items=self.last_emptied_materials  # Use materials that were just emptied
+                    )
+                    refinery_result = dialog.show()
+                    
+                    if refinery_result:  # User added refinery contents
+                        # Add refinery materials to cumulative session tracking
+                        for material_name, quantity in refinery_result.items():
+                            # Add to session_minerals_mined for report totals
+                            self.session_minerals_mined[material_name] = \
+                                self.session_minerals_mined.get(material_name, 0) + quantity
+                            print(f"[Refinery Multi-Session] Added {quantity}t of {material_name}, " + 
+                                  f"session total now: {self.session_minerals_mined[material_name]}t")
+                        
+                        # Calculate totals
+                        refinery_total = sum(refinery_result.values())
+                        print(f"[Refinery Multi-Session] Total added from refinery: {refinery_total}t")
+                        
+                        # Show confirmation
+                        messagebox.showinfo("Refinery Contents Added", 
+                                          f"Added {refinery_total} tons from refinery.\n\n"
+                                          f"These materials will be included in your multi-session mining report.",
+                                          parent=parent_window)
+                        
+                        # DON'T call update_callback here - it triggers report generation!
+                        # In multi-session mode, reports are only generated when ending the session
+                        # Just update the display statistics instead
+                        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+                            self.prospector_panel._update_statistics_display()
+                        
+                except Exception as e:
+                    print(f"Error showing refinery dialog in multi-session: {e}")
+                    
+        except Exception as e:
+            print(f"Error prompting for refinery contents: {e}")
     
     def read_new_journal_entries(self):
         """Read new entries from the journal file with retry logic for file locking issues"""
@@ -2589,15 +2755,33 @@ cargo panel forces Elite to write detailed inventory data.
                 
                 if inventory:
                     # We have detailed inventory - use it!
-                    self.cargo_items.clear()
+                    # Track changes before clearing
+                    new_cargo = {}
                     for item in inventory:
                         name = item.get("Name", "").replace("$", "").replace("_name;", "")
                         name_localized = item.get("Name_Localised", name)
-                        item_name = name_localized if name_localized else name.replace("_", " ").title()
+                        # ALWAYS normalize to Title Case to prevent duplicates from capitalization variations
+                        if name_localized:
+                            item_name = name_localized.title()
+                        else:
+                            item_name = name.replace("_", " ").title()
                         item_count = item.get("Count", 0)
                         if item_name and item_count > 0:
-                            self.cargo_items[item_name] = item_count
+                            new_cargo[item_name] = item_count
+                            
+                            # Track session minerals if quantity increased (skip limpets/drones)
+                            # Only track if a mining session is active
+                            if (self.session_start_snapshot and 
+                                "limpet" not in item_name.lower() and 
+                                "drone" not in item_name.lower()):
+                                old_qty = self.cargo_items.get(item_name, 0)
+                                if item_count > old_qty:
+                                    added = item_count - old_qty
+                                    self.session_minerals_mined[item_name] = self.session_minerals_mined.get(item_name, 0) + added
+                                    print(f"[DEBUG] Cargo event tracked {added}t of {item_name}, session total: {self.session_minerals_mined[item_name]}t")
                     
+                    # Update cargo items
+                    self.cargo_items = new_cargo
                     self.current_cargo = sum(self.cargo_items.values())
                     self.update_display()
                     
@@ -2632,6 +2816,123 @@ cargo panel forces Elite to write detailed inventory data.
                     
                     if hasattr(self, 'status_label'):
                         self.status_label.configure(text=f"💰 Sold {count}x {item_name}")
+                    
+                    # Notify prospector panel for multi-session tracking
+                    if self.update_callback:
+                        self.update_callback(event_type="MarketSell", count=count)
+                    
+                    # Check if MINERAL cargo (non-limpets) is now empty and prompt for refinery materials
+                    # Calculate cargo excluding limpets/drones
+                    has_minerals = any(item for item in self.cargo_items.keys() 
+                                      if "limpet" not in item.lower() and "drone" not in item.lower())
+                    mineral_cargo = sum(qty for item, qty in self.cargo_items.items() 
+                                       if "limpet" not in item.lower() and "drone" not in item.lower())
+                    print(f"[DEBUG] MarketSell - total_cargo: {self.current_cargo}, mineral_cargo: {mineral_cargo}, has_minerals: {has_minerals}, cargo_items: {list(self.cargo_items.keys())}, session_start_snapshot: {self.session_start_snapshot is not None}")
+                    if not has_minerals and self.session_start_snapshot:
+                        # Store minerals that were just sold for refinery quick-add
+                        self.last_emptied_materials = {item: qty for item, qty in self.cargo_items.items() 
+                                                       if "limpet" not in item.lower() and "drone" not in item.lower()}
+                        print("[DEBUG] MarketSell triggering refinery prompt (all minerals sold)")
+                        self._prompt_for_refinery_contents_multi_session()
+            
+            elif event_type == "CargoTransfer":
+                # Handle cargo transfer (e.g., to Fleet Carrier)
+                # CargoTransfer has a different structure: { "Transfers": [ { "Type": "...", "Count": N, "Direction": "..." } ] }
+                transfers = event.get("Transfers", [])
+                total_transferred = 0
+                
+                # Store minerals before they're removed for refinery quick-add
+                minerals_before_transfer = {item: qty for item, qty in self.cargo_items.items() 
+                                           if "limpet" not in item.lower() and "drone" not in item.lower()}
+                
+                for transfer in transfers:
+                    direction = transfer.get("Direction", "")
+                    type_name = transfer.get("Type", "").replace("$", "").replace("_name;", "")
+                    item_name = type_name.replace("_", " ").title()
+                    count = transfer.get("Count", 0)
+                    
+                    if direction == "toship":
+                        # Transfer FROM carrier TO ship - this is buying/retrieving, NOT mining
+                        # Update cargo but DON'T trigger mining tracking
+                        print(f"[DEBUG] CargoTransfer FROM carrier: '{item_name}' x{count}t (ignoring for mining stats)")
+                        if item_name in self.cargo_items:
+                            self.cargo_items[item_name] += count
+                        else:
+                            self.cargo_items[item_name] = count
+                        # Update display without triggering mining tracking
+                        self.current_cargo = sum(self.cargo_items.values())
+                        self.update_display()
+                        continue  # Skip mining tracking for transfers from carrier
+                        
+                    elif direction == "tocarrier":
+                        # Transfer FROM ship TO carrier - count for multi-session tracking
+                        print(f"[DEBUG] CargoTransfer TO carrier: '{item_name}' x{count}t (direction: {direction})")
+                        
+                        # Skip limpets/drones - they're not minerals
+                        if "limpet" not in item_name.lower() and "drone" not in item_name.lower():
+                            total_transferred += count
+                            print(f"[DEBUG] CargoTransfer counted: {count}t of {item_name}")
+                        else:
+                            print(f"[DEBUG] CargoTransfer skipped limpet/drone: {count}t")
+                        
+                        if item_name in self.cargo_items:
+                            new_qty = max(0, self.cargo_items[item_name] - count)
+                            if new_qty > 0:
+                                self.cargo_items[item_name] = new_qty
+                            else:
+                                del self.cargo_items[item_name]
+                
+                # Only notify if actual minerals were transferred (not just limpets)
+                if total_transferred > 0:
+                    self.current_cargo = sum(self.cargo_items.values())
+                    self.update_display()
+                    
+                    if hasattr(self, 'status_label'):
+                        self.status_label.configure(text=f"📦 Transferred {total_transferred}t to carrier")
+                    
+                    # DON'T notify prospector panel - transfers are not mining!
+                    # Multi-session tracking should only count actual mining via read_cargo_json increases
+                    # The live display counter should not show transfer tonnage as "mined"
+                    
+                    # Check if MINERAL cargo (non-limpets) is now empty and prompt for refinery materials
+                    # Calculate cargo excluding limpets/drones
+                    has_minerals = any(item for item in self.cargo_items.keys() 
+                                      if "limpet" not in item.lower() and "drone" not in item.lower())
+                    mineral_cargo = sum(qty for item, qty in self.cargo_items.items() 
+                                       if "limpet" not in item.lower() and "drone" not in item.lower())
+                    print(f"[DEBUG] CargoTransfer - total_cargo: {self.current_cargo}, mineral_cargo: {mineral_cargo}, has_minerals: {has_minerals}, cargo_items: {list(self.cargo_items.keys())}, session_start_snapshot: {self.session_start_snapshot is not None}")
+                    if not has_minerals and self.session_start_snapshot:
+                        # Store materials that were just transferred for refinery quick-add
+                        self.last_emptied_materials = minerals_before_transfer
+                        print("[DEBUG] CargoTransfer triggering refinery prompt (all minerals transferred)")
+                        self._prompt_for_refinery_contents_multi_session()
+                        
+                elif transfers:  # Transfers occurred but all were limpets
+                    print(f"[DEBUG] CargoTransfer: Only limpets transferred - not counting")
+            
+            elif event_type == "EjectCargo":
+                # Handle cargo ejection (dumping/abandoning)
+                type_name = event.get("Type", "").replace("$", "").replace("_name;", "")
+                type_localized = event.get("Type_Localised", type_name)
+                item_name = type_localized if type_localized else type_name.replace("_", " ").title()
+                count = event.get("Count", 0)
+                
+                if item_name in self.cargo_items:
+                    new_qty = max(0, self.cargo_items[item_name] - count)
+                    if new_qty > 0:
+                        self.cargo_items[item_name] = new_qty
+                    else:
+                        del self.cargo_items[item_name]
+                    
+                    self.current_cargo = sum(self.cargo_items.values())
+                    self.update_display()
+                    
+                    if hasattr(self, 'status_label'):
+                        self.status_label.configure(text=f"🗑️ Ejected {count}x {item_name}")
+                    
+                    # Notify prospector panel for multi-session tracking (counts as LOSS)
+                    if self.update_callback:
+                        self.update_callback(event_type="EjectCargo", count=count)
                         
             elif event_type in ["ModuleBuy", "ModuleSell", "ModuleSwap", "ModuleRetrieve", "ModuleStore"]:
                 # Handle module changes that might affect cargo capacity
@@ -2742,6 +3043,8 @@ cargo panel forces Elite to write detailed inventory data.
                         # Only track materials in our predefined list
                         if material_name in self.MATERIAL_GRADES:
                             self.materials_collected[material_name] = self.materials_collected.get(material_name, 0) + count
+                            # Track session cumulative total for multi-session mode
+                            self.session_materials_collected[material_name] = self.session_materials_collected.get(material_name, 0) + count
                             logging.info(f"[MaterialCollected] ✓ Added {count}x {material_name} (Total: {self.materials_collected[material_name]})")
                             logging.debug(f"[MaterialCollected] Current materials_collected: {self.materials_collected}")
                             
@@ -2931,6 +3234,10 @@ cargo panel forces Elite to write detailed inventory data.
         if not self._validate_cargo_capacity():
             # Attempt to get correct capacity
             self.refresh_ship_capacity()
+        
+        # Clear multi-session cumulative tracking for fresh session start
+        self.session_minerals_mined.clear()
+        self.session_materials_collected.clear()
             
         self.session_start_snapshot = {
             'timestamp': time.time(),
@@ -2968,22 +3275,37 @@ cargo panel forces Elite to write detailed inventory data.
             'prospector_count': self._get_prospector_count()
         }
         
+        # Check if multi-session mode is active
+        is_multi_session = False
+        if (hasattr(self, 'prospector_panel') and 
+            self.prospector_panel and 
+            hasattr(self.prospector_panel, 'multi_session_var')):
+            is_multi_session = bool(self.prospector_panel.multi_session_var.get())
+        
         # Calculate materials mined during session
         materials_mined = {}
-        start_items = self.session_start_snapshot['cargo_items']
-        end_items = end_snapshot['cargo_items']
         
-        # Find materials that increased during the session
-        for item_name, end_qty in end_items.items():
-            # Skip limpets and non-materials
-            if ("limpet" in item_name.lower() or 
-                "scrap" in item_name.lower() or 
-                "data" in item_name.lower()):
-                continue
-                
-            start_qty = start_items.get(item_name, 0)
-            if end_qty > start_qty:
-                materials_mined[item_name] = end_qty - start_qty
+        if is_multi_session:
+            # Multi-session mode: Use cumulative session tracking
+            # This includes materials that were mined and then transferred/sold
+            materials_mined = self.session_minerals_mined.copy()
+            print(f"[SESSION END] Multi-session mode: Using session_minerals_mined: {materials_mined}")
+        else:
+            # Normal mode: Compare current cargo to session start
+            start_items = self.session_start_snapshot['cargo_items']
+            end_items = end_snapshot['cargo_items']
+            
+            # Find materials that increased during the session
+            for item_name, end_qty in end_items.items():
+                # Skip limpets and non-materials
+                if ("limpet" in item_name.lower() or 
+                    "scrap" in item_name.lower() or 
+                    "data" in item_name.lower()):
+                    continue
+                    
+                start_qty = start_items.get(item_name, 0)
+                if end_qty > start_qty:
+                    materials_mined[item_name] = end_qty - start_qty
         
         # Add refinery contents to materials_mined (not just totals)
         # Check current refinery contents
@@ -3001,6 +3323,9 @@ cargo panel forces Elite to write detailed inventory data.
         # Calculate prospector limpets used (start count - end count)
         prospectors_used = max(0, self.session_start_snapshot['prospector_count'] - end_snapshot['prospector_count'])
         
+        # Build session type header suffix for reports
+        session_type_suffix = "(Multi-Session)" if is_multi_session else "(Single Session)"
+        
         session_data = {
             'start_snapshot': self.session_start_snapshot,
             'end_snapshot': end_snapshot,
@@ -3008,7 +3333,8 @@ cargo panel forces Elite to write detailed inventory data.
             'engineering_materials': self.materials_collected.copy(),  # Add engineering materials
             'prospectors_used': prospectors_used,
             'total_tons_mined': sum(materials_mined.values()),
-            'session_duration': end_snapshot['timestamp'] - self.session_start_snapshot['timestamp']
+            'session_duration': end_snapshot['timestamp'] - self.session_start_snapshot['timestamp'],
+            'session_type': session_type_suffix  # Add session type for HTML reports
         }
         
         # Log session end
@@ -3018,6 +3344,10 @@ cargo panel forces Elite to write detailed inventory data.
         
         # Clear the session tracking
         self.session_start_snapshot = None
+        
+        # Clear multi-session cumulative tracking (data already saved to session_data)
+        self.session_minerals_mined.clear()
+        self.session_materials_collected.clear()
         
         # Reset engineering materials after session ends (data already saved to session_data)
         self.materials_collected.clear()
@@ -3034,38 +3364,51 @@ cargo panel forces Elite to write detailed inventory data.
         """Get tons mined so far in current session"""
         if not self.session_start_snapshot:
             return 0.0
+        
+        # Check if multi-session mode is active via prospector panel
+        is_multi_session = False
+        if (hasattr(self, 'prospector_panel') and 
+            self.prospector_panel and 
+            hasattr(self.prospector_panel, 'multi_session_var')):
+            is_multi_session = bool(self.prospector_panel.multi_session_var.get())
+        
+        if is_multi_session:
+            # Multi-session mode: Use cumulative session tracking
+            # Sum all minerals from session_minerals_mined (already includes refinery)
+            materials_mined = sum(self.session_minerals_mined.values())
+        else:
+            # Normal mode: Compare current cargo to session start (existing behavior)
+            materials_mined = 0.0
+            start_items = self.session_start_snapshot['cargo_items']
+            current_items = self.cargo_items
             
-        materials_mined = 0.0
-        start_items = self.session_start_snapshot['cargo_items']
-        current_items = self.cargo_items
-        
-        # Calculate materials that increased during the session
-        for item_name, current_qty in current_items.items():
-            # Skip limpets and non-materials
-            if ("limpet" in item_name.lower() or 
-                "scrap" in item_name.lower() or 
-                "data" in item_name.lower()):
-                continue
-                
-            start_qty = start_items.get(item_name, 0)
-            if current_qty > start_qty:
-                materials_mined += current_qty - start_qty
-        
-        # Also check if any materials were present at start but increased
-        for item_name, start_qty in start_items.items():
-            if ("limpet" in item_name.lower() or 
-                "scrap" in item_name.lower() or 
-                "data" in item_name.lower()):
-                continue
-                
-            current_qty = current_items.get(item_name, 0)
-            if current_qty > start_qty:
-                # Already counted above, skip
-                continue
-        
-        # Add refinery contents to live calculation
-        if hasattr(self, 'refinery_contents') and self.refinery_contents:
-            materials_mined += sum(self.refinery_contents.values())
+            # Calculate materials that increased during the session
+            for item_name, current_qty in current_items.items():
+                # Skip limpets and non-materials
+                if ("limpet" in item_name.lower() or 
+                    "scrap" in item_name.lower() or 
+                    "data" in item_name.lower()):
+                    continue
+                    
+                start_qty = start_items.get(item_name, 0)
+                if current_qty > start_qty:
+                    materials_mined += current_qty - start_qty
+            
+            # Also check if any materials were present at start but increased
+            for item_name, start_qty in start_items.items():
+                if ("limpet" in item_name.lower() or 
+                    "scrap" in item_name.lower() or 
+                    "data" in item_name.lower()):
+                    continue
+                    
+                current_qty = current_items.get(item_name, 0)
+                if current_qty > start_qty:
+                    # Already counted above, skip
+                    continue
+            
+            # Add refinery contents only in normal mode
+            if hasattr(self, 'refinery_contents') and self.refinery_contents:
+                materials_mined += sum(self.refinery_contents.values())
         
         return round(materials_mined, 1)
 
@@ -3076,34 +3419,79 @@ cargo panel forces Elite to write detailed inventory data.
             dict: Material name -> tons mined (e.g., {'Platinum': 12.3, 'Painite': 8.5})
         """
         if not self.session_start_snapshot:
+            print("[DEBUG] get_live_session_materials: No session snapshot!")
             return {}
-            
+        
+        # Check if multi-session mode is active via prospector panel
+        is_multi_session = False
+        if (hasattr(self, 'prospector_panel') and 
+            self.prospector_panel and 
+            hasattr(self.prospector_panel, 'multi_session_var')):
+            is_multi_session = bool(self.prospector_panel.multi_session_var.get())
+        
+        print(f"[DEBUG] get_live_session_materials: is_multi_session={is_multi_session}")
+        print(f"[DEBUG] session_minerals_mined={self.session_minerals_mined}")
+        print(f"[DEBUG] current cargo_items={self.cargo_items}")
+        
         materials_mined = {}
-        start_items = self.session_start_snapshot['cargo_items']
-        current_items = self.cargo_items
         
-        # Calculate materials that increased during the session
-        for item_name, current_qty in current_items.items():
-            # Skip limpets and non-materials
-            if ("limpet" in item_name.lower() or 
-                "scrap" in item_name.lower() or 
-                "data" in item_name.lower()):
-                continue
-                
-            start_qty = start_items.get(item_name, 0)
-            if current_qty > start_qty:
-                materials_mined[item_name] = round(current_qty - start_qty, 1)
+        if is_multi_session:
+            # Multi-session mode: Use cumulative session tracking (already includes refinery)
+            for material_name, total_mined in self.session_minerals_mined.items():
+                materials_mined[material_name] = round(total_mined, 1)
+            print(f"[DEBUG] Multi-session materials_mined result: {materials_mined}")
+        else:
+            # Normal mode: Compare current cargo to session start (existing behavior)
+            start_items = self.session_start_snapshot['cargo_items']
+            current_items = self.cargo_items
+            
+            print(f"[DEBUG] Single-session start_items: {start_items}")
+            print(f"[DEBUG] Single-session current_items: {current_items}")
+            
+            # Calculate materials that increased during the session
+            for item_name, current_qty in current_items.items():
+                # Skip limpets and non-materials
+                if ("limpet" in item_name.lower() or 
+                    "scrap" in item_name.lower() or 
+                    "data" in item_name.lower()):
+                    continue
+                    
+                start_qty = start_items.get(item_name, 0)
+                if current_qty > start_qty:
+                    materials_mined[item_name] = round(current_qty - start_qty, 1)
+            print(f"[DEBUG] Single-session materials_mined result: {materials_mined}")
+            
+            # Add refinery contents only in normal mode
+            if hasattr(self, 'refinery_contents') and self.refinery_contents:
+                for material_name, refinery_qty in self.refinery_contents.items():
+                    if material_name in materials_mined:
+                        materials_mined[material_name] += refinery_qty
+                    else:
+                        materials_mined[material_name] = refinery_qty
+                    materials_mined[material_name] = round(materials_mined[material_name], 1)
         
-        # Add refinery contents per material
-        if hasattr(self, 'refinery_contents') and self.refinery_contents:
-            for material_name, refinery_qty in self.refinery_contents.items():
-                if material_name in materials_mined:
-                    materials_mined[material_name] += refinery_qty
-                else:
-                    materials_mined[material_name] = refinery_qty
-                materials_mined[material_name] = round(materials_mined[material_name], 1)
-        
+        print(f"[DEBUG] FINAL materials_mined (with refinery): {materials_mined}")
         return materials_mined
+
+    def get_live_session_engineering_materials(self):
+        """Get per-material engineering materials collected in current session
+        
+        Returns:
+            dict: Material name -> pieces collected (e.g., {'Carbon': 150, 'Iron': 80})
+        """
+        # Check if multi-session mode is active via prospector panel
+        is_multi_session = False
+        if (hasattr(self, 'prospector_panel') and 
+            self.prospector_panel and 
+            hasattr(self.prospector_panel, 'multi_session_var')):
+            is_multi_session = bool(self.prospector_panel.multi_session_var.get())
+        
+        if is_multi_session:
+            # Multi-session mode: Use cumulative session tracking
+            return self.session_materials_collected.copy()
+        else:
+            # Normal mode: Use current materials_collected
+            return self.materials_collected.copy()
 
     def _get_prospector_count(self):
         """Get current limpet count from cargo"""
@@ -3986,10 +4374,20 @@ class App(tk.Tk):
         # Schedule next update
         self.after(2000, self._periodic_integrated_cargo_update)  # Every 2 seconds
     
-    def _on_cargo_changed(self):
-        """Callback when cargo monitor data changes - update integrated display"""
+    def _on_cargo_changed(self, event_type=None, count=0):
+        """Callback when cargo monitor data changes - update integrated display
+        
+        Args:
+            event_type: Optional event type (MarketSell, CargoTransfer, EjectCargo)
+            count: Number of tons involved in the event
+        """
         try:
             self._update_integrated_cargo_display()
+            
+            # Forward cargo events to prospector panel for multi-session tracking
+            if event_type and count > 0 and hasattr(self, 'prospector_panel') and self.prospector_panel:
+                if hasattr(self.prospector_panel, '_on_cargo_event'):
+                    self.prospector_panel._on_cargo_event(event_type, count)
             
             # Also refresh prospector panel statistics and ship info
             if hasattr(self, 'prospector_panel') and self.prospector_panel:
@@ -4822,28 +5220,6 @@ class App(tk.Tk):
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text="Automatically check for new mining data in Elite Dangerous journals when the app starts. Disable if you prefer manual imports via Settings → Import History", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
-        r += 1
-        
-        # Auto-start session on first prospector checkbox
-        tk.Checkbutton(scrollable_frame, text="Auto-start Session on First Prospector Launch", variable=self.auto_start_session, 
-                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
-                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
-                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
-        r += 1
-        tk.Label(scrollable_frame, text="Automatically start a mining session when you fire your first prospector limpet. The session will only auto-start if no session is currently active.", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
-        r += 1
-
-        # Prompt when cargo full checkbox
-        tk.Checkbutton(scrollable_frame, text="Prompt when cargo full (idle 1 min)", variable=self.prompt_on_cargo_full, 
-                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
-                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
-                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
-        r += 1
-        tk.Label(scrollable_frame, text="Shows a prompt to end the session when cargo is 100% full and has been idle (no cargo changes) for 1 minute. Helps you remember to save your session before unloading cargo.", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 

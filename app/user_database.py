@@ -397,6 +397,28 @@ class UserDatabase:
                           ring_type, ls_distance, inner_radius, outer_radius, ring_mass, density))
                     log.debug(f"Added hotspot: {system_name} - {body_name} - {material_name} x{hotspot_count}")
                 
+                # Back-fill ring metadata to other materials in the same ring
+                # This ensures all materials in a ring share the same metadata (ls_distance, ring_type, density, etc.)
+                if any([ls_distance, ring_type, inner_radius, outer_radius, ring_mass, density]):
+                    cursor.execute('''
+                        UPDATE hotspot_data
+                        SET ls_distance = COALESCE(ls_distance, ?),
+                            ring_type = COALESCE(ring_type, ?),
+                            inner_radius = COALESCE(inner_radius, ?),
+                            outer_radius = COALESCE(outer_radius, ?),
+                            ring_mass = COALESCE(ring_mass, ?),
+                            density = COALESCE(density, ?)
+                        WHERE system_name = ? 
+                          AND body_name = ? 
+                          AND material_name != ?
+                          AND (ls_distance IS NULL OR ring_type IS NULL OR density IS NULL)
+                    ''', (ls_distance, ring_type, inner_radius, outer_radius, ring_mass, density,
+                          system_name, body_name, material_name))
+                    
+                    updated_count = cursor.rowcount
+                    if updated_count > 0:
+                        log.info(f"Back-filled ring metadata to {updated_count} other materials in {system_name} - {body_name}")
+                
                 conn.commit()
                 
         except Exception as e:
@@ -520,6 +542,45 @@ class UserDatabase:
                 
         except Exception as e:
             log.error(f"Error getting LS distance for {system_name} - {body_name}: {e}")
+            return None
+    
+    def get_ring_metadata(self, system_name: str, body_name: str) -> Optional[dict]:
+        """Get ring metadata from database (for previously scanned rings)
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the celestial body (e.g., "2 A Ring")
+            
+        Returns:
+            Dictionary with ring_type, ls_distance, density, etc. if available, None otherwise
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT ring_type, ls_distance, density, inner_radius, outer_radius, ring_mass
+                    FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ?
+                      AND (ring_type IS NOT NULL OR ls_distance IS NOT NULL)
+                    LIMIT 1
+                ''', (system_name, body_name))
+                
+                result = cursor.fetchone()
+                if result:
+                    metadata = {
+                        'ring_type': result[0],
+                        'ls_distance': result[1],
+                        'density': result[2],
+                        'inner_radius': result[3],
+                        'outer_radius': result[4],
+                        'ring_mass': result[5]
+                    }
+                    log.info(f"Retrieved ring metadata from database: {system_name} - {body_name} = {metadata}")
+                    return metadata
+                return None
+                
+        except Exception as e:
+            log.error(f"Error getting ring metadata for {system_name} - {body_name}: {e}")
             return None
     
     def format_hotspots_for_display(self, system_name: str, body_name: str) -> str:

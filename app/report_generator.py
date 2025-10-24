@@ -971,7 +971,26 @@ class ReportGenerator:
             except:
                 materials_count = 0
         
+        # Get session type (from cargo data or parse from header as fallback)
+        session_type = session_data.get('session_type', '')
+        if not session_type:
+            # Fallback: Parse from header if session_type not in data
+            header = session_data.get('header', '')
+            if "(Multi-Session)" in header:
+                session_type = "Multi-Session"
+            elif "(Single Session)" in header:
+                session_type = "Single Session"
+            else:
+                session_type = "Single Session"  # Default
+        else:
+            # Clean up session_type (remove parentheses if present)
+            session_type = session_type.replace("(", "").replace(")", "")
+        
         stats_html = f"""
+        <div class="stat-card">
+            <div class="stat-value">{session_type}</div>
+            <div class="stat-label">Session Type</div>
+        </div>
         <div class="stat-card">
             <div class="stat-value">{self._safe_float(tons_value):.1f}</div>
             <div class="stat-label">Total Tons Mined</div>

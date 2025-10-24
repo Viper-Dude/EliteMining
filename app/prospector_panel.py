@@ -468,16 +468,47 @@ class ProspectorPanel(ttk.Frame):
         self.session_paused_seconds: float = 0.0
         self.session_system = tk.StringVar(value="")
         self.session_body = tk.StringVar(value="")
+        self.session_mining_body = ""  # Preserved mining location (won't be overwritten by docking events)
         self.session_elapsed = tk.StringVar(value="00:00:00")
         self.session_totals: Dict[str, float] = {}
         
         # Auto-start session on first prospector
-        self.auto_start_on_prospector = False  # Will be set by main app from preferences
+        # Auto-start session - load from toggle file
+        self.auto_start_on_prospector = False
+        try:
+            auto_start_file = os.path.join(self.vars_dir, "autoStartSession.txt")
+            if os.path.exists(auto_start_file):
+                with open(auto_start_file, 'r') as f:
+                    self.auto_start_on_prospector = f.read().strip() == "1"
+        except:
+            pass
         
-        # Prompt when cargo full and idle
-        self.prompt_on_cargo_full = False  # Will be set by main app from preferences
+        # Prompt when cargo full - load from toggle file
+        self.prompt_on_cargo_full = False
         self.cargo_full_start_time = None  # Track when cargo became full
         self.cargo_full_prompted = False  # Track if we already prompted
+        try:
+            prompt_full_file = os.path.join(self.vars_dir, "promptWhenFull.txt")
+            if os.path.exists(prompt_full_file):
+                with open(prompt_full_file, 'r') as f:
+                    self.prompt_on_cargo_full = f.read().strip() == "1"
+        except:
+            pass
+        
+        # Multi-session mode - load from toggle file
+        self.multi_session_mode = False  # Accumulate stats across multiple cargo loads
+        try:
+            multi_session_file = os.path.join(self.vars_dir, "multiSessionMode.txt")
+            if os.path.exists(multi_session_file):
+                with open(multi_session_file, 'r') as f:
+                    self.multi_session_mode = f.read().strip() == "1"
+        except:
+            pass
+        
+        # Multi-session cumulative tracking (only used when multi_session_mode=True)
+        self.session_total_mined = 0  # Total tons mined in session (cumulative)
+        self.session_sold_transferred = 0  # Tons sold or transferred to carrier
+        self.session_ejected = 0  # Tons lost by dumping/abandoning
 
         # UI
         self._build_ui()
@@ -498,6 +529,10 @@ class ProspectorPanel(ttk.Frame):
         self.after(500, self._auto_rebuild_csv_on_startup)
         
         self.after(1000, self._tick)
+        
+        # Link cargo monitor back to this prospector panel for multi-session mode detection
+        if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
+            self.main_app.cargo_monitor.prospector_panel = self
         
         # Switch to real-time mode after startup processing is complete
         self.after(2000, self._enable_realtime_mode)
@@ -1329,18 +1364,14 @@ class ProspectorPanel(ttk.Frame):
         self.cancel_btn.pack(side="left", padx=(4, 0))
         self.ToolTip(self.cancel_btn, "Cancel the current session without saving")
         
-        # Center: Elapsed time display + auto-start checkbox
-        elapsed_frame = ttk.Frame(controls_frame)
-        elapsed_frame.grid(row=0, column=1, sticky="ew", padx=(10, 10))
+        # Session options frame (below buttons for checkboxes)
+        options_frame = ttk.Frame(controls_frame)
+        options_frame.grid(row=1, column=0, sticky="w", pady=(4, 0))
         
-        ttk.Label(elapsed_frame, text="Elapsed:").pack(side="left")
-        self.elapsed_lbl = ttk.Label(elapsed_frame, textvariable=self.session_elapsed, font=("Segoe UI", 9, "bold"))
-        self.elapsed_lbl.pack(side="left", padx=(6, 0))
-        
-        # Auto-start session checkbox (synced with Settings tab)
-        self.auto_start_var = tk.IntVar(value=0)
+        # Auto-start session checkbox
+        self.auto_start_var = tk.IntVar(value=1 if self.auto_start_on_prospector else 0)
         auto_start_cb = tk.Checkbutton(
-            elapsed_frame, 
+            options_frame, 
             text="Auto-start", 
             variable=self.auto_start_var,
             command=self._on_auto_start_checkbox_toggle,
@@ -1357,13 +1388,13 @@ class ProspectorPanel(ttk.Frame):
             anchor="w", 
             relief="flat"
         )
-        auto_start_cb.pack(side="left", padx=(15, 0))
+        auto_start_cb.pack(side="left")
         self.ToolTip(auto_start_cb, "Automatically start session when first prospector limpet is fired\n(Only works when no session is active)")
         
-        # Prompt when cargo full checkbox (synced with Settings tab)
-        self.prompt_on_full_var = tk.IntVar(value=0)
-        prompt_on_full_cb = tk.Checkbutton(
-            elapsed_frame, 
+        # Prompt when cargo full checkbox
+        self.prompt_on_full_var = tk.IntVar(value=1 if self.prompt_on_cargo_full else 0)
+        self.prompt_on_full_cb = tk.Checkbutton(
+            options_frame, 
             text="Prompt when full", 
             variable=self.prompt_on_full_var,
             command=self._on_prompt_on_full_checkbox_toggle,
@@ -1380,8 +1411,39 @@ class ProspectorPanel(ttk.Frame):
             anchor="w", 
             relief="flat"
         )
-        prompt_on_full_cb.pack(side="left", padx=(10, 0))
-        self.ToolTip(prompt_on_full_cb, "Show prompt to end session when cargo is 100% full\nand has been idle (no changes) for 1 minute\nRemember to end session BEFORE unloading cargo!")
+        self.prompt_on_full_cb.pack(side="left", padx=(10, 0))
+        self.ToolTip(self.prompt_on_full_cb, "Show prompt to end session when cargo is 100% full\nand has been idle (no changes) for 1 minute\nRemember to end session BEFORE unloading cargo!")
+        
+        # Multi-session mode checkbox
+        self.multi_session_var = tk.IntVar(value=1 if self.multi_session_mode else 0)
+        multi_session_cb = tk.Checkbutton(
+            options_frame, 
+            text="Multi-Session", 
+            variable=self.multi_session_var,
+            command=self._on_multi_session_checkbox_toggle,
+            bg="#1e1e1e", 
+            fg="#ffffff", 
+            selectcolor="#1e1e1e", 
+            activebackground="#1e1e1e",
+            activeforeground="#ffffff", 
+            highlightthickness=0, 
+            bd=0, 
+            font=("Segoe UI", 8),
+            padx=8, 
+            pady=0, 
+            anchor="w", 
+            relief="flat"
+        )
+        multi_session_cb.pack(side="left", padx=(10, 0))
+        self.ToolTip(multi_session_cb, "Accumulate statistics across multiple cargo loads\nStats won't reset until you manually end the session")
+        
+        # Center: Elapsed time display
+        elapsed_frame = ttk.Frame(controls_frame)
+        elapsed_frame.grid(row=0, column=1, sticky="ew", padx=(10, 10))
+        
+        ttk.Label(elapsed_frame, text="Elapsed:").pack(side="left")
+        self.elapsed_lbl = ttk.Label(elapsed_frame, textvariable=self.session_elapsed, font=("Segoe UI", 9, "bold"))
+        self.elapsed_lbl.pack(side="left", padx=(6, 0))
         
         # Right side: Export button (Reports moved to dedicated tab)
         buttons_frame = ttk.Frame(controls_frame)
@@ -1985,9 +2047,13 @@ class ProspectorPanel(ttk.Frame):
             ), tags=(tag,))
             
             # After inserting, check with actual tree values for consistency
-            tree_values = tree.item(item_id, 'values')
-            if len(tree_values) >= 4:
-                tree_report_id = f"{tree_values[0]}_{tree_values[2]}_{tree_values[3]}"
+            # Use column names instead of indices to avoid breakage when columns are added
+            date_val = tree.set(item_id, "date")
+            ship_val = tree.set(item_id, "ship")
+            system_val = tree.set(item_id, "system")
+            
+            if date_val and ship_val and system_val:
+                tree_report_id = f"{date_val}_{ship_val}_{system_val}"
                 
                 # Update enhanced column with correct check
                 actual_enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
@@ -3739,9 +3805,36 @@ class ProspectorPanel(ttk.Frame):
                     self.tree.delete(item)
             
             # Also clear the history data so only current session asteroids show up
-            self.history = []
+            # BUT: In multi-session mode, keep history to accumulate across cargo runs
+            if not self.multi_session_mode:
+                self.history = []
         except Exception as e:
             print(f"Failed to clear prospector reports: {e}")
+    
+    def _on_cargo_event(self, event_type: str, count: int):
+        """Handle cargo events for multi-session tracking
+        
+        Args:
+            event_type: 'MarketSell', 'CargoTransfer', or 'EjectCargo'
+            count: Number of tons sold/transferred/ejected
+        """
+        if not self.multi_session_mode:
+            return  # Only track in multi-session mode
+        
+        try:
+            if event_type in ["MarketSell", "CargoTransfer"]:
+                # Success - sold or transferred to carrier
+                self.session_sold_transferred += count
+                print(f"[Multi-Session] {event_type}: +{count}t (Total sold/transferred: {self.session_sold_transferred}t)")
+            elif event_type == "EjectCargo":
+                # Loss - dumped/abandoned
+                self.session_ejected += count
+                print(f"[Multi-Session] Ejected: +{count}t (Total lost: {self.session_ejected}t)")
+            
+            # Update display to show new totals
+            self._refresh_statistics_display()
+        except Exception as e:
+            print(f"Error tracking cargo event: {e}")
 
     def _track_session_yield_data(self, materials_txt: str):
         """Extract and store yield data from prospector report during session"""
@@ -4453,9 +4546,13 @@ class ProspectorPanel(ttk.Frame):
                         ))
                         
                         # Check detailed report using tree values for consistency
-                        tree_values = self.reports_tree.item(item_id, 'values')
-                        if len(tree_values) >= 4:
-                            tree_report_id = f"{tree_values[0]}_{tree_values[2]}_{tree_values[3]}"
+                        # Use column names instead of indices to avoid breakage when columns are added
+                        date_val = self.reports_tree.set(item_id, "date")
+                        ship_val = self.reports_tree.set(item_id, "ship")
+                        system_val = self.reports_tree.set(item_id, "system")
+                        
+                        if date_val and ship_val and system_val:
+                            tree_report_id = f"{date_val}_{ship_val}_{system_val}"
                             enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
                             self.reports_tree.set(item_id, "enhanced", enhanced_indicator)
         except Exception as e:
@@ -4501,7 +4598,7 @@ class ProspectorPanel(ttk.Frame):
         self.ToolTip(date_filter_combo, "Filter sessions by date, yield performance, hit rate, or materials")
 
         # Create sortable treeview with Material Analysis columns (Ship column added - parsed from journal files)
-        self.reports_tree_tab = ttk.Treeview(main_frame, columns=("date", "duration", "ship", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"), show="headings", height=16, selectmode="extended")
+        self.reports_tree_tab = ttk.Treeview(main_frame, columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "asteroids", "materials", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"), show="headings", height=16, selectmode="extended")
         self.reports_tree_tab.grid(row=1, column=0, sticky="nsew")
         
         # Note: Tooltip bindings are set up later with the combined_motion_handler
@@ -4513,6 +4610,7 @@ class ProspectorPanel(ttk.Frame):
         # Configure column headings
         self.reports_tree_tab.heading("date", text="Date/Time")
         self.reports_tree_tab.heading("duration", text="Duration")
+        self.reports_tree_tab.heading("session_type", text="Type")
         self.reports_tree_tab.heading("ship", text="Ship")
         self.reports_tree_tab.heading("system", text="System")
         self.reports_tree_tab.heading("body", text="Planet/Ring")
@@ -4609,6 +4707,7 @@ class ProspectorPanel(ttk.Frame):
         
         self.reports_tree_tab.column("date", width=105, stretch=False, anchor="w")
         self.reports_tree_tab.column("duration", width=80, stretch=False, anchor="center")
+        self.reports_tree_tab.column("session_type", width=90, stretch=False, anchor="center")
         self.reports_tree_tab.column("ship", width=250, stretch=False, anchor="w")
         self.reports_tree_tab.column("system", width=230, stretch=False, anchor="w")
         self.reports_tree_tab.column("body", width=125, stretch=False, anchor="center")
@@ -5341,14 +5440,18 @@ class ProspectorPanel(ttk.Frame):
         # Use the existing popup comment editor
         self._edit_comment(self.reports_tree_tab, item)
 
-    def _get_ship_name_from_session(self, system: str, body: str, timestamp_raw: str) -> str:
-        """Parse ship name from session TXT file"""
+    def _get_ship_name_from_session(self, system: str, body: str, timestamp_raw: str) -> tuple:
+        """
+        Parse ship name from session TXT file.
+        Returns: (ship_name, file_path) tuple
+        """
         try:
             # Build the filename from session metadata
             # Format: Session_YYYY-MM-DD_HH-MM-SS_System_Body.txt
             # NOTE: Spaces in system/body names are replaced with underscores in filenames
             if not timestamp_raw:
-                return ""
+                print(f"[DEBUG] Ship name parse - no timestamp_raw")
+                return ("", "")
             
             # Parse timestamp to get date/time parts for filename
             import datetime as dt
@@ -5362,8 +5465,9 @@ class ProspectorPanel(ttk.Frame):
                 # Format timestamp for filename: YYYY-MM-DD_HH-MM-SS
                 date_str = session_time.strftime("%Y-%m-%d")
                 time_str = session_time.strftime("%H-%M-%S")
-            except:
-                return ""
+            except Exception as e:
+                print(f"[DEBUG] Ship name parse - timestamp parse failed: {e}")
+                return ("", "")
             
             # Replace spaces with underscores in system and body names to match filename format
             system_filename = system.replace(" ", "_")
@@ -5373,12 +5477,34 @@ class ProspectorPanel(ttk.Frame):
             filename_base = f"Session_{date_str}_{time_str}_{system_filename}_{body_filename}.txt"
             txt_path = os.path.join(self.reports_dir, filename_base)
             
+            print(f"[DEBUG] Ship name parse - looking for: {filename_base}")
+            
+            # If exact filename doesn't exist, search for files matching timestamp and system
+            # This handles cases where body name in CSV differs from filename (e.g., carrier vs ring location)
             if not os.path.exists(txt_path):
-                return ""
+                print(f"[DEBUG] Ship name parse - exact file not found, searching by timestamp and system...")
+                import glob
+                
+                # Search pattern: Session_YYYY-MM-DD_HH-MM-SS_System_*.txt
+                search_pattern = f"Session_{date_str}_{time_str}_{system_filename}_*.txt"
+                search_path = os.path.join(self.reports_dir, search_pattern)
+                
+                matching_files = glob.glob(search_path)
+                if matching_files:
+                    # Use the first match (should only be one file per timestamp+system)
+                    txt_path = matching_files[0]
+                    print(f"[DEBUG] Ship name parse - found match: {os.path.basename(txt_path)}")
+                else:
+                    print(f"[DEBUG] Ship name parse - no matching files for pattern: {search_pattern}")
+                    return ("", "")
+            else:
+                print(f"[DEBUG] Ship name parse - exact file found")
             
             # Read the TXT file
             with open(txt_path, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
+            
+            print(f"[DEBUG] Ship name parse - file content first 200 chars: {content[:200]}")
             
             # Format: "Session: SYSTEM — BODY — DURATION — Total XXXt\nShip: SHIP_NAME | materials..."
             ship_match = content.find("\nShip: ")
@@ -5392,17 +5518,21 @@ class ProspectorPanel(ttk.Frame):
                     ship_end = len(content)
                 
                 ship_name = content[ship_start:ship_end].strip()
+                print(f"[DEBUG] Ship name parse - extracted: '{ship_name}'")
                 
                 # Remove ship ID in parentheses (e.g., "(VIPD68)") from display
                 # Example: "Mega Bumper (VIPD68) - Type-11 Prospector" → "Mega Bumper - Type-11 Prospector"
                 import re
-                ship_name = re.sub(r'\s*\([A-Z0-9-]+\)\s*', ' ', ship_name).strip()
+                ship_name_cleaned = re.sub(r'\s*\([A-Z0-9-]+\)\s*', ' ', ship_name).strip()
+                print(f"[DEBUG] Ship name parse - after regex: '{ship_name_cleaned}'")
                 
-                return ship_name if ship_name else ""
+                return (ship_name_cleaned if ship_name_cleaned else "", txt_path)
             
-            return ""
+            print(f"[DEBUG] Ship name parse - 'Ship:' line not found in file")
+            return ("", txt_path)
         except Exception as e:
-            return ""
+            print(f"[DEBUG] Ship name parse - exception: {e}")
+            return ("", "")
 
     def _refresh_reports_tab(self) -> None:
         """Refresh the reports tab data"""
@@ -5755,23 +5885,32 @@ class ProspectorPanel(ttk.Frame):
                     except Exception as e:
                         eng_materials_display = eng_materials_raw  # Fallback to raw string
                 
-                # Get ship name from miningSessionSummary.txt
-                ship_name = self._get_ship_name_from_session(
+                # Get ship name and file path from miningSessionSummary.txt
+                print(f"[DEBUG] Parsing session - system: '{session['system']}', body: '{session['body']}', timestamp: '{session['timestamp_raw']}'")
+                ship_name, file_path = self._get_ship_name_from_session(
                     session['system'],
                     session['body'],
                     session['timestamp_raw']
                 )
+                print(f"[DEBUG] Ship name result: '{ship_name}'")
+                
+                # Extract session type from TXT file (or use existing field if available)
+                session['file_path'] = file_path  # Store for later use
+                session_type = self._extract_session_type_from_data(session)
+                # Shorten for display: "Multi-Session" → "Multi", "Single Session" → "Single"
+                session_type_display = "Multi" if "Multi" in session_type else "Single"
                 
                 item_id = self.reports_tree_tab.insert("", "end", values=(
                     session['date'],
                     session['duration'],
+                    session_type_display,  # Session Type column - parsed from TXT file
                     ship_name,  # Ship column - parsed from TXT file
                     session['system'], 
                     session['body'],
                     session['tons'],
                     session['tph'],
-                    session['materials'],
-                    session['asteroids'],
+                    session['asteroids'],  # Prospected column (position 8: "asteroids")
+                    session['materials'],  # Mat Types column (position 9: "materials")
                     session['hit_rate'],
                     session['quality'],
                     session['cargo'],
@@ -5782,13 +5921,18 @@ class ProspectorPanel(ttk.Frame):
                 ))
                 
                 # Check detailed report using tree values for consistency
-                tree_values = self.reports_tree_tab.item(item_id, 'values')
-                if len(tree_values) >= 4:
-                    tree_report_id = f"{tree_values[0]}_{tree_values[2]}_{tree_values[3]}"
+                # Use column names instead of indices to avoid breakage when columns are added
+                date_val = self.reports_tree_tab.set(item_id, "date")
+                ship_val = self.reports_tree_tab.set(item_id, "ship")
+                system_val = self.reports_tree_tab.set(item_id, "system")
+                
+                if date_val and ship_val and system_val:
+                    tree_report_id = f"{date_val}_{ship_val}_{system_val}"
                     enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
                     self.reports_tree_tab.set(item_id, "enhanced", enhanced_indicator)
-                # Store the full session data for tooltip lookup (including ship name)
+                # Store the full session data for tooltip lookup (including ship name and file path)
                 session['ship_name'] = ship_name  # Add ship name to session data for HTML report generation
+                session['file_path'] = file_path  # Add file path for session type extraction
                 self.reports_tab_session_lookup[item_id] = session
             
             # Apply initial word wrap state for reports tab
@@ -5849,6 +5993,11 @@ class ProspectorPanel(ttk.Frame):
                 hasattr(self.main_app.cargo_monitor, 'get_live_session_tons')):
                 try:
                     live_tons = self.main_app.cargo_monitor.get_live_session_tons()
+                    
+                    # Multi-session mode: live_tons already includes ALL mined materials
+                    # (session_minerals_mined tracks cumulative total including sold/transferred)
+                    # DO NOT add sold/transferred again - it would be double counting!
+                    
                     # Calculate TPH based on elapsed time
                     elapsed_str = self.session_elapsed.get()
                     if elapsed_str and elapsed_str != "00:00:00":
@@ -6287,6 +6436,25 @@ class ProspectorPanel(ttk.Frame):
                 name = _clean_name(evt.get("Type_Localised") or evt.get("Type") or "")
                 if name:
                     self.session_totals[name] = self.session_totals.get(name, 0.0) + 1.0  # 1 ton per refine
+                    
+                    # Update session location from actual mining location (not carrier/station where session started)
+                    if not self.session_location_captured_from_mining:
+                        if self.last_system:
+                            self.session_system.set(self.last_system)
+                            print(f"[Session Location] Updated system from mining: {self.last_system}")
+                        if self.last_body:
+                            body_display = _extract_location_display(
+                                self.last_body, 
+                                self.last_body_type, 
+                                self.last_station_name, 
+                                self.last_carrier_name
+                            )
+                            self.session_body.set(body_display)
+                            # PRESERVE mining location for report (won't be overwritten by docking)
+                            self.session_mining_body = body_display
+                            print(f"[Session Location] Updated body from mining: {body_display}")
+                            print(f"[Session Location] PRESERVED mining body: {self.session_mining_body}")
+                        self.session_location_captured_from_mining = True
 
     def _summaries_from_event(self, evt: Dict[str, Any]) -> Tuple[str, str, str, str, str, bool]:
         t = evt.get("timestamp")
@@ -6524,6 +6692,11 @@ class ProspectorPanel(ttk.Frame):
                 hasattr(self.main_app.cargo_monitor, 'get_live_session_tons')):
                 try:
                     live_tons = self.main_app.cargo_monitor.get_live_session_tons()
+                    
+                    # Multi-session mode: live_tons already includes ALL mined materials
+                    # (session_minerals_mined tracks cumulative total including sold/transferred)
+                    # DO NOT add sold/transferred again - it would be double counting!
+                    
                     # Calculate TPH based on elapsed time
                     elapsed_str = self.session_elapsed.get()
                     if elapsed_str and elapsed_str != "00:00:00":
@@ -6536,7 +6709,16 @@ class ProspectorPanel(ttk.Frame):
             
             if total_asteroids > 0 or live_tons > 0:
                 if live_tons > 0:
-                    summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
+                    base_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
+                    
+                    # Add multi-session info if enabled
+                    if self.multi_session_mode and (self.session_sold_transferred > 0 or self.session_ejected > 0):
+                        multi_session_text = f" | Sold/Stored: {self.session_sold_transferred:.0f}t"
+                        if self.session_ejected > 0:
+                            multi_session_text += f" | Lost: {self.session_ejected:.0f}t"
+                        summary_text = base_text + multi_session_text
+                    else:
+                        summary_text = base_text
                 else:
                     summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits}"
                 self.stats_summary_label.config(text=summary_text, foreground="#e6e6e6")
@@ -6631,6 +6813,8 @@ class ProspectorPanel(ttk.Frame):
         self.session_elapsed.set("00:00:00")
         self.session_screenshots = []  # Initialize screenshots list for this session
         self.session_yield_data = {}  # Track yield data during session {material: [percentages]}
+        self.session_location_captured_from_mining = False  # Flag to update location on first material collected
+        self.session_mining_body = ""  # Reset preserved mining location for new session
         
         # Reset and start mining statistics for new session
         self.session_analytics.start_session()
@@ -6642,9 +6826,16 @@ class ProspectorPanel(ttk.Frame):
         # Start cargo tracking for material breakdown
         if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
             self.main_app.cargo_monitor.start_session_tracking()
-            # Reset engineering materials counter for new session
+            # Reset engineering materials counter for new session (unless multi-session mode)
             if hasattr(self.main_app.cargo_monitor, 'reset_materials'):
-                self.main_app.cargo_monitor.reset_materials()
+                if not self.multi_session_mode:
+                    self.main_app.cargo_monitor.reset_materials()
+        
+        # ALWAYS reset multi-session cumulative tracking when starting a NEW session
+        # Multi-session mode means "accumulate during THIS session", not "accumulate forever"
+        self.session_total_mined = 0
+        self.session_sold_transferred = 0
+        self.session_ejected = 0
 
         self.start_btn.config(state="disabled")
         self.pause_resume_btn.config(state="normal", text="Pause")
@@ -6657,9 +6848,13 @@ class ProspectorPanel(ttk.Frame):
         enabled = bool(self.auto_start_var.get())
         self.auto_start_on_prospector = enabled
         
-        # Sync with main app setting (Settings tab)
-        if self.main_app and hasattr(self.main_app, 'auto_start_session'):
-            self.main_app.auto_start_session.set(1 if enabled else 0)
+        # Save to toggle file
+        try:
+            auto_start_file = os.path.join(self.vars_dir, "autoStartSession.txt")
+            with open(auto_start_file, 'w') as f:
+                f.write("1" if enabled else "0")
+        except:
+            pass
         
         self._set_status(f"Auto-start session on first prospector {'enabled' if enabled else 'disabled'}")
 
@@ -6668,16 +6863,53 @@ class ProspectorPanel(ttk.Frame):
         enabled = bool(self.prompt_on_full_var.get())
         self.prompt_on_cargo_full = enabled
         
-        # Sync with main app setting (Settings tab)
-        if self.main_app and hasattr(self.main_app, 'prompt_on_cargo_full'):
-            self.main_app.prompt_on_cargo_full.set(1 if enabled else 0)
+        # Save to toggle file
+        try:
+            prompt_full_file = os.path.join(self.vars_dir, "promptWhenFull.txt")
+            with open(prompt_full_file, 'w') as f:
+                f.write("1" if enabled else "0")
+        except:
+            pass
         
         self._set_status(f"Prompt when cargo full {'enabled' if enabled else 'disabled'}")
+    
+    def _on_multi_session_checkbox_toggle(self) -> None:
+        """Called when multi-session checkbox is toggled"""
+        enabled = bool(self.multi_session_var.get())
+        self.multi_session_mode = enabled
+        
+        # Automatically disable cargo full prompt when multi-session is enabled
+        if enabled:
+            # Disable cargo full prompt
+            if self.prompt_on_cargo_full:
+                self.prompt_on_cargo_full = False
+                self.prompt_on_full_var.set(0)
+            # Disable the checkbox widget
+            if hasattr(self, 'prompt_on_full_cb'):
+                self.prompt_on_full_cb.config(state="disabled", fg="#666666")
+            self._set_status("Multi-session mode enabled - Cargo full prompt disabled")
+        else:
+            # Re-enable the checkbox widget
+            if hasattr(self, 'prompt_on_full_cb'):
+                self.prompt_on_full_cb.config(state="normal", fg="#ffffff")
+            self._set_status("Multi-session mode disabled")
+        
+        # Save to toggle file
+        try:
+            multi_session_file = os.path.join(self.vars_dir, "multiSessionMode.txt")
+            with open(multi_session_file, 'w') as f:
+                f.write("1" if enabled else "0")
+        except:
+            pass
 
     def _check_cargo_full_idle(self) -> None:
         """Check if cargo is 100% full and has been idle for 1 minute, then prompt to end session"""
         # Only check if feature is enabled and session is active
         if not self.prompt_on_cargo_full or not self.session_active:
+            return
+        
+        # Skip in multi-session mode (cargo will be emptied and session continues)
+        if self.multi_session_mode:
             return
         
         # Get cargo monitor from main app
@@ -6718,8 +6950,9 @@ class ProspectorPanel(ttk.Frame):
                 # Check if 60 seconds have passed
                 elapsed = current_time - self.cargo_full_start_time
                 if elapsed >= 60 and not self.cargo_full_prompted:
-                    # Show prompt
-                    self._prompt_end_session_cargo_full()
+                    # Show prompt (but don't auto-end in multi-session mode)
+                    if not self.multi_session_mode:
+                        self._prompt_end_session_cargo_full()
                     self.cargo_full_prompted = True  # Don't prompt again until cargo changes
             else:
                 # Cargo not full - reset tracking
@@ -6930,13 +7163,14 @@ class ProspectorPanel(ttk.Frame):
             new_values = list(values)
             comment_display = '💬' if new_comment.strip() else ''  # Show emoji if comment exists
             
-            if len(new_values) > 14:
-                new_values[14] = comment_display
+            # Comment column is at position 15 (after session_type was added at position 2)
+            if len(new_values) > 15:
+                new_values[15] = comment_display
             else:
-                # Extend list to have 15 elements and set comment at index 14
-                while len(new_values) < 15:
+                # Extend list to have 16 elements and set comment at index 15
+                while len(new_values) < 16:
                     new_values.append('')
-                new_values[14] = comment_display
+                new_values[15] = comment_display
             tree.item(item, values=new_values)
             
             # Get the raw timestamp for CSV update from session lookup
@@ -7576,8 +7810,11 @@ class ProspectorPanel(ttk.Frame):
         self.session_analytics.stop_session()
         
         # Ask if user wants to add refinery materials BEFORE ending session tracking
+        # Skip for multi-session mode (refinery already captured after each transfer/sale)
         from tkinter import messagebox
-        if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
+        is_multi_session = bool(self.multi_session_var.get())
+        
+        if self.main_app and hasattr(self.main_app, 'cargo_monitor') and not is_multi_session:
             add_refinery = messagebox.askyesno(
                 "Refinery Materials", 
                 "Do you have any additional materials in your refinery that you want to add to this session?",
@@ -7678,11 +7915,16 @@ class ProspectorPanel(ttk.Frame):
                 lines.append(f"{mat} {tons:.0f}t ({tph:.2f} t/hr)")
 
         sysname = self.session_system.get().strip() or self.last_system or "Unknown System"
-        body = self.session_body.get().strip() or self.last_body or "Unknown Body"
+        # Use preserved mining body if available (prevents docking from overwriting actual mining location)
+        body = self.session_mining_body or self.session_body.get().strip() or self.last_body or "Unknown Body"
         elapsed_txt = self.session_elapsed.get()
         
-        # Build header line and ship line (ship name will be parsed from TXT for Reports tab)
-        header = f"Session: {sysname} — {body} — {elapsed_txt} — Total {total_tons:.0f}t"
+        # Determine session type for report
+        is_multi_session = bool(self.multi_session_var.get())
+        session_type_suffix = " (Multi-Session)" if is_multi_session else " (Single Session)"
+        
+        # Build header line with session type and ship line (ship name will be parsed from TXT for Reports tab)
+        header = f"Session: {sysname} — {body} — {elapsed_txt} — Total {total_tons:.0f}t{session_type_suffix}"
         
         # Add ship name on second line if available
         ship_line = ""
@@ -10310,6 +10552,40 @@ class ProspectorPanel(ttk.Frame):
         
         return converted
     
+    def _extract_session_type_from_data(self, session_data):
+        """Extract session type from session data (header or other fields)"""
+        # First check if session_type is already in data (new sessions)
+        if 'session_type' in session_data and session_data['session_type']:
+            session_type = session_data['session_type']
+            # Clean up (remove parentheses if present)
+            return session_type.replace("(", "").replace(")", "")
+        
+        # Try to parse from header field (for old sessions stored in TXT files)
+        header = session_data.get('header', '')
+        if header:
+            if "(Multi-Session)" in header:
+                return "Multi-Session"
+            elif "(Single Session)" in header:
+                return "Single Session"
+        
+        # Try to read the TXT file if file_path is available
+        file_path = session_data.get('file_path', '')
+        
+        if file_path and os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    first_line = f.readline().strip()
+                    # Parse header line: "Session: System — Body — Duration — Total XXt (Multi-Session)"
+                    if "(Multi-Session)" in first_line:
+                        return "Multi-Session"
+                    elif "(Single Session)" in first_line:
+                        return "Single Session"
+            except Exception as e:
+                pass
+        
+        # Fallback: Single Session (default for old reports without type info)
+        return "Single Session"
+    
     def _generate_enhanced_report_from_menu(self, tree):
         """Generate detailed HTML report for selected report from context menu"""
         try:
@@ -10617,8 +10893,8 @@ class ProspectorPanel(ttk.Frame):
                 'threshold_settings': {},
                 # Add ship name if available
                 'ship_name': session_data.get('ship_name', ''),
-                # Add additional data for compatibility
-                'session_type': 'Enhanced Report from Tree Data',
+                # Parse session_type from header if available (for old reports)
+                'session_type': self._extract_session_type_from_data(session_data),
                 'data_source': 'Report Entry'
             }
             

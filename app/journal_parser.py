@@ -293,10 +293,13 @@ class JournalParser:
             inner_radius = None
             outer_radius = None
             ring_mass = None
+            density = None
+            
             if system_address and body_name:
                 key = (system_address, body_name)
                 ring_data = self.ring_info.get(key)
                 if ring_data:
+                    # Got data from current Scan event (fresh data)
                     ring_class = ring_data.get('ring_class')
                     ls_distance = ring_data.get('ls_distance')
                     inner_radius = ring_data.get('inner_radius')
@@ -304,13 +307,19 @@ class JournalParser:
                     ring_mass = ring_data.get('ring_mass')
                     log.debug(f"Found ring info for {body_name}: Class={ring_class}, LS={ls_distance}, Inner={inner_radius}, Outer={outer_radius}, Mass={ring_mass}")
                 else:
-                    # Ring info not in cache - try to get LS distance from database
+                    # Ring info not in cache - try to get from database (previously scanned)
                     log.debug(f"Ring info not in cache for: {key}, attempting database lookup")
-                    ls_distance = self.user_db.get_ls_distance(system_name, body_name)
-                    if ls_distance:
-                        log.info(f"Retrieved LS distance from database: {body_name} = {ls_distance} Ls")
+                    db_metadata = self.user_db.get_ring_metadata(system_name, body_name)
+                    if db_metadata:
+                        ring_class = db_metadata.get('ring_type')
+                        ls_distance = db_metadata.get('ls_distance')
+                        density = db_metadata.get('density')
+                        inner_radius = db_metadata.get('inner_radius')
+                        outer_radius = db_metadata.get('outer_radius')
+                        ring_mass = db_metadata.get('ring_mass')
+                        log.info(f"Retrieved ring metadata from database: {body_name} = Type:{ring_class}, LS:{ls_distance}, Density:{density}")
                     else:
-                        log.warning(f"LS distance not available for {system_name} - {body_name}")
+                        log.warning(f"Ring metadata not available for {system_name} - {body_name}")
             
             # Process each signal (material hotspot)
             for signal in signals:
@@ -338,7 +347,8 @@ class JournalParser:
                         ls_distance=ls_distance,
                         inner_radius=inner_radius,
                         outer_radius=outer_radius,
-                        ring_mass=ring_mass
+                        ring_mass=ring_mass,
+                        density=density
                     )
                     
                     log.debug(f"Added hotspot: {system_name} - {body_name} - {material_name} ({count})")
