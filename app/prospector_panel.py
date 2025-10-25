@@ -3353,54 +3353,184 @@ class ProspectorPanel(ttk.Frame):
             messagebox.showerror("Error", error_msg)
 
     def _show_discord_setup_dialog(self):
-        """Show Discord webhook setup dialog"""
+        """Show Discord webhook setup dialog with proper positioning and icon"""
         try:
-            from tkinter import messagebox, simpledialog
+            import tkinter as tk
+            from tkinter import ttk, messagebox
             
-            # Show info about Discord setup
-            info_msg = ("Discord webhook setup required!\n\n"
-                       "To share reports to Discord:\n"
-                       "1. Go to your Discord server\n"
-                       "2. Edit a channel → Integrations → Webhooks\n"
-                       "3. Create New Webhook\n"
-                       "4. Copy the webhook URL\n"
-                       "5. Paste it below")
+            # Create toplevel window
+            dialog = tk.Toplevel(self.winfo_toplevel())
+            dialog.title("Discord Webhook Setup")
+            dialog.configure(bg="#1e1e1e")
+            dialog.resizable(False, False)
             
-            messagebox.showinfo("Discord Setup", info_msg)
+            # Set app icon
+            try:
+                from icon_utils import set_window_icon
+                set_window_icon(dialog)
+            except Exception as e:
+                print(f"[DEBUG] Could not set dialog icon: {e}")
             
-            # Get webhook URL from user
-            webhook_url = simpledialog.askstring(
-                "Discord Webhook URL",
-                "Enter your Discord webhook URL:",
-                show="*"  # Hide URL for privacy
-            )
+            # Make it modal and appear on top
+            dialog.transient(self.winfo_toplevel())
+            dialog.grab_set()
+            dialog.attributes('-topmost', True)
             
-            if not webhook_url:
-                return
+            # Position dialog relative to main EliteMining window (same monitor)
+            dialog_width = 500
+            dialog_height = 400
+            dialog.geometry(f"{dialog_width}x{dialog_height}")
+            dialog.update_idletasks()
             
-            # Validate and test webhook
-            from discord_integration import validate_webhook_url, test_discord_webhook
-            from config import update_config_value
+            # Get main app window position
+            try:
+                if self.main_app:
+                    # Force update to get accurate position
+                    self.main_app.update_idletasks()
+                    main_x = self.main_app.winfo_x()
+                    main_y = self.main_app.winfo_y()
+                    main_width = self.main_app.winfo_width()
+                    main_height = self.main_app.winfo_height()
+                    
+                    # Center dialog on main app window
+                    x = main_x + (main_width - dialog_width) // 2
+                    y = main_y + (main_height - dialog_height) // 2
+                    
+                    dialog.geometry(f"+{x}+{y}")
+                else:
+                    # Fallback: center on screen
+                    x = (dialog.winfo_screenwidth() // 2) - (dialog_width // 2)
+                    y = (dialog.winfo_screenheight() // 2) - (dialog_height // 2)
+                    dialog.geometry(f"+{x}+{y}")
+            except Exception as e:
+                print(f"[DEBUG] Error positioning dialog: {e}")
+                # Final fallback
+                dialog.geometry(f"+{(dialog.winfo_screenwidth() // 2) - 250}+{(dialog.winfo_screenheight() // 2) - 200}")
             
-            if not validate_webhook_url(webhook_url):
-                messagebox.showerror("Invalid URL", "The entered URL is not a valid Discord webhook URL.")
-                return
+            dialog.update_idletasks()
+            dialog.focus_force()
             
-            # Test the webhook
-            success, test_message = test_discord_webhook(webhook_url)
+            # Main frame
+            main_frame = tk.Frame(dialog, bg="#1e1e1e")
+            main_frame.pack(fill="both", expand=True, padx=20, pady=20)
             
-            if success:
-                # Save webhook URL and enable Discord
-                update_config_value("discord_webhook_url", webhook_url)
-                update_config_value("discord_enabled", True)
+            # Title
+            title_label = tk.Label(main_frame, text="Discord Webhook Setup", 
+                                  font=("Arial", 14, "bold"), 
+                                  fg="#ffffff", bg="#1e1e1e")
+            title_label.pack(pady=(0, 15))
+            
+            # Instructions frame
+            inst_frame = tk.Frame(main_frame, bg="#2a2a2a", relief="ridge", bd=1)
+            inst_frame.pack(fill="x", pady=(0, 15))
+            
+            inst_label = tk.Label(inst_frame, 
+                                 text="To share reports to Discord:\n\n" +
+                                      "1. Go to your Discord server\n" +
+                                      "2. Edit a channel → Integrations → Webhooks\n" +
+                                      "3. Create New Webhook\n" +
+                                      "4. Copy the webhook URL\n" +
+                                      "5. Paste it below",
+                                 font=("Arial", 10), 
+                                 fg="#ffffff", bg="#2a2a2a",
+                                 justify="left")
+            inst_label.pack(padx=15, pady=15)
+            
+            # URL input frame
+            url_frame = tk.Frame(main_frame, bg="#1e1e1e")
+            url_frame.pack(fill="x", pady=(0, 15))
+            
+            url_label = tk.Label(url_frame, text="Discord Webhook URL:", 
+                                font=("Arial", 10), 
+                                fg="#ffffff", bg="#1e1e1e")
+            url_label.pack(anchor="w")
+            
+            url_entry = tk.Entry(url_frame, font=("Arial", 10), width=60,
+                                 bg="#333333", fg="#ffffff", 
+                                 insertbackground="#ffffff",
+                                 relief="solid", bd=1)
+            url_entry.pack(fill="x", pady=(5, 0))
+            url_entry.focus()
+            
+            # Result variable
+            result = {"webhook_url": None}
+            
+            def on_ok():
+                webhook_url = url_entry.get().strip()
+                if not webhook_url:
+                    messagebox.showwarning("Missing URL", "Please enter a webhook URL.")
+                    return
                 
-                messagebox.showinfo("Success", "Discord webhook configured successfully! You can now share reports to Discord.")
+                # Validate webhook URL
+                from discord_integration import validate_webhook_url, test_discord_webhook
+                from config import update_config_value
+                
+                if not validate_webhook_url(webhook_url):
+                    messagebox.showerror("Invalid URL", "The entered URL is not a valid Discord webhook URL.")
+                    return
+                
+                # Test the webhook
+                dialog.configure(cursor="wait")
+                dialog.update()
+                
+                try:
+                    success, test_message = test_discord_webhook(webhook_url)
+                    
+                    if success:
+                        # Save webhook URL and enable Discord
+                        update_config_value("discord_webhook_url", webhook_url)
+                        update_config_value("discord_enabled", True)
+                        
+                        result["webhook_url"] = webhook_url
+                        messagebox.showinfo("Success", "Discord webhook configured successfully! You can now share reports to Discord.")
+                        dialog.destroy()
+                    else:
+                        messagebox.showerror("Webhook Test Failed", f"Failed to test webhook: {test_message}")
+                        dialog.configure(cursor="")
+                except Exception as e:
+                    messagebox.showerror("Test Error", f"Error testing webhook: {e}")
+                    dialog.configure(cursor="")
+            
+            def on_cancel():
+                dialog.destroy()
+            
+            # Button frame
+            btn_frame = tk.Frame(main_frame, bg="#1e1e1e")
+            btn_frame.pack(fill="x", pady=(10, 0))
+            
+            # Cancel button (left)
+            cancel_btn = tk.Button(btn_frame, text="Cancel", 
+                                  command=on_cancel,
+                                  bg="#444444", fg="#ffffff",
+                                  activebackground="#555555", activeforeground="#ffffff",
+                                  relief="solid", bd=1, width=10)
+            cancel_btn.pack(side="left")
+            
+            # OK button (right)
+            ok_btn = tk.Button(btn_frame, text="Test & Save", 
+                              command=on_ok,
+                              bg="#5865F2", fg="#ffffff",
+                              activebackground="#4752C4", activeforeground="#ffffff",
+                              relief="solid", bd=1, width=12)
+            ok_btn.pack(side="right")
+            
+            # Handle Enter key
+            def on_enter(event):
+                on_ok()
+            
+            url_entry.bind("<Return>", on_enter)
+            dialog.bind("<Return>", on_enter)
+            
+            # Handle dialog close (X button)
+            dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+            
+            # Wait for dialog to close
+            dialog.wait_window()
+            
+            # If webhook was configured successfully, try sharing again
+            if result["webhook_url"]:
                 self._set_status("Discord webhook configured successfully!")
-                
-                # Try sharing again
                 self._share_to_discord()
-            else:
-                messagebox.showerror("Webhook Test Failed", f"Failed to test webhook: {test_message}")
                 
         except Exception as e:
             from tkinter import messagebox
