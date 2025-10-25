@@ -1,5 +1,6 @@
 import win32com.client
 import time
+import threading
 from config import _load_cfg, _save_cfg
 
 _speaker = None
@@ -8,6 +9,8 @@ _selected_voice = None
 _initialization_failed = False
 _speech_queue = []
 _is_speaking = False
+_max_queue_size = 10  # Prevent unlimited queue growth
+_tts_lock = threading.RLock()  # Thread safety for TTS operations
 
 def _initialize_tts():
     """Initialize TTS engine with retry logic"""
@@ -129,7 +132,7 @@ def load_saved_settings():
         pass  # No saved voice found, using system default
 
 def say(text: str):
-    """Queue text for TTS speech"""
+    """Queue text for TTS speech with memory leak prevention"""
     global _speech_queue, _is_speaking
     print(f"[ANNOUNCER] say() called with: {text}")
     
@@ -138,33 +141,40 @@ def say(text: str):
         return
     
     if text.strip():
-        _speech_queue.append(text.strip())
-        print(f"[ANNOUNCER] Added to queue: {text}")
+        with _tts_lock:  # Thread-safe queue access
+            # Prevent unlimited queue growth (memory leak prevention)
+            if len(_speech_queue) >= _max_queue_size:
+                print(f"[ANNOUNCER] Queue full ({_max_queue_size} items), removing oldest item")
+                _speech_queue.pop(0)  # Remove oldest item
+            
+            _speech_queue.append(text.strip())
+            print(f"[ANNOUNCER] Added to queue: {text} (queue size: {len(_speech_queue)})")
+        
         _process_speech_queue()
 
 def _process_speech_queue():
-    """Process queued speech items"""
+    """Process queued speech items with thread safety"""
     global _is_speaking, _speech_queue
     
-    if _is_speaking or not _speech_queue:
-        return
-    
-    try:
-        text = _speech_queue.pop(0)
-        _is_speaking = True
-        print(f"[ANNOUNCER] Speaking: {text}")
+    with _tts_lock:  # Thread-safe access
+        if _is_speaking or not _speech_queue:
+            return
         
-        # Use asynchronous speech and check status periodically
-        _speaker.Speak(text, 1)  # SVSFlagsAsync = 1 (asynchronous)
-        
-        # Start monitoring speech completion
-        import threading
-        threading.Thread(target=_monitor_speech_completion, daemon=True).start()
+        try:
+            text = _speech_queue.pop(0)
+            _is_speaking = True
+            print(f"[ANNOUNCER] Speaking: {text} (remaining queue: {len(_speech_queue)})")
             
-    except Exception as e:
-        print(f"[ANNOUNCER] Error in _process_speech_queue(): {e}")
-        _is_speaking = False
-        _reset_tts()
+            # Use asynchronous speech and check status periodically
+            _speaker.Speak(text, 1)  # SVSFlagsAsync = 1 (asynchronous)
+            
+            # Start monitoring speech completion
+            threading.Thread(target=_monitor_speech_completion, daemon=True).start()
+                
+        except Exception as e:
+            print(f"[ANNOUNCER] Error in _process_speech_queue(): {e}")
+            _is_speaking = False
+            _reset_tts()
 
 def _monitor_speech_completion():
     """Monitor when speech is complete and process next item"""
@@ -175,25 +185,60 @@ def _monitor_speech_completion():
         while _speaker.Status.RunningState == 2:  # Speaking
             time.sleep(0.1)
         
-        _is_speaking = False
-        print(f"[ANNOUNCER] Speech completed")
-        
-        # Process next item if any
-        if _speech_queue:
-            _process_speech_queue()
+        with _tts_lock:  # Thread-safe access
+            _is_speaking = False
+            print(f"[ANNOUNCER] Speech completed")
             
+            # Process next item if any
+            if _speech_queue:
+                _process_speech_queue()
+                
     except Exception as e:
         print(f"[ANNOUNCER] Error monitoring speech: {e}")
-        _is_speaking = False
+        with _tts_lock:
+            _is_speaking = False
 
 def _reset_tts():
-    """Reset TTS engine variables"""
+    """Reset TTS engine variables with proper cleanup"""
     global _speaker, _voices, _initialization_failed, _speech_queue, _is_speaking
-    _speaker = None
-    _voices = None
-    _initialization_failed = True
-    _speech_queue.clear()
-    _is_speaking = False
+    
+    with _tts_lock:  # Thread-safe cleanup
+        # Stop any ongoing speech
+        if _speaker:
+            try:
+                _speaker.Speak("", 2)  # SVSFPurgeBeforeSpeak = 2 (stop current speech)
+            except:
+                pass
+        
+        # Clean up COM objects
+        _speaker = None
+        _voices = None
+        _initialization_failed = True
+        _speech_queue.clear()
+        _is_speaking = False
+        print("[ANNOUNCER] TTS system reset and cleaned up")
+
+
+def cleanup_tts():
+    """Clean up TTS system for application shutdown"""
+    global _speaker, _voices, _speech_queue
+    
+    with _tts_lock:
+        print("[ANNOUNCER] Cleaning up TTS system...")
+        
+        # Stop any ongoing speech
+        if _speaker:
+            try:
+                _speaker.Speak("", 2)  # Stop current speech
+            except:
+                pass
+        
+        # Clear queue and release COM objects
+        _speech_queue.clear()
+        _speaker = None
+        _voices = None
+        
+        print("[ANNOUNCER] TTS cleanup completed")
 
 def diagnose_tts():
     """Diagnose TTS system for debugging"""

@@ -1127,6 +1127,10 @@ class CargoMonitor:
     - self.materials_collected: Engineering materials (Raw)
     """
     def __init__(self, update_callback=None, capacity_changed_callback=None, ship_info_changed_callback=None, app_dir=None):
+        # Threading safety
+        self._lock = threading.RLock()  # Reentrant lock for thread safety
+        self._stop_event = threading.Event()  # For clean thread shutdown
+        
         self.cargo_window = None
         self.cargo_label = None
         self.position = "upper_right"
@@ -2153,13 +2157,15 @@ cargo panel forces Elite to write detailed inventory data.
         self.last_heartbeat = time.time()  # Track thread health
         
         def background_monitor():
-            while self.journal_monitor_active:
+            while self.journal_monitor_active and not self._stop_event.is_set():
                 try:
                     # Heartbeat: Log every 60 seconds to verify thread is alive
                     current_time = time.time()
                     if current_time - self.last_heartbeat > 60:
                         self.last_heartbeat = current_time
-                        logging.info(f"[HEARTBEAT] Background monitor alive - Materials: {len(self.materials_collected)}")
+                        with self._lock:  # Thread-safe access to materials_collected
+                            materials_count = len(self.materials_collected)
+                        logging.info(f"[HEARTBEAT] Background monitor alive - Materials: {materials_count}")
                     
                     # Check Status.json first for ship changes (faster than journal)
                     self._check_status_for_ship_changes()
@@ -2286,6 +2292,26 @@ cargo panel forces Elite to write detailed inventory data.
     def stop_journal_monitoring(self):
         """Stop journal monitoring"""
         self.journal_monitor_active = False
+    
+    def cleanup(self):
+        """Clean up CargoMonitor resources for safe shutdown"""
+        print("[CargoMonitor] Starting cleanup...")
+        
+        # Signal threads to stop
+        self._stop_event.set()
+        
+        # Stop journal monitoring
+        self.journal_monitor_active = False
+        
+        # Close cargo window if open
+        if self.cargo_window:
+            try:
+                self.cargo_window.destroy()
+                self.cargo_window = None
+            except:
+                pass
+        
+        print("[CargoMonitor] Cleanup completed")
     
     def find_latest_journal(self):
         """Find the most recent journal file"""
@@ -6907,10 +6933,24 @@ class App(tk.Tk):
         if hasattr(self, 'text_overlay'):
             self.text_overlay.destroy()
             
-        # Clean up cargo monitor
+        # Clean up cargo monitor with enhanced resource management
         if hasattr(self, 'cargo_monitor'):
             self.cargo_monitor.hide()
-            self.cargo_monitor.stop_journal_monitoring()
+            self.cargo_monitor.cleanup()  # Enhanced cleanup method
+            
+        # Clean up TTS system
+        try:
+            from announcer import cleanup_tts
+            cleanup_tts()
+        except:
+            pass
+            
+        # Clean up file watcher
+        try:
+            from file_watcher import cleanup_file_watcher
+            cleanup_file_watcher()
+        except:
+            pass
             
         # Clean up matplotlib resources
         try:
