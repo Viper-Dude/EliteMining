@@ -6942,6 +6942,8 @@ class ProspectorPanel(ttk.Frame):
                 # Cargo is full - check if we have limpets vs minerals
                 limpet_cargo = sum(qty for item, qty in cargo_monitor.cargo_items.items() 
                                   if "limpet" in item.lower())
+                mineral_cargo = sum(qty for item, qty in cargo_monitor.cargo_items.items() 
+                                   if "limpet" not in item.lower())
                 
                 if limpet_cargo > 0:
                     # We have limpets in cargo - don't prompt for session end
