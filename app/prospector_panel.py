@@ -3332,7 +3332,10 @@ class ProspectorPanel(ttk.Frame):
             
             # Check if Discord is configured
             if not is_discord_enabled():
-                self._show_discord_setup_dialog()
+                from tkinter import messagebox
+                messagebox.showinfo("Discord Sharing", 
+                                   "Discord sharing is not available in this version.\n\n" +
+                                   "Contact the administrator if you believe this is an error.")
                 return
             
             # Send to Discord
@@ -3352,7 +3355,8 @@ class ProspectorPanel(ttk.Frame):
             from tkinter import messagebox
             messagebox.showerror("Error", error_msg)
 
-    def _show_discord_setup_dialog(self):
+    # DISABLED: Discord setup dialog - webhook is now pre-configured
+    # def _show_discord_setup_dialog(self):
         """Show Discord webhook setup dialog with proper positioning and icon"""
         try:
             import tkinter as tk

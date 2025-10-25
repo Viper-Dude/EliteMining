@@ -49,7 +49,7 @@ def format_mining_report_embed(session_data: dict) -> dict:
     # Create Discord embed
     embed = {
         "title": f"🚀 Elite Mining Report - {system}",
-        "description": f"Mining session completed in **{system}** at **{body}**",
+        "description": f"Community mining session completed in **{system}** at **{body}**",
         "color": 0x00ff00 if float(tons.replace('t', '')) > 0 else 0xff6600,  # Green if successful, orange if no mining
         "timestamp": datetime.now().isoformat(),
         "fields": [
@@ -85,7 +85,7 @@ def format_mining_report_embed(session_data: dict) -> dict:
             }
         ],
         "footer": {
-            "text": "EliteMining - Elite Dangerous Mining Assistant",
+            "text": "EliteMining Community - Elite Dangerous Mining Assistant",
             "icon_url": "https://raw.githubusercontent.com/Viper-Dude/EliteMining/main/app/Images/EliteMining_Icon_64.png"
         }
     }
@@ -129,7 +129,7 @@ def send_discord_report(session_data: dict) -> tuple[bool, str]:
         # Prepare Discord payload
         payload = {
             "embeds": [embed],
-            "username": "EliteMining",
+            "username": "EliteMining Community",
             "avatar_url": "https://raw.githubusercontent.com/Viper-Dude/EliteMining/main/app/Images/EliteMining_Icon_64.png"
         }
         
