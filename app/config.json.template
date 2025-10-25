@@ -1,5 +1,5 @@
 {
-  "config_version": "4.1.7",
+  "config_version": "4.1.8",
   "tts_volume": 100,
   "va_folder": "",
   "window": {
@@ -14,6 +14,8 @@
   "text_overlay_duration": 12,
   "stay_on_top": true,
   "tts_voice": "IVONA 2 Brian OEM",
+  "discord_webhook_url": "",
+  "discord_enabled": false,
   "announce_map": {
     "Alexandrite": true,
     "Bauxite": true,

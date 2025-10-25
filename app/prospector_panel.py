@@ -3303,6 +3303,109 @@ class ProspectorPanel(ttk.Frame):
             from tkinter import messagebox
             messagebox.showerror("Export Failed", error_msg)
 
+    def _share_to_discord(self):
+        """Share selected mining session report to Discord"""
+        try:
+            # Check if a session is selected
+            selected = self.reports_tree_tab.selection()
+            if not selected:
+                from tkinter import messagebox
+                messagebox.showwarning("No Selection", "Please select a mining session to share to Discord.")
+                return
+            
+            # Get selected session data
+            item_id = selected[0]
+            if item_id not in self.reports_tab_session_lookup:
+                from tkinter import messagebox
+                messagebox.showerror("Error", "Session data not found for selected item.")
+                return
+            
+            session = self.reports_tab_session_lookup[item_id]
+            
+            # Import Discord integration
+            try:
+                from discord_integration import send_discord_report, is_discord_enabled
+            except ImportError:
+                from tkinter import messagebox
+                messagebox.showerror("Error", "Discord integration module not found.")
+                return
+            
+            # Check if Discord is configured
+            if not is_discord_enabled():
+                self._show_discord_setup_dialog()
+                return
+            
+            # Send to Discord
+            success, message = send_discord_report(session)
+            
+            from tkinter import messagebox
+            if success:
+                messagebox.showinfo("Discord Share", message)
+                self._set_status("Report shared to Discord successfully!")
+            else:
+                messagebox.showerror("Discord Error", message)
+                self._set_status(f"Discord share failed: {message}")
+                
+        except Exception as e:
+            error_msg = f"Failed to share to Discord: {e}"
+            self._set_status(error_msg)
+            from tkinter import messagebox
+            messagebox.showerror("Error", error_msg)
+
+    def _show_discord_setup_dialog(self):
+        """Show Discord webhook setup dialog"""
+        try:
+            from tkinter import messagebox, simpledialog
+            
+            # Show info about Discord setup
+            info_msg = ("Discord webhook setup required!\n\n"
+                       "To share reports to Discord:\n"
+                       "1. Go to your Discord server\n"
+                       "2. Edit a channel → Integrations → Webhooks\n"
+                       "3. Create New Webhook\n"
+                       "4. Copy the webhook URL\n"
+                       "5. Paste it below")
+            
+            messagebox.showinfo("Discord Setup", info_msg)
+            
+            # Get webhook URL from user
+            webhook_url = simpledialog.askstring(
+                "Discord Webhook URL",
+                "Enter your Discord webhook URL:",
+                show="*"  # Hide URL for privacy
+            )
+            
+            if not webhook_url:
+                return
+            
+            # Validate and test webhook
+            from discord_integration import validate_webhook_url, test_discord_webhook
+            from config import update_config_value
+            
+            if not validate_webhook_url(webhook_url):
+                messagebox.showerror("Invalid URL", "The entered URL is not a valid Discord webhook URL.")
+                return
+            
+            # Test the webhook
+            success, test_message = test_discord_webhook(webhook_url)
+            
+            if success:
+                # Save webhook URL and enable Discord
+                update_config_value("discord_webhook_url", webhook_url)
+                update_config_value("discord_enabled", True)
+                
+                messagebox.showinfo("Success", "Discord webhook configured successfully! You can now share reports to Discord.")
+                self._set_status("Discord webhook configured successfully!")
+                
+                # Try sharing again
+                self._share_to_discord()
+            else:
+                messagebox.showerror("Webhook Test Failed", f"Failed to test webhook: {test_message}")
+                
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Setup Error", f"Failed to set up Discord: {e}")
+
     def _parse_report_file(self, filename: str, first_line: str, mtime: float) -> Optional[Tuple[str, str, str, str, str]]:
         """Parse report filename and content to extract date, system, body, duration, and TPH"""
         try:
@@ -4781,6 +4884,16 @@ class ProspectorPanel(ttk.Frame):
                               highlightbackground="#666666", highlightcolor="#666666")
         export_btn.pack(side="left", padx=(0, 5))
         self.ToolTip(export_btn, "Export session data to a CSV file that can be opened in Excel or other spreadsheet programs.")
+        
+        # Share to Discord button
+        discord_btn = tk.Button(button_frame, text="Share to Discord", 
+                               command=self._share_to_discord, 
+                               bg="#5865F2", fg="#ffffff", 
+                               activebackground="#4752C4", activeforeground="#ffffff", 
+                               relief="solid", bd=1, 
+                               highlightbackground="#666666", highlightcolor="#666666")
+        discord_btn.pack(side="left", padx=(0, 5))
+        self.ToolTip(discord_btn, "Share selected mining session report to Discord via webhook")
         
         # Add double-click functionality for opening report files
         def open_selected():
