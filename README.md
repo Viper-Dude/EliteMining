@@ -11,7 +11,24 @@
 <details>
 <summary>Table of Contents</summary>
 
-- [ EliteMining](#-elitemining)
+- [Features and Usage Options](#features-and-usage-options)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [EliteMining App](#elitemining-app)
+- [Hotspot Finder](#hotspot-finder)
+- [Getting Started](#getting-started)
+- [Commands](#commands)
+- [Mining Presets](#mining-presets)
+- [Usage Tips](#usage-tips)
+- [Known Limitations](#known-limitations)
+- [Training Speech Recognition](#training-speech-recognition)
+- [In Development](#in-development)
+- [FAQ](#faq)
+- [Contact](#contact)
+- [License](#license--third-party-notices)
+- [Credits](#credits)
+
+</details>
   - [Features and Usage Options](#features-and-usage-options)
     - [Standalone (Without VoiceAttack)](#standalone-without-voiceattack)
     - [With VoiceAttack Integration (Optional)](#with-voiceattack-integration-optional)
