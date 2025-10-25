@@ -505,6 +505,10 @@ class ProspectorPanel(ttk.Frame):
         except:
             pass
         
+        # If multi-session is enabled, force prompt_on_cargo_full to False (incompatible features)
+        if self.multi_session_mode:
+            self.prompt_on_cargo_full = False
+        
         # Multi-session cumulative tracking (only used when multi_session_mode=True)
         self.session_total_mined = 0  # Total tons mined in session (cumulative)
         self.session_sold_transferred = 0  # Tons sold or transferred to carrier
@@ -1391,8 +1395,9 @@ class ProspectorPanel(ttk.Frame):
         auto_start_cb.pack(side="left")
         self.ToolTip(auto_start_cb, "Automatically start session when first prospector limpet is fired\n(Only works when no session is active)")
         
-        # Prompt when cargo full checkbox
-        self.prompt_on_full_var = tk.IntVar(value=1 if self.prompt_on_cargo_full else 0)
+        # Prompt when cargo full checkbox - force to 0 if multi-session is active
+        initial_prompt_value = 0 if self.multi_session_mode else (1 if self.prompt_on_cargo_full else 0)
+        self.prompt_on_full_var = tk.IntVar(value=initial_prompt_value)
         self.prompt_on_full_cb = tk.Checkbutton(
             options_frame, 
             text="Prompt when full", 
@@ -1436,6 +1441,10 @@ class ProspectorPanel(ttk.Frame):
         )
         multi_session_cb.pack(side="left", padx=(10, 0))
         self.ToolTip(multi_session_cb, "Accumulate statistics across multiple cargo loads\nStats won't reset until you manually end the session")
+        
+        # Apply initial state: If multi-session is already enabled (loaded from file), disable "Prompt when full"
+        if self.multi_session_mode:
+            self.prompt_on_full_cb.config(state="disabled", fg="#666666")
         
         # Center: Elapsed time display
         elapsed_frame = ttk.Frame(controls_frame)
@@ -5348,18 +5357,21 @@ class ProspectorPanel(ttk.Frame):
                 column_tooltips = {
                     "#1": "Date and time when the mining session ended",
                     "#2": "Total duration of the mining session", 
-                    "#3": "Star system where mining took place",
-                    "#4": "Planet, ring, or celestial body that was mined",
-                    "#5": "Total tons of materials mined",
-                    "#6": "Tons per hour mining rate",
-                    "#7": "Number of different mineral types found",
-                    "#8": "Total asteroids scanned during the session",
-                    "#9": "Percentage of asteroids that had valuable minerals",
-                    "#10": "Average quality/yield percentage of minerals found",
-                    "#11": "Minerals mined with quantities and individual yields",
-                    "#12": "Number of prospector limpets used during mining session",
-                    "#13": "Session comments and notes",
-                    "#14": "Detailed report for this session"
+                    "#3": "Session type (Single or Multi-session)",
+                    "#4": "Ship name, type, and identifier used for mining",
+                    "#5": "Star system where mining took place",
+                    "#6": "Planet, ring, or celestial body that was mined",
+                    "#7": "Total tons of materials mined",
+                    "#8": "Tons per hour mining rate",
+                    "#9": "Total asteroids scanned during the session",
+                    "#10": "Number of different mineral types found within the threshold set in announcement panel",
+                    "#11": "Percentage of asteroids that had valuable minerals",
+                    "#12": "Average quality/yield percentage of minerals found",
+                    "#13": "Minerals mined with quantities and individual yields",
+                    "#14": "Number of prospector limpets used during mining session",
+                    "#15": "Engineering materials collected during the session",
+                    "#16": "Session comments and notes",
+                    "#17": "Detailed report for this session"
                 }
                 
                 tooltip_text = column_tooltips.get(column)
@@ -6889,10 +6901,13 @@ class ProspectorPanel(ttk.Frame):
                 self.prompt_on_full_cb.config(state="disabled", fg="#666666")
             self._set_status("Multi-session mode enabled - Cargo full prompt disabled")
         else:
-            # Re-enable the checkbox widget
+            # Re-enable the checkbox widget and restore prompt setting
             if hasattr(self, 'prompt_on_full_cb'):
                 self.prompt_on_full_cb.config(state="normal", fg="#ffffff")
-            self._set_status("Multi-session mode disabled")
+            # Auto-enable prompt when multi-session is disabled
+            self.prompt_on_cargo_full = True
+            self.prompt_on_full_var.set(1)
+            self._set_status("Multi-session mode disabled - Cargo full prompt enabled")
         
         # Save to toggle file
         try:
@@ -6924,7 +6939,15 @@ class ProspectorPanel(ttk.Frame):
             current_cargo = cargo_monitor.current_cargo
             
             if percentage >= 100:
-                # Cargo is full
+                # Cargo is full - check if we have limpets vs minerals
+                limpet_cargo = sum(qty for item, qty in cargo_monitor.cargo_items.items() 
+                                  if "limpet" in item.lower())
+                
+                if limpet_cargo > 0:
+                    # We have limpets in cargo - don't prompt for session end
+                    print(f"[CARGO FULL] Cargo full but contains {limpet_cargo}t limpets - no prompt needed")
+                    return
+                
                 import time
                 current_time = time.time()
                 
@@ -6944,7 +6967,7 @@ class ProspectorPanel(ttk.Frame):
                 if self.cargo_full_start_time is None:
                     self.cargo_full_start_time = current_time
                     self.cargo_full_prompted = False  # Reset prompt flag
-                    print("[CARGO FULL] Cargo is 100% full - started tracking idle time...")
+                    print(f"[CARGO FULL] Cargo is 100% full with {mineral_cargo}t minerals - started tracking idle time...")
                     return
                 
                 # Check if 60 seconds have passed

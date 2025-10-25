@@ -1210,6 +1210,10 @@ class CargoMonitor:
         self.refinery_prompt_shown_for_this_transfer = False
         self.last_emptied_materials = {}  # Track materials that were just emptied for refinery quick-add
         
+        # Transfer event tracking - prevent tracking cargo increases immediately after transfers
+        self.last_transfer_time = 0  # Timestamp of last CargoTransfer event
+        self.transfer_exclusion_window = 3.0  # Seconds to ignore cargo increases after transfer
+        
         # Status.json file path for current ship data  
         self.status_json_path = os.path.join(self.journal_dir, "Status.json")
         
@@ -1653,16 +1657,26 @@ class CargoMonitor:
                 if display_name and item_count > 0:
                     new_cargo[display_name] = item_count
                     
-                    # Track session minerals for multi-session mode
-                    # Only track if a mining session is active and quantity increased
+                    # Track session minerals ONLY if:
+                    # 1. Mining session is active
+                    # 2. NOT within exclusion window after transfer
+                    # 3. Quantity increased (actual mining)
+                    # 4. Not limpets/drones
+                    time_since_transfer = time.time() - self.last_transfer_time
+                    within_exclusion_window = time_since_transfer < self.transfer_exclusion_window
+                    
                     if (self.session_start_snapshot and 
+                        not within_exclusion_window and
                         "limpet" not in display_name.lower() and 
                         "drone" not in display_name.lower()):
+                        
                         old_qty = self.cargo_items.get(display_name, 0)
                         if item_count > old_qty:
                             added = item_count - old_qty
                             self.session_minerals_mined[display_name] = self.session_minerals_mined.get(display_name, 0) + added
-                            print(f"[DEBUG] Cargo.json tracked {added}t of {display_name}, session total: {self.session_minerals_mined[display_name]}t")
+                            print(f"[DEBUG] read_cargo_json tracked {added}t of {display_name}, session total: {self.session_minerals_mined[display_name]}t")
+                    elif within_exclusion_window:
+                        print(f"[DEBUG] read_cargo_json SKIPPED tracking {display_name} (within {time_since_transfer:.1f}s of transfer)")
             
             # Update cargo items
             self.cargo_items = new_cargo
@@ -2522,9 +2536,9 @@ cargo panel forces Elite to write detailed inventory data.
         if hasattr(self, 'prospector_panel') and self.prospector_panel:
             is_multi_session = bool(self.prospector_panel.multi_session_var.get())
         
-        # Only show during multi-session mode, not at session end
-        if not is_multi_session:
-            print("[DEBUG] Skipping - not in multi-session mode")
+        # Skip dialog in multi-session mode (refinery auto-processes, would cause double counting)
+        if is_multi_session:
+            print("[DEBUG] Skipping refinery prompt - multi-session mode (auto-processes refinery)")
             return
         
         # Prevent multiple prompts for the same cargo empty event
@@ -2828,11 +2842,9 @@ cargo panel forces Elite to write detailed inventory data.
                     mineral_cargo = sum(qty for item, qty in self.cargo_items.items() 
                                        if "limpet" not in item.lower() and "drone" not in item.lower())
                     print(f"[DEBUG] MarketSell - total_cargo: {self.current_cargo}, mineral_cargo: {mineral_cargo}, has_minerals: {has_minerals}, cargo_items: {list(self.cargo_items.keys())}, session_start_snapshot: {self.session_start_snapshot is not None}")
-                    if not has_minerals and self.session_start_snapshot:
-                        # Store minerals that were just sold for refinery quick-add
-                        self.last_emptied_materials = {item: qty for item, qty in self.cargo_items.items() 
-                                                       if "limpet" not in item.lower() and "drone" not in item.lower()}
-                        print("[DEBUG] MarketSell triggering refinery prompt (all minerals sold)")
+                    
+                    # Multi-session mode: Prompt for refinery when cargo is emptied
+                    if mineral_cargo == 0 and self.session_start_snapshot and not self.refinery_prompt_shown_for_this_transfer:
                         self._prompt_for_refinery_contents_multi_session()
             
             elif event_type == "CargoTransfer":
@@ -2840,6 +2852,10 @@ cargo panel forces Elite to write detailed inventory data.
                 # CargoTransfer has a different structure: { "Transfers": [ { "Type": "...", "Count": N, "Direction": "..." } ] }
                 transfers = event.get("Transfers", [])
                 total_transferred = 0
+                
+                # Mark transfer time to prevent read_cargo_json from tracking immediately after
+                self.last_transfer_time = time.time()
+                print(f"[DEBUG] CargoTransfer detected - marking timestamp {self.last_transfer_time} to exclude tracking")
                 
                 # Store minerals before they're removed for refinery quick-add
                 minerals_before_transfer = {item: qty for item, qty in self.cargo_items.items() 
@@ -2853,16 +2869,13 @@ cargo panel forces Elite to write detailed inventory data.
                     
                     if direction == "toship":
                         # Transfer FROM carrier TO ship - this is buying/retrieving, NOT mining
-                        # Update cargo but DON'T trigger mining tracking
+                        # Update cargo but DON'T add to session_minerals_mined
                         print(f"[DEBUG] CargoTransfer FROM carrier: '{item_name}' x{count}t (ignoring for mining stats)")
                         if item_name in self.cargo_items:
                             self.cargo_items[item_name] += count
                         else:
                             self.cargo_items[item_name] = count
-                        # Update display without triggering mining tracking
-                        self.current_cargo = sum(self.cargo_items.values())
-                        self.update_display()
-                        continue  # Skip mining tracking for transfers from carrier
+                        # Don't add to mining stats, but continue processing to update display properly
                         
                     elif direction == "tocarrier":
                         # Transfer FROM ship TO carrier - count for multi-session tracking
@@ -2882,11 +2895,17 @@ cargo panel forces Elite to write detailed inventory data.
                             else:
                                 del self.cargo_items[item_name]
                 
-                # Only notify if actual minerals were transferred (not just limpets)
+                # Update cargo display after any transfer (toship or tocarrier)
+                self.current_cargo = sum(self.cargo_items.values())
+                self.update_display()
+                
+                # Notify main app to update mineral analysis table
+                print(f"[DEBUG] CargoTransfer complete - notifying main app with cargo_items: {self.cargo_items}")
+                if self.update_callback:
+                    self.update_callback()
+                
+                # Only count minerals transferred TO carrier for multi-session tracking
                 if total_transferred > 0:
-                    self.current_cargo = sum(self.cargo_items.values())
-                    self.update_display()
-                    
                     if hasattr(self, 'status_label'):
                         self.status_label.configure(text=f"📦 Transferred {total_transferred}t to carrier")
                     
@@ -2901,10 +2920,9 @@ cargo panel forces Elite to write detailed inventory data.
                     mineral_cargo = sum(qty for item, qty in self.cargo_items.items() 
                                        if "limpet" not in item.lower() and "drone" not in item.lower())
                     print(f"[DEBUG] CargoTransfer - total_cargo: {self.current_cargo}, mineral_cargo: {mineral_cargo}, has_minerals: {has_minerals}, cargo_items: {list(self.cargo_items.keys())}, session_start_snapshot: {self.session_start_snapshot is not None}")
-                    if not has_minerals and self.session_start_snapshot:
-                        # Store materials that were just transferred for refinery quick-add
-                        self.last_emptied_materials = minerals_before_transfer
-                        print("[DEBUG] CargoTransfer triggering refinery prompt (all minerals transferred)")
+                    
+                    # Multi-session mode: Prompt for refinery when cargo is emptied
+                    if mineral_cargo == 0 and self.session_start_snapshot and not self.refinery_prompt_shown_for_this_transfer:
                         self._prompt_for_refinery_contents_multi_session()
                         
                 elif transfers:  # Transfers occurred but all were limpets
@@ -4500,9 +4518,11 @@ class App(tk.Tk):
             # Set prompt on cargo full preference after panel is created
             prompt_enabled = bool(self.prompt_on_cargo_full.get())
             self.prospector_panel.prompt_on_cargo_full = prompt_enabled
-            # Sync checkbox in Mining Analytics tab
+            # Sync checkbox in Mining Analytics tab - but respect multi-session mode
             if hasattr(self.prospector_panel, 'prompt_on_full_var'):
-                self.prospector_panel.prompt_on_full_var.set(1 if prompt_enabled else 0)
+                # Don't override if multi-session mode is enabled (checkbox should stay disabled/unchecked)
+                if not self.prospector_panel.multi_session_mode:
+                    self.prospector_panel.prompt_on_full_var.set(1 if prompt_enabled else 0)
         except Exception as e:
             # Log detailed error
             import traceback
