@@ -211,7 +211,7 @@ def format_mining_report_embed(session_data: dict) -> dict:
                 "inline": True
             },
             {
-                "name": "Hit Rate (Min Threshold)",
+                "name": "Hit Rate (% Above Min Threshold)",
                 "value": hit_rate,
                 "inline": True
             }

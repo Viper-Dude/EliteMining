@@ -11,7 +11,7 @@
 <details>
 <summary>Table of Contents</summary>
 
-- [ EliteMining](#-elitemining)
+- [EliteMining](#-elitemining)
   - [Features and Usage Options](#features-and-usage-options)
     - [Standalone (Without VoiceAttack)](#standalone-without-voiceattack)
     - [With VoiceAttack Integration (Optional)](#with-voiceattack-integration-optional)
@@ -38,6 +38,28 @@
       - [Detailed HTML Reports](#detailed-html-reports)
       - [Discord Integration](#discord-integration)
       - [Bookmarks](#bookmarks)
+      - [Comprehensive Analytics](#comprehensive-analytics)
+      - [Settings Tab](#settings-tab)
+    - [Backup \& Restore](#backup--restore)
+  - [Commands](#commands)
+    - [Status Checks](#status-checks)
+    - [Firegroup \& Parameter Commands](#firegroup--parameter-commands)
+    - [Miscellaneous](#miscellaneous)
+  - [Mining Presets](#mining-presets)
+    - [Hazardous Mining Preset](#hazardous-mining-preset)
+    - [Customization](#customization)
+  - [Usage Tips](#usage-tips)
+  - [Known Limitations](#known-limitations)
+  - [Training Speech Recognition](#training-speech-recognition)
+  - [In Development](#in-development)
+  - [Contact](#contact)
+    - [Community Support](#community-support)
+    - [Other Resources](#other-resources)
+  - [License \& Third-Party Notices](#license--third-party-notices)
+  - [Credits](#credits)
+  - [FAQ](#faq)
+
+</details>
       - [Comprehensive Analytics](#comprehensive-analytics)
       - [Settings Tab](#settings-tab)
     - [Backup \& Restore](#backup--restore)
