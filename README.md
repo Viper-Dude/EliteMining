@@ -19,6 +19,7 @@
 - [Getting Started](#getting-started)  
   - [EliteMining GUI](#elitemining-gui)  
   - [Backup & Restore](#backup--restore)  
+  - [Discord Integration](#discord-integration)  
 - [Commands](#commands)  
 - [Mining Presets](#mining-presets)  
 - [Usage Tips](#usage-tips)  
@@ -248,6 +249,11 @@ Generate comprehensive HTML reports with interactive charts, mining analytics, a
 - Performance graphs: `Reports/Mining Session/Graphs/`  
 
 Right-click any mining session to generate a detailed report, add screenshots, or manage existing reports. All reports are saved with your session data and can be opened directly from the reports tab.
+
+#### Discord Integration
+*Share mining session reports automatically to Discord channels.*  
+
+Automatically share completed mining session summaries to Discord channels via webhook integration. Configure your Discord webhook URL in settings to enable automatic posting of session reports including materials found, yields, performance metrics, and session duration. Perfect for mining groups and community sharing.
 
 <details>
 <summary>📸 View HTML Report Screenshots</summary>
