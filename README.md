@@ -11,7 +11,7 @@
 <details>
 <summary>Table of Contents</summary>
 
-- [ EliteMining](#-elitemining)
+- [EliteMining](#-elitemining)
   - [Features and Usage Options](#features-and-usage-options)
     - [Standalone (Without VoiceAttack)](#standalone-without-voiceattack)
     - [With VoiceAttack Integration (Optional)](#with-voiceattack-integration-optional)
