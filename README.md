@@ -281,7 +281,7 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 #### Discord Integration
 *Manually share mining session reports to Discord channels.*  
 
-Share completed mining session summaries to Discord channels via webhook integration. Configure your Discord webhook URL in settings, then manually share individual session reports with custom comments. Reports include materials found, yields, performance metrics, and session duration. Perfect for mining groups and community sharing.
+Share completed mining session summaries to Discord channels via webhook integration. Configure your Discord webhook URL in settings, then manually share individual session reports with custom comments. Reports include materials found, yields, performance metrics, and session duration. 
 
 <details>
 <summary>📸 View HTML Report Screenshots</summary>
