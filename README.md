@@ -11,25 +11,53 @@
 <details>
 <summary>Table of Contents</summary>
 
-- [Features and Usage Options](#features-and-usage-options)  
-- [Requirements](#requirements)  
-- [Installation](#installation)  
-- [EliteMining App](#elitemining-app)  
-- [Hotspot Finder](#hotspot-finder)  
-- [Getting Started](#getting-started)  
-  - [EliteMining GUI](#elitemining-gui)  
-  - [Backup & Restore](#backup--restore)  
-  - [Discord Integration](#discord-integration)  
-- [Commands](#commands)  
-- [Mining Presets](#mining-presets)  
-- [Usage Tips](#usage-tips)  
-- [Known Limitations](#known-limitations)  
-- [Training Speech Recognition](#training-speech-recognition)  
-- [In Development](#in-development)  
-- [FAQ](#faq)  
-- [Contact](#contact)  
-- [License](#license--third-party-notices)  
-- [Credits](#credits)  
+- [ EliteMining](#-elitemining)
+  - [Features and Usage Options](#features-and-usage-options)
+    - [Standalone (Without VoiceAttack)](#standalone-without-voiceattack)
+    - [With VoiceAttack Integration (Optional)](#with-voiceattack-integration-optional)
+  - [Requirements](#requirements)
+    - [Keybind Requirement for EliteVA](#keybind-requirement-for-eliteva)
+    - [Custom Keybinds for Mining Control](#custom-keybinds-for-mining-control)
+  - [Installation](#installation)
+    - [Included Components](#included-components)
+    - [VoiceAttack Profile Installation](#voiceattack-profile-installation)
+  - [EliteMining App](#elitemining-app)
+    - [Start EliteMining](#start-elitemining)
+  - [Hotspot Finder](#hotspot-finder)
+    - [Key Features](#key-features)
+  - [Getting Started](#getting-started)
+    - [Firegroup (FG) Setup](#firegroup-fg-setup)
+    - [Key / HOTAS Bindings](#key--hotas-bindings)
+    - [EliteMining GUI](#elitemining-gui)
+      - [Main Window (Dashboard) \& Firegroups](#main-window-dashboard--firegroups)
+      - [Timers/Toggles Tab](#timerstoggles-tab)
+    - [Mining Session Tab](#mining-session-tab)
+      - [Announcement Panel](#announcement-panel)
+      - [Mining Session](#mining-session)
+      - [Reports](#reports)
+      - [Detailed HTML Reports](#detailed-html-reports)
+      - [Discord Integration](#discord-integration)
+      - [Bookmarks](#bookmarks)
+      - [Comprehensive Analytics](#comprehensive-analytics)
+      - [Settings Tab](#settings-tab)
+    - [Backup \& Restore](#backup--restore)
+  - [Commands](#commands)
+    - [Status Checks](#status-checks)
+    - [Firegroup \& Parameter Commands](#firegroup--parameter-commands)
+    - [Miscellaneous](#miscellaneous)
+  - [Mining Presets](#mining-presets)
+    - [Hazardous Mining Preset](#hazardous-mining-preset)
+    - [Customization](#customization)
+  - [Usage Tips](#usage-tips)
+  - [Known Limitations](#known-limitations)
+  - [Training Speech Recognition](#training-speech-recognition)
+  - [In Development](#in-development)
+  - [Contact](#contact)
+    - [Community Support](#community-support)
+    - [Other Resources](#other-resources)
+  - [License \& Third-Party Notices](#license--third-party-notices)
+  - [Credits](#credits)
+  - [FAQ](#faq)
 
 </details>
 
@@ -251,9 +279,9 @@ Generate comprehensive HTML reports with interactive charts, mining analytics, a
 Right-click any mining session to generate a detailed report, add screenshots, or manage existing reports. All reports are saved with your session data and can be opened directly from the reports tab.
 
 #### Discord Integration
-*Share mining session reports automatically to Discord channels.*  
+*Manually share mining session reports to Discord channels.*  
 
-Automatically share completed mining session summaries to Discord channels via webhook integration. Configure your Discord webhook URL in settings to enable automatic posting of session reports including materials found, yields, performance metrics, and session duration. Perfect for mining groups and community sharing.
+Share completed mining session summaries to Discord channels via webhook integration. Configure your Discord webhook URL in settings, then manually share individual session reports with custom comments. Reports include materials found, yields, performance metrics, and session duration. Perfect for mining groups and community sharing.
 
 <details>
 <summary>📸 View HTML Report Screenshots</summary>
