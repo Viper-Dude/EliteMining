@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.3.5
+AppVersion=v4.3.6
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -52,9 +52,9 @@ Source: "Doc\*"; DestDir: "{app}\Doc"; Flags: recursesubdirs createallsubdirs un
 Source: "Variables\*"; DestDir: "{app}\Variables"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Check: IsVADetected
 ; v4.1.9+: Force update VoiceAttack profile to apply command behavior corrections
 Source: "EliteMining-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninstall skipifsourcedoesntexist; Check: IsVADetected
-; v4.1.5+: Never overwrite config.json - preserves user settings
+; v4.3.6: Force overwrite config.json for Discord integration migration
 ; NOTE: Use template file to avoid including developer's personal paths
-Source: "app\config.json.template"; DestDir: "{app}"; DestName: "config.json"; Flags: onlyifdoesntexist
+Source: "app\config.json.template"; DestDir: "{app}"; DestName: "config.json"
 Source: "app\mining_bookmarks.json"; DestDir: "{app}\app"; Flags: onlyifdoesntexist skipifsourcedoesntexist
 Source: "app\EliteVA\*"; DestDir: "{app}\..\EliteVA"; Flags: recursesubdirs createallsubdirs; Check: IsVADetected
 Source: "LICENSE.txt"; DestDir: "{app}"

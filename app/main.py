@@ -6872,26 +6872,11 @@ class App(tk.Tk):
     def _check_config_migration(self):
         """Check if config needs migration and perform it if necessary"""
         try:
-            from config import needs_config_migration, migrate_config, _save_cfg
+            from config import force_migration_v436
             
-            cfg = _load_cfg()
-            if needs_config_migration(cfg):
-                print("Config migration needed - updating configuration...")
-                
-                # Backup original config
-                import shutil
-                from config import CONFIG_FILE
-                backup_path = CONFIG_FILE + ".backup"
-                try:
-                    shutil.copy2(CONFIG_FILE, backup_path)
-                    print(f"Backed up original config to: {backup_path}")
-                except Exception as e:
-                    print(f"Could not create backup: {e}")
-                
-                # Migrate config
-                migrated_config = migrate_config(cfg)
-                _save_cfg(migrated_config)
-                print("Config successfully migrated!")
+            # Force migration for v4.3.6
+            if force_migration_v436():
+                print("Config successfully migrated to v4.3.6!")
             else:
                 print("Config is up to date")
                 

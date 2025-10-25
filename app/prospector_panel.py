@@ -2355,7 +2355,9 @@ class ProspectorPanel(ttk.Frame):
                     context_menu.add_separator()
                     context_menu.add_command(label="📊 Generate Detailed Report (HTML)", command=lambda: self._generate_enhanced_report_from_menu(tree))
                     context_menu.add_separator()
-                    context_menu.add_command(label="� Copy System Name", command=lambda: copy_system_to_clipboard_reports(tree))
+                    context_menu.add_command(label="Share to Discord", command=lambda: self._share_selected_to_discord_popup(tree))
+                    context_menu.add_separator()
+                    context_menu.add_command(label="📋 Copy System Name", command=lambda: copy_system_to_clipboard_reports(tree))
                     context_menu.add_separator()
                     context_menu.add_separator()
                     
@@ -3322,6 +3324,30 @@ class ProspectorPanel(ttk.Frame):
             
             session = self.reports_tab_session_lookup[item_id]
             
+            # Get or prompt for Discord username
+            username_result = self._get_discord_username()
+            if not username_result[0]:  # User cancelled
+                return
+            
+            username, comment = username_result
+            
+            # Add username and comment to session data
+            session_with_user = session.copy()
+            session_with_user['discord_username'] = username
+            if comment:
+                session_with_user['discord_comment'] = comment
+            
+            # Try to add report content for material breakdown
+            try:
+                if 'file_path' in session and session['file_path']:
+                    report_path = session['file_path']
+                    if os.path.exists(report_path):
+                        with open(report_path, 'r', encoding='utf-8') as f:
+                            session_with_user['report_content'] = f.read()
+            except Exception as e:
+                print(f"[DEBUG] Could not read report content: {e}")
+                # Continue without report content
+            
             # Import Discord integration
             try:
                 from discord_integration import send_discord_report, is_discord_enabled
@@ -3339,7 +3365,7 @@ class ProspectorPanel(ttk.Frame):
                 return
             
             # Send to Discord
-            success, message = send_discord_report(session)
+            success, message = send_discord_report(session_with_user)
             
             from tkinter import messagebox
             if success:
@@ -3355,16 +3381,35 @@ class ProspectorPanel(ttk.Frame):
             from tkinter import messagebox
             messagebox.showerror("Error", error_msg)
 
-    # DISABLED: Discord setup dialog - webhook is now pre-configured
-    # def _show_discord_setup_dialog(self):
-        """Show Discord webhook setup dialog with proper positioning and icon"""
+    def _get_discord_username(self):
+        """Get Discord username with re-prompt option (Option 4)"""
+        try:
+            from config import _load_cfg, update_config_value
+            
+            # Check if username is already saved
+            cfg = _load_cfg()
+            saved_username = cfg.get('discord_username', '').strip()
+            
+            # Always show the dialog - with or without existing username
+            username_result = self._show_username_dialog(saved_username)
+            if username_result:
+                username, comment = username_result
+                return username, comment
+            else:
+                return None, None
+                
+        except Exception as e:
+            print(f"[DEBUG] Error getting Discord username: {e}")
+            return None, None
+
+    def _show_username_dialog(self, current_username=""):
+        """Show custom username input dialog with proper positioning and icon"""
         try:
             import tkinter as tk
-            from tkinter import ttk, messagebox
             
             # Create toplevel window
             dialog = tk.Toplevel(self.winfo_toplevel())
-            dialog.title("Discord Webhook Setup")
+            dialog.title("Discord Username")
             dialog.configure(bg="#1e1e1e")
             dialog.resizable(False, False)
             
@@ -3382,34 +3427,59 @@ class ProspectorPanel(ttk.Frame):
             
             # Position dialog relative to main EliteMining window (same monitor)
             dialog_width = 500
-            dialog_height = 400
+            dialog_height = 420
             dialog.geometry(f"{dialog_width}x{dialog_height}")
-            dialog.update_idletasks()
             
-            # Get main app window position
+            # Give some time for geometry to settle
+            dialog.update_idletasks()
+            dialog.after(10)  # Small delay to ensure proper positioning
+            
+            # Get main app window position and center on parent
             try:
-                if self.main_app:
+                # Get the parent window (main app)
+                main_window = self.winfo_toplevel()
+                if main_window:
                     # Force update to get accurate position
-                    self.main_app.update_idletasks()
-                    main_x = self.main_app.winfo_x()
-                    main_y = self.main_app.winfo_y()
-                    main_width = self.main_app.winfo_width()
-                    main_height = self.main_app.winfo_height()
+                    main_window.update_idletasks()
+                    dialog.update_idletasks()
                     
-                    # Center dialog on main app window
+                    main_x = main_window.winfo_rootx()
+                    main_y = main_window.winfo_rooty()
+                    main_width = main_window.winfo_width()
+                    main_height = main_window.winfo_height()
+                    
+                    # Center dialog on main app window (stays on same monitor)
                     x = main_x + (main_width - dialog_width) // 2
                     y = main_y + (main_height - dialog_height) // 2
                     
+                    # Keep dialog within reasonable bounds of parent window
+                    # Only adjust if dialog would be completely off the main window area
+                    min_x = main_x - 100  # Allow some overhang
+                    max_x = main_x + main_width + 100 - dialog_width
+                    min_y = main_y - 50
+                    max_y = main_y + main_height + 50 - dialog_height
+                    
+                    x = max(min_x, min(x, max_x))
+                    y = max(min_y, min(y, max_y))
+                    
                     dialog.geometry(f"+{x}+{y}")
+                    print(f"[DEBUG] Dialog positioned at: x={x}, y={y} (main window: {main_x},{main_y} {main_width}x{main_height})")
                 else:
-                    # Fallback: center on screen
-                    x = (dialog.winfo_screenwidth() // 2) - (dialog_width // 2)
-                    y = (dialog.winfo_screenheight() // 2) - (dialog_height // 2)
+                    # Fallback: position near main app
+                    x = self.winfo_rootx() + 50
+                    y = self.winfo_rooty() + 50
                     dialog.geometry(f"+{x}+{y}")
+                    print(f"[DEBUG] Dialog fallback positioned at: x={x}, y={y}")
             except Exception as e:
                 print(f"[DEBUG] Error positioning dialog: {e}")
-                # Final fallback
-                dialog.geometry(f"+{(dialog.winfo_screenwidth() // 2) - 250}+{(dialog.winfo_screenheight() // 2) - 200}")
+                # Final fallback - position near prospector panel
+                try:
+                    x = self.winfo_rootx() + 50
+                    y = self.winfo_rooty() + 50
+                    dialog.geometry(f"+{x}+{y}")
+                except:
+                    dialog.geometry("500x420+100+100")
+                print(f"[DEBUG] Dialog emergency positioned")
             
             dialog.update_idletasks()
             dialog.focus_force()
@@ -3418,89 +3488,132 @@ class ProspectorPanel(ttk.Frame):
             main_frame = tk.Frame(dialog, bg="#1e1e1e")
             main_frame.pack(fill="both", expand=True, padx=20, pady=20)
             
-            # Title
-            title_label = tk.Label(main_frame, text="Discord Webhook Setup", 
-                                  font=("Arial", 14, "bold"), 
-                                  fg="#ffffff", bg="#1e1e1e")
-            title_label.pack(pady=(0, 15))
+            # Title/prompt - show different text based on whether username exists
+            if current_username:
+                prompt_text = f"Posting as: {current_username}\n\nEdit your Discord username:"
+            else:
+                prompt_text = "Enter your name for Discord posts:"
+                
+            title_label = tk.Label(main_frame, text=prompt_text, 
+                                  font=("Arial", 12), 
+                                  fg="#ffffff", bg="#1e1e1e",
+                                  justify="left")
+            title_label.pack(pady=(0, 10))
             
-            # Instructions frame
-            inst_frame = tk.Frame(main_frame, bg="#2a2a2a", relief="ridge", bd=1)
-            inst_frame.pack(fill="x", pady=(0, 15))
+            # Discord info panel with logo
+            info_frame = tk.Frame(main_frame, bg="#2a2a2a", relief="ridge", bd=1)
+            info_frame.pack(fill="x", pady=(0, 15))
             
-            inst_label = tk.Label(inst_frame, 
-                                 text="To share reports to Discord:\n\n" +
-                                      "1. Go to your Discord server\n" +
-                                      "2. Edit a channel → Integrations → Webhooks\n" +
-                                      "3. Create New Webhook\n" +
-                                      "4. Copy the webhook URL\n" +
-                                      "5. Paste it below",
-                                 font=("Arial", 10), 
+            # Try to load Discord logo
+            discord_logo = None
+            try:
+                from PIL import Image, ImageTk
+                import os
+                logo_path = os.path.join(os.path.dirname(__file__), "Images", "Discord-Logo-Blurple.png")
+                if os.path.exists(logo_path):
+                    # Load and resize logo with better proportions
+                    img = Image.open(logo_path)
+                    # Get original dimensions to maintain aspect ratio
+                    original_width, original_height = img.size
+                    # Set target height and calculate width to maintain aspect ratio
+                    target_height = 20
+                    target_width = int((original_width * target_height) / original_height)
+                    img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                    discord_logo = ImageTk.PhotoImage(img)
+            except Exception as e:
+                print(f"[DEBUG] Could not load Discord logo: {e}")
+                discord_logo = None
+            
+            # Main info text
+            main_text = "This will post your mining report to the\nEliteMining Community Discord server."
+            main_label = tk.Label(info_frame, text=main_text,
+                                 font=("Arial", 9), 
                                  fg="#ffffff", bg="#2a2a2a",
-                                 justify="left")
-            inst_label.pack(padx=15, pady=15)
+                                 justify="center")
+            main_label.pack(padx=15, pady=(10, 5))
             
-            # URL input frame
-            url_frame = tk.Frame(main_frame, bg="#1e1e1e")
-            url_frame.pack(fill="x", pady=(0, 15))
+            # Discord link section
+            link_frame = tk.Frame(info_frame, bg="#2a2a2a")
+            link_frame.pack(padx=15, pady=(0, 10))
             
-            url_label = tk.Label(url_frame, text="Discord Webhook URL:", 
-                                font=("Arial", 10), 
-                                fg="#ffffff", bg="#1e1e1e")
-            url_label.pack(anchor="w")
+            def open_discord_link():
+                import webbrowser
+                webbrowser.open("https://discord.gg/5dsF3UshRR")
             
-            url_entry = tk.Entry(url_frame, font=("Arial", 10), width=60,
-                                 bg="#333333", fg="#ffffff", 
-                                 insertbackground="#ffffff",
-                                 relief="solid", bd=1)
-            url_entry.pack(fill="x", pady=(5, 0))
-            url_entry.focus()
+            if discord_logo:
+                # Clickable Discord logo
+                logo_label = tk.Label(link_frame, image=discord_logo, bg="#2a2a2a", cursor="hand2")
+                logo_label.image = discord_logo  # Keep reference
+                logo_label.pack(side="left", padx=(0, 8))
+                logo_label.bind("<Button-1>", lambda e: open_discord_link())
+            
+            # "Join our community" text - always show this
+            link_text = "Join our community"
+            link_label = tk.Label(link_frame, text=link_text,
+                                 font=("Arial", 9, "underline"), 
+                                 fg="#5865F2", bg="#2a2a2a",  # Discord blurple color
+                                 cursor="hand2")
+            if discord_logo:
+                link_label.pack(side="left")
+            else:
+                link_label.pack()
+            link_label.bind("<Button-1>", lambda e: open_discord_link())
+            
+            # Add Discord URL below the link text for clarity
+            url_label = tk.Label(link_frame, text="discord.gg/5dsF3UshRR",
+                                font=("Arial", 8), 
+                                fg="#888888", bg="#2a2a2a")
+            if discord_logo:
+                url_label.pack(side="left", padx=(8, 0))
+            else:
+                url_label.pack(pady=(2, 0))
+            
+            # Username input
+            username_entry = tk.Entry(main_frame, font=("Arial", 11), width=35,
+                                     bg="#333333", fg="#ffffff", 
+                                     insertbackground="#ffffff",
+                                     relief="solid", bd=1)
+            username_entry.pack(pady=(0, 15))
+            username_entry.insert(0, current_username)
+            username_entry.focus()
+            username_entry.select_range(0, tk.END)
+            
+            # Comment label
+            comment_label = tk.Label(main_frame, text="Add a comment (optional):", 
+                                   font=("Arial", 10), 
+                                   fg="#ffffff", bg="#1e1e1e")
+            comment_label.pack(anchor="w", pady=(0, 5))
+            
+            # Comment input
+            comment_entry = tk.Entry(main_frame, font=("Arial", 10), width=35,
+                                   bg="#333333", fg="#ffffff", 
+                                   insertbackground="#ffffff",
+                                   relief="solid", bd=1)
+            comment_entry.pack(pady=(0, 20))
             
             # Result variable
-            result = {"webhook_url": None}
+            result = {"username": None, "comment": None}
             
             def on_ok():
-                webhook_url = url_entry.get().strip()
-                if not webhook_url:
-                    messagebox.showwarning("Missing URL", "Please enter a webhook URL.")
-                    return
-                
-                # Validate webhook URL
-                from discord_integration import validate_webhook_url, test_discord_webhook
-                from config import update_config_value
-                
-                if not validate_webhook_url(webhook_url):
-                    messagebox.showerror("Invalid URL", "The entered URL is not a valid Discord webhook URL.")
-                    return
-                
-                # Test the webhook
-                dialog.configure(cursor="wait")
-                dialog.update()
-                
-                try:
-                    success, test_message = test_discord_webhook(webhook_url)
-                    
-                    if success:
-                        # Save webhook URL and enable Discord
-                        update_config_value("discord_webhook_url", webhook_url)
-                        update_config_value("discord_enabled", True)
-                        
-                        result["webhook_url"] = webhook_url
-                        messagebox.showinfo("Success", "Discord webhook configured successfully! You can now share reports to Discord.")
-                        dialog.destroy()
-                    else:
-                        messagebox.showerror("Webhook Test Failed", f"Failed to test webhook: {test_message}")
-                        dialog.configure(cursor="")
-                except Exception as e:
-                    messagebox.showerror("Test Error", f"Error testing webhook: {e}")
-                    dialog.configure(cursor="")
+                username = username_entry.get().strip()
+                comment = comment_entry.get().strip()
+                if username:
+                    # Save to config
+                    from config import update_config_value
+                    update_config_value("discord_username", username)
+                    result["username"] = username
+                    result["comment"] = comment if comment else None
+                    dialog.destroy()
+                else:
+                    # Empty username not allowed
+                    username_entry.focus()
             
             def on_cancel():
                 dialog.destroy()
             
             # Button frame
             btn_frame = tk.Frame(main_frame, bg="#1e1e1e")
-            btn_frame.pack(fill="x", pady=(10, 0))
+            btn_frame.pack(fill="x")
             
             # Cancel button (left)
             cancel_btn = tk.Button(btn_frame, text="Cancel", 
@@ -3511,18 +3624,18 @@ class ProspectorPanel(ttk.Frame):
             cancel_btn.pack(side="left")
             
             # OK button (right)
-            ok_btn = tk.Button(btn_frame, text="Test & Save", 
+            ok_btn = tk.Button(btn_frame, text="OK", 
                               command=on_ok,
                               bg="#5865F2", fg="#ffffff",
                               activebackground="#4752C4", activeforeground="#ffffff",
-                              relief="solid", bd=1, width=12)
+                              relief="solid", bd=1, width=10)
             ok_btn.pack(side="right")
             
             # Handle Enter key
             def on_enter(event):
                 on_ok()
             
-            url_entry.bind("<Return>", on_enter)
+            username_entry.bind("<Return>", on_enter)
             dialog.bind("<Return>", on_enter)
             
             # Handle dialog close (X button)
@@ -3531,14 +3644,112 @@ class ProspectorPanel(ttk.Frame):
             # Wait for dialog to close
             dialog.wait_window()
             
-            # If webhook was configured successfully, try sharing again
-            if result["webhook_url"]:
-                self._set_status("Discord webhook configured successfully!")
-                self._share_to_discord()
+            return result["username"], result["comment"]
                 
         except Exception as e:
+            print(f"[DEBUG] Error showing username dialog: {e}")
+            return None, None
+
+    def _share_selected_to_discord(self):
+        """Share the currently selected session to Discord (for context menu)"""
+        try:
+            # Check if a session is selected
+            selected = self.reports_tree_tab.selection()
+            if not selected:
+                from tkinter import messagebox
+                messagebox.showwarning("No Selection", "Please select a mining session to share to Discord.")
+                return
+            
+            # Use the existing _share_to_discord method which handles the rest
+            self._share_to_discord()
+                
+        except Exception as e:
+            error_msg = f"Failed to share to Discord: {e}"
+            self._set_status(error_msg)
             from tkinter import messagebox
-            messagebox.showerror("Setup Error", f"Failed to set up Discord: {e}")
+            messagebox.showerror("Error", error_msg)
+
+    def _share_selected_to_discord_popup(self, tree):
+        """Share the currently selected session to Discord from popup window"""
+        try:
+            # Check if a session is selected in the popup tree
+            selected = tree.selection()
+            if not selected:
+                from tkinter import messagebox
+                messagebox.showwarning("No Selection", "Please select a mining session to share to Discord.")
+                return
+            
+            # Get the session data from popup tree - need to get from session lookup
+            item_id = selected[0]
+            
+            # Check if there's a session lookup for the popup
+            if hasattr(self, 'session_lookup') and item_id in self.session_lookup:
+                session = self.session_lookup[item_id]
+            else:
+                # Fall back to reports_tab_session_lookup
+                if item_id in self.reports_tab_session_lookup:
+                    session = self.reports_tab_session_lookup[item_id]
+                else:
+                    from tkinter import messagebox
+                    messagebox.showerror("Error", "Session data not found for selected item.")
+                    return
+            
+            # Get or prompt for Discord username
+            username_result = self._get_discord_username()
+            if not username_result[0]:  # User cancelled
+                return
+            
+            username, comment = username_result
+            
+            # Add username and comment to session data
+            session_with_user = session.copy()
+            session_with_user['discord_username'] = username
+            if comment:
+                session_with_user['discord_comment'] = comment
+            
+            # Try to add report content for material breakdown
+            try:
+                if 'file_path' in session and session['file_path']:
+                    report_path = session['file_path']
+                    if os.path.exists(report_path):
+                        with open(report_path, 'r', encoding='utf-8') as f:
+                            session_with_user['report_content'] = f.read()
+            except Exception as e:
+                print(f"[DEBUG] Could not read report content: {e}")
+                # Continue without report content
+            
+            # Import Discord integration
+            try:
+                from discord_integration import send_discord_report, is_discord_enabled
+            except ImportError:
+                from tkinter import messagebox
+                messagebox.showerror("Error", "Discord integration module not found.")
+                return
+            
+            # Check if Discord is configured
+            if not is_discord_enabled():
+                from tkinter import messagebox
+                messagebox.showinfo("Discord Sharing", 
+                                   "Discord sharing is not available in this version.\n\n" +
+                                   "Contact the administrator if you believe this is an error.")
+                return
+            
+            # Send to Discord
+            success, message = send_discord_report(session_with_user)
+            
+            from tkinter import messagebox
+            if success:
+                messagebox.showinfo("Discord Share", message)
+                self._set_status("Report shared to Discord successfully!")
+            else:
+                messagebox.showerror("Discord Error", message)
+                self._set_status(f"Discord share failed: {message}")
+                
+        except Exception as e:
+            error_msg = f"Failed to share to Discord: {e}"
+            self._set_status(error_msg)
+            from tkinter import messagebox
+            messagebox.showerror("Error", error_msg)
 
     def _parse_report_file(self, filename: str, first_line: str, mtime: float) -> Optional[Tuple[str, str, str, str, str]]:
         """Parse report filename and content to extract date, system, body, duration, and TPH"""
@@ -5302,6 +5513,8 @@ class ProspectorPanel(ttk.Frame):
                     context_menu.add_command(label="Generate Detailed Report (HTML)", command=lambda: self._generate_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()
                     context_menu.add_command(label="Copy System Name", command=lambda: copy_system_name_tab())
+                    context_menu.add_separator()
+                    context_menu.add_command(label="Share to Discord", command=lambda: self._share_selected_to_discord())
                     context_menu.add_separator()
                     context_menu.add_command(label="Delete Detailed Report + Screenshots", command=lambda: self._delete_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()  # Add separator for safety

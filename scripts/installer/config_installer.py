@@ -285,7 +285,8 @@ def migrate_user_config(existing_config: dict, new_config: dict) -> dict:
         "text_overlay_transparency", "text_overlay_color", "text_overlay_position",
         "text_overlay_size", "text_overlay_duration", "stay_on_top", "tts_voice",
         "announcements", "cargo_monitor_enabled", "cargo_monitor_position",
-        "cargo_monitor_transparency", "tooltips_enabled"
+        "cargo_monitor_transparency", "tooltips_enabled", "discord_webhook_url",
+        "discord_enabled", "discord_username"
     ]
     
     for key in safe_to_preserve:

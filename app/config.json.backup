@@ -3,7 +3,7 @@
   "tts_volume": 100,
   "va_folder": "D:/My Apps Work Folder/Elitemining Working folder/Releases/EliteMining-Dev",
   "window": {
-    "geometry": "1100x680+791+398",
+    "geometry": "1100x680+2399+313",
     "zoomed": false
   },
   "text_overlay_enabled": true,
@@ -593,5 +593,6 @@
   "auto_start_session": true,
   "prompt_on_cargo_full": true,
   "discord_webhook_url": "https://discord.com/api/webhooks/1431645227634131005/ZtoPZTa-_d1hYrP11FZbP_jBpb4nVo8e8HSMK3i33-7Nmu94wm7Xzc3GUEb2nPfr0DcO",
-  "discord_enabled": true
+  "discord_enabled": true,
+  "discord_username": "ViperDude"
 }

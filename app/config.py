@@ -150,6 +150,11 @@ def needs_config_migration(config: Dict[str, Any]) -> bool:
     current_config_version = get_config_version()
     file_config_version = config.get("config_version", "0.0.0")
     
+    # Force migration for versions before 4.3.6
+    if file_config_version in ["4.1.7", "4.1.8"]:
+        log.info(f"Forcing migration from {file_config_version} to {current_config_version}")
+        return True
+    
     # Version-based migration check
     if file_config_version != current_config_version:
         log.info(f"Config version mismatch: file={file_config_version}, current={current_config_version}")
@@ -281,5 +286,42 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
         if "min_pct_map" in config["last_material_settings"] and "Coltan" not in config["last_material_settings"]["min_pct_map"]:
             config["last_material_settings"]["min_pct_map"]["Coltan"] = 20.0
     
+    # Add Discord integration fields if missing
+    if "discord_webhook_url" not in config:
+        config["discord_webhook_url"] = "https://discord.com/api/webhooks/1431645227634131005/ZtoPZTa-_d1hYrP11FZbP_jBpb4nVo8e8HSMK3i33-7Nmu94wm7Xzc3GUEb2nPfr0DcO"
+    if "discord_enabled" not in config:
+        config["discord_enabled"] = True
+    if "discord_username" not in config:
+        config["discord_username"] = ""
+    
     log.info(f"Config migrated to version {get_config_version()}")
     return config
+
+
+def force_migration_v436():
+    """Force migration for v4.3.6 - ensures config gets updated"""
+    try:
+        from version import get_config_version
+        
+        cfg = _load_cfg()
+        current_version = cfg.get("config_version", "0.0.0")
+        
+        # Only migrate if not already on 4.3.6
+        if current_version != "4.3.6":
+            # Backup original
+            import shutil
+            backup_path = CONFIG_FILE + ".backup_v436"
+            try:
+                shutil.copy2(CONFIG_FILE, backup_path)
+            except Exception:
+                pass
+            
+            # Force migration
+            migrated = migrate_config(cfg)
+            _save_cfg(migrated)
+            log.info(f"Force migrated config from {current_version} to 4.3.6")
+            return True
+        return False
+    except Exception as e:
+        log.error(f"Force migration failed: {e}")
+        return False

@@ -4,7 +4,7 @@ Version management for Elite Mining application
 
 __version__ = "4.3.6"
 __build_date__ = "2025-10-25"
-__config_version__ = "4.1.8"  # Config schema version - increment when config structure changes
+__config_version__ = "4.3.6"  # Config schema version - increment when config structure changes
 
 # Update server configuration
 UPDATE_CHECK_URL = "https://api.github.com/repos/Viper-Dude/EliteMining/releases/latest"
