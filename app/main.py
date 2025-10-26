@@ -4539,13 +4539,9 @@ class App(tk.Tk):
             # No need to override from config.json
             
             # Set prompt on cargo full preference after panel is created
-            prompt_enabled = bool(self.prompt_on_cargo_full.get())
-            self.prospector_panel.prompt_on_cargo_full = prompt_enabled
-            # Sync checkbox in Mining Analytics tab - but respect multi-session mode
-            if hasattr(self.prospector_panel, 'prompt_on_full_var'):
-                # Don't override if multi-session mode is enabled (checkbox should stay disabled/unchecked)
-                if not self.prospector_panel.multi_session_mode:
-                    self.prospector_panel.prompt_on_full_var.set(1 if prompt_enabled else 0)
+            # Note: Prompt-when-full is now handled exclusively by prospector panel via txt files
+            # No need to override from config.json
+            
         except Exception as e:
             # Log detailed error
             import traceback
@@ -6286,13 +6282,10 @@ class App(tk.Tk):
         """Called when prompt on cargo full checkbox is toggled"""
         enabled = bool(self.prompt_on_cargo_full.get())
         self._save_prompt_on_full_preference()
-        # Pass setting to prospector panel
-        if hasattr(self, 'prospector_panel') and self.prospector_panel:
-            self.prospector_panel.prompt_on_cargo_full = enabled
-            # Also sync the checkbox in Mining Analytics tab
-            if hasattr(self.prospector_panel, 'prompt_on_full_var'):
-                self.prospector_panel.prompt_on_full_var.set(1 if enabled else 0)
-        self._set_status(f"Prompt when cargo full {'enabled' if enabled else 'disabled'}")
+        # Prompt-when-full is now handled exclusively by prospector panel via txt files
+        # No need for main.py to interfere with this setting
+        
+        self._set_status(f"Prompt-when-full setting handled by prospector panel")
 
     # ---------- Journal folder preference handling ----------
     def _import_journal_history(self):

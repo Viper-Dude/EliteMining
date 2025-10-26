@@ -1448,8 +1448,12 @@ class ProspectorPanel(ttk.Frame):
         
         # Disable prompt checkbox if multi-session is active (incompatible features)
         if self.multi_session_mode:
-            self.prompt_on_full_cb.config(state="disabled")
-            print(f"[DEBUG] Prompt-when-full checkbox disabled due to multi-session mode")
+            self.prompt_on_full_cb.config(state="disabled", fg="#666666")
+            self.prompt_on_full_var.set(0)  # Uncheck when multi-session is active
+            print(f"[DEBUG] Prompt-when-full checkbox disabled and unchecked due to multi-session mode")
+        else:
+            self.prompt_on_full_cb.config(state="normal", fg="#ffffff")
+            print(f"[DEBUG] Prompt-when-full checkbox enabled (single session mode)")
         
         self.ToolTip(self.prompt_on_full_cb, "Show prompt to end session when cargo is 100% full\nand has been idle (no changes) for 1 minute\nRemember to end session BEFORE unloading cargo!")
         
@@ -7411,14 +7415,17 @@ class ProspectorPanel(ttk.Frame):
         
         # Handle UI interaction between multi-session and prompt-when-full
         if enabled:
-            # Disable the prompt checkbox widget (but preserve the setting)
+            # Disable the prompt checkbox widget and uncheck it (incompatible features)
             if hasattr(self, 'prompt_on_full_cb'):
                 self.prompt_on_full_cb.config(state="disabled", fg="#666666")
+                self.prompt_on_full_var.set(0)  # Uncheck the box when multi-session is enabled
             self._set_status("Multi-session mode enabled - Cargo full prompt disabled")
         else:
-            # Re-enable the prompt checkbox widget
+            # Re-enable the prompt checkbox widget and restore its saved state
             if hasattr(self, 'prompt_on_full_cb'):
                 self.prompt_on_full_cb.config(state="normal", fg="#ffffff")
+                # Restore the checkbox to match the saved boolean value
+                self.prompt_on_full_var.set(1 if self.prompt_on_cargo_full else 0)
             self._set_status("Multi-session mode disabled")
         
         # Save to toggle file
