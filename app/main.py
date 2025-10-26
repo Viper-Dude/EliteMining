@@ -4535,11 +4535,8 @@ class App(tk.Tk):
             self.prospector_panel.grid(row=0, column=0, sticky="nsew")
             
             # Set auto-start preference after panel is created
-            enabled = bool(self.auto_start_session.get())
-            self.prospector_panel.auto_start_on_prospector = enabled
-            # Sync checkbox in Mining Analytics tab
-            if hasattr(self.prospector_panel, 'auto_start_var'):
-                self.prospector_panel.auto_start_var.set(1 if enabled else 0)
+            # Note: Auto-start is now handled exclusively by prospector panel via txt files
+            # No need to override from config.json
             
             # Set prompt on cargo full preference after panel is created
             prompt_enabled = bool(self.prompt_on_cargo_full.get())
@@ -6267,13 +6264,10 @@ class App(tk.Tk):
         """Called when auto-start session checkbox is toggled"""
         enabled = bool(self.auto_start_session.get())
         self._save_auto_start_preference()
-        # Pass setting to prospector panel
-        if hasattr(self, 'prospector_panel') and self.prospector_panel:
-            self.prospector_panel.auto_start_on_prospector = enabled
-            # Also sync the checkbox in Mining Analytics tab
-            if hasattr(self.prospector_panel, 'auto_start_var'):
-                self.prospector_panel.auto_start_var.set(1 if enabled else 0)
-        self._set_status(f"Auto-start session on first prospector {'enabled' if enabled else 'disabled'}")
+        # Auto-start is now handled exclusively by prospector panel via txt files
+        # No need to sync from config.json
+        
+        self._set_status(f"Auto-start session setting handled by prospector panel")
 
     def _load_prompt_on_full_preference(self) -> None:
         """Load prompt on cargo full preference from config"""
@@ -6871,17 +6865,70 @@ class App(tk.Tk):
 
     def _check_config_migration(self):
         """Check if config needs migration and perform it if necessary"""
+        import logging
+        from datetime import datetime
+        
+        log = logging.getLogger("EliteMining.Migration")
+        
         try:
-            from config import force_migration_v436
+            from config import _load_cfg, needs_config_migration, migrate_config, _save_cfg, CONFIG_FILE
             
-            # Force migration for v4.3.6
-            if force_migration_v436():
-                print("Config successfully migrated to v4.3.6!")
+            # Log migration check start
+            log.info(f"=== CONFIG MIGRATION CHECK START === {datetime.now().isoformat()}")
+            log.info(f"Config file path: {CONFIG_FILE}")
+            
+            cfg = _load_cfg()
+            current_version = cfg.get("config_version", "0.0.0")
+            log.info(f"Current config version: {current_version}")
+            
+            if needs_config_migration(cfg):
+                log.info(f"Migration needed from {current_version}")
+                
+                # Create backup
+                import shutil
+                backup_path = CONFIG_FILE + f".backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                try:
+                    shutil.copy2(CONFIG_FILE, backup_path)
+                    log.info(f"Config backup created: {backup_path}")
+                except Exception as backup_error:
+                    log.error(f"Failed to create backup: {backup_error}")
+                
+                # Perform migration
+                migrated_cfg = migrate_config(cfg)
+                log.info(f"About to save migrated config to: {CONFIG_FILE}")
+                _save_cfg(migrated_cfg)
+                log.info(f"Config saved successfully")
+                
+                # Clear config cache to force fresh reload
+                import config
+                config._cached_config = {}
+                config._last_load_time = 0
+                log.info(f"Config cache cleared to force fresh reload")
+                
+                new_version = migrated_cfg.get("config_version", "unknown")
+                log.info(f"Config successfully migrated from {current_version} to {new_version}")
+                
+                # Add small delay before verification
+                import time
+                time.sleep(0.1)
+                
+                # Verify migration
+                log.info(f"Verifying migration by reading from: {CONFIG_FILE}")
+                verification_cfg = _load_cfg()
+                verification_version = verification_cfg.get("config_version", "failed")
+                if verification_version == new_version:
+                    log.info(f"Migration verification successful: {verification_version}")
+                else:
+                    log.error(f"Migration verification failed: expected {new_version}, got {verification_version}")
+                    log.error(f"Verification read from: {CONFIG_FILE}")
+                    
             else:
-                print("Config is up to date")
+                log.info(f"Config is up to date at version {current_version}")
+                
+            log.info(f"=== CONFIG MIGRATION CHECK END === {datetime.now().isoformat()}")
                 
         except Exception as e:
-            print(f"Config migration check failed: {e}")
+            log.error(f"Config migration check failed: {e}", exc_info=True)
             # Continue startup even if migration fails
 
     def _on_close(self) -> None:

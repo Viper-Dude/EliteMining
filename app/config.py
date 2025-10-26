@@ -75,9 +75,23 @@ def _save_cfg(cfg: Dict[str, Any]) -> None:
         config_dir = os.path.dirname(CONFIG_FILE)
         if not os.path.exists(config_dir):
             os.makedirs(config_dir, exist_ok=True)
+            log.info(f"Created config directory: {config_dir}")
+        
+        log.info(f"Saving config to: {CONFIG_FILE}")
+        log.info(f"Config version being saved: {cfg.get('config_version', 'MISSING')}")
         
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
+            
+        log.info(f"Config file written successfully")
+        
+        # Verify the file was written correctly
+        if os.path.exists(CONFIG_FILE):
+            file_size = os.path.getsize(CONFIG_FILE)
+            log.info(f"Config file exists, size: {file_size} bytes")
+        else:
+            log.error(f"Config file does not exist after save!")
+            
     except Exception as e:
         log.exception("Failed saving config: %s", e)
 
@@ -201,10 +215,20 @@ def should_overwrite_config() -> bool:
 
 def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Migrate config to current version, preserving user settings where possible"""
+    import logging
+    from datetime import datetime
     from version import get_config_version
     
+    log = logging.getLogger("EliteMining.Migration")
+    log.info(f"Starting config migration at {datetime.now().isoformat()}")
+    
+    original_version = config.get("config_version", "unknown")
+    target_version = get_config_version()
+    log.info(f"Migrating from {original_version} to {target_version}")
+    
     # Add version field if missing
-    config["config_version"] = get_config_version()
+    config["config_version"] = target_version
+    log.info(f"Updated config_version to {target_version}")
     
     # Add missing presets with defaults
     default_preset_structure = {
@@ -215,16 +239,21 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "Non-Core Asteroids": True
     }
     
+    presets_added = 0
     for i in range(1, 6):
         preset_key = f"announce_preset_{i}"
         if preset_key not in config:
             config[preset_key] = default_preset_structure.copy()
+            presets_added += 1
         else:
             # Ensure Core/Non-Core fields exist in existing presets
             if "Core Asteroids" not in config[preset_key]:
                 config[preset_key]["Core Asteroids"] = (i % 2 == 1)  # Alternate defaults
+                log.info(f"Added Core Asteroids field to preset {i}")
             if "Non-Core Asteroids" not in config[preset_key]:
                 config[preset_key]["Non-Core Asteroids"] = (i % 2 == 0)
+                log.info(f"Added Non-Core Asteroids field to preset {i}")
+    
     
     # Ensure last_material_settings exists and has Core/Non-Core fields
     if "last_material_settings" not in config:
@@ -235,16 +264,21 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
             "Core Asteroids": True,
             "Non-Core Asteroids": False
         }
+        log.info("Added missing last_material_settings configuration")
     else:
         last_settings = config["last_material_settings"]
         if "Core Asteroids" not in last_settings:
             last_settings["Core Asteroids"] = True
+            log.info("Added Core Asteroids field to last_material_settings")
         if "Non-Core Asteroids" not in last_settings:
             last_settings["Non-Core Asteroids"] = False
+            log.info("Added Non-Core Asteroids field to last_material_settings")
     
     # Add Tritium to all presets and main announce/min_pct maps
+    materials_added = []
     if "announce_map" in config and "Tritium" not in config["announce_map"]:
         config["announce_map"]["Tritium"] = True
+        materials_added.append("Tritium")
     if "min_pct_map" in config and "Tritium" not in config["min_pct_map"]:
         config["min_pct_map"]["Tritium"] = 20.0
     
@@ -267,6 +301,7 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     # Add Coltan to all presets and main announce/min_pct maps
     if "announce_map" in config and "Coltan" not in config["announce_map"]:
         config["announce_map"]["Coltan"] = True
+        materials_added.append("Coltan")
     if "min_pct_map" in config and "Coltan" not in config["min_pct_map"]:
         config["min_pct_map"]["Coltan"] = 20.0
     
@@ -286,42 +321,23 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
         if "min_pct_map" in config["last_material_settings"] and "Coltan" not in config["last_material_settings"]["min_pct_map"]:
             config["last_material_settings"]["min_pct_map"]["Coltan"] = 20.0
     
+    if materials_added:
+        log.info(f"Added new materials: {', '.join(materials_added)}")
+    
     # Add Discord integration fields if missing
+    discord_fields_added = []
     if "discord_webhook_url" not in config:
         config["discord_webhook_url"] = "https://discord.com/api/webhooks/1431645227634131005/ZtoPZTa-_d1hYrP11FZbP_jBpb4nVo8e8HSMK3i33-7Nmu94wm7Xzc3GUEb2nPfr0DcO"
+        discord_fields_added.append("discord_webhook_url")
     if "discord_enabled" not in config:
         config["discord_enabled"] = True
+        discord_fields_added.append("discord_enabled")
     if "discord_username" not in config:
         config["discord_username"] = ""
+        discord_fields_added.append("discord_username")
     
-    log.info(f"Config migrated to version {get_config_version()}")
+    if discord_fields_added:
+        log.info(f"Added Discord integration fields: {', '.join(discord_fields_added)}")
+    
+    log.info(f"Config migration completed successfully from {original_version} to {target_version}")
     return config
-
-
-def force_migration_v436():
-    """Force migration for v4.3.6 - ensures config gets updated"""
-    try:
-        from version import get_config_version
-        
-        cfg = _load_cfg()
-        current_version = cfg.get("config_version", "0.0.0")
-        
-        # Only migrate if not already on 4.3.6
-        if current_version != "4.3.6":
-            # Backup original
-            import shutil
-            backup_path = CONFIG_FILE + ".backup_v436"
-            try:
-                shutil.copy2(CONFIG_FILE, backup_path)
-            except Exception:
-                pass
-            
-            # Force migration
-            migrated = migrate_config(cfg)
-            _save_cfg(migrated)
-            log.info(f"Force migrated config from {current_version} to 4.3.6")
-            return True
-        return False
-    except Exception as e:
-        log.error(f"Force migration failed: {e}")
-        return False

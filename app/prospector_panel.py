@@ -477,10 +477,16 @@ class ProspectorPanel(ttk.Frame):
         self.auto_start_on_prospector = False
         try:
             auto_start_file = os.path.join(self.vars_dir, "autoStartSession.txt")
+            print(f"[DEBUG] Loading auto-start from: {auto_start_file}")
             if os.path.exists(auto_start_file):
                 with open(auto_start_file, 'r') as f:
-                    self.auto_start_on_prospector = f.read().strip() == "1"
-        except:
+                    content = f.read().strip()
+                    self.auto_start_on_prospector = content == "1"
+                    print(f"[DEBUG] Auto-start file exists, content: '{content}', result: {self.auto_start_on_prospector}")
+            else:
+                print(f"[DEBUG] Auto-start file does not exist, defaulting to False")
+        except Exception as e:
+            print(f"[DEBUG] Error loading auto-start file: {e}")
             pass
         
         # Prompt when cargo full - load from toggle file
@@ -489,25 +495,37 @@ class ProspectorPanel(ttk.Frame):
         self.cargo_full_prompted = False  # Track if we already prompted
         try:
             prompt_full_file = os.path.join(self.vars_dir, "promptWhenFull.txt")
+            print(f"[DEBUG] Loading prompt-when-full from: {prompt_full_file}")
             if os.path.exists(prompt_full_file):
                 with open(prompt_full_file, 'r') as f:
-                    self.prompt_on_cargo_full = f.read().strip() == "1"
-        except:
+                    content = f.read().strip()
+                    self.prompt_on_cargo_full = content == "1"
+                    print(f"[DEBUG] Prompt-when-full file exists, content: '{content}', result: {self.prompt_on_cargo_full}")
+            else:
+                print(f"[DEBUG] Prompt-when-full file does not exist, defaulting to False")
+        except Exception as e:
+            print(f"[DEBUG] Error loading prompt-when-full file: {e}")
             pass
         
         # Multi-session mode - load from toggle file
         self.multi_session_mode = False  # Accumulate stats across multiple cargo loads
         try:
             multi_session_file = os.path.join(self.vars_dir, "multiSessionMode.txt")
+            print(f"[DEBUG] Loading multi-session from: {multi_session_file}")
             if os.path.exists(multi_session_file):
                 with open(multi_session_file, 'r') as f:
-                    self.multi_session_mode = f.read().strip() == "1"
-        except:
+                    content = f.read().strip()
+                    self.multi_session_mode = content == "1"
+                    print(f"[DEBUG] Multi-session file exists, content: '{content}', result: {self.multi_session_mode}")
+            else:
+                print(f"[DEBUG] Multi-session file does not exist, defaulting to False")
+        except Exception as e:
+            print(f"[DEBUG] Error loading multi-session file: {e}")
             pass
         
-        # If multi-session is enabled, force prompt_on_cargo_full to False (incompatible features)
-        if self.multi_session_mode:
-            self.prompt_on_cargo_full = False
+        # Note: Multi-session and prompt-when-full are incompatible features
+        # This will be handled in the UI initialization
+        print(f"[DEBUG] After loading - auto_start: {self.auto_start_on_prospector}, prompt_on_cargo_full: {self.prompt_on_cargo_full}, multi_session: {self.multi_session_mode}")
         
         # Multi-session cumulative tracking (only used when multi_session_mode=True)
         self.session_total_mined = 0  # Total tons mined in session (cumulative)
@@ -1373,12 +1391,14 @@ class ProspectorPanel(ttk.Frame):
         options_frame.grid(row=1, column=0, sticky="w", pady=(4, 0))
         
         # Auto-start session checkbox
-        self.auto_start_var = tk.IntVar(value=1 if self.auto_start_on_prospector else 0)
+        auto_start_ui_value = 1 if self.auto_start_on_prospector else 0
+        print(f"[DEBUG] UI Init - auto_start boolean: {self.auto_start_on_prospector}, UI value: {auto_start_ui_value}")
+        self.auto_start_var = tk.IntVar()  # Initialize without value first
         auto_start_cb = tk.Checkbutton(
             options_frame, 
             text="Auto-start", 
             variable=self.auto_start_var,
-            command=self._on_auto_start_checkbox_toggle,
+            # Don't set command yet - will add after setting value
             bg="#1e1e1e", 
             fg="#ffffff", 
             selectcolor="#1e1e1e", 
@@ -1393,16 +1413,21 @@ class ProspectorPanel(ttk.Frame):
             relief="flat"
         )
         auto_start_cb.pack(side="left")
+        self.auto_start_var.set(auto_start_ui_value)  # Set value without callback
+        auto_start_cb.config(command=self._on_auto_start_checkbox_toggle)  # Now add callback
+        print(f"[DEBUG] Auto-start checkbox created and value set to: {auto_start_ui_value}")
         self.ToolTip(auto_start_cb, "Automatically start session when first prospector limpet is fired\n(Only works when no session is active)")
         
-        # Prompt when cargo full checkbox - force to 0 if multi-session is active
-        initial_prompt_value = 0 if self.multi_session_mode else (1 if self.prompt_on_cargo_full else 0)
-        self.prompt_on_full_var = tk.IntVar(value=initial_prompt_value)
+        # Prompt when cargo full checkbox - preserve user's saved setting
+        # If both multi-session and prompt-when-full are enabled, we'll disable prompt UI but keep the setting
+        initial_prompt_value = 1 if self.prompt_on_cargo_full else 0
+        print(f"[DEBUG] UI Init - prompt_on_cargo_full boolean: {self.prompt_on_cargo_full}, UI value: {initial_prompt_value}")
+        self.prompt_on_full_var = tk.IntVar()  # Initialize without value first
         self.prompt_on_full_cb = tk.Checkbutton(
             options_frame, 
             text="Prompt when full", 
             variable=self.prompt_on_full_var,
-            command=self._on_prompt_on_full_checkbox_toggle,
+            # Don't set command yet - will add after setting value
             bg="#1e1e1e", 
             fg="#ffffff", 
             selectcolor="#1e1e1e", 
@@ -1417,15 +1442,26 @@ class ProspectorPanel(ttk.Frame):
             relief="flat"
         )
         self.prompt_on_full_cb.pack(side="left", padx=(10, 0))
+        self.prompt_on_full_var.set(initial_prompt_value)  # Set value without callback
+        self.prompt_on_full_cb.config(command=self._on_prompt_on_full_checkbox_toggle)  # Now add callback
+        print(f"[DEBUG] Prompt-when-full checkbox created and value set to: {initial_prompt_value}")
+        
+        # Disable prompt checkbox if multi-session is active (incompatible features)
+        if self.multi_session_mode:
+            self.prompt_on_full_cb.config(state="disabled")
+            print(f"[DEBUG] Prompt-when-full checkbox disabled due to multi-session mode")
+        
         self.ToolTip(self.prompt_on_full_cb, "Show prompt to end session when cargo is 100% full\nand has been idle (no changes) for 1 minute\nRemember to end session BEFORE unloading cargo!")
         
         # Multi-session mode checkbox
-        self.multi_session_var = tk.IntVar(value=1 if self.multi_session_mode else 0)
+        multi_session_ui_value = 1 if self.multi_session_mode else 0
+        print(f"[DEBUG] UI Init - multi_session_mode boolean: {self.multi_session_mode}, UI value: {multi_session_ui_value}")
+        self.multi_session_var = tk.IntVar()  # Initialize without value first
         multi_session_cb = tk.Checkbutton(
             options_frame, 
             text="Multi-Session", 
             variable=self.multi_session_var,
-            command=self._on_multi_session_checkbox_toggle,
+            # Don't set command yet - will add after setting value
             bg="#1e1e1e", 
             fg="#ffffff", 
             selectcolor="#1e1e1e", 
@@ -1440,11 +1476,16 @@ class ProspectorPanel(ttk.Frame):
             relief="flat"
         )
         multi_session_cb.pack(side="left", padx=(10, 0))
+        self.multi_session_var.set(multi_session_ui_value)  # Set value without callback
+        multi_session_cb.config(command=self._on_multi_session_checkbox_toggle)  # Now add callback
+        print(f"[DEBUG] Multi-session checkbox created and value set to: {multi_session_ui_value}")
         self.ToolTip(multi_session_cb, "Accumulate statistics across multiple cargo loads\nStats won't reset until you manually end the session")
         
         # Apply initial state: If multi-session is already enabled (loaded from file), disable "Prompt when full"
         if self.multi_session_mode:
             self.prompt_on_full_cb.config(state="disabled", fg="#666666")
+        
+        print(f"[DEBUG] After UI creation - auto_start: {self.auto_start_on_prospector}, prompt_on_cargo_full: {self.prompt_on_cargo_full}, multi_session: {self.multi_session_mode}")
         
         # Center: Elapsed time display
         elapsed_frame = ttk.Frame(controls_frame)
@@ -7317,30 +7358,48 @@ class ProspectorPanel(ttk.Frame):
     
     def _on_auto_start_checkbox_toggle(self) -> None:
         """Called when auto-start checkbox in Mining Analytics tab is toggled"""
+        import traceback
+        print(f"[DEBUG] _on_auto_start_checkbox_toggle called!")
+        print(f"[DEBUG] Stack trace:")
+        traceback.print_stack()
+        
         enabled = bool(self.auto_start_var.get())
         self.auto_start_on_prospector = enabled
         
         # Save to toggle file
         try:
             auto_start_file = os.path.join(self.vars_dir, "autoStartSession.txt")
+            value_to_write = "1" if enabled else "0"
+            print(f"[DEBUG] Saving auto-start to: {auto_start_file}, value: '{value_to_write}'")
             with open(auto_start_file, 'w') as f:
-                f.write("1" if enabled else "0")
-        except:
+                f.write(value_to_write)
+            print(f"[DEBUG] Auto-start file saved successfully")
+        except Exception as e:
+            print(f"[DEBUG] Error saving auto-start file: {e}")
             pass
         
         self._set_status(f"Auto-start session on first prospector {'enabled' if enabled else 'disabled'}")
 
     def _on_prompt_on_full_checkbox_toggle(self) -> None:
         """Called when prompt on cargo full checkbox in Mining Analytics tab is toggled"""
+        import traceback
+        print(f"[DEBUG] _on_prompt_on_full_checkbox_toggle called!")
+        print(f"[DEBUG] Stack trace:")
+        traceback.print_stack()
+        
         enabled = bool(self.prompt_on_full_var.get())
         self.prompt_on_cargo_full = enabled
         
         # Save to toggle file
         try:
             prompt_full_file = os.path.join(self.vars_dir, "promptWhenFull.txt")
+            value_to_write = "1" if enabled else "0"
+            print(f"[DEBUG] Saving prompt-when-full to: {prompt_full_file}, value: '{value_to_write}'")
             with open(prompt_full_file, 'w') as f:
-                f.write("1" if enabled else "0")
-        except:
+                f.write(value_to_write)
+            print(f"[DEBUG] Prompt-when-full file saved successfully")
+        except Exception as e:
+            print(f"[DEBUG] Error saving prompt-when-full file: {e}")
             pass
         
         self._set_status(f"Prompt when cargo full {'enabled' if enabled else 'disabled'}")
@@ -7350,31 +7409,28 @@ class ProspectorPanel(ttk.Frame):
         enabled = bool(self.multi_session_var.get())
         self.multi_session_mode = enabled
         
-        # Automatically disable cargo full prompt when multi-session is enabled
+        # Handle UI interaction between multi-session and prompt-when-full
         if enabled:
-            # Disable cargo full prompt
-            if self.prompt_on_cargo_full:
-                self.prompt_on_cargo_full = False
-                self.prompt_on_full_var.set(0)
-            # Disable the checkbox widget
+            # Disable the prompt checkbox widget (but preserve the setting)
             if hasattr(self, 'prompt_on_full_cb'):
                 self.prompt_on_full_cb.config(state="disabled", fg="#666666")
             self._set_status("Multi-session mode enabled - Cargo full prompt disabled")
         else:
-            # Re-enable the checkbox widget and restore prompt setting
+            # Re-enable the prompt checkbox widget
             if hasattr(self, 'prompt_on_full_cb'):
                 self.prompt_on_full_cb.config(state="normal", fg="#ffffff")
-            # Auto-enable prompt when multi-session is disabled
-            self.prompt_on_cargo_full = True
-            self.prompt_on_full_var.set(1)
-            self._set_status("Multi-session mode disabled - Cargo full prompt enabled")
+            self._set_status("Multi-session mode disabled")
         
         # Save to toggle file
         try:
             multi_session_file = os.path.join(self.vars_dir, "multiSessionMode.txt")
+            value_to_write = "1" if enabled else "0"
+            print(f"[DEBUG] Saving multi-session to: {multi_session_file}, value: '{value_to_write}'")
             with open(multi_session_file, 'w') as f:
-                f.write("1" if enabled else "0")
-        except:
+                f.write(value_to_write)
+            print(f"[DEBUG] Multi-session file saved successfully")
+        except Exception as e:
+            print(f"[DEBUG] Error saving multi-session file: {e}")
             pass
 
     def _check_cargo_full_idle(self) -> None:
