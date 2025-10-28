@@ -1283,7 +1283,7 @@ class ProspectorPanel(ttk.Frame):
 
         ttk.Label(rep, text="Prospector Reports:", font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 4))
 
-        self.tree = ttk.Treeview(rep, columns=("materials", "content", "time"), show="headings", height=12)
+        self.tree = ttk.Treeview(rep, columns=("materials", "content", "time"), show="headings", height=15)
         self.tree.tag_configure("darkrow", background="#1e1e1e", foreground="#e6e6e6")
         self.tree.heading("materials", text="Minerals", anchor="center")
         self.tree.heading("content", text="Asteroid Content", anchor="center")
@@ -1304,7 +1304,7 @@ class ProspectorPanel(ttk.Frame):
         
         # Statistics tree for live percentage yields
         self.stats_tree = ttk.Treeview(stats_frame, columns=("material", "tons", "tph", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"), 
-                                       show="headings", height=6)
+                                       show="headings", height=4)
         self.stats_tree.heading("material", text="Mineral", anchor="center")
         self.stats_tree.heading("tons", text="Tons", anchor="center")
         self.stats_tree.heading("tph", text="T/hr", anchor="center")

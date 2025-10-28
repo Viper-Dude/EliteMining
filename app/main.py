@@ -2551,6 +2551,7 @@ cargo panel forces Elite to write detailed inventory data.
         """
         Prompt user to add refinery contents when cargo is emptied in multi-session mode.
         Called after CargoTransfer or MarketSell events that empty the cargo hold.
+        Single sessions skip this dialog - refinery is handled when the session ends.
         """
         print(f"[DEBUG] _prompt_for_refinery_contents_multi_session called")
         print(f"[DEBUG] refinery_prompt_shown_for_this_transfer: {self.refinery_prompt_shown_for_this_transfer}")
@@ -2562,9 +2563,9 @@ cargo panel forces Elite to write detailed inventory data.
         if hasattr(self, 'prospector_panel') and self.prospector_panel:
             is_multi_session = bool(self.prospector_panel.multi_session_var.get())
         
-        # Skip dialog in multi-session mode (refinery auto-processes, would cause double counting)
-        if is_multi_session:
-            print("[DEBUG] Skipping refinery prompt - multi-session mode (auto-processes refinery)")
+        # Show dialog ONLY for multi-session mode (single sessions handle refinery at session end)
+        if not is_multi_session:
+            print("[DEBUG] Skipping refinery prompt - single session mode (refinery handled at session end)")
             return
         
         # Prevent multiple prompts for the same cargo empty event
@@ -2869,7 +2870,8 @@ cargo panel forces Elite to write detailed inventory data.
                                        if "limpet" not in item.lower() and "drone" not in item.lower())
                     print(f"[DEBUG] MarketSell - total_cargo: {self.current_cargo}, mineral_cargo: {mineral_cargo}, has_minerals: {has_minerals}, cargo_items: {list(self.cargo_items.keys())}, session_start_snapshot: {self.session_start_snapshot is not None}")
                     
-                    # Multi-session mode: Prompt for refinery when cargo is emptied
+                    # Multi-session mode only: Prompt for refinery when cargo is emptied
+                    # Single sessions handle refinery when the session ends via "End" button
                     if mineral_cargo == 0 and self.session_start_snapshot and not self.refinery_prompt_shown_for_this_transfer:
                         self._prompt_for_refinery_contents_multi_session()
             
@@ -2947,7 +2949,8 @@ cargo panel forces Elite to write detailed inventory data.
                                        if "limpet" not in item.lower() and "drone" not in item.lower())
                     print(f"[DEBUG] CargoTransfer - total_cargo: {self.current_cargo}, mineral_cargo: {mineral_cargo}, has_minerals: {has_minerals}, cargo_items: {list(self.cargo_items.keys())}, session_start_snapshot: {self.session_start_snapshot is not None}")
                     
-                    # Multi-session mode: Prompt for refinery when cargo is emptied
+                    # Multi-session mode only: Prompt for refinery when cargo is emptied
+                    # Single sessions handle refinery when the session ends via "End" button
                     if mineral_cargo == 0 and self.session_start_snapshot and not self.refinery_prompt_shown_for_this_transfer:
                         self._prompt_for_refinery_contents_multi_session()
                         
