@@ -1,2 +1,2 @@
-Session: Macua — 2 — 00:00:00 — Total 0t (Single Session)
-Ship: Panther Grabber - Panther Clipper Mk II | No refined materials.
+Session: Macua — 2 — 00:00:00 — Total 4t (Single Session)
+Ship: Mega Bumper - Type-11 Prospector | Bauxite 4t (34309.65 t/hr)

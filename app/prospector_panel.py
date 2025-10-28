@@ -2103,14 +2103,19 @@ class ProspectorPanel(ttk.Frame):
             # After inserting, check with actual tree values for consistency
             # Use column names instead of indices to avoid breakage when columns are added
             date_val = tree.set(item_id, "date")
-            ship_val = tree.set(item_id, "ship")
             system_val = tree.set(item_id, "system")
+            body_val = tree.set(item_id, "body")
             
-            if date_val and ship_val and system_val:
-                tree_report_id = f"{date_val}_{ship_val}_{system_val}"
+            print(f"[DEBUG] Tree values - date: '{date_val}', system: '{system_val}', body: '{body_val}'")
+            
+            if date_val and system_val and body_val:
+                # Use same format as saved in mappings: date_system_body
+                tree_report_id = f"{date_val}_{system_val}_{body_val}"
+                print(f"[DEBUG] Looking up detailed report with ID: '{tree_report_id}'")
                 
                 # Update enhanced column with correct check
                 actual_enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
+                print(f"[DEBUG] Enhanced indicator for '{tree_report_id}': '{actual_enhanced_indicator}'")
                 tree.set(item_id, "enhanced", actual_enhanced_indicator)
             # Store the full session data for file lookup and tooltips
             session_lookup[item_id] = session
@@ -5050,11 +5055,11 @@ class ProspectorPanel(ttk.Frame):
                         # Check detailed report using tree values for consistency
                         # Use column names instead of indices to avoid breakage when columns are added
                         date_val = self.reports_tree.set(item_id, "date")
-                        ship_val = self.reports_tree.set(item_id, "ship")
                         system_val = self.reports_tree.set(item_id, "system")
+                        body_val = self.reports_tree.set(item_id, "body")
                         
-                        if date_val and ship_val and system_val:
-                            tree_report_id = f"{date_val}_{ship_val}_{system_val}"
+                        if date_val and system_val and body_val:
+                            tree_report_id = f"{date_val}_{system_val}_{body_val}"
                             enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
                             self.reports_tree.set(item_id, "enhanced", enhanced_indicator)
         except Exception as e:
@@ -5455,8 +5460,8 @@ class ProspectorPanel(ttk.Frame):
                     self._set_status("Invalid report data")
                     return
                 
-                # System name is in column index 2 (date, duration, system, body...)
-                system_name = values[2]
+                # System name is in column index 4 (date, duration, session_type, ship, system...)
+                system_name = values[4]
                 if system_name:
                     # Copy to clipboard
                     self.clipboard_clear()
@@ -5480,28 +5485,40 @@ class ProspectorPanel(ttk.Frame):
             if not item:
                 return
             
-            # Check if it's the comment column (#13) or detailed reports column (#14)
-            if column == '#13':  # Comment column
+            # Check if it's the comment column (#16) or detailed reports column (#17)
+            if column == '#16':  # Comment column
                 # Use the existing popup comment editor
                 self._edit_comment_popup_reports(event)
-            elif column == '#14':  # Detailed reports column
-                # Handle detailed report opening on double-click too
+            elif column == '#17':  # Detailed reports column
+                # Handle detailed report opening on double-click
                 columns = self.reports_tree_tab["columns"]
-                column_name = columns[13]  # Enhanced column (0-indexed)
+                column_name = columns[16]  # Enhanced column (0-indexed)
                 cell_value = self.reports_tree_tab.set(item, column_name)
-                if cell_value == "✓":  # Has detailed report
+                print(f"[DEBUG] Enhanced column double-clicked, cell value: {cell_value}")
+                if cell_value == "📊":  # Has detailed report
                     session_data = self.reports_tab_session_lookup.get(item)
                     if session_data:
-                        original_timestamp = session_data.get('timestamp_raw', session_data.get('date', ''))
+                        # Use display date format (same as right-click menu) instead of timestamp_raw
+                        display_date = session_data.get('date', '')
                         system = session_data.get('system', '')
                         body = session_data.get('body', '')
-                        report_id = f"{original_timestamp}_{system}_{body}"
+                        report_id = f"{display_date}_{system}_{body}"
+                        print(f"[DEBUG] Opening enhanced report with ID: {report_id}")
                         self._open_enhanced_report(report_id)
-                # Don't open CSV file for detailed reports column
+                    else:
+                        print(f"[DEBUG] No session data found for item: {item}")
+                else:
+                    print(f"[DEBUG] No detailed report available (cell value: {cell_value})")
                 return
             else:
-                # Open the report file for other columns
-                open_selected()
+                # For all other columns, open the text report file on double-click
+                if item in self.reports_tab_session_lookup:
+                    session = self.reports_tab_session_lookup[item]
+                    file_path = session.get('file_path', '')
+                    if file_path and os.path.exists(file_path):
+                        self._open_path(file_path)
+            # For all other columns, ignore double-click (single-click already handled it)
+            # This prevents double-opening of text reports
 
         self.reports_tree_tab.bind("<Double-1>", handle_double_click)
         
@@ -6440,11 +6457,11 @@ class ProspectorPanel(ttk.Frame):
                 # Check detailed report using tree values for consistency
                 # Use column names instead of indices to avoid breakage when columns are added
                 date_val = self.reports_tree_tab.set(item_id, "date")
-                ship_val = self.reports_tree_tab.set(item_id, "ship")
                 system_val = self.reports_tree_tab.set(item_id, "system")
+                body_val = self.reports_tree_tab.set(item_id, "body")
                 
-                if date_val and ship_val and system_val:
-                    tree_report_id = f"{date_val}_{ship_val}_{system_val}"
+                if date_val and system_val and body_val:
+                    tree_report_id = f"{date_val}_{system_val}_{body_val}"
                     enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
                     self.reports_tree_tab.set(item_id, "enhanced", enhanced_indicator)
                 # Store the full session data for tooltip lookup (including ship name and file path)
@@ -9867,8 +9884,11 @@ class ProspectorPanel(ttk.Frame):
         """Get HTML filename for a report_id"""
         try:
             mappings = self._load_enhanced_report_mappings()
+            print(f"[DEBUG] _get_report_filenames({report_id})")
+            print(f"[DEBUG] Available mappings keys: {list(mappings.keys())}")
             if report_id in mappings:
                 mapping = mappings[report_id]
+                print(f"[DEBUG] Found mapping for {report_id}: {mapping}")
                 # Handle both new dict format and legacy string format
                 if isinstance(mapping, dict):
                     # Backward compatibility for existing dict format
@@ -9876,6 +9896,8 @@ class ProspectorPanel(ttk.Frame):
                 else:
                     # Simple string format
                     return mapping
+            else:
+                print(f"[DEBUG] No mapping found for {report_id}")
             return None
         except Exception as e:
             print(f"Error getting report filenames: {e}")
@@ -9894,6 +9916,7 @@ class ProspectorPanel(ttk.Frame):
         """Get appropriate indicator symbol for detailed reports column"""
         try:
             html_filename = self._get_report_filenames(report_id)
+            print(f"[DEBUG] _get_detailed_report_indicator({report_id}) -> filename: {html_filename}")
             return "📊" if html_filename else ""
         except Exception as e:
             print(f"Error getting detailed report indicator: {e}")
@@ -10554,9 +10577,9 @@ class ProspectorPanel(ttk.Frame):
                 
             # Extract timestamp to use as report_id (should be in the first column)
             display_date = values[0]  # Date/Time column  
-            # Note: Column layout is: [0]=date, [1]=duration, [2]=ship, [3]=system, [4]=body
-            system = values[3] if len(values) > 3 else ''  # System column (adjusted for ship column)
-            body = values[4] if len(values) > 4 else ''    # Body column (adjusted for ship column)
+            # Note: Column layout is: [0]=date, [1]=duration, [2]=session_type, [3]=ship, [4]=system, [5]=body
+            system = values[4] if len(values) > 4 else ''  # System column (correct index)
+            body = values[5] if len(values) > 5 else ''    # Body column (correct index)
             report_id = f"{display_date}_{system}_{body}"
             
             # Open the detailed report
@@ -10848,22 +10871,32 @@ class ProspectorPanel(ttk.Frame):
                 item = tree.identify_row(event.y)
                 column = tree.identify_column(event.x)
                 
+                print(f"[DEBUG] Click detected - item: {item}, column: {column}")
+                
                 if item and column:
                     columns = tree["columns"]
                     column_index = int(column[1:]) - 1
                     if column_index < len(columns):
                         column_name = columns[column_index]
+                        print(f"[DEBUG] Column name: {column_name}")
                         
                         # Handle clicks on comment column - open comment editor
                         if column_name == "comment":
+                            print(f"[DEBUG] Comment column clicked")
                             self._edit_comment(tree, item)
                             return "break"  # Prevent default behavior
                         
-                        # Handle clicks on the enhanced column (don't open on click)
+                        # Handle clicks on the enhanced column - do nothing on single-click
                         elif column_name == "enhanced":
-                            # Don't open reports on column click - only allow through right-click menu
-                            # Allow normal row selection behavior by not returning "break"
-                            pass
+                            print(f"[DEBUG] Enhanced column clicked - use double-click to open HTML report")
+                            return None  # Allow normal row selection
+                        
+                        # For all other columns (except comment and enhanced), do nothing on single-click
+                        else:
+                            # Allow normal row selection behavior
+                            return None
+                else:
+                    print(f"[DEBUG] No item or column detected")
                 
                 # For all other clicks, allow normal processing
                 return None

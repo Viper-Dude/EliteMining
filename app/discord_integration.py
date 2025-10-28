@@ -161,6 +161,22 @@ def format_mining_report_embed(session_data: dict) -> dict:
     discord_username = session_data.get('discord_username', 'Anonymous Miner')
     discord_comment = session_data.get('discord_comment', '')
     prospectors_used = session_data.get('prospectors_used', session_data.get('prospects', '0'))
+    asteroids_prospected = '0'  # Default value for asteroids prospected
+    
+    # If we have report content, try to extract both values from it
+    if 'report_content' in session_data and session_data['report_content']:
+        import re
+        report_content = session_data['report_content']
+        
+        # Extract "Prospector Limpets Used: X" from CARGO MATERIAL BREAKDOWN section
+        limpets_match = re.search(r'Prospector Limpets Used:\s*(\d+)', report_content)
+        if limpets_match:
+            prospectors_used = limpets_match.group(1)
+        
+        # Extract "Asteroids Prospected: X" from MINERAL ANALYSIS section
+        asteroids_match = re.search(r'Asteroids Prospected:\s*(\d+)', report_content)
+        if asteroids_match:
+            asteroids_prospected = asteroids_match.group(1)
     
     # Get material breakdown from session data
     material_breakdown = get_material_breakdown(session_data)
@@ -208,6 +224,11 @@ def format_mining_report_embed(session_data: dict) -> dict:
             {
                 "name": "Prospector Limpets Used",
                 "value": str(prospectors_used),
+                "inline": True
+            },
+            {
+                "name": "Asteroids Prospected",
+                "value": str(asteroids_prospected),
                 "inline": True
             },
             {
