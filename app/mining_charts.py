@@ -433,16 +433,9 @@ class MiningChartsPanel:
             return False  # No data to save
         
         try:
-            # Use EXACT same app_dir logic as screenshots in prospector_panel
-            if getattr(sys, 'frozen', False):
-                # Running as executable (installer version) - use va_root from main_app
-                app_dir = os.path.join(self.main_app.va_root, "app")
-            else:
-                # Running in development mode
-                app_dir = os.path.dirname(os.path.abspath(__file__))
-                
-            # Create graphs folder if it doesn't exist
-            graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
+            # Use centralized path utility for consistency with other components
+            from path_utils import get_reports_dir
+            graphs_dir = os.path.join(get_reports_dir(), "Graphs")
             os.makedirs(graphs_dir, exist_ok=True)
             
             # Generate timestamp and filename components
@@ -497,15 +490,9 @@ class MiningChartsPanel:
     def _update_graph_mappings(self, session_id, timeline_filename, comparison_filename):
         """Update the graph mappings JSON file"""
         try:
-            # Get the correct app directory using EXACT same logic as auto_save_graphs
-            if getattr(sys, 'frozen', False):
-                # Running as executable (installer version)
-                app_dir = os.path.join(self.main_app.va_root, "app")
-            else:
-                # Running in development mode
-                app_dir = os.path.dirname(os.path.abspath(__file__))
-            
-            mappings_file = os.path.join(app_dir, "Reports", "Mining Session", "Graphs", "graph_mappings.json")
+            # Use centralized path utility for consistency
+            from path_utils import get_reports_dir
+            mappings_file = os.path.join(get_reports_dir(), "Graphs", "graph_mappings.json")
             
             # Load existing mappings
             mappings = {}

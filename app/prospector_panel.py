@@ -2106,16 +2106,12 @@ class ProspectorPanel(ttk.Frame):
             system_val = tree.set(item_id, "system")
             body_val = tree.set(item_id, "body")
             
-            print(f"[DEBUG] Tree values - date: '{date_val}', system: '{system_val}', body: '{body_val}'")
-            
             if date_val and system_val and body_val:
                 # Use same format as saved in mappings: date_system_body
                 tree_report_id = f"{date_val}_{system_val}_{body_val}"
-                print(f"[DEBUG] Looking up detailed report with ID: '{tree_report_id}'")
                 
                 # Update enhanced column with correct check
                 actual_enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
-                print(f"[DEBUG] Enhanced indicator for '{tree_report_id}': '{actual_enhanced_indicator}'")
                 tree.set(item_id, "enhanced", actual_enhanced_indicator)
             # Store the full session data for file lookup and tooltips
             session_lookup[item_id] = session
@@ -2400,7 +2396,7 @@ class ProspectorPanel(ttk.Frame):
                                          activebackground=MENU_COLORS["activebackground"], 
                                          activeforeground=MENU_COLORS["activeforeground"],
                                          selectcolor=MENU_COLORS["selectcolor"])
-                    context_menu.add_command(label="📂 Open Report (CSV)", command=open_selected)
+                    context_menu.add_command(label="📂 Open Report (TXT)", command=open_selected)
                     context_menu.add_command(label="📊 Open Detailed Report (HTML)", command=lambda: self._open_enhanced_report_from_menu(tree))
                     context_menu.add_separator()
                     context_menu.add_command(label="📊 Generate Detailed Report (HTML)", command=lambda: self._generate_enhanced_report_from_menu(tree))
@@ -4189,6 +4185,7 @@ class ProspectorPanel(ttk.Frame):
                     total_avg_yield = self._calculate_total_average_yield()
                 except Exception as e:
                     # Fallback to old method if new calculation fails
+                    raw_yields = {}  # Initialize raw_yields to prevent UnboundLocalError
                     all_percentages = []
                     for stats in material_summary.values():
                         if stats['find_count'] > 0:
@@ -5568,7 +5565,7 @@ class ProspectorPanel(ttk.Frame):
                     
                     # Create context menu
                     context_menu = tk.Menu(self.reports_tree_tab, tearoff=0, bg="#2d2d2d", fg="#ffffff")
-                    context_menu.add_command(label="Open Report (CSV)", command=lambda: open_selected())
+                    context_menu.add_command(label="Open Report (TXT)", command=lambda: open_selected())
                     context_menu.add_command(label="Open Detailed Report (HTML)", command=lambda: self._open_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()
                     context_menu.add_command(label="Bookmark This Location", command=lambda: bookmark_selected())
@@ -5758,11 +5755,11 @@ class ProspectorPanel(ttk.Frame):
                             # Delete screenshots and HTML report
                             try:
                                 values = self.reports_tree_tab.item(item_id, 'values')
-                                if values and len(values) >= 5:
+                                if values and len(values) >= 6:
                                     display_date = values[0]  # Date column
-                                    # Columns: date, duration, ship, system, body...
-                                    system_val = values[3] if len(values) > 3 else system  # System is column 3
-                                    body_val = values[4] if len(values) > 4 else body      # Body is column 4
+                                    # Columns: date, duration, session_type, ship, system, body...
+                                    system_val = values[4] if len(values) > 4 else system  # System is column 4
+                                    body_val = values[5] if len(values) > 5 else body      # Body is column 5
                                     report_id = f"{display_date}_{system_val}_{body_val}"
                                     
                                     # Delete HTML file
@@ -5788,17 +5785,24 @@ class ProspectorPanel(ttk.Frame):
                                     # Delete screenshots - try multiple report_id formats for compatibility
                                     screenshots = self._get_report_screenshots(report_id)
                                     
-                                    # If not found, try alternate format with ship name (for older screenshots)
+                                    # If not found, try alternate formats for older screenshots
                                     if not screenshots:
-                                        # Get ship name from tree
-                                        ship_name = values[2] if len(values) > 2 else ""
-                                        if ship_name:
-                                            # Try format: date_shipname_system (without body)
-                                            alt_report_id = f"{display_date}_{ship_name}_{system_val}"
-                                            screenshots = self._get_report_screenshots(alt_report_id)
+                                        session_type = values[2] if len(values) > 2 else ""  # Session type is column 2
+                                        ship_name = values[3] if len(values) > 3 else ""     # Ship is column 3
+                                        
+                                        # Try old format 1: date_sessiontype_ship (old screenshot bug)
+                                        if session_type and ship_name:
+                                            old_format1 = f"{display_date}_{session_type}_{ship_name}"
+                                            screenshots = self._get_report_screenshots(old_format1)
                                             if screenshots:
-                                                # Use the alternate ID for deletion
-                                                report_id = alt_report_id
+                                                report_id = old_format1
+                                        
+                                        # Try old format 2: date_ship_system (alternate format)
+                                        if not screenshots and ship_name:
+                                            old_format2 = f"{display_date}_{ship_name}_{system_val}"
+                                            screenshots = self._get_report_screenshots(old_format2)
+                                            if screenshots:
+                                                report_id = old_format2
                                     
                                     for screenshot_path in screenshots:
                                         if os.path.exists(screenshot_path):
@@ -6011,12 +6015,9 @@ class ProspectorPanel(ttk.Frame):
             filename_base = f"Session_{date_str}_{time_str}_{system_filename}_{body_filename}.txt"
             txt_path = os.path.join(self.reports_dir, filename_base)
             
-            print(f"[DEBUG] Ship name parse - looking for: {filename_base}")
-            
             # If exact filename doesn't exist, search for files matching timestamp and system
             # This handles cases where body name in CSV differs from filename (e.g., carrier vs ring location)
             if not os.path.exists(txt_path):
-                print(f"[DEBUG] Ship name parse - exact file not found, searching by timestamp and system...")
                 import glob
                 
                 # Search pattern: Session_YYYY-MM-DD_HH-MM-SS_System_*.txt
@@ -6027,18 +6028,12 @@ class ProspectorPanel(ttk.Frame):
                 if matching_files:
                     # Use the first match (should only be one file per timestamp+system)
                     txt_path = matching_files[0]
-                    print(f"[DEBUG] Ship name parse - found match: {os.path.basename(txt_path)}")
                 else:
-                    print(f"[DEBUG] Ship name parse - no matching files for pattern: {search_pattern}")
                     return ("", "")
-            else:
-                print(f"[DEBUG] Ship name parse - exact file found")
             
             # Read the TXT file
             with open(txt_path, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
-            
-            print(f"[DEBUG] Ship name parse - file content first 200 chars: {content[:200]}")
             
             # Format: "Session: SYSTEM — BODY — DURATION — Total XXXt\nShip: SHIP_NAME | materials..."
             ship_match = content.find("\nShip: ")
@@ -6426,7 +6421,6 @@ class ProspectorPanel(ttk.Frame):
                     session['body'],
                     session['timestamp_raw']
                 )
-                print(f"[DEBUG] Ship name result: '{ship_name}'")
                 
                 # Extract session type from TXT file (or use existing field if available)
                 session['file_path'] = file_path  # Store for later use
@@ -8519,7 +8513,9 @@ class ProspectorPanel(ttk.Frame):
             # Update CSV index with new session data (pass timestamp for consistency)
             self._update_csv_with_session(sysname, body, elapsed_txt, total_tons, overall_tph, cargo_session_data, session_comment, session_timestamp)
             
-            # NOTE: Don't rebuild CSV here - it would overwrite cargo data with parsed text file data (which lacks TPH info)
+            # Rebuild CSV from files to ensure everything is properly synchronized
+            csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
+            self._rebuild_csv_from_files_tab(csv_path, silent=True)
             
             # Refresh the Reports tab to show the new session
             self._refresh_reports_tab()
@@ -9743,7 +9739,8 @@ class ProspectorPanel(ttk.Frame):
                 if copied_files:
                     # Get report identifier to link screenshots
                     values = tree.item(item, 'values')
-                    report_id = f"{values[0]}_{values[2]}_{values[3]}"  # date_system_body as unique ID
+                    # Use correct column indices: date, system, body
+                    report_id = f"{values[0]}_{values[4]}_{values[5]}"  # date_system_body as unique ID
                     
                     # Store screenshot references for the selected report
                     self._store_report_screenshots(report_id, copied_files)
@@ -9884,11 +9881,8 @@ class ProspectorPanel(ttk.Frame):
         """Get HTML filename for a report_id"""
         try:
             mappings = self._load_enhanced_report_mappings()
-            print(f"[DEBUG] _get_report_filenames({report_id})")
-            print(f"[DEBUG] Available mappings keys: {list(mappings.keys())}")
             if report_id in mappings:
                 mapping = mappings[report_id]
-                print(f"[DEBUG] Found mapping for {report_id}: {mapping}")
                 # Handle both new dict format and legacy string format
                 if isinstance(mapping, dict):
                     # Backward compatibility for existing dict format
@@ -9896,8 +9890,6 @@ class ProspectorPanel(ttk.Frame):
                 else:
                     # Simple string format
                     return mapping
-            else:
-                print(f"[DEBUG] No mapping found for {report_id}")
             return None
         except Exception as e:
             print(f"Error getting report filenames: {e}")
@@ -9916,7 +9908,6 @@ class ProspectorPanel(ttk.Frame):
         """Get appropriate indicator symbol for detailed reports column"""
         try:
             html_filename = self._get_report_filenames(report_id)
-            print(f"[DEBUG] _get_detailed_report_indicator({report_id}) -> filename: {html_filename}")
             return "📊" if html_filename else ""
         except Exception as e:
             print(f"Error getting detailed report indicator: {e}")
@@ -10598,9 +10589,9 @@ class ProspectorPanel(ttk.Frame):
                 
             # Extract report_id 
             display_date = values[0]  # Date/Time column  
-            # Note: Column layout is: [0]=date, [1]=duration, [2]=ship, [3]=system, [4]=body
-            system = values[3] if len(values) > 3 else ''  # System column (adjusted for ship column)
-            body = values[4] if len(values) > 4 else ''    # Body column (adjusted for ship column)
+            # Note: Column layout is: [0]=date, [1]=duration, [2]=session_type, [3]=ship, [4]=system, [5]=body
+            system = values[4] if len(values) > 4 else ''  # System column (correct index)
+            body = values[5] if len(values) > 5 else ''    # Body column (correct index)
             report_id = f"{display_date}_{system}_{body}"
             
             # Check if detailed report exists
@@ -10673,11 +10664,11 @@ class ProspectorPanel(ttk.Frame):
                     continue
                     
                 # Extract report_id
-                # Columns: date, duration, ship, system, body...
+                # Columns: date, duration, session_type, ship, system, body...
                 display_date = values[0]  # Date/Time column
-                ship_name = values[2] if len(values) > 2 else ''  # Ship is column 2  
-                system = values[3] if len(values) > 3 else ''  # System is column 3
-                body = values[4] if len(values) > 4 else ''    # Body is column 4
+                ship_name = values[3] if len(values) > 3 else ''  # Ship is column 3  
+                system = values[4] if len(values) > 4 else ''  # System is column 4
+                body = values[5] if len(values) > 5 else ''    # Body is column 5
                 report_id = f"{display_date}_{system}_{body}"
                 
                 # Check if detailed report exists
@@ -10871,32 +10862,25 @@ class ProspectorPanel(ttk.Frame):
                 item = tree.identify_row(event.y)
                 column = tree.identify_column(event.x)
                 
-                print(f"[DEBUG] Click detected - item: {item}, column: {column}")
-                
                 if item and column:
                     columns = tree["columns"]
                     column_index = int(column[1:]) - 1
                     if column_index < len(columns):
                         column_name = columns[column_index]
-                        print(f"[DEBUG] Column name: {column_name}")
                         
                         # Handle clicks on comment column - open comment editor
                         if column_name == "comment":
-                            print(f"[DEBUG] Comment column clicked")
                             self._edit_comment(tree, item)
                             return "break"  # Prevent default behavior
                         
                         # Handle clicks on the enhanced column - do nothing on single-click
                         elif column_name == "enhanced":
-                            print(f"[DEBUG] Enhanced column clicked - use double-click to open HTML report")
                             return None  # Allow normal row selection
                         
                         # For all other columns (except comment and enhanced), do nothing on single-click
                         else:
                             # Allow normal row selection behavior
                             return None
-                else:
-                    print(f"[DEBUG] No item or column detected")
                 
                 # For all other clicks, allow normal processing
                 return None
@@ -10995,6 +10979,9 @@ class ProspectorPanel(ttk.Frame):
                     # Rebuild CSV to reflect changes
                     csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
                     self._rebuild_csv_from_files_tab(csv_path)
+                    
+                    # Refresh the reports tab to show updated session immediately
+                    self._refresh_reports_tab()
                     
                     messagebox.showinfo(
                         "Refinery Contents Added",
@@ -11571,7 +11558,7 @@ class ProspectorPanel(ttk.Frame):
             
             # Get screenshots that are specifically linked to this report
             values = tree.item(item, 'values')
-            report_id = f"{values[0]}_{values[2]}_{values[3]}"  # date_system_body as unique ID
+            report_id = f"{values[0]}_{values[4]}_{values[5]}"  # date_system_body as unique ID (correct indices)
             report_screenshots = self._get_report_screenshots(report_id)
             
             # Only include screenshots that exist and are linked to this report
