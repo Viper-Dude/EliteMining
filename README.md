@@ -134,7 +134,7 @@ The Hotspot Finder provides access to a comprehensive database of 32,000+ confir
 ### Key Features
 - **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
 - **Filter by Minerals** – Search for specific minerals (Painite, Platinum, Low Temperature Diamonds, etc.)
-- **Auto-Search** – Automatically searches for hotspots when jumping to new systems (remembers preference across restarts)
+- **Auto-Search** – Automatically searches for hotspots when jumping to new systems and auto-refreshes results when scanning rings (remembers preference across restarts)
 - **Pre-loaded Database** – 32,000+ hotspots with minerals types, ring densities
 - **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
 - **Distance-Based Results** – Filter by jump range to find nearby opportunities
