@@ -2607,84 +2607,48 @@ class RingFinder:
         return ', '.join(materials)
 
     def _setup_status_monitoring(self):
-        """Setup Status.json monitoring for auto-search functionality"""
+        """Setup journal monitoring for auto-search functionality"""
         try:
             if self.prospector_panel and hasattr(self.prospector_panel, 'journal_dir'):
-                self.status_json_path = os.path.join(self.prospector_panel.journal_dir, "Status.json")
+                # Get current system from prospector panel for initialization
+                self.last_monitored_system = getattr(self.prospector_panel, 'last_system', None)
                 
-                # Initialize with current system to prevent immediate search on startup
-                if os.path.exists(self.status_json_path):
-                    with open(self.status_json_path, 'r') as f:
-                        status_data = json.load(f)
-                        destination = status_data.get("Destination", {})
-                        destination_name = destination.get("Name") if destination else None
-                        # Extract system name (ignore planet selections)
-                        self.last_monitored_system = self._extract_system_name(destination_name) if destination_name else None
+                # Hook into the existing journal monitoring system via cargo monitor
+                if hasattr(self.prospector_panel, 'main_app') and self.prospector_panel.main_app:
+                    cargo_monitor = getattr(self.prospector_panel.main_app, 'cargo_monitor', None)
+                    if cargo_monitor:
+                        # Add our callback to the journal monitoring
+                        original_process = cargo_monitor.process_journal_event
+                        def enhanced_process(line):
+                            # Call original processing first
+                            original_process(line)
+                            # Then check for auto-search triggers
+                            self._check_journal_event_for_auto_search(line)
+                        cargo_monitor.process_journal_event = enhanced_process
                 
-                # Start monitoring
-                self._monitor_system_changes()
+                print(f"[AUTO-SEARCH] Setup complete, monitoring journal events")
         except Exception as e:
             print(f"[AUTO-SEARCH] Failed to setup monitoring: {e}")
 
-    def _extract_system_name(self, destination_name: str) -> str:
-        """
-        Extract system name from destination, ignoring planet/body suffixes.
-        
-        Examples:
-        'Scorpii Sector GW-W c1-5 D 3' -> 'Scorpii Sector GW-W c1-5'
-        'Sol' -> 'Sol'
-        'Alpha Centauri A' -> 'Alpha Centauri'
-        """
-        if not destination_name:
-            return ""
-            
-        # Common planet/body suffixes to remove: A, B, C, D, etc. followed by optional numbers
-        import re
-        
-        # Pattern: ends with space + letter + optional numbers (e.g., " A", " B 1", " D 3")
-        pattern = r'\s+[A-Z]\s*\d*$'
-        system_name = re.sub(pattern, '', destination_name)
-        
-        return system_name
-
-    def _monitor_system_changes(self):
-        """Monitor Status.json for system changes and trigger auto-search"""
+    def _check_journal_event_for_auto_search(self, line: str):
+        """Check journal events for FSD jumps and trigger auto-search"""
         if not self.auto_search_var.get():
-            # Re-check in 2 seconds
-            self.parent.after(2000, self._monitor_system_changes)
-            return
-            
-        if not self.status_json_path:
-            self.parent.after(2000, self._monitor_system_changes)
             return
             
         try:
-            if os.path.exists(self.status_json_path):
-                with open(self.status_json_path, 'r') as f:
-                    status_data = json.load(f)
-                    
-                # Status.json uses Destination.Name for the system name, not StarSystem
-                destination = status_data.get("Destination", {})
-                destination_name = destination.get("Name") if destination else None
-                
-                # Extract just the system name (ignore planet selections)
-                current_system = self._extract_system_name(destination_name) if destination_name else None
-                
-                # If no system from destination, fallback to prospector panel
-                if not current_system and self.prospector_panel:
-                    current_system = getattr(self.prospector_panel, 'last_system', None)
-                
+            import json
+            event = json.loads(line.strip())
+            event_type = event.get("event", "")
+            
+            if event_type == "FSDJump":
+                current_system = event.get("StarSystem")
                 if current_system and current_system != self.last_monitored_system:
-                    # System changed - update reference system and auto-search
                     self.last_monitored_system = current_system
-                    self._auto_search_new_system(current_system)
+                    # Schedule auto-search in main thread
+                    self.parent.after(1000, lambda: self._auto_search_new_system(current_system))
                     
         except Exception as e:
-            # Silent fail - don't spam errors
-            pass
-            
-        # Continue monitoring every 2 seconds
-        self.parent.after(2000, self._monitor_system_changes)
+            pass  # Silent fail
 
     def _auto_search_new_system(self, system_name: str):
         """Auto-populate reference system and trigger search silently"""
@@ -2725,31 +2689,16 @@ class RingFinder:
     def _startup_auto_search(self):
         """Perform auto-search on startup if enabled"""
         try:
-            # Get current system from Status.json
-            if self.status_json_path and os.path.exists(self.status_json_path):
-                with open(self.status_json_path, 'r') as f:
-                    status_data = json.load(f)
-                    
-                    # Try Destination.Name first (when jumping/traveling)
-                    destination = status_data.get("Destination", {})
-                    destination_name = destination.get("Name") if destination else None
-                    
-                    # Extract just the system name (ignore planet selections)
-                    current_system = self._extract_system_name(destination_name) if destination_name else None
-                    
-                    # If no system from destination, try to get from prospector panel (last known system)
-                    if not current_system and self.prospector_panel:
-                        current_system = getattr(self.prospector_panel, 'last_system', None)
-                    
-                    if current_system:
-                        self.status_var.set(f"Auto-search: {current_system}")
-                        self.system_var.set(current_system)
-                        self.last_monitored_system = current_system
-                        self.search_hotspots()
-                    else:
-                        self.status_var.set("Auto-search: No system detected")
+            # Get current system from prospector panel (most reliable)
+            current_system = getattr(self.prospector_panel, 'last_system', None) if self.prospector_panel else None
+            
+            if current_system:
+                self.status_var.set(f"Auto-search: {current_system}")
+                self.system_var.set(current_system)
+                self.last_monitored_system = current_system
+                self.search_hotspots()
             else:
-                self.status_var.set("Auto-search: Elite Dangerous not running")
+                self.status_var.set("Auto-search: No system detected")
                 
         except Exception as e:
             self.status_var.set("Auto-search: Detection failed")
