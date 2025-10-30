@@ -2617,12 +2617,35 @@ class RingFinder:
                     with open(self.status_json_path, 'r') as f:
                         status_data = json.load(f)
                         destination = status_data.get("Destination", {})
-                        self.last_monitored_system = destination.get("Name") if destination else None
+                        destination_name = destination.get("Name") if destination else None
+                        # Extract system name (ignore planet selections)
+                        self.last_monitored_system = self._extract_system_name(destination_name) if destination_name else None
                 
                 # Start monitoring
                 self._monitor_system_changes()
         except Exception as e:
             print(f"[AUTO-SEARCH] Failed to setup monitoring: {e}")
+
+    def _extract_system_name(self, destination_name: str) -> str:
+        """
+        Extract system name from destination, ignoring planet/body suffixes.
+        
+        Examples:
+        'Scorpii Sector GW-W c1-5 D 3' -> 'Scorpii Sector GW-W c1-5'
+        'Sol' -> 'Sol'
+        'Alpha Centauri A' -> 'Alpha Centauri'
+        """
+        if not destination_name:
+            return ""
+            
+        # Common planet/body suffixes to remove: A, B, C, D, etc. followed by optional numbers
+        import re
+        
+        # Pattern: ends with space + letter + optional numbers (e.g., " A", " B 1", " D 3")
+        pattern = r'\s+[A-Z]\s*\d*$'
+        system_name = re.sub(pattern, '', destination_name)
+        
+        return system_name
 
     def _monitor_system_changes(self):
         """Monitor Status.json for system changes and trigger auto-search"""
@@ -2642,7 +2665,14 @@ class RingFinder:
                     
                 # Status.json uses Destination.Name for the system name, not StarSystem
                 destination = status_data.get("Destination", {})
-                current_system = destination.get("Name") if destination else None
+                destination_name = destination.get("Name") if destination else None
+                
+                # Extract just the system name (ignore planet selections)
+                current_system = self._extract_system_name(destination_name) if destination_name else None
+                
+                # If no system from destination, fallback to prospector panel
+                if not current_system and self.prospector_panel:
+                    current_system = getattr(self.prospector_panel, 'last_system', None)
                 
                 if current_system and current_system != self.last_monitored_system:
                     # System changed - update reference system and auto-search
@@ -2702,9 +2732,12 @@ class RingFinder:
                     
                     # Try Destination.Name first (when jumping/traveling)
                     destination = status_data.get("Destination", {})
-                    current_system = destination.get("Name") if destination else None
+                    destination_name = destination.get("Name") if destination else None
                     
-                    # If no destination, try to get from prospector panel (last known system)
+                    # Extract just the system name (ignore planet selections)
+                    current_system = self._extract_system_name(destination_name) if destination_name else None
+                    
+                    # If no system from destination, try to get from prospector panel (last known system)
                     if not current_system and self.prospector_panel:
                         current_system = getattr(self.prospector_panel, 'last_system', None)
                     

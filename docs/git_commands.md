@@ -18,7 +18,7 @@ git push
 ### Latest Fixes (October 30, 2025)
 ```bash
 git add .
-git commit -m "Fix UI scrollbars and EDSM timing - improved prospector panel scrollbar, added vertical scrollbar to mineral analysis, fixed EDSM fallback timing issue"
+git commit -m "Fixed auto-search clearing results when selecting planets within the same system - now only triggers on actual FSD jumps to new systems, preserving search results during planet navigation"
 git push
 ```
 
