@@ -882,9 +882,9 @@ class RingFinder:
                 cursor.execute("""
                     SELECT ring_type, ls_distance, inner_radius, outer_radius, ring_mass, density
                     FROM hotspot_data
-                    WHERE system_name = ? AND body_name LIKE ? AND material_name = ?
+                    WHERE system_name = ? AND body_name = ? AND material_name = ?
                     LIMIT 1
-                """, (system_name, f"%{body_name}%", material_name))
+                """, (system_name, body_name, material_name))
                 
                 row = cursor.fetchone()
                 if row:
