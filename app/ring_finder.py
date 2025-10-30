@@ -168,7 +168,7 @@ class RingFinder:
             'Benitoite': 'Beni',
             'Bromellite': 'Brom',
             'Grandidierite': 'Gran',
-            'Low Temperature Diamonds': 'LTD',
+            'Low Temp Diamonds': 'LTD',
             'Monazite': 'Mona',
             'Musgravite': 'Musg',
             'Painite': 'Pain',
@@ -2322,7 +2322,9 @@ class RingFinder:
                 
                 # Convert database format to display format for special cases
                 if material_name == "LowTemperatureDiamond":
-                    material_name = "Low Temperature Diamonds"
+                    material_name = "Low Temp Diamonds"  # Show as "Low Temp Diamonds" in search results
+                elif material_name == "Low Temperature Diamonds":
+                    material_name = "Low Temp Diamonds"  # Show as "Low Temp Diamonds" in search results
                 
                 # Check if material_name already contains counts (from RingFinder.ALL_MINERALS GROUP_CONCAT)
                 # Format: "Material (X)" or "Material1 (X), Material2 (Y)"
