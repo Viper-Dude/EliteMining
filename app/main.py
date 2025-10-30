@@ -1337,6 +1337,45 @@ class CargoMonitor:
             # Log error but don't break other functionality
             print(f"Warning: Failed to refresh Ring Finder after hotspot add: {e}")
     
+    def _check_auto_refresh_ring_finder(self, scanned_system: str):
+        """Check if Ring Finder should auto-refresh after ring scan"""
+        try:
+            # Access main app to get Ring Finder
+            main_app = getattr(self, 'main_app_ref', self)
+            
+            # Check if Ring Finder exists and auto-search is enabled
+            if not (hasattr(main_app, 'ring_finder') and 
+                   main_app.ring_finder is not None and
+                   hasattr(main_app.ring_finder, 'auto_search_var')):
+                return
+            
+            ring_finder = main_app.ring_finder
+            
+            # Only refresh if auto-search is enabled
+            if not ring_finder.auto_search_var.get():
+                return
+            
+            # Only refresh if scanning in the same system as current search
+            current_reference_system = ring_finder.system_var.get().strip()
+            if not current_reference_system or current_reference_system.lower() != scanned_system.lower():
+                return
+            
+            # All conditions met - refresh the search
+            print(f"🔍 Auto-refresh: New hotspots found in {scanned_system}")
+            
+            # Schedule refresh in main thread with status message
+            def do_refresh():
+                ring_finder.status_var.set(f"Found new hotspots - updating results")
+                ring_finder.search_hotspots()
+                # Clear status after 3 seconds
+                ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
+            
+            main_app.after(500, do_refresh)  # Small delay to ensure database is updated
+            
+        except Exception as e:
+            # Silent fail - don't break journal processing
+            pass
+
     def get_ship_info_string(self) -> str:
         """
         Get formatted ship information string for display.
@@ -3069,6 +3108,10 @@ cargo panel forces Elite to write detailed inventory data.
                             )
                     
                     print(f"✓ SAASignalsFound processed successfully")
+                    
+                    # Auto-search refresh: Check if Ring Finder should update results
+                    self._check_auto_refresh_ring_finder(self.current_system)
+                    
                 except Exception as saa_err:
                     print(f"Warning: Failed to process SAASignalsFound event: {saa_err}")
             

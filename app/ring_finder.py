@@ -389,7 +389,7 @@ class RingFinder:
             "System": 170,
             "Planet/Ring": 100,
             "Ring Type": 120,
-            "Hotspots": 200,
+            "Hotspots": 150,  # Reduced from 200 to 150
             "Visited": 60,
             "Density": 110
         }
@@ -2331,22 +2331,15 @@ class RingFinder:
                 already_formatted = bool(re.search(r'\(\d+\)$', material_name.strip()))
                 
                 if already_formatted:
-                    # Already formatted with counts - just abbreviate if needed
-                    if self.specific_material_var.get() == RingFinder.ALL_MINERALS:
-                        hotspot_count_display = self._abbreviate_material_for_display(material_name)
-                    else:
-                        hotspot_count_display = material_name
+                    # Already formatted with counts - show full names
+                    hotspot_count_display = material_name
                 else:
                     # Not formatted - add count wrapper
                     hotspot_count = hotspot.get("count", 1)
                     hotspot_display = f"{material_name} ({hotspot_count})"
                     
-                    # Abbreviate material names ONLY when RingFinder.ALL_MINERALS filter is selected
-                    if self.specific_material_var.get() == RingFinder.ALL_MINERALS:
-                        hotspot_count_display = self._abbreviate_material_for_display(hotspot_display)
-                    else:
-                        # Show full name when a specific material is filtered
-                        hotspot_count_display = hotspot_display
+                    # Show full material names (no abbreviations)
+                    hotspot_count_display = hotspot_display
             elif "EDTools" in data_source:
                 # EDTools data - check if it's already formatted from GROUP_CONCAT
                 material_name = hotspot.get("type", "")
@@ -2355,10 +2348,7 @@ class RingFinder:
                 
                 if already_formatted:
                     # Material name already contains counts from GROUP_CONCAT - use it directly
-                    if self.specific_material_var.get() == RingFinder.ALL_MINERALS:
-                        hotspot_count_display = self._abbreviate_material_for_display(material_name)
-                    else:
-                        hotspot_count_display = material_name
+                    hotspot_count_display = material_name
                 else:
                     # Regular count display
                     hotspot_count_display = str(hotspot.get("count", "-"))
