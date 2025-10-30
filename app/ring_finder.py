@@ -135,10 +135,26 @@ class RingFinder:
         
         # Always use local database since it's now bundled with the application
         self.use_local_db = True
+        
+        # Auto-search monitoring variables
+        self.last_monitored_system = None
+        self.status_json_path = None
+        
+        # Variables directory for persistence
+        from app_utils import get_variables_dir
+        self.vars_dir = get_variables_dir()
+        
         self.setup_ui()
+        
+        # Setup status monitoring AFTER UI is created (auto_search_var exists)
+        self._setup_status_monitoring()
         
         # Load initial data in background
         threading.Thread(target=self._preload_data, daemon=True).start()
+        
+        # Schedule startup auto-search if enabled (after database loads)
+        if self.auto_search_var.get():
+            self.parent.after(3000, self._startup_auto_search)  # 3 second delay
         
     def _abbreviate_material_for_display(self, hotspot_text: str) -> str:
         """Abbreviate material names in hotspot display text for Ring Finder column
@@ -206,7 +222,7 @@ class RingFinder:
         search_header.pack(fill="x", padx=10, pady=5)
         
         # Search frame title and help text
-        search_title = ttk.Label(search_header, text="Ring Search", font=("Segoe UI", 9, "bold"))
+        search_title = ttk.Label(search_header, text="Search For Hotspots", font=("Segoe UI", 9, "bold"))
         search_title.pack(side="left")
         
         # Database status on the right
@@ -253,6 +269,28 @@ class RingFinder:
                                    font=("Segoe UI", 8, "normal"), cursor="hand2")
         self.search_btn.grid(row=0, column=3, padx=10, pady=5)
 
+        # Auto-search checkbox
+        self.auto_search_var = tk.BooleanVar(value=False)
+        
+        # Load saved auto-search state
+        auto_search_enabled = self._load_auto_search_state()
+        self.auto_search_var.set(auto_search_enabled)
+        
+        self.auto_search_cb = tk.Checkbutton(search_frame, text="Auto-Search", 
+                                           variable=self.auto_search_var,
+                                           command=self._save_auto_search_state,
+                                           bg="#1e1e1e", fg="#e0e0e0", 
+                                           activebackground="#2e2e2e", activeforeground="#ffffff",
+                                           selectcolor="#1e1e1e", relief="flat",
+                                           font=("Segoe UI", 8, "normal"))
+        self.auto_search_cb.grid(row=0, column=4, padx=10, pady=5)
+        
+        # Tooltip for auto-search
+        ToolTip(self.auto_search_cb, 
+               "Automatically search for hotspots when arriving in a new system.\n"
+               "Uses your last search settings (ring type, mineral, distance).\n"
+               "Updates reference system from game status.")
+
         # Ring Type filter
         ttk.Label(search_frame, text="Ring Type:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
         self.material_var = tk.StringVar(value="All")
@@ -276,14 +314,14 @@ class RingFinder:
         
         # Distance filter (now a dropdown)
         ttk.Label(search_frame, text="Max Distance (LY):").grid(row=1, column=2, sticky="w", padx=10, pady=5)
-        self.distance_var = tk.StringVar(value="100")
+        self.distance_var = tk.StringVar(value="50")
         distance_combo = ttk.Combobox(search_frame, textvariable=self.distance_var, width=8, state="readonly")
         distance_combo['values'] = ("10", "50", "100", "150", "200")
         distance_combo.grid(row=1, column=3, sticky="w", padx=5, pady=5)
         
         # Max Results filter
         ttk.Label(search_frame, text="Max Results:").grid(row=2, column=2, sticky="w", padx=10, pady=5)
-        self.max_results_var = tk.StringVar(value="50")
+        self.max_results_var = tk.StringVar(value="30")
         max_results_combo = ttk.Combobox(search_frame, textvariable=self.max_results_var, width=8, state="readonly")
         max_results_combo['values'] = ("10", "20", "30", "50", "100", "All")
         max_results_combo.grid(row=2, column=3, sticky="w", padx=5, pady=5)
@@ -2567,3 +2605,121 @@ class RingFinder:
                 materials.append(material)  # Keep as is if not in abbreviations
                 
         return ', '.join(materials)
+
+    def _setup_status_monitoring(self):
+        """Setup Status.json monitoring for auto-search functionality"""
+        try:
+            if self.prospector_panel and hasattr(self.prospector_panel, 'journal_dir'):
+                self.status_json_path = os.path.join(self.prospector_panel.journal_dir, "Status.json")
+                
+                # Initialize with current system to prevent immediate search on startup
+                if os.path.exists(self.status_json_path):
+                    with open(self.status_json_path, 'r') as f:
+                        status_data = json.load(f)
+                        destination = status_data.get("Destination", {})
+                        self.last_monitored_system = destination.get("Name") if destination else None
+                
+                # Start monitoring
+                self._monitor_system_changes()
+        except Exception as e:
+            print(f"[AUTO-SEARCH] Failed to setup monitoring: {e}")
+
+    def _monitor_system_changes(self):
+        """Monitor Status.json for system changes and trigger auto-search"""
+        if not self.auto_search_var.get():
+            # Re-check in 2 seconds
+            self.parent.after(2000, self._monitor_system_changes)
+            return
+            
+        if not self.status_json_path:
+            self.parent.after(2000, self._monitor_system_changes)
+            return
+            
+        try:
+            if os.path.exists(self.status_json_path):
+                with open(self.status_json_path, 'r') as f:
+                    status_data = json.load(f)
+                    
+                # Status.json uses Destination.Name for the system name, not StarSystem
+                destination = status_data.get("Destination", {})
+                current_system = destination.get("Name") if destination else None
+                
+                if current_system and current_system != self.last_monitored_system:
+                    # System changed - update reference system and auto-search
+                    self.last_monitored_system = current_system
+                    self._auto_search_new_system(current_system)
+                    
+        except Exception as e:
+            # Silent fail - don't spam errors
+            pass
+            
+        # Continue monitoring every 2 seconds
+        self.parent.after(2000, self._monitor_system_changes)
+
+    def _auto_search_new_system(self, system_name: str):
+        """Auto-populate reference system and trigger search silently"""
+        try:
+            # Update reference system field
+            self.system_var.set(system_name)
+            
+            # Trigger search with current settings - but only if not already searching
+            if self.search_btn['state'] == 'normal':
+                self.search_hotspots()
+                
+        except Exception as e:
+            # Silent fail - let user search manually if auto-search fails
+            pass
+
+    def _load_auto_search_state(self) -> bool:
+        """Load auto-search enabled state from Variables folder"""
+        try:
+            auto_search_file = os.path.join(self.vars_dir, "autoSearch.txt")
+            if os.path.exists(auto_search_file):
+                with open(auto_search_file, 'r') as f:
+                    content = f.read().strip()
+                    return content == "1"
+        except Exception as e:
+            pass
+        return False  # Default to disabled
+
+    def _save_auto_search_state(self):
+        """Save auto-search enabled state to Variables folder"""
+        try:
+            os.makedirs(self.vars_dir, exist_ok=True)
+            auto_search_file = os.path.join(self.vars_dir, "autoSearch.txt")
+            with open(auto_search_file, 'w') as f:
+                f.write("1" if self.auto_search_var.get() else "0")
+        except Exception as e:
+            pass
+
+    def _startup_auto_search(self):
+        """Perform auto-search on startup if enabled"""
+        try:
+            # Get current system from Status.json
+            if self.status_json_path and os.path.exists(self.status_json_path):
+                with open(self.status_json_path, 'r') as f:
+                    status_data = json.load(f)
+                    
+                    # Try Destination.Name first (when jumping/traveling)
+                    destination = status_data.get("Destination", {})
+                    current_system = destination.get("Name") if destination else None
+                    
+                    # If no destination, try to get from prospector panel (last known system)
+                    if not current_system and self.prospector_panel:
+                        current_system = getattr(self.prospector_panel, 'last_system', None)
+                    
+                    if current_system:
+                        self.status_var.set(f"Auto-search: {current_system}")
+                        self.system_var.set(current_system)
+                        self.last_monitored_system = current_system
+                        self.search_hotspots()
+                    else:
+                        self.status_var.set("Auto-search: No system detected")
+            else:
+                self.status_var.set("Auto-search: Elite Dangerous not running")
+                
+        except Exception as e:
+            self.status_var.set("Auto-search: Detection failed")
+            
+        # Clear status after 5 seconds
+        self.parent.after(5000, lambda: self.status_var.set(""))
