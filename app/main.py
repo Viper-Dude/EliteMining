@@ -1303,6 +1303,10 @@ class CargoMonitor:
         # Flag to track pending Ring Finder refreshes
         self._pending_ring_finder_refresh = False
         
+        # Auto-refresh delay timer for ring scans (prevent rapid-fire searches)
+        self._auto_refresh_timer = None
+        self._auto_refresh_delay = 5000  # 5 seconds in milliseconds
+        
         # Start journal monitoring regardless of window state
         self.start_journal_monitoring()
         
@@ -1338,7 +1342,7 @@ class CargoMonitor:
             print(f"Warning: Failed to refresh Ring Finder after hotspot add: {e}")
     
     def _check_auto_refresh_ring_finder(self, scanned_system: str):
-        """Check if Ring Finder should auto-refresh after ring scan"""
+        """Check if Ring Finder should auto-refresh after ring scan with 5-second delay"""
         try:
             # Access main app to get Ring Finder
             main_app = getattr(self, 'main_app_ref', self)
@@ -1360,17 +1364,29 @@ class CargoMonitor:
             if not current_reference_system or current_reference_system.lower() != scanned_system.lower():
                 return
             
-            # All conditions met - refresh the search
-            print(f"🔍 Auto-refresh: New hotspots found in {scanned_system}")
+            # Cancel any existing timer (reset approach)
+            if self._auto_refresh_timer:
+                main_app.after_cancel(self._auto_refresh_timer)
+                self._auto_refresh_timer = None
             
-            # Schedule refresh in main thread with status message
-            def do_refresh():
-                ring_finder.status_var.set(f"Found new hotspots - updating results")
-                ring_finder.search_hotspots()
-                # Clear status after 3 seconds
-                ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
+            print(f"🔍 Auto-refresh: New hotspots found in {scanned_system} - scheduling search in 5s")
             
-            main_app.after(500, do_refresh)  # Small delay to ensure database is updated
+            # Set status message with countdown
+            ring_finder.status_var.set(f"Found new hotspots - search in 5s")
+            
+            # Schedule the actual refresh with delay
+            def do_delayed_refresh():
+                try:
+                    ring_finder.status_var.set(f"Found new hotspots - updating results")
+                    ring_finder.search_hotspots()
+                    # Clear status after 3 seconds
+                    ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
+                    self._auto_refresh_timer = None  # Clear timer reference
+                except Exception as e:
+                    print(f"Auto-refresh error: {e}")
+            
+            # Schedule refresh after delay
+            self._auto_refresh_timer = main_app.after(self._auto_refresh_delay, do_delayed_refresh)
             
         except Exception as e:
             # Silent fail - don't break journal processing
