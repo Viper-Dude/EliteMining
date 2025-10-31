@@ -365,7 +365,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.3.9"
+APP_VERSION = "v4.4.0"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4244,15 +4244,15 @@ class App(tk.Tk):
         self.notebook = ttk.Notebook(content_frame)
         self.notebook.grid(row=0, column=0, sticky="nsew")
 
-        # Comprehensive Dashboard with all mining controls
-        dashboard_tab = ttk.Frame(self.notebook, padding=8)
-        self._build_comprehensive_dashboard(dashboard_tab)
-        self.notebook.add(dashboard_tab, text="Dashboard")
+        # Mining Session tab (moved from Dashboard, with all its sub-tabs)
+        mining_session_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_mining_session_tab(mining_session_tab)
+        self.notebook.add(mining_session_tab, text="Mining Session")
 
-        # Settings tab
-        interface_tab = ttk.Frame(self.notebook, padding=8)
-        self._build_interface_options_tab(interface_tab)
-        self.notebook.add(interface_tab, text="Settings")
+        # Settings tab (converted to notebook with sub-tabs)
+        settings_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_settings_notebook(settings_tab)
+        self.notebook.add(settings_tab, text="Settings")
 
         # Hotspots Finder tab
         ring_finder_tab = ttk.Frame(self.notebook, padding=8)
@@ -4612,30 +4612,6 @@ class App(tk.Tk):
         return True
 
     # ---------- Comprehensive Dashboard with Sub-tabs ----------
-    def _build_comprehensive_dashboard(self, frame: ttk.Frame) -> None:
-        # Simple dashboard with sub-tabs (no sidebar here)
-        frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(0, weight=1)
-
-        # Create a nested notebook for sub-tabs
-        self.dashboard_notebook = ttk.Notebook(frame)
-        self.dashboard_notebook.pack(fill="both", expand=True)
-
-        # === FIREGROUPS & FIRE BUTTONS SUB-TAB ===
-        fg_tab = ttk.Frame(self.dashboard_notebook, padding=8)
-        self._build_fg_tab(fg_tab)
-        self.dashboard_notebook.add(fg_tab, text="Firegroups & Fire Buttons")
-
-        # === MINING SEQUENCE CONTROLS SUB-TAB ===
-        timers_toggles_tab = ttk.Frame(self.dashboard_notebook, padding=8)
-        self._build_timers_tab(timers_toggles_tab)
-        self.dashboard_notebook.add(timers_toggles_tab, text="Mining Sequence Controls")
-
-        # === MINING SESSION SUB-TAB ===
-        session_tab = ttk.Frame(self.dashboard_notebook, padding=8)
-        self._build_mining_session_tab(session_tab)
-        self.dashboard_notebook.add(session_tab, text="Mining Session")
-
     def _build_mining_session_tab(self, frame: ttk.Frame) -> None:
         """Build the mining session control tab"""
         frame.columnconfigure(0, weight=1)
@@ -4987,6 +4963,27 @@ class App(tk.Tk):
         frame.bind("<Configure>", _on_cfg_resize)
 
     # ---------- Interface Options tab ----------
+    def _build_settings_notebook(self, frame: ttk.Frame) -> None:
+        """Build the Settings tab with sub-tabs for different setting categories"""
+        # Create a notebook for settings sub-tabs
+        self.settings_notebook = ttk.Notebook(frame)
+        self.settings_notebook.pack(fill="both", expand=True)
+
+        # === GENERAL SETTINGS SUB-TAB ===
+        general_tab = ttk.Frame(self.settings_notebook, padding=8)
+        self._build_interface_options_tab(general_tab)
+        self.settings_notebook.add(general_tab, text="General Settings")
+
+        # === MINING CONTROLS SUB-TAB ===
+        mining_controls_tab = ttk.Frame(self.settings_notebook, padding=8)
+        self._build_timers_tab(mining_controls_tab)
+        self.settings_notebook.add(mining_controls_tab, text="Mining Controls")
+
+        # === FIREGROUPS & FIRE BUTTONS SUB-TAB ===
+        firegroups_tab = ttk.Frame(self.settings_notebook, padding=8)
+        self._build_fg_tab(firegroups_tab)
+        self.settings_notebook.add(firegroups_tab, text="Firegroups & Fire Buttons")
+
     def _build_interface_options_tab(self, frame: ttk.Frame) -> None:
         # Create a canvas and scrollbar for scrollable content
         canvas = tk.Canvas(frame, bg="#1e1e1e", highlightthickness=0)
