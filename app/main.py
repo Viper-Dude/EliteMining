@@ -365,7 +365,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.3.8"
+APP_VERSION = "v4.3.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1305,7 +1305,14 @@ class CargoMonitor:
         
         # Auto-refresh delay timer for ring scans (prevent rapid-fire searches)
         self._auto_refresh_timer = None
-        self._auto_refresh_delay = 5000  # 5 seconds in milliseconds
+        self._auto_refresh_delay = 2000  # 2 seconds - reduced since EDSM fallback now happens immediately
+        
+        # EDSM fallback cache to prevent duplicate queries for same system
+        self._edsm_fallback_cache = set()  # Track systems already processed
+        self._edsm_cache_clear_timer = None  # Timer to clear cache periodically
+        
+        # Track if this is the first ring scan (no delay needed) vs subsequent scans (delay needed)
+        self._first_ring_scan_in_system = True  # Reset when changing systems
         
         # Start journal monitoring regardless of window state
         self.start_journal_monitoring()
@@ -1336,13 +1343,40 @@ class CargoMonitor:
             # Ring Finder exists - refresh it now
             print("✓ Hotspot added - refreshing Ring Finder database info")
             main_app._refresh_ring_finder()
+            
+            # IMMEDIATE EDSM FALLBACK: Fill missing metadata for newly scanned system
+            # This ensures auto-refresh shows complete data after the 5-second delay
+            if hasattr(main_app, 'ring_finder') and main_app.ring_finder and self.current_system:
+                # Check cache to avoid duplicate EDSM queries for same system
+                if self.current_system not in self._edsm_fallback_cache:
+                    print(f"🔧 Running immediate EDSM fallback for newly scanned system: {self.current_system}")
+                    try:
+                        # Add to cache immediately
+                        self._edsm_fallback_cache.add(self.current_system)
+                        
+                        # Schedule cache cleanup after 30 seconds
+                        if self._edsm_cache_clear_timer:
+                            main_app.after_cancel(self._edsm_cache_clear_timer)
+                        self._edsm_cache_clear_timer = main_app.after(30000, lambda: self._edsm_fallback_cache.clear())
+                        
+                        # Run EDSM fallback for the current system immediately
+                        if hasattr(main_app.ring_finder, 'edsm'):
+                            stats = main_app.ring_finder.edsm.fill_missing_metadata_for_systems_direct([self.current_system])
+                            if stats.get('materials_updated', 0) > 0:
+                                print(f"✓ EDSM immediate fallback: Updated {stats['rings_updated']} rings, {stats['materials_updated']} materials")
+                            else:
+                                print(f"ℹ EDSM immediate fallback: No updates needed for {self.current_system}")
+                    except Exception as e:
+                        print(f"⚠ EDSM immediate fallback failed: {e}")
+                else:
+                    print(f"⚡ EDSM fallback skipped for {self.current_system} (already processed)")
                     
         except Exception as e:
             # Log error but don't break other functionality
             print(f"Warning: Failed to refresh Ring Finder after hotspot add: {e}")
     
     def _check_auto_refresh_ring_finder(self, scanned_system: str):
-        """Check if Ring Finder should auto-refresh after ring scan with 5-second delay"""
+        """Check if Ring Finder should auto-refresh after ring scan - no delay for first scan, 2s delay for subsequent scans"""
         try:
             # Access main app to get Ring Finder
             main_app = getattr(self, 'main_app_ref', self)
@@ -1362,6 +1396,8 @@ class CargoMonitor:
             # Only refresh if scanning in the same system as current search
             current_reference_system = ring_finder.system_var.get().strip()
             if not current_reference_system or current_reference_system.lower() != scanned_system.lower():
+                # Different system - reset first scan flag
+                self._first_ring_scan_in_system = True
                 return
             
             # Cancel any existing timer (reset approach)
@@ -1369,15 +1405,28 @@ class CargoMonitor:
                 main_app.after_cancel(self._auto_refresh_timer)
                 self._auto_refresh_timer = None
             
-            print(f"🔍 Auto-refresh: New hotspots found in {scanned_system} - scheduling search in 5s")
+            # Determine delay: 0 for first scan, 2s for subsequent scans
+            if self._first_ring_scan_in_system:
+                delay = 0  # Immediate refresh for first ring scan
+                delay_text = "immediately"
+                self._first_ring_scan_in_system = False  # Mark that first scan is done
+            else:
+                delay = self._auto_refresh_delay  # 2 second delay for subsequent scans
+                delay_text = "in 2s"
             
-            # Set status message with countdown
-            ring_finder.status_var.set(f"Found new hotspots - search in 5s")
+            print(f"🔍 Auto-refresh: New hotspots found in {scanned_system} - {'updating' if delay == 0 else 'scheduling search'} {delay_text}")
             
-            # Schedule the actual refresh with delay
+            # Set status message
+            if delay == 0:
+                ring_finder.status_var.set(f"Found new hotspots - updating results")
+            else:
+                ring_finder.status_var.set(f"Found new hotspots - search in 2s")
+            
+            # Schedule the actual refresh with appropriate delay
             def do_delayed_refresh():
                 try:
-                    ring_finder.status_var.set(f"Found new hotspots - updating results")
+                    if delay > 0:  # Only update status if there was a delay
+                        ring_finder.status_var.set(f"Found new hotspots - updating results")
                     ring_finder.search_hotspots()
                     # Clear status after 3 seconds
                     ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
@@ -1385,8 +1434,8 @@ class CargoMonitor:
                 except Exception as e:
                     print(f"Auto-refresh error: {e}")
             
-            # Schedule refresh after delay
-            self._auto_refresh_timer = main_app.after(self._auto_refresh_delay, do_delayed_refresh)
+            # Schedule refresh with appropriate delay (0 = immediate, >0 = delayed)
+            self._auto_refresh_timer = main_app.after(delay, do_delayed_refresh)
             
         except Exception as e:
             # Silent fail - don't break journal processing
@@ -3126,6 +3175,7 @@ cargo panel forces Elite to write detailed inventory data.
                     print(f"✓ SAASignalsFound processed successfully")
                     
                     # Auto-search refresh: Check if Ring Finder should update results
+                    print(f"[AUTO-REFRESH DEBUG] SAASignalsFound processing complete, checking auto-refresh for system: {self.current_system}")
                     self._check_auto_refresh_ring_finder(self.current_system)
                     
                 except Exception as saa_err:

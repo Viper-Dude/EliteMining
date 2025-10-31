@@ -750,7 +750,11 @@ class RingFinder:
     
     def search_hotspots(self):
         """Search for mining hotspots using reference system as center point"""
+        print(f"[SEARCH DEBUG] search_hotspots() called")
+        
         reference_system = self.system_var.get().strip()
+        print(f"[SEARCH DEBUG] Reference system: '{reference_system}'")
+        
         material_filter = self.material_var.get()
         specific_material = self.specific_material_var.get()
         
@@ -845,7 +849,10 @@ class RingFinder:
             # EDSM FALLBACK: Automatically fill missing ring metadata before displaying
             # This runs silently in background - users only see complete data
             if hotspots:
+                print(f"[AUTO-REFRESH DEBUG] About to call EDSM fallback for {len(hotspots)} hotspots")
                 self._fill_missing_metadata_edsm(hotspots)
+            else:
+                print(f"[AUTO-REFRESH DEBUG] No hotspots found, skipping EDSM fallback")
             
             # Update UI in main thread
             self.parent.after(0, self._update_results, hotspots)
@@ -868,27 +875,40 @@ class RingFinder:
             hotspots: List of hotspot dicts to check and potentially update
         """
         try:
+            print(f"[EDSM DEBUG] Starting EDSM fallback check for {len(hotspots)} hotspots")
+            
             # Build set of systems with incomplete rings in THIS result set only
             systems_needing_data = set()
             for hotspot in hotspots:
-                if hotspot.get('ring_type') is None or hotspot.get('ls_distance') is None:
-                    system_name = hotspot.get('systemName')
+                system_name = hotspot.get('systemName')
+                ring_type = hotspot.get('ring_type')
+                ls_distance = hotspot.get('ls_distance')
+                
+                print(f"[EDSM DEBUG] Hotspot: {system_name} - Ring Type: {ring_type}, LS: {ls_distance}")
+                
+                if ring_type is None or ls_distance is None:
                     if system_name:
                         systems_needing_data.add(system_name)
+                        print(f"[EDSM DEBUG] System {system_name} needs metadata (missing ring_type={ring_type is None}, ls_distance={ls_distance is None})")
             
             if not systems_needing_data:
                 # All metadata complete in this result set
+                print(f"[EDSM DEBUG] All metadata complete, no EDSM query needed")
                 return
             
             print(f"[EDSM] {len(systems_needing_data)} systems in results need metadata, querying EDSM...")
+            print(f"[EDSM DEBUG] Systems needing data: {list(systems_needing_data)}")
             
-            # Query only systems in current result set
-            stats = self.edsm.fill_missing_metadata_for_systems(list(systems_needing_data))
+            # Use modified EDSM query that doesn't rely on get_incomplete_rings() filtering
+            stats = self.edsm.fill_missing_metadata_for_systems_direct(list(systems_needing_data))
+            
+            print(f"[EDSM DEBUG] EDSM query completed, stats: {stats}")
             
             if stats.get('materials_updated', 0) > 0:
                 print(f"[EDSM] ✓ Filled {stats['rings_updated']} rings ({stats['materials_updated']} materials)")
                 
                 # Refresh hotspot data from database to get updated metadata
+                print(f"[EDSM DEBUG] Refreshing hotspot metadata from database")
                 self._refresh_hotspot_metadata_from_db(hotspots)
             else:
                 print(f"[EDSM] ℹ No updates applied (rings may not exist in EDSM)")
@@ -896,6 +916,7 @@ class RingFinder:
         except Exception as e:
             # EDSM fallback failure is non-critical - just log and continue
             print(f"[EDSM] ⚠ Fallback failed (non-critical): {e}")
+            print(f"[EDSM DEBUG] Exception details: {type(e).__name__}: {str(e)}")
     
     def _refresh_hotspot_metadata_from_db(self, hotspots: List[Dict]):
         """
@@ -904,9 +925,13 @@ class RingFinder:
         Modifies hotspot dicts in-place to include updated metadata.
         """
         try:
+            print(f"[EDSM DEBUG] _refresh_hotspot_metadata_from_db called for {len(hotspots)} hotspots")
+            
             import sqlite3
             conn = sqlite3.connect(self.user_db.db_path)
             cursor = conn.cursor()
+            
+            updated_count = 0
             
             for hotspot in hotspots:
                 system_name = hotspot.get('systemName')
@@ -926,6 +951,10 @@ class RingFinder:
                 
                 row = cursor.fetchone()
                 if row:
+                    # Store original values for comparison
+                    old_ring_type = hotspot.get('ring_type')
+                    old_ls_distance = hotspot.get('ls_distance')
+                    
                     # Update hotspot dict with fresh metadata
                     hotspot['ring_type'] = row[0] if row[0] else hotspot.get('ring_type')
                     hotspot['ls_distance'] = row[1] if row[1] else hotspot.get('ls_distance')
@@ -933,11 +962,19 @@ class RingFinder:
                     hotspot['outer_radius'] = row[3] if row[3] else hotspot.get('outer_radius')
                     hotspot['ring_mass'] = row[4] if row[4] else hotspot.get('ring_mass')
                     hotspot['density'] = row[5] if row[5] else hotspot.get('density')
+                    
+                    # Check if anything actually changed
+                    if (old_ring_type != hotspot.get('ring_type')) or (old_ls_distance != hotspot.get('ls_distance')):
+                        updated_count += 1
+                        print(f"[EDSM DEBUG] Updated {system_name} {body_name}: LS {old_ls_distance} -> {hotspot.get('ls_distance')}, Type {old_ring_type} -> {hotspot.get('ring_type')}")
             
             conn.close()
             
+            print(f"[EDSM DEBUG] Metadata refresh completed: {updated_count} hotspots updated")
+            
         except Exception as e:
             print(f"[EDSM] ⚠ Error refreshing metadata: {e}")
+            print(f"[EDSM DEBUG] Refresh exception: {type(e).__name__}: {str(e)}")
     
     def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None) -> List[Dict]:
         """Get hotspot data using user database only - no EDSM dependencies"""

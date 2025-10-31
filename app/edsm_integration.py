@@ -377,8 +377,14 @@ class EDSMIntegration:
         
         # Get incomplete rings only for specified systems
         all_incomplete = self.get_incomplete_rings()
+        print(f"[EDSM DEBUG] get_incomplete_rings() returned {len(all_incomplete)} total incomplete rings")
+        print(f"[EDSM DEBUG] All incomplete rings: {all_incomplete[:10]}...")  # Show first 10
+        
         systems_set = set(system_names)
+        print(f"[EDSM DEBUG] Systems requested for query: {systems_set}")
+        
         incomplete_rings = [(sys, ring) for sys, ring in all_incomplete if sys in systems_set]
+        print(f"[EDSM DEBUG] Filtered incomplete rings for requested systems: {incomplete_rings}")
         
         stats["rings_checked"] = len(incomplete_rings)
         
@@ -416,6 +422,93 @@ class EDSMIntegration:
                         stats["materials_updated"] += rows_updated
         
         return stats
+
+    def fill_missing_metadata_for_systems_direct(self, system_names: List[str]) -> Dict[str, int]:
+        """
+        Fill missing ring metadata for specific systems - DIRECT VERSION.
+        
+        This version bypasses get_incomplete_rings() filtering and queries all requested systems,
+        updating any rings found in those systems that have missing metadata.
+        
+        Args:
+            system_names: List of system names to query and update
+            
+        Returns:
+            Stats dict with results
+        """
+        stats = {
+            "rings_checked": 0,
+            "systems_queried": 0,
+            "rings_updated": 0,
+            "materials_updated": 0
+        }
+        
+        print(f"[EDSM DEBUG] fill_missing_metadata_for_systems_direct called with: {system_names}")
+        
+        # Query each system directly
+        for system_name in system_names:
+            stats["systems_queried"] += 1
+            print(f"[EDSM] Querying: {system_name}")
+            
+            try:
+                edsm_data = self._query_edsm_system(system_name)
+                
+                if not edsm_data:
+                    print(f"[EDSM DEBUG] No EDSM data for {system_name}")
+                    continue
+                
+                # Get all rings in this system that need metadata (regardless of get_incomplete_rings filter)
+                rings_in_system = self._get_rings_needing_metadata_in_system(system_name)
+                print(f"[EDSM DEBUG] Found {len(rings_in_system)} rings needing metadata in {system_name}: {rings_in_system}")
+                
+                stats["rings_checked"] += len(rings_in_system)
+                
+                for ring_name in rings_in_system:
+                    ring_metadata = self._extract_ring_data(edsm_data, ring_name)
+                    
+                    if ring_metadata:
+                        rows_updated = self._update_ring_metadata(
+                            system_name, 
+                            ring_name, 
+                            ring_metadata
+                        )
+                        
+                        if rows_updated > 0:
+                            stats["rings_updated"] += 1
+                            stats["materials_updated"] += rows_updated
+                            print(f"[EDSM] ✓ Updated {rows_updated} materials in {ring_name}")
+                            print(f"       Type: {ring_metadata.get('ring_class', 'Unknown')}, LS: {ring_metadata.get('ls_distance', 'Unknown')}")
+                    else:
+                        print(f"[EDSM DEBUG] No ring metadata found for {ring_name} in {system_name}")
+                        
+            except Exception as e:
+                print(f"[EDSM DEBUG] Error processing {system_name}: {e}")
+        
+        return stats
+    
+    def _get_rings_needing_metadata_in_system(self, system_name: str) -> List[str]:
+        """Get list of ring names in a system that need metadata (ls_distance or ring_type missing)"""
+        try:
+            conn = sqlite3.connect(self.user_db_path)
+            cursor = conn.cursor()
+            
+            # Find unique rings in this system with missing metadata
+            cursor.execute("""
+                SELECT DISTINCT body_name
+                FROM hotspot_data
+                WHERE system_name = ?
+                  AND (ring_type IS NULL OR ls_distance IS NULL)
+                ORDER BY body_name
+            """, (system_name,))
+            
+            results = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            
+            return results
+            
+        except Exception as e:
+            print(f"[EDSM DEBUG] Error getting rings for {system_name}: {e}")
+            return []
 
 
 def fill_missing_ring_metadata(user_db_path: str) -> Dict[str, int]:

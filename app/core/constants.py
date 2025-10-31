@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 
 # Application info
 APP_TITLE = "Elite Mining – Configuration"
-APP_VERSION = "v4.1.1"
+APP_VERSION = "v4.3.8"
 PRESET_INDENT = "   "
 
 # Firegroup mappings
