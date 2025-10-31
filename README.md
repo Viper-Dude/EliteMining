@@ -34,10 +34,6 @@
 
 ## Features and Usage Options
 
----
-
-## Features and Usage Options
-
 ### Standalone (Without VoiceAttack)
 Full-featured mining companion with GUI controls:
 - Real-time mining statistics  
@@ -208,13 +204,6 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 
 ### Mining Session Tab  
 
-#### Announcement Panel  
-<img src="Screenshot/mining-announcement.png" width="600"><br>  
-*Controls announcements, thresholds, and filters.*  
-
-<img src="Screenshot/txt_overlay.png" width="600"><br>  
-*Text overlay showing real-time mining announcements in-game.*  
-
 #### Mining Session  
 <img src="Screenshot/mining-session.png" width="600"><br>  
 *Tracks time, prospector reports, minerals, and progress.*  
@@ -279,6 +268,13 @@ Share completed mining session summaries to Discord channels via webhook integra
 #### Settings Tab  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-options.png" width="600" height="400"><br>  
 *UI and announcement preferences.*  
+
+#### Announcement Panel  
+<img src="Screenshot/mining-announcement.png" width="600"><br>  
+*Controls announcements, thresholds, and filters.*  
+
+<img src="Screenshot/txt_overlay.png" width="600"><br>  
+*Text overlay showing real-time mining announcements in-game.*  
 
 </details>
 

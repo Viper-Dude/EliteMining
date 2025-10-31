@@ -1,0 +1,16 @@
+ProspectorPanel Initialization Crash
+Time: 2025-10-31 22:35:56.441649
+VoiceAttack Root: D:\SteamLibrary\steamapps\common\VoiceAttack 2\Apps\EliteMining
+Error: 'ProspectorPanel' object has no attribute 'mat_tree'
+
+Traceback (most recent call last):
+  File "d:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\app\main.py", line 4622, in _build_mining_session_tab
+    self.prospector_panel = ProspectorPanel(frame, self.va_root, self._set_status, self.toggle_vars, self.text_overlay, self, self.announcement_vars, self.main_announcement_enabled, ToolTip)
+                            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\app\prospector_panel.py", line 544, in __init__
+    self._load_last_material_settings()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "d:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\app\prospector_panel.py", line 1001, in _load_last_material_settings
+    for m in self.mat_tree.get_children():
+             ^^^^^^^^^^^^^
+AttributeError: 'ProspectorPanel' object has no attribute 'mat_tree'. Did you mean: 'stats_tree'?

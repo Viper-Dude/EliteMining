@@ -542,10 +542,11 @@ class ProspectorPanel(ttk.Frame):
         
         # Load last settings after UI is built
         self._load_last_material_settings()
-        # Force announce_map to UI after build
-        for m in self.mat_tree.get_children():
-            flag = "✓" if self.announce_map.get(m, True) else "—"
-            self.mat_tree.item(m, values=(flag, m, ""))
+        # Force announce_map to UI after build (only if mat_tree exists)
+        if hasattr(self, 'mat_tree'):
+            for m in self.mat_tree.get_children():
+                flag = "✓" if self.announce_map.get(m, True) else "—"
+                self.mat_tree.item(m, values=(flag, m, ""))
         
         # Automatically rebuild CSV on startup to ensure data is current
         self.after(500, self._auto_rebuild_csv_on_startup)
@@ -566,6 +567,14 @@ class ProspectorPanel(ttk.Frame):
         for delay in [2000, 4000, 6000, 8000, 10000]:
             self.after(delay, self._update_ship_info_display)
 
+    # --- Stub methods for announcements panel (moved to Settings) ---
+    def _position_minpct_spinboxes(self):
+        """Stub method - announcements panel moved to Settings tab"""
+        pass
+        
+    def _sync_spinboxes_to_min_pct_map(self):
+        """Stub method - announcements panel moved to Settings tab"""
+        pass
 
     # --- CFG passthrough ---
     def _load_cfg(self) -> Dict[str, Any]:
@@ -895,14 +904,18 @@ class ProspectorPanel(ttk.Frame):
             if "Non-Core Asteroids" in self.announcement_vars and 'Non-Core Asteroids' in data:
                 self.announcement_vars["Non-Core Asteroids"].set(data['Non-Core Asteroids'])
         
-        for m in self.mat_tree.get_children():
-            flag = "✓" if self.announce_map.get(m, True) else "—"
-            self.mat_tree.item(m, values=(flag, m, ""))
-        for m, v in self._minpct_spin.items():
-            if m in self.min_pct_map:
-                v.set(self.min_pct_map[m])
-        self._position_minpct_spinboxes()
-        self._sync_spinboxes_to_min_pct_map()
+        # Update UI (only if mat_tree exists - announcements panel moved to Settings)
+        if hasattr(self, 'mat_tree'):
+            for m in self.mat_tree.get_children():
+                flag = "✓" if self.announce_map.get(m, True) else "—"
+                self.mat_tree.item(m, values=(flag, m, ""))
+                
+        if hasattr(self, '_minpct_spin'):
+            for m, v in self._minpct_spin.items():
+                if m in self.min_pct_map:
+                    v.set(self.min_pct_map[m])
+            self._position_minpct_spinboxes()
+            self._sync_spinboxes_to_min_pct_map()
         self._save_announce_map()
         self._save_min_pct_map()
         self._save_threshold_value()
@@ -963,14 +976,18 @@ class ProspectorPanel(ttk.Frame):
             if "Non-Core Asteroids" in self.announcement_vars and 'Non-Core Asteroids' in data:
                 self.announcement_vars["Non-Core Asteroids"].set(data['Non-Core Asteroids'])
         
-        for m in self.mat_tree.get_children():
-            flag = "✓" if self.announce_map.get(m, True) else "—"
-            self.mat_tree.item(m, values=(flag, m, ""))
-        for m, v in self._minpct_spin.items():
-            if m in self.min_pct_map:
-                v.set(self.min_pct_map[m])
-        self._position_minpct_spinboxes()
-        self._sync_spinboxes_to_min_pct_map()
+        # Update UI (only if mat_tree exists - announcements panel moved to Settings)
+        if hasattr(self, 'mat_tree'):
+            for m in self.mat_tree.get_children():
+                flag = "✓" if self.announce_map.get(m, True) else "—"
+                self.mat_tree.item(m, values=(flag, m, ""))
+                
+        if hasattr(self, '_minpct_spin'):
+            for m, v in self._minpct_spin.items():
+                if m in self.min_pct_map:
+                    v.set(self.min_pct_map[m])
+            self._position_minpct_spinboxes()
+            self._sync_spinboxes_to_min_pct_map()
         self._save_announce_map()
         self._save_min_pct_map()
         self._save_threshold_value()
@@ -997,14 +1014,17 @@ class ProspectorPanel(ttk.Frame):
                 if "Non-Core Asteroids" in self.announcement_vars and "Non-Core Asteroids" in last_settings:
                     self.announcement_vars["Non-Core Asteroids"].set(last_settings["Non-Core Asteroids"])
             
-            # Update UI
-            for m in self.mat_tree.get_children():
-                flag = "✓" if self.announce_map.get(m, True) else "—"
-                self.mat_tree.item(m, values=(flag, m, ""))
-            for m, v in self._minpct_spin.items():
-                if m in self.min_pct_map:
-                    v.set(self.min_pct_map[m])
-            self._position_minpct_spinboxes()
+            # Update UI (only if mat_tree exists - announcements panel moved to Settings)
+            if hasattr(self, 'mat_tree'):
+                for m in self.mat_tree.get_children():
+                    flag = "✓" if self.announce_map.get(m, True) else "—"
+                    self.mat_tree.item(m, values=(flag, m, ""))
+                    
+            if hasattr(self, '_minpct_spin'):
+                for m, v in self._minpct_spin.items():
+                    if m in self.min_pct_map:
+                        v.set(self.min_pct_map[m])
+                self._position_minpct_spinboxes()
 
     def _save_last_material_settings(self):
         """Save current material settings as last used"""
@@ -1508,17 +1528,11 @@ class ProspectorPanel(ttk.Frame):
         buttons_frame = ttk.Frame(controls_frame)
         buttons_frame.grid(row=0, column=2, sticky="e")
         
-        # --- Announcements Panels tab ---
-        ann = ttk.Frame(nb, padding=8)
-        nb.add(ann, text="Announcements Panel")
-        ann.columnconfigure(0, weight=1)
-        ann.columnconfigure(1, weight=0)
-        ann.rowconfigure(2, weight=1)
-
-        # Main controls frame to hold both toggles and threshold
-        main_controls = ttk.Frame(ann)
-        main_controls.grid(row=0, column=0, sticky="w")
+        # --- Announcements Panel moved to Settings tab ---
+        # (Announcements functionality moved to Settings → Announcements)
         
+        """
+        # DISABLED: Announcements code - moved to Settings tab
         # Left side: Announcement toggles
         toggles_frame = ttk.Frame(main_controls)
         toggles_frame.pack(side="left", padx=(0, 20))
@@ -1728,6 +1742,7 @@ class ProspectorPanel(ttk.Frame):
                           f"Use Preset {i} to store different announcement profiles\n"
                           "(e.g. Core-only, High-value, All materials)")
             self.ToolTip(btn, tooltip_text)
+        """
 
         # Graphs tab - Analytics visualization (Session tab removed and merged into Prospector)
         if CHARTS_AVAILABLE:

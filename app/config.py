@@ -77,18 +77,17 @@ def _save_cfg(cfg: Dict[str, Any]) -> None:
             os.makedirs(config_dir, exist_ok=True)
             log.info(f"Created config directory: {config_dir}")
         
-        log.info(f"Saving config to: {CONFIG_FILE}")
-        log.info(f"Config version being saved: {cfg.get('config_version', 'MISSING')}")
+        # Single concise log message instead of 3 verbose ones
+        log.info(f"Config saved (v{cfg.get('config_version', 'MISSING')}): {os.path.basename(CONFIG_FILE)}")
         
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
             
-        log.info(f"Config file written successfully")
-        
-        # Verify the file was written correctly
-        if os.path.exists(CONFIG_FILE):
-            file_size = os.path.getsize(CONFIG_FILE)
-            log.info(f"Config file exists, size: {file_size} bytes")
+        # Only log verification if there's an issue
+        if not os.path.exists(CONFIG_FILE):
+            log.error(f"Config file was not created: {CONFIG_FILE}")
+        elif os.path.getsize(CONFIG_FILE) == 0:
+            log.error(f"Config file is empty: {CONFIG_FILE}")
         else:
             log.error(f"Config file does not exist after save!")
             

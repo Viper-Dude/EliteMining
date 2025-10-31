@@ -4249,15 +4249,20 @@ class App(tk.Tk):
         self._build_mining_session_tab(mining_session_tab)
         self.notebook.add(mining_session_tab, text="Mining Session")
 
-        # Settings tab (converted to notebook with sub-tabs)
-        settings_tab = ttk.Frame(self.notebook, padding=8)
-        self._build_settings_notebook(settings_tab)
-        self.notebook.add(settings_tab, text="Settings")
+        # VoiceAttack Controls tab (combined Firegroups + Mining Controls)
+        voiceattack_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_voiceattack_controls_tab(voiceattack_tab)
+        self.notebook.add(voiceattack_tab, text="VoiceAttack Controls")
 
         # Hotspots Finder tab
         ring_finder_tab = ttk.Frame(self.notebook, padding=8)
         self._setup_ring_finder(ring_finder_tab)
         self.notebook.add(ring_finder_tab, text="Hotspots Finder")
+
+        # Settings tab (simplified with remaining sub-tabs)
+        settings_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_settings_notebook(settings_tab)
+        self.notebook.add(settings_tab, text="Settings")
 
         # Actions row (global)
         actions = ttk.Frame(content_frame)
@@ -4969,20 +4974,440 @@ class App(tk.Tk):
         self.settings_notebook = ttk.Notebook(frame)
         self.settings_notebook.pack(fill="both", expand=True)
 
+        # === ANNOUNCEMENTS SUB-TAB ===
+        announcements_tab = ttk.Frame(self.settings_notebook, padding=8)
+        self._build_announcements_tab(announcements_tab)
+        self.settings_notebook.add(announcements_tab, text="Announcements")
+
         # === GENERAL SETTINGS SUB-TAB ===
         general_tab = ttk.Frame(self.settings_notebook, padding=8)
         self._build_interface_options_tab(general_tab)
         self.settings_notebook.add(general_tab, text="General Settings")
 
-        # === MINING CONTROLS SUB-TAB ===
-        mining_controls_tab = ttk.Frame(self.settings_notebook, padding=8)
-        self._build_timers_tab(mining_controls_tab)
-        self.settings_notebook.add(mining_controls_tab, text="Mining Controls")
+    def _build_voiceattack_controls_tab(self, frame: ttk.Frame) -> None:
+        """Build the VoiceAttack Controls tab with Firegroups and Mining Controls"""
+        # Create a notebook for VoiceAttack sub-tabs
+        self.voiceattack_notebook = ttk.Notebook(frame)
+        self.voiceattack_notebook.pack(fill="both", expand=True)
 
         # === FIREGROUPS & FIRE BUTTONS SUB-TAB ===
-        firegroups_tab = ttk.Frame(self.settings_notebook, padding=8)
+        firegroups_tab = ttk.Frame(self.voiceattack_notebook, padding=8)
         self._build_fg_tab(firegroups_tab)
-        self.settings_notebook.add(firegroups_tab, text="Firegroups & Fire Buttons")
+        self.voiceattack_notebook.add(firegroups_tab, text="Firegroups & Fire Buttons")
+
+        # === MINING CONTROLS SUB-TAB ===
+        mining_controls_tab = ttk.Frame(self.voiceattack_notebook, padding=8)
+        self._build_timers_tab(mining_controls_tab)
+        self.voiceattack_notebook.add(mining_controls_tab, text="Mining Controls")
+
+    def _build_announcements_tab(self, frame: ttk.Frame) -> None:
+        """Build the Announcements settings tab with full material functionality"""
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(2, weight=1)
+
+        # Basic announcement controls
+        ttk.Label(frame, text="Announcement Settings", font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
+        
+        # Check if prospector panel is available for advanced controls
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            # Import materials for full functionality
+            try:
+                from prospector_panel import ANNOUNCEMENT_TOGGLES, KNOWN_MATERIALS, CORE_ONLY
+                
+                # Main controls frame
+                main_controls = ttk.Frame(frame)
+                main_controls.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+                frame.columnconfigure(0, weight=1)
+                
+                # Left side: Announcement toggles
+                toggles_frame = ttk.Frame(main_controls)
+                toggles_frame.pack(side="left", padx=(0, 20))
+                
+                # Add announcement toggles if available
+                if hasattr(self, 'announcement_vars') and self.announcement_vars:
+                    ttk.Label(toggles_frame, text="Announcement Types:", font=("Segoe UI", 9, "bold")).pack(anchor="w")
+                    for name, (_fname, helptext) in ANNOUNCEMENT_TOGGLES.items():
+                        # Check if the variable exists before trying to use it
+                        if name in self.announcement_vars:
+                            checkbox = tk.Checkbutton(toggles_frame, text=name, 
+                                                    variable=self.announcement_vars[name], 
+                                                    bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", 
+                                                    activebackground="#1e1e1e", activeforeground="#ffffff", 
+                                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                                    padx=4, pady=1, anchor="w")
+                            checkbox.pack(anchor="w", padx=(10, 0))
+                            ToolTip(checkbox, helptext)
+                
+                # Right side: Threshold controls
+                thr = ttk.Frame(main_controls)
+                thr.pack(side="left")
+                ttk.Label(thr, text="Announce at ≥").pack(side="left")
+                sp = ttk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
+                                 textvariable=self.prospector_panel.threshold, 
+                                 command=self.prospector_panel._save_threshold_value)
+                sp.pack(side="left", padx=(6, 4))
+                ToolTip(sp, "Set the minimum percentage threshold for announcements")
+                
+                set_all_btn = tk.Button(thr, text="Set all", command=self._ann_set_all_threshold,
+                                       bg="#2a4a5a", fg="#ffffff", 
+                                       activebackground="#3a5a6a", activeforeground="#ffffff",
+                                       relief="solid", bd=1, cursor="hand2", pady=2, padx=8)
+                set_all_btn.pack(side="left", padx=(10, 0))
+                ToolTip(set_all_btn, "Set all materials to the minimum threshold percentage")
+                ttk.Label(thr, text="%").pack(side="left")
+
+                # Materials section label
+                ttk.Label(frame, text="Select minerals and set minimum percentages:",
+                          font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(8, 4))
+
+                # Create the full material tree with functionality
+                materials_frame = ttk.Frame(frame)
+                materials_frame.grid(row=3, column=0, sticky="nsew", pady=(0, 10))
+                materials_frame.columnconfigure(0, weight=1)
+                materials_frame.rowconfigure(0, weight=1)
+                frame.rowconfigure(3, weight=1)
+
+                # Material tree
+                self.ann_mat_tree = ttk.Treeview(materials_frame, columns=("announce", "material", "minpct"), show="headings", height=14)
+                self.ann_mat_tree.heading("announce", text="Announce")
+                self.ann_mat_tree.heading("material", text="Mineral")
+                self.ann_mat_tree.heading("minpct", text="Minimal %")
+                self.ann_mat_tree.column("announce", width=90, anchor="center", stretch=False)
+                self.ann_mat_tree.column("material", width=300, anchor="center", stretch=True)
+                self.ann_mat_tree.column("minpct", width=100, anchor="center", stretch=False)
+                self.ann_mat_tree.grid(row=0, column=0, sticky="nsew")
+                
+                ann_scrollbar = ttk.Scrollbar(materials_frame, orient="vertical", command=self.ann_mat_tree.yview)
+                ann_scrollbar.grid(row=0, column=1, sticky="ns")
+                self.ann_mat_tree.configure(yscrollcommand=ann_scrollbar.set)
+
+                # Create spinboxes for per-material thresholds
+                self._ann_minpct_spin = {}
+                self._ann_minpct_vars = {}
+
+                def _on_ann_minpct_change_factory(material):
+                    def _on_change():
+                        try:
+                            v = float(self._ann_minpct_vars[material].get())
+                            v = max(0.0, min(100.0, v))
+                            self.prospector_panel.min_pct_map[material] = v
+                            self.prospector_panel._save_min_pct_map()
+                        except ValueError:
+                            pass
+                    return _on_change
+
+                # Populate with materials and create spinboxes
+                for mat in KNOWN_MATERIALS:
+                    flag = "✓" if self.prospector_panel.announce_map.get(mat, True) else "—"
+                    if mat in CORE_ONLY:
+                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""))
+                    else:
+                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""))
+                        
+                        # Create spinbox for non-core materials
+                        v = self.prospector_panel.min_pct_map.get(mat, 0.0)
+                        self._ann_minpct_vars[mat] = tk.DoubleVar(value=v)
+                        
+                        self._ann_minpct_spin[mat] = ttk.Spinbox(
+                            self.ann_mat_tree,
+                            from_=0.0,
+                            to=100.0,
+                            increment=0.5,
+                            width=4,
+                            textvariable=self._ann_minpct_vars[mat],
+                            command=_on_ann_minpct_change_factory(mat)
+                        )
+
+                # Add double-click handler to toggle announcement
+                def _ann_toggle_announce(event):
+                    item = self.ann_mat_tree.identify_row(event.y)
+                    if item and item in KNOWN_MATERIALS:
+                        col = self.ann_mat_tree.identify_column(event.x)
+                        if col == "#1":  # First column (announce)
+                            try:
+                                # Toggle
+                                current_state = self.prospector_panel.announce_map.get(item, True)
+                                new_state = not current_state
+                                self.prospector_panel.announce_map[item] = new_state
+                                self.prospector_panel._save_announce_map()
+                                
+                                # Update display immediately
+                                flag = "✓" if new_state else "—"
+                                current = self.ann_mat_tree.item(item, "values")
+                                self.ann_mat_tree.item(item, values=(flag, current[1], current[2]))
+                                print(f"Toggled {item}: {current_state} → {new_state}")
+                            except Exception as e:
+                                print(f"Error toggling {item}: {e}")
+
+                self.ann_mat_tree.bind("<Double-1>", _ann_toggle_announce)
+
+                # Position spinboxes
+                def _ann_position_minpct_spinboxes():
+                    try:
+                        for material, spinbox in self._ann_minpct_spin.items():
+                            if material in CORE_ONLY:
+                                continue
+                                
+                            # Get the bounding box of the item
+                            bbox = self.ann_mat_tree.bbox(material, "#3")  # Third column
+                            if bbox:
+                                x, y, width, height = bbox
+                                # Position the spinbox with fixed width instead of cell width
+                                spinbox_width = 60  # Fixed width for spinbox
+                                # Center the spinbox in the cell
+                                x_offset = (width - spinbox_width) // 2
+                                spinbox.place(in_=self.ann_mat_tree, x=x + x_offset, y=y, width=spinbox_width, height=height)
+                            else:
+                                spinbox.place_forget()
+                    except Exception:
+                        pass
+
+                # Position spinboxes initially and on scroll
+                self.ann_mat_tree.update_idletasks()
+                _ann_position_minpct_spinboxes()
+                
+                def _ann_yscroll_set(lo, hi):
+                    ann_scrollbar.set(lo, hi)
+                    _ann_position_minpct_spinboxes()
+                self.ann_mat_tree.configure(yscroll=_ann_yscroll_set)
+
+                # Buttons frame
+                btns = ttk.Frame(frame)
+                btns.grid(row=4, column=0, sticky="w", pady=(8, 0))
+                
+                select_all_btn = tk.Button(btns, text="Select all", command=self._ann_select_all,
+                                          bg="#2a5a2a", fg="#ffffff", 
+                                          activebackground="#3a6a3a", activeforeground="#ffffff",
+                                          relief="solid", bd=1, cursor="hand2", pady=3)
+                select_all_btn.pack(side="left")
+                ToolTip(select_all_btn, "Enable announcements for all materials")
+                
+                unselect_all_btn = tk.Button(btns, text="Unselect all", command=self._ann_unselect_all,
+                                           bg="#5a2a2a", fg="#ffffff", 
+                                           activebackground="#6a3a3a", activeforeground="#ffffff",
+                                           relief="solid", bd=1, cursor="hand2", pady=3)
+                unselect_all_btn.pack(side="left", padx=(6, 0))
+                ToolTip(unselect_all_btn, "Disable announcements for all materials")
+                
+                # Add preset buttons
+                for i in range(1, 6):  # Preset 1 to 5
+                    preset_btn = tk.Button(btns, text=f"Preset {i}",
+                                         bg="#4a4a2a", fg="#ffffff",
+                                         activebackground="#5a5a3a", activeforeground="#ffffff",
+                                         relief="solid", bd=1,
+                                         width=8, font=("Segoe UI", 9), cursor="hand2", pady=3,
+                                         highlightbackground="#2a2a1a", highlightcolor="#2a2a1a")
+                    preset_btn.pack(side="left", padx=(8, 0))
+                    
+                    # Bind left and right click events
+                    if i == 1:
+                        preset_btn.bind("<Button-1>", lambda e: self._ann_load_preset1())
+                        preset_btn.bind("<Button-3>", lambda e: self._ann_save_preset1())
+                    else:
+                        preset_btn.bind("<Button-1>", lambda e, num=i: self._ann_load_preset(num))
+                        preset_btn.bind("<Button-3>", lambda e, num=i: self._ann_save_preset(num))
+                    
+                    # Fix button state after right-click
+                    preset_btn.bind("<ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
+                    
+                    # Add tooltip
+                    tooltip_text = ("Left-click = Load saved preset\n"
+                                  "Right-click = Save current settings into that preset slot\n"
+                                  f"Use Preset {i} to store different announcement profiles\n"
+                                  "(e.g. Core-only, High-value, All materials)")
+                    ToolTip(preset_btn, tooltip_text)
+                
+            except ImportError:
+                # Fallback if imports fail
+                ttk.Label(frame, text="Announcement settings require the Mining Session to be initialized.\nPlease restart the application if this persists.", 
+                         font=("Segoe UI", 10), foreground="orange").grid(row=1, column=0, sticky="w", padx=20, pady=20)
+        else:
+            # Simple message if prospector panel not available
+            ttk.Label(frame, text="Announcement settings will be available after the Mining Session initializes.\nPlease restart the application if this persists.", 
+                     font=("Segoe UI", 10), foreground="orange").grid(row=1, column=0, sticky="w", padx=20, pady=20)
+
+    def _ann_select_all(self):
+        """Enable announcements for all materials"""
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                from prospector_panel import KNOWN_MATERIALS
+                for mat in KNOWN_MATERIALS:
+                    self.prospector_panel.announce_map[mat] = True
+                self.prospector_panel._save_announce_map()
+                self._ann_update_display()
+            except Exception as e:
+                print(f"Error in _ann_select_all: {e}")
+    
+    def _ann_unselect_all(self):
+        """Disable announcements for all materials"""
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                from prospector_panel import KNOWN_MATERIALS
+                for mat in KNOWN_MATERIALS:
+                    self.prospector_panel.announce_map[mat] = False
+                self.prospector_panel._save_announce_map()
+                self._ann_update_display()
+            except Exception as e:
+                print(f"Error in _ann_unselect_all: {e}")
+    
+    def _ann_set_all_threshold(self):
+        """Set all materials to the current threshold percentage"""
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                from prospector_panel import KNOWN_MATERIALS, CORE_ONLY
+                threshold_val = self.prospector_panel.threshold.get()
+                for mat in KNOWN_MATERIALS:
+                    if mat not in CORE_ONLY:  # Only set threshold for non-core materials
+                        self.prospector_panel.min_pct_map[mat] = threshold_val
+                        # Update the spinbox if it exists
+                        if hasattr(self, '_ann_minpct_vars') and mat in self._ann_minpct_vars:
+                            self._ann_minpct_vars[mat].set(threshold_val)
+                self.prospector_panel._save_min_pct_map()
+            except Exception as e:
+                print(f"Error in _ann_set_all_threshold: {e}")
+            
+    def _ann_update_display(self):
+        """Update the announcements display"""
+        if hasattr(self, 'ann_mat_tree') and hasattr(self, 'prospector_panel'):
+            try:
+                from prospector_panel import KNOWN_MATERIALS
+                for mat in KNOWN_MATERIALS:
+                    flag = "✓" if self.prospector_panel.announce_map.get(mat, True) else "—"
+                    current = self.ann_mat_tree.item(mat, "values")
+                    if current:
+                        self.ann_mat_tree.item(mat, values=(flag, current[1], current[2]))
+            except Exception as e:
+                print(f"Error in _ann_update_display: {e}")
+
+    def _ann_save_preset1(self):
+        """Save current announcement settings as preset 1"""
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                cfg = self.prospector_panel._load_cfg()
+                preset_data = {
+                    'announce_map': self.prospector_panel.announce_map.copy(),
+                    'min_pct_map': self.prospector_panel.min_pct_map.copy(),
+                    'announce_threshold': self.prospector_panel.threshold.get()
+                }
+                
+                # Save Core/Non-Core settings if available
+                if hasattr(self, 'announcement_vars') and self.announcement_vars:
+                    if "Core Asteroids" in self.announcement_vars:
+                        preset_data['Core Asteroids'] = self.announcement_vars["Core Asteroids"].get()
+                    if "Non-Core Asteroids" in self.announcement_vars:
+                        preset_data['Non-Core Asteroids'] = self.announcement_vars["Non-Core Asteroids"].get()
+                
+                cfg['announce_preset_1'] = preset_data
+                self.prospector_panel._save_cfg(cfg)
+                self._set_status("Saved Preset 1.")
+            except Exception as e:
+                print(f"Error saving preset 1: {e}")
+
+    def _ann_load_preset1(self):
+        """Load announcement settings from preset 1"""
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                cfg = self.prospector_panel._load_cfg()
+                data = cfg.get('announce_preset_1')
+                if not data:
+                    from tkinter import messagebox
+                    messagebox.showinfo("Load Preset 1", "No Preset 1 saved yet.")
+                    return
+                
+                self.prospector_panel.announce_map = data.get('announce_map', {}).copy()
+                self.prospector_panel.min_pct_map = data.get('min_pct_map', {}).copy()
+                self.prospector_panel.threshold.set(data.get('announce_threshold', 20.0))
+                
+                # Load Core/Non-Core settings if available
+                if hasattr(self, 'announcement_vars') and self.announcement_vars:
+                    if "Core Asteroids" in self.announcement_vars and 'Core Asteroids' in data:
+                        self.announcement_vars["Core Asteroids"].set(data['Core Asteroids'])
+                    if "Non-Core Asteroids" in self.announcement_vars and 'Non-Core Asteroids' in data:
+                        self.announcement_vars["Non-Core Asteroids"].set(data['Non-Core Asteroids'])
+                
+                # Update spinboxes
+                if hasattr(self, '_ann_minpct_vars'):
+                    for mat, var in self._ann_minpct_vars.items():
+                        if mat in self.prospector_panel.min_pct_map:
+                            var.set(self.prospector_panel.min_pct_map[mat])
+                
+                self.prospector_panel._save_announce_map()
+                self.prospector_panel._save_min_pct_map()
+                self._ann_update_display()
+                self._set_status("Loaded Preset 1.")
+            except Exception as e:
+                print(f"Error loading preset 1: {e}")
+
+    def _ann_save_preset(self, num):
+        """Save current announcement settings as preset num"""
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                cfg = self.prospector_panel._load_cfg()
+                preset_data = {
+                    'announce_map': self.prospector_panel.announce_map.copy(),
+                    'min_pct_map': self.prospector_panel.min_pct_map.copy(),
+                    'announce_threshold': self.prospector_panel.threshold.get()
+                }
+                
+                # Save Core/Non-Core settings if available
+                if hasattr(self, 'announcement_vars') and self.announcement_vars:
+                    if "Core Asteroids" in self.announcement_vars:
+                        preset_data['Core Asteroids'] = self.announcement_vars["Core Asteroids"].get()
+                    if "Non-Core Asteroids" in self.announcement_vars:
+                        preset_data['Non-Core Asteroids'] = self.announcement_vars["Non-Core Asteroids"].get()
+                
+                cfg[f'announce_preset_{num}'] = preset_data
+                self.prospector_panel._save_cfg(cfg)
+                self._set_status(f"Saved Preset {num}.")
+            except Exception as e:
+                print(f"Error saving preset {num}: {e}")
+
+    def _ann_load_preset(self, num):
+        """Load announcement settings from preset num"""
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                from prospector_panel import KNOWN_MATERIALS, CORE_ONLY
+                cfg = self.prospector_panel._load_cfg()
+                data = cfg.get(f'announce_preset_{num}')
+                if not data:
+                    from tkinter import messagebox
+                    messagebox.showinfo(f"Load Preset {num}", f"No Preset {num} saved yet.")
+                    return
+                
+                # Merge preset data with current materials to preserve new materials
+                preset_announce = data.get('announce_map', {})
+                preset_minpct = data.get('min_pct_map', {})
+                
+                # Fill in any missing materials with defaults
+                for material in KNOWN_MATERIALS:
+                    if material not in preset_announce:
+                        preset_announce[material] = self.prospector_panel.announce_map.get(material, True)
+                    if material not in preset_minpct:
+                        preset_minpct[material] = self.prospector_panel.min_pct_map.get(material, 20.0)
+                
+                self.prospector_panel.announce_map = preset_announce
+                self.prospector_panel.min_pct_map = preset_minpct
+                self.prospector_panel.threshold.set(data.get('announce_threshold', 20.0))
+                
+                # Load Core/Non-Core settings if available
+                if hasattr(self, 'announcement_vars') and self.announcement_vars:
+                    if "Core Asteroids" in self.announcement_vars and 'Core Asteroids' in data:
+                        self.announcement_vars["Core Asteroids"].set(data['Core Asteroids'])
+                    if "Non-Core Asteroids" in self.announcement_vars and 'Non-Core Asteroids' in data:
+                        self.announcement_vars["Non-Core Asteroids"].set(data['Non-Core Asteroids'])
+                
+                # Update spinboxes
+                if hasattr(self, '_ann_minpct_vars'):
+                    for mat, var in self._ann_minpct_vars.items():
+                        if mat in self.prospector_panel.min_pct_map:
+                            var.set(self.prospector_panel.min_pct_map[mat])
+                
+                self.prospector_panel._save_announce_map()
+                self.prospector_panel._save_min_pct_map()
+                self._ann_update_display()
+                self._set_status(f"Loaded Preset {num}.")
+            except Exception as e:
+                print(f"Error loading preset {num}: {e}")
 
     def _build_interface_options_tab(self, frame: ttk.Frame) -> None:
         # Create a canvas and scrollbar for scrollable content
@@ -7889,7 +8314,7 @@ class App(tk.Tk):
             # Pass the correct app directory to Ring Finder for proper database path
             # Only use va_root path in installer mode, None in dev mode for consistent database location
             app_dir = os.path.join(self.va_root, "app") if getattr(sys, 'frozen', False) and hasattr(self, 'va_root') and self.va_root else None
-            self.ring_finder = RingFinder(parent_frame, self.prospector_panel, app_dir)
+            self.ring_finder = RingFinder(parent_frame, self.prospector_panel, app_dir, ToolTip)
             
             # Check if there were any pending hotspot additions while Ring Finder was being created
             if getattr(self, '_pending_ring_finder_refresh', False):

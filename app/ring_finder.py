@@ -99,13 +99,18 @@ class RingFinder:
     
     ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter
     
-    def __init__(self, parent_frame: ttk.Frame, prospector_panel=None, app_dir: Optional[str] = None):
+    def __init__(self, parent_frame: ttk.Frame, prospector_panel=None, app_dir: Optional[str] = None, tooltip_class=None):
         self.parent = parent_frame
         self.prospector_panel = prospector_panel  # Reference to get current system
         self.systems_data = {}  # System coordinates cache
         self.current_system_coords = None
         self.app_dir = app_dir  # Store app_dir for galaxy database access
         self.db_ready = False  # Track database initialization status
+        
+        # Use main app's ToolTip class if provided, otherwise use local one
+        global ToolTip
+        if tooltip_class:
+            ToolTip = tooltip_class
         
         # Initialize local database manager
         self.local_db = LocalSystemsDatabase()
