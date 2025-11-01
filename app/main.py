@@ -33,6 +33,7 @@ import time
 import zipfile
 import announcer
 from ring_finder import RingFinder
+# from marketplace_finder import MarketplaceFinder  # No longer used - using external sites
 from config import _load_cfg, _save_cfg, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry, load_cargo_window_position, save_cargo_window_position
 from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
 from update_checker import UpdateChecker
@@ -365,7 +366,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.4.0"
+APP_VERSION = "v4.4.1"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -3953,6 +3954,18 @@ class App(tk.Tk):
         except Exception:
             pass
 
+        # --- Green accent button style (like ring finder buttons) ---
+        style.configure("Accent.TButton",
+                        background="#2a4a2a",     # Green tint
+                        foreground="#e0e0e0",
+                        borderwidth=1,
+                        relief="raised",
+                        font=("Segoe UI", 9, "normal"))
+        style.map("Accent.TButton",
+                  background=[("active", "#3a5a3a"), ("pressed", "#1a3a1a")],
+                  foreground=[("active", "#ffffff"), ("pressed", "#ffffff")],
+                  relief=[("pressed", "sunken")])
+
 
         # --- Force clam theme for Notebook to allow tab styling ---
         try:
@@ -4143,6 +4156,9 @@ class App(tk.Tk):
         self.text_overlay_color = tk.StringVar(value="White")  # Default white
         self.text_overlay_duration = tk.IntVar(value=7)  # Default 7 seconds (range: 5-30)
         
+        # EDDN sending enable/disable
+        self.eddn_send_enabled = tk.IntVar(value=1)  # Default enabled to contribute to community
+        
         # Color options optimized for colorblind accessibility - subdued brightness
         self.color_options = {
             "White": "#E8E8E8",        # Soft white - high contrast but not harsh
@@ -4207,6 +4223,31 @@ class App(tk.Tk):
         # Initialize update checker with app directory (not settings dir)
         update_dir = get_app_data_dir()
         self.update_checker = UpdateChecker(get_version(), UPDATE_CHECK_URL, update_dir)
+        
+        # Marketplace finder removed - using external sites (Inara, edtools.cc) instead
+        # No local database needed - simpler and more reliable
+        
+        # Initialize EDDN sender for sharing data back to community
+        from eddn_sender import EDDNSender
+        self.eddn_sender = EDDNSender(
+            commander_name="EliteMining User",  # Will be updated from journal
+            app_name="EliteMining",
+            app_version=get_version()
+        )
+        self.eddn_sender.set_enabled(self.eddn_send_enabled.get() == 1)
+        print(f"✅ EDDN sender {'enabled' if self.eddn_send_enabled.get() == 1 else 'disabled'}")
+        
+        # Initialize market handler for Market.json processing
+        from market_handler import MarketHandler
+        self.market_handler = MarketHandler(self.eddn_sender)
+        
+        # Watch for Market.json changes to send to EDDN
+        from file_watcher import get_file_watcher
+        file_watcher = get_file_watcher()
+        journal_dir = self.prospector_panel.journal_dir if hasattr(self, 'prospector_panel') else None
+        if journal_dir and os.path.exists(journal_dir):
+            file_watcher.add_watch(journal_dir, self._on_journal_file_change)
+            print(f"✅ Watching journal directory for Market.json updates")
 
         # Build UI
         self._build_ui()
@@ -4258,6 +4299,11 @@ class App(tk.Tk):
         ring_finder_tab = ttk.Frame(self.notebook, padding=8)
         self._setup_ring_finder(ring_finder_tab)
         self.notebook.add(ring_finder_tab, text="Hotspots Finder")
+
+        # Commodity Market tab
+        marketplace_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_marketplace_tab(marketplace_tab)
+        self.notebook.add(marketplace_tab, text="Commodity Market")
 
         # Settings tab (simplified with remaining sub-tabs)
         settings_tab = ttk.Frame(self.notebook, padding=8)
@@ -5464,6 +5510,28 @@ class App(tk.Tk):
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text="Keep application window always on top of other windows", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+        
+        # ========== EDDN SECTION ==========
+        ttk.Label(scrollable_frame, text="EDDN", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        r += 1
+        
+        # Add separator
+        separator_eddn = tk.Frame(scrollable_frame, height=1, bg="#444444")
+        separator_eddn.grid(row=r, column=0, sticky="ew", pady=(0, 8))
+        r += 1
+        
+        # EDDN send enable/disable
+        tk.Checkbutton(scrollable_frame, text="✓ Send Event Information to EDDN", variable=self.eddn_send_enabled, 
+                      command=self._on_eddn_send_toggle,
+                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
+                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+        r += 1
+        tk.Label(scrollable_frame, text="Share market data with the Elite Dangerous community via EDDN (Elite Dangerous Data Network)", 
+                 wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
@@ -6820,6 +6888,46 @@ class App(tk.Tk):
         # No need for main.py to interfere with this setting
         
         self._set_status(f"Prompt-when-full setting handled by prospector panel")
+    
+    def _on_eddn_send_toggle(self) -> None:
+        """Called when EDDN send checkbox is toggled"""
+        enabled = bool(self.eddn_send_enabled.get())
+        if hasattr(self, 'eddn_sender'):
+            self.eddn_sender.set_enabled(enabled)
+            status_msg = "EDDN sharing enabled - Contributing to community" if enabled else "EDDN sharing disabled"
+            self._set_status(status_msg)
+            print(f"✅ {status_msg}")
+    
+    def _on_journal_file_change(self, file_path: str):
+        """Called when a file in journal directory changes"""
+        file_name = os.path.basename(file_path).lower()
+        
+        # Process Market.json for EDDN sending
+        if file_name == 'market.json' and hasattr(self, 'market_handler'):
+            self.market_handler.process_market_file(file_path)
+        
+        # Process journal files for LoadGame and location tracking
+        elif file_name.startswith('journal.') and file_name.endswith('.log') and hasattr(self, 'market_handler'):
+            try:
+                # Read last line of journal to get latest event
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    # Seek to end and read backwards to get last complete line
+                    f.seek(0, 2)  # Go to end
+                    file_size = f.tell()
+                    if file_size > 0:
+                        # Read last 2KB to get recent events
+                        f.seek(max(0, file_size - 2048))
+                        lines = f.readlines()
+                        # Process last few events
+                        for line in lines[-10:]:  # Last 10 events
+                            if line.strip():
+                                try:
+                                    event = json.loads(line)
+                                    self.market_handler.process_journal_event(event)
+                                except json.JSONDecodeError:
+                                    pass
+            except Exception as e:
+                log.error(f"Error processing journal for EDDN: {e}")
 
     # ---------- Journal folder preference handling ----------
     def _import_journal_history(self):
@@ -7517,6 +7625,8 @@ class App(tk.Tk):
             plt.close('all')
         except:
             pass
+        
+        # EDDN listener removed - no longer needed
             
         self.destroy()
 
@@ -8322,6 +8432,917 @@ class App(tk.Tk):
                 
         except Exception as e:
             print(f"Ring finder setup failed: {e}")
+
+    def _build_marketplace_tab(self, frame: ttk.Frame) -> None:
+        """Build the Commodity Market tab - matches Hotspots Finder design"""
+        # Main container
+        main_container = ttk.Frame(frame)
+        main_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Search section
+        search_frame = ttk.LabelFrame(main_container, text="Search For Commodity Prices", padding=10)
+        search_frame.pack(fill="x", pady=(0, 10))
+        
+        # Configure grid weights
+        search_frame.columnconfigure(1, weight=1)
+        search_frame.columnconfigure(3, weight=1)
+        
+        # Row 1: Reference System with "Use Current System" button
+        ttk.Label(search_frame, text="Reference System:").grid(row=0, column=0, sticky="w", padx=(0, 5))
+        
+        self.marketplace_reference_system = tk.StringVar(value="Paesia")
+        ref_system_entry = ttk.Entry(search_frame, textvariable=self.marketplace_reference_system, width=20)
+        ref_system_entry.grid(row=0, column=1, sticky="w", padx=(0, 5))
+        
+        # Bind Enter key to trigger search
+        ref_system_entry.bind("<Return>", lambda e: self._open_edtools_market())
+        
+        # "Use Current System" button (same as Ring Finder)
+        use_current_btn = ttk.Button(search_frame, text="Use Current System", 
+                                     command=self._use_current_system_marketplace,
+                                     style="Accent.TButton")
+        use_current_btn.grid(row=0, column=2, sticky="w", padx=(5, 20))
+        
+        ttk.Label(search_frame, text="Commodity:").grid(row=0, column=3, sticky="w", padx=(0, 5))
+        
+        self.marketplace_commodity = tk.StringVar(value="Alexandrite")
+        # Hardcoded list of common mining commodities (alphabetically sorted)
+        sorted_commodities = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
+                             "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Indite", 
+                             "Lepidolite", "Low Temperature Diamonds", "Monazite", "Musgravite", 
+                             "Osmium", "Painite", "Palladium", "Platinum", "Praseodymium", 
+                             "Rhodplumsite", "Rutile", "Samarium", "Serendibite", "Silver", 
+                             "Tritium", "Uraninite", "Void Opals"]
+        commodity_combo = ttk.Combobox(search_frame, textvariable=self.marketplace_commodity,
+                                     values=sorted_commodities,
+                                     state="readonly", width=25)
+        commodity_combo.grid(row=0, column=4, sticky="w")
+        
+        # Bind Enter key to trigger search on commodity combobox too
+        commodity_combo.bind("<Return>", lambda e: self._open_edtools_market())
+        
+        # Row 2: Search button
+        edtools_btn = tk.Button(search_frame, text="🔍 Find on edtools.cc", 
+                               command=self._open_edtools_market,
+                               bg="#2a4a2a", fg="#e0e0e0", 
+                               activebackground="#3a5a3a", activeforeground="#ffffff",
+                               relief="ridge", bd=1, padx=12, pady=6,
+                               font=("Segoe UI", 9, "bold"), cursor="hand2")
+        edtools_btn.grid(row=1, column=0, columnspan=5, pady=(15, 5))
+        
+        # Info text
+        info_text = "🌐 Find commodity buyers on edtools.cc"
+        info_label = ttk.Label(search_frame, text=info_text, foreground="gray", font=("TkDefaultFont", 8))
+        info_label.grid(row=2, column=0, columnspan=5, pady=(5, 0))
+        
+        # Add tooltips
+        ToolTip(ref_system_entry, "Enter your reference system for distance-based search")
+        ToolTip(use_current_btn, "Use current system from journal/cargo monitor")
+        ToolTip(edtools_btn, "Open edtools.cc with pre-selected system and commodity")
+        ToolTip(commodity_combo, "Select the commodity you want to sell")
+        
+    def _use_current_system_marketplace(self):
+        """Use current system from journal/hotspots finder for marketplace search"""
+        try:
+            # Get current system from ring finder if available
+            if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'reference_system_var'):
+                current_system = self.ring_finder.reference_system_var.get().strip()
+                if current_system:
+                    self.marketplace_reference_system.set(current_system)
+                    return
+            
+            # Fallback to cargo monitor current system if available
+            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'current_system'):
+                current_system = getattr(self.cargo_monitor, 'current_system', '').strip()
+                if current_system:
+                    self.marketplace_reference_system.set(current_system)
+                    self._set_status(f"Using current system: {current_system}")
+                    return
+            
+            # If no current system found, show message
+            self._set_status("No current system detected. Enter system manually.")
+            
+        except Exception as e:
+            print(f"Error getting current system: {e}")
+            self._set_status("Error detecting current system. Enter system manually.")
+    
+    def _open_edtools_market(self):
+        """Open edtools.cc commodity search in browser with pre-selected commodity"""
+        import webbrowser
+        import urllib.parse
+        
+        commodity = self.marketplace_commodity.get()
+        system = self.marketplace_reference_system.get().strip()
+        
+        # edtools.cc commodity ID mapping (format: c_ID=on)
+        # IDs verified from edtools.cc multi-commodity page
+        edtools_commodity_ids = {
+            "Platinum": "46",
+            "Painite": "83",
+            "Osmium": "97",
+            "Low Temperature Diamonds": "276",
+            "Rhodplumsite": "343",
+            "Serendibite": "344",
+            "Monazite": "345",
+            "Musgravite": "346",
+            "Benitoite": "347",
+            "Grandidierite": "348",
+            "Alexandrite": "349",
+            "Void Opals": "350",
+            # Additional common mining commodities (IDs to be verified if needed)
+            "Bauxite": "396",
+            "Bertrandite": "371",
+            "Bromellite": "352",
+            "Cobalt": "397",
+            "Coltan": "398",
+            "Gallite": "372",
+            "Gold": "399",
+            "Indite": "373",
+            "Lepidolite": "354",
+            "Palladium": "401",
+            "Praseodymium": "374",
+            "Rutile": "375",
+            "Samarium": "376",
+            "Silver": "402",
+            "Tritium": "403",
+            "Uraninite": "377"
+        }
+        
+        # Build URL with system and commodity
+        url = "https://edtools.cc/multi"
+        params = []
+        
+        if system:
+            params.append(f"s={urllib.parse.quote(system)}")
+        
+        # Add commodity using c_ID=on format
+        if commodity and commodity in edtools_commodity_ids:
+            commodity_id = edtools_commodity_ids[commodity]
+            params.append(f"c_{commodity_id}=on")
+        
+        if params:
+            url += "?" + "&".join(params)
+        
+        webbrowser.open(url)
+        self._set_status(f"Opening edtools.cc for {commodity} near {system if system else 'Sol'}...")
+        
+    def _export_marketplace_results(self):
+        """Export marketplace search results to CSV"""
+        try:
+            import csv
+            from tkinter import filedialog
+            
+            # Get all items from tree
+            items = []
+            for child in self.marketplace_tree.get_children():
+                values = self.marketplace_tree.item(child)['values']
+                items.append(values)
+            
+            if not items:
+                self.marketplace_total_label.config(text="No results to export")
+                return
+            
+            # Ask for save location
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv")],
+                title="Export Marketplace Results"
+            )
+            
+            if file_path:
+                with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+                    writer = csv.writer(csvfile)
+                    
+                    # Write headers
+                    headers = ["Location", "Station Type", "Pad", "St dist", "Distance", "Demand", "Price", "Updated"]
+                    writer.writerow(headers)
+                    
+                    # Write data
+                    writer.writerows(items)
+                
+                self.marketplace_total_label.config(text=f"✅ Exported {len(items)} results to {file_path}")
+            
+        except Exception as e:
+            self.marketplace_total_label.config(text=f"❌ Export failed: {str(e)}")
+    
+    def _clear_marketplace_cache(self):
+        """Clear marketplace cache - no longer needed (using external sites)"""
+        self.marketplace_total_label.config(text="ℹ️ Cache not needed (using external sites)")
+    
+    # ==================== UNUSED MARKETPLACE SEARCH METHODS (Kept for reference) ====================
+    # These methods are no longer used - marketplace now uses external websites (Inara, edtools.cc)
+    # Kept here temporarily in case rollback is needed
+    
+    def _search_marketplace(self):
+        """Search for commodity prices (matches hotspots finder behavior)"""
+        commodity = self.marketplace_commodity.get()
+        reference_system = self.marketplace_reference_system.get().strip()
+        max_distance = self.marketplace_max_distance.get().strip()
+        station_type = self.marketplace_station_type.get()
+        price_age = self.marketplace_price_age.get().strip()
+        
+        # Use fixed max results (increased for better coverage)
+        max_results = 100
+        
+        # Validation
+        if not reference_system:
+            self.marketplace_total_label.config(text="❌ Please enter a reference system")
+            return
+            
+        try:
+            if max_distance.lower() == "any":
+                max_dist = float('inf')  # No distance limit
+            else:
+                max_dist = float(max_distance)
+        except ValueError:
+            self.marketplace_total_label.config(text="❌ Invalid distance value")
+            return
+            
+        # Start search in background thread to prevent hanging
+        self.marketplace_total_label.config(text="🔍 Searching for commodity prices...")
+        self.update()  # Force UI update
+        
+        # Run search in background thread
+        import threading
+        search_thread = threading.Thread(
+            target=self._marketplace_search_worker,
+            args=(commodity, reference_system, max_dist, station_type, max_results, price_age),
+            daemon=True
+        )
+        search_thread.start()
+    
+    def _marketplace_search_worker(self, commodity, reference_system, max_dist, station_type, max_results, price_age):
+        """Background worker for marketplace search to prevent UI hanging"""
+        try:
+            # Clear existing results on UI thread
+            self.after(0, self._clear_marketplace_results)
+            
+            # Perform search with timeout
+            results = []
+            try:
+                # Use a simplified search with fewer API calls
+                results = self._quick_marketplace_search(commodity, reference_system, max_results * 2, max_dist, price_age)
+            except Exception as search_error:
+                self.after(0, lambda: self.marketplace_total_label.config(
+                    text=f"❌ Search failed: {str(search_error)}"
+                ))
+                return
+            
+            if not results:
+                self.after(0, lambda: self.marketplace_total_label.config(
+                    text="❌ No selling stations found"
+                ))
+                return
+            
+            # Filter by station type
+            if station_type == "Large Landing Pads":
+                results = [r for r in results if self._has_large_pads(r.get('station_type', ''))]
+            elif station_type == "Medium Landing Pads":
+                results = [r for r in results if self._has_medium_pads(r.get('station_type', ''))]
+            elif station_type == "Small Landing Pads":
+                results = [r for r in results if self._has_small_pads(r.get('station_type', ''))]
+            elif station_type == "Fleet Carriers Only":
+                results = [r for r in results if "Fleet Carrier" in r.get('station_type', '')]
+            elif station_type == "Surface Stations Only":
+                results = [r for r in results if self._is_surface_station(r.get('station_type', ''))]
+            elif station_type == "Space Stations Only":
+                results = [r for r in results if self._is_space_station(r.get('station_type', ''))]
+            elif station_type == "Odyssey Settlements Only":
+                results = [r for r in results if "Odyssey Settlement" in r.get('station_type', '')]
+            elif station_type == "Regular Stations (No Carriers)":
+                results = [r for r in results if "Fleet Carrier" not in r.get('station_type', '')]
+            
+            # Remove duplicates - prioritize newest data first, then best price
+            unique_results = {}
+            for result in results:
+                station_key = f"{result['system_name']}_{result['station_name']}"
+                
+                if station_key not in unique_results:
+                    unique_results[station_key] = result
+                else:
+                    # Compare by update time first (newer is better)
+                    current_updated = result.get('updated', 'Unknown')
+                    existing_updated = unique_results[station_key].get('updated', 'Unknown')
+                    
+                    # Convert update strings to comparable values (hours as numbers)
+                    def parse_update_time(update_str):
+                        if 'h' in update_str:
+                            return float(update_str.replace('h', ''))
+                        elif 'd' in update_str:
+                            return float(update_str.replace('d', '')) * 24  # Convert days to hours
+                        else:
+                            return float('inf')  # Unknown = very old
+                    
+                    current_age = parse_update_time(current_updated)
+                    existing_age = parse_update_time(existing_updated)
+                    
+                    # Keep the newer data (smaller age number)
+                    if current_age < existing_age:
+                        unique_results[station_key] = result
+                    elif current_age == existing_age:
+                        # If same age, keep the higher price
+                        if result['sell_price'] > unique_results[station_key]['sell_price']:
+                            unique_results[station_key] = result
+            
+            # Convert back to list
+            results = list(unique_results.values())
+            
+            # Filter by distance
+            results = [r for r in results if r['system_distance'] <= max_dist]
+            
+            # Limit results
+            results = results[:max_results]
+            
+            if not results:
+                self.after(0, lambda: self.marketplace_total_label.config(
+                    text="❌ No results found within specified criteria"
+                ))
+                return
+            
+            # Update UI on main thread
+            self.after(0, lambda: self._populate_marketplace_results(results, commodity))
+            
+        except Exception as e:
+            error_msg = f"❌ Search failed: {str(e)}"
+            self.after(0, lambda: self.marketplace_total_label.config(text=error_msg))
+            print(f"Marketplace search error: {e}")
+    
+    def _quick_marketplace_search(self, commodity, reference_system, max_results, max_dist, price_age):
+        """Fast search using nearby systems from user database with price age filtering"""
+        from datetime import datetime, timedelta
+        
+        # Convert price age to hours for filtering
+        age_hours = self._convert_price_age_to_hours(price_age)
+        print(f"DEBUG: Price age filter: {price_age} = {age_hours} hours")
+        
+        # Get reference system coordinates from database (marketplace_finder removed)
+        ref_coords = self._get_system_coords_from_db(reference_system)
+        if not ref_coords:
+            raise Exception(f"Could not find coordinates for {reference_system} (use external sites instead)")
+        
+        # Get nearby systems from the user database (much faster than API calls)
+        nearby_systems = self._get_nearby_systems_from_db(reference_system, max_dist)
+        
+        # Debug: Check what the database search returned
+        print(f"DEBUG: Database returned {len(nearby_systems)} nearby systems")
+        if len(nearby_systems) > 0:
+            print(f"DEBUG: First 5 systems from DB: {nearby_systems[:5]}")
+        else:
+            print("DEBUG: Database search returned empty - will use fallback list")
+        
+        # If no nearby systems from DB, fall back to a comprehensive list of known trading systems
+        if not nearby_systems:
+            nearby_systems = [
+                reference_system, "Sol", "Shinrarta Dezhra", "Diaguandri", "LHS 3447",
+                # Major trading hubs
+                "Jameson Memorial", "Ray Gateway", "Ohm City", "Abraham Lincoln", 
+                "Daedalus", "Columbus", "Li Qing Jao", "M.Gorbachev",
+                # Common mining/trading systems  
+                "NADUR", "HR 5900", "COL 285 SECTOR UE-G C11-5", "KHAN GUBII",
+                "COL 285 SECTOR YK-E C12-33", "COL 285 SECTOR AL-O D6-68",
+                "COL 285 SECTOR NF-W A45-1", "COL 285 SECTOR KD-O B21-1", 
+                "COL 285 SECTOR XK-E C12-33", "COL 285 SECTOR SA-W A45-1",
+                "ASSIONES", "PAESIA", "DELKAR", "BORANN", "HYADES SECTOR DB-X D1-112",
+                "HIP 69643", "BIBRIGES", "SAN YAMURT",
+                # Additional trading systems
+                "WITCH HEAD SECTOR DL-Y D17", "WITCH HEAD SECTOR GW-W C1-4",
+                "LP 40-239", "GCRV 1568", "LTT 1345", "WOLF 562", "DECIAT",
+                "MAIA", "MEROPE", "ELECTRA", "TAYGETA", "ASTEROPE", "CELAENO",
+                # Industrial systems
+                "CEOS", "SOTHIS", "ROBIGO", "QUINCE", "RHEA", "DRACONIS",
+                # More bubble systems
+                "ACHENAR", "ALIOTH", "BETA HYDRI", "ETA CASSIOPEIAE", "PROCYON",
+                "SIRIUS", "VEGA", "ALTAIR", "FOMALHAUT", "ARCTURUS"
+            ]
+        
+        print(f"DEBUG: Searching {len(nearby_systems)} systems for {commodity}...")
+        
+        # Limit systems to check - only closest 30 systems
+        systems_to_check = nearby_systems[:30]
+        print(f"DEBUG: Will check {len(systems_to_check)} systems (limited from {len(nearby_systems)} total)")
+        
+        results = []
+        systems_checked = 0
+        total_systems = len(systems_to_check)
+        last_ui_update = 0
+        
+        for system_name in systems_to_check:
+            systems_checked += 1
+            
+            # Update progress only every 5 systems to avoid UI spam
+            if systems_checked - last_ui_update >= 5 or systems_checked == total_systems:
+                last_ui_update = systems_checked
+                self.after(0, lambda s=systems_checked, t=total_systems: 
+                          self.marketplace_total_label.config(
+                              text=f"🔍 Searching systems... ({s}/{t})"
+                          ))
+            
+            # Stop early if we have enough results
+            if len(results) >= max_results * 3:
+                print(f"DEBUG: Found enough results ({len(results)}), stopping search early")
+                break
+            
+            try:
+                # Get system coordinates from database (marketplace_finder removed)
+                system_coords = self._get_system_coords_from_db(system_name)
+                if not system_coords:
+                    continue
+                
+                # Calculate distance manually
+                distance = ((ref_coords['x'] - system_coords['x'])**2 + 
+                           (ref_coords['y'] - system_coords['y'])**2 + 
+                           (ref_coords['z'] - system_coords['z'])**2)**0.5
+                
+                if max_dist != float('inf') and distance > max_dist:
+                    continue
+                
+                # Debug first 10 systems
+                if systems_checked <= 10:
+                    print(f"DEBUG: Checking system {systems_checked}: {system_name} at {distance:.2f} LY")
+                
+                # marketplace_finder removed - this search function is obsolete (use external sites)
+                continue
+                
+                # Filter stations by market data age first
+                valid_stations = []
+                for station in stations:
+                    if not station.get('haveMarket') or not station.get('marketId'):
+                        continue
+                    
+                    # Check market update time if age filtering is enabled
+                    if age_hours is not None:
+                        update_time = station.get('updateTime', {}).get('market')
+                        if update_time:
+                            try:
+                                # Parse EDSM timestamp format: '2025-11-01 07:42:55'
+                                market_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
+                                age = (datetime.now() - market_time).total_seconds() / 3600
+                                
+                                if age > age_hours:
+                                    if systems_checked <= 5:
+                                        print(f"DEBUG:   Station {station.get('name')} excluded: {age:.1f}h > {age_hours}h")
+                                    continue  # Skip stations with old market data
+                                    
+                            except:
+                                # If we can't parse the time, include the station
+                                pass
+                    
+                    valid_stations.append(station)
+                
+                if not valid_stations:
+                    continue
+                
+                # Check ALL valid stations in the system
+                for station in valid_stations:
+                    try:
+                        market_data = self.marketplace_finder.get_station_market_data(station['marketId'])
+                        if not market_data or 'commodities' not in market_data:
+                            continue
+                    except:
+                        continue  # Skip this station if API call fails
+                    
+                    # Look for the commodity
+                    for commodity_data in market_data['commodities']:
+                        comm_name = commodity_data.get('name', '')
+                        if commodity.lower() in comm_name.lower():
+                            sell_price = commodity_data.get('sellPrice', 0)
+                            
+                            # Clean debug output for HR 5900 specifically (remove after testing)
+                            if "HR 5900" in system_name or "5900" in system_name:
+                                print(f"DEBUG: HR 5900 - Found {comm_name} at {station.get('name')} - Price: {sell_price}")
+                                update_time = station.get('updateTime', {}).get('market', '')
+                                if update_time:
+                                    print(f"DEBUG: HR 5900 - Raw timestamp: {update_time}")
+                                    try:
+                                        from datetime import datetime
+                                        market_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
+                                        age = (datetime.now() - market_time).total_seconds() / 3600
+                                        days = age / 24
+                                        print(f"DEBUG: HR 5900 - Age: {age:.1f}h ({days:.1f}d) -> Display: {int(days)}d")
+                                    except Exception as e:
+                                        print(f"DEBUG: HR 5900 - Timestamp parse error: {e}")
+                            
+                            if sell_price > 0:
+                                # Get demand and skip stations with zero demand
+                                demand = commodity_data.get('demand', 0)
+                                if demand <= 0:
+                                    continue  # Skip stations with no demand
+                                
+                                # Get market update time for the UPDATED column
+                                update_time = station.get('updateTime', {}).get('market', '')
+                                if update_time:
+                                    try:
+                                        from datetime import datetime
+                                        market_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
+                                        age = (datetime.now() - market_time).total_seconds() / 3600
+                                        if age < 24:
+                                            updated_str = f"{age:.0f}h"
+                                        else:
+                                            days = age / 24
+                                            # Use floor division to match how most sites show age
+                                            # 1.7 days shows as "1d", not "2d"
+                                            updated_str = f"{int(days)}d"
+                                    except:
+                                        updated_str = "Unknown"
+                                else:
+                                    updated_str = "Unknown"
+                                
+                                result = {
+                                    'system_name': system_name.title(),  # Ensure proper capitalization
+                                    'system_distance': distance,
+                                    'station_name': station.get('name'),
+                                    'station_type': station.get('type'),
+                                    'arrival_distance': station.get('distanceToArrival', 0),
+                                    'commodity_name': comm_name,
+                                    'sell_price': sell_price,
+                                    'demand': demand,  # Use the demand variable we already have
+                                    'updated': updated_str,
+                                }
+                                results.append(result)
+                                
+                                # Stop early if we have enough results
+                                if len(results) >= max_results:
+                                    break
+                    
+                    if len(results) >= max_results:
+                        break
+                        
+            except Exception as e:
+                print(f"Search error for {system_name}: {e}")
+                continue
+            
+            # Early exit if we have enough results
+            if len(results) >= max_results:
+                break
+        
+        # Sort by distance
+        results.sort(key=lambda x: x['system_distance'])
+        return results
+    
+    def _get_nearby_systems_from_db(self, reference_system, max_dist):
+        """Get nearby systems from database or EDSM API"""
+        try:
+            # Use galaxy_systems.db which has all known systems
+            from path_utils import get_app_data_dir
+            import os
+            galaxy_db_path = os.path.join(os.path.dirname(__file__), 'data', 'galaxy_systems.db')
+            
+            import sqlite3
+            with sqlite3.connect(galaxy_db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Get reference system coordinates from galaxy database (table is named 'systems')
+                cursor.execute('''
+                    SELECT x, y, z FROM systems 
+                    WHERE name = ? COLLATE NOCASE
+                ''', (reference_system,))
+                
+                ref_row = cursor.fetchone()
+                if not ref_row:
+                    # Database empty - use EDSM API
+                    return self._get_nearby_systems_from_edsm(reference_system, max_dist)
+                
+                ref_x, ref_y, ref_z = ref_row
+                
+                # Get nearby systems from galaxy database
+                if max_dist == float('inf'):
+                    max_dist_sql = 1000  # Large but finite number for SQL
+                else:
+                    max_dist_sql = max_dist
+                
+                # Get nearby systems sorted by distance
+                cursor.execute('''
+                    SELECT name, x, y, z,
+                           SQRT(POWER(x - ?, 2) + POWER(y - ?, 2) + POWER(z - ?, 2)) as distance
+                    FROM systems 
+                    WHERE distance <= ?
+                    ORDER BY distance
+                    LIMIT 100
+                ''', (ref_x, ref_y, ref_z, max_dist_sql))
+                
+                nearby = cursor.fetchall()
+                if nearby:
+                    return [row[0] for row in nearby]
+                else:
+                    # Database has no nearby systems - use EDSM API
+                    return self._get_nearby_systems_from_edsm(reference_system, max_dist)
+                    
+        except Exception as e:
+            pass
+        
+        # Final fallback to EDSM API
+        return self._get_nearby_systems_from_edsm(reference_system, max_dist)
+    
+    def _get_nearby_systems_from_edsm(self, reference_system, max_dist):
+        """Get nearby systems from EDSM sphere-systems API (marketplace_finder removed)"""
+        print(f"DEBUG: marketplace_finder removed - use external sites (Inara/edtools.cc) instead")
+        return []
+    
+    def _get_system_coords_from_db(self, system_name):
+        """Get system coordinates from galaxy database"""
+        try:
+            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                db_path = self.cargo_monitor.user_db.db_path
+                
+                import sqlite3
+                with sqlite3.connect(db_path) as conn:
+                    cursor = conn.cursor()
+                    
+                    # Check if galaxy_systems table exists first
+                    cursor.execute("""
+                        SELECT name FROM sqlite_master 
+                        WHERE type='table' AND name='galaxy_systems'
+                    """)
+                    
+                    if not cursor.fetchone():
+                        # Table doesn't exist, return None to use EDSM fallback
+                        return None
+                    
+                    cursor.execute('''
+                        SELECT x, y, z FROM galaxy_systems 
+                        WHERE name = ? COLLATE NOCASE
+                    ''', (system_name,))
+                    
+                    row = cursor.fetchone()
+                    if row:
+                        return {'x': row[0], 'y': row[1], 'z': row[2]}
+        except Exception as e:
+            # Silently fall back to EDSM - don't print error messages
+            pass
+        
+        return None
+    
+    def _get_station_priority(self, station_type):
+        """Get priority order for station types (lower number = higher priority)"""
+        priority_order = {
+            'Coriolis Starport': 1,
+            'Orbis Starport': 2, 
+            'Ocellus Starport': 3,
+            'Asteroid Base': 4,
+            'Planetary Port': 5,
+            'Planetary Outpost': 6,
+            'Outpost': 7,
+            'Fleet Carrier': 8,
+            'Odyssey Settlement': 9
+        }
+        
+        for station_name, priority in priority_order.items():
+            if station_name in station_type:
+                return priority
+        
+        return 10  # Unknown types last
+    
+    def _convert_price_age_to_hours(self, price_age):
+        """Convert price age string to hours, return None for 'Any'"""
+        age_map = {
+            "Any": None,
+            "1 hour": 1,
+            "8 hours": 8,
+            "16 hours": 16,
+            "1 day": 24,
+            "2 days": 48,
+            "3 days": 72,
+            "7 days": 168,
+            "14 days": 336,
+            "30 days": 720,
+            "180 days": 4320
+        }
+        return age_map.get(price_age, None)
+    
+    def _clear_marketplace_results(self):
+        """Clear marketplace results tree"""
+        for item in self.marketplace_tree.get_children():
+            self.marketplace_tree.delete(item)
+    
+    def _populate_marketplace_results(self, results, commodity):
+        """Populate marketplace results in UI"""
+        try:
+            # Populate results (sorted by distance - closest first)
+            for result in results:
+                # LOCATION (System + Station)
+                location = f"{result['system_name']} / {result['station_name'][:25]}"
+                
+                # TYPE (Station type)
+                station_type = result['station_type'] if result['station_type'] else "Unknown"
+                
+                # PAD (Landing pad size)
+                pad = self._get_landing_pad_size(result['station_type'])
+                
+                # ST DIST (Station distance from star)
+                if result['arrival_distance'] > 0:
+                    # Round to whole number for cleaner display
+                    st_dist = f"{result['arrival_distance']:,.0f} Ls"
+                else:
+                    st_dist = "?"
+                
+                # DISTANCE (System distance)
+                distance = f"{result['system_distance']:.1f} LY"
+                
+                # DEMAND 
+                demand = f"{result['demand']:,}" if result['demand'] > 0 else "0"
+                
+                # PRICE
+                price = f"{result['sell_price']:,} CR"
+                
+                # UPDATED (Data age)
+                updated = result.get('updated', 'Unknown')
+                
+                self.marketplace_tree.insert("", "end", values=(
+                    location,
+                    station_type,
+                    pad,
+                    st_dist,
+                    distance,
+                    demand,
+                    price,
+                    updated
+                ))
+            
+            # Update status (like hotspots finder format)
+            if results:
+                best_price = max(results, key=lambda x: x['sell_price'])
+                self.marketplace_total_label.config(
+                    text=f"Found {len(results)} stations selling {commodity}. "
+                         f"Best price: {best_price['sell_price']:,} CR/t at {best_price['station_name']} "
+                         f"({best_price['system_distance']:.1f} LY)"
+                )
+            
+        except Exception as e:
+            self.marketplace_total_label.config(text=f"❌ Error displaying results: {str(e)}")
+            print(f"Error populating results: {e}")
+    
+    def _get_landing_pad_size(self, station_type):
+        """Get landing pad size abbreviation from station type"""
+        if not station_type:
+            return "?"
+        
+        # Large pad stations
+        large_pad_types = [
+            "Coriolis Starport", "Orbis Starport", "Ocellus Starport",
+            "Asteroid Base", "Planetary Port", "Planetary Outpost"
+        ]
+        
+        # Small pad stations (outposts)
+        small_pad_types = ["Outpost"]
+        
+        # Fleet carriers (large pads)
+        if "Fleet Carrier" in station_type:
+            return "L"
+        
+        # Check for large pad stations
+        for large_type in large_pad_types:
+            if large_type in station_type:
+                return "L"
+        
+        # Check for small pad stations
+        for small_type in small_pad_types:
+            if small_type in station_type:
+                return "S"
+        
+        # Default to medium for most other stations
+        return "M"
+    
+    def _create_marketplace_context_menu(self):
+        """Create the right-click context menu for marketplace results"""
+        self.marketplace_context_menu = tk.Menu(self, tearoff=0,
+                                               bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
+                                               activebackground=MENU_COLORS["activebackground"], 
+                                               activeforeground=MENU_COLORS["activeforeground"],
+                                               selectcolor=MENU_COLORS["selectcolor"])
+        self.marketplace_context_menu.add_command(label="Copy System Name", command=self._copy_marketplace_system_name)
+    
+    def _show_marketplace_context_menu(self, event):
+        """Show the context menu when right-clicking on marketplace results"""
+        try:
+            # Select the item under cursor
+            item = self.marketplace_tree.identify_row(event.y)
+            if item:
+                self.marketplace_tree.selection_set(item)
+                self.marketplace_tree.focus(item)
+                self.marketplace_context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.marketplace_context_menu.grab_release()
+    
+    def _copy_marketplace_system_name(self):
+        """Copy the selected system name to clipboard"""
+        selection = self.marketplace_tree.selection()
+        if selection:
+            item = selection[0]
+            values = self.marketplace_tree.item(item, 'values')
+            if values and len(values) > 0:
+                # Location format is "System / Station", extract system name
+                location = values[0]  # Location is column index 0
+                system_name = location.split(' / ')[0] if ' / ' in location else location
+                self.clipboard_clear()
+                self.clipboard_append(system_name)
+                self.marketplace_total_label.config(text=f"✅ Copied '{system_name}' to clipboard")
+    
+    def _sort_marketplace_column(self, column, numeric):
+        """Sort marketplace results by column"""
+        try:
+            # Get all items from the tree
+            items = [(self.marketplace_tree.item(item, 'values'), item) for item in self.marketplace_tree.get_children()]
+            
+            if not items:
+                return
+            
+            # Check if we're clicking the same column
+            if self.marketplace_sort_column == column:
+                # Reverse the sort direction
+                self.marketplace_sort_reverse = not self.marketplace_sort_reverse
+            else:
+                # New column, start with ascending
+                self.marketplace_sort_column = column
+                self.marketplace_sort_reverse = False
+            
+            # Get column index
+            columns = ("Location", "Station Type", "Pad", "St dist", "Distance", "Demand", "Price", "Updated")
+            col_index = columns.index(column)
+            
+            # Define sort function based on column type
+            if numeric:
+                def sort_key(item):
+                    value = item[0][col_index]
+                    try:
+                        if column == "Distance":
+                            # Remove " LY" suffix and convert to float
+                            return float(value.replace(" LY", ""))
+                        elif column == "St dist":
+                            # Remove " Ls" suffix and handle "?" values
+                            if value == "?":
+                                return float('inf')  # Put unknown distances at the end
+                            return float(value.replace(" Ls", "").replace(",", ""))
+                        elif column == "Price":
+                            # Remove " CR" suffix and commas
+                            return float(value.replace(" CR", "").replace(",", ""))
+                        elif column == "Demand":
+                            # Remove commas
+                            return float(value.replace(",", "")) if value != "0" else 0
+                        elif column == "Updated":
+                            # Convert time format to comparable number
+                            if "h" in value:
+                                return float(value.replace("h", ""))
+                            elif "d" in value:
+                                return float(value.replace("d", "")) * 24  # Convert days to hours
+                            else:
+                                return float('inf')  # Unknown times go to end
+                        else:
+                            return float(value.replace(",", "")) if value.replace(",", "").replace(".", "").isdigit() else 0
+                    except:
+                        return 0 if not self.marketplace_sort_reverse else float('inf')
+            else:
+                def sort_key(item):
+                    # String sorting
+                    return item[0][col_index].lower()
+            
+            # Sort items
+            items.sort(key=sort_key, reverse=self.marketplace_sort_reverse)
+            
+            # Clear tree and re-insert sorted items
+            for values, item in items:
+                self.marketplace_tree.move(item, '', 'end')
+            
+            # Update column headers to show sort direction
+            for col in columns:
+                if col == column:
+                    arrow = " ↓" if self.marketplace_sort_reverse else " ↑"
+                    self.marketplace_tree.heading(col, text=col + arrow)
+                else:
+                    self.marketplace_tree.heading(col, text=col)
+                    
+        except Exception as e:
+            print(f"Error sorting marketplace column: {e}")
+            self.marketplace_total_label.config(text=f"❌ Sort error: {str(e)}")
+    
+    def _has_large_pads(self, station_type):
+        """Check if station has large landing pads"""
+        large_pad_stations = [
+            "Coriolis Starport", "Orbis Starport", "Ocellus Starport",
+            "Asteroid Base", "Planetary Outpost", "Planetary Port"
+        ]
+        return any(pad_type in station_type for pad_type in large_pad_stations)
+    
+    def _has_medium_pads(self, station_type):
+        """Check if station has medium landing pads (most stations)"""
+        return not self._has_large_pads(station_type) and "Fleet Carrier" not in station_type
+    
+    def _has_small_pads(self, station_type):
+        """Check if station has small landing pads (outposts)"""
+        small_pad_stations = ["Outpost", "Planetary Outpost"]
+        return any(pad_type in station_type for pad_type in small_pad_stations)
+    
+    def _is_surface_station(self, station_type):
+        """Check if station is on planetary surface"""
+        surface_stations = ["Planetary Outpost", "Planetary Port", "Odyssey Settlement"]
+        return any(surface_type in station_type for surface_type in surface_stations)
+    
+    def _is_space_station(self, station_type):
+        """Check if station is in space"""
+        space_stations = [
+            "Coriolis Starport", "Orbis Starport", "Ocellus Starport",
+            "Asteroid Base", "Outpost"
+        ]
+        return any(space_type in station_type for space_type in space_stations)
 
     def _check_for_updates_startup(self):
         """Check for updates on startup (automatic check)"""
