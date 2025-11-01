@@ -1,0 +1,34 @@
+EliteMining - Elite Dangerous Mining Assistant
+Copyright (C) 2024-2025 Viper-Dude
+
+This program is licensed under the GNU General Public License v3.0.
+See LICENSE file for full license text.
+
+================================================================================
+
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+This project incorporates components from the following third-party projects:
+
+1. ELITEVA
+   Copyright (c) 2023 Somfic
+   Licensed under MIT License
+   https://docs.somfic.dev/projects/eliteva
+
+2. Python and associated libraries
+   Various licenses (see individual package licenses)
+
+================================================================================
+
+COMMUNITY DATA SOURCES
+
+EliteMining uses data from:
+- EDSM (Elite Dangerous Star Map) - https://www.edsm.net/
+- EDDN (Elite Dangerous Data Network) - https://github.com/EDCD/EDDN
+- edtools.cc - https://edtools.cc/
+
+================================================================================
+
+For questions about licensing, please contact:
+GitHub: https://github.com/Viper-Dude/EliteMining
+Discord: https://discord.gg/5dsF3UshRR

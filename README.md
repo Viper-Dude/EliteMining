@@ -2,6 +2,7 @@
 
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
 
 **EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 32,000+ mining locations as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
@@ -404,11 +405,17 @@ Join our Discord server for real-time help, mining tips, and community discussio
 
 ## License & Third-Party Notices  
 
-**EliteMining** © 2025 CMDR ViperDude.  
-Distributed under the [MIT License](LICENSE.md).  
+**EliteMining** © 2024-2025 CMDR ViperDude (Viper-Dude).  
+Licensed under the [GNU General Public License v3.0](LICENSE).  
 
-This project bundles:  
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+**Third-Party Components:**  
 - **ELITEVA** © 2023 Somfic – MIT License  
+
+For complete license terms, see the [LICENSE](LICENSE) file in the repository.  
 
 [Back to Top](#top)
 
