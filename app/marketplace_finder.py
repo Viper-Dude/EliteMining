@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Commodity Marketplace Finder for EliteMining
-Finds best selling prices for commodities using EDSM API
 """
 
 import requests

@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.4.1
+AppVersion=v4.4.2
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -22,6 +22,8 @@ UninstallDisplayIcon={app}\Configurator\EliteMining.exe
 [InstallDelete]
 ; Delete old Configurator.exe before installing new EliteMining.exe (v4.3.2+ rename)
 Type: files; Name: "{app}\Configurator\Configurator.exe"
+; Delete old MIT LICENSE.txt (replaced with GPLv3 LICENSE in v4.4.1+)
+Type: files; Name: "{app}\LICENSE.txt"
 
 [Files]
 ; Only include specific file types from needed subfolders (exclude .py files)
@@ -57,7 +59,8 @@ Source: "EliteMining-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninstall 
 Source: "app\config.json.template"; DestDir: "{app}"; DestName: "config.json"; Flags: onlyifdoesntexist
 Source: "app\mining_bookmarks.json"; DestDir: "{app}\app"; Flags: onlyifdoesntexist skipifsourcedoesntexist
 Source: "app\EliteVA\*"; DestDir: "{app}\..\EliteVA"; Flags: recursesubdirs createallsubdirs; Check: IsVADetected
-Source: "LICENSE.txt"; DestDir: "{app}"
+Source: "LICENSE"; DestDir: "{app}"
+Source: "NOTICE"; DestDir: "{app}"
 
 [Tasks]
 ; Offer optional desktop icon

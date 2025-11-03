@@ -4384,6 +4384,166 @@ class ProspectorPanel(ttk.Frame):
                     
             except ValueError:
                 continue
+    
+    def _show_prospector_overlay_or_standard(self, standard_msg: str, panel_summary: str, materials_txt: str, content_txt: str):
+        """
+        Show overlay based on mode setting.
+        
+        STANDARD MODE: Shows simple text only when TTS triggers
+        ENHANCED MODE: Shows game-style format every prospector fire
+        
+        Args:
+            standard_msg: TTS message (may be empty if nothing triggered)
+            panel_summary: Filtered materials (above threshold only)
+            materials_txt: ALL materials (unfiltered)
+            content_txt: Content and remaining text
+        """
+        from config import _load_cfg
+        cfg = _load_cfg()
+        overlay_mode = cfg.get("overlay_mode", "standard")
+        show_all = cfg.get("prospector_show_all", False)
+        
+        if overlay_mode == "enhanced":
+            # ENHANCED MODE: Always show overlay with game-style format
+            # Pass materials and content separately to formatter
+            if show_all:
+                # Show ALL materials (unfiltered)
+                enhanced_msg = self._format_enhanced_overlay_ex(materials_txt, content_txt)
+            else:
+                # Show only materials above threshold (filtered) - use panel_summary
+                enhanced_msg = self._format_enhanced_overlay(panel_summary)
+            
+            self.text_overlay.show_message(enhanced_msg)
+        else:
+            # STANDARD MODE: Only show when TTS triggered
+            if standard_msg:
+                self.text_overlay.show_message(standard_msg)
+    
+    def _format_enhanced_overlay(self, panel_summary: str) -> str:
+        """
+        Format panel_summary text in Elite Dangerous game style.
+        Input: "Low — Bertrandite 16.2%, Indite 13.7% — Remaining 100.00%"
+        Output format matching game:
+        LIMPET (PROSPECTOR)
+        
+        MINERALS REMAINING: 100%
+        METHANOL MONOHYDRATE CRYSTALS 18%
+        METHANE CLATHRATE 10.2%
+        LIQUID OXYGEN 1.8%
+        
+        MATERIAL CONTENT: LOW
+        """
+        import re
+        
+        log.debug(f"[Enhanced Overlay] Input: {panel_summary}")
+        
+        lines = ["LIMPET (PROSPECTOR)"]
+        
+        # Parse panel_summary by splitting on " — "
+        parts = [p.strip() for p in panel_summary.split(" — ")]
+        log.debug(f"[Enhanced Overlay] Parts: {parts}")
+        
+        content = ""
+        materials_text = ""
+        remaining = "100%"
+        
+        # Identify parts
+        for part in parts:
+            if "Remaining" in part:
+                remaining = part.replace("Remaining ", "").strip()
+            elif part.lower() in ["low", "medium", "high"]:  # Exact match only, not substring
+                content = part
+            else:
+                materials_text = part
+        
+        print(f"[Enhanced Overlay] Materials text: {materials_text}")
+        print(f"[Enhanced Overlay] Content: {content}")
+        print(f"[Enhanced Overlay] Remaining: {remaining}")
+        
+        # Add remaining first
+        if "Depleted" in remaining:
+            lines.append("MINERALS REMAINING: DEPLETED")
+        else:
+            lines.append(f"MINERALS REMAINING: {remaining}")
+        
+        # Parse materials: "Bertrandite 16.2%, Indite 13.7%"
+        # Materials are separated by ", " (comma space)
+        # Split by ", " then parse each material entry
+        if materials_text and "No materials" not in materials_text:
+            # Split by comma to get individual materials
+            material_entries = materials_text.split(", ")
+            log.debug(f"[Enhanced Overlay] Material entries: {material_entries}")
+            
+            for entry in material_entries:
+                # Each entry is like "Bertrandite 16.2%" or "Methanol Monohydrate Crystals 18%"
+                # Split from the right to get the percentage
+                match = re.match(r'^(.+?)\s+(\d+(?:\.\d+)?)%$', entry.strip())
+                if match:
+                    material_name = match.group(1)
+                    percentage = match.group(2)
+                    lines.append(f"{material_name.upper()} {percentage}%")
+                    log.debug(f"[Enhanced Overlay] Added: {material_name.upper()} {percentage}%")
+        
+        # Add content at the end
+        if content:
+            lines.append(f"MATERIAL CONTENT: {content.upper()}")
+        
+        result = "\n".join(lines)
+        print(f"[Enhanced Overlay] Output lines count: {len(lines)}")
+        print(f"[Enhanced Overlay] Output repr: {repr(result)}")
+        return result
+    
+    def _format_enhanced_overlay_ex(self, materials_txt: str, content_txt: str) -> str:
+        """
+        Format materials and content separately for enhanced overlay (show_all mode).
+        
+        Args:
+            materials_txt: "Water 5.8%, Liquid Oxygen 7.1%, Lithium Hydroxide 4.9%"
+            content_txt: "Low — Remaining 100.00%"
+        """
+        import re
+        
+        log.debug(f"[Enhanced Overlay EX] Materials: {materials_txt}")
+        log.debug(f"[Enhanced Overlay EX] Content: {content_txt}")
+        
+        lines = ["LIMPET (PROSPECTOR)"]
+        
+        # Parse content_txt to extract content and remaining
+        content = ""
+        remaining = "100%"
+        
+        if content_txt:
+            parts = [p.strip() for p in content_txt.split(" — ")]
+            for part in parts:
+                if "Remaining" in part:
+                    remaining = part.replace("Remaining ", "").strip()
+                elif part.lower() in ["low", "medium", "high"]:  # Exact match only, not substring
+                    content = part
+        
+        # Add remaining first
+        if "Depleted" in remaining:
+            lines.append("MINERALS REMAINING: DEPLETED")
+        else:
+            lines.append(f"MINERALS REMAINING: {remaining}")
+        
+        # Parse materials
+        if materials_txt and "No materials" not in materials_txt:
+            material_entries = materials_txt.split(", ")
+            
+            for entry in material_entries:
+                match = re.match(r'^(.+?)\s+(\d+(?:\.\d+)?)%$', entry.strip())
+                if match:
+                    material_name = match.group(1)
+                    percentage = match.group(2)
+                    lines.append(f"{material_name.upper()} {percentage}%")
+        
+        # Add content at the end
+        if content:
+            lines.append(f"MATERIAL CONTENT: {content.upper()}")
+        
+        result = "\n".join(lines)
+        log.debug(f"[Enhanced Overlay EX] Output:\n{result}")
+        return result
 
     def _calculate_yield_from_prospector_reports(self) -> Dict[str, float]:
         """
@@ -6948,34 +7108,38 @@ class ProspectorPanel(ttk.Frame):
                             
 
                 
-                # Combine and announce
+                # ALWAYS show overlay (even if below threshold)
+                # The overlay shows the full panel_summary data regardless of announcement settings
+                if self.text_overlay:
+                    # Determine what message to use for TTS (may be empty if nothing triggered)
+                    if core_msg and noncore_msg:
+                        tts_msg = f"Prospector Reports: {core_msg} and {noncore_msg}"
+                    elif core_msg:
+                        tts_msg = f"Prospector Reports: {core_msg}"
+                    elif noncore_msg:
+                        tts_msg = f"Prospector Reports: {noncore_msg}"
+                    else:
+                        tts_msg = ""  # No TTS, but still show overlay
+                    
+                    # Show overlay with both filtered and unfiltered data
+                    self._show_prospector_overlay_or_standard(tts_msg, panel_summary, materials_txt, content_txt)
+                
+                # TTS announcement (only if triggered)
                 if core_msg and noncore_msg:
                     # Both core and non-core - combine with "and"
                     msg = f"Prospector Reports: {core_msg} and {noncore_msg}"
-                    # Remove VA_TTS_ANNOUNCEMENT - this might trigger VoiceAttack TTS
-                    # self._write_var_text(VA_TTS_ANNOUNCEMENT, msg)
-                    if self.text_overlay:
-                        self.text_overlay.show_message(msg)
                     announcer.say(msg)
                     announcement_made = True
                     self._set_status("Combined core and non-core announcement triggered.")
                 elif core_msg:
                     # Only core
                     msg = f"Prospector Reports: {core_msg}"
-                    # Remove VA_TTS_ANNOUNCEMENT - this might trigger VoiceAttack TTS
-                    # self._write_var_text(VA_TTS_ANNOUNCEMENT, msg)
-                    if self.text_overlay:
-                        self.text_overlay.show_message(msg)
                     announcer.say(msg)
                     announcement_made = True
                     self._set_status("Core announcement triggered.")
                 elif noncore_msg:
                     # Only non-core
                     msg = f"Prospector Reports: {noncore_msg}"
-                    # Remove VA_TTS_ANNOUNCEMENT - this might trigger VoiceAttack TTS
-                    # self._write_var_text(VA_TTS_ANNOUNCEMENT, msg)
-                    if self.text_overlay:
-                        self.text_overlay.show_message(msg)
                     announcer.say(msg)
                     announcement_made = True
                     self._set_status("Non-core announcement triggered.")

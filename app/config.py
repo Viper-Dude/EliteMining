@@ -88,8 +88,6 @@ def _save_cfg(cfg: Dict[str, Any]) -> None:
             log.error(f"Config file was not created: {CONFIG_FILE}")
         elif os.path.getsize(CONFIG_FILE) == 0:
             log.error(f"Config file is empty: {CONFIG_FILE}")
-        else:
-            log.error(f"Config file does not exist after save!")
             
     except Exception as e:
         log.exception("Failed saving config: %s", e)

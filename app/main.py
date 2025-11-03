@@ -215,14 +215,14 @@ class TextOverlay:
             text="",
             bg="#000001",  # Same as transparent color - will be invisible
             fg=self.text_color,  # Use current color (will be updated with brightness)
-            font=("Arial", self.font_size, "normal"),  # Changed to Arial for thinner appearance
-            wraplength=580,  # Increased from 380 to reduce text wrapping
+            font=("Segoe UI", 11, "normal"),  # Fixed smaller size
+            wraplength=0,  # Disable wrapping - let newlines control line breaks
             justify="left",
-            relief="flat",  # No border
-            bd=0,  # No border width
-            highlightthickness=0  # No highlight
+            relief="flat",
+            bd=0,
+            highlightthickness=0
         )
-        self.text_label.pack(fill="both", expand=True, padx=10, pady=10)
+        self.text_label.pack(anchor="nw", padx=10, pady=5)
         
         # Hide initially
         self.overlay_window.withdraw()
@@ -249,8 +249,13 @@ class TextOverlay:
         if not self.overlay_window:
             self.create_overlay()
             
-        # Update text and show window
+        # Update text
         self.text_label.config(text=message)
+        
+        # CRITICAL: Reposition window every time before showing (Windows can reset position)
+        self._set_window_position()
+        
+        # Show window
         self.overlay_window.deiconify()
         
         # Cancel any existing timer
@@ -343,9 +348,9 @@ class TextOverlay:
         self.font_size = size
         if self.overlay_window and hasattr(self, 'text_label'):
             try:
-                # Always use normal weight with Arial font for thinner appearance
-                family = "Arial"  # Changed from Segoe UI to Arial
-                style = "normal"  # Force normal weight
+                # Use Segoe UI (original font) with normal weight
+                family = "Segoe UI"
+                style = "normal"
                 self.text_label.configure(font=(family, size, style))
             except Exception as e:
                 print(f"Error setting font size: {e}")
@@ -358,24 +363,142 @@ class TextOverlay:
     
     def _set_window_position(self):
         """Set window position based on current position setting"""
+        if not self.overlay_window:
+            return
+            
         screen_width = self.overlay_window.winfo_screenwidth()
-        screen_height = self.overlay_window.winfo_screenheight()
-        
-        window_width = 600
-        window_height = 120
+        window_width = 750  # Wider for long material names like "Low Temperature Diamonds"
+        window_height = 300  # Larger for enhanced overlay with different font sizes
         
         if self.position == "upper_left":
-            # Position in upper-left corner with some margin
-            x_pos = 50
+            # Upper left: absolute position
+            x_pos = 20
+            y_pos = 100
         else:  # upper_right (default)
-            # Position in upper-right corner with margin
-            x_pos = screen_width - window_width - 50
-        
-        # Ensure window stays on screen
-        x_pos = max(0, min(x_pos, screen_width - window_width))
-        y_pos = max(0, min(50, screen_height - window_height))
+            # Upper right with margin
+            x_pos = screen_width - window_width - 20
+            y_pos = 100
         
         self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
+    
+    def show_prospector_overlay(self, evt_data: dict, show_all: bool = False, threshold: float = 0.0, 
+                               announce_map: dict = None, min_pct_map: dict = None):
+        """
+        Display enhanced prospector overlay in game style format.
+        
+        Args:
+            evt_data: Prospector event data from journal
+            show_all: If True, show all materials; if False, filter by threshold
+            threshold: Default threshold percentage
+            announce_map: Dictionary of material names -> enabled status
+            min_pct_map: Dictionary of material names -> custom thresholds
+        """
+        print(f"[ENHANCED OVERLAY] Called with show_all={show_all}, threshold={threshold}")
+        
+        if not self.overlay_enabled:
+            print("[ENHANCED OVERLAY] Overlay not enabled, returning")
+            return
+            
+        if not self.overlay_window:
+            self.create_overlay()
+        
+        # Extract data from event
+        materials = evt_data.get("Materials", [])
+        motherlode = evt_data.get("MotherlodeMaterial_Localised") or evt_data.get("MotherlodeMaterial")
+        content = evt_data.get("Content_Localised") or evt_data.get("Content", "")
+        remaining = evt_data.get("Remaining")
+        
+        print(f"[ENHANCED OVERLAY] Materials count: {len(materials)}, Motherlode: {motherlode}")
+        
+        # Clean up content string (remove "Material Content: " prefix if present)
+        if content and content.lower().startswith("material content"):
+            content = content[len("Material Content:"):].strip()
+        
+        # Format header line with distance if available
+        # TODO: Add distance from prospector data when available in journal
+        header = "LIMPET (PROSPECTOR)"
+        
+        # Build the message lines
+        lines = [header, ""]  # Empty line after header
+        
+        # Add motherlode if present (always in cyan)
+        if motherlode:
+            motherlode_clean = self._clean_material_name(motherlode)
+            lines.append(f"MOTHERLODE DETECTED: {motherlode_clean.upper()}")
+            lines.append("")  # Empty line after motherlode
+        
+        # Add remaining percentage
+        if remaining is not None:
+            if remaining <= 0.0:
+                lines.append("MINERALS REMAINING: DEPLETED")
+            elif remaining >= 100.0:
+                lines.append("MINERALS REMAINING: 100.00%")
+            else:
+                lines.append(f"MINERALS REMAINING: {remaining:.2f}%")
+        else:
+            lines.append("MINERALS REMAINING: 100.00%")
+        
+        # Process materials
+        material_lines = []
+        for m in materials:
+            # Extract material name and percentage
+            name = m.get("Name_Localised") or m.get("Name", "")
+            name = self._clean_material_name(name)
+            pct = m.get("Proportion")
+            
+            if not name or pct is None:
+                continue
+            
+            # Convert proportion to percentage
+            pct_value = pct * 100.0
+            
+            # Check if we should display this material
+            if not show_all:
+                # Filter by threshold
+                eff_threshold = min_pct_map.get(name, threshold) if min_pct_map else threshold
+                is_enabled = announce_map.get(name, False) if announce_map else True
+                
+                # Also try title case for material name lookup
+                if not is_enabled and name != name.title():
+                    is_enabled = announce_map.get(name.title(), False) if announce_map else False
+                
+                # Skip if below threshold or not enabled
+                if not is_enabled or pct_value < eff_threshold:
+                    continue
+            
+            # Format material line
+            material_lines.append(f"{name.upper()} {pct_value:.2f}%")
+        
+        # Add material lines
+        lines.extend(material_lines)
+        
+        # Add content line if present
+        if content:
+            lines.append("")  # Empty line before content
+            lines.append(f"MATERIAL CONTENT: {content.upper()}")
+        
+        # Join all lines
+        message = "\n".join(lines)
+        
+        print(f"[ENHANCED OVERLAY] Displaying {len(lines)} lines")
+        print(f"[ENHANCED OVERLAY] Message:\n{message}")
+        
+        # Show the overlay
+        self.show_message(message)
+    
+    def _clean_material_name(self, name: str) -> str:
+        """Clean up material name (remove $, underscores, etc.)"""
+        if not name:
+            return ""
+        # Remove common prefixes
+        if name.startswith("$"):
+            name = name[1:]
+        if name.endswith("_name;"):
+            name = name[:-6]
+        # Replace underscores with spaces
+        name = name.replace("_", " ")
+        # Title case
+        return name.title()
             
     def destroy(self):
         """Clean up the overlay"""
@@ -386,7 +509,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.4.1"
+APP_VERSION = "v4.4.2"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4175,6 +4298,8 @@ class App(tk.Tk):
         self.text_overlay_transparency = tk.IntVar(value=90)  # Default 90% (0.9 alpha)
         self.text_overlay_color = tk.StringVar(value="White")  # Default white
         self.text_overlay_duration = tk.IntVar(value=7)  # Default 7 seconds (range: 5-30)
+        self.overlay_mode = tk.StringVar(value="standard")  # "standard" or "enhanced" prospector overlay
+        self.prospector_show_all = tk.IntVar(value=0)  # 0=threshold only, 1=all materials
         
         # EDDN sending enable/disable
         self.eddn_send_enabled = tk.IntVar(value=1)  # Default enabled to contribute to community
@@ -4201,8 +4326,8 @@ class App(tk.Tk):
         # Text size options for overlay
         self.text_overlay_size = tk.StringVar(value="Normal")  # Default normal size
         self.size_options = {
-            "Small": 14,      # Small text (increased from 12)
-            "Normal": 16,     # Normal text (increased from 14)
+            "Small": 12,      # Small text
+            "Normal": 16,     # Normal text
             "Large": 20       # Large text (increased from 18)
         }
         
@@ -4229,6 +4354,8 @@ class App(tk.Tk):
         self.text_overlay_position.trace('w', self._on_position_change)
         self.text_overlay_size.trace('w', self._on_size_change)
         self.text_overlay_duration.trace('w', self._on_duration_change)
+        self.overlay_mode.trace('w', self._on_overlay_mode_change)
+        self.prospector_show_all.trace('w', self._on_show_all_change)
         
         # Cargo monitor traces
         self.cargo_enabled.trace('w', self._on_cargo_toggle)
@@ -4244,7 +4371,7 @@ class App(tk.Tk):
         update_dir = get_app_data_dir()
         self.update_checker = UpdateChecker(get_version(), UPDATE_CHECK_URL, update_dir)
         
-        # Marketplace finder removed - using external sites (Inara, edtools.cc) instead
+        # Marketplace finder removed - using external sites ( edtools.cc) instead
         # No local database needed - simpler and more reliable
         
         # Initialize EDDN sender for sharing data back to community
@@ -5671,8 +5798,41 @@ class App(tk.Tk):
         self.position_combo.pack(side="left", padx=(8, 0))
         r += 1
         tk.Label(scrollable_frame, text="Choose overlay position on screen", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
+        
+        # Overlay mode selection (Standard vs Enhanced Prospector)
+        mode_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        mode_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
+        tk.Label(mode_frame, text="Overlay Mode:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        
+        # Radio buttons for mode selection
+        tk.Radiobutton(mode_frame, text="Standard Text", value="standard", variable=self.overlay_mode,
+                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                      padx=4, pady=2, anchor="w").pack(side="left", padx=(8, 0))
+        tk.Radiobutton(mode_frame, text="Enhanced Prospector", value="enhanced", variable=self.overlay_mode,
+                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                      padx=4, pady=2, anchor="w").pack(side="left", padx=(8, 0))
+        r += 1
+        tk.Label(scrollable_frame, text="Standard: Simple text (only when announced) | Enhanced: Game-style display (every prospector fire)",
+                 wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+        r += 1
+        
+        # Show all materials checkbox (for enhanced mode) - HIDDEN but functionality preserved
+        # tk.Checkbutton(scrollable_frame, text="Enhanced Mode: Show All Materials (uncheck to only show materials above threshold)",
+        #               variable=self.prospector_show_all,
+        #               bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+        #               activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
+        #               padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
+        #               highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+        # r += 1
+        # tk.Label(scrollable_frame, text="Only affects Enhanced mode - controls whether to display all materials or filter by threshold",
+        #          wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        #          font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        # r += 1
         
         # ========== TEXT-TO-SPEECH AUDIO SECTION ==========
         ttk.Label(scrollable_frame, text="Text-to-Speech Audio", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
@@ -7270,6 +7430,8 @@ class App(tk.Tk):
         position = cfg.get("text_overlay_position", "Upper Right")  # Default to upper right
         size = cfg.get("text_overlay_size", "Normal")  # Default to normal size
         duration = cfg.get("text_overlay_duration", 7)  # Default to 7 seconds
+        overlay_mode = cfg.get("overlay_mode", "standard")  # Default to standard mode
+        show_all = cfg.get("prospector_show_all", False)  # Default to threshold only
         
         self.text_overlay_enabled.set(1 if enabled else 0)
         self.text_overlay_transparency.set(transparency)
@@ -7277,6 +7439,8 @@ class App(tk.Tk):
         self.text_overlay_position.set(position)
         self.text_overlay_size.set(size)
         self.text_overlay_duration.set(duration)
+        self.overlay_mode.set(overlay_mode)
+        self.prospector_show_all.set(1 if show_all else 0)
         
         self.text_overlay.set_enabled(enabled)
         self.text_overlay.set_transparency(transparency)
@@ -7301,7 +7465,9 @@ class App(tk.Tk):
             "text_overlay_color": str(self.text_overlay_color.get()),
             "text_overlay_position": str(self.text_overlay_position.get()),
             "text_overlay_size": str(self.text_overlay_size.get()),
-            "text_overlay_duration": int(self.text_overlay_duration.get())
+            "text_overlay_duration": int(self.text_overlay_duration.get()),
+            "overlay_mode": str(self.overlay_mode.get()),
+            "prospector_show_all": bool(self.prospector_show_all.get())
         }
         update_config_values(updates)
 
@@ -7366,6 +7532,26 @@ class App(tk.Tk):
         # Show a preview message if overlay is enabled to test duration
         if self.text_overlay.overlay_enabled:
             self.text_overlay.show_message(f"Display Duration: {duration} seconds - This message will stay for {duration} seconds!")
+
+    def _on_overlay_mode_change(self, *args) -> None:
+        """Called when overlay mode (standard/enhanced) is changed"""
+        mode = self.overlay_mode.get()
+        self._save_text_overlay_preference()
+        
+        # Show a preview message if overlay is enabled
+        if self.text_overlay.overlay_enabled:
+            mode_name = "Enhanced Prospector" if mode == "enhanced" else "Standard Text"
+            self.text_overlay.show_message(f"Overlay Mode: {mode_name}")
+
+    def _on_show_all_change(self, *args) -> None:
+        """Called when show all materials checkbox is changed"""
+        show_all = bool(self.prospector_show_all.get())
+        self._save_text_overlay_preference()
+        
+        # Show a preview message if overlay is enabled
+        if self.text_overlay.overlay_enabled:
+            filter_mode = "All Materials" if show_all else "Threshold Only"
+            self.text_overlay.show_message(f"Prospector Filter: {filter_mode}")
 
     def _update_color_menu_display(self):
         """Update the color menu button to show the selected color"""
@@ -8502,7 +8688,7 @@ class App(tk.Tk):
         commodity_combo.bind("<Return>", lambda e: self._open_edtools_market())
         
         # Row 2: Search button
-        edtools_btn = tk.Button(search_frame, text="🔍 Find on edtools.cc", 
+        edtools_btn = tk.Button(search_frame, text="🔍 Search EDTools.cc", 
                                command=self._open_edtools_market,
                                bg="#2a4a2a", fg="#e0e0e0", 
                                activebackground="#3a5a3a", activeforeground="#ffffff",
@@ -8511,7 +8697,7 @@ class App(tk.Tk):
         edtools_btn.grid(row=1, column=0, columnspan=5, pady=(15, 5))
         
         # Info text
-        info_text = "🌐 Find commodity buyers on edtools.cc"
+        info_text = "🌐 Find the best commodity prices on edtools.cc"
         info_label = ttk.Label(search_frame, text=info_text, foreground="gray", font=("TkDefaultFont", 8))
         info_label.grid(row=2, column=0, columnspan=5, pady=(5, 0))
         
