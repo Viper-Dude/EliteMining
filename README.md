@@ -278,6 +278,18 @@ Right-click any mining session to generate a detailed report, add screenshots, o
 
 Share completed mining session summaries to Discord channels via webhook integration. Configure your Discord webhook URL in settings, then manually share individual session reports with custom comments. Reports include materials found, yields, performance metrics, and session duration. 
 
+#### 📊 Mining Cards
+Generate shareable PNG cards from your mining sessions.
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_cards.png" width="300"><br>
+
+**Features:**
+- Session stats, performance metrics, and commodity breakdown
+- Add your CMDR name and optional notes
+- Right-click any session in Reports → "Mining Card"
+
+Cards saved to: `app/Reports/Mining Session/Cards/`
+
 <details>
 <summary>📸 View HTML Report Screenshots</summary>
 
