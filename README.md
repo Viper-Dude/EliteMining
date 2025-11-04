@@ -167,7 +167,7 @@ The Commodity Market helps you find the best sell prices for your mined commodit
 
 Perfect for planning your mining runs and finding the most profitable stations to sell your haul.
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commodity_market.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commidity_marked.png" width="600"><br>  
 *Commodity Market showing search results with filters and distance calculations.*
 
 [Back to Top](#top)
