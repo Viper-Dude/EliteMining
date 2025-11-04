@@ -2684,22 +2684,39 @@ class ProspectorPanel(ttk.Frame):
                             
                             if os.path.exists(cards_dir):
                                 try:
-                                    timestamp = session['timestamp_raw'].replace('Z', '').replace('T', '_').replace(':', '-')
+                                    # Extract timestamp from report filename (same as card generation logic)
+                                    # Report filename format: Session_YYYY-MM-DD_HH-MM-SS_System_Body.txt
+                                    report_files = [f for f in os.listdir(get_reports_dir()) if f.endswith('.txt')]
+                                    timestamp = None
                                     
-                                    # Build card filename prefix (same logic as card generation)
-                                    clean_system = session['system'].replace(' ', '_')
-                                    clean_body = session['body'].replace(' ', '_')
-                                    card_prefix = f"Session_{timestamp}_{clean_system}_{clean_body}_Card"
+                                    # Find the matching report file to get timestamp
+                                    for report_file in report_files:
+                                        if (session['system'].replace(' ', '_') in report_file and 
+                                            session['body'].replace(' ', '_') in report_file):
+                                            # Extract timestamp from filename
+                                            if report_file.startswith('Session_') and '_' in report_file:
+                                                parts = report_file.replace('.txt', '').split('_')
+                                                if len(parts) >= 3:
+                                                    timestamp = f"{parts[1]}_{parts[2]}"
+                                                    break
                                     
-                                    # Find and delete matching card file
-                                    for card_file in os.listdir(cards_dir):
-                                        if card_file.startswith(card_prefix) and card_file.endswith('.png'):
-                                            card_path = os.path.join(cards_dir, card_file)
-                                            os.remove(card_path)
-                                            print(f"[DELETE] Removed mining card: {card_file}")
-                                            break
+                                    if timestamp:
+                                        # Build card filename prefix (same logic as card generation)
+                                        clean_system = session['system'].replace(' ', '_')
+                                        clean_body = session['body'].replace(' ', '_')
+                                        card_prefix = f"Session_{timestamp}_{clean_system}_{clean_body}_Card"
+                                        
+                                        # Find and delete matching card file
+                                        for card_file in os.listdir(cards_dir):
+                                            if card_file.startswith(card_prefix) and card_file.endswith('.png'):
+                                                card_path = os.path.join(cards_dir, card_file)
+                                                os.remove(card_path)
+                                                print(f"[DELETE] Removed mining card: {card_file}")
+                                                break
                                 except Exception as e:
                                     print(f"[DELETE] Error deleting mining card: {e}")
+                                    import traceback
+                                    traceback.print_exc()
                         except Exception as e:
                             print(f"[DELETE] Error in card deletion: {e}")
                         
