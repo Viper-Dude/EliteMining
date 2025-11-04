@@ -2550,7 +2550,11 @@ class ProspectorPanel(ttk.Frame):
                               f"• Tons Mined: {session['tons']}\n\n"
                               f"This will permanently delete:\n"
                               f"• The CSV report entry\n"
-                              f"• The individual report file\n\n"
+                              f"• The individual report file\n"
+                              f"• Graph files (if any)\n"
+                              f"• Detailed HTML report (if any)\n"
+                              f"• Mining card PNG (if any)\n"
+                              f"• Screenshots (if any)\n\n"
                               f"This action cannot be undone.")
                 title = "Delete Mining Session Report"
             else:
@@ -2562,7 +2566,8 @@ class ProspectorPanel(ttk.Frame):
                     confirm_msg += f"  ... and {len(sessions_to_delete) - 5} more\n"
                 confirm_msg += f"\nThis will permanently delete:\n"
                 confirm_msg += f"• All CSV report entries\n"
-                confirm_msg += f"• All individual report files\n\n"
+                confirm_msg += f"• All individual report files\n"
+                confirm_msg += f"• All associated graphs, HTML reports, mining cards, and screenshots\n\n"
                 confirm_msg += f"This action cannot be undone."
                 title = "Delete Multiple Mining Session Reports"
             
@@ -2672,6 +2677,31 @@ class ProspectorPanel(ttk.Frame):
                                 print(f"DEBUG: Graphs directory does not exist: {graphs_dir}")
                         except Exception as e:
                             print(f"DEBUG: Error in graph deletion: {e}")
+                        
+                        # Delete corresponding mining card (v4.4.3+)
+                        try:
+                            cards_dir = os.path.join(get_reports_dir(), "Cards")
+                            
+                            if os.path.exists(cards_dir):
+                                try:
+                                    timestamp = session['timestamp_raw'].replace('Z', '').replace('T', '_').replace(':', '-')
+                                    
+                                    # Build card filename prefix (same logic as card generation)
+                                    clean_system = session['system'].replace(' ', '_')
+                                    clean_body = session['body'].replace(' ', '_')
+                                    card_prefix = f"Session_{timestamp}_{clean_system}_{clean_body}_Card"
+                                    
+                                    # Find and delete matching card file
+                                    for card_file in os.listdir(cards_dir):
+                                        if card_file.startswith(card_prefix) and card_file.endswith('.png'):
+                                            card_path = os.path.join(cards_dir, card_file)
+                                            os.remove(card_path)
+                                            print(f"[DELETE] Removed mining card: {card_file}")
+                                            break
+                                except Exception as e:
+                                    print(f"[DELETE] Error deleting mining card: {e}")
+                        except Exception as e:
+                            print(f"[DELETE] Error in card deletion: {e}")
                         
                         success_count += 1
                         
