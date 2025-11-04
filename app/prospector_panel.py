@@ -2684,35 +2684,20 @@ class ProspectorPanel(ttk.Frame):
                             
                             if os.path.exists(cards_dir):
                                 try:
-                                    # Extract timestamp from report filename (same as card generation logic)
-                                    # Report filename format: Session_YYYY-MM-DD_HH-MM-SS_System_Body.txt
-                                    report_files = [f for f in os.listdir(get_reports_dir()) if f.endswith('.txt')]
-                                    timestamp = None
+                                    # Build expected card filename from session timestamp
+                                    from datetime import datetime
+                                    timestamp_raw = session['timestamp_raw']
+                                    dt = datetime.fromisoformat(timestamp_raw.replace('Z', ''))
+                                    timestamp_str = dt.strftime("%Y-%m-%d_%H-%M-%S")
                                     
-                                    # Find the matching report file to get timestamp
-                                    for report_file in report_files:
-                                        if (session['system'].replace(' ', '_') in report_file and 
-                                            session['body'].replace(' ', '_') in report_file):
-                                            # Extract timestamp from filename
-                                            if report_file.startswith('Session_') and '_' in report_file:
-                                                parts = report_file.replace('.txt', '').split('_')
-                                                if len(parts) >= 3:
-                                                    timestamp = f"{parts[1]}_{parts[2]}"
-                                                    break
+                                    clean_system = session['system'].replace(' ', '_')
+                                    clean_body = session['body'].replace(' ', '_')
                                     
-                                    if timestamp:
-                                        # Build card filename prefix (same logic as card generation)
-                                        clean_system = session['system'].replace(' ', '_')
-                                        clean_body = session['body'].replace(' ', '_')
-                                        card_prefix = f"Session_{timestamp}_{clean_system}_{clean_body}_Card"
-                                        
-                                        # Find and delete matching card file
-                                        for card_file in os.listdir(cards_dir):
-                                            if card_file.startswith(card_prefix) and card_file.endswith('.png'):
-                                                card_path = os.path.join(cards_dir, card_file)
-                                                os.remove(card_path)
-                                                print(f"[DELETE] Removed mining card: {card_file}")
-                                                break
+                                    expected_card = f"Session_{timestamp_str}_{clean_system}_{clean_body}_Card.png"
+                                    card_path = os.path.join(cards_dir, expected_card)
+                                    
+                                    if os.path.exists(card_path):
+                                        os.remove(card_path)
                                 except Exception as e:
                                     print(f"[DELETE] Error deleting mining card: {e}")
                                     import traceback
@@ -6397,6 +6382,7 @@ class ProspectorPanel(ttk.Frame):
                               f"• The individual report file\n"
                               f"• Graph files (if any)\n"
                               f"• Detailed HTML report (if any)\n"
+                              f"• Mining card PNG (if any)\n"
                               f"• Screenshots (if any)\n\n"
                               f"This action cannot be undone.")
                         title = "Delete Mining Session Report"
@@ -6533,6 +6519,32 @@ class ProspectorPanel(ttk.Frame):
                                         pass  # Silent error handling
                             except Exception as graph_error:
                                 pass  # Silent error handling
+                            
+                            # Delete corresponding mining card (v4.4.3+)
+                            try:
+                                cards_dir = os.path.join(get_reports_dir(), "Cards")
+                                
+                                if os.path.exists(cards_dir):
+                                    try:
+                                        # Build expected card filename from session data
+                                        from datetime import datetime
+                                        dt = datetime.fromisoformat(timestamp_raw.replace('Z', ''))
+                                        timestamp_str = dt.strftime("%Y-%m-%d_%H-%M-%S")
+                                        
+                                        clean_system = system.replace(' ', '_')
+                                        clean_body = body.replace(' ', '_')
+                                        
+                                        expected_card = f"Session_{timestamp_str}_{clean_system}_{clean_body}_Card.png"
+                                        card_path = os.path.join(cards_dir, expected_card)
+                                        
+                                        if os.path.exists(card_path):
+                                            os.remove(card_path)
+                                    except Exception as e:
+                                        print(f"[DELETE] Error deleting mining card: {e}")
+                                        import traceback
+                                        traceback.print_exc()
+                            except Exception as e:
+                                print(f"[DELETE] Error in card deletion: {e}")
                             
                             # Delete screenshots and HTML report
                             try:
