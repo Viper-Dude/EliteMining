@@ -306,7 +306,10 @@ Share completed mining session summaries to Discord channels via webhook integra
 *Controls announcements, thresholds, and filters.*  
 
 <img src="Screenshot/txt_overlay.png" width="600"><br>  
-*Text overlay showing real-time mining announcements in-game.*  
+*Text overlay showing real-time mining announcements in-game.*
+
+<img src="Screenshot/txt_overlay_enhanced.png" width="600"><br>  
+*Enhanced overlay with improved readability and detailed mining statistics.*
 
 </details>
 
