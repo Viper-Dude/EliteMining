@@ -452,6 +452,7 @@ For complete license terms, see the [LICENSE](LICENSE) file in the repository.
 
 ## Credits  
 - [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA  
+- [Iain Collins](https://github.com/iaincollins/ardent-api) – Developer of Ardent API for Elite Dangerous market data  
 
 [Back to Top](#top)
 
