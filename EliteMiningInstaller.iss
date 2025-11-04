@@ -74,6 +74,10 @@ Name: "{commondesktop}\EliteMining"; Filename: "{app}\Configurator\EliteMining.e
 ; Uninstall shortcut
 Name: "{group}\Uninstall EliteMining"; Filename: "{app}\Apps\unins000.exe"
 
+[Dirs]
+; Create Cards folder for mining card PNGs (v4.4.3+)
+Name: "{app}\app\Reports\Cards"; Permissions: users-modify
+
 [Run]
 ; Create symbolic link to uninstaller
 Filename: "{cmd}"; Parameters: "/C mklink ""{app}\Apps\Uninstall_EliteMining.exe"" ""{app}\Apps\unins000.exe"""; Description: "Creating custom uninstaller link"; Flags: runhidden
