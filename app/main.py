@@ -8663,7 +8663,7 @@ class App(tk.Tk):
         help_frame.pack(fill="x", pady=(0, 10))
         
         help_text = ttk.Label(help_frame, 
-                             text="Find the best prices for your mined commodities. Near System: top 30 within 500 LY. Galaxy-Wide: top 30 best prices.",
+                             text="Search for best commodity prices. Near System: 500 LY radius. Galaxy-Wide: unlimited range.",
                              foreground="#888888",
                              font=("Segoe UI", 8))
         help_text.pack(anchor="w")
@@ -8685,17 +8685,23 @@ class App(tk.Tk):
         mode_frame = tk.Frame(search_frame, bg="#1e1e1e")
         mode_frame.grid(row=0, column=1, columnspan=3, sticky="w", pady=(0, 5))
         
-        tk.Radiobutton(mode_frame, text="Near System (Filter by Distance)", variable=self.marketplace_search_mode,
+        rb1 = tk.Radiobutton(mode_frame, text="Near System (Max 500 LY Radius)", variable=self.marketplace_search_mode,
                       value="near_system",
-                      bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
+                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e",
                       activebackground="#1e1e1e", activeforeground="#ffffff",
-                      font=("Segoe UI", 9)).pack(side="left", padx=(0, 15))
+                      highlightthickness=0, bd=0, relief="flat",
+                      font=("Segoe UI", 9))
+        rb1.pack(side="left", padx=(0, 15))
+        rb1.config(takefocus=0)
         
-        tk.Radiobutton(mode_frame, text="Galaxy-Wide (Top 30 Prices)", variable=self.marketplace_search_mode,
+        rb2 = tk.Radiobutton(mode_frame, text="Galaxy-Wide (Top 30 Prices)", variable=self.marketplace_search_mode,
                       value="galaxy_wide",
-                      bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
+                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e",
                       activebackground="#1e1e1e", activeforeground="#ffffff",
-                      font=("Segoe UI", 9)).pack(side="left")
+                      highlightthickness=0, bd=0, relief="flat",
+                      font=("Segoe UI", 9))
+        rb2.pack(side="left")
+        rb2.config(takefocus=0)
         
         # Row 1: Reference System with "Use Current System" button (only for "Near System" mode)
         self.marketplace_ref_label = ttk.Label(search_frame, text="Reference System:")
@@ -8717,23 +8723,7 @@ class App(tk.Tk):
                                     font=("Segoe UI", 8, "normal"), cursor="hand2")
         self.marketplace_use_current_btn.grid(row=1, column=2, sticky="w", padx=(5, 20))
         
-        ttk.Label(search_frame, text="Commodity:").grid(row=1, column=3, sticky="w", padx=(0, 5))
-        
-        self.marketplace_commodity = tk.StringVar(value="Alexandrite")
-        # Hardcoded list of common mining commodities (alphabetically sorted, LTD abbreviated for width)
-        sorted_commodities = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
-                             "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Indite", 
-                             "Lepidolite", "LTD", "Monazite", "Musgravite", 
-                             "Osmium", "Painite", "Palladium", "Platinum", "Praseodymium", 
-                             "Rhodplumsite", "Rutile", "Samarium", "Serendibite", "Silver", 
-                             "Tritium", "Uraninite", "Void Opals"]
-        commodity_combo = ttk.Combobox(search_frame, textvariable=self.marketplace_commodity,
-                                     values=sorted_commodities,
-                                     state="readonly", width=18)
-        commodity_combo.grid(row=1, column=4, sticky="w")
-        
-        # Bind Enter key to trigger search on commodity combobox too
-        commodity_combo.bind("<Return>", lambda e: self._search_marketplace())
+        # Commodity dropdown will be moved to row 2 with checkboxes
         
         # Row 2: Station Type Filter + All Checkboxes on same row
         # Create a container frame for Station Type + Pads on left side
@@ -8777,7 +8767,26 @@ class App(tk.Tk):
                       variable=self.marketplace_exclude_carriers,
                       bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
                       activebackground="#1e1e1e", activeforeground="#ffffff",
-                      anchor="w").pack(side="left")
+                      anchor="w").pack(side="left", padx=(0, 20))
+        
+        # Commodity dropdown on same row, to the right
+        ttk.Label(pad_frame, text="Commodity:").pack(side="left", padx=(0, 5))
+        
+        self.marketplace_commodity = tk.StringVar(value="Alexandrite")
+        # Hardcoded list of common mining commodities (alphabetically sorted, LTD abbreviated for width)
+        sorted_commodities = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
+                             "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Indite", 
+                             "Lepidolite", "LTD", "Monazite", "Musgravite", 
+                             "Osmium", "Painite", "Palladium", "Platinum", "Praseodymium", 
+                             "Rhodplumsite", "Rutile", "Samarium", "Serendibite", "Silver", 
+                             "Tritium", "Uraninite", "Void Opals"]
+        commodity_combo = ttk.Combobox(pad_frame, textvariable=self.marketplace_commodity,
+                                     values=sorted_commodities,
+                                     state="readonly", width=18)
+        commodity_combo.pack(side="left")
+        
+        # Bind Enter key to trigger search on commodity combobox
+        commodity_combo.bind("<Return>", lambda e: self._search_marketplace())
         
         # Row 3: Search button (centered)
         search_btn = tk.Button(search_frame, text="🔍 Search Marketplace", 
@@ -8794,9 +8803,20 @@ class App(tk.Tk):
         #                        bg="#2a4a2a", fg="#e0e0e0")
         # edtools_btn.grid(row=4, column=0, columnspan=5, pady=(5, 5))
         
-        # Results section
-        results_frame = ttk.LabelFrame(main_container, text="Search Results", padding=10)
-        results_frame.pack(fill="both", expand=True, pady=(10, 0))
+        # Results section with help text on same line as label
+        results_header = tk.Frame(main_container, bg="#1e1e1e")
+        results_header.pack(fill="x", pady=(10, 0))
+        
+        tk.Label(results_header, text="Search Results", 
+                bg="#1e1e1e", fg="#ffffff", 
+                font=("Segoe UI", 10, "bold")).pack(side="left")
+        
+        tk.Label(results_header, text="  •  Click columns for sorting • Right-click rows for options",
+                bg="#1e1e1e", fg="#888888",
+                font=("Segoe UI", 8)).pack(side="left")
+        
+        results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
+        results_frame.pack(fill="both", expand=True, pady=(5, 0))
         
         # Create results table
         self._create_marketplace_results_table(results_frame)
@@ -8833,7 +8853,7 @@ class App(tk.Tk):
         self.marketplace_sort_reverse = False
         
         # Set column widths - Location left-aligned, all others centered
-        self.marketplace_tree.column("location", width=300, minwidth=150, anchor="w", stretch=False)
+        self.marketplace_tree.column("location", width=250, minwidth=150, anchor="w", stretch=False)
         self.marketplace_tree.column("type", width=90, minwidth=70, anchor="center", stretch=False)
         self.marketplace_tree.column("pad", width=40, minwidth=40, anchor="center", stretch=False)
         self.marketplace_tree.column("distance", width=80, minwidth=60, anchor="center", stretch=False)
@@ -8878,7 +8898,52 @@ class App(tk.Tk):
                                                activebackground=MENU_COLORS["activebackground"],
                                                activeforeground=MENU_COLORS["activeforeground"],
                                                selectcolor=MENU_COLORS["selectcolor"])
+        self.marketplace_context_menu.add_command(label="Open in Inara", command=self._open_inara_from_menu)
+        self.marketplace_context_menu.add_command(label="Open in EDSM", command=self._open_edsm_from_menu)
+        self.marketplace_context_menu.add_separator()
         self.marketplace_context_menu.add_command(label="Copy System Name", command=self._copy_marketplace_system)
+    
+    def _open_inara_from_menu(self):
+        """Open Inara station search from context menu"""
+        selection = self.marketplace_tree.selection()
+        if selection:
+            try:
+                item = selection[0]
+                values = self.marketplace_tree.item(item, 'values')
+                if values and len(values) > 0:
+                    location = values[0]  # "System / Station"
+                    if ' / ' in location:
+                        system_name, station_name = location.split(' / ', 1)
+                        # URL encode station name using quote_plus (converts spaces to +)
+                        import urllib.parse
+                        encoded_station = urllib.parse.quote_plus(station_name.strip())
+                        url = f"https://inara.cz/elite/stations/?search={encoded_station}"
+                        import webbrowser
+                        webbrowser.open(url)
+                        print(f"[MARKETPLACE] Opening Inara for station: {station_name}")
+            except Exception as e:
+                print(f"[MARKETPLACE] Error opening Inara: {e}")
+    
+    def _open_edsm_from_menu(self):
+        """Open EDSM station search from context menu"""
+        selection = self.marketplace_tree.selection()
+        if selection:
+            try:
+                item = selection[0]
+                values = self.marketplace_tree.item(item, 'values')
+                if values and len(values) > 0:
+                    location = values[0]  # "System / Station"
+                    if ' / ' in location:
+                        system_name, station_name = location.split(' / ', 1)
+                        # URL encode station name using quote (no + for EDSM)
+                        import urllib.parse
+                        encoded_station = urllib.parse.quote(station_name.strip())
+                        url = f"https://www.edsm.net/en/search/stations/index/name/{encoded_station}/"
+                        import webbrowser
+                        webbrowser.open(url)
+                        print(f"[MARKETPLACE] Opening EDSM for station: {station_name}")
+            except Exception as e:
+                print(f"[MARKETPLACE] Error opening EDSM: {e}")
     
     def _show_marketplace_context_menu(self, event):
         """Show context menu on right-click"""
@@ -9759,14 +9824,7 @@ class App(tk.Tk):
         # Default to medium for most other stations
         return "M"
     
-    def _create_marketplace_context_menu(self):
-        """Create the right-click context menu for marketplace results"""
-        self.marketplace_context_menu = tk.Menu(self, tearoff=0,
-                                               bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
-                                               activebackground=MENU_COLORS["activebackground"], 
-                                               activeforeground=MENU_COLORS["activeforeground"],
-                                               selectcolor=MENU_COLORS["selectcolor"])
-        self.marketplace_context_menu.add_command(label="Copy System Name", command=self._copy_marketplace_system_name)
+
     
     def _show_marketplace_context_menu(self, event):
         """Show the context menu when right-clicking on marketplace results"""

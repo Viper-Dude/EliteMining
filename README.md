@@ -164,6 +164,10 @@ The Commodity Market helps you find the best sell prices for your mined commodit
 - **Data Freshness** – Shows when prices were last updated (minutes/hours/days ago)
 - **Sortable Results** – Click column headers to sort by location, type, distance, demand, or price
 - **Threaded Updates** – Results appear instantly with distances calculated in background for smooth performance
+- **External Links** – Right-click any search result to:
+  - Open station in Inara (station search)
+  - Open system in EDSM (system page with all stations)
+  - Copy system name to clipboard
 
 Perfect for planning your mining runs and finding the most profitable stations to sell your haul.
 
