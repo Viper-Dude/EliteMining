@@ -510,7 +510,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.4.2"
+APP_VERSION = "v4.4.3|"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -8844,9 +8844,11 @@ class App(tk.Tk):
         self.marketplace_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
         
         # Define headings with sorting
+        numeric_columns = {"distance", "demand", "price", "updated"}
         for col in columns:
+            is_numeric = col in numeric_columns
             self.marketplace_tree.heading(col, text=self._get_column_title(col), 
-                                         command=lambda c=col: self._sort_marketplace_column(c, False))
+                                         command=lambda c=col, n=is_numeric: self._sort_marketplace_column(c, n))
         
         # Track sort state
         self.marketplace_sort_column = None
