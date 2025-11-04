@@ -459,6 +459,7 @@ For complete license terms, see the [LICENSE](LICENSE) file in the repository.
 - [Somfic](https://docs.somfic.dev/projects/eliteva) – Creator of EliteVA  
 - [Iain Collins](https://github.com/iaincollins/ardent-api) – Developer of Ardent API for Elite Dangerous market data  
 - [EDCD/EDDN](https://github.com/EDCD/EDDN) – Elite Dangerous Data Network for real-time game data  
+- **gOOvER | CMDR Shyvin** – For continued support and contributions to this project
 
 [Back to Top](#top)
 
