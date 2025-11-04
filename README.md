@@ -17,6 +17,7 @@
 - [Installation](#installation)
 - [EliteMining App](#elitemining-app)
 - [Hotspot Finder](#hotspot-finder)
+- [Commodity Market](#commodity-market)
 - [Getting Started](#getting-started)
 - [Commands](#commands)
 - [Mining Presets](#mining-presets)
@@ -48,6 +49,7 @@ Full-featured mining companion with GUI controls:
 - GUI for firegroups, timers, toggles, and announcements  
 - **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
 - **Hotspot Finder** – Search 32,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
+- **Commodity Market** – Find the best sell prices for your mined commodities with real-time market data and distance calculations  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports
 
 ### With VoiceAttack Integration (Optional)
@@ -142,6 +144,33 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="600"><br>  
 *Hotspot Finder showing search results with minerals filters and distance calculations.*
+
+[Back to Top](#top)
+
+---
+
+## Commodity Market
+
+The Commodity Market helps you find the best sell prices for your mined commodities using real-time market data from the Ardent API, with automatic distance calculations to help you maximize profits.
+
+### Key Features
+- **Two Search Modes:**
+  - **Near System** – Find top 30 stations within 500 LY, filtered by distance
+  - **Galaxy-Wide** – Find top 30 best prices anywhere in the galaxy with calculated distances
+- **Real-Time Market Data** – Live commodity prices updated from active commanders
+- **Smart Filtering:**
+  - Station type (Orbital/Surface/Fleet Carrier/MegaShip)
+  - Landing pad size (Large pads only option)
+  - Exclude Fleet Carriers
+- **Distance Calculations** – Automatically calculates jump distance from your reference system
+- **Data Freshness** – Shows when prices were last updated (minutes/hours/days ago)
+- **Sortable Results** – Click column headers to sort by location, type, distance, demand, or price
+- **Threaded Updates** – Results appear instantly with distances calculated in background for smooth performance
+
+Perfect for planning your mining runs and finding the most profitable stations to sell your haul.
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commodity_market.png" width="600"><br>  
+*Commodity Market showing search results with filters and distance calculations.*
 
 [Back to Top](#top)
 

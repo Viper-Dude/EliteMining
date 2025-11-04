@@ -54,6 +54,7 @@ import zipfile
 import announcer
 from ring_finder import RingFinder
 # from marketplace_finder import MarketplaceFinder  # No longer used - using external sites
+from marketplace_api import MarketplaceAPI
 from config import _load_cfg, _save_cfg, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry, load_cargo_window_position, save_cargo_window_position
 from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
 from update_checker import UpdateChecker
@@ -4451,6 +4452,9 @@ class App(tk.Tk):
         marketplace_tab = ttk.Frame(self.notebook, padding=8)
         self._build_marketplace_tab(marketplace_tab)
         self.notebook.add(marketplace_tab, text="Commodity Market")
+        
+        # Auto-populate marketplace system after UI is built
+        self.after(3000, self._populate_marketplace_system)
 
         # Settings tab (simplified with remaining sub-tabs)
         settings_tab = ttk.Frame(self.notebook, padding=8)
@@ -7802,6 +7806,15 @@ class App(tk.Tk):
         except Exception:
             pass
         
+        # Save marketplace filter settings
+        try:
+            cfg = _load_cfg()
+            cfg['marketplace_large_pad_only'] = self.marketplace_large_pad_only.get()
+            cfg['marketplace_exclude_carriers'] = self.marketplace_exclude_carriers.get()
+            _save_cfg(cfg)
+        except Exception:
+            pass
+        
         # Clean up text overlay
         if hasattr(self, 'text_overlay'):
             self.text_overlay.destroy()
@@ -8645,6 +8658,16 @@ class App(tk.Tk):
         main_container = ttk.Frame(frame)
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
         
+        # Help text (like Ring Finder)
+        help_frame = ttk.Frame(main_container)
+        help_frame.pack(fill="x", pady=(0, 10))
+        
+        help_text = ttk.Label(help_frame, 
+                             text="Find the best prices for your mined commodities. Near System: top 30 within 500 LY. Galaxy-Wide: top 30 best prices.",
+                             foreground="#888888",
+                             font=("Segoe UI", 8))
+        help_text.pack(anchor="w")
+        
         # Search section
         search_frame = ttk.LabelFrame(main_container, text="Search For Commodity Prices", padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
@@ -8653,84 +8676,267 @@ class App(tk.Tk):
         search_frame.columnconfigure(1, weight=1)
         search_frame.columnconfigure(3, weight=1)
         
-        # Row 1: Reference System with "Use Current System" button
-        ttk.Label(search_frame, text="Reference System:").grid(row=0, column=0, sticky="w", padx=(0, 5))
+        # Row 0: Search Mode (Radio Buttons)
+        mode_label = ttk.Label(search_frame, text="Search Mode:")
+        mode_label.grid(row=0, column=0, sticky="w", padx=(0, 5))
         
-        self.marketplace_reference_system = tk.StringVar(value="Paesia")
-        ref_system_entry = ttk.Entry(search_frame, textvariable=self.marketplace_reference_system, width=20)
-        ref_system_entry.grid(row=0, column=1, sticky="w", padx=(0, 5))
+        self.marketplace_search_mode = tk.StringVar(value="near_system")
         
-        # Bind Enter key to trigger search
-        ref_system_entry.bind("<Return>", lambda e: self._open_edtools_market())
+        mode_frame = tk.Frame(search_frame, bg="#1e1e1e")
+        mode_frame.grid(row=0, column=1, columnspan=3, sticky="w", pady=(0, 5))
         
-        # "Use Current System" button (same as Ring Finder)
-        use_current_btn = ttk.Button(search_frame, text="Use Current System", 
-                                     command=self._use_current_system_marketplace,
-                                     style="Accent.TButton")
-        use_current_btn.grid(row=0, column=2, sticky="w", padx=(5, 20))
+        tk.Radiobutton(mode_frame, text="Near System (Filter by Distance)", variable=self.marketplace_search_mode,
+                      value="near_system",
+                      bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
+                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      font=("Segoe UI", 9)).pack(side="left", padx=(0, 15))
         
-        ttk.Label(search_frame, text="Commodity:").grid(row=0, column=3, sticky="w", padx=(0, 5))
+        tk.Radiobutton(mode_frame, text="Galaxy-Wide (Top 30 Prices)", variable=self.marketplace_search_mode,
+                      value="galaxy_wide",
+                      bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
+                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      font=("Segoe UI", 9)).pack(side="left")
+        
+        # Row 1: Reference System with "Use Current System" button (only for "Near System" mode)
+        self.marketplace_ref_label = ttk.Label(search_frame, text="Reference System:")
+        self.marketplace_ref_label.grid(row=1, column=0, sticky="w", padx=(0, 5))
+        
+        self.marketplace_reference_system = tk.StringVar(value="")
+        self.marketplace_ref_entry = ttk.Entry(search_frame, textvariable=self.marketplace_reference_system, width=35)
+        self.marketplace_ref_entry.grid(row=1, column=1, sticky="w", padx=(0, 5))
+        
+        # Bind Enter key to trigger Ardent API search
+        self.marketplace_ref_entry.bind("<Return>", lambda e: self._search_marketplace())
+        
+        # "Use Current System" button (same brown color as Ring Finder)
+        self.marketplace_use_current_btn = tk.Button(search_frame, text="Use Current System", 
+                                    command=self._use_current_system_marketplace,
+                                    bg="#4a3a2a", fg="#e0e0e0",
+                                    activebackground="#5a4a3a", activeforeground="#ffffff",
+                                    relief="ridge", bd=1, padx=8, pady=4,
+                                    font=("Segoe UI", 8, "normal"), cursor="hand2")
+        self.marketplace_use_current_btn.grid(row=1, column=2, sticky="w", padx=(5, 20))
+        
+        ttk.Label(search_frame, text="Commodity:").grid(row=1, column=3, sticky="w", padx=(0, 5))
         
         self.marketplace_commodity = tk.StringVar(value="Alexandrite")
-        # Hardcoded list of common mining commodities (alphabetically sorted)
+        # Hardcoded list of common mining commodities (alphabetically sorted, LTD abbreviated for width)
         sorted_commodities = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
                              "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Indite", 
-                             "Lepidolite", "Low Temperature Diamonds", "Monazite", "Musgravite", 
+                             "Lepidolite", "LTD", "Monazite", "Musgravite", 
                              "Osmium", "Painite", "Palladium", "Platinum", "Praseodymium", 
                              "Rhodplumsite", "Rutile", "Samarium", "Serendibite", "Silver", 
                              "Tritium", "Uraninite", "Void Opals"]
         commodity_combo = ttk.Combobox(search_frame, textvariable=self.marketplace_commodity,
                                      values=sorted_commodities,
-                                     state="readonly", width=25)
-        commodity_combo.grid(row=0, column=4, sticky="w")
+                                     state="readonly", width=18)
+        commodity_combo.grid(row=1, column=4, sticky="w")
         
         # Bind Enter key to trigger search on commodity combobox too
-        commodity_combo.bind("<Return>", lambda e: self._open_edtools_market())
+        commodity_combo.bind("<Return>", lambda e: self._search_marketplace())
         
-        # Row 2: Search button
-        edtools_btn = tk.Button(search_frame, text="🔍 Search EDTools.cc", 
-                               command=self._open_edtools_market,
-                               bg="#2a4a2a", fg="#e0e0e0", 
-                               activebackground="#3a5a3a", activeforeground="#ffffff",
-                               relief="ridge", bd=1, padx=12, pady=6,
-                               font=("Segoe UI", 9, "bold"), cursor="hand2")
-        edtools_btn.grid(row=1, column=0, columnspan=5, pady=(15, 5))
+        # Row 2: Station Type Filter + All Checkboxes on same row
+        # Create a container frame for Station Type + Pads on left side
+        filters_container = tk.Frame(search_frame, bg="#1e1e1e")
+        filters_container.grid(row=2, column=0, columnspan=5, sticky="w", pady=(10, 0))
         
-        # Info text
-        info_text = "🌐 Find the best commodity prices on edtools.cc"
-        info_label = ttk.Label(search_frame, text=info_text, foreground="gray", font=("TkDefaultFont", 8))
-        info_label.grid(row=2, column=0, columnspan=5, pady=(5, 0))
+        # Station Type inside container (Surface/Orbital/Carrier filter)
+        ttk.Label(filters_container, text="Station Type:").pack(side="left", padx=(0, 5))
         
-        # Add tooltips
-        ToolTip(ref_system_entry, "Enter your reference system for distance-based search")
-        ToolTip(use_current_btn, "Use current system from journal/cargo monitor")
-        ToolTip(edtools_btn, "Open edtools.cc with pre-selected system and commodity")
+        self.marketplace_station_type = tk.StringVar(value="All")
+        station_combo = ttk.Combobox(filters_container, textvariable=self.marketplace_station_type,
+                                values=["All", "Orbital Only", "Surface Only", "Fleet Carrier", "MegaShip Only"],
+                                state="readonly", width=14)
+        station_combo.pack(side="left", padx=(0, 20))
+        
+        # Auto-uncheck "Exclude Fleet Carriers" when "Fleet Carrier" is selected
+        def on_station_type_change(*args):
+            if self.marketplace_station_type.get() == "Fleet Carrier":
+                self.marketplace_exclude_carriers.set(False)
+        self.marketplace_station_type.trace_add("write", on_station_type_change)
+        
+        # Simplified pad filter - single checkbox for large pads only
+        pad_frame = tk.Frame(filters_container, bg="#1e1e1e")
+        pad_frame.pack(side="left")
+        
+        # Load saved marketplace settings (must be before creating checkboxes)
+        cfg = _load_cfg()
+        saved_large_pad = cfg.get('marketplace_large_pad_only', False)
+        saved_exclude_carriers = cfg.get('marketplace_exclude_carriers', True)
+        
+        self.marketplace_large_pad_only = tk.BooleanVar(value=saved_large_pad)
+        tk.Checkbutton(pad_frame, text="Large Pads Only",
+                      variable=self.marketplace_large_pad_only,
+                      bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
+                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      anchor="w").pack(side="left", padx=(0, 10))
+        
+        # Exclude carriers checkbox on same row (using loaded value)
+        self.marketplace_exclude_carriers = tk.BooleanVar(value=saved_exclude_carriers)
+        tk.Checkbutton(pad_frame, text="Exclude Fleet Carriers",
+                      variable=self.marketplace_exclude_carriers,
+                      bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
+                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      anchor="w").pack(side="left")
+        
+        # Row 3: Search button (centered)
+        search_btn = tk.Button(search_frame, text="🔍 Search Marketplace", 
+                              command=self._search_marketplace,
+                              bg="#2a4a2a", fg="#e0e0e0", 
+                              activebackground="#3a5a3a", activeforeground="#ffffff",
+                              relief="ridge", bd=1, padx=10, pady=4,
+                              font=("Segoe UI", 9, "bold"), cursor="hand2")
+        search_btn.grid(row=3, column=0, columnspan=5, pady=(10, 0))
+        
+        # EDTools button hidden (keep for future reference)
+        # edtools_btn = tk.Button(search_frame, text="🔍 Search EDTools.cc", 
+        #                        command=self._open_edtools_market,
+        #                        bg="#2a4a2a", fg="#e0e0e0")
+        # edtools_btn.grid(row=4, column=0, columnspan=5, pady=(5, 5))
+        
+        # Results section
+        results_frame = ttk.LabelFrame(main_container, text="Search Results", padding=10)
+        results_frame.pack(fill="both", expand=True, pady=(10, 0))
+        
+        # Create results table
+        self._create_marketplace_results_table(results_frame)
+        
+        # Status label
+        self.marketplace_total_label = tk.Label(main_container, text="Enter system and commodity, then click Search",
+                                               fg="gray", font=("TkDefaultFont", 8))
+        self.marketplace_total_label.pack(pady=(5, 0))
+        
+        # Add tooltips (using correct variable names)
+        ToolTip(self.marketplace_ref_entry, "Enter your reference system for distance-based search")
+        ToolTip(self.marketplace_use_current_btn, "Use current system from journal/cargo monitor")
+        ToolTip(search_btn, "Search for buyers using Ardent API")
         ToolTip(commodity_combo, "Select the commodity you want to sell")
+    
+    def _create_marketplace_results_table(self, parent_frame):
+        """Create results table for marketplace search"""
+        table_frame = ttk.Frame(parent_frame)
+        table_frame.pack(fill="both", expand=True)
         
+        # Define columns (removed St Dist due to API data inaccuracies)
+        columns = ("location", "type", "pad", "distance", "demand", "price", "updated")
+        
+        # Create Treeview
+        self.marketplace_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
+        
+        # Define headings with sorting
+        for col in columns:
+            self.marketplace_tree.heading(col, text=self._get_column_title(col), 
+                                         command=lambda c=col: self._sort_marketplace_column(c, False))
+        
+        # Track sort state
+        self.marketplace_sort_column = None
+        self.marketplace_sort_reverse = False
+        
+        # Set column widths - Location left-aligned, all others centered
+        self.marketplace_tree.column("location", width=300, minwidth=150, anchor="w", stretch=False)
+        self.marketplace_tree.column("type", width=90, minwidth=70, anchor="center", stretch=False)
+        self.marketplace_tree.column("pad", width=40, minwidth=40, anchor="center", stretch=False)
+        self.marketplace_tree.column("distance", width=80, minwidth=60, anchor="center", stretch=False)
+        self.marketplace_tree.column("demand", width=90, minwidth=60, anchor="center", stretch=False)
+        self.marketplace_tree.column("price", width=120, minwidth=80, anchor="center", stretch=False)
+        self.marketplace_tree.column("updated", width=90, minwidth=70, anchor="center", stretch=False)
+        
+        # Add scrollbars - pack in correct order
+        v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.marketplace_tree.yview)
+        v_scrollbar.pack(side="right", fill="y")
+        
+        h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.marketplace_tree.xview)
+        h_scrollbar.pack(side="bottom", fill="x")
+        
+        # Pack tree last so scrollbars are placed first
+        self.marketplace_tree.pack(side="left", fill="both", expand=True)
+        
+        # Configure scrollbars
+        self.marketplace_tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        
+        # Add right-click context menu
+        self._create_marketplace_context_menu()
+        self.marketplace_tree.bind("<Button-3>", self._show_marketplace_context_menu)
+    
+    def _get_column_title(self, col):
+        """Get display title for column"""
+        titles = {
+            "location": "Location",
+            "type": "Type",
+            "pad": "Pad",
+            "distance": "Distance",
+            "demand": "Demand",
+            "price": "Price",
+            "updated": "Updated"
+        }
+        return titles.get(col, col)
+    
+    def _create_marketplace_context_menu(self):
+        """Create right-click context menu for marketplace results"""
+        self.marketplace_context_menu = tk.Menu(self, tearoff=0,
+                                               bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
+                                               activebackground=MENU_COLORS["activebackground"],
+                                               activeforeground=MENU_COLORS["activeforeground"],
+                                               selectcolor=MENU_COLORS["selectcolor"])
+        self.marketplace_context_menu.add_command(label="Copy System Name", command=self._copy_marketplace_system)
+    
+    def _show_marketplace_context_menu(self, event):
+        """Show context menu on right-click"""
+        try:
+            # Select item under cursor
+            item = self.marketplace_tree.identify_row(event.y)
+            if item:
+                self.marketplace_tree.selection_set(item)
+                self.marketplace_tree.focus(item)
+                self.marketplace_context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.marketplace_context_menu.grab_release()
+    
+    def _copy_marketplace_system(self):
+        """Copy system name from location column (format: 'System / Station')"""
+        selection = self.marketplace_tree.selection()
+        if selection:
+            item = selection[0]
+            values = self.marketplace_tree.item(item, 'values')
+            if values and len(values) > 0:
+                location = values[0]  # Location is first column
+                # Extract system name (before the " / ")
+                if " / " in location:
+                    system_name = location.split(" / ")[0]
+                    self.clipboard_clear()
+                    self.clipboard_append(system_name)
+                    self.marketplace_total_label.config(text=f"✓ Copied '{system_name}' to clipboard")
+    
+    def _populate_marketplace_system(self):
+        """Auto-populate marketplace system on startup (same as ring finder)"""
+        try:
+            if hasattr(self, 'ring_finder'):
+                self.ring_finder._auto_detect_system()
+                detected_system = self.ring_finder.system_var.get()
+                if detected_system:
+                    self.marketplace_reference_system.set(detected_system)
+        except:
+            pass
+    
     def _use_current_system_marketplace(self):
         """Use current system from journal/hotspots finder for marketplace search"""
         try:
-            # Get current system from ring finder if available
-            if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'reference_system_var'):
-                current_system = self.ring_finder.reference_system_var.get().strip()
-                if current_system:
-                    self.marketplace_reference_system.set(current_system)
+            # Use ring finder's auto-detect logic
+            if hasattr(self, 'ring_finder'):
+                self.ring_finder._auto_detect_system()
+                detected_system = self.ring_finder.system_var.get()
+                if detected_system:
+                    self.marketplace_reference_system.set(detected_system)
                     return
             
-            # Fallback to cargo monitor current system if available
-            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'current_system'):
-                current_system = getattr(self.cargo_monitor, 'current_system', '').strip()
-                if current_system:
-                    self.marketplace_reference_system.set(current_system)
-                    self._set_status(f"Using current system: {current_system}")
-                    return
-            
-            # If no current system found, show message
-            self._set_status("No current system detected. Enter system manually.")
+            # Fallback: No ring finder available
+            self._set_status("Ring finder not available. Enter system manually.")
             
         except Exception as e:
             print(f"Error getting current system: {e}")
             self._set_status("Error detecting current system. Enter system manually.")
+    
+    # Removed _toggle_search_mode() - reference system now always visible for both modes
     
     def _open_edtools_market(self):
         """Open edtools.cc commodity search in browser with pre-selected commodity"""
@@ -8781,9 +8987,15 @@ class App(tk.Tk):
         if system:
             params.append(f"s={urllib.parse.quote(system)}")
         
+        # Map abbreviated commodity names back to full names for API
+        commodity_mapping = {
+            "LTD": "Low Temperature Diamonds"
+        }
+        commodity_full = commodity_mapping.get(commodity, commodity)
+        
         # Add commodity using c_ID=on format
-        if commodity and commodity in edtools_commodity_ids:
-            commodity_id = edtools_commodity_ids[commodity]
+        if commodity_full and commodity_full in edtools_commodity_ids:
+            commodity_id = edtools_commodity_ids[commodity_full]
             params.append(f"c_{commodity_id}=on")
         
         if params:
@@ -8840,42 +9052,109 @@ class App(tk.Tk):
     # Kept here temporarily in case rollback is needed
     
     def _search_marketplace(self):
-        """Search for commodity prices (matches hotspots finder behavior)"""
-        commodity = self.marketplace_commodity.get()
-        reference_system = self.marketplace_reference_system.get().strip()
-        max_distance = self.marketplace_max_distance.get().strip()
-        station_type = self.marketplace_station_type.get()
-        price_age = self.marketplace_price_age.get().strip()
-        
-        # Use fixed max results (increased for better coverage)
-        max_results = 100
-        
-        # Validation
-        if not reference_system:
-            self.marketplace_total_label.config(text="❌ Please enter a reference system")
-            return
-            
+        """Search for commodity prices using Ardent API"""
         try:
-            if max_distance.lower() == "any":
-                max_dist = float('inf')  # No distance limit
-            else:
-                max_dist = float(max_distance)
-        except ValueError:
-            self.marketplace_total_label.config(text="❌ Invalid distance value")
-            return
+            commodity = self.marketplace_commodity.get()
+            search_mode = self.marketplace_search_mode.get()
             
-        # Start search in background thread to prevent hanging
-        self.marketplace_total_label.config(text="🔍 Searching for commodity prices...")
-        self.update()  # Force UI update
-        
-        # Run search in background thread
-        import threading
-        search_thread = threading.Thread(
-            target=self._marketplace_search_worker,
-            args=(commodity, reference_system, max_dist, station_type, max_results, price_age),
-            daemon=True
-        )
-        search_thread.start()
+            # Validation
+            if not commodity:
+                self.marketplace_total_label.config(text="❌ Please select a commodity")
+                return
+            
+            # Mode-specific validation
+            if search_mode == "near_system":
+                reference_system = self.marketplace_reference_system.get().strip()
+                if not reference_system:
+                    self.marketplace_total_label.config(text="❌ Please enter a reference system")
+                    return
+            
+            # Show searching status
+            self.marketplace_total_label.config(text="🔍 Searching Ardent API...")
+            self.update()
+            
+            # Call appropriate API based on search mode
+            if search_mode == "galaxy_wide":
+                # Galaxy-wide search (top 30 best prices)
+                results = MarketplaceAPI.search_buyers_galaxy_wide(commodity)
+            else:
+                # Near system search (within 500 LY)
+                reference_system = self.marketplace_reference_system.get().strip()
+                results = MarketplaceAPI.search_buyers(commodity, reference_system, None)
+            
+            # Apply filters
+            exclude_carriers = self.marketplace_exclude_carriers.get()
+            station_type_filter = self.marketplace_station_type.get()
+            
+            # Filter by Fleet Carriers (ignore if "Fleet Carrier" is selected in dropdown)
+            if exclude_carriers and station_type_filter != "Fleet Carrier":
+                results = [r for r in results if "FleetCarrier" not in r.get('stationType', '')]
+            
+            # Filter by Station Type (Surface/Orbital/Carrier/MegaShip)
+            if station_type_filter == "Orbital Only":
+                # Orbital stations: Coriolis, Orbis, Ocellus, Outpost, Asteroid Base, etc.
+                orbital_types = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase"]
+                results = [r for r in results if any(t in r.get('stationType', '') for t in orbital_types)]
+            elif station_type_filter == "Surface Only":
+                # Surface stations: CraterOutpost, OnFootSettlement, OnFootStation, etc.
+                surface_types = ["Crater", "OnFoot", "Planetary"]
+                results = [r for r in results if any(t in r.get('stationType', '') for t in surface_types)]
+            elif station_type_filter == "Fleet Carrier":
+                # Fleet Carriers only
+                results = [r for r in results if "FleetCarrier" in r.get('stationType', '')]
+            elif station_type_filter == "MegaShip Only":
+                # MegaShips only
+                results = [r for r in results if r.get('stationType', '') == "MegaShip"]
+            
+            # Filter by Landing Pad Size (Large only if checked)
+            large_pad_only = self.marketplace_large_pad_only.get()
+            
+            if large_pad_only:
+                # Only show stations with Large pads (maxLandingPadSize == 3)
+                results = [r for r in results if r.get('maxLandingPadSize') == 3]
+            
+            if results:
+                # Sort by price first (highest first) for both modes
+                results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
+                
+                # For galaxy-wide mode, calculate distances for top 30 results in background
+                if search_mode == "galaxy_wide":
+                    reference_system = self.marketplace_reference_system.get().strip()
+                    if reference_system:
+                        # Show results immediately without distances
+                        self._display_marketplace_results(results_sorted[:30])
+                        self.marketplace_total_label.config(text="⏳ Calculating distances...")
+                        self.config(cursor="watch")
+                        self.update_idletasks()
+                        
+                        # Start distance calculation in background thread
+                        import threading
+                        def calculate_distances_thread():
+                            try:
+                                top_30 = results_sorted[:30]
+                                top_30_with_dist = MarketplaceAPI.add_distances_to_results(top_30, reference_system)
+                                # Update UI in main thread
+                                self.after(0, lambda: self._update_marketplace_with_distances(top_30_with_dist, len(results)))
+                            except Exception as e:
+                                print(f"[MARKETPLACE] Distance calculation error: {e}")
+                                self.after(0, lambda: self._restore_marketplace_cursor(len(results)))
+                        
+                        thread = threading.Thread(target=calculate_distances_thread, daemon=True)
+                        thread.start()
+                        # Results already displayed above, skip default display
+                    else:
+                        # No reference system - show without distances
+                        self._display_marketplace_results(results_sorted[:30])
+                        self.marketplace_total_label.config(text=f"✓ Found {len(results)} stations (showing top 30 by price)")
+                elif search_mode == "near_system":
+                    # Near system: show top 30 by price (already sorted by distance in API)
+                    self._display_marketplace_results(results_sorted[:30])
+                    self.marketplace_total_label.config(text=f"✓ Found {len(results)} stations (showing top 30 by price)")
+            else:
+                self.marketplace_total_label.config(text="❌ No results found")
+                
+        except Exception as e:
+            self.marketplace_total_label.config(text=f"❌ Search failed: {str(e)}")
     
     def _marketplace_search_worker(self, commodity, reference_system, max_dist, station_type, max_results, price_age):
         """Background worker for marketplace search to prevent UI hanging"""
@@ -8886,8 +9165,8 @@ class App(tk.Tk):
             # Perform search with timeout
             results = []
             try:
-                # Use a simplified search with fewer API calls
-                results = self._quick_marketplace_search(commodity, reference_system, max_results * 2, max_dist, price_age)
+                # Use a simplified search with fewer API calls - ignore max_dist (user can sort results)
+                results = self._quick_marketplace_search(commodity, reference_system, max_results * 2, None, price_age)
             except Exception as search_error:
                 self.after(0, lambda: self.marketplace_total_label.config(
                     text=f"❌ Search failed: {str(search_error)}"
@@ -9315,49 +9594,113 @@ class App(tk.Tk):
         }
         return age_map.get(price_age, None)
     
+    def _check_landing_pad(self, station_type: str, required_pad: str) -> bool:
+        """Check if station has required landing pad size"""
+        large_stations = ["Coriolis", "Orbis", "Ocellus", "Asteroid Base", "Planetary Port"]
+        medium_stations = ["Outpost", "Planetary Outpost"]
+        
+        if required_pad == "Large":
+            return any(s in station_type for s in large_stations)
+        elif required_pad == "Medium":
+            return any(s in station_type for s in medium_stations) or any(s in station_type for s in large_stations)
+        else:  # Small
+            return True  # All stations have small pads
+    
     def _clear_marketplace_results(self):
         """Clear marketplace results tree"""
         for item in self.marketplace_tree.get_children():
             self.marketplace_tree.delete(item)
+    
+    def _display_marketplace_results(self, results):
+        """Display marketplace results from Ardent API (sorted by distance by default)"""
+        self._clear_marketplace_results()
+        
+        # Sort by distance (closest first) for display
+        results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+        
+        commodity = self.marketplace_commodity.get()
+        self._populate_marketplace_results(results_sorted, commodity)
     
     def _populate_marketplace_results(self, results, commodity):
         """Populate marketplace results in UI"""
         try:
             # Populate results (sorted by distance - closest first)
             for result in results:
-                # LOCATION (System + Station)
-                location = f"{result['system_name']} / {result['station_name'][:25]}"
+                # LOCATION (System + Station) - API uses camelCase
+                location = f"{result['systemName']} / {result['stationName'][:25]}"
                 
-                # TYPE (Station type)
-                station_type = result['station_type'] if result['station_type'] else "Unknown"
+                # TYPE (Station type) - Simplified to Orbital/Surface matching filter
+                api_type = result.get('stationType', 'Unknown')
                 
-                # PAD (Landing pad size)
-                pad = self._get_landing_pad_size(result['station_type'])
+                # Determine if orbital or surface
+                orbital_types = ['Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'AsteroidBase']
+                surface_keywords = ['Crater', 'OnFoot', 'Planetary', 'Surface']
                 
-                # ST DIST (Station distance from star)
-                if result['arrival_distance'] > 0:
-                    # Round to whole number for cleaner display
-                    st_dist = f"{result['arrival_distance']:,.0f} Ls"
+                if api_type in orbital_types:
+                    station_type = 'Orbital'
+                elif any(keyword in api_type for keyword in surface_keywords):
+                    station_type = 'Surface'
+                elif api_type == 'FleetCarrier':
+                    station_type = 'Carrier'
+                elif api_type == 'MegaShip':
+                    station_type = 'MegaShip'
                 else:
-                    st_dist = "?"
+                    station_type = api_type  # Fallback to original name
                 
-                # DISTANCE (System distance)
-                distance = f"{result['system_distance']:.1f} LY"
+                # PAD (Landing pad size) - Ardent API returns integer: 0=?, 1=S, 2=M, 3=L
+                pad_size = result.get('maxLandingPadSize')
+                
+                # Map integer to letter (based on actual Elite Dangerous pad sizes)
+                if isinstance(pad_size, int):
+                    pad_map = {0: '?', 1: 'S', 2: 'M', 3: 'L'}
+                    pad = pad_map.get(pad_size, '?')
+                elif isinstance(pad_size, str):
+                    # Fallback if API ever sends strings
+                    pad = pad_size.upper()
+                else:
+                    pad = '?'
+                
+                # DISTANCE (System distance) - calculate for both modes
+                if 'distance' in result:
+                    distance = f"{result['distance']:.1f}"
+                else:
+                    distance = "Unknown"  # No distance available
                 
                 # DEMAND 
-                demand = f"{result['demand']:,}" if result['demand'] > 0 else "0"
+                demand = f"{result['demand']:,}" if result.get('demand', 0) > 0 else "0"
                 
                 # PRICE
-                price = f"{result['sell_price']:,} CR"
+                price = f"{result['sellPrice']:,} CR"
                 
-                # UPDATED (Data age)
-                updated = result.get('updated', 'Unknown')
+                # UPDATED (Data age) - show hours/days ago
+                updated_at = result.get('updatedAt', 'Unknown')
+                if updated_at and updated_at != 'Unknown':
+                    try:
+                        # Parse ISO timestamp (e.g., "2024-11-03T12:30:00Z")
+                        from datetime import datetime, timezone
+                        updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                        now = datetime.now(timezone.utc)
+                        diff = now - updated_time
+                        
+                        # Convert to minutes, hours, or days
+                        total_minutes = diff.total_seconds() / 60
+                        if total_minutes < 60:
+                            updated = f"{int(total_minutes)}m"
+                        elif total_minutes < 1440:  # Less than 24 hours
+                            hours = int(total_minutes / 60)
+                            updated = f"{hours}h"
+                        else:
+                            days = int(total_minutes / 1440)
+                            updated = f"{days}d"
+                    except Exception as e:
+                        updated = 'Unknown'
+                else:
+                    updated = 'Unknown'
                 
                 self.marketplace_tree.insert("", "end", values=(
                     location,
                     station_type,
                     pad,
-                    st_dist,
                     distance,
                     demand,
                     price,
@@ -9366,12 +9709,20 @@ class App(tk.Tk):
             
             # Update status (like hotspots finder format)
             if results:
-                best_price = max(results, key=lambda x: x['sell_price'])
-                self.marketplace_total_label.config(
-                    text=f"Found {len(results)} stations selling {commodity}. "
-                         f"Best price: {best_price['sell_price']:,} CR/t at {best_price['station_name']} "
-                         f"({best_price['system_distance']:.1f} LY)"
-                )
+                best_price = max(results, key=lambda x: x['sellPrice'])
+                # Different message for galaxy-wide vs near system
+                if 'distance' in best_price:
+                    self.marketplace_total_label.config(
+                        text=f"Found {len(results)} stations selling {commodity}. "
+                             f"Best price: {best_price['sellPrice']:,} CR/t at {best_price['stationName']} "
+                             f"({best_price['distance']:.1f} LY)"
+                    )
+                else:
+                    self.marketplace_total_label.config(
+                        text=f"Found {len(results)} stations selling {commodity}. "
+                             f"Best price: {best_price['sellPrice']:,} CR/t at {best_price['stationName']} "
+                             f"in {best_price.get('systemName', 'Unknown')}"
+                    )
             
         except Exception as e:
             self.marketplace_total_label.config(text=f"❌ Error displaying results: {str(e)}")
@@ -9461,9 +9812,23 @@ class App(tk.Tk):
                 self.marketplace_sort_column = column
                 self.marketplace_sort_reverse = False
             
-            # Get column index
-            columns = ("Location", "Station Type", "Pad", "St dist", "Distance", "Demand", "Price", "Updated")
-            col_index = columns.index(column)
+            # Get column index - column IDs, not display names
+            column_ids = ("location", "type", "pad", "distance", "demand", "price", "updated")
+            
+            # Map display names to column IDs
+            display_to_id = {
+                "Location": "location",
+                "Station Type": "type", 
+                "Pad": "pad",
+                "Distance": "distance",
+                "Demand": "demand",
+                "Price": "price",
+                "Updated": "updated"
+            }
+            
+            # Get the column ID from display name
+            col_id = display_to_id.get(column, column)
+            col_index = column_ids.index(col_id)
             
             # Define sort function based on column type
             if numeric:
@@ -9509,16 +9874,33 @@ class App(tk.Tk):
                 self.marketplace_tree.move(item, '', 'end')
             
             # Update column headers to show sort direction
-            for col in columns:
-                if col == column:
+            display_names = ["Location", "Station Type", "Pad", "Distance", "Demand", "Price", "Updated"]
+            for col_name in display_names:
+                if col_name == column:
                     arrow = " ↓" if self.marketplace_sort_reverse else " ↑"
-                    self.marketplace_tree.heading(col, text=col + arrow)
+                    self.marketplace_tree.heading(display_to_id[col_name], text=col_name + arrow)
                 else:
-                    self.marketplace_tree.heading(col, text=col)
+                    self.marketplace_tree.heading(display_to_id[col_name], text=col_name)
                     
         except Exception as e:
             print(f"Error sorting marketplace column: {e}")
             self.marketplace_total_label.config(text=f"❌ Sort error: {str(e)}")
+    
+    def _update_marketplace_with_distances(self, results_with_distances, total_results):
+        """Update marketplace display after distance calculation completes (called from thread)"""
+        try:
+            # Re-display results with distances
+            self._display_marketplace_results(results_with_distances)
+            self.marketplace_total_label.config(text=f"✓ Found {total_results} stations (showing top 30 with distances)")
+            self.config(cursor="")
+        except Exception as e:
+            print(f"[MARKETPLACE] Error updating with distances: {e}")
+            self.config(cursor="")
+    
+    def _restore_marketplace_cursor(self, total_results):
+        """Restore cursor if distance calculation fails"""
+        self.marketplace_total_label.config(text=f"✓ Found {total_results} stations (showing top 30)")
+        self.config(cursor="")
     
     def _has_large_pads(self, station_type):
         """Check if station has large landing pads"""
