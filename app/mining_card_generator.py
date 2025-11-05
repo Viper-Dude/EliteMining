@@ -368,11 +368,11 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
                 draw.text((col2_x, y_position), f"Asteroids: {asteroids_prospected}", fill=TEXT_COLOR, font=body_font)
             y_position += LINE_HEIGHT
             
-            # Row 3: Minerals Tracked | Total Finds
+            # Row 3: Minerals Tracked | Total Hits
             if materials_tracked > 0:
                 draw.text((col1_x, y_position), f"Minerals Tracked: {materials_tracked}", fill=TEXT_COLOR, font=body_font)
             if total_finds > 0:
-                draw.text((col2_x, y_position), f"Total Finds: {total_finds}", fill=TEXT_COLOR, font=body_font)
+                draw.text((col2_x, y_position), f"Total Hits: {total_finds}", fill=TEXT_COLOR, font=body_font)
             y_position += LINE_HEIGHT
             
             # Row 4: Hit Rate | Prospecting Speed
