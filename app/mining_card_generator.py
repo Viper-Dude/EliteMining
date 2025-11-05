@@ -93,8 +93,9 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
             # Get logo from app installation directory
             import sys
             if getattr(sys, 'frozen', False):
-                # PyInstaller
-                app_dir = os.path.dirname(sys.executable)
+                # PyInstaller - executable is in Configurator folder, app is one level up
+                configurator_dir = os.path.dirname(sys.executable)
+                app_dir = os.path.join(os.path.dirname(configurator_dir), 'app')
             else:
                 # Dev mode
                 app_dir = os.path.dirname(os.path.abspath(__file__))
@@ -116,7 +117,15 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
                 # Center logo
                 logo_x = (CARD_WIDTH - logo.width) // 2
                 img.paste(logo, (logo_x, y_position), logo if logo.mode == 'RGBA' else None)
-                y_position += logo.height + 20
+                y_position += logo.height + 10
+                
+                # Add branding text below logo
+                tagline = "Your Elite Dangerous Mining Companion"
+                tagline_bbox = draw.textbbox((0, 0), tagline, font=small_font)
+                tagline_width = tagline_bbox[2] - tagline_bbox[0]
+                tagline_x = (CARD_WIDTH - tagline_width) // 2
+                draw.text((tagline_x, y_position), tagline, fill=TEXT_COLOR, font=small_font)
+                y_position += LINE_HEIGHT + 10
         except Exception as e:
             print(f"[CARD] Could not load logo: {e}")
             # Fallback to text title if logo fails

@@ -8815,16 +8815,16 @@ class App(tk.Tk):
                 bg="#1e1e1e", fg="#888888",
                 font=("Segoe UI", 8)).pack(side="left")
         
+        # Status label (moved to header, right side)
+        self.marketplace_total_label = tk.Label(results_header, text="Enter system and commodity, then click Search",
+                                               bg="#1e1e1e", fg="gray", font=("TkDefaultFont", 8))
+        self.marketplace_total_label.pack(side="right")
+        
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
         
         # Create results table
         self._create_marketplace_results_table(results_frame)
-        
-        # Status label
-        self.marketplace_total_label = tk.Label(main_container, text="Enter system and commodity, then click Search",
-                                               fg="gray", font=("TkDefaultFont", 8))
-        self.marketplace_total_label.pack(pady=(5, 0))
         
         # Add tooltips (using correct variable names)
         ToolTip(self.marketplace_ref_entry, "Enter your reference system for distance-based search")
@@ -9895,26 +9895,23 @@ class App(tk.Tk):
                 def sort_key(item):
                     value = item[0][col_index]
                     try:
-                        if column == "Distance":
+                        if col_id == "distance":
                             # Remove " LY" suffix and convert to float
                             return float(value.replace(" LY", ""))
-                        elif column == "St dist":
-                            # Remove " Ls" suffix and handle "?" values
-                            if value == "?":
-                                return float('inf')  # Put unknown distances at the end
-                            return float(value.replace(" Ls", "").replace(",", ""))
-                        elif column == "Price":
+                        elif col_id == "price":
                             # Remove " CR" suffix and commas
                             return float(value.replace(" CR", "").replace(",", ""))
-                        elif column == "Demand":
+                        elif col_id == "demand":
                             # Remove commas
                             return float(value.replace(",", "")) if value != "0" else 0
-                        elif column == "Updated":
-                            # Convert time format to comparable number
-                            if "h" in value:
-                                return float(value.replace("h", ""))
+                        elif col_id == "updated":
+                            # Convert time format to comparable number (minutes)
+                            if "m" in value:
+                                return float(value.replace("m", ""))
+                            elif "h" in value:
+                                return float(value.replace("h", "")) * 60  # Convert hours to minutes
                             elif "d" in value:
-                                return float(value.replace("d", "")) * 24  # Convert days to hours
+                                return float(value.replace("d", "")) * 1440  # Convert days to minutes
                             else:
                                 return float('inf')  # Unknown times go to end
                         else:
