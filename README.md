@@ -155,6 +155,9 @@ The Commodity Market helps you find the best sell prices for your mined commodit
 - **Two Search Modes:**
   - **Near System** – Find top 30 stations within 500 LY, filtered by distance
   - **Galaxy-Wide** – Find top 30 best prices anywhere in the galaxy with calculated distances
+- **Buy/Sell Toggle:**
+  - **Sell Mode** – Find stations buying your commodities (best sell prices)
+  - **Buy Mode** – Find stations selling commodities you want to purchase (lowest buy prices)
 - **Real-Time Market Data** – Live commodity prices updated from active commanders
 - **Smart Filtering:**
   - Station type (Orbital/Surface/Fleet Carrier/MegaShip)
