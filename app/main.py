@@ -4657,6 +4657,10 @@ class App(tk.Tk):
                 # Clean up item name for display - use full name, not truncated
                 display_name = item_name.replace('_', ' ').replace('$', '').title()
                 
+                # Abbreviate only "Low Temperature Diamonds" to prevent truncation
+                if display_name in ['Low Temp. Diamonds', 'Low Temperature Diamonds']:
+                    display_name = 'LTD'
+                
                 # Simple icons with better spacing
                 if "limpet" in item_name.lower():
                     icon = "🤖"
