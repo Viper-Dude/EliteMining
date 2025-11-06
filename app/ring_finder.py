@@ -321,7 +321,7 @@ class RingFinder:
         ttk.Label(search_frame, text="Max Distance (LY):").grid(row=1, column=2, sticky="w", padx=10, pady=5)
         self.distance_var = tk.StringVar(value="50")
         distance_combo = ttk.Combobox(search_frame, textvariable=self.distance_var, width=8, state="readonly")
-        distance_combo['values'] = ("10", "50", "100", "150", "200")
+        distance_combo['values'] = ("10", "50", "100", "150", "200", "300", "400", "500")
         distance_combo.grid(row=1, column=3, sticky="w", padx=5, pady=5)
         
         # Max Results filter
@@ -828,7 +828,7 @@ class RingFinder:
 
         # Disable search button
         self.search_btn.configure(state="disabled", text="Searching...")
-        self.status_var.set("Searching for rings...")
+        self.status_var.set("⏳ Searching for rings...")
 
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
@@ -851,11 +851,15 @@ class RingFinder:
             self.current_system_coords = reference_coords
             hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results)
             
-            # EDSM FALLBACK: Automatically fill missing ring metadata before displaying
-            # This runs silently in background - users only see complete data
-            if hotspots:
-                print(f"[AUTO-REFRESH DEBUG] About to call EDSM fallback for {len(hotspots)} hotspots")
+            # EDSM FALLBACK: Smart throttling to prevent hanging
+            # Small searches: Query all systems
+            # Large searches: Query only first 30 systems for top results
+            if hotspots and len(hotspots) < 100:
+                print(f"[AUTO-REFRESH DEBUG] Running EDSM fallback for all {len(hotspots)} hotspots")
                 self._fill_missing_metadata_edsm(hotspots)
+            elif hotspots and len(hotspots) >= 100:
+                print(f"[AUTO-REFRESH DEBUG] Large search ({len(hotspots)} hotspots) - limiting EDSM to first 30 systems")
+                self._fill_missing_metadata_edsm(hotspots, max_systems=30)
             else:
                 print(f"[AUTO-REFRESH DEBUG] No hotspots found, skipping EDSM fallback")
             
@@ -869,7 +873,7 @@ class RingFinder:
             # Re-enable search button
             self.parent.after(0, lambda: self.search_btn.configure(state="normal", text="Search"))
     
-    def _fill_missing_metadata_edsm(self, hotspots: List[Dict]):
+    def _fill_missing_metadata_edsm(self, hotspots: List[Dict], max_systems: int = None):
         """
         Automatically fill missing ring metadata using EDSM fallback.
         
@@ -878,9 +882,10 @@ class RingFinder:
         
         Args:
             hotspots: List of hotspot dicts to check and potentially update
+            max_systems: Optional limit on number of systems to query (for large searches)
         """
         try:
-            print(f"[EDSM DEBUG] Starting EDSM fallback check for {len(hotspots)} hotspots")
+            print(f"[EDSM DEBUG] Starting EDSM fallback check for {len(hotspots)} hotspots (max_systems={max_systems})")
             
             # Build set of systems with incomplete rings in THIS result set only
             systems_needing_data = set()
@@ -901,11 +906,18 @@ class RingFinder:
                 print(f"[EDSM DEBUG] All metadata complete, no EDSM query needed")
                 return
             
-            print(f"[EDSM] {len(systems_needing_data)} systems in results need metadata, querying EDSM...")
-            print(f"[EDSM DEBUG] Systems needing data: {list(systems_needing_data)}")
+            # Apply max_systems limit if specified (for large searches)
+            systems_to_query = list(systems_needing_data)
+            if max_systems and len(systems_to_query) > max_systems:
+                systems_to_query = systems_to_query[:max_systems]
+                print(f"[EDSM] {len(systems_needing_data)} systems need metadata, limiting to first {max_systems} systems")
+            else:
+                print(f"[EDSM] {len(systems_needing_data)} systems in results need metadata, querying EDSM...")
+            
+            print(f"[EDSM DEBUG] Systems to query: {systems_to_query}")
             
             # Use modified EDSM query that doesn't rely on get_incomplete_rings() filtering
-            stats = self.edsm.fill_missing_metadata_for_systems_direct(list(systems_needing_data))
+            stats = self.edsm.fill_missing_metadata_for_systems_direct(systems_to_query)
             
             print(f"[EDSM DEBUG] EDSM query completed, stats: {stats}")
             
@@ -1054,6 +1066,7 @@ class RingFinder:
                     'ring_type': hotspot.get('ring_type', 'No data') if hotspot.get('ring_type') not in [None, 'Unknown'] else 'No data',  # Clean ring_type from database
                     'type': material_name,  # Add the material name here
                     'ls': ls_distance,
+                    'ls_distance': hotspot.get('ls_distance'),  # Add raw ls_distance for EDSM compatibility
                     'distance': f"{distance:.1f}" if distance > 0 else "0.0",
                     'mass': "No data",  # User database doesn't store ring mass
                     'radius': "No data",  # User database doesn't store ring radius
@@ -1845,6 +1858,11 @@ class RingFinder:
             import sqlite3
             user_hotspots = []
             
+            # Cache for coordinates fetched from galaxy DB (prevent duplicate lookups in same search)
+            coord_cache = {}
+            # Track coordinates to save back to database
+            coords_to_update = []
+            
             # Get reference coordinates from multiple sources FIRST
             reference_coords = self.current_system_coords
             if not reference_coords and reference_system:
@@ -1891,6 +1909,10 @@ class RingFinder:
                 if reference_coords and max_distance < 1000:  # Only pre-filter for specific distance searches
                     systems_in_range = self._find_systems_in_range(reference_coords, max_distance)
                     if systems_in_range:
+                        # Cap systems to prevent search hanging on large distance searches
+                        if len(systems_in_range) > 5000:
+                            print(f" DEBUG: Too many systems ({len(systems_in_range)}) - limiting to 5000 for performance")
+                            systems_in_range = systems_in_range[:5000]
                         print(f" DEBUG: Pre-filtered to {len(systems_in_range)} systems within {max_distance} LY")
                 
                 # Build optimized query based on whether we have a system filter
@@ -1985,9 +2007,16 @@ class RingFinder:
                 material_matches = 0
                 systems_with_coords = 0
                 systems_without_coords = 0
+                processed_count = 0
+                max_process_limit = 10000  # Hard limit to prevent infinite processing
                 
                 for system_name, body_name, material_name, hotspot_count, x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type_db, inner_radius, outer_radius in results:
                     try:
+                        # Safety: Stop processing if we've hit the limit
+                        processed_count += 1
+                        if processed_count > max_process_limit:
+                            print(f" DEBUG: Hit processing limit ({max_process_limit}) - stopping to prevent hang")
+                            break
                         # Filter by specific material using our smart material matching
                         if specific_material != RingFinder.ALL_MINERALS and not self._material_matches(specific_material, material_name):
                             continue
@@ -2016,14 +2045,28 @@ class RingFinder:
                             coords_available = True
                             systems_with_coords += 1
                         else:
-                            # Fallback to galaxy_systems.db for coordinates
-                            galaxy_coords = self._get_system_coords_from_galaxy_db(system_name)
+                            # Fallback to galaxy_systems.db for coordinates (with caching)
+                            if system_name not in coord_cache:
+                                galaxy_coords = self._get_system_coords_from_galaxy_db(system_name)
+                                
+                                # If not in galaxy DB, try EDSM as final fallback
+                                if not galaxy_coords:
+                                    edsm_coords = self._get_system_coords_from_edsm(system_name)
+                                    if edsm_coords:
+                                        galaxy_coords = edsm_coords
+                                        print(f" DEBUG: Used EDSM coords for {system_name}")
+                                
+                                coord_cache[system_name] = galaxy_coords
+                            else:
+                                galaxy_coords = coord_cache[system_name]
+                            
                             if galaxy_coords:
                                 system_coords = galaxy_coords
                                 coords_available = True
                                 x_coord, y_coord, z_coord = galaxy_coords['x'], galaxy_coords['y'], galaxy_coords['z']
                                 systems_with_coords += 1
-                                print(f" DEBUG: Used galaxy database coords for {system_name}")
+                                # Track coordinates to save back to database
+                                coords_to_update.append((x_coord, y_coord, z_coord, system_name))
                             else:
                                 systems_without_coords += 1
                         
@@ -2081,6 +2124,21 @@ class RingFinder:
                 print(f" DEBUG: Applied filters - Ring Type: '{material_filter}', Material: '{specific_material}'")
                 print(f" DEBUG: Systems with coordinates: {systems_with_coords}, without coordinates: {systems_without_coords}")
                 print(f" DEBUG: Distance filter: {max_distance} LY from {reference_system or 'current system'}")
+                
+                # Batch-update database with fetched coordinates (save for future searches)
+                if coords_to_update:
+                    try:
+                        print(f" DEBUG: Saving {len(coords_to_update)} coordinate lookups to database...")
+                        cursor.executemany('''
+                            UPDATE hotspot_data 
+                            SET x_coord = ?, y_coord = ?, z_coord = ?, coord_source = 'galaxy_systems.db'
+                            WHERE system_name = ? AND x_coord IS NULL
+                        ''', coords_to_update)
+                        conn.commit()
+                        print(f" DEBUG: Successfully saved {len(coords_to_update)} coordinates to database")
+                    except Exception as update_error:
+                        print(f" DEBUG: Error saving coordinates to database: {update_error}")
+                
                 print(f" DEBUG: Returning {len(user_hotspots)} user database hotspots after filtering")
                 return user_hotspots
                 

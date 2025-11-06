@@ -105,6 +105,8 @@ class EDSMIntegration:
         if not edsm_data or "bodies" not in edsm_data:
             return None
         
+        print(f"[EDSM MATCH DEBUG] Searching for ring: '{ring_name}'")
+        
         # Normalize ring name - ensure it ends with " Ring" for EDSM matching
         normalized_ring_name = ring_name
         if not ring_name.endswith(" Ring"):
@@ -112,6 +114,8 @@ class EDSMIntegration:
             parts = ring_name.split()
             if parts and len(parts[-1]) == 1 and parts[-1] in "ABCDE":
                 normalized_ring_name = ring_name + " Ring"
+        
+        print(f"[EDSM MATCH DEBUG] Normalized to: '{normalized_ring_name}'")
         
         # Try to find a matching body and ring
         # EDSM includes system name in ring names, but DB might only have body number
@@ -125,10 +129,12 @@ class EDSMIntegration:
             # Find matching ring
             for ring in body["rings"]:
                 ring_edsm_name = ring.get("name", "")
+                print(f"[EDSM MATCH DEBUG] Comparing with EDSM ring: '{ring_edsm_name}'")
                 
                 # Try multiple matching strategies:
                 # 1. Exact match (rare, but try it)
                 if ring_edsm_name == normalized_ring_name or ring_edsm_name == ring_name:
+                    print(f"[EDSM MATCH DEBUG] ✓ MATCHED (exact): '{ring_edsm_name}' == '{normalized_ring_name}'")
                     return {
                         "ring_type": ring.get("type"),
                         "ls_distance": body.get("distanceToArrival"),
@@ -140,6 +146,7 @@ class EDSMIntegration:
                 # 2. EDSM name ends with our ring name (most common)
                 # "Macua 1 A Ring" ends with "1 A Ring"
                 if ring_edsm_name.endswith(normalized_ring_name):
+                    print(f"[EDSM MATCH DEBUG] ✓ MATCHED (ends with): '{ring_edsm_name}' ends with '{normalized_ring_name}'")
                     return {
                         "ring_type": ring.get("type"),
                         "ls_distance": body.get("distanceToArrival"),
@@ -150,6 +157,7 @@ class EDSMIntegration:
                 
                 # 3. Our name ends with EDSM name (reverse case)
                 if normalized_ring_name.endswith(ring_edsm_name):
+                    print(f"[EDSM MATCH DEBUG] ✓ MATCHED (reverse): '{normalized_ring_name}' ends with '{ring_edsm_name}'")
                     return {
                         "ring_type": ring.get("type"),
                         "ls_distance": body.get("distanceToArrival"),
@@ -158,6 +166,7 @@ class EDSMIntegration:
                         "ring_mass": ring.get("mass")
                     }
         
+        print(f"[EDSM MATCH DEBUG] ✗ NO MATCH FOUND for '{ring_name}'")
         return None
     
     def _calculate_density(self, inner_radius: Optional[float], outer_radius: Optional[float], 
