@@ -20,8 +20,9 @@ class JournalParser:
     """Parses Elite Dangerous journal files to extract mining-relevant data"""
     
     # Canonical material name mapping - normalizes all variants to standard forms
+    # Includes: English, German, French, Spanish, Russian
     MATERIAL_NAME_MAP = {
-        # Tritium variants
+        # Tritium variants (same in most languages)
         'tritium': 'Tritium',
         'Tritium': 'Tritium',
         
@@ -33,7 +34,17 @@ class JournalParser:
     'low temp. diamonds': 'Low Temperature Diamonds',
     'Low Temp. Diamonds': 'Low Temperature Diamonds',
     'LowTemperatureDiamond': 'Low Temperature Diamonds',
-    'lowtemperaturediamond': 'Low Temperature Diamonds',        # Void Opals variants
+    'lowtemperaturediamond': 'Low Temperature Diamonds',
+    'tieftemperaturdiamanten': 'Low Temperature Diamonds',  # German
+    'Tieftemperaturdiamanten': 'Low Temperature Diamonds',  # German
+    'diamants basse température': 'Low Temperature Diamonds',  # French
+    'Diamants Basse Température': 'Low Temperature Diamonds',  # French
+    'diamantes de baja temperatura': 'Low Temperature Diamonds',  # Spanish
+    'Diamantes De Baja Temperatura': 'Low Temperature Diamonds',  # Spanish
+    'алмазы низкой температуры': 'Low Temperature Diamonds',  # Russian
+    'Алмазы Низкой Температуры': 'Low Temperature Diamonds',  # Russian
+        
+        # Void Opals variants
         'void opals': 'Void Opals',
         'Void Opals': 'Void Opals',
         'void opal': 'Void Opals',
@@ -41,34 +52,144 @@ class JournalParser:
         'Void Opal': 'Void Opals',
         'opal': 'Void Opals',
         'Opal': 'Void Opals',
+        'leerenopal': 'Void Opals',  # German
+        'Leerenopal': 'Void Opals',  # German
+        'opales du vide': 'Void Opals',  # French
+        'Opales Du Vide': 'Void Opals',  # French
+        'ópalos del vacío': 'Void Opals',  # Spanish
+        'Ópalos Del Vacío': 'Void Opals',  # Spanish
+        'опалы пустоты': 'Void Opals',  # Russian
+        'Опалы Пустоты': 'Void Opals',  # Russian
         
-        # Other materials - standard capitalization
+        # Alexandrite
         'alexandrite': 'Alexandrite',
         'Alexandrite': 'Alexandrite',
+        'alexandrit': 'Alexandrite',  # German
+        'Alexandrit': 'Alexandrite',  # German
+        'alexandrita': 'Alexandrite',  # Spanish
+        'Alexandrita': 'Alexandrite',  # Spanish
+        'александрит': 'Alexandrite',  # Russian
+        'Александрит': 'Alexandrite',  # Russian
+        
+        # Benitoite
         'benitoite': 'Benitoite',
         'Benitoite': 'Benitoite',
+        'benitoïte': 'Benitoite',  # French
+        'Benitoïte': 'Benitoite',  # French
+        'benitoita': 'Benitoite',  # Spanish
+        'Benitoita': 'Benitoite',  # Spanish
+        'бенитоит': 'Benitoite',  # Russian
+        'Бенитоит': 'Benitoite',  # Russian
+        
+        # Bromellite
         'bromellite': 'Bromellite',
         'Bromellite': 'Bromellite',
+        'bromellit': 'Bromellite',  # German
+        'Bromellit': 'Bromellite',  # German
+        'bromellita': 'Bromellite',  # Spanish
+        'Bromellita': 'Bromellite',  # Spanish
+        'бромеллит': 'Bromellite',  # Russian
+        'Бромеллит': 'Bromellite',  # Russian
+        
+        # Grandidierite
         'grandidierite': 'Grandidierite',
         'Grandidierite': 'Grandidierite',
+        'grandidierit': 'Grandidierite',  # German
+        'Grandidierit': 'Grandidierite',  # German
+        'grandidiérite': 'Grandidierite',  # French
+        'Grandidiérite': 'Grandidierite',  # French
+        'grandidierita': 'Grandidierite',  # Spanish
+        'Grandidierita': 'Grandidierite',  # Spanish
+        'грандидиерит': 'Grandidierite',  # Russian
+        'Грандидиерит': 'Grandidierite',  # Russian
+        
+        # Monazite
         'monazite': 'Monazite',
         'Monazite': 'Monazite',
+        'monazit': 'Monazite',  # German
+        'Monazit': 'Monazite',  # German
+        'monazita': 'Monazite',  # Spanish
+        'Monazita': 'Monazite',  # Spanish
+        'монацит': 'Monazite',  # Russian
+        'Монацит': 'Monazite',  # Russian
+        
+        # Musgravite
         'musgravite': 'Musgravite',
         'Musgravite': 'Musgravite',
+        'musgrafit': 'Musgravite',  # German
+        'Musgrafit': 'Musgravite',  # German
+        'musgravita': 'Musgravite',  # Spanish
+        'Musgravita': 'Musgravite',  # Spanish
+        'мусгравит': 'Musgravite',  # Russian
+        'Мусгравит': 'Musgravite',  # Russian
+        
+        # Painite
         'painite': 'Painite',
         'Painite': 'Painite',
+        'painit': 'Painite',  # German
+        'Painit': 'Painite',  # German
+        'païnite': 'Painite',  # French
+        'Païnite': 'Painite',  # French
+        'painita': 'Painite',  # Spanish
+        'Painita': 'Painite',  # Spanish
+        'пейнит': 'Painite',  # Russian
+        'Пейнит': 'Painite',  # Russian
+        
+        # Platinum
         'platinum': 'Platinum',
         'Platinum': 'Platinum',
+        'platin': 'Platinum',  # German
+        'Platin': 'Platinum',  # German
+        'platine': 'Platinum',  # French
+        'Platine': 'Platinum',  # French
+        'platino': 'Platinum',  # Spanish
+        'Platino': 'Platinum',  # Spanish
+        'платина': 'Platinum',  # Russian
+        'Платина': 'Platinum',  # Russian
+        
+        # Rhodplumsite
         'rhodplumsite': 'Rhodplumsite',
         'Rhodplumsite': 'Rhodplumsite',
+        'rhodplumsit': 'Rhodplumsite',  # German
+        'Rhodplumsit': 'Rhodplumsite',  # German
+        'rhodplumsita': 'Rhodplumsite',  # Spanish
+        'Rhodplumsita': 'Rhodplumsite',  # Spanish
+        'родплюмсит': 'Rhodplumsite',  # Russian
+        'Родплюмсит': 'Rhodplumsite',  # Russian
+        
+        # Serendibite
         'serendibite': 'Serendibite',
         'Serendibite': 'Serendibite',
+        'serendibit': 'Serendibite',  # German
+        'Serendibit': 'Serendibite',  # German
+        'sérendibite': 'Serendibite',  # French
+        'Sérendibite': 'Serendibite',  # French
+        'serendibita': 'Serendibite',  # Spanish
+        'Serendibita': 'Serendibite',  # Spanish
+        'серендибит': 'Serendibite',  # Russian
+        'Серендибит': 'Serendibite',  # Russian
+        
+        # Palladium (same in most languages)
         'palladium': 'Palladium',
         'Palladium': 'Palladium',
+        'паладий': 'Palladium',  # Russian
+        'Паладий': 'Palladium',  # Russian
+        
+        # Gold
         'gold': 'Gold',
         'Gold': 'Gold',
+        'or': 'Gold',  # French
+        'Or': 'Gold',  # French
+        'oro': 'Gold',  # Spanish
+        'Oro': 'Gold',  # Spanish
+        'золото': 'Gold',  # Russian
+        'Золото': 'Gold',  # Russian
+        
+        # Osmium (same in most languages)
         'osmium': 'Osmium',
         'Osmium': 'Osmium',
+        'осмий': 'Osmium',  # Russian
+        'Осмий': 'Osmium',  # Russian
     }
     
     def __init__(self, journal_dir: str, user_db: Optional[UserDatabase] = None, on_hotspot_added: Optional[callable] = None):

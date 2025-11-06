@@ -77,6 +77,9 @@ from mining_statistics import SessionAnalytics
 from config import _load_cfg, _save_cfg, _atomic_write_text, VA_TTS_ANNOUNCEMENT, CONFIG_FILE
 import announcer
 
+# Import normalization from journal_parser for consistent material name handling
+from journal_parser import JournalParser
+
 # Import graphs module for graphical analytics
 try:
     from mining_charts import MiningChartsPanel
@@ -7679,9 +7682,12 @@ class ProspectorPanel(ttk.Frame):
                 noncore_msg = ""
                 
                 # Prepare core announcement if toggle is enabled and motherlode present
-                if mother and core_toggle and self.announce_map.get(mother, True):
-                    if "Remaining Depleted" not in panel_summary:
-                        core_msg = f"Motherlode: {mother}"
+                # Normalize motherlode name to English for lookup in announce_map
+                if mother:
+                    mother_for_lookup = JournalParser.normalize_material_name(mother)
+                    if core_toggle and self.announce_map.get(mother_for_lookup, True):
+                        if "Remaining Depleted" not in panel_summary:
+                            core_msg = f"Motherlode: {mother}"
                 
                 # Prepare non-core announcement if toggle is enabled
                 if noncore_toggle and triggered and speak_summary:
@@ -7807,6 +7813,8 @@ class ProspectorPanel(ttk.Frame):
         speak_parts: List[str] = []      # for TTS (filtered)
         triggered = False
         th = float(self.threshold.get())
+        
+        print(f"[ANNOUNCE DEBUG] _summaries_from_event called, materials count: {len(materials)}, threshold: {th}")
 
         for m in materials:
             name = _extract_material_name(m)
@@ -7818,11 +7826,16 @@ class ProspectorPanel(ttk.Frame):
             all_parts.append(entry)
 
             eff_th = float(self.min_pct_map.get(name, th))
-            # Use case-insensitive lookup for material filtering
-            # First try exact match, then try title case
-            is_enabled = self.announce_map.get(name, False)
-            if not is_enabled and name != name.title():
-                is_enabled = self.announce_map.get(name.title(), False)
+            # Normalize material name to English for lookup in announce_map
+            # This ensures German/French/Spanish names match English settings
+            name_for_lookup = JournalParser.normalize_material_name(name)
+            print(f"[ANNOUNCE DEBUG] Material: '{name}' → Normalized: '{name_for_lookup}'")
+            is_enabled = self.announce_map.get(name_for_lookup, False)
+            print(f"[ANNOUNCE DEBUG] announce_map.get('{name_for_lookup}') = {is_enabled}")
+            if not is_enabled and name_for_lookup != name_for_lookup.title():
+                is_enabled = self.announce_map.get(name_for_lookup.title(), False)
+                print(f"[ANNOUNCE DEBUG] Retry with title case: '{name_for_lookup.title()}' = {is_enabled}")
+            print(f"[ANNOUNCE DEBUG] Final enabled={is_enabled}, pct={pct_val}, threshold={eff_th}")
             if pct_val is not None and is_enabled and pct_val >= eff_th:
                 speak_parts.append(entry)
                 triggered = True
@@ -7831,9 +7844,11 @@ class ProspectorPanel(ttk.Frame):
         mother = _clean_name(mother) if isinstance(mother, str) else ""
         if mother:
             all_parts.insert(0, f"Motherlode: {mother}")
+            # Normalize motherlode name to English for lookup in announce_map
+            mother_for_lookup = JournalParser.normalize_material_name(mother)
             # Only add to speak_parts if Core Asteroids toggle is enabled
             core_toggle = bool(self.announcement_vars["Core Asteroids"].get())
-            if self.announce_map.get(mother, False):   # Default to False for consistency
+            if self.announce_map.get(mother_for_lookup, False):   # Default to False for consistency
                 speak_parts.insert(0, f"Motherlode: {mother}")
                 triggered = True
 

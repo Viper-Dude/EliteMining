@@ -1291,6 +1291,9 @@ class CargoMonitor:
         self.session_minerals_mined = {}  # Dict of refined material: total tons mined (includes transferred)
         self.session_materials_collected = {}  # Dict of engineering material: total pieces collected (includes discarded)
         
+        # Localized material names for display (maps English -> Localized)
+        self.materials_localized_names = {}  # Dict of English name -> Localized name for display
+        
         self.update_callback = update_callback  # Callback to notify main app of changes
         self.capacity_changed_callback = capacity_changed_callback  # Callback when cargo capacity changes
         self.ship_info_changed_callback = ship_info_changed_callback  # Callback when ship info changes
@@ -2350,9 +2353,9 @@ cargo panel forces Elite to write detailed inventory data.
                 # Get grade for this material
                 grade = self.MATERIAL_GRADES.get(material_name, 0)
                 
-                # Format: Material Name (GX)  quantity
-                # Limit name length for alignment
-                display_name = material_name[:20]
+                # Use localized name for display if available, otherwise use English name
+                localized_name = self.materials_localized_names.get(material_name, material_name)
+                display_name = localized_name[:20]
                 line = f"{display_name} (G{grade}){' ' * (24 - len(display_name))}{quantity:>4}"
                 self.cargo_text.insert(tk.END, f"{line}\n")
             
@@ -3354,7 +3357,9 @@ cargo panel forces Elite to write detailed inventory data.
                             self.materials_collected[material_name] = self.materials_collected.get(material_name, 0) + count
                             # Track session cumulative total for multi-session mode
                             self.session_materials_collected[material_name] = self.session_materials_collected.get(material_name, 0) + count
-                            logging.info(f"[MaterialCollected] ✓ Added {count}x {material_name} (Total: {self.materials_collected[material_name]})")
+                            # Store localized name for display
+                            self.materials_localized_names[material_name] = material_name_display.title()
+                            logging.info(f"[MaterialCollected] ✓ Added {count}x {material_name} (Display: {material_name_display}) (Total: {self.materials_collected[material_name]})")
                             logging.debug(f"[MaterialCollected] Current materials_collected: {self.materials_collected}")
                             
                             # Update popup window display if it exists
@@ -4686,8 +4691,8 @@ class App(tk.Tk):
                 # Get grade for this material
                 grade = cargo.MATERIAL_GRADES.get(material_name, 0)
                 
-                # Format: Material (GX)  quantity
-                display_name = material_name[:13]
+                # Use localized name for display if available, otherwise use English name
+                display_name = cargo.materials_localized_names.get(material_name, material_name)[:13]
                 grade_text = f"(G{grade})"
                 line = f"{display_name:<13} {grade_text} {quantity:>4}"
                 self.integrated_cargo_text.insert(tk.END, line)
