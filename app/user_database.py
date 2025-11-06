@@ -88,10 +88,18 @@ class UserDatabase:
     def _run_migrations(self) -> None:
         """Run database migrations silently on startup"""
         try:
+            print("[MIGRATION] Checking for database migrations...")
+            log.info("[Migration] Checking for database migrations...")
             # Migration v4.4.6: Normalize material names to fix language duplicates
             self._migrate_material_names_v446()
+            print("[MIGRATION] Migration check complete")
+            log.info("[Migration] Migration check complete")
         except Exception as e:
-            log.warning(f"Migration warning (non-critical): {e}")
+            print(f"[MIGRATION ERROR] {e}")
+            log.error(f"[Migration] Error during migration: {e}")
+            import traceback
+            traceback.print_exc()
+            log.error(traceback.format_exc())
     
     def _migrate_material_names_v446(self) -> None:
         """Migrate material names to English-only format (v4.4.6)
@@ -99,7 +107,41 @@ class UserDatabase:
         Fixes duplicate hotspots caused by mixed language entries.
         Runs once, silently on first startup after v4.4.6 update.
         """
-        from journal_parser import JournalParser
+        # Inline normalization to avoid circular import with journal_parser
+        def normalize_name(name: str) -> str:
+            """Normalize material name to English canonical form"""
+            # Common non-English mappings (German, French, Spanish, etc.)
+            mappings = {
+                # German names
+                'tieftemperaturdiamanten': 'Low Temperature Diamonds',
+                'alexandrit': 'Alexandrite',
+                'bromellit': 'Bromellite',
+                'grandidierit': 'Grandidierite',
+                'monazit': 'Monazite',
+                'painit': 'Painite',
+                'benito it': 'Benitoite',
+                'musgrafit': 'Musgravite',
+                'rhodplumsit': 'Rhodplumsite',
+                'serendibit': 'Serendibite',
+                'tritium': 'Tritium',  # Same in all languages
+                'platin': 'Platinum',
+                'leereopal': 'Void Opals',
+                'leerenopal': 'Void Opals',
+                # Standard English variants
+                'lowtemperaturediamond': 'Low Temperature Diamonds',
+                'low temp diamonds': 'Low Temperature Diamonds',
+                'low temperature diamonds': 'Low Temperature Diamonds',
+                'opal': 'Void Opals',
+                'void opal': 'Void Opals',
+                'void opals': 'Void Opals',
+            }
+            
+            lower_name = name.lower().strip()
+            if lower_name in mappings:
+                return mappings[lower_name]
+            
+            # Title case for standard names
+            return name.strip().title()
         
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -111,14 +153,20 @@ class UserDatabase:
                 
                 updates_needed = {}
                 for material_name in materials:
-                    normalized = JournalParser.normalize_material_name(material_name)
+                    normalized = normalize_name(material_name)
                     if material_name != normalized:
                         updates_needed[material_name] = normalized
                 
                 if not updates_needed:
+                    print("[MIGRATION v4.4.6] No non-English material names found - database is clean")
+                    log.info("[Migration v4.4.6] No non-English material names found - database is clean")
                     return  # No migration needed
                 
-                log.info(f"[Migration v4.4.6] Normalizing {len(updates_needed)} material names...")
+                print(f"[MIGRATION v4.4.6] Found {len(updates_needed)} material names to normalize:")
+                log.info(f"[Migration v4.4.6] Found {len(updates_needed)} material names to normalize:")
+                for old, new in updates_needed.items():
+                    print(f"  '{old}' -> '{new}'")
+                    log.info(f"  '{old}' -> '{new}'")
                 
                 for old_name, new_name in updates_needed.items():
                     # Check for duplicates that would be created
@@ -136,19 +184,38 @@ class UserDatabase:
                     
                     duplicates = cursor.fetchall()
                     
-                    # Merge duplicates (keep newer entry)
-                    for system, body in duplicates:
-                        cursor.execute("""
-                            DELETE FROM hotspot_data
-                            WHERE system_name = ? AND body_name = ? AND material_name = ?
-                            AND id NOT IN (
-                                SELECT id FROM hotspot_data
-                                WHERE system_name = ? AND body_name = ? AND material_name = ?
-                                ORDER BY scan_date DESC LIMIT 1
-                            )
-                        """, (system, body, old_name, system, body, old_name))
+                    if duplicates:
+                        print(f"  [MIGRATION] Merging {len(duplicates)} duplicate entries for '{old_name}' -> '{new_name}'")
+                        log.info(f"  Merging {len(duplicates)} duplicate entries for '{old_name}' -> '{new_name}'")
                     
-                    # Update remaining entries
+                    # Merge duplicates: Keep the NEWER entry between old and new names
+                    for system, body in duplicates:
+                        # Get both entries
+                        cursor.execute("""
+                            SELECT id, scan_date, hotspot_count FROM hotspot_data
+                            WHERE system_name = ? AND body_name = ? AND material_name IN (?, ?)
+                            ORDER BY scan_date DESC
+                        """, (system, body, old_name, new_name))
+                        
+                        entries = cursor.fetchall()
+                        if len(entries) >= 2:
+                            # Keep the newest entry, delete the rest
+                            keep_id = entries[0][0]
+                            cursor.execute("""
+                                DELETE FROM hotspot_data
+                                WHERE system_name = ? AND body_name = ? 
+                                AND material_name IN (?, ?)
+                                AND id != ?
+                            """, (system, body, old_name, new_name, keep_id))
+                            
+                            # Update the kept entry to use the new name
+                            cursor.execute("""
+                                UPDATE hotspot_data 
+                                SET material_name = ? 
+                                WHERE id = ?
+                            """, (new_name, keep_id))
+                    
+                    # Update remaining entries that don't have duplicates
                     cursor.execute("""
                         UPDATE hotspot_data 
                         SET material_name = ? 
@@ -156,10 +223,14 @@ class UserDatabase:
                     """, (new_name, old_name))
                 
                 conn.commit()
+                print(f"[MIGRATION v4.4.6] ✅ Completed successfully - {len(updates_needed)} materials normalized")
                 log.info(f"[Migration v4.4.6] Completed successfully - {len(updates_needed)} materials normalized")
                 
         except Exception as e:
+            print(f"[MIGRATION v4.4.6 ERROR] {e}")
             log.error(f"[Migration v4.4.6] Error: {e}")
+            import traceback
+            traceback.print_exc()
             raise
         
     def _create_tables(self) -> None:
