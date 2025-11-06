@@ -3336,14 +3336,16 @@ cargo panel forces Elite to write detailed inventory data.
                 # Track engineering materials collected (Raw materials only)
                 try:
                     category = event.get("Category", "")
-                    material_name_raw = event.get("Name_Localised", event.get("Name", "")).strip()
+                    # Use internal Name (always English) for lookup, but get localized name for display
+                    material_name_internal = event.get("Name", "").strip()
+                    material_name_display = event.get("Name_Localised", material_name_internal).strip()
                     count = event.get("Count", 1)
                     
-                    logging.info(f"[MaterialCollected] Raw event data: Category={category}, Name={material_name_raw}, Count={count}")
+                    logging.info(f"[MaterialCollected] Raw event data: Category={category}, Name={material_name_display}, Count={count}")
                     
                     if category == "Raw":
-                        # Normalize material name to Title Case for matching
-                        material_name = material_name_raw.title()
+                        # Normalize internal material name to Title Case for matching against MATERIAL_GRADES
+                        material_name = material_name_internal.title()
                         
                         logging.debug(f"[MaterialCollected] Checking material: '{material_name}' (after title())")
                         
