@@ -83,6 +83,84 @@ class UserDatabase:
             
         self.db_path = db_path
         self._create_tables()
+        self._run_migrations()
+        
+    def _run_migrations(self) -> None:
+        """Run database migrations silently on startup"""
+        try:
+            # Migration v4.4.6: Normalize material names to fix language duplicates
+            self._migrate_material_names_v446()
+        except Exception as e:
+            log.warning(f"Migration warning (non-critical): {e}")
+    
+    def _migrate_material_names_v446(self) -> None:
+        """Migrate material names to English-only format (v4.4.6)
+        
+        Fixes duplicate hotspots caused by mixed language entries.
+        Runs once, silently on first startup after v4.4.6 update.
+        """
+        from journal_parser import JournalParser
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Check if migration needed by looking for non-English material names
+                cursor.execute("SELECT DISTINCT material_name FROM hotspot_data")
+                materials = [row[0] for row in cursor.fetchall()]
+                
+                updates_needed = {}
+                for material_name in materials:
+                    normalized = JournalParser.normalize_material_name(material_name)
+                    if material_name != normalized:
+                        updates_needed[material_name] = normalized
+                
+                if not updates_needed:
+                    return  # No migration needed
+                
+                log.info(f"[Migration v4.4.6] Normalizing {len(updates_needed)} material names...")
+                
+                for old_name, new_name in updates_needed.items():
+                    # Check for duplicates that would be created
+                    cursor.execute("""
+                        SELECT DISTINCT h1.system_name, h1.body_name
+                        FROM hotspot_data h1
+                        WHERE h1.material_name = ?
+                        AND EXISTS (
+                            SELECT 1 FROM hotspot_data h2 
+                            WHERE h2.system_name = h1.system_name 
+                            AND h2.body_name = h1.body_name 
+                            AND h2.material_name = ?
+                        )
+                    """, (old_name, new_name))
+                    
+                    duplicates = cursor.fetchall()
+                    
+                    # Merge duplicates (keep newer entry)
+                    for system, body in duplicates:
+                        cursor.execute("""
+                            DELETE FROM hotspot_data
+                            WHERE system_name = ? AND body_name = ? AND material_name = ?
+                            AND id NOT IN (
+                                SELECT id FROM hotspot_data
+                                WHERE system_name = ? AND body_name = ? AND material_name = ?
+                                ORDER BY scan_date DESC LIMIT 1
+                            )
+                        """, (system, body, old_name, system, body, old_name))
+                    
+                    # Update remaining entries
+                    cursor.execute("""
+                        UPDATE hotspot_data 
+                        SET material_name = ? 
+                        WHERE material_name = ?
+                    """, (new_name, old_name))
+                
+                conn.commit()
+                log.info(f"[Migration v4.4.6] Completed successfully - {len(updates_needed)} materials normalized")
+                
+        except Exception as e:
+            log.error(f"[Migration v4.4.6] Error: {e}")
+            raise
         
     def _create_tables(self) -> None:
         """Create database tables if they don't exist"""
