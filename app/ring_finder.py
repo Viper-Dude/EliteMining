@@ -248,6 +248,15 @@ class RingFinder:
         search_frame = ttk.Frame(self.scrollable_frame)
         search_frame.pack(fill="x", padx=10, pady=(0, 5))
         
+        # Configure grid columns - prevent column 2 from expanding
+        search_frame.grid_columnconfigure(0, weight=0)
+        search_frame.grid_columnconfigure(1, weight=0)
+        search_frame.grid_columnconfigure(2, weight=0)
+        search_frame.grid_columnconfigure(3, weight=0)
+        search_frame.grid_columnconfigure(4, weight=0)
+        search_frame.grid_columnconfigure(5, weight=0)
+        search_frame.grid_columnconfigure(6, weight=1)  # Let column 6 take remaining space
+        
         # Single smart search input
         ttk.Label(search_frame, text="Reference System:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.system_var = tk.StringVar()
@@ -258,21 +267,25 @@ class RingFinder:
         # For compatibility, current_system_var points to the same system_var
         self.current_system_var = self.system_var
         
+        # Create frame for buttons (to pack them tightly)
+        buttons_frame = ttk.Frame(search_frame)
+        buttons_frame.grid(row=0, column=2, sticky="w", padx=(5, 0))
+        
         # Auto-detect button (fills current system automatically) - with app color scheme
-        auto_btn = tk.Button(search_frame, text="Use Current System", command=self._auto_detect_system,
+        auto_btn = tk.Button(buttons_frame, text="Use Current System", command=self._auto_detect_system,
                             bg="#4a3a2a", fg="#e0e0e0", 
                             activebackground="#5a4a3a", activeforeground="#ffffff",
                             relief="ridge", bd=1, padx=8, pady=4,
                             font=("Segoe UI", 8, "normal"), cursor="hand2")
-        auto_btn.grid(row=0, column=2, padx=10, pady=5)
+        auto_btn.pack(side="left", padx=(0, 5))
         
         # Search button - with app color scheme
-        self.search_btn = tk.Button(search_frame, text="Search", command=self.search_hotspots,
+        self.search_btn = tk.Button(buttons_frame, text="Search", command=self.search_hotspots,
                                    bg="#2a4a2a", fg="#e0e0e0", 
                                    activebackground="#3a5a3a", activeforeground="#ffffff",
-                                   relief="ridge", bd=1, padx=8, pady=4,
+                                   relief="ridge", bd=1, padx=15, pady=4,
                                    font=("Segoe UI", 8, "normal"), cursor="hand2")
-        self.search_btn.grid(row=0, column=3, padx=10, pady=5)
+        self.search_btn.pack(side="left", padx=(0, 5))
 
         # Auto-search checkbox
         self.auto_search_var = tk.BooleanVar(value=False)
@@ -281,14 +294,14 @@ class RingFinder:
         auto_search_enabled = self._load_auto_search_state()
         self.auto_search_var.set(auto_search_enabled)
         
-        self.auto_search_cb = tk.Checkbutton(search_frame, text="Auto-Search", 
+        self.auto_search_cb = tk.Checkbutton(buttons_frame, text="Auto-Search", 
                                            variable=self.auto_search_var,
                                            command=self._save_auto_search_state,
                                            bg="#1e1e1e", fg="#e0e0e0", 
                                            activebackground="#2e2e2e", activeforeground="#ffffff",
                                            selectcolor="#1e1e1e", relief="flat",
                                            font=("Segoe UI", 8, "normal"))
-        self.auto_search_cb.grid(row=0, column=4, padx=10, pady=5)
+        self.auto_search_cb.pack(side="left")
         
         # Tooltip for auto-search
         ToolTip(self.auto_search_cb, 
@@ -317,19 +330,43 @@ class RingFinder:
         ToolTip(material_combo, "Filter by ring type:\n- Metallic: Platinum, Gold, Silver\n- Icy: LTDs, Tritium, Bromellite\n- Rocky: Alexandrite, Benitoite, Opals\n- Metal Rich: Painite, Osmium")
         ToolTip(specific_material_combo, "Filter by specific material:\nAutomatically shows only confirmed hotspots\n(no theoretical ring data)")
         
-        # Distance filter (now a dropdown)
-        ttk.Label(search_frame, text="Max Distance (LY):").grid(row=1, column=2, sticky="w", padx=10, pady=5)
-        self.distance_var = tk.StringVar(value="50")
-        distance_combo = ttk.Combobox(search_frame, textvariable=self.distance_var, width=8, state="readonly")
-        distance_combo['values'] = ("10", "50", "100", "150", "200", "300", "400", "500")
-        distance_combo.grid(row=1, column=3, sticky="w", padx=5, pady=5)
+        # Create a sub-frame for right-side filters (row 1-2) that will pack tightly
+        right_filters_frame_row1 = ttk.Frame(search_frame)
+        right_filters_frame_row1.grid(row=1, column=2, columnspan=2, sticky="w", padx=(10, 0))
         
-        # Max Results filter
-        ttk.Label(search_frame, text="Max Results:").grid(row=2, column=2, sticky="w", padx=10, pady=5)
+        right_filters_frame_row2 = ttk.Frame(search_frame)
+        right_filters_frame_row2.grid(row=2, column=2, columnspan=2, sticky="w", padx=(10, 0))
+        
+        # Distance filter (now a dropdown) - in sub-frame with fixed label width
+        ttk.Label(right_filters_frame_row1, text="Max Distance (LY):", width=15, anchor="e").pack(side="left", padx=(0, 5))
+        self.distance_var = tk.StringVar(value="50")
+        distance_combo = ttk.Combobox(right_filters_frame_row1, textvariable=self.distance_var, width=8, state="readonly")
+        distance_combo['values'] = ("10", "50", "100", "150", "200", "300", "400", "500")
+        distance_combo.pack(side="left")
+        
+        # Max Results filter - in sub-frame with fixed label width to align dropdowns
+        ttk.Label(right_filters_frame_row2, text="Max Results:", width=15, anchor="e").pack(side="left", padx=(0, 5))
         self.max_results_var = tk.StringVar(value="30")
-        max_results_combo = ttk.Combobox(search_frame, textvariable=self.max_results_var, width=8, state="readonly")
+        max_results_combo = ttk.Combobox(right_filters_frame_row2, textvariable=self.max_results_var, width=8, state="readonly")
         max_results_combo['values'] = ("10", "20", "30", "50", "100", "All")
-        max_results_combo.grid(row=2, column=3, sticky="w", padx=5, pady=5)
+        max_results_combo.pack(side="left", padx=(0, 10))
+        
+        # Min Hotspots filter (only active for specific materials) - in sub-frame
+        ttk.Label(right_filters_frame_row2, text="Min Hotspots:", width=12, anchor="e").pack(side="left", padx=(0, 5))
+        self.min_hotspots_var = tk.IntVar(value=1)  # Changed to IntVar for spinbox
+        self.min_hotspots_spinbox = ttk.Spinbox(right_filters_frame_row2, 
+                                                 textvariable=self.min_hotspots_var, 
+                                                 from_=1, 
+                                                 to=20, 
+                                                 width=6,
+                                                 state="disabled",  # Start disabled (greyed out)
+                                                 wrap=False,
+                                                 command=lambda: None)  # Enable arrow clicks
+        self.min_hotspots_spinbox.pack(side="left")
+        ToolTip(self.min_hotspots_spinbox, "Minimum hotspot count filter\nOnly shows rings with X or more hotspots\n(Only active when specific mineral is selected)")
+        
+        # NOW bind material selection to enable/disable min hotspots filter (after spinbox exists!)
+        specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_changed)
         
         # Confirmed hotspots only checkbox - DISABLED FOR TESTING
         # try:
@@ -349,12 +386,9 @@ class RingFinder:
         self.confirmed_only_var = tk.BooleanVar(value=False)
         self.confirmed_checkbox = None
         
-        # Now bind material combo change and initialize (after all widgets are created)
-        specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_change)
-        
         # Initialize checkbox state based on default material selection (with error handling)
         try:
-            self._on_material_change()
+            self._on_material_changed()  # Use the unified callback
         except Exception as e:
             print(f"Warning: Failed to initialize material change handler: {e}")
         
@@ -550,6 +584,32 @@ class RingFinder:
             return (RingFinder.ALL_MINERALS, "Alexandrite", "Benitoite", "Bromellite", "Grandidierite", 
                    "Low Temp Diamonds", "Monazite", "Musgravite", "Painite", 
                    "Platinum", "Rhodplumsite", "Serendibite", "Tritium", "Void Opals")
+    
+    def _on_material_changed(self, event=None):
+        """Enable/disable min hotspots filter AND update confirmed checkbox based on material selection"""
+        selected_material = self.specific_material_var.get()
+        
+        print(f"[DEBUG] Material changed to: '{selected_material}'")
+        
+        if selected_material == RingFinder.ALL_MINERALS:
+            # Disable min hotspots filter for "All Minerals" - disabled state prevents interaction
+            self.min_hotspots_spinbox.configure(state="disabled")
+            self.min_hotspots_var.set(1)  # Reset to default (IntVar)
+            print(f"[DEBUG] Min Hotspots DISABLED")
+            
+            # Enable confirmed checkbox for user control
+            if hasattr(self, 'confirmed_checkbox') and self.confirmed_checkbox:
+                self.confirmed_checkbox.configure(state="normal", fg="#cccccc")
+        else:
+            # Enable for specific materials - normal state allows arrow clicks and typing
+            self.min_hotspots_spinbox.configure(state="normal")
+            print(f"[DEBUG] Min Hotspots ENABLED")
+            
+            # Material selected - force confirmed hotspots and disable checkbox
+            if hasattr(self, 'confirmed_only_var'):
+                self.confirmed_only_var.set(True)
+            if hasattr(self, 'confirmed_checkbox') and self.confirmed_checkbox:
+                self.confirmed_checkbox.configure(state="disabled", fg="#888888")
     
     def _format_material_for_display(self, material_name: str) -> str:
         """Format material name for display in dropdown"""
@@ -826,16 +886,26 @@ class RingFinder:
             if not self.current_system_coords:
                 self.status_var.set(f"Warning: '{reference_system}' coordinates not found - distances may be inaccurate")
 
+        # Get min hotspots filter (only valid for specific materials)
+        min_hotspots = 1  # Default
+        if specific_material != RingFinder.ALL_MINERALS:
+            try:
+                min_hotspots = int(self.min_hotspots_var.get())
+                if min_hotspots < 1:
+                    min_hotspots = 1
+            except (ValueError, AttributeError):
+                min_hotspots = 1
+        
         # Disable search button
         self.search_btn.configure(state="disabled", text="Searching...")
         self.status_var.set("⏳ Searching for rings...")
 
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
-                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results),
+                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots),
                         daemon=True).start()
         
-    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results):
+    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1):
         """Background worker for hotspot search"""
         try:
             # Wait for database to be ready (with timeout)
@@ -850,6 +920,14 @@ class RingFinder:
             # Set the reference system coords for this worker thread
             self.current_system_coords = reference_coords
             hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results)
+            
+            # Apply min hotspots filter if needed
+            if min_hotspots > 1 and specific_material != RingFinder.ALL_MINERALS:
+                original_count = len(hotspots)
+                hotspots = [h for h in hotspots if h.get('count', 1) >= min_hotspots]
+                filtered_count = len(hotspots)
+                if filtered_count < original_count:
+                    print(f" DEBUG: Min hotspots filter ({min_hotspots}+): {original_count} -> {filtered_count} results")
             
             # EDSM FALLBACK: Smart throttling to prevent hanging
             # Small searches: Query all systems
@@ -975,6 +1053,16 @@ class RingFinder:
                     # Update hotspot dict with fresh metadata
                     hotspot['ring_type'] = row[0] if row[0] else hotspot.get('ring_type')
                     hotspot['ls_distance'] = row[1] if row[1] else hotspot.get('ls_distance')
+                    
+                    # Format LS distance for display (whole numbers with comma separators)
+                    if row[1] is not None:
+                        try:
+                            hotspot['ls'] = f"{int(float(row[1])):,}"
+                        except (ValueError, TypeError):
+                            hotspot['ls'] = row[1]
+                    else:
+                        hotspot['ls'] = hotspot.get('ls')
+                    
                     hotspot['inner_radius'] = row[2] if row[2] else hotspot.get('inner_radius')
                     hotspot['outer_radius'] = row[3] if row[3] else hotspot.get('outer_radius')
                     hotspot['ring_mass'] = row[4] if row[4] else hotspot.get('ring_mass')

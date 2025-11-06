@@ -131,11 +131,12 @@ The Hotspot Finder provides access to a comprehensive database of 32,000+ confir
 ### Key Features
 - **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
 - **Filter by Minerals** – Search for specific minerals (Painite, Platinum, Low Temperature Diamonds, etc.)
+- **Min Hotspots Filter** – Filter results to show only rings with X or more hotspots (1-20 range, available when specific mineral selected)
 - **Auto-Search** – Automatically searches for hotspots when jumping to new systems and auto-refreshes results when scanning rings (remembers preference across restarts)
 - **Pre-loaded Database** – 32,000+ hotspots with minerals types, ring densities
 - **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
-- **Distance-Based Results** – Filter by jump range to find nearby opportunities
-- **Ring Composition Details** – View ring density and distance from arrival
+- **Distance-Based Results** – Filter by jump range (up to 500 LY) to find nearby opportunities
+- **Ring Composition Details** – View ring density and distance from arrival (LS) with comma-separated formatting
 - **Smart Sorting** – Results ranked by distance, hotspot overlaps, and ring density
 
 Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.

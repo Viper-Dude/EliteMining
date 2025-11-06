@@ -510,7 +510,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.4.5"
+APP_VERSION = "v4.4.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1540,8 +1540,14 @@ class CargoMonitor:
             
             # Only refresh if scanning in the same system as current search
             current_reference_system = ring_finder.system_var.get().strip()
-            if not current_reference_system or current_reference_system.lower() != scanned_system.lower():
-                # Different system - reset first scan flag
+            
+            # If reference system is empty, populate it with scanned system
+            if not current_reference_system:
+                ring_finder.system_var.set(scanned_system)
+                current_reference_system = scanned_system
+                print(f"🔍 Auto-refresh: Reference system was empty, set to {scanned_system}")
+            elif current_reference_system.lower() != scanned_system.lower():
+                # Different system - reset first scan flag but don't refresh
                 self._first_ring_scan_in_system = True
                 return
             
