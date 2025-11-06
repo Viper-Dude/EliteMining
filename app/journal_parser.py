@@ -329,8 +329,9 @@ class JournalParser:
                 # For ring scans, the Type field contains the material name directly
                 # (e.g., "Platinum", "Monazite"), not "Material"
                 if signal_type and count > 0:
-                    # Use Type_Localised if available, otherwise use Type
-                    raw_material_name = signal.get('Type_Localised', signal_type)
+                    # Use internal Type (English) for database consistency across all languages
+                    # Type is always English, Type_Localised varies by game language
+                    raw_material_name = signal.get('Type', signal.get('Type_Localised', ''))
                     
                     # Normalize material name to prevent duplicates (e.g., "tritium" -> "Tritium")
                     material_name = self.normalize_material_name(raw_material_name)
