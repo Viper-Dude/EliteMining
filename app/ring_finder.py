@@ -929,6 +929,11 @@ class RingFinder:
                 if filtered_count < original_count:
                     print(f" DEBUG: Min hotspots filter ({min_hotspots}+): {original_count} -> {filtered_count} results")
             
+            # Apply max_results limit AFTER min_hotspots filtering
+            if max_results and len(hotspots) > max_results:
+                print(f" DEBUG: Limiting results from {len(hotspots)} to {max_results} (after min_hotspots filter)")
+                hotspots = hotspots[:max_results]
+            
             # EDSM FALLBACK: Smart throttling to prevent hanging
             # Small searches: Query all systems
             # Large searches: Query only first 30 systems for top results
@@ -1175,9 +1180,7 @@ class RingFinder:
             except:
                 pass
             
-            # Apply max results limit
-            if max_results and len(compatible_results) > max_results:
-                compatible_results = compatible_results[:max_results]
+            # Don't apply max_results here - it will be applied AFTER min_hotspots filter in _search_worker
             
             print(f" DEBUG: Converted {len(compatible_results)} user database hotspots to compatible format")
             return compatible_results
@@ -2013,8 +2016,8 @@ class RingFinder:
                         batch = systems_in_range[i:i + BATCH_SIZE]
                         placeholders = ','.join(['?'] * len(batch))
                         
-                        # Different query for RingFinder.ALL_MINERALS vs specific material
-                        if material_filter == RingFinder.ALL_MINERALS:
+                        # Different query for ALL_MINERALS vs specific material
+                        if specific_material == RingFinder.ALL_MINERALS:
                             # Show ALL rings of this type (one row per ring, combining hotspot info)
                             query = f'''
                                 SELECT system_name, body_name, 
@@ -2028,17 +2031,18 @@ class RingFinder:
                                 GROUP BY system_name, body_name
                                 ORDER BY system_name, body_name
                             '''
+                            cursor.execute(query, batch)
                         else:
-                            # Show only rings WITH this specific material (current behavior)
+                            # Show only rings WITH this specific material - filter by material in SQL for efficiency
                             query = f'''
                                 SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
                                        x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type, inner_radius, outer_radius
                                 FROM hotspot_data
-                                WHERE system_name IN ({placeholders})
+                                WHERE system_name IN ({placeholders}) AND material_name = ?
                                 ORDER BY 
                                     hotspot_count DESC, system_name, body_name
                             '''
-                        cursor.execute(query, batch)
+                            cursor.execute(query, batch + [specific_material])
                         all_results.extend(cursor.fetchall())
                     
                     # Use results from batched queries
@@ -2047,8 +2051,8 @@ class RingFinder:
                     # If no systems in range found, try direct system name search first
                     search_pattern = f"%{reference_system}%"
                     
-                    # Different query for RingFinder.ALL_MINERALS vs specific material
-                    if material_filter == RingFinder.ALL_MINERALS:
+                    # Different query for ALL_MINERALS vs specific material
+                    if specific_material == RingFinder.ALL_MINERALS:
                         # Show ALL rings of this type (one row per ring)
                         direct_search_query = '''
                             SELECT system_name, body_name, 
@@ -2063,19 +2067,19 @@ class RingFinder:
                             ORDER BY system_name, body_name
                             LIMIT 1000
                         '''
+                        cursor.execute(direct_search_query, (search_pattern, reference_system))
                     else:
-                        # Show only rings WITH this specific material
+                        # Show only rings WITH this specific material - filter by material in SQL
                         direct_search_query = '''
                             SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
                                    x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type, inner_radius, outer_radius
                             FROM hotspot_data
-                            WHERE system_name LIKE ? OR system_name = ?
+                            WHERE (system_name LIKE ? OR system_name = ?) AND material_name = ?
                             ORDER BY 
                                 hotspot_count DESC, system_name, body_name
                             LIMIT 1000
                         '''
-                    
-                    cursor.execute(direct_search_query, (search_pattern, reference_system))
+                        cursor.execute(direct_search_query, (search_pattern, reference_system, specific_material))
                     direct_results = cursor.fetchall()
                     
                     if direct_results:
