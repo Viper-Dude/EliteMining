@@ -174,6 +174,7 @@ class RingFinder:
             'Bromellite': 'Brom',
             'Grandidierite': 'Gran',
             'Low Temp Diamonds': 'LTD',
+            'Low Temperature Diamonds': 'LTD',  # Database version
             'Monazite': 'Mona',
             'Musgravite': 'Musg',
             'Painite': 'Pain',
@@ -823,6 +824,10 @@ class RingFinder:
         material_filter = self.material_var.get()
         specific_material = self.specific_material_var.get()
         
+        # Convert dropdown display names to database names for SQL query
+        if specific_material == "Low Temp Diamonds":
+            specific_material = "Low Temperature Diamonds"
+        
         # Get confirmed_only with error handling
         try:
             confirmed_only = self.confirmed_only_var.get()
@@ -1204,6 +1209,7 @@ class RingFinder:
         # Handle display name to database name mapping
         display_to_db_mapping = {
             'low temperature diamonds': 'lowtemperaturediamond',
+            'low temp diamonds': 'lowtemperaturediamond',  # Dropdown shows this
             'void opals': 'opal'
         }
         
@@ -2181,10 +2187,17 @@ class RingFinder:
                         
                         # Include this system in results
                         source_label = f"EDTools.cc ({coord_source})" if coord_source else "EDTools.cc Community Data"
+                        
+                        # Abbreviate material names ONLY for "All Minerals" view
+                        if specific_material == RingFinder.ALL_MINERALS:
+                            display_material_name = self._abbreviate_material_for_display(material_name)
+                        else:
+                            display_material_name = material_name
+                        
                         hotspot_entry = {
                             'systemName': system_name,
                             'bodyName': body_name,
-                            'type': material_name,
+                            'type': display_material_name,
                             'count': hotspot_count,
                             'distance': round(distance, 1) if distance < 999 else 999.9,
                             'coords': {'x': x_coord, 'y': y_coord, 'z': z_coord} if x_coord is not None else None,
@@ -2514,9 +2527,9 @@ class RingFinder:
                 
                 # Convert database format to display format for special cases
                 if material_name == "LowTemperatureDiamond":
-                    material_name = "Low Temp Diamonds"  # Show as "Low Temp Diamonds" in search results
+                    material_name = "Low Temp Diamonds"  # Show dropdown format
                 elif material_name == "Low Temperature Diamonds":
-                    material_name = "Low Temp Diamonds"  # Show as "Low Temp Diamonds" in search results
+                    material_name = "Low Temp Diamonds"  # Show dropdown format
                 
                 # Check if material_name already contains counts (from RingFinder.ALL_MINERALS GROUP_CONCAT)
                 # Format: "Material (X)" or "Material1 (X), Material2 (Y)"
