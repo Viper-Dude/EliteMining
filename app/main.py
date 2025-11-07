@@ -190,7 +190,7 @@ class TextOverlay:
         self.fade_timer = None
         self.transparency = 0.9  # Default transparency (90%)
         self.text_color = "#FFFFFF"  # Default white color
-        self.position = "upper_right"  # Default position
+        self.position = "upper_left"  # Fixed position
         self.font_size = 14  # Default font size (Normal)
         
     def create_overlay(self):
@@ -339,8 +339,8 @@ class TextOverlay:
         self.text_label.configure(fg=final_color)
     
     def set_position(self, position: str):
-        """Set overlay position ('upper_right' or 'upper_left')"""
-        self.position = position
+        """Set overlay position - always upper left"""
+        self.position = "upper_left"  # Always use upper left
         if self.overlay_window:
             self._set_window_position()
     
@@ -363,22 +363,15 @@ class TextOverlay:
         # The new duration will apply to the next message
     
     def _set_window_position(self):
-        """Set window position based on current position setting"""
+        """Set window position - always upper left"""
         if not self.overlay_window:
             return
             
-        screen_width = self.overlay_window.winfo_screenwidth()
-        window_width = 750  # Wider for long material names like "Low Temperature Diamonds"
-        window_height = 300  # Larger for enhanced overlay with different font sizes
-        
-        if self.position == "upper_left":
-            # Upper left: absolute position
-            x_pos = 20
-            y_pos = 100
-        else:  # upper_right (default)
-            # Upper right with margin
-            x_pos = screen_width - window_width - 20
-            y_pos = 100
+        # Fixed position: upper left
+        window_width = 750
+        window_height = 300
+        x_pos = 20
+        y_pos = 100
         
         self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
     
@@ -4332,13 +4325,6 @@ class App(tk.Tk):
             "Magenta": "#CC00CC"       # Muted magenta, distinct from most backgrounds
         }
         
-        # Position options for overlay placement
-        self.text_overlay_position = tk.StringVar(value="Upper Right")  # Default upper right
-        self.position_options = {
-            "Upper Right": "upper_right",
-            "Upper Left": "upper_left"
-        }
-        
         # Text size options for overlay
         self.text_overlay_size = tk.StringVar(value="Normal")  # Default normal size
         self.size_options = {
@@ -4367,7 +4353,6 @@ class App(tk.Tk):
         self.text_overlay_enabled.trace('w', self._on_text_overlay_toggle)
         self.text_overlay_transparency.trace('w', self._on_transparency_change)
         self.text_overlay_color.trace('w', self._on_color_change)
-        self.text_overlay_position.trace('w', self._on_position_change)
         self.text_overlay_size.trace('w', self._on_size_change)
         self.text_overlay_duration.trace('w', self._on_duration_change)
         self.overlay_mode.trace('w', self._on_overlay_mode_change)
@@ -5808,19 +5793,6 @@ class App(tk.Tk):
         tk.Label(duration_frame, text="seconds", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         r += 1
         tk.Label(scrollable_frame, text="How long text stays visible on screen (5-30 seconds)", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
-        r += 1
-        
-        # Position selection
-        position_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
-        position_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(position_frame, text="Position:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
-        self.position_combo = ttk.Combobox(position_frame, textvariable=self.text_overlay_position, 
-                                          values=list(self.position_options.keys()), 
-                                          state="readonly", width=12, font=("Segoe UI", 8))
-        self.position_combo.pack(side="left", padx=(8, 0))
-        r += 1
-        tk.Label(scrollable_frame, text="Choose overlay position on screen", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
@@ -7450,7 +7422,6 @@ class App(tk.Tk):
         enabled = cfg.get("text_overlay_enabled", False)  # Default to disabled
         transparency = cfg.get("text_overlay_transparency", 90)  # Default to 90%
         color = cfg.get("text_overlay_color", "White")  # Default to white
-        position = cfg.get("text_overlay_position", "Upper Right")  # Default to upper right
         size = cfg.get("text_overlay_size", "Normal")  # Default to normal size
         duration = cfg.get("text_overlay_duration", 7)  # Default to 7 seconds
         overlay_mode = cfg.get("overlay_mode", "standard")  # Default to standard mode
@@ -7459,7 +7430,6 @@ class App(tk.Tk):
         self.text_overlay_enabled.set(1 if enabled else 0)
         self.text_overlay_transparency.set(transparency)
         self.text_overlay_color.set(color)
-        self.text_overlay_position.set(position)
         self.text_overlay_size.set(size)
         self.text_overlay_duration.set(duration)
         self.overlay_mode.set(overlay_mode)
@@ -7470,9 +7440,8 @@ class App(tk.Tk):
         # Set color after transparency to ensure proper brightness calculation
         color_hex = self.color_options.get(color, "#FFFFFF")
         self.text_overlay.set_color(color_hex)
-        # Set position
-        position_value = self.position_options.get(position, "upper_right")
-        self.text_overlay.set_position(position_value)
+        # Position is always upper left
+        self.text_overlay.set_position("upper_left")
         # Set font size
         size_value = self.size_options.get(size, 14)
         self.text_overlay.set_font_size(size_value)
@@ -7480,13 +7449,12 @@ class App(tk.Tk):
         self.text_overlay.set_display_duration(duration)
 
     def _save_text_overlay_preference(self) -> None:
-        """Save text overlay enabled state, transparency, color, and position to config"""
+        """Save text overlay enabled state, transparency, color, and settings to config"""
         from config import update_config_values
         updates = {
             "text_overlay_enabled": bool(self.text_overlay_enabled.get()),
             "text_overlay_transparency": int(self.text_overlay_transparency.get()),
             "text_overlay_color": str(self.text_overlay_color.get()),
-            "text_overlay_position": str(self.text_overlay_position.get()),
             "text_overlay_size": str(self.text_overlay_size.get()),
             "text_overlay_duration": int(self.text_overlay_duration.get()),
             "overlay_mode": str(self.overlay_mode.get()),
@@ -7523,17 +7491,6 @@ class App(tk.Tk):
         # Show a preview message if overlay is enabled to test color
         if self.text_overlay.overlay_enabled:
             self.text_overlay.show_message(f"Color: {color_name}")
-
-    def _on_position_change(self, *args) -> None:
-        """Called when position selection is changed"""
-        position_name = self.text_overlay_position.get()
-        position_value = self.position_options.get(position_name, "upper_right")
-        self.text_overlay.set_position(position_value)
-        self._save_text_overlay_preference()
-        
-        # Show a preview message if overlay is enabled to test position
-        if self.text_overlay.overlay_enabled:
-            self.text_overlay.show_message(f"Position: {position_name}")
 
     def _on_size_change(self, *args) -> None:
         """Called when text size selection is changed"""
@@ -8696,9 +8653,11 @@ class App(tk.Tk):
         # Configure grid weights
         search_frame.columnconfigure(1, weight=1)
         
-        self.marketplace_search_mode = tk.StringVar(value="near_system")
-        self.marketplace_sell_mode = tk.BooleanVar(value=True)
-        self.marketplace_buy_mode = tk.BooleanVar(value=False)
+        # Load marketplace preferences from config
+        cfg = _load_cfg()
+        self.marketplace_search_mode = tk.StringVar(value=cfg.get('marketplace_search_mode', 'near_system'))
+        self.marketplace_sell_mode = tk.BooleanVar(value=cfg.get('marketplace_sell_mode', True))
+        self.marketplace_buy_mode = tk.BooleanVar(value=cfg.get('marketplace_buy_mode', False))
         
         # Row 0: Search Mode (Near/Galaxy) + Sell/Buy
         row0_frame = tk.Frame(search_frame, bg="#1e1e1e")
@@ -8739,7 +8698,7 @@ class App(tk.Tk):
         row1_frame.grid(row=1, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
         ttk.Label(row1_frame, text="Ref. System:").pack(side="left", padx=(0, 5))
-        self.marketplace_reference_system = tk.StringVar(value="")
+        self.marketplace_reference_system = tk.StringVar(value=cfg.get('marketplace_reference_system', ''))
         self.marketplace_ref_entry = ttk.Entry(row1_frame, textvariable=self.marketplace_reference_system, width=30)
         self.marketplace_ref_entry.pack(side="left", padx=(0, 5))
         self.marketplace_ref_entry.bind("<Return>", lambda e: self._search_marketplace())
@@ -8751,7 +8710,7 @@ class App(tk.Tk):
         self.marketplace_use_current_btn.pack(side="left", padx=(0, 20))
         
         ttk.Label(row1_frame, text="Commodity:").pack(side="left", padx=(0, 5))
-        self.marketplace_commodity = tk.StringVar(value="Alexandrite")
+        self.marketplace_commodity = tk.StringVar(value=cfg.get('marketplace_commodity', 'Alexandrite'))
         sorted_commodities = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
                              "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Indite", 
                              "Lepidolite", "LTD", "Monazite", "Musgravite", 
@@ -8762,13 +8721,14 @@ class App(tk.Tk):
                                      values=sorted_commodities, state="readonly", width=18)
         commodity_combo.pack(side="left")
         commodity_combo.bind("<Return>", lambda e: self._search_marketplace())
+        commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         
         # Row 2: All filters
         row2_frame = tk.Frame(search_frame, bg="#1e1e1e")
         row2_frame.grid(row=2, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
         ttk.Label(row2_frame, text="Station:").pack(side="left", padx=(0, 5))
-        self.marketplace_station_type = tk.StringVar(value="All")
+        self.marketplace_station_type = tk.StringVar(value=cfg.get('marketplace_station_type', 'All'))
         station_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_station_type,
                                 values=["All", "Orbital Only", "Surface Only", "Fleet Carrier", "Megaship", "Stronghold"],
                                 state="readonly", width=12)
@@ -8778,11 +8738,12 @@ class App(tk.Tk):
         def on_station_type_change(*args):
             if self.marketplace_station_type.get() == "Fleet Carrier":
                 self.marketplace_exclude_carriers.set(False)
+            self._save_marketplace_preferences()
         self.marketplace_station_type.trace_add("write", on_station_type_change)
         
-        cfg = _load_cfg()
         self.marketplace_exclude_carriers = tk.BooleanVar(value=cfg.get('marketplace_exclude_carriers', True))
         exclude_cb = tk.Checkbutton(row2_frame, text="Exclude Carriers", variable=self.marketplace_exclude_carriers,
+                      command=self._save_marketplace_preferences,
                       bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
                       activebackground="#1e1e1e", activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
@@ -8791,6 +8752,7 @@ class App(tk.Tk):
         
         self.marketplace_large_pad_only = tk.BooleanVar(value=cfg.get('marketplace_large_pad_only', False))
         large_pad_cb = tk.Checkbutton(row2_frame, text="Large Pads", variable=self.marketplace_large_pad_only,
+                      command=self._save_marketplace_preferences,
                       bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
                       activebackground="#1e1e1e", activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
@@ -8798,19 +8760,21 @@ class App(tk.Tk):
         ToolTip(large_pad_cb, "Show only stations with Large landing pads")
         
         ttk.Label(row2_frame, text="Sort by:").pack(side="left", padx=(0, 5))
-        self.marketplace_order_by = tk.StringVar(value="Distance")
+        self.marketplace_order_by = tk.StringVar(value=cfg.get('marketplace_order_by', 'Distance'))
         self.marketplace_order_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_order_by,
                                      values=["Best price", "Distance", "Best supply/demand", "Last update"],
-                                     state="readonly", width=15)
+                                     state="readonly", width=18)
         self.marketplace_order_combo.pack(side="left", padx=(0, 10))
+        self.marketplace_order_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         ToolTip(self.marketplace_order_combo, "Sort results by price, distance, supply/demand, or data freshness")
         
         ttk.Label(row2_frame, text="Max age:").pack(side="left", padx=(0, 5))
-        self.marketplace_max_age = tk.StringVar(value="8 hours")
+        self.marketplace_max_age = tk.StringVar(value=cfg.get('marketplace_max_age', '8 hours'))
         age_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_max_age,
                                 values=["Any", "1 hour", "8 hours", "16 hours", "1 day", "2 days"],
                                 state="readonly", width=10)
         age_combo.pack(side="left", padx=(0, 15))
+        age_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         ToolTip(age_combo, "Filter by how recent the market data is")
         
         # Row 3: Search button
@@ -9043,6 +9007,9 @@ class App(tk.Tk):
         
         # Update order by dropdown options for sell mode
         self._update_marketplace_order_options()
+        
+        # Save preference
+        self._save_marketplace_preferences()
     
     def _on_buy_mode_toggle(self):
         """Handle buy checkbox toggle - ensure only one mode is active"""
@@ -9058,6 +9025,9 @@ class App(tk.Tk):
         
         # Update order by dropdown options for buy mode
         self._update_marketplace_order_options()
+        
+        # Save preference
+        self._save_marketplace_preferences()
     
     def _update_marketplace_order_options(self):
         """Update Order by dropdown options based on buy/sell mode"""
@@ -9223,6 +9193,23 @@ class App(tk.Tk):
         """Clear marketplace cache - no longer needed (using external sites)"""
         self.marketplace_total_label.config(text="ℹ️ Cache not needed (using external sites)")
     
+    def _save_marketplace_preferences(self):
+        """Save all marketplace preferences to config"""
+        from config import update_config_values
+        updates = {
+            "marketplace_search_mode": str(self.marketplace_search_mode.get()),
+            "marketplace_sell_mode": bool(self.marketplace_sell_mode.get()),
+            "marketplace_buy_mode": bool(self.marketplace_buy_mode.get()),
+            "marketplace_reference_system": str(self.marketplace_reference_system.get()),
+            "marketplace_commodity": str(self.marketplace_commodity.get()),
+            "marketplace_station_type": str(self.marketplace_station_type.get()),
+            "marketplace_exclude_carriers": bool(self.marketplace_exclude_carriers.get()),
+            "marketplace_large_pad_only": bool(self.marketplace_large_pad_only.get()),
+            "marketplace_order_by": str(self.marketplace_order_by.get()),
+            "marketplace_max_age": str(self.marketplace_max_age.get())
+        }
+        update_config_values(updates)
+    
     # ==================== UNUSED MARKETPLACE SEARCH METHODS (Kept for reference) ====================
     # These methods are no longer used - marketplace now uses external websites (Inara, edtools.cc)
     # Kept here temporarily in case rollback is needed
@@ -9230,6 +9217,9 @@ class App(tk.Tk):
     def _search_marketplace(self):
         """Search for commodity prices using Ardent API"""
         try:
+            # Save current search parameters
+            self._save_marketplace_preferences()
+            
             commodity = self.marketplace_commodity.get()
             search_mode = self.marketplace_search_mode.get()
             
