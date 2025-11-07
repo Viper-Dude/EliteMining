@@ -1311,9 +1311,9 @@ class ProspectorPanel(ttk.Frame):
         self.tree.heading("materials", text="Minerals", anchor="center")
         self.tree.heading("content", text="Asteroid Content", anchor="center")
         self.tree.heading("time", text="Time")
-        self.tree.column("materials", width=400, anchor="w", stretch=True)
-        self.tree.column("content", width=180, anchor="w", stretch=True)
-        self.tree.column("time", width=80, anchor="center", stretch=False)
+        self.tree.column("materials", width=400, minwidth=150, anchor="w", stretch=False)
+        self.tree.column("content", width=180, minwidth=100, anchor="w", stretch=False)
+        self.tree.column("time", width=80, minwidth=60, anchor="center", stretch=True)
         self.tree.grid(row=4, column=0, sticky="nsew")
         yscroll = ttk.Scrollbar(rep, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscroll=yscroll.set)
@@ -1337,14 +1337,14 @@ class ProspectorPanel(ttk.Frame):
         self.stats_tree.heading("latest_pct", text="Latest %", anchor="center")
         self.stats_tree.heading("count", text="Hits", anchor="center")
         
-        self.stats_tree.column("material", width=100, anchor="w", stretch=True)
-        self.stats_tree.column("tons", width=65, anchor="center", stretch=False)
-        self.stats_tree.column("tph", width=65, anchor="center", stretch=False)
-        self.stats_tree.column("avg_all", width=95, anchor="center", stretch=False)
-        self.stats_tree.column("avg_pct", width=130, anchor="center", stretch=False)
-        self.stats_tree.column("best_pct", width=80, anchor="center", stretch=False)
-        self.stats_tree.column("latest_pct", width=80, anchor="center", stretch=False)
-        self.stats_tree.column("count", width=65, anchor="center", stretch=False)
+        self.stats_tree.column("material", width=100, minwidth=80, anchor="w", stretch=False)
+        self.stats_tree.column("tons", width=65, minwidth=50, anchor="center", stretch=False)
+        self.stats_tree.column("tph", width=65, minwidth=50, anchor="center", stretch=False)
+        self.stats_tree.column("avg_all", width=95, minwidth=70, anchor="center", stretch=False)
+        self.stats_tree.column("avg_pct", width=130, minwidth=100, anchor="center", stretch=False)
+        self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="center", stretch=False)
+        self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="center", stretch=False)
+        self.stats_tree.column("count", width=65, minwidth=50, anchor="center", stretch=True)
         
         self.stats_tree.tag_configure("darkrow", background="#1e1e1e", foreground="#e6e6e6")
         self.stats_tree.grid(row=0, column=0, sticky="ew")
@@ -7653,7 +7653,6 @@ class ProspectorPanel(ttk.Frame):
                     self._startup_skip = False  # Clear flag after first event
                 materials_txt, content_txt, time_txt, panel_summary, speak_summary, triggered = self._summaries_from_event(evt)
                 self.history.insert(0, (materials_txt, content_txt, time_txt))
-                self.history = self.history[:10]
                 
                 # Track yield data during session for later CSV calculation
                 self._track_session_yield_data(materials_txt)

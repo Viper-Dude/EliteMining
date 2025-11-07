@@ -216,7 +216,7 @@ class TextOverlay:
             text="",
             bg="#000001",  # Same as transparent color - will be invisible
             fg=self.text_color,  # Use current color (will be updated with brightness)
-            font=("Segoe UI", 11, "normal"),  # Fixed smaller size
+            font=("Segoe UI", self.font_size, "normal"),  # Use current font_size setting
             wraplength=0,  # Disable wrapping - let newlines control line breaks
             justify="left",
             relief="flat",
@@ -510,7 +510,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.4.6"
+APP_VERSION = "v4.4.7"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4202,6 +4202,9 @@ class App(tk.Tk):
         self.resizable(True, True)
         self.minsize(850, 680)  # Increased height to ensure status bar is visible
         
+        # Withdraw window initially to prevent flash on wrong monitor
+        self.withdraw()
+        
         # Set window class name for better Windows integration (PowerToys compatibility)
         try:
             self.wm_class("EliteMining", "EliteMining")
@@ -4216,8 +4219,7 @@ class App(tk.Tk):
         except Exception as e:
             print(f"Window attributes setup failed: {e}")
 
-        # Restore window geometry
-        self._restore_window_geometry()
+        # Don't restore geometry here - will be done after widgets load
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # Two-column layout: balanced dashboard + narrower presets sidebar
@@ -7704,6 +7706,13 @@ class App(tk.Tk):
                         geom = f"{width}x{height}+{x}+{y}"
                 
                 self.geometry(geom)
+                
+                # Restore zoomed/maximized state
+                if zoomed:
+                    self.state("zoomed")
+                    
+                # Show window after geometry is set
+                self.deiconify()
             except Exception as e:
                 # If saved geometry fails, center on screen with default size
                 self.geometry("1100x650")
@@ -7720,6 +7729,11 @@ class App(tk.Tk):
             screen_width = self.winfo_screenwidth()
             screen_height = self.winfo_screenheight()
             x = (screen_width - 1100) // 2
+            y = (screen_height - 650) // 2
+            self.geometry(f"1100x650+{x}+{y}")
+            
+            # Show window after geometry is set
+            self.deiconify()
             y = (screen_height - 650) // 2
             self.geometry(f"1100x650+{x}+{y}")
         
@@ -8875,7 +8889,7 @@ class App(tk.Tk):
         self.marketplace_tree.column("distance", width=65, minwidth=55, anchor="center", stretch=False)
         self.marketplace_tree.column("demand", width=70, minwidth=55, anchor="center", stretch=False)
         self.marketplace_tree.column("price", width=120, minwidth=80, anchor="center", stretch=False)
-        self.marketplace_tree.column("updated", width=90, minwidth=70, anchor="center", stretch=False)
+        self.marketplace_tree.column("updated", width=90, minwidth=70, anchor="center", stretch=True)
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.marketplace_tree.yview)
@@ -10518,6 +10532,8 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
 if __name__ == "__main__":
     try:
         app = App()
+        # Restore geometry after all widgets are created
+        app.after(100, app._restore_window_geometry)
         app.mainloop()
     except Exception as e:
         # Show error dialog with full traceback

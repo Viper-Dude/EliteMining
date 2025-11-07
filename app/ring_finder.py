@@ -452,7 +452,7 @@ class RingFinder:
             elif col == "LS":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
             elif col == "Density":
-                self.results_tree.column(col, width=column_widths[col], minwidth=90, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=90, anchor="center", stretch=True)
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.results_tree.yview)
