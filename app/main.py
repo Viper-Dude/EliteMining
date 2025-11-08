@@ -503,7 +503,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.4.7"
+APP_VERSION = "v4.4.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -8697,7 +8697,8 @@ class App(tk.Tk):
         row1_frame = tk.Frame(search_frame, bg="#1e1e1e")
         row1_frame.grid(row=1, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
-        ttk.Label(row1_frame, text="Ref. System:").pack(side="left", padx=(0, 5))
+        # Fixed-width label for perfect alignment with Station: below
+        ttk.Label(row1_frame, text="Ref. System:", width=12).pack(side="left", padx=(0, 5))
         self.marketplace_reference_system = tk.StringVar(value=cfg.get('marketplace_reference_system', ''))
         self.marketplace_ref_entry = ttk.Entry(row1_frame, textvariable=self.marketplace_reference_system, width=30)
         self.marketplace_ref_entry.pack(side="left", padx=(0, 5))
@@ -8723,11 +8724,13 @@ class App(tk.Tk):
         commodity_combo.bind("<Return>", lambda e: self._search_marketplace())
         commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         
-        # Row 2: All filters
+        # Row 2: All filters (aligned with Row 1)
         row2_frame = tk.Frame(search_frame, bg="#1e1e1e")
         row2_frame.grid(row=2, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
-        ttk.Label(row2_frame, text="Station:").pack(side="left", padx=(0, 5))
+        # Station label with same width as "Ref. System:" for perfect alignment
+        station_label = ttk.Label(row2_frame, text="Station:", width=12)
+        station_label.pack(side="left", padx=(0, 5))
         self.marketplace_station_type = tk.StringVar(value=cfg.get('marketplace_station_type', 'All'))
         station_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_station_type,
                                 values=["All", "Orbital Only", "Surface Only", "Fleet Carrier", "Megaship", "Stronghold"],
@@ -8823,6 +8826,9 @@ class App(tk.Tk):
         ToolTip(self.marketplace_use_current_btn, "Use current system from journal")
         ToolTip(search_btn, "Search for commodity prices")
         ToolTip(commodity_combo, "Select commodity to search")
+        
+        # Initialize dropdown options based on current buy/sell mode
+        self._update_marketplace_order_options()
     
     def _create_marketplace_results_table(self, parent_frame):
         """Create results table for marketplace search"""
@@ -9849,14 +9855,14 @@ class App(tk.Tk):
             self.marketplace_tree.delete(item)
     
     def _display_marketplace_results(self, results):
-        """Display marketplace results from Ardent API (sorted by distance by default)"""
+        """Display marketplace results (already sorted by user's selected criteria)"""
         self._clear_marketplace_results()
         
-        # Sort by distance (closest first) for display
-        results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+        # Results are already sorted by the search function based on user's "Sort by" selection
+        # DO NOT re-sort here - just display them as provided
         
         commodity = self.marketplace_commodity.get()
-        self._populate_marketplace_results(results_sorted, commodity)
+        self._populate_marketplace_results(results, commodity)
     
     def _populate_marketplace_results(self, results, commodity):
         """Populate marketplace results in UI"""
@@ -10187,13 +10193,11 @@ class App(tk.Tk):
         return any(space_type in station_type for space_type in space_stations)
 
     def _check_for_updates_startup(self):
-        """Check for updates on startup (automatic check)"""
+        """Check for updates on startup (automatic check) - checks every time app starts"""
         print(f"Checking for updates... Current version: {get_version()}")
-        if self.update_checker.should_check_for_updates(UPDATE_CHECK_INTERVAL):
-            print("Update check: Time limit passed, checking for updates...")
-            self.update_checker.check_for_updates_async(self)
-        else:
-            print("Update check: Skipping - checked recently")
+        # Always check on startup (best practice for desktop apps)
+        print("Update check: Checking for updates on startup...")
+        self.update_checker.check_for_updates_async(self)
 
     def _manual_update_check(self):
         """Manually check for updates (from menu)"""
