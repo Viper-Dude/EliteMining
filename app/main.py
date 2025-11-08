@@ -10197,6 +10197,34 @@ class App(tk.Tk):
         print(f"Checking for updates... Current version: {get_version()}")
         # Always check on startup (best practice for desktop apps)
         print("Update check: Checking for updates on startup...")
+        
+        # Create temporary update check notification
+        try:
+            update_label = tk.Label(
+                self,
+                text="🔍 Checking for updates...",
+                bg="#2d2d2d",
+                fg="#ffffff",
+                font=("Segoe UI", 10, "bold"),
+                padx=20,
+                pady=10,
+                relief="raised",
+                bd=2
+            )
+            update_label.place(relx=0.5, rely=0.5, anchor="center")
+            update_label.lift()  # Bring to front
+            
+            # Remove label after 3 seconds
+            def hide_update_label():
+                try:
+                    update_label.destroy()
+                except:
+                    pass
+            
+            self.after(3000, hide_update_label)
+        except Exception as e:
+            print(f"Could not show update check notification: {e}")
+        
         self.update_checker.check_for_updates_async(self)
 
     def _manual_update_check(self):
