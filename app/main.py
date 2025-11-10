@@ -503,7 +503,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.4.8"
+APP_VERSION = "v4.4.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -10198,32 +10198,22 @@ class App(tk.Tk):
         # Always check on startup (best practice for desktop apps)
         print("Update check: Checking for updates on startup...")
         
-        # Create temporary update check notification
+        # Show update check in cargo monitor status label instead of popup
         try:
-            update_label = tk.Label(
-                self,
-                text="🔍 Checking for updates...",
-                bg="#2d2d2d",
-                fg="#ffffff",
-                font=("Segoe UI", 10, "bold"),
-                padx=20,
-                pady=10,
-                relief="raised",
-                bd=2
-            )
-            update_label.place(relx=0.5, rely=0.5, anchor="center")
-            update_label.lift()  # Bring to front
-            
-            # Remove label after 3 seconds
-            def hide_update_label():
-                try:
-                    update_label.destroy()
-                except:
-                    pass
-            
-            self.after(3000, hide_update_label)
+            if hasattr(self, 'cargo_monitor') and self.cargo_monitor and hasattr(self.cargo_monitor, 'status_label'):
+                self.cargo_monitor.status_label.configure(text="🔍 Checking for updates...")
+                
+                # Restore normal status after 3 seconds
+                def restore_status():
+                    try:
+                        if hasattr(self, 'cargo_monitor') and self.cargo_monitor:
+                            self.cargo_monitor.status_label.configure(text="🔍 Monitoring Elite Dangerous journal...")
+                    except:
+                        pass
+                
+                self.after(3000, restore_status)
         except Exception as e:
-            print(f"Could not show update check notification: {e}")
+            print(f"Could not update status label for update check: {e}")
         
         self.update_checker.check_for_updates_async(self)
 
