@@ -342,7 +342,7 @@ class RingFinder:
         ttk.Label(right_filters_frame_row1, text="Max Distance (LY):", width=15, anchor="e").pack(side="left", padx=(0, 5))
         self.distance_var = tk.StringVar(value="50")
         distance_combo = ttk.Combobox(right_filters_frame_row1, textvariable=self.distance_var, width=8, state="readonly")
-        distance_combo['values'] = ("10", "50", "100", "150", "200", "300", "400", "500")
+        distance_combo['values'] = ("10", "50", "100", "150", "200", "300")
         distance_combo.pack(side="left")
         
         # Max Results filter - in sub-frame with fixed label width to align dropdowns
@@ -454,6 +454,35 @@ class RingFinder:
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
             elif col == "Density":
                 self.results_tree.column(col, width=column_widths[col], minwidth=90, anchor="center", stretch=True)
+        
+        # Load saved column widths from config
+        try:
+            from config import load_ring_finder_column_widths
+            saved_widths = load_ring_finder_column_widths()
+            if saved_widths:
+                for col_name, width in saved_widths.items():
+                    try:
+                        self.results_tree.column(col_name, width=width)
+                    except:
+                        pass
+        except Exception as e:
+            print(f"[DEBUG] Could not load Ring Finder column widths: {e}")
+
+        # Bind column resize event to save widths
+        def save_ring_finder_widths(event=None):
+            try:
+                from config import save_ring_finder_column_widths
+                widths = {}
+                for col in columns:
+                    try:
+                        widths[col] = self.results_tree.column(col, "width")
+                    except:
+                        pass
+                save_ring_finder_column_widths(widths)
+            except Exception as e:
+                print(f"[DEBUG] Could not save Ring Finder column widths: {e}")
+        
+        self.results_tree.bind("<ButtonRelease-1>", save_ring_finder_widths)
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.results_tree.yview)
@@ -749,6 +778,16 @@ class RingFinder:
         """Initialize empty systems cache for coordinate lookups"""
         # Start with empty cache - coordinates will be fetched from EDSM as needed
         self.systems_data = {}
+        
+        # Load saved filter settings
+        self._load_filter_settings()
+        
+        # Add traces to save settings when they change
+        self.material_var.trace_add('write', lambda *args: self._save_filter_settings())
+        self.specific_material_var.trace_add('write', lambda *args: self._save_filter_settings())
+        self.distance_var.trace_add('write', lambda *args: self._save_filter_settings())
+        self.max_results_var.trace_add('write', lambda *args: self._save_filter_settings())
+        self.min_hotspots_var.trace_add('write', lambda *args: self._save_filter_settings())
     
     def _on_material_change(self, event=None):
         """Update confirmed hotspots checkbox when material filter changes"""
@@ -813,6 +852,51 @@ class RingFinder:
             print(f" DEBUG: Looking for abbreviations: {material_abbrevs.get(specific_material, [])} in: {hotspot_display}")
         
         return False
+    
+    def _save_filter_settings(self):
+        """Save current filter settings to config"""
+        try:
+            from config import save_ring_finder_filters
+            
+            settings = {
+                "ring_type": self.material_var.get(),
+                "specific_material": self.specific_material_var.get(),
+                "distance": self.distance_var.get(),
+                "max_results": self.max_results_var.get(),
+                "min_hotspots": self.min_hotspots_var.get()
+            }
+            
+            save_ring_finder_filters(settings)
+            print(f"DEBUG: Saved ring finder settings: {settings}")
+            
+        except Exception as e:
+            print(f"DEBUG: Error saving ring finder settings: {e}")
+    
+    def _load_filter_settings(self):
+        """Load filter settings from config"""
+        try:
+            from config import load_ring_finder_filters
+            
+            settings = load_ring_finder_filters()
+            if not settings:
+                return
+            
+            # Restore settings
+            if "ring_type" in settings:
+                self.material_var.set(settings["ring_type"])
+            if "specific_material" in settings:
+                self.specific_material_var.set(settings["specific_material"])
+            if "distance" in settings:
+                self.distance_var.set(settings["distance"])
+            if "max_results" in settings:
+                self.max_results_var.set(settings["max_results"])
+            if "min_hotspots" in settings:
+                self.min_hotspots_var.set(settings["min_hotspots"])
+            
+            print(f"DEBUG: Loaded ring finder settings: {settings}")
+            
+        except Exception as e:
+            print(f"DEBUG: Error loading ring finder settings: {e}")
     
     def search_hotspots(self):
         """Search for mining hotspots using reference system as center point"""
@@ -1996,7 +2080,13 @@ class RingFinder:
                     if reference_coords:
                         print(f" DEBUG: Found reference system {reference_system} in galaxy database")
                     else:
-                        print(f" DEBUG: Reference system {reference_system} not found in any database, will show all results without distance filtering")
+                        # Final fallback: Try EDSM API (for systems not in galaxy DB, e.g., after carrier jump while offline)
+                        print(f" DEBUG: Reference system {reference_system} not in galaxy database, trying EDSM API...")
+                        reference_coords = self._get_system_coords_from_edsm(reference_system)
+                        if reference_coords:
+                            print(f" DEBUG: Found reference system {reference_system} coordinates from EDSM API")
+                        else:
+                            print(f" DEBUG: Reference system {reference_system} not found in any database or EDSM, will show all results without distance filtering")
             
             with sqlite3.connect(self.user_db.db_path) as conn:
                 cursor = conn.cursor()
@@ -2005,11 +2095,22 @@ class RingFinder:
                 systems_in_range = None
                 if reference_coords and max_distance < 1000:  # Only pre-filter for specific distance searches
                     systems_in_range = self._find_systems_in_range(reference_coords, max_distance)
+                    
+                    if systems_in_range is None:
+                        systems_in_range = [reference_system]
+                        print(f" DEBUG: No systems found in range, starting with reference system '{reference_system}'")
+                    
                     if systems_in_range:
                         # Cap systems to prevent search hanging on large distance searches
                         if len(systems_in_range) > 5000:
                             print(f" DEBUG: Too many systems ({len(systems_in_range)}) - limiting to 5000 for performance")
                             systems_in_range = systems_in_range[:5000]
+                        
+                        # Always include reference system itself (distance = 0 LY) AFTER limiting
+                        if reference_system not in systems_in_range:
+                            systems_in_range.append(reference_system)
+                            print(f" DEBUG: Added reference system '{reference_system}' to search list (0 LY)")
+                        
                         print(f" DEBUG: Pre-filtered to {len(systems_in_range)} systems within {max_distance} LY")
                 
                 # Build optimized query based on whether we have a system filter
@@ -2342,15 +2443,20 @@ class RingFinder:
                 results = cursor.fetchall()
                 print(f" DEBUG: Galaxy database returned {len(results)} systems from cube query")
                 
-                # Calculate actual distance and filter
+                # Calculate actual distance and filter - store as (name, distance) tuples
+                systems_with_distances = []
                 for name, x, y, z in results:
                     system_coords = {'x': x, 'y': y, 'z': z}
                     distance = self._calculate_distance(reference_coords, system_coords)
                     
                     if distance <= max_distance:
-                        systems_in_range.append(name)
+                        systems_with_distances.append((name, distance))
+                
+                # Sort by distance (closest first) before converting to name-only list
+                systems_with_distances.sort(key=lambda x: x[1])
+                systems_in_range = [name for name, dist in systems_with_distances]
                         
-                print(f" DEBUG: Found {len(systems_in_range)} systems within {max_distance} LY using galaxy database")
+                print(f" DEBUG: Found {len(systems_in_range)} systems within {max_distance} LY using galaxy database (sorted by distance)")
                 
                 # Also check user database for visited systems within range
                 try:

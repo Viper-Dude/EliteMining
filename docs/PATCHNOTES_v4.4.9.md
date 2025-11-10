@@ -8,6 +8,13 @@
 
 ### User Interface
 - **Changed:** Removed visual popup notification for update checks at startup. Update check status now displays in the bottom left status label instead (shows for 3 seconds).
+- **New:** All table column widths are now remembered and restored on app restart. Applies to:
+  - Mining Analysis (Reports Tab) - Session list
+  - Prospector Report - Asteroid prospecting list
+  - Mineral Analysis - Live mining statistics
+  - Mining Bookmarks - Saved mining locations
+  - Ring Finder - Search results
+  - Commodity Market - Market prices
 
 ### Documentation
 - **Cleaned:** Removed duplicate sections in API specification and implementation plan documents

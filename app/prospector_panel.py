@@ -1314,6 +1314,36 @@ class ProspectorPanel(ttk.Frame):
         self.tree.column("materials", width=400, minwidth=150, anchor="w", stretch=False)
         self.tree.column("content", width=180, minwidth=100, anchor="w", stretch=False)
         self.tree.column("time", width=80, minwidth=60, anchor="center", stretch=True)
+        
+        # Load saved column widths from config
+        try:
+            from config import load_prospector_report_column_widths
+            saved_widths = load_prospector_report_column_widths()
+            if saved_widths:
+                for col_name, width in saved_widths.items():
+                    try:
+                        self.tree.column(col_name, width=width)
+                    except:
+                        pass
+        except Exception as e:
+            print(f"[DEBUG] Could not load Prospector Report column widths: {e}")
+
+        # Bind column resize event to save widths
+        def save_prospector_report_widths(event=None):
+            try:
+                from config import save_prospector_report_column_widths
+                widths = {}
+                for col in ["materials", "content", "time"]:
+                    try:
+                        widths[col] = self.tree.column(col, "width")
+                    except:
+                        pass
+                save_prospector_report_column_widths(widths)
+            except Exception as e:
+                print(f"[DEBUG] Could not save Prospector Report column widths: {e}")
+        
+        self.tree.bind("<ButtonRelease-1>", save_prospector_report_widths)
+        
         self.tree.grid(row=4, column=0, sticky="nsew")
         yscroll = ttk.Scrollbar(rep, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscroll=yscroll.set)
@@ -1345,6 +1375,35 @@ class ProspectorPanel(ttk.Frame):
         self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("count", width=65, minwidth=50, anchor="center", stretch=True)
+        
+        # Load saved column widths from config
+        try:
+            from config import load_mineral_analysis_column_widths
+            saved_widths = load_mineral_analysis_column_widths()
+            if saved_widths:
+                for col_name, width in saved_widths.items():
+                    try:
+                        self.stats_tree.column(col_name, width=width)
+                    except:
+                        pass
+        except Exception as e:
+            print(f"[DEBUG] Could not load Mineral Analysis column widths: {e}")
+
+        # Bind column resize event to save widths
+        def save_mineral_analysis_widths(event=None):
+            try:
+                from config import save_mineral_analysis_column_widths
+                widths = {}
+                for col in ["material", "tons", "tph", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"]:
+                    try:
+                        widths[col] = self.stats_tree.column(col, "width")
+                    except:
+                        pass
+                save_mineral_analysis_column_widths(widths)
+            except Exception as e:
+                print(f"[DEBUG] Could not save Mineral Analysis column widths: {e}")
+        
+        self.stats_tree.bind("<ButtonRelease-1>", save_mineral_analysis_widths)
         
         self.stats_tree.tag_configure("darkrow", background="#1e1e1e", foreground="#e6e6e6")
         self.stats_tree.grid(row=0, column=0, sticky="ew")
@@ -1935,6 +1994,42 @@ class ProspectorPanel(ttk.Frame):
         tree.column("prospectors", width=80, minwidth=70, anchor="center", stretch=False)
         tree.column("comment", width=200, minwidth=150, anchor="w", stretch=True)
         tree.column("enhanced", width=100, minwidth=80, anchor="center", stretch=False)
+
+        # Load saved column widths from config
+        try:
+            from config import load_mining_analysis_column_widths
+            saved_widths = load_mining_analysis_column_widths()
+            print(f"[DEBUG] Loading saved column widths: {saved_widths}")
+            if saved_widths:
+                for col_name, width in saved_widths.items():
+                    try:
+                        tree.column(col_name, width=width)
+                        print(f"[DEBUG] Applied width {width} to column {col_name}")
+                    except Exception as e:
+                        print(f"[DEBUG] Could not set width for {col_name}: {e}")
+            else:
+                print("[DEBUG] No saved column widths found, using defaults")
+        except Exception as e:
+            print(f"[DEBUG] Could not load saved column widths: {e}")
+
+        # Bind column resize event to save widths
+        def save_column_widths(event=None):
+            try:
+                print("[DEBUG] ButtonRelease-1 triggered, attempting to save column widths...")
+                from config import save_mining_analysis_column_widths
+                widths = {}
+                for col in ["date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospectors", "comment", "enhanced"]:
+                    try:
+                        widths[col] = tree.column(col, "width")
+                    except:
+                        pass
+                print(f"[DEBUG] Saving column widths: {widths}")
+                save_mining_analysis_column_widths(widths)
+                print("[DEBUG] Column widths saved successfully")
+            except Exception as e:
+                print(f"[DEBUG] Could not save column widths: {e}")
+        
+        tree.bind("<ButtonRelease-1>", save_column_widths)
 
         # Add scrollbar
         sb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
@@ -5986,6 +6081,42 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.column("comment", width=80, stretch=False, anchor="center")  # Wider to show header text
         self.reports_tree_tab.column("enhanced", width=100, stretch=False, anchor="center")
 
+        # Load saved column widths from config
+        try:
+            from config import load_mining_analysis_column_widths
+            saved_widths = load_mining_analysis_column_widths()
+            print(f"[DEBUG] Loading saved column widths for Reports Tab: {saved_widths}")
+            if saved_widths:
+                for col_name, width in saved_widths.items():
+                    try:
+                        self.reports_tree_tab.column(col_name, width=width)
+                        print(f"[DEBUG] Applied width {width} to Reports Tab column {col_name}")
+                    except Exception as e:
+                        print(f"[DEBUG] Could not set width for Reports Tab column {col_name}: {e}")
+            else:
+                print("[DEBUG] No saved column widths found for Reports Tab, using defaults")
+        except Exception as e:
+            print(f"[DEBUG] Could not load saved column widths for Reports Tab: {e}")
+
+        # Bind column resize event to save widths
+        def save_column_widths_tab(event=None):
+            try:
+                print("[DEBUG] ButtonRelease-1 triggered on Reports Tab, attempting to save column widths...")
+                from config import save_mining_analysis_column_widths
+                widths = {}
+                for col in ["date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "asteroids", "materials", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"]:
+                    try:
+                        widths[col] = self.reports_tree_tab.column(col, "width")
+                    except:
+                        pass
+                print(f"[DEBUG] Saving Reports Tab column widths: {widths}")
+                save_mining_analysis_column_widths(widths)
+                print("[DEBUG] Reports Tab column widths saved successfully")
+            except Exception as e:
+                print(f"[DEBUG] Could not save Reports Tab column widths: {e}")
+        
+        self.reports_tree_tab.bind("<ButtonRelease-1>", save_column_widths_tab)
+
         # Add vertical scrollbar
         v_scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.reports_tree_tab.yview)
         v_scrollbar.grid(row=1, column=1, sticky="ns")
@@ -9528,6 +9659,35 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.column("target_material", width=120, stretch=False, anchor="w")
         self.bookmarks_tree.column("overlap", width=70, stretch=False, anchor="center")
         self.bookmarks_tree.column("notes", width=50, stretch=False, anchor="center")  # Narrower for emoji
+
+        # Load saved column widths from config
+        try:
+            from config import load_bookmarks_column_widths
+            saved_widths = load_bookmarks_column_widths()
+            if saved_widths:
+                for col_name, width in saved_widths.items():
+                    try:
+                        self.bookmarks_tree.column(col_name, width=width)
+                    except:
+                        pass
+        except Exception as e:
+            print(f"[DEBUG] Could not load Bookmarks column widths: {e}")
+
+        # Bind column resize event to save widths
+        def save_bookmarks_widths(event=None):
+            try:
+                from config import save_bookmarks_column_widths
+                widths = {}
+                for col in ["last_mined", "system", "body", "hotspot", "materials", "avg_yield", "target_material", "overlap", "notes"]:
+                    try:
+                        widths[col] = self.bookmarks_tree.column(col, "width")
+                    except:
+                        pass
+                save_bookmarks_column_widths(widths)
+            except Exception as e:
+                print(f"[DEBUG] Could not save Bookmarks column widths: {e}")
+        
+        self.bookmarks_tree.bind("<ButtonRelease-1>", save_bookmarks_widths)
 
         # Add vertical scrollbar
         v_scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.bookmarks_tree.yview)

@@ -8861,6 +8861,35 @@ class App(tk.Tk):
         self.marketplace_tree.column("price", width=120, minwidth=80, anchor="center", stretch=False)
         self.marketplace_tree.column("updated", width=90, minwidth=70, anchor="center", stretch=True)
         
+        # Load saved column widths from config
+        try:
+            from config import load_commodity_market_column_widths
+            saved_widths = load_commodity_market_column_widths()
+            if saved_widths:
+                for col_name, width in saved_widths.items():
+                    try:
+                        self.marketplace_tree.column(col_name, width=width)
+                    except:
+                        pass
+        except Exception as e:
+            print(f"[DEBUG] Could not load Commodity Market column widths: {e}")
+
+        # Bind column resize event to save widths
+        def save_marketplace_widths(event=None):
+            try:
+                from config import save_commodity_market_column_widths
+                widths = {}
+                for col in columns:
+                    try:
+                        widths[col] = self.marketplace_tree.column(col, "width")
+                    except:
+                        pass
+                save_commodity_market_column_widths(widths)
+            except Exception as e:
+                print(f"[DEBUG] Could not save Commodity Market column widths: {e}")
+        
+        self.marketplace_tree.bind("<ButtonRelease-1>", save_marketplace_widths)
+        
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.marketplace_tree.yview)
         self.marketplace_tree.configure(yscrollcommand=v_scrollbar.set)

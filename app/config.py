@@ -134,6 +134,83 @@ def save_cargo_window_position(x: int, y: int) -> None:
     cfg["cargo_window"] = {"x": x, "y": y}
     _save_cfg(cfg)
 
+def load_ring_finder_filters() -> Dict[str, Any]:
+    """Load ring finder filter settings from config"""
+    cfg = _load_cfg()
+    return cfg.get("ring_finder_filters", {})
+
+def save_ring_finder_filters(filters: Dict[str, Any]) -> None:
+    """Save ring finder filter settings to config"""
+    cfg = _load_cfg()
+    cfg["ring_finder_filters"] = filters
+    _save_cfg(cfg)
+
+def load_mining_analysis_column_widths() -> Dict[str, int]:
+    """Load Mining Analysis table column widths from config"""
+    cfg = _load_cfg()
+    return cfg.get("mining_analysis_column_widths", {})
+
+def save_mining_analysis_column_widths(widths: Dict[str, int]) -> None:
+    """Save Mining Analysis table column widths to config"""
+    cfg = _load_cfg()
+    cfg["mining_analysis_column_widths"] = widths
+    _save_cfg(cfg)
+
+def load_bookmarks_column_widths() -> Dict[str, int]:
+    """Load Mining Bookmarks table column widths from config"""
+    cfg = _load_cfg()
+    return cfg.get("bookmarks_column_widths", {})
+
+def save_bookmarks_column_widths(widths: Dict[str, int]) -> None:
+    """Save Mining Bookmarks table column widths to config"""
+    cfg = _load_cfg()
+    cfg["bookmarks_column_widths"] = widths
+    _save_cfg(cfg)
+
+def load_ring_finder_column_widths() -> Dict[str, int]:
+    """Load Ring Finder table column widths from config"""
+    cfg = _load_cfg()
+    return cfg.get("ring_finder_column_widths", {})
+
+def save_ring_finder_column_widths(widths: Dict[str, int]) -> None:
+    """Save Ring Finder table column widths to config"""
+    cfg = _load_cfg()
+    cfg["ring_finder_column_widths"] = widths
+    _save_cfg(cfg)
+
+def load_commodity_market_column_widths() -> Dict[str, int]:
+    """Load Commodity Market table column widths from config"""
+    cfg = _load_cfg()
+    return cfg.get("commodity_market_column_widths", {})
+
+def save_commodity_market_column_widths(widths: Dict[str, int]) -> None:
+    """Save Commodity Market table column widths to config"""
+    cfg = _load_cfg()
+    cfg["commodity_market_column_widths"] = widths
+    _save_cfg(cfg)
+
+def load_prospector_report_column_widths() -> Dict[str, int]:
+    """Load Prospector Report table column widths from config"""
+    cfg = _load_cfg()
+    return cfg.get("prospector_report_column_widths", {})
+
+def save_prospector_report_column_widths(widths: Dict[str, int]) -> None:
+    """Save Prospector Report table column widths to config"""
+    cfg = _load_cfg()
+    cfg["prospector_report_column_widths"] = widths
+    _save_cfg(cfg)
+
+def load_mineral_analysis_column_widths() -> Dict[str, int]:
+    """Load Mineral Analysis table column widths from config"""
+    cfg = _load_cfg()
+    return cfg.get("mineral_analysis_column_widths", {})
+
+def save_mineral_analysis_column_widths(widths: Dict[str, int]) -> None:
+    """Save Mineral Analysis table column widths to config"""
+    cfg = _load_cfg()
+    cfg["mineral_analysis_column_widths"] = widths
+    _save_cfg(cfg)
+
 
 # --- Safe text write (atomic) ---
 def _atomic_write_text(path: str, text: str) -> None:
