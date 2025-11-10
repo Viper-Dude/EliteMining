@@ -160,31 +160,55 @@ X-API-Key: {api_key}
 ```
 
 ---
-```
-
-### Bulk Upload Request
-```json
-[
-  {
-    "cmdr_name": "...",
-    "timestamp": "...",
-    ...
-  },
-  {
-    "cmdr_name": "...",
-    "timestamp": "...",
-    ...
-  }
-]
-```
-
----
 
 ## Field Definitions
 
 ### Session Metadata
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `cmdr_name` | string | Yes | Commander name |
+| `timestamp` | string | Yes | ISO 8601 format: "2025-11-09T14:30:00" |
+| `system` | string | Yes | System name |
+| `body` | string | Yes | Body name with ring info |
+| `ship` | string | Yes | Ship type |
+| `session_type` | string | Yes | "Laser Mining", "Core Mining", etc. |
+| `comment` | string | No | User's session notes/comments |
+
+### Session Statistics
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `duration` | string | Yes | Session duration as "HH:MM" (e.g., "06:43") |
+| `total_tons` | float | Yes | Total tons of materials refined |
+| `tph` | float | Yes | Tons per hour |
+| `prospectors_used` | integer | Yes | Number of prospector limpets used |
+| `asteroids_prospected` | integer | Yes | Total asteroids prospected |
+| `asteroids_with_materials` | integer | Yes | Asteroids containing tracked materials |
+| `hit_rate_percent` | float | Yes | Percentage of asteroids with valuable materials |
+| `avg_quality_percent` | float | Yes | Average yield percentage across all asteroids |
+| `total_average_yield` | float | Yes | Total average yield across all tracked materials |
+| `best_material` | string | No | Best performing material with percentage (e.g., "Platinum (25.3%)") |
+| `materials_tracked` | integer | Yes | Number of different material types tracked |
+| `total_finds` | integer | Yes | Total number of material finds across all asteroids |
+
+### Materials Mined
+Object with material names as keys, each containing:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tons` | float | Yes | Tons of this material refined |
+| `tph` | float | Yes | Tons per hour for this material |
+| `avg_percentage` | float | Yes | Average percentage found in asteroids |
+| `best_percentage` | float | Yes | Best (highest) percentage found |
+| `find_count` | integer | Yes | Number of times this material was found |
+
+### Mineral Performance
+Object with material names as keys, each containing:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `prospected` | integer | Yes | Number of asteroids prospected for this material |
+| `hit_rate` | float | Yes | Hit rate percentage for this material |
+
 ### Engineering Materials
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -195,6 +219,30 @@ X-API-Key: {api_key}
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `hotspot_info` | object | No | Hotspot data if session was in a tracked hotspot |
+| `system_name` | string | Yes* | System name |
+| `system_address` | integer | Yes* | System address from journal |
+| `body_name` | string | Yes* | Body name (without ring) |
+| `body_id` | integer | Yes* | Body ID from journal |
+| `ring_type` | string | Yes* | Ring type (e.g., "Pristine Metallic") |
+| `ring_mass` | integer | Yes* | Ring mass |
+| `inner_radius` | integer | Yes* | Inner radius in meters |
+| `outer_radius` | integer | Yes* | Outer radius in meters |
+| `density` | float | Yes* | Ring density |
+| `ls_distance` | float | Yes* | Distance from arrival point in light-seconds |
+| `material_name` | string | Yes* | Hotspot material name |
+| `hotspot_count` | integer | Yes* | Number of overlapping hotspots |
+| `scan_date` | string | Yes* | ISO 8601 format scan timestamp |
+| `x_coord` | float | No | System X coordinate |
+| `y_coord` | float | No | System Y coordinate |
+| `z_coord` | float | No | System Z coordinate |
+| `coord_source` | string | No | Source of coordinates (e.g., "EDSM", "journal") |
+
+*Required if `hotspot_info` is present
+
+---
+
+## Response Format
+
 ### Success Response - Session Upload
 ```json
 {
@@ -220,17 +268,17 @@ For bulk session uploads:
   "message": "Hotspot data received",
   "hotspots_processed": 42
 }
-```coord_source` | string | No | Source of coordinates (e.g., "EDSM", "journal") |
+```
 
-*Required if `hotspot_info` is present
+### Error Responses
+- `200 OK` - Success
+- `400 Bad Request` - Invalid data format
+- `401 Unauthorized` - Invalid/missing API key
+- `429 Too Many Requests` - Rate limit exceeded
+- `500 Internal Server Error` - Server error
 
----comment` | string | No | User's session notes/comments |
+---
 
-### Session Statistics
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `duration` | string | Yes | Session duration as "HH:MM" (e.g., "06:43") |
-| `total_tons` | float | Yes | Total tons of materials refined |
 ## Client Behavior
 
 ### Upload Timing
@@ -240,28 +288,31 @@ For bulk session uploads:
   - Uploads all past mining sessions from TXT reports
   - Uploads all discovered hotspots from user database
 - **Retry**: Failed uploads queued and retried with exponential backoff
-| `asteroids_prospected` | integer | Yes | Total asteroids prospected |
-| `asteroids_with_materials` | integer | Yes | Asteroids containing tracked materials |
-| `hit_rate_percent` | float | Yes | Percentage of asteroids with valuable materials |
-| `avg_quality_percent` | float | Yes | Average yield percentage across all asteroids |
-| `total_average_yield` | float | Yes | Total average yield across all tracked materials |
-| `best_material` | string | No | Best performing material with percentage (e.g., "Platinum (25.3%)") |
-| `materials_tracked` | integer | Yes | Number of different material types tracked |
-| `total_finds` | integer | Yes | Total number of material finds across all asteroids |
 
-### Materials Mined
-Object with material names as keys, each containing:
+### Retry Logic
+1. **First retry**: 30 seconds after failure
+2. **Second retry**: 2 minutes after first retry
+3. **Third retry**: 5 minutes after second retry
+4. **Final failure**: Store in queue, notify user
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `tons` | float | Yes | Tons of this material refined |
-| `tph` | float | Yes | Tons per hour for this material |
-| `avg_percentage` | float | Yes | Average percentage found in asteroids |
-| `best_percentage` | float | Yes | Best (highest) percentage found |
-| `find_count` | integer | Yes | Number of times this material was found |
+### Queue Storage
+Failed uploads stored in: `{app_data_dir}/failed_api_uploads.json`
 
-### Mineral Performance
-Object with material names as keys, each containing:
+```json
+{
+  "queue": [
+    {
+      "session_data": {...},
+      "timestamp": "2025-11-09T14:30:00Z",
+      "retry_count": 0,
+      "last_error": "Connection timeout"
+    }
+  ]
+}
+```
+
+---
+
 ## Privacy & Security
 
 ### User Consent
@@ -276,7 +327,7 @@ A clear consent message is shown when enabling the feature.
 ### Data NOT Sent
 - Screenshots
 - Ship loadout details
-- Personal bookmarks/notes (except hotspot data)
+- Private bookmarks/notes (except hotspot data)
 - Private communications
 
 ### Data Sent
@@ -285,21 +336,33 @@ A clear consent message is shown when enabling the feature.
 - System/body names and coordinates (public Elite Dangerous data)
 - Ring metadata (mass, radius, density)
 - Commander name (required for dashboard)
-### Engineering Materials
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `engineering_materials` | object | No | Raw materials collected (e.g., `{"Iron": 45, "Nickel": 23}`) |
-| `engineering_materials_total` | integer | No | Total count of engineering materials |
 
 ---
 
-## Response Format
+## Example Implementation
 
-### Success Response
-```json
-{
-  "success": true,
-  "message": "Session data received",
+### Python Client Example
+```python
+import requests
+import json
+
+def upload_session(base_url, api_key, session_data):
+    headers = {
+        'Content-Type': 'application/json',
+        'X-API-Key': api_key
+    }
+    
+    endpoint = f"{base_url}/api/mining/session"
+    
+    response = requests.post(
+        endpoint,
+        headers=headers,
+        json=session_data,
+        timeout=10
+    )
+    
+    return response.json()
+```
 ### Server Endpoint Examples (FastAPI)
 ```python
 from fastapi import FastAPI, Header, HTTPException
@@ -354,106 +417,6 @@ async def receive_hotspots(
         "message": "Hotspot data received",
         "hotspots_processed": len(hotspots)
     }
-```200 OK` - Success
-- `400 Bad Request` - Invalid data format
-- `401 Unauthorized` - Invalid/missing API key
-- `429 Too Many Requests` - Rate limit exceeded
-- `500 Internal Server Error` - Server error
-
----
-
-## Client Behavior
-
-### Upload Timing
-- **Automatic**: After each mining session ends (if enabled in settings)
-- **Manual**: Bulk upload of historical data on first enable
-- **Retry**: Failed uploads queued and retried with exponential backoff
-
-### Retry Logic
-1. **First retry**: 30 seconds after failure
-2. **Second retry**: 2 minutes after first retry
-3. **Third retry**: 5 minutes after second retry
-4. **Final failure**: Store in queue, notify user
-
-### Queue Storage
-Failed uploads stored in: `{app_data_dir}/failed_api_uploads.json`
-
-```json
-{
-  "queue": [
-    {
-      "session_data": {...},
-      "timestamp": "2025-11-09T14:30:00Z",
-      "retry_count": 0,
-      "last_error": "Connection timeout"
-    }
-  ]
-}
-```
-
----
-
-## Privacy & Security
-
-### Data NOT Sent
-- Screenshots
-- Exact system coordinates
-- Ship loadout details
-- Personal system bookmarks
-
-### Data Sent
-- Session statistics and materials only
-- System/body names (public Elite Dangerous data)
-- Commander name (required for dashboard)
-
----
-
-## Example Implementation
-
-### Python Client Example
-```python
-import requests
-import json
-
-def upload_session(api_endpoint, api_key, session_data):
-    headers = {
-        'Content-Type': 'application/json',
-        'X-API-Key': api_key
-    }
-    
-    response = requests.post(
-        api_endpoint,
-        headers=headers,
-        json=session_data,
-        timeout=10
-    )
-    
-    return response.json()
-```
-
-### Server Endpoint Example (FastAPI)
-```python
-from fastapi import FastAPI, Header, HTTPException
-
-app = FastAPI()
-
-@app.post("/api/mining/session")
-async def receive_session(
-    session_data: dict,
-    x_api_key: str = Header(None)
-):
-    # Validate API key
-    if not validate_api_key(x_api_key):
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    
-    # Store in database
-    store_session(session_data)
-    
-    return {
-        "success": True,
-        "message": "Session data received",
-        "sessions_processed": 1
-    }
 ```
 
 ---
@@ -467,6 +430,11 @@ async def receive_session(
 def mock_endpoint(data: dict):
     print(f"Received: {json.dumps(data, indent=2)}")
     return {"success": True, "sessions_processed": 1}
+
+@app.post("/api/hotspots/bulk")
+def mock_hotspot_endpoint(data: dict):
+    print(f"Received hotspots: {len(data.get('hotspots', []))}")
+    return {"success": True, "hotspots_processed": len(data.get('hotspots', []))}
 ```
 
 ### Test Data
@@ -480,11 +448,13 @@ See example session JSON above for complete test payload.
 ```json
 {
   "api_upload_enabled": false,
-  "api_endpoint_url": "https://elitemining.example.com/api/mining/session",
+  "api_endpoint_url": "https://elitemining.example.com",
   "api_key": "",
   "cmdr_name_for_api": ""
 }
 ```
+
+**Note:** `api_endpoint_url` is the base URL only. Endpoints `/api/mining/session` and `/api/hotspots/bulk` are appended by the client.
 
 ### Self-Hosting Support
 - Endpoint URL fully configurable

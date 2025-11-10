@@ -53,19 +53,13 @@ Implement API upload functionality to send mining session data to a server for a
   - [ ] Handle optional fields properly
   - [ ] Validate data before sending
   - [ ] Build hotspot bulk upload JSON structure
-- [ ] Implement JSON builder
-  - [ ] Convert parsed TXT data to API JSON format
-  - [ ] Include all required fields from spec
-  - [ ] Calculate derived fields (TPH, hit rates, etc.)
-  - [ ] Handle optional fields properly
+
 - [ ] Implement HTTP client
   - [ ] POST request with JSON body to `/api/mining/session`
   - [ ] POST request to `/api/hotspots/bulk` for hotspot data
   - [ ] Set headers (Content-Type, X-API-Key)
   - [ ] Configurable timeout (10 seconds default)
   - [ ] Handle connection errors
-  - [ ] Handle HTTP error responses (400, 401, 429, 500)
-  - [ ] Parse success/error responses
   - [ ] Handle HTTP error responses (400, 401, 429, 500)
   - [ ] Parse success/error responses
 
@@ -85,6 +79,7 @@ Implement API upload functionality to send mining session data to a server for a
 
 **Dependencies:**
 - `requests` library (already used in project)
+
 **Testing:**
 - [ ] Test TXT parser with real session files
 - [ ] Test hotspot database query
@@ -93,11 +88,13 @@ Implement API upload functionality to send mining session data to a server for a
 - [ ] Test retry logic with simulated failures
 - [ ] Test queue persistence across app restarts
 - [ ] Test hotspot matching to sessions
-- [ ] Test HTTP client with mock endpoint
-- [ ] Test retry logic with simulated failures
-- [ ] Test queue persistence across app restarts
 
 ---
+
+### ⏳ Phase 2: Configuration Management
+**Status:** NOT STARTED  
+**Files:** `app/config.json.template`, `app/config.py`
+
 #### Tasks:
 - [ ] Add new config fields to `config.json.template`:
   ```json
@@ -108,12 +105,7 @@ Implement API upload functionality to send mining session data to a server for a
     "cmdr_name_for_api": ""
   }
   ```
-  Note: Base URL only, endpoints are `/api/mining/session` and `/api/hotspots/bulk`api_upload_enabled": false,
-    "api_endpoint_url": "https://elitemining.example.com/api/mining/session",
-    "api_key": "",
-    "cmdr_name_for_api": ""
-  }
-  ```
+  Note: Base URL only, endpoints are `/api/mining/session` and `/api/hotspots/bulk`
 
 - [ ] Update `config.py` to handle new fields
   - [ ] Add getters for API settings
@@ -132,6 +124,12 @@ Implement API upload functionality to send mining session data to a server for a
 - [ ] Test backward compatibility with old config files
 - [ ] Test validation rejects invalid URLs
 
+---
+
+### ⏳ Phase 3: User Interface Settings
+**Status:** NOT STARTED  
+**Files:** `app/main.py` (or settings UI file)
+
 #### Tasks:
 - [ ] Add API Upload section to General Settings tab
   - [ ] Enable/Disable checkbox with consent message
@@ -142,18 +140,13 @@ Implement API upload functionality to send mining session data to a server for a
   - [ ] Test Connection button
   - [ ] Upload Statistics display (sessions uploaded, hotspots uploaded, last upload time)
   - [ ] Manual Bulk Upload button (sessions + hotspots)
-  - [ ] API Endpoint URL text field (with default)
-  - [ ] API Key text field (password-style)
-  - [ ] CMDR Name text field
-  - [ ] Test Connection button
-  - [ ] Upload Statistics display (sessions uploaded, last upload time)
-  - [ ] Manual Bulk Upload button
 
 - [ ] Implement UI callbacks
   - [ ] Save settings on change
   - [ ] Test connection validates endpoint and API key
   - [ ] Show success/error messages
   - [ ] Bulk upload shows progress dialog
+
 **UI Layout:**
 ```
 ┌─ API Upload Settings ────────────────────────┐
@@ -175,13 +168,6 @@ Implement API upload functionality to send mining session data to a server for a
 │                                               │
 │ Status: ✓ Last upload: 5 minutes ago         │
 │ Sessions uploaded: 42  |  Hotspots: 15       │
-│                                               │
-└───────────────────────────────────────────────┘
-```                                             │
-│ [Test Connection] [Bulk Upload All Sessions] │
-│                                               │
-│ Status: ✓ Last upload: 5 minutes ago         │
-│ Total sessions uploaded: 42                   │
 │                                               │
 └───────────────────────────────────────────────┘
 ```
@@ -222,6 +208,19 @@ Implement API upload functionality to send mining session data to a server for a
 - Session end: `prospector_panel.py` → `end_mining_session_internal()`
 - Report save: `prospector_panel.py` → `_save_session_report_with_timestamp()`
 
+**Testing:**
+- [ ] Test upload triggers after session end
+- [ ] Test upload doesn't block session end UI
+- [ ] Test queued uploads retry on startup
+- [ ] Test with API disabled
+- [ ] Test with invalid API settings
+
+---
+
+### ⏳ Phase 5: Bulk Upload Functionality
+**Status:** NOT STARTED  
+**Files:** `app/api_uploader.py`
+
 #### Tasks:
 - [ ] Implement bulk session upload function
   - [ ] Scan `Reports/Mining Session/` directory for TXT files
@@ -242,23 +241,6 @@ Implement API upload functionality to send mining session data to a server for a
 - [ ] Implement combined bulk upload
   - [ ] Upload hotspots first
   - [ ] Then upload sessions
-**Testing:**
-- [ ] Test bulk upload with 1 session
-- [ ] Test bulk upload with 10 sessions
-- [ ] Test bulk upload with 100+ sessions
-- [ ] Test bulk hotspot upload with multiple hotspots
-- [ ] Test combined upload (hotspots + sessions)
-- [ ] Test progress reporting for both types
-- [ ] Test cancellation
-- [ ] Test partial failure handling
-- [ ] Test duplicate prevention on re-enablen
-  - [ ] Scan `Reports/Mining Session/` directory for TXT files
-  - [ ] Use `sessions_index.csv` to get file list
-  - [ ] Parse each TXT file
-  - [ ] Build array of session objects
-  - [ ] Send as bulk upload (single POST with array)
-  - [ ] Show progress (e.g., "Uploading 15 of 42 sessions...")
-  - [ ] Handle partial failures (some sessions succeed, some fail)
 
 - [ ] Add progress callback
   - [ ] Report current file being processed
@@ -274,9 +256,12 @@ Implement API upload functionality to send mining session data to a server for a
 - [ ] Test bulk upload with 1 session
 - [ ] Test bulk upload with 10 sessions
 - [ ] Test bulk upload with 100+ sessions
-- [ ] Test progress reporting
+- [ ] Test bulk hotspot upload with multiple hotspots
+- [ ] Test combined upload (hotspots + sessions)
+- [ ] Test progress reporting for both types
 - [ ] Test cancellation
 - [ ] Test partial failure handling
+- [ ] Test duplicate prevention on re-enable
 
 ---
 
