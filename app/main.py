@@ -10223,26 +10223,33 @@ class App(tk.Tk):
 
     def _check_for_updates_startup(self):
         """Check for updates on startup (automatic check) - checks every time app starts"""
-        print(f"Checking for updates... Current version: {get_version()}")
-        # Always check on startup (best practice for desktop apps)
-        print("Update check: Checking for updates on startup...")
+        current_version = get_version()
+        logging.info(f"[UPDATE_CHECK] Starting update check... Current version: {current_version}")
+        print(f"Checking for updates... Current version: {current_version}")
         
-        # Show update check in cargo monitor status label instead of popup
+        # Show update check in main window status bar (bottom left)
         try:
-            if hasattr(self, 'cargo_monitor') and self.cargo_monitor and hasattr(self.cargo_monitor, 'status_label'):
-                self.cargo_monitor.status_label.configure(text="🔍 Checking for updates...")
+            if hasattr(self, 'status'):
+                # Save current status
+                current_status = self.status.get()
                 
-                # Restore normal status after 3 seconds
+                # Show checking message
+                self.status.set("🔍 Checking for updates...")
+                logging.info("[UPDATE_CHECK] Status bar updated: Checking for updates...")
+                
+                # Restore original status after 3 seconds
                 def restore_status():
                     try:
-                        if hasattr(self, 'cargo_monitor') and self.cargo_monitor:
-                            self.cargo_monitor.status_label.configure(text="🔍 Monitoring Elite Dangerous journal...")
+                        if hasattr(self, 'status'):
+                            self.status.set(current_status)
+                            logging.info("[UPDATE_CHECK] Status bar restored")
                     except:
                         pass
                 
                 self.after(3000, restore_status)
         except Exception as e:
-            print(f"Could not update status label for update check: {e}")
+            logging.error(f"[UPDATE_CHECK] Could not update status bar: {e}")
+            print(f"Could not update status bar for update check: {e}")
         
         self.update_checker.check_for_updates_async(self)
 
