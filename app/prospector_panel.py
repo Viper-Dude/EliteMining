@@ -7323,10 +7323,10 @@ class ProspectorPanel(ttk.Frame):
                 eng_materials_raw = session.get('engineering_materials', '')
                 if eng_materials_raw and eng_materials_raw.strip():
                     try:
-                        # Parse "Iron:45,Nickel:23" format
+                        # Parse "Iron:45,Nickel:23" format and show ALL materials (no limit)
                         mat_pairs = [p for p in eng_materials_raw.split(',') if ':' in p]
                         formatted_mats = []
-                        for pair in mat_pairs[:3]:  # Show max 3 materials
+                        for pair in mat_pairs:  # Show ALL materials
                             mat_name, qty = pair.split(':', 1)
                             # Get grade from cargo monitor
                             grade = 0
@@ -7334,12 +7334,8 @@ class ProspectorPanel(ttk.Frame):
                                 grade = self.main_app.cargo_monitor.MATERIAL_GRADES.get(mat_name.strip(), 0)
                             formatted_mats.append(f"{mat_name.strip()} ({qty}) G{grade}")
                         
-                        # Only show "+X more" if there are actually more materials than we're displaying
-                        remaining = len(mat_pairs) - len(formatted_mats)
-                        if remaining > 0:
-                            eng_materials_display = ", ".join(formatted_mats) + f" +{remaining} more"
-                        else:
-                            eng_materials_display = ", ".join(formatted_mats)
+                        # Show all materials without "+X more"
+                        eng_materials_display = ", ".join(formatted_mats)
                     except Exception as e:
                         eng_materials_display = eng_materials_raw  # Fallback to raw string
                 
