@@ -4385,6 +4385,16 @@ class App(tk.Tk):
         self.eddn_sender.set_enabled(self.eddn_send_enabled.get() == 1)
         print(f"✅ EDDN sender {'enabled' if self.eddn_send_enabled.get() == 1 else 'disabled'}")
         
+        # Initialize API uploader for session/hotspot sharing
+        from api_uploader import APIUploader
+        self.api_uploader = APIUploader()
+        if self.api_uploader.enabled:
+            print(f"✅ API uploader enabled - endpoint: {self.api_uploader.api_url}")
+            # Retry any queued uploads from previous sessions
+            self.after(3000, lambda: self.api_uploader.retry_queued_uploads())
+        else:
+            print(f"API uploader disabled")
+        
         # Initialize market handler for Market.json processing
         from market_handler import MarketHandler
         self.market_handler = MarketHandler(self.eddn_sender)
@@ -6131,8 +6141,132 @@ class App(tk.Tk):
         #          font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         # r += 1
 
-        # ========== BACKUP & RESTORE SECTION ==========
+        # ========== API UPLOAD SECTION ==========
         r += 1
+        ttk.Label(scrollable_frame, text="API Upload", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        r += 1
+        
+        # Add separator line
+        separator_api = tk.Frame(scrollable_frame, height=1, bg="#444444")
+        separator_api.grid(row=r, column=0, sticky="ew", pady=(0, 8))
+        r += 1
+        
+        # API Upload enable/disable with consent message
+        api_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        api_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
+        
+        # Initialize API variables
+        if not hasattr(self, 'api_upload_enabled'):
+            from config import load_api_upload_settings
+            api_settings = load_api_upload_settings()
+            self.api_upload_enabled = tk.IntVar(value=1 if api_settings["enabled"] else 0)
+            self.api_endpoint_url = tk.StringVar(value=api_settings["endpoint_url"])
+            self.api_key = tk.StringVar(value=api_settings["api_key"])
+            self.api_cmdr_name = tk.StringVar(value=api_settings["cmdr_name"])
+        
+        api_check = tk.Checkbutton(api_frame, text="Enable API Upload", 
+                                   variable=self.api_upload_enabled,
+                                   command=self._on_api_upload_toggle,
+                                   bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", 
+                                   activebackground="#1e1e1e", activeforeground="#ffffff", 
+                                   highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                   padx=4, pady=2, anchor="w")
+        api_check.pack(anchor="w")
+        r += 1
+        
+        # Consent message
+        consent_frame = tk.Frame(scrollable_frame, bg="#2a2a2a", relief="solid", bd=1)
+        consent_frame.grid(row=r, column=0, sticky="ew", pady=(4, 8), padx=(20, 0))
+        tk.Label(consent_frame, text="ℹ️ By enabling, you agree to share:", 
+                bg="#2a2a2a", fg="#ffcc00", font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=8, pady=(6, 2))
+        tk.Label(consent_frame, text="  • Mining session statistics", 
+                bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8)
+        tk.Label(consent_frame, text="  • Discovered hotspot locations", 
+                bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8)
+        tk.Label(consent_frame, text="  • Materials and performance data", 
+                bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8, pady=(0, 6))
+        r += 1
+        
+        # CMDR Name
+        cmdr_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        cmdr_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
+        tk.Label(cmdr_frame, text="CMDR Name:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        cmdr_entry = tk.Entry(cmdr_frame, textvariable=self.api_cmdr_name, 
+                             bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9), width=30)
+        cmdr_entry.pack(side="left", padx=(8, 0))
+        r += 1
+        
+        # API Endpoint URL
+        endpoint_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        endpoint_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
+        tk.Label(endpoint_frame, text="API Endpoint:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        endpoint_entry = tk.Entry(endpoint_frame, textvariable=self.api_endpoint_url, 
+                                 bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9), width=50)
+        endpoint_entry.pack(side="left", padx=(8, 0))
+        r += 1
+        
+        # API Key
+        apikey_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        apikey_frame.grid(row=r, column=0, sticky="w", pady=(4, 8))
+        tk.Label(apikey_frame, text="API Key:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        apikey_entry = tk.Entry(apikey_frame, textvariable=self.api_key, 
+                               bg="#2d2d2d", fg="#ffffff", font=("Consolas", 9), width=50, show="*")
+        apikey_entry.pack(side="left", padx=(8, 0))
+        
+        # Show/hide API key button
+        def _toggle_api_key_visibility():
+            current_show = apikey_entry.cget("show")
+            apikey_entry.configure(show="" if current_show == "*" else "*")
+            show_btn.configure(text="👁️" if current_show == "*" else "🔒")
+        
+        show_btn = tk.Button(apikey_frame, text="👁️", command=_toggle_api_key_visibility,
+                            bg="#2a2a2a", fg="#e0e0e0", activebackground="#3a3a3a",
+                            activeforeground="#ffffff", relief="ridge", bd=1, 
+                            font=("Segoe UI", 8), cursor="hand2", width=3)
+        show_btn.pack(side="left", padx=(4, 0))
+        r += 1
+        
+        # Buttons frame
+        api_buttons_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        api_buttons_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
+        
+        # Test Connection button
+        test_btn = tk.Button(api_buttons_frame, text="Test Connection", command=self._test_api_connection,
+                            bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                            activeforeground="#ffffff", relief="ridge", bd=1, padx=10, pady=3,
+                            font=("Segoe UI", 8, "normal"), cursor="hand2")
+        test_btn.pack(side="left", padx=(0, 8))
+        ToolTip(test_btn, "Test connection to API server and validate credentials")
+        
+        # Save Settings button
+        save_api_btn = tk.Button(api_buttons_frame, text="Save Settings", command=self._save_api_settings,
+                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                                activeforeground="#ffffff", relief="ridge", bd=1, padx=10, pady=3,
+                                font=("Segoe UI", 8, "normal"), cursor="hand2")
+        save_api_btn.pack(side="left", padx=(0, 8))
+        
+        # Bulk Upload button
+        bulk_upload_btn = tk.Button(api_buttons_frame, text="Bulk Upload All Data", command=self._bulk_upload_api_data,
+                                    bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
+                                    activeforeground="#ffffff", relief="ridge", bd=1, padx=10, pady=3,
+                                    font=("Segoe UI", 8, "normal"), cursor="hand2")
+        bulk_upload_btn.pack(side="left")
+        ToolTip(bulk_upload_btn, "Upload all historical mining sessions and hotspots to the server")
+        r += 1
+        
+        # Status label
+        self.api_status_label = tk.Label(scrollable_frame, text="", 
+                                         bg="#1e1e1e", fg="gray", font=("Segoe UI", 8))
+        self.api_status_label.grid(row=r, column=0, sticky="w", pady=(4, 4))
+        self._update_api_status()
+        r += 1
+        
+        tk.Label(scrollable_frame, text="Share mining data with the community for aggregation and analytics", 
+                wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+
+        # ========== BACKUP & RESTORE SECTION ==========
         ttk.Label(scrollable_frame, text="Backup & Restore", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
@@ -7072,6 +7206,100 @@ class App(tk.Tk):
             status_msg = "EDDN sharing enabled - Contributing to community" if enabled else "EDDN sharing disabled"
             self._set_status(status_msg)
             print(f"✅ {status_msg}")
+    
+    def _on_api_upload_toggle(self) -> None:
+        """Called when API upload checkbox is toggled"""
+        enabled = bool(self.api_upload_enabled.get())
+        from config import save_api_upload_enabled
+        save_api_upload_enabled(enabled)
+        self._update_api_status()
+        status_msg = "API upload enabled" if enabled else "API upload disabled"
+        self._set_status(status_msg)
+    
+    def _save_api_settings(self) -> None:
+        """Save API upload settings to config"""
+        from config import save_api_upload_settings
+        try:
+            settings = {
+                "enabled": bool(self.api_upload_enabled.get()),
+                "endpoint_url": self.api_endpoint_url.get().strip(),
+                "api_key": self.api_key.get().strip(),
+                "cmdr_name": self.api_cmdr_name.get().strip()
+            }
+            save_api_upload_settings(settings)
+            self._update_api_status()
+            messagebox.showinfo("Saved", "API upload settings saved successfully!")
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save settings: {e}")
+    
+    def _test_api_connection(self) -> None:
+        """Test connection to API server"""
+        from api_uploader import APIUploader
+        try:
+            # Save settings first
+            self._save_api_settings()
+            
+            # Test connection
+            uploader = APIUploader()
+            success, message = uploader.test_connection()
+            
+            if success:
+                messagebox.showinfo("Connection Test", f"✓ {message}")
+            else:
+                messagebox.showwarning("Connection Test", f"✗ {message}")
+        except Exception as e:
+            messagebox.showerror("Connection Test", f"Error: {e}")
+    
+    def _bulk_upload_api_data(self) -> None:
+        """Bulk upload all sessions and hotspots"""
+        if not self.api_upload_enabled.get():
+            messagebox.showwarning("Upload Disabled", "Please enable API upload first.")
+            return
+        
+        # Confirm action
+        result = messagebox.askyesno(
+            "Bulk Upload",
+            "This will upload all mining sessions and hotspots to the server.\n\n"
+            "This may take several minutes depending on your data.\n\n"
+            "Continue?"
+        )
+        
+        if not result:
+            return
+        
+        # TODO: Implement bulk upload in Phase 5
+        # For now, show a placeholder
+        messagebox.showinfo(
+            "Coming Soon",
+            "Bulk upload functionality will be implemented in Phase 5.\n\n"
+            "For now, new sessions will be uploaded automatically when you end a mining session."
+        )
+    
+    def _update_api_status(self) -> None:
+        """Update API status label"""
+        if hasattr(self, 'api_status_label'):
+            from config import load_api_upload_settings
+            settings = load_api_upload_settings()
+            
+            if settings["enabled"]:
+                # Check if configured
+                if settings["api_key"] and settings["cmdr_name"]:
+                    self.api_status_label.configure(
+                        text="✓ API upload enabled and configured",
+                        fg="#00ff00"
+                    )
+                else:
+                    self.api_status_label.configure(
+                        text="⚠ API upload enabled but not configured (add CMDR name and API key)",
+                        fg="#ffaa00"
+                    )
+            else:
+                self.api_status_label.configure(
+                    text="API upload disabled",
+                    fg="gray"
+                )
     
     def _on_journal_file_change(self, file_path: str):
         """Called when a file in journal directory changes"""

@@ -580,5 +580,9 @@
   "cargo_transparency": 90,
   "cargo_show_in_overlay": false,
   "journal_dir": "",
-  "auto_scan_journals": true
+  "auto_scan_journals": true,
+  "api_upload_enabled": false,
+  "api_endpoint_url": "https://elitemining.example.com",
+  "api_key": "",
+  "cmdr_name_for_api": ""
 }

@@ -413,5 +413,98 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     if discord_fields_added:
         log.info(f"Added Discord integration fields: {', '.join(discord_fields_added)}")
     
+    # Add API upload fields if missing
+    api_fields_added = []
+    if "api_upload_enabled" not in config:
+        config["api_upload_enabled"] = False
+        api_fields_added.append("api_upload_enabled")
+    if "api_endpoint_url" not in config:
+        config["api_endpoint_url"] = "https://elitemining.example.com"
+        api_fields_added.append("api_endpoint_url")
+    if "api_key" not in config:
+        config["api_key"] = ""
+        api_fields_added.append("api_key")
+    if "cmdr_name_for_api" not in config:
+        config["cmdr_name_for_api"] = ""
+        api_fields_added.append("cmdr_name_for_api")
+    
+    if api_fields_added:
+        log.info(f"Added API upload fields: {', '.join(api_fields_added)}")
+    
     log.info(f"Config migration completed successfully from {original_version} to {target_version}")
     return config
+
+
+# API Upload Configuration
+def load_api_upload_enabled() -> bool:
+    """Load API upload enabled state from config"""
+    cfg = _load_cfg()
+    return cfg.get("api_upload_enabled", False)
+
+def save_api_upload_enabled(enabled: bool) -> None:
+    """Save API upload enabled state to config"""
+    cfg = _load_cfg()
+    cfg["api_upload_enabled"] = enabled
+    _save_cfg(cfg)
+
+def load_api_endpoint_url() -> str:
+    """Load API endpoint URL from config"""
+    cfg = _load_cfg()
+    return cfg.get("api_endpoint_url", "https://elitemining.example.com")
+
+def save_api_endpoint_url(url: str) -> None:
+    """Save API endpoint URL to config (validates URL format)"""
+    url = url.strip().rstrip('/')
+    if url and not (url.startswith('http://') or url.startswith('https://')):
+        raise ValueError("URL must start with http:// or https://")
+    cfg = _load_cfg()
+    cfg["api_endpoint_url"] = url
+    _save_cfg(cfg)
+
+def load_api_key() -> str:
+    """Load API key from config"""
+    cfg = _load_cfg()
+    return cfg.get("api_key", "")
+
+def save_api_key(key: str) -> None:
+    """Save API key to config"""
+    cfg = _load_cfg()
+    cfg["api_key"] = key.strip()
+    _save_cfg(cfg)
+
+def load_cmdr_name_for_api() -> str:
+    """Load Commander name for API from config"""
+    cfg = _load_cfg()
+    return cfg.get("cmdr_name_for_api", "")
+
+def save_cmdr_name_for_api(name: str) -> None:
+    """Save Commander name for API to config"""
+    cfg = _load_cfg()
+    cfg["cmdr_name_for_api"] = name.strip()
+    _save_cfg(cfg)
+
+def load_api_upload_settings() -> Dict[str, Any]:
+    """Load all API upload settings as a dict"""
+    cfg = _load_cfg()
+    return {
+        "enabled": cfg.get("api_upload_enabled", False),
+        "endpoint_url": cfg.get("api_endpoint_url", "https://elitemining.example.com"),
+        "api_key": cfg.get("api_key", ""),
+        "cmdr_name": cfg.get("cmdr_name_for_api", "")
+    }
+
+def save_api_upload_settings(settings: Dict[str, Any]) -> None:
+    """Save all API upload settings from a dict"""
+    cfg = _load_cfg()
+    if "enabled" in settings:
+        cfg["api_upload_enabled"] = settings["enabled"]
+    if "endpoint_url" in settings:
+        url = settings["endpoint_url"].strip().rstrip('/')
+        if url and not (url.startswith('http://') or url.startswith('https://')):
+            raise ValueError("URL must start with http:// or https://")
+        cfg["api_endpoint_url"] = url
+    if "api_key" in settings:
+        cfg["api_key"] = settings["api_key"].strip()
+    if "cmdr_name" in settings:
+        cfg["cmdr_name_for_api"] = settings["cmdr_name"].strip()
+    _save_cfg(cfg)

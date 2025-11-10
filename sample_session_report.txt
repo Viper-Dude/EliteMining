@@ -1,0 +1,54 @@
+Mining Session Report
+System: Hyades Sector AB-C d1234
+Body: Body A Ring
+Ship Type: Python
+Ship: My Mining Python
+Session Duration: 06:43
+Total Cargo Refined: 44.0t
+Mining Efficiency: 461.8 t/hr
+
+=== REFINED MINERALS ===
+ - Platinum: 25.5t (280.1 t/hr)
+ - Painite: 18.5t (181.7 t/hr)
+
+=== MINERAL ANALYSIS ===
+Asteroids Prospected: 120
+Minerals Tracked: 2
+Total Material Finds: 23
+Hit Rate: 35.5% (asteroids with valuable minerals)
+Prospecting Speed: 17.9 asteroids/minute
+
+--- Mineral Performance ---
+Platinum:
+  • Average: 15.3%
+  • Best: 32.8%
+  • Finds: 15x
+Painite:
+  • Average: 10.2%
+  • Best: 24.1%
+  • Finds: 8x
+
+Overall Quality: 12.8% average yield
+Best Performer: Platinum (15.3% avg, 15x finds)
+
+=== CARGO MATERIAL BREAKDOWN ===
+Prospector Limpets Used: 120
+Materials Collected: 2 types
+
+Platinum: 25.5t (280.1 t/hr)
+Painite: 18.5t (181.7 t/hr)
+
+=== ENGINEERING MATERIALS COLLECTED ===
+
+Grade 1 (Very Common):
+  Carbon: 15
+  Iron: 12
+
+Grade 2 (Common):
+  Nickel: 8
+  Germanium: 5
+
+Total Engineering Materials: 40 pieces
+
+=== SESSION COMMENT ===
+Great hotspot, found excellent Platinum rocks. Will return here.
