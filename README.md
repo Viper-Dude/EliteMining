@@ -16,6 +16,7 @@
 - [EliteMining App](#elitemining-app)
 - [Hotspot Finder](#hotspot-finder)
 - [Commodity Market](#commodity-market)
+- [Distance Calculator](#distance-calculator)
 - [Getting Started](#getting-started)
 - [Commands](#commands)
 - [Mining Presets](#mining-presets)
@@ -177,6 +178,29 @@ Perfect for planning your mining runs and finding the most profitable stations t
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commidity_marked.png" width="600"><br>  
 *Commodity Market showing search results with filters and distance calculations.*
+
+[Back to Top](#top)
+
+---
+
+## Distance Calculator
+
+Calculate distances between any two systems using real-time EDSM data. Perfect for planning long-distance trips, tracking your home base, or finding your fleet carrier.
+
+### Key Features
+- **System Distance Calculator** – Calculate precise jump distances between any two star systems
+- **Home System Tracking** – Save your home system and see distance from your current location in real-time
+- **Fleet Carrier Tracking** – Auto-detect your fleet carrier location from journals or set manually
+- **Coordinates & Sol Distance** – View galactic coordinates and distance to Sol for all systems
+- **Live Updates** – Distances to Home and Fleet Carrier update automatically when you jump systems
+- **Session Memory** – Remembers your last calculated systems and settings between app restarts
+- **Quick Actions:**
+  - "Use Current" button fills with your current system instantly
+  - "Home" and "FC" buttons quickly fill destination field
+  - Press Enter to calculate without clicking
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/distance_calc.png" width="600"><br>  
+*Distance Calculator showing system distances with Home and Fleet Carrier tracking.*
 
 [Back to Top](#top)
 

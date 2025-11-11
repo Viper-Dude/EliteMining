@@ -1,10 +1,17 @@
 # EliteMining v4.5.0 - Patch Notes
 
-**Release Date:** November 10, 2025
+**Release Date:** November 11, 2025
 
 ---
 
 ## What's New
+
+### Distance Calculator (NEW!)
+- **New:** Distance Calculator tab for calculating distances between any two systems using EDSM data
+- **New:** Auto-tracks Home System and Fleet Carrier locations with live distance updates from current position
+- **New:** Fleet Carrier auto-detection from journal files
+- **New:** All calculator settings (System A, System B, Home, FC) are remembered between sessions
+- **New:** Shows coordinates and distance to Sol for all systems
 
 ### User Interface
 - **Changed:** Removed visual popup notification for update checks at startup. Update check status now displays in the bottom left status label instead (shows for 3 seconds).

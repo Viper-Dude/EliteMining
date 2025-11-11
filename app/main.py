@@ -6445,7 +6445,6 @@ class App(tk.Tk):
     # ---------- Timers/Toggles tab ----------
     def _build_timers_tab(self, frame: ttk.Frame) -> None:
         frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(100, weight=1)  # Allow bottom content to expand
         
         # DEBUG: Print TIMERS order
         print("DEBUG: TIMERS keys order:", list(TIMERS.keys()))
@@ -6492,10 +6491,13 @@ class App(tk.Tk):
             ToolTip(checkbox, helptext)
             r += 1
         
-        # Add logo at bottom right
+        # Add spacer row with weight to push logo to bottom
+        frame.rowconfigure(r, weight=1)
         r += 1
+        
+        # Add logo at bottom right
         logo_frame = tk.Frame(frame, bg="#1e1e1e")
-        logo_frame.grid(row=r, column=0, sticky="se", pady=(40, 5), padx=(0, 10))
+        logo_frame.grid(row=r, column=0, sticky="se", pady=(5, 5), padx=(0, 10))
         
         import sys
         
