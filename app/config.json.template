@@ -584,5 +584,9 @@
   "api_upload_enabled": false,
   "api_endpoint_url": "https://elitemining.example.com",
   "api_key": "",
-  "cmdr_name_for_api": ""
+  "cmdr_name_for_api": "",
+  "home_system": "",
+  "fleet_carrier_system": "",
+  "distance_calculator_system_a": "",
+  "distance_calculator_system_b": ""
 }

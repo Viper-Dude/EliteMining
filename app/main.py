@@ -503,7 +503,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.4.9"
+APP_VERSION = "v4.5.0"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -2661,6 +2661,12 @@ cargo panel forces Elite to write detailed inventory data.
                         if system_name:
                             self.current_system = system_name
                             location_found = True
+                            # Update distance calculator home/FC distances
+                            if hasattr(self, '_update_home_fc_distances'):
+                                try:
+                                    self._update_home_fc_distances()
+                                except:
+                                    pass
                             continue
                     
                     # Process Scan events for ring metadata (new logic)
@@ -3265,6 +3271,13 @@ cargo panel forces Elite to write detailed inventory data.
                 
                 if system_name:
                     self.current_system = system_name
+                    
+                    # Update distance calculator home/FC distances
+                    if hasattr(self, '_update_home_fc_distances'):
+                        try:
+                            self._update_home_fc_distances()
+                        except:
+                            pass
                     
                     # Also add to visited systems database
                     timestamp = event.get("timestamp", "")
@@ -4465,6 +4478,11 @@ class App(tk.Tk):
         
         # Auto-populate marketplace system after UI is built
         self.after(3000, self._populate_marketplace_system)
+
+        # Distance Calculator tab
+        distance_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_distance_calculator_tab(distance_tab)
+        self.notebook.add(distance_tab, text="Distance Calculator")
 
         # Settings tab (simplified with remaining sub-tabs)
         settings_tab = ttk.Frame(self.notebook, padding=8)
@@ -6151,7 +6169,20 @@ class App(tk.Tk):
         separator_api.grid(row=r, column=0, sticky="ew", pady=(0, 8))
         r += 1
         
-        # API Upload enable/disable with consent message
+        # COMING SOON notice
+        coming_soon_frame = tk.Frame(scrollable_frame, bg="#3a3a00", relief="solid", bd=1)
+        coming_soon_frame.grid(row=r, column=0, sticky="ew", pady=(0, 10))
+        tk.Label(coming_soon_frame, text="🚧 COMING SOON - Server Infrastructure In Development", 
+                bg="#3a3a00", fg="#ffff00", font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=10, pady=(8, 4))
+        tk.Label(coming_soon_frame, text="The API upload feature is currently under development. Server-side infrastructure", 
+                bg="#3a3a00", fg="#ffffff", font=("Segoe UI", 8)).pack(anchor="w", padx=10)
+        tk.Label(coming_soon_frame, text="is being built to receive and process mining data. This feature will be enabled", 
+                bg="#3a3a00", fg="#ffffff", font=("Segoe UI", 8)).pack(anchor="w", padx=10)
+        tk.Label(coming_soon_frame, text="in a future release. Stay tuned!", 
+                bg="#3a3a00", fg="#ffffff", font=("Segoe UI", 8)).pack(anchor="w", padx=10, pady=(0, 8))
+        r += 1
+        
+        # API Upload enable/disable with consent message (DISABLED FOR NOW)
         api_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
         api_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
         
@@ -6159,18 +6190,19 @@ class App(tk.Tk):
         if not hasattr(self, 'api_upload_enabled'):
             from config import load_api_upload_settings
             api_settings = load_api_upload_settings()
-            self.api_upload_enabled = tk.IntVar(value=1 if api_settings["enabled"] else 0)
+            # Force disabled for this release
+            self.api_upload_enabled = tk.IntVar(value=0)
             self.api_endpoint_url = tk.StringVar(value=api_settings["endpoint_url"])
             self.api_key = tk.StringVar(value=api_settings["api_key"])
             self.api_cmdr_name = tk.StringVar(value=api_settings["cmdr_name"])
         
-        api_check = tk.Checkbutton(api_frame, text="Enable API Upload", 
+        api_check = tk.Checkbutton(api_frame, text="Enable API Upload (Not Yet Available)", 
                                    variable=self.api_upload_enabled,
                                    command=self._on_api_upload_toggle,
-                                   bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", 
-                                   activebackground="#1e1e1e", activeforeground="#ffffff", 
+                                   bg="#1e1e1e", fg="#888888", selectcolor="#1e1e1e", 
+                                   activebackground="#1e1e1e", activeforeground="#888888", 
                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
-                                   padx=4, pady=2, anchor="w")
+                                   padx=4, pady=2, anchor="w", state="disabled")
         api_check.pack(anchor="w")
         r += 1
         
@@ -6187,42 +6219,40 @@ class App(tk.Tk):
                 bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8, pady=(0, 6))
         r += 1
         
-        # CMDR Name
+        # CMDR Name (DISABLED)
         cmdr_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
         cmdr_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        tk.Label(cmdr_frame, text="CMDR Name:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(cmdr_frame, text="CMDR Name:", bg="#1e1e1e", fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         cmdr_entry = tk.Entry(cmdr_frame, textvariable=self.api_cmdr_name, 
-                             bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9), width=30)
+                             bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=30, state="disabled")
         cmdr_entry.pack(side="left", padx=(8, 0))
         r += 1
         
-        # API Endpoint URL
+        # API Endpoint URL (DISABLED)
         endpoint_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
         endpoint_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        tk.Label(endpoint_frame, text="API Endpoint:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(endpoint_frame, text="API Endpoint:", bg="#1e1e1e", fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         endpoint_entry = tk.Entry(endpoint_frame, textvariable=self.api_endpoint_url, 
-                                 bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9), width=50)
+                                 bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=50, state="disabled")
         endpoint_entry.pack(side="left", padx=(8, 0))
         r += 1
         
-        # API Key
+        # API Key (DISABLED)
         apikey_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
         apikey_frame.grid(row=r, column=0, sticky="w", pady=(4, 8))
-        tk.Label(apikey_frame, text="API Key:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(apikey_frame, text="API Key:", bg="#1e1e1e", fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         apikey_entry = tk.Entry(apikey_frame, textvariable=self.api_key, 
-                               bg="#2d2d2d", fg="#ffffff", font=("Consolas", 9), width=50, show="*")
+                               bg="#2d2d2d", fg="#888888", font=("Consolas", 9), width=50, show="*", state="disabled")
         apikey_entry.pack(side="left", padx=(8, 0))
         
-        # Show/hide API key button
+        # Show/hide API key button (DISABLED)
         def _toggle_api_key_visibility():
-            current_show = apikey_entry.cget("show")
-            apikey_entry.configure(show="" if current_show == "*" else "*")
-            show_btn.configure(text="👁️" if current_show == "*" else "🔒")
+            return  # Disabled
         
         show_btn = tk.Button(apikey_frame, text="👁️", command=_toggle_api_key_visibility,
-                            bg="#2a2a2a", fg="#e0e0e0", activebackground="#3a3a3a",
-                            activeforeground="#ffffff", relief="ridge", bd=1, 
-                            font=("Segoe UI", 8), cursor="hand2", width=3)
+                            bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
+                            activeforeground="#888888", relief="ridge", bd=1, 
+                            font=("Segoe UI", 8), cursor="hand2", width=3, state="disabled")
         show_btn.pack(side="left", padx=(4, 0))
         r += 1
         
@@ -6230,28 +6260,28 @@ class App(tk.Tk):
         api_buttons_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
         api_buttons_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
         
-        # Test Connection button
+        # Test Connection button (DISABLED)
         test_btn = tk.Button(api_buttons_frame, text="Test Connection", command=self._test_api_connection,
-                            bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                            activeforeground="#ffffff", relief="ridge", bd=1, padx=10, pady=3,
-                            font=("Segoe UI", 8, "normal"), cursor="hand2")
+                            bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
+                            activeforeground="#888888", relief="ridge", bd=1, padx=10, pady=3,
+                            font=("Segoe UI", 8, "normal"), cursor="hand2", state="disabled")
         test_btn.pack(side="left", padx=(0, 8))
-        ToolTip(test_btn, "Test connection to API server and validate credentials")
+        ToolTip(test_btn, "Not available - server infrastructure in development")
         
-        # Save Settings button
+        # Save Settings button (DISABLED)
         save_api_btn = tk.Button(api_buttons_frame, text="Save Settings", command=self._save_api_settings,
-                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                                activeforeground="#ffffff", relief="ridge", bd=1, padx=10, pady=3,
-                                font=("Segoe UI", 8, "normal"), cursor="hand2")
+                                bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
+                                activeforeground="#888888", relief="ridge", bd=1, padx=10, pady=3,
+                                font=("Segoe UI", 8, "normal"), cursor="hand2", state="disabled")
         save_api_btn.pack(side="left", padx=(0, 8))
         
-        # Bulk Upload button
+        # Bulk Upload button (DISABLED)
         bulk_upload_btn = tk.Button(api_buttons_frame, text="Bulk Upload All Data", command=self._bulk_upload_api_data,
-                                    bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
-                                    activeforeground="#ffffff", relief="ridge", bd=1, padx=10, pady=3,
-                                    font=("Segoe UI", 8, "normal"), cursor="hand2")
+                                    bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
+                                    activeforeground="#888888", relief="ridge", bd=1, padx=10, pady=3,
+                                    font=("Segoe UI", 8, "normal"), cursor="hand2", state="disabled")
         bulk_upload_btn.pack(side="left")
-        ToolTip(bulk_upload_btn, "Upload all historical mining sessions and hotspots to the server")
+        ToolTip(bulk_upload_btn, "Not available - server infrastructure in development")
         r += 1
         
         # Status label
@@ -6906,6 +6936,522 @@ class App(tk.Tk):
             self._set_status(f"Renamed preset to '{new}'.")
         except Exception as e:
             messagebox.showerror("Rename failed", str(e))
+
+    # ==================== DISTANCE CALCULATOR TAB ====================
+    
+    def _build_distance_calculator_tab(self, frame: ttk.Frame) -> None:
+        """Build the Distance Calculator tab"""
+        from edsm_distance import get_distance_calculator
+        from fleet_carrier_tracker import get_fleet_carrier_tracker
+        from config import (load_home_system, save_home_system,
+                           load_fleet_carrier_system, save_fleet_carrier_system,
+                           load_distance_calculator_systems)
+        
+        # Get calculator instance
+        self.distance_calculator = get_distance_calculator()
+        self.fc_tracker = get_fleet_carrier_tracker()
+        
+        # Main container
+        main_container = ttk.Frame(frame)
+        main_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Configuration section (moved to top)
+        config_frame = ttk.LabelFrame(main_container, text="Configuration", padding=10)
+        config_frame.pack(fill="x", pady=(0, 10))
+        
+        # Home System
+        row = 0
+        ttk.Label(config_frame, text="Home System:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        self.distance_home_system = tk.StringVar(value=load_home_system())
+        home_entry = tk.Entry(config_frame, textvariable=self.distance_home_system, 
+                             bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9), width=20,
+                             insertbackground="#ffffff")
+        home_entry.grid(row=row, column=1, padx=(5, 5), pady=3)
+        
+        set_home_btn = tk.Button(config_frame, text="Set", command=self._distance_set_home,
+                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                                activeforeground="#ffffff", relief="ridge", bd=1, 
+                                font=("Segoe UI", 8, "normal"), cursor="hand2", width=6)
+        set_home_btn.grid(row=row, column=2, padx=(0, 5), pady=3)
+        ToolTip(set_home_btn, "Save this as your home system")
+        
+        # Distance to Home (from current) and to Sol
+        home_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
+        home_info_frame.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
+        
+        self.distance_to_home_label = tk.Label(home_info_frame, text="", 
+                                               font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+        self.distance_to_home_label.pack(side="left")
+        
+        self.home_sol_label = tk.Label(home_info_frame, text="", 
+                                       font=("Segoe UI", 8), fg="#888888", bg="#1e1e1e", anchor="w")
+        self.home_sol_label.pack(side="left", padx=(10, 0))
+        
+        # Fleet Carrier System
+        row += 1
+        ttk.Label(config_frame, text="Fleet Carrier:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        self.distance_fc_system = tk.StringVar(value=load_fleet_carrier_system())
+        fc_entry = tk.Entry(config_frame, textvariable=self.distance_fc_system, 
+                           bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9), width=20,
+                           insertbackground="#ffffff")
+        fc_entry.grid(row=row, column=1, padx=(5, 5), pady=3)
+        
+        set_fc_btn = tk.Button(config_frame, text="Set", command=self._distance_set_fc,
+                              bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                              activeforeground="#ffffff", relief="ridge", bd=1, 
+                              font=("Segoe UI", 8, "normal"), cursor="hand2", width=6)
+        set_fc_btn.grid(row=row, column=2, padx=(0, 5), pady=3)
+        ToolTip(set_fc_btn, "Save this as your fleet carrier location")
+        
+        # Distance to FC (from current) and to Sol
+        fc_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
+        fc_info_frame.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
+        
+        self.distance_to_fc_label = tk.Label(fc_info_frame, text="", 
+                                             font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+        self.distance_to_fc_label.pack(side="left")
+        
+        self.fc_sol_label = tk.Label(fc_info_frame, text="", 
+                                     font=("Segoe UI", 8), fg="#888888", bg="#1e1e1e", anchor="w")
+        self.fc_sol_label.pack(side="left", padx=(10, 0))
+        
+        # Auto-detect FC button
+        row += 1
+        auto_fc_btn = tk.Button(config_frame, text="Auto-detect FC from journals", 
+                               command=self._distance_auto_detect_fc,
+                               bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
+                               activeforeground="#ffffff", relief="ridge", bd=1, padx=8, pady=3,
+                               font=("Segoe UI", 8, "normal"), cursor="hand2")
+        auto_fc_btn.grid(row=row, column=0, columnspan=4, pady=(8, 0))
+        ToolTip(auto_fc_btn, "Scan journal files to find your fleet carrier location")
+        
+        # Calculator section
+        calc_frame = ttk.LabelFrame(main_container, text="System Distance Calculator", padding=10)
+        calc_frame.pack(fill="x", pady=(0, 10))
+        
+        # Load saved systems
+        saved_system_a, saved_system_b = load_distance_calculator_systems()
+        
+        # System A input
+        row = 0
+        ttk.Label(calc_frame, text="System A:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        self.distance_system_a = tk.StringVar(value=saved_system_a)
+        system_a_entry = tk.Entry(calc_frame, textvariable=self.distance_system_a, 
+                                  bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9), width=20,
+                                  insertbackground="#ffffff")
+        system_a_entry.grid(row=row, column=1, padx=(5, 5), pady=3)
+        system_a_entry.bind("<Return>", lambda e: self._calculate_distances())
+        system_a_entry.bind("<FocusOut>", lambda e: self._save_distance_systems())
+        
+        use_current_btn = tk.Button(calc_frame, text="Use Current", command=self._distance_use_current_system,
+                                   bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                                   activeforeground="#ffffff", relief="ridge", bd=1, 
+                                   font=("Segoe UI", 8, "normal"), cursor="hand2", width=10)
+        use_current_btn.grid(row=row, column=2, pady=3)
+        ToolTip(use_current_btn, "Fill with your current system from journals")
+        
+        # System B input
+        row += 1
+        ttk.Label(calc_frame, text="System B:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        self.distance_system_b = tk.StringVar(value=saved_system_b)
+        system_b_entry = tk.Entry(calc_frame, textvariable=self.distance_system_b, 
+                                  bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9), width=20,
+                                  insertbackground="#ffffff")
+        system_b_entry.grid(row=row, column=1, padx=(5, 5), pady=3)
+        system_b_entry.bind("<Return>", lambda e: self._calculate_distances())
+        system_b_entry.bind("<FocusOut>", lambda e: self._save_distance_systems())
+        
+        # Quick buttons for System B
+        buttons_frame = tk.Frame(calc_frame, bg="#1e1e1e")
+        buttons_frame.grid(row=row, column=2, pady=3)
+        
+        use_home_btn = tk.Button(buttons_frame, text="Home", command=self._distance_use_home,
+                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                                activeforeground="#ffffff", relief="ridge", bd=1, 
+                                font=("Segoe UI", 8, "normal"), cursor="hand2", width=5)
+        use_home_btn.pack(side="left", padx=(0, 2))
+        ToolTip(use_home_btn, "Fill with your Home System")
+        
+        use_fc_btn = tk.Button(buttons_frame, text="FC", command=self._distance_use_fc,
+                              bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                              activeforeground="#ffffff", relief="ridge", bd=1, 
+                              font=("Segoe UI", 8, "normal"), cursor="hand2", width=5)
+        use_fc_btn.pack(side="left")
+        ToolTip(use_fc_btn, "Fill with your Fleet Carrier location")
+        
+        # Calculate button (or auto-calculate on change)
+        row += 1
+        calc_btn = tk.Button(calc_frame, text="Calculate Distance", command=self._calculate_distances,
+                           bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                           activeforeground="#ffffff", relief="ridge", bd=1, padx=12, pady=4,
+                           font=("Segoe UI", 9, "bold"), cursor="hand2")
+        calc_btn.grid(row=row, column=0, columnspan=3, pady=(8, 3))
+        ToolTip(calc_btn, "Calculate distances between systems (or press Enter)")
+        
+        # Status/Loading indicator
+        row += 1
+        self.distance_status_label = tk.Label(calc_frame, text="", 
+                                              font=("Segoe UI", 8, "italic"), fg="#888888", bg="#1e1e1e")
+        self.distance_status_label.grid(row=row, column=0, columnspan=3, pady=(0, 5))
+        
+        # Results section
+        results_frame = ttk.LabelFrame(main_container, text="Results", padding=10)
+        results_frame.pack(fill="both", expand=True, pady=(0, 10))
+        
+        # Distance A ↔ B
+        row = 0
+        self.distance_ab_label = tk.Label(results_frame, text="➤ Distance A ↔ B: ---", 
+                                         font=("Segoe UI", 11, "bold"), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+        self.distance_ab_label.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        
+        # Separator
+        row += 1
+        separator = tk.Frame(results_frame, height=1, bg="#444444")
+        separator.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        
+        # System A Info (left column)
+        row += 1
+        tk.Label(results_frame, text="System A Info:", font=("Segoe UI", 9, "bold"), 
+                fg="#ffffff", bg="#1e1e1e", anchor="w").grid(row=row, column=0, sticky="w", padx=(0, 20))
+        
+        # System B Info (right column)
+        tk.Label(results_frame, text="System B Info:", font=("Segoe UI", 9, "bold"), 
+                fg="#ffffff", bg="#1e1e1e", anchor="w").grid(row=row, column=1, sticky="w")
+        
+        # Distance to Sol - side by side
+        row += 1
+        self.distance_a_sol_label = tk.Label(results_frame, text="➤ Distance to Sol: ---", 
+                                             font=("Segoe UI", 9), fg="#ffffff", bg="#1e1e1e", anchor="w")
+        self.distance_a_sol_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
+        
+        self.distance_b_sol_label = tk.Label(results_frame, text="➤ Distance to Sol: ---", 
+                                             font=("Segoe UI", 9), fg="#ffffff", bg="#1e1e1e", anchor="w")
+        self.distance_b_sol_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
+        
+        # Coordinates - side by side
+        row += 1
+        self.distance_a_coords_label = tk.Label(results_frame, text="➤ Coordinates: ---", 
+                                                font=("Segoe UI", 9), fg="#ffffff", bg="#1e1e1e", anchor="w")
+        self.distance_a_coords_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
+        
+        self.distance_b_coords_label = tk.Label(results_frame, text="➤ Coordinates: ---", 
+                                                font=("Segoe UI", 9), fg="#ffffff", bg="#1e1e1e", anchor="w")
+        self.distance_b_coords_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
+        
+        results_frame.columnconfigure(0, weight=1)
+        results_frame.columnconfigure(1, weight=1)
+        
+        # Auto-calculate on startup (delayed to allow init)
+        self.after(1000, self._distance_auto_calculate_on_startup)
+    
+    def _distance_auto_calculate_on_startup(self):
+        """Auto-calculate distances and Home/FC on startup"""
+        try:
+            # Update Home/FC distances
+            self._update_home_fc_distances()
+            
+            # If both System A and B are populated, auto-calculate
+            system_a = self.distance_system_a.get().strip()
+            system_b = self.distance_system_b.get().strip()
+            
+            if system_a or system_b:
+                # Run calculation to restore previous results
+                self._calculate_distances()
+        except Exception as e:
+            print(f"Error in auto-calculate on startup: {e}")
+    
+    def _distance_use_current_system(self):
+        """Fill System A with current system"""
+        try:
+            # Try multiple ways to get current system
+            current_system = None
+            
+            # Method 1: From prospector panel (last_system or current_system)
+            if hasattr(self, 'prospector_panel'):
+                current_system = getattr(self.prospector_panel, 'last_system', None) or \
+                               getattr(self.prospector_panel, 'current_system', None)
+            
+            # Method 2: From ring finder (if it has already loaded)
+            if not current_system and hasattr(self, 'ring_finder') and self.ring_finder.system_var:
+                sys_from_rf = self.ring_finder.system_var.get()
+                if sys_from_rf:
+                    current_system = sys_from_rf
+            
+            # Method 3: Read Status.json directly (immediate, no delay)
+            if not current_system:
+                import os
+                import json
+                try:
+                    ed_folder = os.path.expanduser("~\\Saved Games\\Frontier Developments\\Elite Dangerous")
+                    status_file = os.path.join(ed_folder, "Status.json")
+                    if os.path.exists(status_file):
+                        with open(status_file, 'r', encoding='utf-8') as f:
+                            status_data = json.load(f)
+                            if 'SystemName' in status_data:
+                                current_system = status_data['SystemName']
+                except:
+                    pass
+            
+            if current_system:
+                self.distance_system_a.set(current_system)
+                self._set_status(f"Current system: {current_system}")
+                self.distance_status_label.config(text=f"Using current system: {current_system}", fg="#4da6ff")
+                # Update Home/FC distances
+                self._update_home_fc_distances()
+            else:
+                messagebox.showinfo("No Current System", "No current system detected.\n\nMake sure Elite Dangerous is running and you're in a system.")
+                self.distance_status_label.config(text="⚠ No current system detected", fg="#ffaa00")
+        except Exception as e:
+            print(f"Error getting current system: {e}")
+            messagebox.showerror("Error", f"Failed to get current system: {e}")
+    
+    def _distance_use_home(self):
+        """Fill System B with home system"""
+        home = self.distance_home_system.get().strip()
+        if home:
+            self.distance_system_b.set(home)
+        else:
+            messagebox.showinfo("No Home System", "Please set your home system first in Configuration section below.")
+    
+    def _distance_use_fc(self):
+        """Fill System B with fleet carrier system"""
+        fc = self.distance_fc_system.get().strip()
+        if fc:
+            self.distance_system_b.set(fc)
+        else:
+            messagebox.showinfo("No Fleet Carrier", "Please set your fleet carrier location first, or use Auto-detect.")
+    
+    def _distance_set_home(self):
+        """Save home system to config"""
+        from config import save_home_system
+        home = self.distance_home_system.get().strip()
+        if home:
+            save_home_system(home)
+            self._set_status(f"Home system set to: {home}")
+            # Update distances
+            self._update_home_fc_distances()
+            messagebox.showinfo("Saved", f"Home system set to: {home}")
+        else:
+            messagebox.showwarning("Empty System", "Please enter a system name.")
+    
+    def _distance_set_fc(self):
+        """Save fleet carrier system to config"""
+        from config import save_fleet_carrier_system
+        fc = self.distance_fc_system.get().strip()
+        if fc:
+            save_fleet_carrier_system(fc)
+            self._set_status(f"Fleet Carrier location set to: {fc}")
+            # Update distances
+            self._update_home_fc_distances()
+            messagebox.showinfo("Saved", f"Fleet Carrier location set to: {fc}")
+        else:
+            messagebox.showwarning("Empty System", "Please enter a system name.")
+    
+    def _distance_auto_detect_fc(self):
+        """Auto-detect fleet carrier from journals"""
+        try:
+            # Set journal directory for tracker
+            if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
+                self.fc_tracker.set_journal_directory(self.prospector_panel.journal_dir)
+                
+                # Show scanning message
+                self._set_status("Scanning journals for fleet carrier...")
+                self.update()
+                
+                # Scan journals
+                carrier_system = self.fc_tracker.scan_journals_for_carrier()
+                
+                if carrier_system:
+                    self.distance_fc_system.set(carrier_system)
+                    carrier_info = self.fc_tracker.get_carrier_info()
+                    carrier_name = carrier_info.get('carrier_name', 'Unknown') if carrier_info else 'Unknown'
+                    self._set_status(f"Fleet Carrier '{carrier_name}' found in {carrier_system}")
+                    messagebox.showinfo("Fleet Carrier Found", 
+                                      f"Fleet Carrier: {carrier_name}\nLocation: {carrier_system}\n\nClick 'Set' to save this location.")
+                else:
+                    self._set_status("No fleet carrier found in journals")
+                    messagebox.showinfo("Not Found", 
+                                      "No fleet carrier location found in recent journal files.\n\n" 
+                                      "Make sure you have:\n"
+                                      "• Jumped your carrier recently, or\n"
+                                      "• Docked at your carrier recently")
+            else:
+                messagebox.showwarning("No Journal Directory", 
+                                     "Journal directory not set. Please configure it in Settings → General Settings → Journal Files.")
+        except Exception as e:
+            print(f"Error auto-detecting FC: {e}")
+            messagebox.showerror("Error", f"Failed to scan journals: {e}")
+    
+    def _save_distance_systems(self):
+        """Save System A and B to config"""
+        try:
+            from config import save_distance_calculator_systems
+            system_a = self.distance_system_a.get().strip()
+            system_b = self.distance_system_b.get().strip()
+            save_distance_calculator_systems(system_a, system_b)
+        except Exception as e:
+            print(f"Error saving distance calculator systems: {e}")
+    
+    def _calculate_distances(self):
+        """Calculate distances between systems"""
+        system_a = self.distance_system_a.get().strip()
+        system_b = self.distance_system_b.get().strip()
+        
+        if not system_a and not system_b:
+            self.distance_status_label.config(text="⚠ Please enter at least one system name", fg="#ffaa00")
+            return
+        
+        # Save systems to config
+        self._save_distance_systems()
+        
+        try:
+            # Show calculating status
+            self.distance_status_label.config(text="🔍 Querying EDSM...", fg="#4da6ff")
+            self._set_status("Calculating distances...")
+            self.update()
+            
+            # Reset labels
+            self.distance_ab_label.config(text="➤ Distance A ↔ B: Calculating...", fg="#cccccc")
+            self.distance_a_sol_label.config(text="➤ Distance to Sol: ---", fg="#ffffff")
+            self.distance_a_coords_label.config(text="➤ Coordinates: ---", fg="#ffffff")
+            self.distance_b_sol_label.config(text="➤ Distance to Sol: ---", fg="#ffffff")
+            self.distance_b_coords_label.config(text="➤ Coordinates: ---", fg="#ffffff")
+            self.update()
+            
+            # Get system info from EDSM
+            sys_a_info = None
+            sys_b_info = None
+            
+            if system_a:
+                sys_a_info = self.distance_calculator.get_system_coordinates(system_a)
+                if not sys_a_info:
+                    self.distance_a_sol_label.config(text=f"➤ System '{system_a}' not found in EDSM", fg="#ff6666")
+                    self._set_status(f"System A '{system_a}' not found")
+            
+            if system_b:
+                sys_b_info = self.distance_calculator.get_system_coordinates(system_b)
+                if not sys_b_info:
+                    self.distance_b_sol_label.config(text=f"➤ System '{system_b}' not found in EDSM", fg="#ff6666")
+                    self._set_status(f"System B '{system_b}' not found")
+            
+            # Calculate distance between A and B
+            if sys_a_info and sys_b_info:
+                distance_ab = self.distance_calculator.calculate_distance(sys_a_info, sys_b_info)
+                if distance_ab is not None:
+                    self.distance_ab_label.config(text=f"➤ Distance A ↔ B: {distance_ab:.2f} LY", fg="#ffcc00")
+                else:
+                    self.distance_ab_label.config(text="➤ Distance A ↔ B: Calculation failed", fg="#ff6666")
+            else:
+                self.distance_ab_label.config(text="➤ Distance A ↔ B: Need both systems", fg="#cccccc")
+            
+            # System A info
+            if sys_a_info:
+                sol_dist_a, _ = self.distance_calculator.get_distance_to_sol(system_a)
+                self.distance_a_sol_label.config(
+                    text=f"➤ Distance to Sol: {sol_dist_a:.2f} LY" if sol_dist_a is not None else "➤ Distance to Sol: ---",
+                    fg="#ffffff"
+                )
+                self.distance_a_coords_label.config(
+                    text=f"➤ Coordinates: X: {sys_a_info['x']:.2f}, Y: {sys_a_info['y']:.2f}, Z: {sys_a_info['z']:.2f}",
+                    fg="#ffffff"
+                )
+            
+            # System B info
+            if sys_b_info:
+                sol_dist_b, _ = self.distance_calculator.get_distance_to_sol(system_b)
+                self.distance_b_sol_label.config(
+                    text=f"➤ Distance to Sol: {sol_dist_b:.2f} LY" if sol_dist_b is not None else "➤ Distance to Sol: ---",
+                    fg="#ffffff"
+                )
+                self.distance_b_coords_label.config(
+                    text=f"➤ Coordinates: X: {sys_b_info['x']:.2f}, Y: {sys_b_info['y']:.2f}, Z: {sys_b_info['z']:.2f}",
+                    fg="#ffffff"
+                )
+            
+            # Update status based on results
+            if sys_a_info and sys_b_info:
+                self.distance_status_label.config(text="✓ Calculation complete", fg="#00ff00")
+            elif sys_a_info or sys_b_info:
+                self.distance_status_label.config(text="⚠ One system not found", fg="#ffaa00")
+            else:
+                self.distance_status_label.config(text="✗ Systems not found in EDSM", fg="#ff6666")
+            
+            # Calculate distances to Home and FC from current position
+            self._update_home_fc_distances()
+            
+            self._set_status("Distance calculation complete")
+            
+        except Exception as e:
+            print(f"Error calculating distances: {e}")
+            self.distance_status_label.config(text=f"✗ Error: {str(e)[:50]}", fg="#ff6666")
+            self._set_status("Distance calculation failed")
+    
+    def _update_home_fc_distances(self):
+        """Update distances to Home and FC from current system"""
+        try:
+            # Get current system
+            current_system = None
+            if hasattr(self, 'prospector_panel'):
+                current_system = getattr(self.prospector_panel, 'last_system', None) or \
+                               getattr(self.prospector_panel, 'current_system', None)
+            if not current_system and hasattr(self, 'ring_finder'):
+                current_system = self.ring_finder.system_var.get()
+            
+            if not current_system:
+                self.distance_to_home_label.config(text="")
+                self.home_sol_label.config(text="")
+                self.distance_to_fc_label.config(text="")
+                self.fc_sol_label.config(text="")
+                return
+            
+            # Calculate distance to Home
+            home_system = self.distance_home_system.get().strip()
+            if home_system:
+                # Distance from current to home
+                distance, home_info, current_info = self.distance_calculator.get_distance_between_systems(
+                    current_system, home_system
+                )
+                if distance is not None:
+                    self.distance_to_home_label.config(text=f"➤ {distance:.2f} LY from current", fg="#ffcc00")
+                else:
+                    self.distance_to_home_label.config(text="", fg="#888888")
+                
+                # Distance from home to Sol
+                sol_distance, _ = self.distance_calculator.get_distance_to_sol(home_system)
+                if sol_distance is not None:
+                    self.home_sol_label.config(text=f"(Sol: {sol_distance:.2f} LY)", fg="#888888")
+                else:
+                    self.home_sol_label.config(text="")
+            else:
+                self.distance_to_home_label.config(text="")
+                self.home_sol_label.config(text="")
+            
+            # Calculate distance to FC
+            fc_system = self.distance_fc_system.get().strip()
+            if fc_system:
+                # Distance from current to FC
+                distance, fc_info, current_info = self.distance_calculator.get_distance_between_systems(
+                    current_system, fc_system
+                )
+                if distance is not None:
+                    self.distance_to_fc_label.config(text=f"➤ {distance:.2f} LY from current", fg="#ffcc00")
+                else:
+                    self.distance_to_fc_label.config(text="", fg="#888888")
+                
+                # Distance from FC to Sol
+                sol_distance, _ = self.distance_calculator.get_distance_to_sol(fc_system)
+                if sol_distance is not None:
+                    self.fc_sol_label.config(text=f"(Sol: {sol_distance:.2f} LY)", fg="#888888")
+                else:
+                    self.fc_sol_label.config(text="")
+            else:
+                self.distance_to_fc_label.config(text="")
+                self.fc_sol_label.config(text="")
+                
+        except Exception as e:
+            print(f"Error updating home/FC distances: {e}")
+    
+    # ==================== END DISTANCE CALCULATOR ====================
 
     def _load_selected_preset(self) -> None:
         sel = self._get_selected_preset()

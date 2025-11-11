@@ -70,6 +70,7 @@ def _load_cfg() -> Dict[str, Any]:
     return {}
 
 def _save_cfg(cfg: Dict[str, Any]) -> None:
+    global _cached_config, _last_load_time
     try:
         # Ensure the directory exists
         config_dir = os.path.dirname(CONFIG_FILE)
@@ -82,6 +83,10 @@ def _save_cfg(cfg: Dict[str, Any]) -> None:
         
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
+        
+        # Update cache immediately after save
+        _cached_config = cfg.copy()
+        _last_load_time = time.time()
             
         # Only log verification if there's an issue
         if not os.path.exists(CONFIG_FILE):
@@ -431,6 +436,24 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     if api_fields_added:
         log.info(f"Added API upload fields: {', '.join(api_fields_added)}")
     
+    # Add Distance Calculator fields if missing
+    distance_fields_added = []
+    if "home_system" not in config:
+        config["home_system"] = ""
+        distance_fields_added.append("home_system")
+    if "fleet_carrier_system" not in config:
+        config["fleet_carrier_system"] = ""
+        distance_fields_added.append("fleet_carrier_system")
+    if "distance_calculator_system_a" not in config:
+        config["distance_calculator_system_a"] = ""
+        distance_fields_added.append("distance_calculator_system_a")
+    if "distance_calculator_system_b" not in config:
+        config["distance_calculator_system_b"] = ""
+        distance_fields_added.append("distance_calculator_system_b")
+    
+    if distance_fields_added:
+        log.info(f"Added Distance Calculator fields: {', '.join(distance_fields_added)}")
+    
     log.info(f"Config migration completed successfully from {original_version} to {target_version}")
     return config
 
@@ -507,4 +530,42 @@ def save_api_upload_settings(settings: Dict[str, Any]) -> None:
         cfg["api_key"] = settings["api_key"].strip()
     if "cmdr_name" in settings:
         cfg["cmdr_name_for_api"] = settings["cmdr_name"].strip()
+    _save_cfg(cfg)
+
+
+# Distance Calculator Configuration
+def load_home_system() -> str:
+    """Load home system from config"""
+    cfg = _load_cfg()
+    return cfg.get("home_system", "")
+
+def save_home_system(system_name: str) -> None:
+    """Save home system to config"""
+    cfg = _load_cfg()
+    cfg["home_system"] = system_name.strip()
+    _save_cfg(cfg)
+
+def load_fleet_carrier_system() -> str:
+    """Load fleet carrier system from config"""
+    cfg = _load_cfg()
+    return cfg.get("fleet_carrier_system", "")
+
+def save_fleet_carrier_system(system_name: str) -> None:
+    """Save fleet carrier system to config"""
+    cfg = _load_cfg()
+    cfg["fleet_carrier_system"] = system_name.strip()
+    _save_cfg(cfg)
+
+def load_distance_calculator_systems() -> tuple:
+    """Load System A and System B from config"""
+    cfg = _load_cfg()
+    system_a = cfg.get("distance_calculator_system_a", "")
+    system_b = cfg.get("distance_calculator_system_b", "")
+    return system_a, system_b
+
+def save_distance_calculator_systems(system_a: str, system_b: str) -> None:
+    """Save System A and System B to config"""
+    cfg = _load_cfg()
+    cfg["distance_calculator_system_a"] = system_a.strip()
+    cfg["distance_calculator_system_b"] = system_b.strip()
     _save_cfg(cfg)
