@@ -4254,6 +4254,10 @@ class App(tk.Tk):
         # Set the main app reference so cargo monitor can access prospector panel later
         self.cargo_monitor.main_app_ref = self
         
+        # Centralized current system tracking (single source of truth)
+        self.current_system = ""
+        self.current_system_coords = None
+        
         # Only create Variables folder if it's in a VA installation path
         if 'VoiceAttack' in self.va_root or os.path.exists(os.path.join(self.va_root, '..', 'VoiceAttack.exe')):
             os.makedirs(self.vars_dir, exist_ok=True)
@@ -7126,24 +7130,16 @@ class App(tk.Tk):
         separator = tk.Frame(results_frame, height=1, bg="#444444")
         separator.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         
-        # System names display (plain text showing what's in System A/B fields)
+        # System A Info with system name on same line (left column)
         row += 1
-        self.distance_system_a_name = tk.Label(results_frame, text="System A: ---", 
-                                               font=("Segoe UI", 9), fg="#ffaa00", bg="#1e1e1e", anchor="w")
-        self.distance_system_a_name.grid(row=row, column=0, sticky="w", padx=(0, 20))
+        self.distance_system_a_name = tk.Label(results_frame, text="System A Info: ---", 
+                                               font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg="#1e1e1e", anchor="w")
+        self.distance_system_a_name.grid(row=row, column=0, sticky="w", padx=(0, 20), pady=(5, 0))
         
-        self.distance_system_b_name = tk.Label(results_frame, text="System B: ---", 
-                                               font=("Segoe UI", 9), fg="#ffaa00", bg="#1e1e1e", anchor="w")
-        self.distance_system_b_name.grid(row=row, column=1, sticky="w")
-        
-        # System A Info (left column)
-        row += 1
-        tk.Label(results_frame, text="System A Info:", font=("Segoe UI", 9, "bold"), 
-                fg="#ffffff", bg="#1e1e1e", anchor="w").grid(row=row, column=0, sticky="w", padx=(0, 20), pady=(5, 0))
-        
-        # System B Info (right column)
-        tk.Label(results_frame, text="System B Info:", font=("Segoe UI", 9, "bold"), 
-                fg="#ffffff", bg="#1e1e1e", anchor="w").grid(row=row, column=1, sticky="w", pady=(5, 0))
+        # System B Info with system name on same line (right column)
+        self.distance_system_b_name = tk.Label(results_frame, text="System B Info: ---", 
+                                               font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg="#1e1e1e", anchor="w")
+        self.distance_system_b_name.grid(row=row, column=1, sticky="w", pady=(5, 0))
         
         # Distance to Sol - side by side
         row += 1
@@ -7172,63 +7168,43 @@ class App(tk.Tk):
         self.after(1000, self._distance_auto_calculate_on_startup)
     
     def _distance_auto_calculate_on_startup(self):
-        """Auto-calculate distances and Home/FC on startup"""
-        try:
-            # Auto-detect Fleet Carrier location from journals (always fresh scan)
-            if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
-                try:
-                    self.fc_tracker.set_journal_directory(self.prospector_panel.journal_dir)
-                    carrier_system = self.fc_tracker.scan_journals_for_carrier()
-                    if carrier_system:
-                        self.distance_fc_system.set(carrier_system)
-                        print(f"Auto-detected Fleet Carrier in: {carrier_system}")
-                except Exception as e:
-                    print(f"Error auto-detecting FC on startup: {e}")
-            
-            # Update Home/FC distances
-            self._update_home_fc_distances()
-            
-            # If both System A and B are populated, auto-calculate
-            system_a = self.distance_system_a.get().strip()
-            system_b = self.distance_system_b.get().strip()
-            
-            if system_a or system_b:
-                # Run calculation to restore previous results
-                self._calculate_distances()
-        except Exception as e:
-            print(f"Error in auto-calculate on startup: {e}")
+        """Auto-calculate distances and Home/FC on startup (runs in background thread)"""
+        import threading
+        
+        def startup_thread():
+            try:
+                # Auto-detect Fleet Carrier location from journals (always fresh scan)
+                if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
+                    try:
+                        self.fc_tracker.set_journal_directory(self.prospector_panel.journal_dir)
+                        carrier_system = self.fc_tracker.scan_journals_for_carrier()
+                        if carrier_system:
+                            self.after(0, lambda: self.distance_fc_system.set(carrier_system))
+                            print(f"Auto-detected Fleet Carrier in: {carrier_system}")
+                    except Exception as e:
+                        print(f"Error auto-detecting FC on startup: {e}")
+                
+                # Defer distance updates to prevent startup freeze (wait for prospector panel to scan journals)
+                self.after(500, self._update_home_fc_distances)
+                
+                # If both System A and B are populated, auto-calculate
+                system_a = self.distance_system_a.get().strip()
+                system_b = self.distance_system_b.get().strip()
+                
+                if system_a or system_b:
+                    # Defer calculation to prevent blocking startup
+                    self.after(500, self._calculate_distances)
+            except Exception as e:
+                print(f"Error in auto-calculate on startup: {e}")
+        
+        # Start background thread
+        threading.Thread(target=startup_thread, daemon=True).start()
     
     def _distance_use_current_system(self):
         """Fill System A with current system"""
         try:
-            # Try multiple ways to get current system
-            current_system = None
-            
-            # Method 1: From prospector panel (last_system or current_system)
-            if hasattr(self, 'prospector_panel'):
-                current_system = getattr(self.prospector_panel, 'last_system', None) or \
-                               getattr(self.prospector_panel, 'current_system', None)
-            
-            # Method 2: From ring finder (if it has already loaded)
-            if not current_system and hasattr(self, 'ring_finder') and self.ring_finder.system_var:
-                sys_from_rf = self.ring_finder.system_var.get()
-                if sys_from_rf:
-                    current_system = sys_from_rf
-            
-            # Method 3: Read Status.json directly (immediate, no delay)
-            if not current_system:
-                import os
-                import json
-                try:
-                    ed_folder = os.path.expanduser("~\\Saved Games\\Frontier Developments\\Elite Dangerous")
-                    status_file = os.path.join(ed_folder, "Status.json")
-                    if os.path.exists(status_file):
-                        with open(status_file, 'r', encoding='utf-8') as f:
-                            status_data = json.load(f)
-                            if 'SystemName' in status_data:
-                                current_system = status_data['SystemName']
-                except:
-                    pass
+            # Get current system from centralized source
+            current_system = self.get_current_system()
             
             if current_system:
                 self.distance_system_a.set(current_system)
@@ -7328,9 +7304,9 @@ class App(tk.Tk):
         system_a = self.distance_system_a.get().strip()
         system_b = self.distance_system_b.get().strip()
         
-        # Update system name labels
-        self.distance_system_a_name.config(text=f"System A: {system_a if system_a else '---'}")
-        self.distance_system_b_name.config(text=f"System B: {system_b if system_b else '---'}")
+        # Update system info labels with system names on same line
+        self.distance_system_a_name.config(text=f"System A Info: {system_a if system_a else '---'}")
+        self.distance_system_b_name.config(text=f"System B Info: {system_b if system_b else '---'}")
         
         if not system_a and not system_b:
             self.distance_status_label.config(text="⚠ Please enter at least one system name", fg="#ffaa00")
@@ -7424,13 +7400,8 @@ class App(tk.Tk):
     def _update_home_fc_distances(self):
         """Update distances to Home and FC from current system"""
         try:
-            # Get current system
-            current_system = None
-            if hasattr(self, 'prospector_panel'):
-                current_system = getattr(self.prospector_panel, 'last_system', None) or \
-                               getattr(self.prospector_panel, 'current_system', None)
-            if not current_system and hasattr(self, 'ring_finder'):
-                current_system = self.ring_finder.system_var.get()
+            # Get current system from centralized source
+            current_system = self.get_current_system()
             
             # Update current system display
             if hasattr(self, 'distance_current_system'):
@@ -11392,6 +11363,43 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         # Run in background thread to not block UI
         thread = threading.Thread(target=scan_in_background, daemon=True)
         thread.start()
+    
+    def get_current_system(self) -> Optional[str]:
+        """Centralized method to get current system - single source of truth"""
+        # Return cached value if available
+        if self.current_system:
+            return self.current_system
+        
+        # Try to get from prospector panel (already scanned on startup)
+        if hasattr(self, 'prospector_panel') and self.prospector_panel.last_system:
+            self.current_system = self.prospector_panel.last_system
+            return self.current_system
+        
+        return None
+    
+    def update_current_system(self, system_name: str, coords: Optional[tuple] = None) -> None:
+        """Centralized method to update current system - notifies all interested components"""
+        if not system_name:
+            return
+            
+        # Update central cache
+        self.current_system = system_name
+        self.current_system_coords = coords
+        
+        # Notify all components that use current system
+        # 1. Update ring finder reference system
+        if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_var'):
+            self.ring_finder.system_var.set(system_name)
+            if coords:
+                self.ring_finder.current_system_coords = coords
+        
+        # 2. Update distance calculator display
+        if hasattr(self, 'distance_current_system'):
+            self.distance_current_system.set(system_name)
+            # Trigger distance updates to home/FC
+            self.after(0, self._update_home_fc_distances)
+        
+        print(f"[SYSTEM] Updated current system: {system_name}")
 
 if __name__ == "__main__":
     try:

@@ -445,8 +445,9 @@ class ProspectorPanel(ttk.Frame):
         # Track whether we're processing startup events or real-time events
         self.startup_processing: bool = True
         
-        # Read initial location from journal on startup
-        self._read_initial_location_from_journal()
+        # Defer journal scanning to prevent startup freeze
+        # Will be called after UI is built
+        self._initial_scan_pending = True
 
         # Prospector history view
         self.history: List[Tuple[str, str, str]] = []
@@ -538,13 +539,12 @@ class ProspectorPanel(ttk.Frame):
         # UI
         self._build_ui()
         
-        # Update location display with any data found during journal scan
-        if self.last_system or self.last_body:
-            self._update_location_display()
-            print(f"[STARTUP] UI updated - System: '{self.session_system.get()}', Body: '{self.session_body.get()}'")
-        
         # Load last settings after UI is built
         self._load_last_material_settings()
+        
+        # Defer journal scanning to prevent blocking UI initialization
+        if self._initial_scan_pending:
+            self.after(100, self._deferred_initial_scan)
         # Force announce_map to UI after build (only if mat_tree exists)
         if hasattr(self, 'mat_tree'):
             for m in self.mat_tree.get_children():
@@ -754,13 +754,26 @@ class ProspectorPanel(ttk.Frame):
         # Force an update to show what we currently think the location is
         self._update_location_display()
     
+    def _deferred_initial_scan(self) -> None:
+        """Deferred journal scan - runs after UI is initialized to prevent startup freeze"""
+        self._initial_scan_pending = False
+        self._read_initial_location_from_journal()
+        
+        # Update location display with any data found during journal scan
+        if self.last_system or self.last_body:
+            self._update_location_display()
+            print(f"[STARTUP] UI updated - System: '{self.session_system.get()}', Body: '{self.session_body.get()}'")
+            
+            # Notify main app of current system (single source of truth)
+            if self.main_app and hasattr(self.main_app, 'update_current_system'):
+                self.main_app.update_current_system(self.last_system)
+    
     def _read_initial_location_from_journal(self) -> None:
         """Read the most recent journal file to populate initial system/body location on startup"""
         if not self.journal_dir or not os.path.isdir(self.journal_dir):
             return
         
-        try:
-            # Find the most recent journal file
+        try:# Find the most recent journal file
             journal_files = [f for f in os.listdir(self.journal_dir) if f.startswith("Journal.") and f.endswith(".log")]
             if not journal_files:
                 return
@@ -7560,6 +7573,18 @@ class ProspectorPanel(ttk.Frame):
                 if evt.get("StarSystem"):
                     self.last_system = evt.get("StarSystem")
                     self.session_system.set(self.last_system)
+                    
+                    # Get coordinates if available
+                    coords = None
+                    if "StarPos" in evt:
+                        coords = tuple(evt["StarPos"])
+                    
+                    # Notify main app - centralized system update
+                    if self.main_app and hasattr(self.main_app, 'update_current_system'):
+                        self.main_app.update_current_system(self.last_system, coords)
+                        # Update distances in background (non-blocking)
+                        if hasattr(self.app, '_update_home_fc_distances'):
+                            self.app.after(100, self.app._update_home_fc_distances)
                 
                 # Update location context
                 self.last_body_type = evt.get("BodyType", "")
@@ -7570,9 +7595,9 @@ class ProspectorPanel(ttk.Frame):
                 if carrier_system and hasattr(self.app, 'distance_fc_system'):
                     print(f"[FLEET CARRIER] Detected FC jump to: {carrier_system}")
                     self.app.distance_fc_system.set(carrier_system)
-                    # Update distances in Distance Calculator
+                    # Update distances in Distance Calculator (non-blocking)
                     if hasattr(self.app, '_update_home_fc_distances'):
-                        self.app._update_home_fc_distances()
+                        self.app.after(100, self.app._update_home_fc_distances)
                 
                 # Handle station/carrier context - use real-time Status.json for docked state
                 journal_docked_status = evt.get("Docked", False)

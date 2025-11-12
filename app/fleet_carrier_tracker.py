@@ -137,7 +137,23 @@ class FleetCarrierTracker:
                         timestamp = event.get("timestamp")
                         
                         # Collect relevant carrier events
-                        if event_type == "CarrierJump":
+                        # Use CarrierLocation event - but ONLY for YOUR FleetCarrier (not SquadronCarrier)
+                        if event_type == "CarrierLocation":
+                            carrier_type = event.get("CarrierType", "")
+                            system_name = event.get("StarSystem")
+                            carrier_id = event.get("CarrierID")
+                            
+                            # ONLY track YOUR FleetCarrier, ignore SquadronCarrier
+                            if carrier_type == "FleetCarrier" and system_name and timestamp:
+                                carrier_events.append({
+                                    "timestamp": timestamp,
+                                    "system": system_name,
+                                    "carrier_name": None,
+                                    "event_type": "CarrierLocation"
+                                })
+                                logger.debug(f"Found CarrierLocation (FleetCarrier): {system_name} at {timestamp}")
+                        # Also check CarrierJump as fallback (only for YOUR carrier)
+                        elif event_type == "CarrierJump":
                             system_name = event.get("StarSystem")
                             if system_name and timestamp:
                                 carrier_events.append({
@@ -146,41 +162,7 @@ class FleetCarrierTracker:
                                     "carrier_name": None,
                                     "event_type": "CarrierJump"
                                 })
-                        elif event_type == "CarrierLocation":
-                            # CarrierLocation event after carrier jump completes
-                            system_name = event.get("StarSystem")
-                            if system_name and timestamp:
-                                carrier_events.append({
-                                    "timestamp": timestamp,
-                                    "system": system_name,
-                                    "carrier_name": None,
-                                    "event_type": "CarrierLocation"
-                                })
-                        elif event_type == "Location":
-                            docked = event.get("Docked", False)
-                            station_type = event.get("StationType", "")
-                            if docked and station_type == "FleetCarrier":
-                                system_name = event.get("StarSystem")
-                                carrier_name = event.get("StationName")
-                                if system_name and timestamp:
-                                    carrier_events.append({
-                                        "timestamp": timestamp,
-                                        "system": system_name,
-                                        "carrier_name": carrier_name,
-                                        "event_type": "Location"
-                                    })
-                        elif event_type == "Docked":
-                            station_type = event.get("StationType", "")
-                            if station_type == "FleetCarrier":
-                                system_name = event.get("StarSystem")
-                                carrier_name = event.get("StationName")
-                                if system_name and timestamp:
-                                    carrier_events.append({
-                                        "timestamp": timestamp,
-                                        "system": system_name,
-                                        "carrier_name": carrier_name,
-                                        "event_type": "Docked"
-                                    })
+                                logger.debug(f"Found CarrierJump: {system_name} at {timestamp}")
                             
             except Exception as e:
                 logger.error(f"Error reading journal file {journal_file}: {e}")

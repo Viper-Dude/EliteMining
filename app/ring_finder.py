@@ -665,24 +665,27 @@ class RingFinder:
     def _auto_detect_system(self):
         """Auto-detect current system from Elite Dangerous journal"""
         try:
-            if self.prospector_panel and hasattr(self.prospector_panel, 'last_system'):
+            # Get current system from main app (centralized source)
+            current_system = None
+            if self.prospector_panel and hasattr(self.prospector_panel, 'main_app'):
+                main_app = self.prospector_panel.main_app
+                if hasattr(main_app, 'get_current_system'):
+                    current_system = main_app.get_current_system()
+            
+            # Fallback to prospector panel directly
+            if not current_system and self.prospector_panel and hasattr(self.prospector_panel, 'last_system'):
                 current_system = self.prospector_panel.last_system
-                if current_system:
-                    self.current_system_var.set(current_system)
+            
+            if current_system:
+                self.current_system_var.set(current_system)
+                self.status_var.set(f"Current system: {current_system}")
+                # Check if coordinates exist in cache
+                coords = self.systems_data.get(current_system.lower())
+                if not coords:
+                    self.status_var.set(f"Current system: {current_system} (coordinates not available)")
+                else:
                     self.status_var.set(f"Current system: {current_system}")
-                    # Check if coordinates exist or get them from EDSM
-                    coords = self.systems_data.get(current_system.lower())
-                    if not coords:
-                # EDSM disabled - only use galaxy database for coordinates
-                # coords = self._get_system_coords_from_edsm(current_system)
-                        if coords:
-                            self.systems_data[current_system.lower()] = coords
-                            self.status_var.set(f"Current system: {current_system}")
-                        else:
-                            self.status_var.set(f"Current system: {current_system} (coordinates not available)")
-                    else:
-                        self.status_var.set(f"Current system: {current_system}")
-                    return
+                return
             
             # Fallback: read directly from Status.json
             ed_folder = os.path.expanduser("~\\Saved Games\\Frontier Developments\\Elite Dangerous")
