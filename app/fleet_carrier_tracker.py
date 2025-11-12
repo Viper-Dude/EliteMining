@@ -146,6 +146,16 @@ class FleetCarrierTracker:
                                     "carrier_name": None,
                                     "event_type": "CarrierJump"
                                 })
+                        elif event_type == "CarrierLocation":
+                            # CarrierLocation event after carrier jump completes
+                            system_name = event.get("StarSystem")
+                            if system_name and timestamp:
+                                carrier_events.append({
+                                    "timestamp": timestamp,
+                                    "system": system_name,
+                                    "carrier_name": None,
+                                    "event_type": "CarrierLocation"
+                                })
                         elif event_type == "Location":
                             docked = event.get("Docked", False)
                             station_type = event.get("StationType", "")
@@ -178,7 +188,16 @@ class FleetCarrierTracker:
         
         # Sort by timestamp (most recent first) and take the most recent
         if carrier_events:
-            carrier_events.sort(key=lambda x: x["timestamp"], reverse=True)
+            # Convert timestamps to datetime for proper sorting
+            for event in carrier_events:
+                try:
+                    event["datetime"] = datetime.fromisoformat(event["timestamp"].replace('Z', '+00:00'))
+                except:
+                    # Fallback: keep string comparison if parsing fails
+                    event["datetime"] = event["timestamp"]
+            
+            # Sort by datetime (most recent first)
+            carrier_events.sort(key=lambda x: x["datetime"], reverse=True)
             most_recent = carrier_events[0]
             
             self.last_carrier_system = most_recent["system"]
@@ -186,6 +205,7 @@ class FleetCarrierTracker:
             self.last_carrier_timestamp = most_recent["timestamp"]
             
             logger.info(f"Fleet Carrier last seen in: {self.last_carrier_system} at {self.last_carrier_timestamp}")
+            logger.info(f"Event type: {most_recent['event_type']}")
             if self.last_known_carrier:
                 logger.info(f"Fleet Carrier name: {self.last_known_carrier}")
         else:

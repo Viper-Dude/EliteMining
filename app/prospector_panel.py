@@ -7563,6 +7563,16 @@ class ProspectorPanel(ttk.Frame):
                 
                 # Update location context
                 self.last_body_type = evt.get("BodyType", "")
+            
+            # Track Fleet Carrier location changes
+            if ev == "CarrierLocation":
+                carrier_system = evt.get("StarSystem")
+                if carrier_system and hasattr(self.app, 'distance_fc_system'):
+                    print(f"[FLEET CARRIER] Detected FC jump to: {carrier_system}")
+                    self.app.distance_fc_system.set(carrier_system)
+                    # Update distances in Distance Calculator
+                    if hasattr(self.app, '_update_home_fc_distances'):
+                        self.app._update_home_fc_distances()
                 
                 # Handle station/carrier context - use real-time Status.json for docked state
                 journal_docked_status = evt.get("Docked", False)
