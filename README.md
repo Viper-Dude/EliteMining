@@ -3,7 +3,7 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
 
-**EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 32,000+ mining locations as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
+**EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 61,000+ mining locations as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
 
 ---
 
@@ -47,7 +47,7 @@ Full-featured mining companion with GUI controls:
 - Ship configuration management  
 - GUI for firegroups, timers, toggles, and announcements  
 - **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
-- **Hotspot Finder** – Search 32,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
+- **Hotspot Finder** – Search 61,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
 - **Commodity Market** – Find the best sell prices for your mined commodities with real-time market data and distance calculations  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports
 
@@ -127,14 +127,14 @@ The **EliteMining App** lets you adjust firegroups, toggles, timers, and announc
 
 ## Hotspot Finder
 
-The Hotspot Finder provides access to a comprehensive database of 32,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities.
+The Hotspot Finder provides access to a comprehensive database of 61,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities.
 
 ### Key Features
 - **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
 - **Filter by Minerals** – Search for specific minerals (Painite, Platinum, Low Temperature Diamonds, etc.)
 - **Min Hotspots Filter** – Filter results to show only rings with X or more hotspots (1-20 range, available when specific mineral selected)
 - **Auto-Search** – Automatically searches for hotspots when jumping to new systems and auto-refreshes results when scanning rings (remembers preference across restarts)
-- **Pre-loaded Database** – 32,000+ hotspots with minerals types, ring densities
+- **Pre-loaded Database** – 61,000+ hotspots with minerals types, ring densities
 - **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
 - **Distance-Based Results** – Filter by jump range (up to 500 LY) to find nearby opportunities
 - **Ring Composition Details** – View ring density and distance from arrival (LS) with comma-separated formatting

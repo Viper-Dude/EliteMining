@@ -555,9 +555,9 @@ class RingFinder:
             with sqlite3.connect(self.user_db.db_path) as conn:
                 cursor = conn.cursor()
                 
-                # Count total hotspots (table is named hotspot_data, not hotspots)
-                cursor.execute("SELECT COUNT(*) FROM hotspot_data")
-                total_hotspots = cursor.fetchone()[0]
+                # Count total hotspots (sum of all hotspot counts across all materials)
+                cursor.execute("SELECT SUM(hotspot_count) FROM hotspot_data")
+                total_hotspots = cursor.fetchone()[0] or 0
                 
                 # Count unique systems
                 cursor.execute("SELECT COUNT(DISTINCT system_name) FROM hotspot_data")
@@ -2104,17 +2104,36 @@ class RingFinder:
                         print(f" DEBUG: No systems found in range, starting with reference system '{reference_system}'")
                     
                     if systems_in_range:
-                        # Cap systems to prevent search hanging on large distance searches
-                        if len(systems_in_range) > 5000:
-                            print(f" DEBUG: Too many systems ({len(systems_in_range)}) - limiting to 5000 for performance")
-                            systems_in_range = systems_in_range[:5000]
+                        # PRIORITY FIX: Get all systems that have hotspots in the database
+                        cursor.execute('''
+                            SELECT DISTINCT system_name FROM hotspot_data
+                        ''')
+                        systems_with_hotspots = set(row[0] for row in cursor.fetchall())
+                        print(f"🔍 [PRIORITY] Found {len(systems_with_hotspots)} systems with hotspots in database")
                         
-                        # Always include reference system itself (distance = 0 LY) AFTER limiting
+                        # Separate systems into priority (has hotspots) and non-priority
+                        priority_systems = [s for s in systems_in_range if s in systems_with_hotspots]
+                        non_priority_systems = [s for s in systems_in_range if s not in systems_with_hotspots]
+                        
+                        print(f"🔍 [PRIORITY] {len(priority_systems)} priority systems (have hotspots)")
+                        print(f"🔍 [PRIORITY] {len(non_priority_systems)} non-priority systems")
+                        
+                        # Cap non-priority systems to prevent search hanging, but keep ALL priority systems
+                        LIMIT = 5000
+                        if len(priority_systems) + len(non_priority_systems) > LIMIT:
+                            slots_remaining = max(0, LIMIT - len(priority_systems))
+                            non_priority_systems = non_priority_systems[:slots_remaining]
+                            print(f"🔍 [PRIORITY] Keeping all {len(priority_systems)} priority systems + {len(non_priority_systems)} non-priority = {len(priority_systems) + len(non_priority_systems)} total")
+                        
+                        # Combine: priority systems first, then non-priority
+                        systems_in_range = priority_systems + non_priority_systems
+                        
+                        # Always include reference system itself (distance = 0 LY)
                         if reference_system not in systems_in_range:
                             systems_in_range.append(reference_system)
                             print(f" DEBUG: Added reference system '{reference_system}' to search list (0 LY)")
                         
-                        print(f" DEBUG: Pre-filtered to {len(systems_in_range)} systems within {max_distance} LY")
+                        print(f" DEBUG: Pre-filtered to {len(systems_in_range)} systems within {max_distance} LY (prioritized hotspot systems)")
                 
                 # Build optimized query based on whether we have a system filter
                 if systems_in_range:
@@ -2422,6 +2441,9 @@ class RingFinder:
                 
             systems_in_range = []
             
+            print(f"🔍 [DEBUG 300LY] _find_systems_in_range called with max_distance={max_distance}")
+            print(f"🔍 [DEBUG 300LY] Reference coords: {reference_coords}")
+            
             with sqlite3.connect(str(galaxy_db_path)) as conn:
                 cursor = conn.cursor()
                 
@@ -2434,6 +2456,8 @@ class RingFinder:
                 z_min = reference_coords['z'] - max_distance
                 z_max = reference_coords['z'] + max_distance
                 
+                print(f"🔍 [DEBUG 300LY] Bounding box: X[{x_min:.2f}, {x_max:.2f}] Y[{y_min:.2f}, {y_max:.2f}] Z[{z_min:.2f}, {z_max:.2f}]")
+                
                 # Add LIMIT to prevent query timeout on large searches
                 cursor.execute("""
                     SELECT name, x, y, z FROM systems 
@@ -2444,22 +2468,43 @@ class RingFinder:
                 """, (x_min, x_max, y_min, y_max, z_min, z_max))
                 
                 results = cursor.fetchall()
-                print(f" DEBUG: Galaxy database returned {len(results)} systems from cube query")
+                print(f"🔍 [DEBUG 300LY] Galaxy database returned {len(results)} systems from cube query")
                 
                 # Calculate actual distance and filter - store as (name, distance) tuples
                 systems_with_distances = []
+                col_359_found = False
                 for name, x, y, z in results:
                     system_coords = {'x': x, 'y': y, 'z': z}
                     distance = self._calculate_distance(reference_coords, system_coords)
                     
+                    # Debug for Col 359 system
+                    if "Col 359 Sector IG-X d1-90" in name:
+                        col_359_found = True
+                        print(f"🔍 [DEBUG 300LY] Found 'Col 359 Sector IG-X d1-90' in cube results at distance {distance:.2f} LY")
+                        print(f"🔍 [DEBUG 300LY] System coords: X={x:.2f}, Y={y:.2f}, Z={z:.2f}")
+                    
                     if distance <= max_distance:
                         systems_with_distances.append((name, distance))
+                        if "Col 359 Sector IG-X d1-90" in name:
+                            print(f"🔍 [DEBUG 300LY] ✅ 'Col 359 Sector IG-X d1-90' PASSED distance filter ({distance:.2f} <= {max_distance})")
+                    else:
+                        if "Col 359 Sector IG-X d1-90" in name:
+                            print(f"🔍 [DEBUG 300LY] ❌ 'Col 359 Sector IG-X d1-90' FAILED distance filter ({distance:.2f} > {max_distance})")
+                
+                if not col_359_found:
+                    print(f"🔍 [DEBUG 300LY] ⚠️ 'Col 359 Sector IG-X d1-90' NOT FOUND in cube query results")
                 
                 # Sort by distance (closest first) before converting to name-only list
                 systems_with_distances.sort(key=lambda x: x[1])
                 systems_in_range = [name for name, dist in systems_with_distances]
                         
-                print(f" DEBUG: Found {len(systems_in_range)} systems within {max_distance} LY using galaxy database (sorted by distance)")
+                print(f"🔍 [DEBUG 300LY] Found {len(systems_in_range)} systems within {max_distance} LY using galaxy database (sorted by distance)")
+                
+                # Debug: Check if Col 359 is in final list
+                if "Col 359 Sector IG-X d1-90" in systems_in_range:
+                    print(f"🔍 [DEBUG 300LY] ✅ 'Col 359 Sector IG-X d1-90' IS in final systems_in_range list")
+                else:
+                    print(f"🔍 [DEBUG 300LY] ❌ 'Col 359 Sector IG-X d1-90' NOT in final systems_in_range list")
                 
                 # Also check user database for visited systems within range
                 try:
