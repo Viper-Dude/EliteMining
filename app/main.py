@@ -503,7 +503,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.5.1"
+APP_VERSION = "v4.5.2"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4536,8 +4536,13 @@ class App(tk.Tk):
         apply_btn.grid(row=0, column=1, sticky="w", padx=(10, 0))
         ToolTip(apply_btn, "Send your current settings to the game via VoiceAttack\nThis writes configuration to variable files that VoiceAttack uses")
 
+        # VoiceAttack integration label on same line
+        va_label = tk.Label(actions, text="VoiceAttack integration: Sync settings with game files",
+                           fg="gray", bg="#1e1e1e", font=("Segoe UI", 8, "italic"))
+        va_label.grid(row=0, column=2, sticky="w", padx=(20, 0))
+
         # Configure column weights for proper spacing
-        actions.grid_columnconfigure(2, weight=1)  # Expandable space
+        actions.grid_columnconfigure(3, weight=1)  # Expandable space
 
         # Status bar - span both columns
         self.status = tk.StringVar(value=f"{APP_TITLE} {APP_VERSION} | Installation: {self.va_root}")
@@ -4556,7 +4561,7 @@ class App(tk.Tk):
         self.after(150, self._update_journal_label)
         
         # Reset window size for better tab layout - smaller window size
-        self.after(50, lambda: self.geometry("1100x650"))
+        self.after(50, lambda: self.geometry("1200x700"))
 
     def _create_integrated_cargo_monitor(self, parent_frame):
         """
@@ -6376,7 +6381,7 @@ class App(tk.Tk):
         presets_pane.rowconfigure(2, weight=1)  # Row 2 will be the preset list
 
         # Ship Presets title
-        presets_title = ttk.Label(presets_pane, text="⚙️ Ship Presets", font=("Segoe UI", 11, "bold"))
+        presets_title = ttk.Label(presets_pane, text="⚙️ Ship Presets (VoiceAttack only)", font=("Segoe UI", 11, "bold"))
         presets_title.grid(row=0, column=0, sticky="w", pady=(0, 2))
         
         # Help text for preset operations
@@ -6484,68 +6489,19 @@ class App(tk.Tk):
         r += 1
         
         for name, (_fname, helptext) in TOGGLES.items():
-            checkbox = tk.Checkbutton(frame, text=f"Enable {name}", variable=self.toggle_vars[name], 
+            rowf = ttk.Frame(frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            checkbox = tk.Checkbutton(rowf, text=f"Enable {name}", variable=self.toggle_vars[name], 
                                     bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", 
                                     activebackground="#1e1e1e", activeforeground="#ffffff", 
                                     highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                                     padx=4, pady=2, anchor="w")
-            checkbox.grid(row=r, column=0, sticky="w")
+            checkbox.pack(side="left")
             
-            # Add tooltip to checkbox
-            ToolTip(checkbox, helptext)
+            tk.Label(rowf, text=helptext, fg="gray", bg="#1e1e1e",
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
-        
-        # Add spacer row with weight to push logo to bottom
-        frame.rowconfigure(r, weight=1)
-        r += 1
-        
-        # Add logo at bottom right
-        logo_frame = tk.Frame(frame, bg="#1e1e1e")
-        logo_frame.grid(row=r, column=0, sticky="se", pady=(5, 5), padx=(0, 10))
-        
-        import sys
-        
-        # Use consistent path detection like config.py
-        if getattr(sys, 'frozen', False):
-            # Running as compiled executable - images are in app folder
-            exe_dir = os.path.dirname(sys.executable)
-            parent_dir = os.path.dirname(exe_dir)
-            logo_path = os.path.join(parent_dir, 'app', 'Images', 'EliteMining_txt_logo_transp_resize.png')
-        else:
-            # Running in development mode
-            logo_path = os.path.join(os.path.dirname(__file__), 'Images', 'EliteMining_txt_logo_transp_resize.png')
-        
-        try:
-            from PIL import Image, ImageTk
-            if os.path.exists(logo_path):
-                img = Image.open(logo_path)
-                # Resize with much smaller height for compact appearance
-                img = img.resize((200, 35), Image.Resampling.LANCZOS)
-                self.timers_logo_photo = ImageTk.PhotoImage(img)
-                logo_label = tk.Label(logo_frame, image=self.timers_logo_photo, bg="#1e1e1e", cursor="hand2")
-                logo_label.pack()
-                
-                # Make logo clickable to open GitHub
-                def open_github(event=None):
-                    import webbrowser
-                    webbrowser.open("https://github.com/Viper-Dude/EliteMining")
-                logo_label.bind("<Button-1>", open_github)
-        except ImportError:
-            # Fallback to tkinter PhotoImage with subsample for resizing
-            if os.path.exists(logo_path):
-                self.timers_logo_photo = tk.PhotoImage(file=logo_path)
-                # Subsample to make it smaller
-                self.timers_logo_photo = self.timers_logo_photo.subsample(2, 2)
-                logo_label = tk.Label(logo_frame, image=self.timers_logo_photo, bg="#1e1e1e", cursor="hand2")
-                logo_label.pack()
-                
-                def open_github(event=None):
-                    import webbrowser
-                    webbrowser.open("https://github.com/Viper-Dude/EliteMining")
-                logo_label.bind("<Button-1>", open_github)
-        except Exception as e:
-            # Silently fail if logo can't be loaded
-            pass
 
     # ---------- Status helper ----------
     def _set_status(self, msg: str, clear_after: int = 5000) -> None:
@@ -8459,13 +8415,13 @@ class App(tk.Tk):
                 self.deiconify()
             except Exception as e:
                 # If saved geometry fails, center on screen with default size
-                self.geometry("1100x650")
+                self.geometry("1200x700")
                 self.update_idletasks()
                 screen_width = self.winfo_screenwidth()
                 screen_height = self.winfo_screenheight()
                 x = (screen_width - 1100) // 2
                 y = (screen_height - 650) // 2
-                self.geometry(f"1100x650+{x}+{y}")
+                self.geometry(f"1200x700+{x}+{y}")
         else:
             # No saved geometry, center on screen with default size
             self.geometry("1100x650")

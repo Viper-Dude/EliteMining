@@ -9,7 +9,7 @@
       "btn": 2
     },
     "Prospector limpet:": {
-      "fg": "B",
+      "fg": "C",
       "btn": 2
     },
     "Pulse wave analyser:": {
@@ -30,22 +30,24 @@
     }
   },
   "Toggles": {
-    "Cargo Scoop": 1,
-    "Pulse Wave Analyser": 0,
-    "Laser Mining Extra": 0,
-    "Prospector Sequence": 1,
-    "Power Settings": 0,
-    "Target": 0,
     "Auto Honk": 1,
-    "Headtracker Docking Control": 1
+    "Cargo Scoop": 0,
+    "Headtracker Docking Control": 1,
+    "Laser Mining Extra": 0,
+    "Night Vision": 0,
+    "Open System Map": 0,
+    "Power Settings": 0,
+    "Prospector Sequence": 0,
+    "Pulse Wave Analyser": 0,
+    "Target": 0
   },
   "Announcements": {},
   "Timers": {
-    "Cargo Scoop Delay": 14,
-    "Laser Mining Extra Delay": 11,
-    "Laser Mining Duration": 25,
-    "Pause Duration": 1,
-    "Target Delay": 8,
-    "Boost Interval": 5
+    "Duration for firing mining lasers (first period)": 27,
+    "Pause between laser periods for weapon recharge/cooldown": 10,
+    "Duration for second laser period (If Laser Mining Extra is enabled)": 11,
+    "Delay before selecting prospector target after laser mining": 9,
+    "Delay before retracting cargo scoop after mining sequence": 14,
+    "Boost Interval (For Core Mining Boost sequense )": 1
   }
 }
