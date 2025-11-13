@@ -12,17 +12,24 @@
   - Toggle file: `Variables/toggleSystem.txt`
   - Help text: "Automatically open system map after FSD jump"
 
+### Distance Calculator
+- **New:** Current System now displays distance to Sol (yellow text, same format as Home/FC distances)
+- **Improved:** Home System field - press Enter to save (no button needed)
+- **Improved:** Cleaner interface with instant visual feedback when setting home system
+
 ### UI Improvements
 - **Changed:** Toggle checkboxes now show help text inline in italic format instead of tooltips
 - **Improved:** More readable toggle descriptions without needing hover
 - **New:** Added "VoiceAttack integration" label above Import/Apply buttons
 - **New:** Ship Presets title now shows "(VoiceAttack only)" to clarify functionality
 - **Improved:** Help text for VoiceAttack features displayed inline for better visibility
+- **Improved:** Expanded default window size (1200x700) for better layout on new installs
 
 ---
 
 ## Bug Fixes
 - **Fixed:** Logo positioning in Mining Controls tab now properly anchored to prevent hiding on window resize
+- **Removed:** Logo from Mining Controls tab for cleaner appearance
 ---
 
 ## Known Issues

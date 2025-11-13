@@ -6937,6 +6937,11 @@ class App(tk.Tk):
         current_display.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         ToolTip(current_display, "Your current system (updates automatically on FSD jump)")
         
+        # Current system Sol distance label
+        self.current_sol_label = tk.Label(config_frame, text="", 
+                                         font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+        self.current_sol_label.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
+        
         # Home System
         row += 1
         ttk.Label(config_frame, text="Home System:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
@@ -6945,13 +6950,8 @@ class App(tk.Tk):
                              bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
                              insertbackground="#ffffff")
         home_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        
-        set_home_btn = tk.Button(config_frame, text="Set", command=self._distance_set_home,
-                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                                activeforeground="#ffffff", relief="ridge", bd=1, 
-                                font=("Segoe UI", 8, "normal"), cursor="hand2", width=6)
-        set_home_btn.grid(row=row, column=2, padx=(0, 5), pady=3)
-        ToolTip(set_home_btn, "Save this as your home system")
+        home_entry.bind("<Return>", self._distance_set_home)  # Bind Enter key
+        ToolTip(home_entry, "Type system name and press Enter to save")
         
         # Distance to Home (from current) and to Sol
         home_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
@@ -7191,18 +7191,15 @@ class App(tk.Tk):
         else:
             messagebox.showinfo("No Fleet Carrier", "Please set your fleet carrier location first, or use Auto-detect.")
     
-    def _distance_set_home(self):
-        """Save home system to config"""
+    def _distance_set_home(self, event=None):
+        """Save home system to config (called by Enter key)"""
         from config import save_home_system
         home = self.distance_home_system.get().strip()
         if home:
             save_home_system(home)
             self._set_status(f"Home system set to: {home}")
-            # Update distances
+            # Update distances (provides visual confirmation)
             self._update_home_fc_distances()
-            messagebox.showinfo("Saved", f"Home system set to: {home}")
-        else:
-            messagebox.showwarning("Empty System", "Please enter a system name.")
     
     def _distance_auto_detect_fc(self):
         """Auto-detect fleet carrier from journals"""
@@ -7363,8 +7360,15 @@ class App(tk.Tk):
             if hasattr(self, 'distance_current_system'):
                 if current_system:
                     self.distance_current_system.set(current_system)
+                    # Calculate distance from current system to Sol
+                    sol_distance, _ = self.distance_calculator.get_distance_to_sol(current_system)
+                    if sol_distance is not None:
+                        self.current_sol_label.config(text=f"➤ {sol_distance:.2f} LY from Sol", fg="#ffcc00")
+                    else:
+                        self.current_sol_label.config(text="")
                 else:
                     self.distance_current_system.set("---")
+                    self.current_sol_label.config(text="")
             
             if not current_system:
                 self.distance_to_home_label.config(text="")
