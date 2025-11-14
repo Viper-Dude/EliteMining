@@ -695,22 +695,29 @@ class RingFinder:
             return
         
         try:
-            from config import load_home_system, load_fleet_carrier_system
+            # Get main app to access Distance Calculator variables
+            main_app = None
+            if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, 'main_app'):
+                main_app = self.prospector_panel.main_app
+            
+            if not main_app:
+                self.distance_info_var.set("➤ Sol: --- | Home: --- | Fleet Carrier: ---")
+                return
             
             # Get Sol distance
             sol_dist, _ = self.distance_calculator.get_distance_to_sol(system_name)
             sol_text = f"{sol_dist:.2f} LY" if sol_dist is not None else "---"
             
-            # Get Home distance
-            home_system = load_home_system()
+            # Get Home distance - use SAME variable as Distance Calculator
+            home_system = main_app.distance_home_system.get().strip() if hasattr(main_app, 'distance_home_system') else ""
             if home_system:
                 home_dist, _, _ = self.distance_calculator.get_distance_between_systems(system_name, home_system)
                 home_text = f"{home_dist:.2f} LY" if home_dist is not None else "---"
             else:
                 home_text = "---"
             
-            # Get FC distance
-            fc_system = load_fleet_carrier_system()
+            # Get FC distance - use SAME variable as Distance Calculator
+            fc_system = main_app.distance_fc_system.get().strip() if hasattr(main_app, 'distance_fc_system') else ""
             if fc_system:
                 fc_dist, _, _ = self.distance_calculator.get_distance_between_systems(system_name, fc_system)
                 fc_text = f"{fc_dist:.2f} LY" if fc_dist is not None else "---"
