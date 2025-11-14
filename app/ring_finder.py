@@ -99,13 +99,16 @@ class RingFinder:
     
     ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter
     
-    def __init__(self, parent_frame: ttk.Frame, prospector_panel=None, app_dir: Optional[str] = None, tooltip_class=None):
+    def __init__(self, parent_frame: ttk.Frame, prospector_panel=None, app_dir: Optional[str] = None, tooltip_class=None, distance_calculator=None):
+        print("DEBUG: RingFinder.__init__ called")
         self.parent = parent_frame
         self.prospector_panel = prospector_panel  # Reference to get current system
         self.systems_data = {}  # System coordinates cache
         self.current_system_coords = None
         self.app_dir = app_dir  # Store app_dir for galaxy database access
         self.db_ready = False  # Track database initialization status
+        self.distance_calculator = distance_calculator  # Distance calculator for Sol distance
+        print(f"DEBUG: distance_calculator = {distance_calculator}")
         
         # Use main app's ToolTip class if provided, otherwise use local one
         global ToolTip
@@ -194,6 +197,7 @@ class RingFinder:
         
     def setup_ui(self):
         """Create hotspot finder UI following EliteMining patterns"""
+        print("DEBUG: setup_ui called")
         # Configure parent frame to expand
         self.parent.grid_columnconfigure(0, weight=1)
         self.parent.grid_rowconfigure(0, weight=1)
@@ -309,6 +313,12 @@ class RingFinder:
                "Automatically search for hotspots when arriving in a new system.\n"
                "Uses your last search settings (ring type, mineral, distance).\n"
                "Updates reference system from game status.")
+        
+        # Distance to Sol label
+        self.sol_distance_label = tk.Label(buttons_frame, text="➤ Distance to Sol: ---",
+                                          bg="#1e1e1e", fg="#ffaa00",
+                                          font=("Segoe UI", 9))
+        self.sol_distance_label.pack(side="left", padx=(10, 0))
 
         # Ring Type filter
         ttk.Label(search_frame, text="Ring Type:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
@@ -514,6 +524,8 @@ class RingFinder:
         
         # Bind right-click to show context menu
         self.results_tree.bind("<Button-3>", self._show_context_menu)
+        
+        print("DEBUG: setup_ui completed successfully")
     
     def _sort_column(self, col, reverse):
         """Sort treeview column"""
@@ -662,6 +674,25 @@ class RingFinder:
             self.parent.after(0, lambda: self.status_var.set(f"Error loading database: {e}"))
     
             
+    def _update_sol_distance(self, system_name: str):
+        """Update Sol distance label for reference system"""
+        if not self.distance_calculator or not system_name:
+            self.sol_distance_label.config(text="➤ Distance to Sol: ---", fg="#ffaa00")
+            return
+        
+        try:
+            sol_dist, _ = self.distance_calculator.get_distance_to_sol(system_name)
+            if sol_dist is not None:
+                self.sol_distance_label.config(
+                    text=f"➤ {sol_dist:.2f} LY from Sol",
+                    fg="#ffaa00"
+                )
+            else:
+                self.sol_distance_label.config(text="➤ Distance to Sol: ---", fg="#ffaa00")
+        except Exception as e:
+            print(f"Warning: Failed to calculate Sol distance: {e}")
+            self.sol_distance_label.config(text="➤ Distance to Sol: ---", fg="#ffaa00")
+    
     def _auto_detect_system(self):
         """Auto-detect current system from Elite Dangerous journal"""
         try:
@@ -678,6 +709,7 @@ class RingFinder:
             
             if current_system:
                 self.current_system_var.set(current_system)
+                self._update_sol_distance(current_system)
                 self.status_var.set(f"Current system: {current_system}")
                 # Check if coordinates exist in cache
                 coords = self.systems_data.get(current_system.lower())
@@ -907,6 +939,9 @@ class RingFinder:
         
         reference_system = self.system_var.get().strip()
         print(f"[SEARCH DEBUG] Reference system: '{reference_system}'")
+        
+        # Update Sol distance for reference system
+        self._update_sol_distance(reference_system)
         
         material_filter = self.material_var.get()
         specific_material = self.specific_material_var.get()

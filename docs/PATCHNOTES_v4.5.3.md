@@ -12,6 +12,7 @@
   - 5000 system limit now applies only to systems without hotspots
   - Ensures mining locations are never cut off from search results regardless of distance
 - **Fixed:** Hotspot counter now accurately counts actual hotspots instead of database rows
+- **Added:** Distance to Sol display for reference system in search interface
 
 ---
 

@@ -26,7 +26,10 @@ import logging
 from logging_setup import setup_logging
 log_file = setup_logging()  # Only activates when running as packaged executable
 if log_file:
-    print(f"✓ Logging enabled: {log_file}")
+    try:
+        print(f"✓ Logging enabled: {log_file}")
+    except UnicodeEncodeError:
+        print(f"Logging enabled: {log_file}")
 
 # Determine app directory for both PyInstaller and script execution
 if hasattr(sys, '_MEIPASS'):
@@ -4470,6 +4473,11 @@ class App(tk.Tk):
         self._build_voiceattack_controls_tab(voiceattack_tab)
         self.notebook.add(voiceattack_tab, text="VoiceAttack Controls")
 
+        # Distance Calculator tab (build BEFORE Hotspots Finder so distance_calculator exists)
+        distance_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_distance_calculator_tab(distance_tab)
+        self.notebook.add(distance_tab, text="Distance Calculator")
+
         # Hotspots Finder tab
         ring_finder_tab = ttk.Frame(self.notebook, padding=8)
         self._setup_ring_finder(ring_finder_tab)
@@ -4482,11 +4490,6 @@ class App(tk.Tk):
         
         # Auto-populate marketplace system after UI is built
         self.after(3000, self._populate_marketplace_system)
-
-        # Distance Calculator tab
-        distance_tab = ttk.Frame(self.notebook, padding=8)
-        self._build_distance_calculator_tab(distance_tab)
-        self.notebook.add(distance_tab, text="Distance Calculator")
 
         # Settings tab (simplified with remaining sub-tabs)
         settings_tab = ttk.Frame(self.notebook, padding=8)
@@ -9374,18 +9377,23 @@ class App(tk.Tk):
 
     def _setup_ring_finder(self, parent_frame):
         """Setup the ring finder tab"""
+        print("DEBUG: _setup_ring_finder called")
         try:
             # Pass the correct app directory to Ring Finder for proper database path
             # Only use va_root path in installer mode, None in dev mode for consistent database location
             app_dir = os.path.join(self.va_root, "app") if getattr(sys, 'frozen', False) and hasattr(self, 'va_root') and self.va_root else None
-            self.ring_finder = RingFinder(parent_frame, self.prospector_panel, app_dir, ToolTip)
+            print(f"DEBUG: About to create RingFinder, distance_calculator={self.distance_calculator}")
+            self.ring_finder = RingFinder(parent_frame, self.prospector_panel, app_dir, ToolTip, self.distance_calculator)
+            print("DEBUG: RingFinder created successfully")
             
             # Check if there were any pending hotspot additions while Ring Finder was being created
             if getattr(self, '_pending_ring_finder_refresh', False):
                 self._refresh_ring_finder()
                 
         except Exception as e:
+            import traceback
             print(f"Ring finder setup failed: {e}")
+            traceback.print_exc()
 
     def _build_marketplace_tab(self, frame: ttk.Frame) -> None:
         """Build the Commodity Market tab - matches Hotspots Finder design"""
