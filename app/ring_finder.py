@@ -148,6 +148,11 @@ class RingFinder:
         self.last_monitored_system = None
         self.status_json_path = None
         
+        # Track previous search results for highlighting new entries
+        self.previous_results = set()  # Set of (system_name, body_name) tuples
+        self.highlight_timer = None  # Timer for fade-out
+        self.initial_load = True  # Skip highlighting on first search
+        
         # Variables directory for persistence
         from app_utils import get_variables_dir
         self.vars_dir = get_variables_dir()
@@ -241,17 +246,25 @@ class RingFinder:
                                 font=("Segoe UI", 8), foreground="#888888")
         status_label.pack(side="right")
         
-        # Database info label (discreet, below status)
-        db_info_header = ttk.Frame(self.scrollable_frame)
-        db_info_header.pack(fill="x", padx=10, pady=(0, 5))
+        # Distance info (below title on separate line) - label in white, values in yellow
+        distance_header = ttk.Frame(self.scrollable_frame)
+        distance_header.pack(fill="x", padx=10, pady=(0, 5))
         
+        ttk.Label(distance_header, text="Distances:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
+        
+        self.distance_info_var = tk.StringVar(value="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
+        distance_info_label = tk.Label(distance_header, textvariable=self.distance_info_var,
+                                font=("Segoe UI", 9), foreground="#ffaa00", bg="#1e1e1e")
+        distance_info_label.pack(side="left")
+        
+        # Database info on same line, right-aligned
         self.db_info_var = tk.StringVar(value="Total: ... hotspots in ... systems")
-        db_info_label = tk.Label(db_info_header, textvariable=self.db_info_var,
+        db_info_label = tk.Label(distance_header, textvariable=self.db_info_var,
                                 font=("Segoe UI", 8, "italic"), foreground="#888888", bg="#1e1e1e")
         db_info_label.pack(side="right")
         
         search_frame = ttk.Frame(self.scrollable_frame)
-        search_frame.pack(fill="x", padx=10, pady=(0, 5))
+        search_frame.pack(fill="x", padx=10, pady=0)
         
         # Configure grid columns - prevent column 2 from expanding
         search_frame.grid_columnconfigure(0, weight=0)
@@ -313,12 +326,6 @@ class RingFinder:
                "Automatically search for hotspots when arriving in a new system.\n"
                "Uses your last search settings (ring type, mineral, distance).\n"
                "Updates reference system from game status.")
-        
-        # Distance to Sol label
-        self.sol_distance_label = tk.Label(buttons_frame, text="➤ Distance to Sol: ---",
-                                          bg="#1e1e1e", fg="#ffaa00",
-                                          font=("Segoe UI", 9))
-        self.sol_distance_label.pack(side="left", padx=(10, 0))
 
         # Ring Type filter
         ttk.Label(search_frame, text="Ring Type:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
@@ -511,6 +518,13 @@ class RingFinder:
         tree_frame.grid_columnconfigure(0, weight=1)
         tree_frame.grid_rowconfigure(0, weight=1)
         
+        # Configure style for the treeview to allow tag colors
+        style = ttk.Style()
+        style.map('Treeview', background=[('selected', '#4a4a4a')])  # Keep selection color
+        
+        # Configure tag for highlighting new entries with both background and foreground
+        self.results_tree.tag_configure('new_entry', background='#4d7d4d', foreground='#ffffff')  # Light green with white text
+        
         # Update database info immediately and schedule a delayed update (use parent window's after method)
         self._update_database_info()
         if hasattr(self.parent, 'after'):
@@ -675,23 +689,39 @@ class RingFinder:
     
             
     def _update_sol_distance(self, system_name: str):
-        """Update Sol distance label for reference system"""
+        """Update distance info label for reference system (Sol, Home, FC)"""
         if not self.distance_calculator or not system_name:
-            self.sol_distance_label.config(text="➤ Distance to Sol: ---", fg="#ffaa00")
+            self.distance_info_var.set("➤ Sol: --- | Home: --- | FC: ---")
             return
         
         try:
+            from config import load_home_system, load_fleet_carrier_system
+            
+            # Get Sol distance
             sol_dist, _ = self.distance_calculator.get_distance_to_sol(system_name)
-            if sol_dist is not None:
-                self.sol_distance_label.config(
-                    text=f"➤ {sol_dist:.2f} LY from Sol",
-                    fg="#ffaa00"
-                )
+            sol_text = f"{sol_dist:.2f} LY" if sol_dist is not None else "---"
+            
+            # Get Home distance
+            home_system = load_home_system()
+            if home_system:
+                home_dist, _, _ = self.distance_calculator.get_distance_between_systems(system_name, home_system)
+                home_text = f"{home_dist:.2f} LY" if home_dist is not None else "---"
             else:
-                self.sol_distance_label.config(text="➤ Distance to Sol: ---", fg="#ffaa00")
+                home_text = "---"
+            
+            # Get FC distance
+            fc_system = load_fleet_carrier_system()
+            if fc_system:
+                fc_dist, _, _ = self.distance_calculator.get_distance_between_systems(system_name, fc_system)
+                fc_text = f"{fc_dist:.2f} LY" if fc_dist is not None else "---"
+            else:
+                fc_text = "---"
+            
+            # Update label (values only)
+            self.distance_info_var.set(f"➤ Sol: {sol_text} | Home: {home_text} | Fleet Carrier: {fc_text}")
         except Exception as e:
-            print(f"Warning: Failed to calculate Sol distance: {e}")
-            self.sol_distance_label.config(text="➤ Distance to Sol: ---", fg="#ffaa00")
+            print(f"Warning: Failed to calculate distances: {e}")
+            self.distance_info_var.set("➤ Sol: --- | Home: --- | Fleet Carrier: ---")
     
     def _auto_detect_system(self):
         """Auto-detect current system from Elite Dangerous journal"""
@@ -933,9 +963,14 @@ class RingFinder:
         except Exception as e:
             print(f"DEBUG: Error loading ring finder settings: {e}")
     
-    def search_hotspots(self):
-        """Search for mining hotspots using reference system as center point"""
-        print(f"[SEARCH DEBUG] search_hotspots() called")
+    def search_hotspots(self, auto_refresh=False):
+        """Search for mining hotspots using reference system as center point
+        
+        Args:
+            auto_refresh: True if called from auto-refresh after scanning, False for manual search
+        """
+        self._is_auto_refresh = auto_refresh
+        print(f"[SEARCH DEBUG] search_hotspots() called (auto_refresh={auto_refresh})")
         
         reference_system = self.system_var.get().strip()
         print(f"[SEARCH DEBUG] Reference system: '{reference_system}'")
@@ -2375,13 +2410,13 @@ class RingFinder:
                         print(f" DEBUG: Error processing {system_name}: {e}")
                         continue
                 
-                # Sort by hotspot quality first, then distance
+                # Sort by distance first, then LS distance for practical mining workflow
                 if material_filter != RingFinder.ALL_MINERALS:
-                    # For specific materials, prioritize by hotspot count, then distance
-                    user_hotspots.sort(key=lambda x: (-x['count'], x['distance']))
+                    # For specific materials, prioritize by hotspot count, then distance, then LS
+                    user_hotspots.sort(key=lambda x: (-x['count'], x['distance'], x.get('ls_distance', 999999)))
                 else:
-                    # For RingFinder.ALL_MINERALS, sort by distance if available, otherwise by count
-                    user_hotspots.sort(key=lambda x: (x['distance'], -x['count']))
+                    # For All Minerals, sort by distance, then LS distance (closest arrival points first)
+                    user_hotspots.sort(key=lambda x: (x['distance'], x.get('ls_distance', 999999)))
                 
                 print(f" DEBUG: Material matches: {material_matches}")
                 print(f" DEBUG: Applied filters - Ring Type: '{material_filter}', Material: '{specific_material}'")
@@ -2621,6 +2656,25 @@ class RingFinder:
             # self._log_debug("_update_results: ZERO_RESULTS - No hotspots to display for current search.")
             print(f"DEBUG: ZERO_RESULTS - No hotspots to display for current search.")
         
+        # Track current results to identify new entries
+        current_results = set()
+        for hotspot in hotspots:
+            system_name = hotspot.get("systemName", hotspot.get("system", ""))
+            body_name = hotspot.get("bodyName", hotspot.get("body", ""))
+            current_results.add((system_name, body_name))
+        
+        # Identify new entries (only highlight during auto-refresh, not manual searches)
+        is_auto = hasattr(self, '_is_auto_refresh') and self._is_auto_refresh
+        print(f"DEBUG: is_auto_refresh={is_auto}, hasattr={hasattr(self, '_is_auto_refresh')}, value={getattr(self, '_is_auto_refresh', None)}")
+        
+        if is_auto:
+            new_entries = current_results - self.previous_results
+            self._is_auto_refresh = False  # Reset flag
+            print(f"DEBUG: AUTO-REFRESH - Comparing {len(current_results)} current vs {len(self.previous_results)} previous")
+        else:
+            new_entries = set()
+        print(f"DEBUG: Found {len(new_entries)} new entries to highlight")
+        
         # Clear existing results completely
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
@@ -2793,7 +2847,11 @@ class RingFinder:
             if ring_type_val is None or ring_type_val == "None":
                 ring_type_val = "No data"
             
-            self.results_tree.insert("", "end", values=(
+            # Check if this is a new entry and apply highlighting
+            is_new = (system_name, ring_name) in new_entries
+            tags = ('new_entry',) if is_new else ()
+            
+            item_id = self.results_tree.insert("", "end", values=(
                 hotspot.get("distance", "No data"),
                 ls_val,
                 system_name,
@@ -2802,7 +2860,11 @@ class RingFinder:
                 ring_type_val,
                 hotspot_count_display,
                 density_formatted
-            ))
+            ), tags=tags)
+            
+            # Store first new entry for scrolling
+            if is_new and not hasattr(self, '_first_new_item'):
+                self._first_new_item = item_id
             
         # Update status with source information 
         count = len(hotspots)
@@ -2834,6 +2896,21 @@ class RingFinder:
             
         # Set status message
         self.status_var.set(status_msg)
+        
+        # Update previous results for next comparison
+        self.previous_results = current_results
+        
+        # Auto-scroll to first new entry if found
+        if hasattr(self, '_first_new_item'):
+            self.results_tree.see(self._first_new_item)
+            self.results_tree.selection_set(self._first_new_item)
+            delattr(self, '_first_new_item')
+        
+        # Set timer to remove highlight after 10 seconds (reset if already running)
+        if new_entries:
+            if self.highlight_timer:
+                self.parent.after_cancel(self.highlight_timer)
+            self.highlight_timer = self.parent.after(10000, self._clear_highlights)
             
     def _show_error(self, error_msg: str):
         """Show error message and reset UI"""
@@ -2841,6 +2918,17 @@ class RingFinder:
         print(f"Hotspot search error: {error_msg}")
         # Clear results on error
         self.results_tree.delete(*self.results_tree.get_children())
+    
+    def _clear_highlights(self):
+        """Remove highlight tags from all items (called after 10 seconds)"""
+        for item in self.results_tree.get_children():
+            # Remove the 'new_entry' tag from all items
+            tags = list(self.results_tree.item(item, 'tags'))
+            if 'new_entry' in tags:
+                tags.remove('new_entry')
+                self.results_tree.item(item, tags=tuple(tags))
+        self.highlight_timer = None
+        print("DEBUG: Highlights cleared")
     
     def _create_context_menu(self):
         """Create the right-click context menu for results"""

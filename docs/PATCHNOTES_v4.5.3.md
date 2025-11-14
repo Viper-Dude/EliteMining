@@ -12,7 +12,9 @@
   - 5000 system limit now applies only to systems without hotspots
   - Ensures mining locations are never cut off from search results regardless of distance
 - **Fixed:** Hotspot counter now accurately counts actual hotspots instead of database rows
-- **Added:** Distance to Sol display for reference system in search interface
+- **Added:** Distance to Sol, Home, and Fleet Carrier displayed for reference system
+- **Improved:** Search results now sort by distance, then LS distance for better mining workflow
+- **Added:** New hotspots are highlighted for 10 seconds when discovered via auto-refresh
 
 ### User Interface
 - **Fixed:** Tab order reordered for better workflow (Mining Session → Hotspots Finder → Commodity Market → Distance Calculator → VoiceAttack Controls → Settings)

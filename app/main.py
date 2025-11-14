@@ -1470,6 +1470,7 @@ class CargoMonitor:
     
     def _on_hotspot_added(self):
         """Callback triggered when new hotspot data is added to database"""
+        print("[HOTSPOT DEBUG] _on_hotspot_added callback triggered")
         try:
             # Access main app through main_app_ref if this is called from CargoMonitor
             main_app = getattr(self, 'main_app_ref', self)
@@ -1478,6 +1479,8 @@ class CargoMonitor:
             ring_finder_ready = (hasattr(main_app, 'ring_finder') and 
                                  main_app.ring_finder is not None and
                                  hasattr(main_app.ring_finder, '_update_database_info'))
+            
+            print(f"[HOTSPOT DEBUG] ring_finder_ready: {ring_finder_ready}")
             
             if not ring_finder_ready:
                 main_app._pending_ring_finder_refresh = True
@@ -1525,10 +1528,16 @@ class CargoMonitor:
             # Access main app to get Ring Finder
             main_app = getattr(self, 'main_app_ref', self)
             
+            # Debug: Check what we have
+            print(f"[AUTO-REFRESH DEBUG] has ring_finder: {hasattr(main_app, 'ring_finder')}")
+            print(f"[AUTO-REFRESH DEBUG] ring_finder is None: {getattr(main_app, 'ring_finder', None) is None}")
+            print(f"[AUTO-REFRESH DEBUG] has auto_search_var: {hasattr(getattr(main_app, 'ring_finder', None), 'auto_search_var')}")
+            
             # Check if Ring Finder exists and auto-search is enabled
             if not (hasattr(main_app, 'ring_finder') and 
                    main_app.ring_finder is not None and
                    hasattr(main_app.ring_finder, 'auto_search_var')):
+                print(f"[AUTO-REFRESH DEBUG] Ring Finder not ready - exiting")
                 return
             
             ring_finder = main_app.ring_finder
@@ -1577,7 +1586,7 @@ class CargoMonitor:
                 try:
                     if delay > 0:  # Only update status if there was a delay
                         ring_finder.status_var.set(f"Found new hotspots - updating results")
-                    ring_finder.search_hotspots()
+                    ring_finder.search_hotspots(auto_refresh=True)
                     # Clear status after 3 seconds
                     ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
                     self._auto_refresh_timer = None  # Clear timer reference
@@ -3320,9 +3329,22 @@ cargo panel forces Elite to write detailed inventory data.
                 # Process ring scans through JournalParser for complete hotspot data with ring info
                 try:
                     body_name = event.get("BodyName", "")
-                    print(f"🔍 Processing SAASignalsFound: {body_name} in {self.current_system}")
                     
-                    self.journal_parser.process_saa_signals_found(event, self.current_system)
+                    # Extract system name from body name if current_system is not set
+                    scanned_system = self.current_system
+                    if not scanned_system and body_name:
+                        # Body name format: "System Name Body" (e.g., "Col 359 Sector JB-X d1-69 11 A Ring")
+                        # Extract system name by removing body designation
+                        import re
+                        # Match pattern: system name followed by space and body number/letter
+                        match = re.match(r'^(.+?)\s+\d+(\s+[A-Z])?(\s+Ring)?$', body_name)
+                        if match:
+                            scanned_system = match.group(1).strip()
+                            print(f"🔍 Extracted system name from body: {scanned_system}")
+                    
+                    print(f"🔍 Processing SAASignalsFound: {body_name} in {scanned_system}")
+                    
+                    self.journal_parser.process_saa_signals_found(event, scanned_system)
                     
                     # Show notification in status (if available)
                     if hasattr(self, 'status_label') and body_name:
@@ -3338,8 +3360,8 @@ cargo panel forces Elite to write detailed inventory data.
                     print(f"✓ SAASignalsFound processed successfully")
                     
                     # Auto-search refresh: Check if Ring Finder should update results
-                    print(f"[AUTO-REFRESH DEBUG] SAASignalsFound processing complete, checking auto-refresh for system: {self.current_system}")
-                    self._check_auto_refresh_ring_finder(self.current_system)
+                    print(f"[AUTO-REFRESH DEBUG] SAASignalsFound processing complete, checking auto-refresh for system: {scanned_system}")
+                    self._check_auto_refresh_ring_finder(scanned_system)
                     
                 except Exception as saa_err:
                     print(f"Warning: Failed to process SAASignalsFound event: {saa_err}")
