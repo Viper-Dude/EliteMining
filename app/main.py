@@ -4468,17 +4468,11 @@ class App(tk.Tk):
         self._build_mining_session_tab(mining_session_tab)
         self.notebook.add(mining_session_tab, text="Mining Session")
 
-        # VoiceAttack Controls tab (combined Firegroups + Mining Controls)
-        voiceattack_tab = ttk.Frame(self.notebook, padding=8)
-        self._build_voiceattack_controls_tab(voiceattack_tab)
-        self.notebook.add(voiceattack_tab, text="VoiceAttack Controls")
-
-        # Distance Calculator tab (build BEFORE Hotspots Finder so distance_calculator exists)
+        # Distance Calculator tab (build FIRST so distance_calculator exists for other tabs)
         distance_tab = ttk.Frame(self.notebook, padding=8)
         self._build_distance_calculator_tab(distance_tab)
-        self.notebook.add(distance_tab, text="Distance Calculator")
-
-        # Hotspots Finder tab
+        
+        # Hotspots Finder tab (depends on distance_calculator)
         ring_finder_tab = ttk.Frame(self.notebook, padding=8)
         self._setup_ring_finder(ring_finder_tab)
         self.notebook.add(ring_finder_tab, text="Hotspots Finder")
@@ -4487,6 +4481,14 @@ class App(tk.Tk):
         marketplace_tab = ttk.Frame(self.notebook, padding=8)
         self._build_marketplace_tab(marketplace_tab)
         self.notebook.add(marketplace_tab, text="Commodity Market")
+        
+        # Add Distance Calculator tab now (built earlier but added here for correct order)
+        self.notebook.add(distance_tab, text="Distance Calculator")
+
+        # VoiceAttack Controls tab (combined Firegroups + Mining Controls)
+        voiceattack_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_voiceattack_controls_tab(voiceattack_tab)
+        self.notebook.add(voiceattack_tab, text="VoiceAttack Controls")
         
         # Auto-populate marketplace system after UI is built
         self.after(3000, self._populate_marketplace_system)

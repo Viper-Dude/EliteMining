@@ -14,6 +14,9 @@
 - **Fixed:** Hotspot counter now accurately counts actual hotspots instead of database rows
 - **Added:** Distance to Sol display for reference system in search interface
 
+### User Interface
+- **Fixed:** Tab order reordered for better workflow (Mining Session → Hotspots Finder → Commodity Market → Distance Calculator → VoiceAttack Controls → Settings)
+
 ---
 
 ## Known Issues
