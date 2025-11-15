@@ -381,7 +381,9 @@ class JournalParser:
         """
         try:
             body_name = event.get('BodyName', '')
+            log.info(f"[JOURNAL PARSER] Processing SAASignalsFound: {current_system} - {body_name}")
             if not self.is_ring_body(body_name):
+                log.info(f"[JOURNAL PARSER] Skipping non-ring body: {body_name}")
                 return
             
             # Filter out phantom rings that were removed by Frontier

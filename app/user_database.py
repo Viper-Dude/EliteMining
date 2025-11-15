@@ -450,6 +450,10 @@ class UserDatabase:
                 if existing:
                     existing_id, existing_coord_source, existing_ls, existing_ring_type, existing_date, existing_count = existing
                     
+                    # Log existing data for debugging
+                    log.info(f"Found existing hotspot: {system_name} - {body_name} - {material_name} | coord_source={existing_coord_source} | ls={existing_ls} | type={existing_ring_type}")
+                    log.info(f"New data: coord_source={coord_source} | ls={ls_distance} | type={ring_type}")
+                    
                     # Determine if we should update
                     should_update = False
                     update_reason = None
@@ -458,18 +462,6 @@ class UserDatabase:
                     cursor.execute('SELECT ring_mass, density, inner_radius, outer_radius FROM hotspot_data WHERE id = ?', (existing_id,))
                     extra_data_check = cursor.fetchone()
                     existing_mass, existing_density, existing_inner, existing_outer = extra_data_check if extra_data_check else (None, None, None, None)
-                    
-                    # Skip if trying to add journal data when EDTools data exists
-                    # UNLESS we have new mass/density data to add
-                    if coord_source == "visited_systems" and existing_coord_source in (None, "", "unknown"):
-                        # Allow update if we have mass/density that's missing
-                        if (ring_mass and not existing_mass) or (density and not existing_density):
-                            should_update = True
-                            update_reason = "adding ring mass/density data"
-                        else:
-                            # Journal trying to overwrite EDTools/unknown data - skip it
-                            log.debug(f"Skipping journal duplicate: {system_name} - {body_name} - {material_name} (EDTools data exists)")
-                            return
                     
                     # Count completeness of new vs existing data
                     new_data_fields = [
@@ -498,7 +490,7 @@ class UserDatabase:
                         if (ring_mass and not existing_mass) or (density and not existing_density):
                             should_update = True
                             update_reason = "adding ring mass/density data"
-                        # Only update journal data with newer journal data
+                        # Update journal data with newer journal data
                         elif ls_distance and not existing_ls:
                             should_update = True
                             update_reason = "adding LS distance"
@@ -516,6 +508,12 @@ class UserDatabase:
                         elif hotspot_count > existing_count:
                             should_update = True
                             update_reason = "higher hotspot count"
+                        # Allow journal data to update entries with no coord_source (unknown origin)
+                        elif existing_coord_source in (None, "", "unknown") and new_data_count > 0:
+                            should_update = True
+                            update_reason = "updating unknown-source data with journal data"
+                        else:
+                            log.info(f"No update needed for {system_name} - {body_name} - {material_name}: existing_coord_source={existing_coord_source}, new_data_count={new_data_count}")
                     
                     if should_update:
                         log.info(f"Updating hotspot ({update_reason}): {system_name} - {body_name} - {material_name}")

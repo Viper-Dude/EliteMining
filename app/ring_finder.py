@@ -2907,10 +2907,10 @@ class RingFinder:
         # Update previous results for next comparison
         self.previous_results = current_results
         
-        # Auto-scroll to first new entry if found
+        # Auto-scroll to first new entry if found (without selecting it)
         if hasattr(self, '_first_new_item'):
             self.results_tree.see(self._first_new_item)
-            self.results_tree.selection_set(self._first_new_item)
+            # Removed selection_set to prevent auto-selection of scanned rings
             delattr(self, '_first_new_item')
         
         # Set timer to remove highlight after 10 seconds (reset if already running)
