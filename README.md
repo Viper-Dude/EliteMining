@@ -121,6 +121,14 @@ The **EliteMining App** provides a comprehensive GUI for configuring mining auto
 ### Start EliteMining  
 - EliteMining Desktop icon or direct: `\EliteMining\Configurator\EliteMining.exe`
 
+[Back to Top](#top)
+
+---
+
+## VoiceAttack Controls
+
+Configure automation sequences for VoiceAttack integration. These settings can be adjusted via GUI even if running standalone.
+
 ### Firegroups & Fire Buttons
 
 Configure Elite Dangerous firegroups (A-H) and fire buttons (Primary/Secondary) for automated mining sequences:
