@@ -116,10 +116,49 @@ The installer bundles the **EliteVA plugin**. No separate download required.
 
 ## EliteMining App  
 
-The **EliteMining App** lets you adjust firegroups, toggles, timers, and announcements via GUI. It can run standalone without VoiceAttack.  
+The **EliteMining App** provides a comprehensive GUI for configuring mining automation, tracking sessions, and managing all settings. It can run standalone without VoiceAttack.
 
 ### Start EliteMining  
 - EliteMining Desktop icon or direct: `\EliteMining\Configurator\EliteMining.exe`
+
+### Firegroups & Fire Buttons
+
+Configure Elite Dangerous firegroups (A-H) and fire buttons (Primary/Secondary) for automated mining sequences:
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-main.png" width="600"><br>  
+*Firegroups configuration for mining tools and fire button assignments.*
+
+**Available Tools:**
+- **Mining Lasers/MVR** – Automated laser mining with configurable duration
+- **Discovery Scanner** – System honk on FSD arrival  
+- **Prospector Limpet** – Launch and auto-target asteroids
+- **Pulse Wave Analyser** – Core asteroid scanning
+- **Seismic Charge Launcher** – Fissure targeting for core mining
+- **Weapons** – Defense firegroup configuration
+- **Sub-surface Displacement Missile** – Deposit extraction
+
+### Timers & Toggles
+
+Control mining sequence timing and automated behaviors:
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-timers_toggles.png" width="600"><br>  
+*Timers and toggles for mining automation sequences.*
+
+**Timers:** Configure duration for laser periods, pauses, and delays (1-50 seconds range)
+
+**Toggles:**
+- **Auto Honk** – Scan system automatically on FSD arrival
+- **Cargo Scoop** – Auto-retract when mining completes
+- **Headtracker Docking Control** – Toggle headtracker (F9) for docking
+- **Laser Mining Extra** – Second laser period with cooldown pause
+- **Night Vision** – Auto-enable when starting mining
+- **FSD Jump Sequence** – Auto-chain jumps with system map toggle
+- **Power Settings** – Max engines during mining, balance when complete
+- **Prospector Sequence** – Auto-target prospector after launch
+- **Pulse Wave Analyser** – Auto-switch to PWA firegroup after mining
+- **Target** – Deselect prospector when mining completes
+
+💡 **Tip:** Use "Stop all profile commands" in VoiceAttack to interrupt any active sequence.
 
 [Back to Top](#top)
 
@@ -251,16 +290,6 @@ Calculate distances between any two systems using real-time EDSM data. Perfect f
 ### EliteMining GUI  
 <details open>
 <summary>Click to expand</summary>
-
-#### Main Window (Dashboard) & Firegroups  
-<img src="Screenshot/configurator-main.png" width="600"><br>  
-*EliteMining App layout with firegroups & buttons.*  
-
-#### Timers/Toggles Tab  
-<img src="Screenshot/configurator-timers_toggles.png" width="600"><br>  
-*Configure timers and toggles for automation.*  
-
----
 
 ### Mining Session Tab  
 

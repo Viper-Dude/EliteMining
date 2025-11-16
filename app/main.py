@@ -506,7 +506,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.5.4"
+APP_VERSION = "v4.5.5 Testing"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -6511,8 +6511,14 @@ class App(tk.Tk):
         ttk.Separator(frame, orient='horizontal').grid(row=r, column=0, sticky="ew", pady=(20, 10))
         r += 1
         
-        # Toggles section
-        ttk.Label(frame, text="Toggles", font=("Segoe UI", 11, "bold")).grid(row=r, column=0, sticky="w")
+        # Toggles section with tip on same row
+        toggles_header = ttk.Frame(frame)
+        toggles_header.grid(row=r, column=0, sticky="ew", pady=(0, 8))
+        toggles_header.columnconfigure(1, weight=1)  # Make middle column expand
+        
+        ttk.Label(toggles_header, text="Toggles", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
+        tk.Label(toggles_header, text="💡 Tip: Use 'Stop all profile commands' in VoiceAttack to interrupt any active sequence", 
+                 fg="#ffa500", bg="#1e1e1e", font=("Segoe UI", 8, "italic")).grid(row=0, column=1, sticky="")
         r += 1
         
         for name, (_fname, helptext) in TOGGLES.items():
@@ -9448,6 +9454,7 @@ class App(tk.Tk):
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         rb1.pack(side="left", padx=(0, 15))
         rb1.config(takefocus=0)
+        ToolTip(rb1, "Search within 500 LY of reference system - returns all matching stations in range")
         
         rb2 = tk.Radiobutton(row0_frame, text="Galaxy-Wide (Top 30)", variable=self.marketplace_search_mode,
                       value="galaxy_wide", bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e",
@@ -9455,6 +9462,7 @@ class App(tk.Tk):
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         rb2.pack(side="left", padx=(0, 20))
         rb2.config(takefocus=0)
+        ToolTip(rb2, "Show top 30 from best 100 prices galaxy-wide - station filters apply after fetching top 100")
         
         ttk.Separator(row0_frame, orient="vertical").pack(side="left", fill="y", padx=(0, 15))
         
@@ -10071,7 +10079,7 @@ class App(tk.Tk):
                 if is_buy_mode:
                     results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
                 else:
-                    results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, max_days_ago)
+                    results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
             else:
                 # Near system search (within 500 LY)
                 reference_system = self.marketplace_reference_system.get().strip()
@@ -10097,28 +10105,28 @@ class App(tk.Tk):
             
             # Filter by Fleet Carriers (applies to both buy and sell modes)
             if exclude_carriers and station_type_filter != "Fleet Carrier":
-                results = [r for r in results if "FleetCarrier" not in r.get('stationType', '')]
+                results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
             
             # Filter by Station Type (Surface/Orbital/Carrier/MegaShip/Stronghold)
             if station_type_filter == "Orbital Only":
-                # Orbital stations: Coriolis, Orbis, Ocellus, Outpost, AsteroidBase (EXACT MATCH only)
+                # Orbital stations: Coriolis, Orbis, Ocellus, Outpost, AsteroidBase, Dodec (EXACT MATCH only)
                 # BUG FIX: Use exact match to prevent CraterOutpost matching "Outpost" substring
-                orbital_types = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase"]
+                orbital_types = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Dodec"]
                 results = [r for r in results if r.get('stationType', '') in orbital_types]
             elif station_type_filter == "Surface Only":
                 # Surface stations: CraterOutpost, CraterPort, OnFootSettlement, etc. (substring match for variants)
                 # Use startswith/contains for surface types since they have variants (CraterOutpost, CraterPort, OnFootSettlement, OnFootStation)
-                surface_types = ["Crater", "OnFoot", "Planetary"]
-                results = [r for r in results if any(r.get('stationType', '').startswith(t) for t in surface_types)]
+                surface_types = ["Crater", "OnFoot", "Planetary", "Surface"]
+                results = [r for r in results if any((r.get('stationType') or '').startswith(t) for t in surface_types)]
             elif station_type_filter == "Fleet Carrier":
                 # Fleet Carriers only
-                results = [r for r in results if "FleetCarrier" in r.get('stationType', '')]
+                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
             elif station_type_filter == "Megaship":
                 # MegaShips only
                 results = [r for r in results if r.get('stationType', '') == "MegaShip"]
             elif station_type_filter == "Stronghold":
                 # Stronghold Carriers only
-                results = [r for r in results if "StrongholdCarrier" in r.get('stationType', '')]
+                results = [r for r in results if "StrongholdCarrier" in (r.get('stationType') or '')]
             
             # Filter by Landing Pad Size (Large only if checked)
             large_pad_only = self.marketplace_large_pad_only.get()
@@ -10683,17 +10691,22 @@ class App(tk.Tk):
                 # LOCATION (System + Station) - API uses camelCase
                 location = f"{result['systemName']} / {result['stationName'][:25]}"
                 
-                # TYPE (Station type) - Simplified to Orbital/Surface matching filter
+                # TYPE (Station type) - Show category/specific type
                 api_type = result.get('stationType', 'Unknown')
                 
-                # Determine if orbital or surface
-                orbital_types = ['Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'AsteroidBase']
-                surface_keywords = ['Crater', 'OnFoot', 'Planetary', 'Surface']
-                
-                if api_type in orbital_types:
-                    station_type = 'Orbital'
-                elif any(keyword in api_type for keyword in surface_keywords):
-                    station_type = 'Surface'
+                # Orbital starports - show as "Orbital/Type"
+                if api_type == 'AsteroidBase':
+                    station_type = 'Orbital/Asteroid Base'
+                elif api_type in ['Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Dodec']:
+                    station_type = f'Orbital/{api_type}'
+                elif api_type == 'CraterOutpost':
+                    station_type = 'Surface/Crater Outpost'
+                elif api_type == 'CraterPort':
+                    station_type = 'Surface/Crater Port'
+                elif api_type == 'SurfaceStation':
+                    station_type = 'Surface/Station'
+                elif api_type == 'OnFootSettlement':
+                    station_type = 'Surface/OnFoot Settlement'
                 elif api_type == 'FleetCarrier':
                     station_type = 'Carrier'
                 elif api_type == 'StrongholdCarrier':
@@ -10957,8 +10970,21 @@ class App(tk.Tk):
     def _update_marketplace_with_distances(self, results_with_distances, total_results):
         """Update marketplace display after distance calculation completes (called from thread)"""
         try:
+            # Re-sort results based on current sort order after distances are added
+            order_by = self.marketplace_order_by.get()
+            
+            if "Distance" in order_by:
+                # Sort by distance (nearest first)
+                results_sorted = sorted(results_with_distances, key=lambda x: x.get('distance', 999999), reverse=False)
+            elif "Best price" in order_by:
+                # Keep original price sorting
+                results_sorted = results_with_distances
+            else:
+                # For other sort orders, keep original
+                results_sorted = results_with_distances
+            
             # Re-display results with distances
-            self._display_marketplace_results(results_with_distances)
+            self._display_marketplace_results(results_sorted)
             self.marketplace_total_label.config(text=f"✓ Found {total_results} stations (showing top 30 with distances)")
             self.config(cursor="")
         except Exception as e:
