@@ -42,7 +42,7 @@ class EDSMDistanceCalculator:
     
     def get_system_coordinates(self, system_name: str) -> Optional[Dict]:
         """
-        Get system coordinates from EDSM API
+        Get system coordinates from EDSM API with retry logic
         
         Args:
             system_name: Name of the system
@@ -62,54 +62,84 @@ class EDSMDistanceCalculator:
             logger.debug(f"Cache hit for system: {system_name}")
             return self.cache[system_name]["data"]
         
-        # Rate limiting
-        self._rate_limit()
+        # Retry logic: up to 3 attempts with increasing delays
+        max_retries = 3
+        retry_delays = [0, 1, 2]  # seconds to wait before each retry
         
-        # Query EDSM API
-        try:
-            params = {
-                "systemName": system_name,
-                "showCoordinates": 1
-            }
-            
-            logger.info(f"Querying EDSM for system: {system_name}")
-            response = requests.get(self.api_base_url, params=params, timeout=self.timeout)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            if "coords" not in data:
-                logger.warning(f"System '{system_name}' not found in EDSM or has no coordinates")
+        for attempt in range(max_retries):
+            try:
+                # Rate limiting
+                self._rate_limit()
+                
+                # Add retry delay if not first attempt
+                if attempt > 0:
+                    logger.info(f"Retry attempt {attempt + 1}/{max_retries} for {system_name}")
+                    time.sleep(retry_delays[attempt])
+                
+                # Query EDSM API
+                params = {
+                    "systemName": system_name,
+                    "showCoordinates": 1
+                }
+                
+                logger.info(f"Querying EDSM for system: {system_name}")
+                response = requests.get(self.api_base_url, params=params, timeout=self.timeout)
+                response.raise_for_status()
+                
+                data = response.json()
+                
+                if "coords" not in data:
+                    # System genuinely not found - don't retry
+                    logger.warning(f"System '{system_name}' not found in EDSM or has no coordinates")
+                    return None
+                
+                result = {
+                    "name": data["name"],
+                    "x": float(data["coords"]["x"]),
+                    "y": float(data["coords"]["y"]),
+                    "z": float(data["coords"]["z"])
+                }
+                
+                # Cache the result
+                self.cache[system_name] = {
+                    "data": result,
+                    "timestamp": time.time()
+                }
+                
+                logger.info(f"Successfully retrieved coordinates for {result['name']}")
+                return result
+                
+            except requests.exceptions.Timeout:
+                logger.warning(f"Timeout querying EDSM for {system_name} (attempt {attempt + 1}/{max_retries})")
+                if attempt == max_retries - 1:
+                    logger.error(f"All retry attempts failed for {system_name} due to timeout")
+                    return None
+                continue
+                
+            except requests.exceptions.ConnectionError:
+                logger.warning(f"Connection error querying EDSM for {system_name} (attempt {attempt + 1}/{max_retries})")
+                if attempt == max_retries - 1:
+                    logger.error(f"All retry attempts failed for {system_name} due to connection error")
+                    return None
+                continue
+                
+            except requests.exceptions.HTTPError as e:
+                # Don't retry on 4xx errors (client errors)
+                if 400 <= e.response.status_code < 500:
+                    logger.error(f"HTTP client error for {system_name}: {e}")
+                    return None
+                # Retry on 5xx errors (server errors)
+                logger.warning(f"HTTP error querying EDSM for {system_name} (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    logger.error(f"All retry attempts failed for {system_name} due to HTTP error")
+                    return None
+                continue
+                
+            except Exception as e:
+                logger.error(f"Unexpected error querying EDSM for {system_name}: {e}")
                 return None
-            
-            result = {
-                "name": data["name"],
-                "x": float(data["coords"]["x"]),
-                "y": float(data["coords"]["y"]),
-                "z": float(data["coords"]["z"])
-            }
-            
-            # Cache the result
-            self.cache[system_name] = {
-                "data": result,
-                "timestamp": time.time()
-            }
-            
-            logger.info(f"Successfully retrieved coordinates for {result['name']}")
-            return result
-            
-        except requests.exceptions.Timeout:
-            logger.error(f"Timeout while querying EDSM for {system_name}")
-            return None
-        except requests.exceptions.ConnectionError:
-            logger.error(f"Connection error while querying EDSM for {system_name}")
-            return None
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error while querying EDSM for {system_name}: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Unexpected error querying EDSM for {system_name}: {e}")
-            return None
+        
+        return None
     
     def calculate_distance(self, system1: Dict, system2: Dict) -> Optional[float]:
         """
