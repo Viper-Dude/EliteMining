@@ -532,6 +532,25 @@ class JournalParser:
         # Location events have the same structure as FSDJump for our purposes
         return self.process_fsd_jump(event)
     
+    def process_fsd_target(self, event: Dict[str, Any]) -> Optional[int]:
+        """Process FSDTarget event to track jumps remaining in route
+        
+        Args:
+            event: Journal event data
+            
+        Returns:
+            Number of jumps remaining, or None if not available
+        """
+        try:
+            jumps_remaining = event.get('RemainingJumpsInRoute')
+            if jumps_remaining is not None:
+                log.debug(f"Route update: {jumps_remaining} jumps remaining")
+                return jumps_remaining
+            return None
+        except Exception as e:
+            log.error(f"Error processing FSDTarget event: {e}")
+            return None
+    
     def parse_all_journals(self, progress_callback: Optional[callable] = None) -> Dict[str, int]:
         """Parse all journal files to populate the user database
         

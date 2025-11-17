@@ -60,7 +60,7 @@ class EliteFileHandler(FileSystemEventHandler):
             return True
         
         # Status files
-        if file_name in ["status.json", "cargo.json", "market.json", "outfitting.json"]:
+        if file_name in ["status.json", "cargo.json", "market.json", "outfitting.json", "navroute.json"]:
             return True
         
         return False

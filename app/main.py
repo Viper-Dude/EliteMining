@@ -506,7 +506,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.5.5"
+APP_VERSION = "v4.5.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4441,6 +4441,10 @@ class App(tk.Tk):
         from market_handler import MarketHandler
         self.market_handler = MarketHandler(self.eddn_sender)
         
+        # Initialize VoiceAttack variables manager
+        from va_variables import VAVariablesManager
+        self.va_variables = None  # Will be initialized after UI is built
+        
         # Watch for Market.json changes to send to EDDN
         from file_watcher import get_file_watcher
         file_watcher = get_file_watcher()
@@ -4451,6 +4455,9 @@ class App(tk.Tk):
 
         # Build UI
         self._build_ui()
+        
+        # Initialize VoiceAttack variables after UI is built
+        self.after(500, self._initialize_va_variables)
         
         # Check for updates after UI is ready (automatic check once per day)
         self.after(1000, self._check_for_updates_startup)  # Check after 1 second
@@ -6573,6 +6580,154 @@ class App(tk.Tk):
         key = (base_without_txt + ".txt").lower()
         path = idx.get(key, os.path.join(self.vars_dir, base_without_txt + ".txt"))
         _atomic_write_text(path, text)
+    
+    def _initialize_va_variables(self) -> None:
+        """Initialize VoiceAttack variables manager"""
+        try:
+            from va_variables import VAVariablesManager
+            journal_dir = self.prospector_panel.journal_dir if hasattr(self, 'prospector_panel') else None
+            self.va_variables = VAVariablesManager(self.vars_dir, journal_dir)
+            self.va_variables.initialize_jumps_left()
+            print("✅ Initialized VoiceAttack variables (jumpsleft.txt)")
+            
+            # Start polling
+            self.after(2000, self._poll_va_variables)
+        except Exception as e:
+            log.error(f"Error initializing VA variables: {e}")
+    
+    def _poll_va_variables(self) -> None:
+        """Poll for VoiceAttack variable updates"""
+        try:
+            if self.va_variables:
+                self.va_variables.poll_route_status()
+        except Exception as e:
+            log.error(f"Error polling VA variables: {e}")
+        finally:
+            self.after(2000, self._poll_va_variables)
+    
+    def _initialize_jumps_left(self) -> None:
+        """Initialize jumpsleft.txt by checking for active route in current journal"""
+        try:
+            journal_dir = self.prospector_panel.journal_dir if hasattr(self, 'prospector_panel') else None
+            if not journal_dir or not os.path.exists(journal_dir):
+                self._write_jumps_left(0)
+                return
+            
+            # Find most recent journal file
+            journal_files = [f for f in os.listdir(journal_dir) if f.startswith('Journal.') and f.endswith('.log')]
+            if not journal_files:
+                self._write_jumps_left(0)
+                return
+            
+            journal_files.sort(reverse=True)
+            latest_journal = os.path.join(journal_dir, journal_files[0])
+            
+            # Scan backwards through journal to find most recent FSDTarget or NavRouteClear
+            jumps_remaining = 0
+            try:
+                with open(latest_journal, 'r', encoding='utf-8') as f:
+                    # Read last 50KB to find recent route info
+                    f.seek(0, 2)
+                    file_size = f.tell()
+                    f.seek(max(0, file_size - 51200))
+                    lines = f.readlines()
+                    
+                    # Scan backwards for most recent route event
+                    for line in reversed(lines):
+                        if not line.strip():
+                            continue
+                        try:
+                            event = json.loads(line)
+                            event_type = event.get('event')
+                            
+                            if event_type == 'FSDTarget':
+                                jumps_remaining = event.get('RemainingJumpsInRoute', 0)
+                                log.info(f"Found active route on startup: {jumps_remaining} jumps remaining")
+                                break
+                            elif event_type in ['NavRouteClear', 'Docked', 'Touchdown']:
+                                # Route was cleared or arrived
+                                jumps_remaining = 0
+                                break
+                        except json.JSONDecodeError:
+                            continue
+            except Exception as e:
+                log.error(f"Error reading journal for route info: {e}")
+            
+            self._write_jumps_left(jumps_remaining)
+            
+        except Exception as e:
+            log.error(f"Error initializing jumpsleft: {e}")
+            self._write_jumps_left(0)
+    
+    def _poll_route_status(self) -> None:
+        """Poll journal and NavRoute for changes (runs every 2 seconds)"""
+        try:
+            journal_dir = self.prospector_panel.journal_dir if hasattr(self, 'prospector_panel') else None
+            if not journal_dir or not os.path.exists(journal_dir):
+                self.after(2000, self._poll_route_status)
+                return
+            
+            # Check NavRoute.json for cleared route
+            navroute_path = os.path.join(journal_dir, "NavRoute.json")
+            if os.path.exists(navroute_path):
+                try:
+                    with open(navroute_path, 'r', encoding='utf-8') as f:
+                        navroute_data = json.load(f)
+                        route = navroute_data.get('Route', [])
+                        if len(route) == 0:
+                            # Route cleared
+                            current_value = self._read_var_text("jumpsleft")
+                            if current_value != "0":
+                                self._write_jumps_left(0)
+                                log.debug("[Poll] Route cleared, set to 0")
+                except Exception:
+                    pass
+            
+            # Check latest journal for FSDTarget
+            journal_files = [f for f in os.listdir(journal_dir) if f.startswith('Journal.') and f.endswith('.log')]
+            if journal_files:
+                journal_files.sort(reverse=True)
+                latest_journal = os.path.join(journal_dir, journal_files[0])
+                
+                try:
+                    with open(latest_journal, 'r', encoding='utf-8') as f:
+                        f.seek(0, 2)
+                        file_size = f.tell()
+                        f.seek(max(0, file_size - 5120))  # Last 5KB
+                        lines = f.readlines()
+                        
+                        # Scan backwards for latest FSDTarget
+                        for line in reversed(lines):
+                            if not line.strip():
+                                continue
+                            try:
+                                event = json.loads(line)
+                                event_type = event.get('event')
+                                
+                                if event_type == 'FSDTarget':
+                                    jumps = event.get('RemainingJumpsInRoute')
+                                    if jumps is not None:
+                                        current_value = self._read_var_text("jumpsleft")
+                                        if current_value != str(jumps):
+                                            self._write_jumps_left(jumps)
+                                            log.debug(f"[Poll] Route update: {jumps} jumps")
+                                    break
+                                elif event_type in ['NavRouteClear', 'Docked', 'Touchdown']:
+                                    current_value = self._read_var_text("jumpsleft")
+                                    if current_value != "0":
+                                        self._write_jumps_left(0)
+                                        log.debug(f"[Poll] {event_type}, set to 0")
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+                except Exception:
+                    pass
+        
+        except Exception as e:
+            log.error(f"Error polling route status: {e}")
+        
+        # Schedule next poll
+        self.after(2000, self._poll_route_status)
 
     def _import_all_from_txt(self) -> None:
         found: List[str] = []
@@ -7856,6 +8011,24 @@ class App(tk.Tk):
     def _on_journal_file_change(self, file_path: str):
         """Called when a file in journal directory changes"""
         file_name = os.path.basename(file_path).lower()
+        log.debug(f"File watcher triggered for: {file_name}")
+        
+        # NavRoute.json changed = check if route cleared
+        if file_name == 'navroute.json':
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    navroute_data = json.load(f)
+                    route = navroute_data.get('Route', [])
+                    if len(route) == 0:
+                        # Empty route = cleared
+                        self._write_jumps_left(0)
+                        print("[jumpsleft] NavRoute cleared (empty), set to 0")
+                    else:
+                        # Route has systems - will be updated by FSDTarget event
+                        print(f"[jumpsleft] NavRoute updated ({len(route)} systems)")
+            except Exception as e:
+                log.error(f"Error reading NavRoute.json: {e}")
+            return
         
         # Process Market.json for EDDN sending
         if file_name == 'market.json' and hasattr(self, 'market_handler'):
@@ -7873,7 +8046,33 @@ class App(tk.Tk):
                         # Read last 2KB to get recent events
                         f.seek(max(0, file_size - 2048))
                         lines = f.readlines()
-                        # Process last few events
+                        
+                        # Get the very last event first for immediate response
+                        last_event = None
+                        for line in reversed(lines):
+                            if line.strip():
+                                try:
+                                    last_event = json.loads(line)
+                                    break
+                                except json.JSONDecodeError:
+                                    continue
+                        
+                        # Process the most recent event immediately for route tracking
+                        if last_event:
+                            event_type = last_event.get('event')
+                            log.debug(f"Latest journal event: {event_type}")
+                            if event_type == 'FSDTarget':
+                                jumps_remaining = last_event.get('RemainingJumpsInRoute')
+                                if jumps_remaining is not None:
+                                    self._write_jumps_left(jumps_remaining)
+                                    log.info(f"Route update: {jumps_remaining} jumps remaining")
+                                    print(f"[jumpsleft] Updated to {jumps_remaining}")
+                            elif event_type in ['NavRouteClear', 'Docked', 'Touchdown']:
+                                self._write_jumps_left(0)
+                                log.info(f"Route cleared/completed: {event_type}")
+                                print(f"[jumpsleft] Reset to 0 ({event_type})")
+                        
+                        # Process last few events for EDDN
                         for line in lines[-10:]:  # Last 10 events
                             if line.strip():
                                 try:
