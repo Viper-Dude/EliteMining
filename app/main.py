@@ -9719,7 +9719,7 @@ class App(tk.Tk):
         station_label.pack(side="left", padx=(0, 5))
         self.marketplace_station_type = tk.StringVar(value=cfg.get('marketplace_station_type', 'All'))
         station_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_station_type,
-                                values=["All", "Orbital Only", "Surface Only", "Fleet Carrier", "Megaship", "Stronghold"],
+                                values=["All", "Orbital", "Surface", "Fleet Carrier", "Megaship", "Stronghold"],
                                 state="readonly", width=12)
         station_combo.pack(side="left", padx=(0, 15))
         ToolTip(station_combo, "Filter by station type: Orbital, Surface, Fleet Carrier, Megaship, or Stronghold")
@@ -9818,34 +9818,72 @@ class App(tk.Tk):
     
     def _create_marketplace_results_table(self, parent_frame):
         """Create results table for marketplace search"""
-        table_frame = ttk.Frame(parent_frame)
-        table_frame.pack(fill="both", expand=True)
+        table_frame = ttk.Frame(parent_frame, relief="solid", borderwidth=1)
+        table_frame.pack(fill="both", expand=True, padx=2, pady=2)
         
         # Define columns (removed St Dist due to API data inaccuracies)
         columns = ("location", "type", "pad", "distance", "demand", "price", "updated")
         
-        # Create Treeview
-        self.marketplace_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
+        # Configure Marketplace Treeview style with visible borders
+        style = ttk.Style()
         
-        # Define headings with sorting
+        # Main treeview styling
+        style.configure("Marketplace.Treeview",
+                       rowheight=25,
+                       borderwidth=1,
+                       relief="solid",
+                       bordercolor="#3a3a3a",
+                       fieldbackground="#1e1e1e")
+        
+        # Column header styling with borders
+        style.configure("Marketplace.Treeview.Heading",
+                       borderwidth=1,
+                       relief="groove",  # Creates visible column separators
+                       background="#2a2a2a",
+                       foreground="white",
+                       padding=[5, 5],
+                       anchor="w")  # Left-align all headers
+        
+        # Row selection styling
+        style.map("Marketplace.Treeview",
+                 background=[('selected', '#0078d7')],
+                 foreground=[('selected', 'white')])
+        
+        # Add subtle column separation via heading relief
+        style.layout("Marketplace.Treeview.Heading", [
+            ('Treeheading.cell', {'sticky': 'nswe'}),
+            ('Treeheading.border', {'sticky':'nswe', 'children': [
+                ('Treeheading.padding', {'sticky':'nswe', 'children': [
+                    ('Treeheading.image', {'side':'right', 'sticky':''}),
+                    ('Treeheading.text', {'sticky':'we'})
+                ]})
+            ]})
+        ])
+        
+        # Create Treeview with custom style
+        self.marketplace_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
+        
+        # Define headings with sorting - explicitly set anchor to left-align header text
         numeric_columns = {"distance", "demand", "price", "updated"}
         for col in columns:
             is_numeric = col in numeric_columns
             self.marketplace_tree.heading(col, text=self._get_column_title(col), 
+                                         anchor="w",
                                          command=lambda c=col, n=is_numeric: self._sort_marketplace_column(c, n))
         
         # Track sort state
         self.marketplace_sort_column = None
         self.marketplace_sort_reverse = False
         
-        # Set column widths - Location left-aligned, all others centered
-        self.marketplace_tree.column("location", width=250, minwidth=150, anchor="w", stretch=False)
-        self.marketplace_tree.column("type", width=90, minwidth=70, anchor="center", stretch=False)
-        self.marketplace_tree.column("pad", width=40, minwidth=40, anchor="center", stretch=False)
-        self.marketplace_tree.column("distance", width=65, minwidth=55, anchor="center", stretch=False)
-        self.marketplace_tree.column("demand", width=70, minwidth=55, anchor="center", stretch=False)
-        self.marketplace_tree.column("price", width=120, minwidth=80, anchor="center", stretch=False)
-        self.marketplace_tree.column("updated", width=90, minwidth=70, anchor="center", stretch=True)
+        # Set column widths - Add extra padding to create visual separation
+        # Using slightly increased widths and padding to create column spacing effect
+        self.marketplace_tree.column("location", width=255, minwidth=150, anchor="w", stretch=False)
+        self.marketplace_tree.column("type", width=95, minwidth=70, anchor="w", stretch=False)
+        self.marketplace_tree.column("pad", width=45, minwidth=40, anchor="w", stretch=False)
+        self.marketplace_tree.column("distance", width=70, minwidth=55, anchor="w", stretch=False)
+        self.marketplace_tree.column("demand", width=75, minwidth=55, anchor="w", stretch=False)
+        self.marketplace_tree.column("price", width=125, minwidth=80, anchor="w", stretch=False)
+        self.marketplace_tree.column("updated", width=95, minwidth=70, anchor="w", stretch=True)
         
         # Load saved column widths from config
         try:
@@ -9884,6 +9922,10 @@ class App(tk.Tk):
         h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.marketplace_tree.xview)
         self.marketplace_tree.configure(xscrollcommand=h_scrollbar.set)
         
+        # Configure row tags for visible borders (alternating with subtle lines)
+        self.marketplace_tree.tag_configure('oddrow', background='#1e1e1e')
+        self.marketplace_tree.tag_configure('evenrow', background='#252525')
+        
         # Grid layout for treeview and scrollbars (like Ring Finder)
         self.marketplace_tree.grid(row=0, column=0, sticky="nsew")
         v_scrollbar.grid(row=0, column=1, sticky="ns")
@@ -9920,6 +9962,7 @@ class App(tk.Tk):
             for col in ("location", "type", "pad", "distance", "demand", "price", "updated"):
                 is_numeric = col in numeric_columns
                 self.marketplace_tree.heading(col, text=self._get_column_title(col), 
+                                            anchor="w",
                                             command=lambda c=col, n=is_numeric: self._sort_marketplace_column(c, n))
     
     def _create_marketplace_context_menu(self):
@@ -10307,12 +10350,12 @@ class App(tk.Tk):
                 results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
             
             # Filter by Station Type (Surface/Orbital/Carrier/MegaShip/Stronghold)
-            if station_type_filter == "Orbital Only":
+            if station_type_filter == "Orbital":
                 # Orbital stations: Coriolis, Orbis, Ocellus, Outpost, AsteroidBase, Dodec (EXACT MATCH only)
                 # BUG FIX: Use exact match to prevent CraterOutpost matching "Outpost" substring
                 orbital_types = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Dodec"]
                 results = [r for r in results if r.get('stationType', '') in orbital_types]
-            elif station_type_filter == "Surface Only":
+            elif station_type_filter == "Surface":
                 # Surface stations: CraterOutpost, CraterPort, OnFootSettlement, etc. (substring match for variants)
                 # Use startswith/contains for surface types since they have variants (CraterOutpost, CraterPort, OnFootSettlement, OnFootStation)
                 surface_types = ["Crater", "OnFoot", "Planetary", "Surface"]
@@ -10903,7 +10946,7 @@ class App(tk.Tk):
                 elif api_type == 'CraterPort':
                     station_type = 'Surface/Crater Port'
                 elif api_type == 'SurfaceStation':
-                    station_type = 'Surface/Station'
+                    station_type = 'Surface Station'
                 elif api_type == 'OnFootSettlement':
                     station_type = 'Surface/OnFoot Settlement'
                 elif api_type == 'FleetCarrier':
@@ -10977,15 +11020,20 @@ class App(tk.Tk):
                 else:
                     updated = 'Unknown'
                 
+                # Insert with alternating row tags for visual separation
+                row_index = len(self.marketplace_tree.get_children())
+                tag = 'evenrow' if row_index % 2 == 0 else 'oddrow'
+                
+                # Add subtle visual separator using spacing
                 self.marketplace_tree.insert("", "end", values=(
-                    location,
-                    station_type,
-                    pad,
-                    distance,
-                    volume,
-                    price,
-                    updated
-                ))
+                    f" {location} ",
+                    f" {station_type} ",
+                    f" {pad} ",
+                    f" {distance} ",
+                    f" {volume} ",
+                    f" {price} ",
+                    f" {updated} "
+                ), tags=(tag,))
             
             # Update status (like hotspots finder format)
             if results:

@@ -432,12 +432,37 @@ class RingFinder:
         results_frame.pack(fill="both", expand=True, padx=10, pady=(2, 2))
         
         # Create frame for treeview with scrollbars
-        tree_frame = ttk.Frame(results_frame)
+        tree_frame = ttk.Frame(results_frame, relief="solid", borderwidth=1)
         tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
+        
+        # Configure RingFinder Treeview style with visible borders
+        style = ttk.Style()
+        
+        # Main treeview styling
+        style.configure("RingFinder.Treeview",
+                       rowheight=25,
+                       borderwidth=1,
+                       relief="solid",
+                       bordercolor="#3a3a3a",
+                       fieldbackground="#1e1e1e")
+        
+        # Column header styling with borders
+        style.configure("RingFinder.Treeview.Heading",
+                       borderwidth=1,
+                       relief="groove",
+                       background="#2a2a2a",
+                       foreground="white",
+                       padding=[5, 5],
+                       anchor="w")
+        
+        # Row selection styling
+        style.map("RingFinder.Treeview",
+                 background=[('selected', '#0078d7')],
+                 foreground=[('selected', 'white')])
         
         # Results treeview with enhanced columns including source
         columns = ("Distance", "LS", "System", "Visited", "Planet/Ring", "Ring Type", "Hotspots", "Density")
-        self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
+        self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
         
         # Set column widths - similar to EDTOOLS layout
         column_widths = {
@@ -452,25 +477,26 @@ class RingFinder:
         }
         
         for col in columns:
-            self.results_tree.heading(col, text=col, command=lambda c=col: self._sort_column(c, False))
+            # Left-align headers
+            self.results_tree.heading(col, text=col, anchor="w", command=lambda c=col: self._sort_column(c, False))
             
-            # Configure columns with minwidth and stretch like reports tab
+            # Configure columns - all left-aligned for consistency
             if col == "Distance":
-                self.results_tree.column(col, width=column_widths[col], minwidth=50, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=50, anchor="w", stretch=False)
             elif col == "System":
                 self.results_tree.column(col, width=column_widths[col], minwidth=100, anchor="w", stretch=False)
             elif col == "Planet/Ring":
-                self.results_tree.column(col, width=column_widths[col], minwidth=100, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=100, anchor="w", stretch=False)
             elif col == "Ring Type":
-                self.results_tree.column(col, width=column_widths[col], minwidth=80, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=80, anchor="w", stretch=False)
             elif col == "Hotspots":
-                self.results_tree.column(col, width=column_widths[col], minwidth=100, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=100, anchor="w", stretch=False)
             elif col == "Visited":
-                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "LS":
-                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Density":
-                self.results_tree.column(col, width=column_widths[col], minwidth=90, anchor="center", stretch=True)
+                self.results_tree.column(col, width=column_widths[col], minwidth=90, anchor="w", stretch=True)
         
         # Load saved column widths from config
         try:
@@ -500,6 +526,10 @@ class RingFinder:
                 print(f"[DEBUG] Could not save Ring Finder column widths: {e}")
         
         self.results_tree.bind("<ButtonRelease-1>", save_ring_finder_widths)
+        
+        # Configure row tags for alternating colors
+        self.results_tree.tag_configure('oddrow', background='#1e1e1e')
+        self.results_tree.tag_configure('evenrow', background='#252525')
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.results_tree.yview)
@@ -1146,12 +1176,13 @@ class RingFinder:
                 ring_type = hotspot.get('ring_type')
                 ls_distance = hotspot.get('ls_distance')
                 
-                print(f"[EDSM DEBUG] Hotspot: {system_name} - Ring Type: {ring_type}, LS: {ls_distance}")
+                # Skip if ring_type is "No data" - not a real missing value
+                if ring_type == "No data":
+                    ring_type = None
                 
                 if ring_type is None or ls_distance is None:
                     if system_name:
                         systems_needing_data.add(system_name)
-                        print(f"[EDSM DEBUG] System {system_name} needs metadata (missing ring_type={ring_type is None}, ls_distance={ls_distance is None})")
             
             if not systems_needing_data:
                 # All metadata complete in this result set
@@ -2065,8 +2096,9 @@ class RingFinder:
                         try:
                             system_coords = self._get_system_coords(system_name)
                             if system_coords and self.current_system_coords:
-                                distance = self._calculate_distance(self.current_system_coords, system_coords)
-                                distance = round(distance, 1)
+                                calculated_dist = self._calculate_distance(self.current_system_coords, system_coords)
+                                if calculated_dist is not None:
+                                    distance = round(calculated_dist, 1)
                         except:
                             # If coordinate lookup fails, use default distance
                             distance = 999.9
@@ -2326,9 +2358,10 @@ class RingFinder:
                         if ring_type == "Metalic":
                             ring_type = "Metallic"
                         
-                        # Filter by ring type
-                        if material_filter != "All" and ring_type != material_filter:
-                            continue
+                        # Filter by ring type (skip if ring_type is "No data" and filter is set)
+                        if material_filter != "All":
+                            if ring_type == "No data" or ring_type != material_filter:
+                                continue
                         
                         material_matches += 1
                         
@@ -2370,12 +2403,18 @@ class RingFinder:
                         
                         # Calculate distance if we have both reference and system coordinates
                         if reference_coords and coords_available:
-                            distance = self._calculate_distance(reference_coords, system_coords)
+                            calculated_distance = self._calculate_distance(reference_coords, system_coords)
+                            # Ensure distance is never None
+                            distance = calculated_distance if calculated_distance is not None else 999.9
                         elif not coords_available:
                             systems_without_coords += 1
                         
                         # Apply distance filtering if reference coordinates are available
                         if reference_coords and coords_available:
+                            # Safety check: ensure distance is not None before comparison
+                            if distance is None:
+                                print(f" DEBUG: WARNING - distance is None for {system_name}, setting to 999.9")
+                                distance = 999.9
                             # Apply distance filter for systems with coordinates
                             if distance > max_distance:
                                 continue  # Skip systems beyond distance limit
@@ -2394,12 +2433,22 @@ class RingFinder:
                         else:
                             display_material_name = material_name
                         
+                        # Ensure distance is never None (safety check)
+                        if distance is None or distance is False:
+                            distance = 999.9
+                        
+                        # Format distance safely
+                        try:
+                            formatted_distance = round(distance, 1) if distance < 999 else 999.9
+                        except (TypeError, ValueError):
+                            formatted_distance = 999.9
+                        
                         hotspot_entry = {
                             'systemName': system_name,
                             'bodyName': body_name,
                             'type': display_material_name,
-                            'count': hotspot_count,
-                            'distance': round(distance, 1) if distance < 999 else 999.9,
+                            'count': hotspot_count if hotspot_count is not None else 1,
+                            'distance': formatted_distance,
                             'coords': {'x': x_coord, 'y': y_coord, 'z': z_coord} if x_coord is not None else None,
                             'data_source': source_label,
                             'ring_mass': 0,
@@ -2417,13 +2466,25 @@ class RingFinder:
                         print(f" DEBUG: Error processing {system_name}: {e}")
                         continue
                 
+                # CRITICAL FIX: Ensure ALL distances are valid numbers before sorting
+                print(f" DEBUG: Checking {len(user_hotspots)} hotspots for None distances...")
+                try:
+                    for h in user_hotspots:
+                        if h.get('distance') is None:
+                            print(f" DEBUG: WARNING - Fixing None distance for {h.get('systemName')} (DebugID: {h.get('debug_id', 'UNKNOWN')})")
+                            h['distance'] = 999.9
+                except Exception as fix_error:
+                    print(f" DEBUG: Error fixing distances: {fix_error}")
+                
                 # Sort by distance first, then LS distance for practical mining workflow
                 if material_filter != RingFinder.ALL_MINERALS:
                     # For specific materials, prioritize by hotspot count, then distance, then LS
-                    user_hotspots.sort(key=lambda x: (-x['count'], x['distance'], x.get('ls_distance', 999999)))
+                    # Use safe comparison with default value (handle None)
+                    user_hotspots.sort(key=lambda x: (-x.get('count', 0), x.get('distance') or 999.9, x.get('ls_distance') or 999999))
                 else:
                     # For All Minerals, sort by distance, then LS distance (closest arrival points first)
-                    user_hotspots.sort(key=lambda x: (x['distance'], x.get('ls_distance', 999999)))
+                    # Use safe comparison with default value (handle None)
+                    user_hotspots.sort(key=lambda x: (x.get('distance') or 999.9, x.get('ls_distance') or 999999))
                 
                 print(f" DEBUG: Material matches: {material_matches}")
                 print(f" DEBUG: Applied filters - Ring Type: '{material_filter}', Material: '{specific_material}'")
@@ -2448,7 +2509,10 @@ class RingFinder:
                 return user_hotspots
                 
         except Exception as e:
+            import traceback
             print(f" DEBUG: User database search failed: {e}")
+            print(f" DEBUG: Exception traceback:")
+            traceback.print_exc()
             return []
     
     def _calculate_distance(self, coord1: Dict, coord2: Dict) -> float:
@@ -2856,10 +2920,17 @@ class RingFinder:
             
             # Check if this is a new entry and apply highlighting
             is_new = (system_name, ring_name) in new_entries
-            tags = ('new_entry',) if is_new else ()
+            
+            # Apply alternating row colors + new entry highlighting
+            row_index = len(self.results_tree.get_children())
+            if is_new:
+                tags = ('new_entry',)
+            else:
+                row_tag = 'evenrow' if row_index % 2 == 0 else 'oddrow'
+                tags = (row_tag,)
             
             item_id = self.results_tree.insert("", "end", values=(
-                hotspot.get("distance", "No data"),
+                hotspot.get('distance', 'No data'),
                 ls_val,
                 system_name,
                 visited_status,

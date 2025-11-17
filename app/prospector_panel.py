@@ -1319,11 +1319,45 @@ class ProspectorPanel(ttk.Frame):
 
         ttk.Label(rep, text="Prospector Reports:", font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 4))
 
-        self.tree = ttk.Treeview(rep, columns=("materials", "content", "time"), show="headings", height=5)
-        self.tree.tag_configure("darkrow", background="#1e1e1e", foreground="#e6e6e6")
-        self.tree.heading("materials", text="Minerals", anchor="center")
-        self.tree.heading("content", text="Asteroid Content", anchor="center")
-        self.tree.heading("time", text="Time")
+        # Configure Prospector Reports Treeview style with visible borders
+        style = ttk.Style()
+        style.configure("ProspectorReports.Treeview",
+                       rowheight=25,
+                       borderwidth=1,
+                       relief="solid",
+                       bordercolor="#3a3a3a",
+                       fieldbackground="#1e1e1e")
+        style.configure("ProspectorReports.Treeview.Heading",
+                       borderwidth=1,
+                       relief="groove",
+                       background="#2a2a2a",
+                       foreground="white",
+                       padding=[5, 5],
+                       anchor="w")
+        style.map("ProspectorReports.Treeview",
+                 background=[('selected', '#0078d7')],
+                 foreground=[('selected', 'white')])
+        
+        style.layout("ProspectorReports.Treeview.Heading", [
+            ('Treeheading.cell', {'sticky': 'nswe'}),
+            ('Treeheading.border', {'sticky':'nswe', 'children': [
+                ('Treeheading.padding', {'sticky':'nswe', 'children': [
+                    ('Treeheading.image', {'side':'right', 'sticky':''}),
+                    ('Treeheading.text', {'sticky':'we'})
+                ]})
+            ]})
+        ])
+
+        # Create wrapper frame for bordered table
+        tree_frame_prospector = ttk.Frame(rep, relief="solid", borderwidth=1)
+        tree_frame_prospector.grid(row=4, column=0, sticky="nsew")
+
+        self.tree = ttk.Treeview(tree_frame_prospector, columns=("materials", "content", "time"), show="headings", height=5, style="ProspectorReports.Treeview")
+        self.tree.tag_configure('oddrow', background='#1e1e1e')
+        self.tree.tag_configure('evenrow', background='#252525')
+        self.tree.heading("materials", text="Minerals", anchor="w")
+        self.tree.heading("content", text="Asteroid Content", anchor="w")
+        self.tree.heading("time", text="Time", anchor="w")
         self.tree.column("materials", width=400, minwidth=150, anchor="w", stretch=False)
         self.tree.column("content", width=180, minwidth=100, anchor="w", stretch=False)
         self.tree.column("time", width=80, minwidth=60, anchor="center", stretch=True)
@@ -1357,10 +1391,13 @@ class ProspectorPanel(ttk.Frame):
         
         self.tree.bind("<ButtonRelease-1>", save_prospector_report_widths)
         
-        self.tree.grid(row=4, column=0, sticky="nsew")
-        yscroll = ttk.Scrollbar(rep, orient="vertical", command=self.tree.yview)
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        yscroll = ttk.Scrollbar(tree_frame_prospector, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscroll=yscroll.set)
-        yscroll.grid(row=4, column=1, sticky="ns")
+        yscroll.grid(row=0, column=1, sticky="ns")
+        
+        tree_frame_prospector.grid_columnconfigure(0, weight=1)
+        tree_frame_prospector.grid_rowconfigure(0, weight=1)
 
         # --- Live Mining Statistics Section ---
         ttk.Label(rep, text="Mineral Analysis:", font=("Segoe UI", 10, "bold")).grid(row=5, column=0, sticky="w", pady=(10, 4))
@@ -1368,17 +1405,51 @@ class ProspectorPanel(ttk.Frame):
         stats_frame.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(0, 0))
         stats_frame.columnconfigure(0, weight=1)
         
+        # Configure Mineral Analysis Treeview style with visible borders
+        style.configure("MineralAnalysis.Treeview",
+                       rowheight=25,
+                       borderwidth=1,
+                       relief="solid",
+                       bordercolor="#3a3a3a",
+                       fieldbackground="#1e1e1e")
+        style.configure("MineralAnalysis.Treeview.Heading",
+                       borderwidth=1,
+                       relief="groove",
+                       background="#2a2a2a",
+                       foreground="white",
+                       padding=[5, 5],
+                       anchor="w")
+        style.map("MineralAnalysis.Treeview",
+                 background=[('selected', '#0078d7')],
+                 foreground=[('selected', 'white')])
+        
+        style.layout("MineralAnalysis.Treeview.Heading", [
+            ('Treeheading.cell', {'sticky': 'nswe'}),
+            ('Treeheading.border', {'sticky':'nswe', 'children': [
+                ('Treeheading.padding', {'sticky':'nswe', 'children': [
+                    ('Treeheading.image', {'side':'right', 'sticky':''}),
+                    ('Treeheading.text', {'sticky':'we'})
+                ]})
+            ]})
+        ])
+        
+        # Create wrapper frame for bordered table
+        tree_frame_mineral = ttk.Frame(stats_frame, relief="solid", borderwidth=1)
+        tree_frame_mineral.grid(row=0, column=0, sticky="ew")
+        
         # Statistics tree for live percentage yields
-        self.stats_tree = ttk.Treeview(stats_frame, columns=("material", "tons", "tph", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"), 
-                                       show="headings", height=5)
-        self.stats_tree.heading("material", text="Mineral", anchor="center")
-        self.stats_tree.heading("tons", text="Tons", anchor="center")
-        self.stats_tree.heading("tph", text="T/hr", anchor="center")
-        self.stats_tree.heading("avg_all", text="Avg % (All)", anchor="center")
-        self.stats_tree.heading("avg_pct", text="Avg % (≥Threshold)", anchor="center")
-        self.stats_tree.heading("best_pct", text="Best %", anchor="center")
-        self.stats_tree.heading("latest_pct", text="Latest %", anchor="center")
-        self.stats_tree.heading("count", text="Hits", anchor="center")
+        self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"), 
+                                       show="headings", height=5, style="MineralAnalysis.Treeview")
+        self.stats_tree.tag_configure('oddrow', background='#1e1e1e')
+        self.stats_tree.tag_configure('evenrow', background='#252525')
+        self.stats_tree.heading("material", text="Mineral", anchor="w")
+        self.stats_tree.heading("tons", text="Tons", anchor="w")
+        self.stats_tree.heading("tph", text="T/hr", anchor="w")
+        self.stats_tree.heading("avg_all", text="Avg % (All)", anchor="w")
+        self.stats_tree.heading("avg_pct", text="Avg % (≥Threshold)", anchor="w")
+        self.stats_tree.heading("best_pct", text="Best %", anchor="w")
+        self.stats_tree.heading("latest_pct", text="Latest %", anchor="w")
+        self.stats_tree.heading("count", text="Hits", anchor="w")
         
         self.stats_tree.column("material", width=100, minwidth=80, anchor="w", stretch=False)
         self.stats_tree.column("tons", width=65, minwidth=50, anchor="center", stretch=False)
@@ -1422,9 +1493,12 @@ class ProspectorPanel(ttk.Frame):
         self.stats_tree.grid(row=0, column=0, sticky="ew")
         
         # Add vertical scrollbar for Material Analysis
-        stats_yscrollbar = ttk.Scrollbar(stats_frame, orient="vertical", command=self.stats_tree.yview)
+        stats_yscrollbar = ttk.Scrollbar(tree_frame_mineral, orient="vertical", command=self.stats_tree.yview)
         stats_yscrollbar.grid(row=0, column=1, sticky="ns")
         self.stats_tree.configure(yscroll=stats_yscrollbar.set)
+        
+        tree_frame_mineral.grid_columnconfigure(0, weight=1)
+        tree_frame_mineral.grid_rowconfigure(0, weight=1)
         
         # Add horizontal scrollbar for Material Analysis
         stats_xscrollbar = ttk.Scrollbar(stats_frame, orient="horizontal", command=self.stats_tree.xview)
@@ -1939,20 +2013,54 @@ class ProspectorPanel(ttk.Frame):
         self.reports_window = win
         win.protocol("WM_DELETE_WINDOW", self._on_reports_window_close)
 
-        frame = ttk.Frame(win, padding=8)
+        frame = ttk.Frame(win, padding=5)
         frame.grid(row=0, column=0, sticky="nsew")
         frame.columnconfigure(0, weight=1)
         frame.rowconfigure(0, weight=1)
 
+        # Configure Reports Treeview style with visible borders
+        style = ttk.Style()
+        style.configure("Reports.Treeview",
+                       rowheight=25,
+                       borderwidth=1,
+                       relief="solid",
+                       bordercolor="#3a3a3a",
+                       fieldbackground="#1e1e1e")
+        style.configure("Reports.Treeview.Heading",
+                       borderwidth=1,
+                       relief="groove",
+                       background="#2a2a2a",
+                       foreground="white",
+                       padding=[5, 5],
+                       anchor="w")
+        style.map("Reports.Treeview",
+                 background=[('selected', '#0078d7')],
+                 foreground=[('selected', 'white')])
+        
+        # Add subtle column separation via heading relief
+        style.layout("Reports.Treeview.Heading", [
+            ('Treeheading.cell', {'sticky': 'nswe'}),
+            ('Treeheading.border', {'sticky':'nswe', 'children': [
+                ('Treeheading.padding', {'sticky':'nswe', 'children': [
+                    ('Treeheading.image', {'side':'right', 'sticky':''}),
+                    ('Treeheading.text', {'sticky':'we'})
+                ]})
+            ]})
+        ])
+
+        # Create wrapper frame for bordered table
+        tree_frame_popup = ttk.Frame(frame, relief="solid", borderwidth=1)
+        tree_frame_popup.grid(row=0, column=0, sticky="nsew")
+        tree_frame_popup.grid_columnconfigure(0, weight=1)
+        tree_frame_popup.grid_rowconfigure(0, weight=1)
+
         # Create sortable treeview with Material Analysis columns (NO ship column - ship is only in TXT/HTML reports)
-        tree = ttk.Treeview(frame, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospectors", "comment", "enhanced"), show="headings", height=16)
+        tree = ttk.Treeview(tree_frame_popup, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "asteroids", "hit_rate", "quality", "cargo", "prospectors", "comment", "enhanced"), show="headings", height=16, style="Reports.Treeview")
         tree.grid(row=0, column=0, sticky="nsew")
         
-        # Remove custom styling - use default treeview appearance
-        
-
-        
-
+        # Configure row tags for alternating colors
+        tree.tag_configure('oddrow', background='#1e1e1e')
+        tree.tag_configure('evenrow', background='#252525')
         
         # Bind double-click to edit comments
         tree.bind("<Double-1>", self._edit_comment_popup)
@@ -1964,20 +2072,20 @@ class ProspectorPanel(ttk.Frame):
         tree.bind("<Motion>", lambda event: self._handle_mouse_motion(event, tree))
         
         # Configure column headings
-        tree.heading("date", text="Date/Time")
-        tree.heading("duration", text="Duration")
-        tree.heading("system", text="System")
-        tree.heading("body", text="Body")
-        tree.heading("tons", text="Total Tons")
-        tree.heading("tph", text="T/hr")
-        tree.heading("asteroids", text="Prospected")
-        tree.heading("materials", text="Mat Types")
-        tree.heading("hit_rate", text="Hit Rate %")
-        tree.heading("quality", text="Average Yield %")
-        tree.heading("cargo", text="Minerals (Tonnage, Yields & T/hr)")
-        tree.heading("prospectors", text="Prospectors")
-        tree.heading("comment", text="Comment")
-        tree.heading("enhanced", text="Detail Report")
+        tree.heading("date", text="Date/Time", anchor="w")
+        tree.heading("duration", text="Duration", anchor="w")
+        tree.heading("system", text="System", anchor="w")
+        tree.heading("body", text="Body", anchor="w")
+        tree.heading("tons", text="Total Tons", anchor="w")
+        tree.heading("tph", text="T/hr", anchor="w")
+        tree.heading("asteroids", text="Prospected", anchor="w")
+        tree.heading("materials", text="Mat Types", anchor="w")
+        tree.heading("hit_rate", text="Hit Rate %", anchor="w")
+        tree.heading("quality", text="Average Yield %", anchor="w")
+        tree.heading("cargo", text="Minerals (Tonnage, Yields & T/hr)", anchor="w")
+        tree.heading("prospectors", text="Prospectors", anchor="w")
+        tree.heading("comment", text="Comment", anchor="w")
+        tree.heading("enhanced", text="Detail Report", anchor="w")
         
 
         
@@ -2045,7 +2153,7 @@ class ProspectorPanel(ttk.Frame):
         tree.bind("<ButtonRelease-1>", save_column_widths)
 
         # Add scrollbar
-        sb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        sb = ttk.Scrollbar(tree_frame_popup, orient="vertical", command=tree.yview)
         sb.grid(row=0, column=1, sticky="ns")
         tree.configure(yscrollcommand=sb.set)
 
@@ -5968,34 +6076,67 @@ class ProspectorPanel(ttk.Frame):
         
         self.ToolTip(date_filter_combo, "Filter sessions by date, yield performance, hit rate, or materials")
 
-        # Create sortable treeview with Material Analysis columns (Ship column added - parsed from journal files)
-        self.reports_tree_tab = ttk.Treeview(main_frame, columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "asteroids", "materials", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"), show="headings", height=16, selectmode="extended")
-        self.reports_tree_tab.grid(row=1, column=0, sticky="nsew")
+        # Configure Reports tab Treeview style with visible borders
+        style = ttk.Style()
+        style.configure("ReportsTab.Treeview",
+                       rowheight=25,
+                       borderwidth=1,
+                       relief="solid",
+                       bordercolor="#3a3a3a",
+                       fieldbackground="#1e1e1e")
+        style.configure("ReportsTab.Treeview.Heading",
+                       borderwidth=1,
+                       relief="groove",
+                       background="#2a2a2a",
+                       foreground="white",
+                       padding=[5, 5],
+                       anchor="w")
+        style.map("ReportsTab.Treeview",
+                 background=[('selected', '#0078d7')],
+                 foreground=[('selected', 'white')])
         
-        # Note: Tooltip bindings are set up later with the combined_motion_handler
-        
-        # Remove custom styling - use default treeview appearance
-        
+        style.layout("ReportsTab.Treeview.Heading", [
+            ('Treeheading.cell', {'sticky': 'nswe'}),
+            ('Treeheading.border', {'sticky':'nswe', 'children': [
+                ('Treeheading.padding', {'sticky':'nswe', 'children': [
+                    ('Treeheading.image', {'side':'right', 'sticky':''}),
+                    ('Treeheading.text', {'sticky':'we'})
+                ]})
+            ]})
+        ])
 
+        # Create wrapper frame for bordered table
+        tree_frame_reports = ttk.Frame(main_frame, relief="solid", borderwidth=1)
+        tree_frame_reports.grid(row=1, column=0, sticky="nsew")
+        tree_frame_reports.grid_columnconfigure(0, weight=1)
+        tree_frame_reports.grid_rowconfigure(0, weight=1)
+
+        # Create sortable treeview with Material Analysis columns (Ship column added - parsed from journal files)
+        self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "asteroids", "materials", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
+        self.reports_tree_tab.grid(row=0, column=0, sticky="nsew")
+        
+        # Configure row tags for alternating colors
+        self.reports_tree_tab.tag_configure('oddrow', background='#1e1e1e')
+        self.reports_tree_tab.tag_configure('evenrow', background='#252525')
         
         # Configure column headings
-        self.reports_tree_tab.heading("date", text="Date/Time")
-        self.reports_tree_tab.heading("duration", text="Duration")
-        self.reports_tree_tab.heading("session_type", text="Type")
-        self.reports_tree_tab.heading("ship", text="Ship")
-        self.reports_tree_tab.heading("system", text="System")
-        self.reports_tree_tab.heading("body", text="Planet/Ring")
-        self.reports_tree_tab.heading("tons", text="Total Tons")
-        self.reports_tree_tab.heading("tph", text="T/hr")
-        self.reports_tree_tab.heading("asteroids", text="Prospected")
-        self.reports_tree_tab.heading("materials", text="Mat Types")
-        self.reports_tree_tab.heading("hit_rate", text="Hit Rate %")
-        self.reports_tree_tab.heading("quality", text="Average Yield %")
-        self.reports_tree_tab.heading("cargo", text="Minerals (Tonnage, Yields & T/hr)")
-        self.reports_tree_tab.heading("prospects", text="Limpets")
-        self.reports_tree_tab.heading("eng_materials", text="Engineering Materials")
-        self.reports_tree_tab.heading("comment", text="Comment")
-        self.reports_tree_tab.heading("enhanced", text="Detail Report")
+        self.reports_tree_tab.heading("date", text="Date/Time", anchor="w")
+        self.reports_tree_tab.heading("duration", text="Duration", anchor="w")
+        self.reports_tree_tab.heading("session_type", text="Type", anchor="w")
+        self.reports_tree_tab.heading("ship", text="Ship", anchor="w")
+        self.reports_tree_tab.heading("system", text="System", anchor="w")
+        self.reports_tree_tab.heading("body", text="Planet/Ring", anchor="w")
+        self.reports_tree_tab.heading("tons", text="Total Tons", anchor="w")
+        self.reports_tree_tab.heading("tph", text="T/hr", anchor="w")
+        self.reports_tree_tab.heading("asteroids", text="Prospected", anchor="w")
+        self.reports_tree_tab.heading("materials", text="Mat Types", anchor="w")
+        self.reports_tree_tab.heading("hit_rate", text="Hit Rate %", anchor="w")
+        self.reports_tree_tab.heading("quality", text="Average Yield %", anchor="w")
+        self.reports_tree_tab.heading("cargo", text="Minerals (Tonnage, Yields & T/hr)", anchor="w")
+        self.reports_tree_tab.heading("prospects", text="Limpets", anchor="w")
+        self.reports_tree_tab.heading("eng_materials", text="Engineering Materials", anchor="w")
+        self.reports_tree_tab.heading("comment", text="Comment", anchor="w")
+        self.reports_tree_tab.heading("enhanced", text="Detail Report", anchor="w")
         
         # Add sorting to tab treeview
         tab_sort_dirs = {}
@@ -6131,8 +6272,8 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.bind("<ButtonRelease-1>", save_column_widths_tab)
 
         # Add vertical scrollbar
-        v_scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.reports_tree_tab.yview)
-        v_scrollbar.grid(row=1, column=1, sticky="ns")
+        v_scrollbar = ttk.Scrollbar(tree_frame_reports, orient="vertical", command=self.reports_tree_tab.yview)
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
         self.reports_tree_tab.configure(yscrollcommand=v_scrollbar.set)
 
         # Add horizontal scrollbar
@@ -7326,7 +7467,9 @@ class ProspectorPanel(ttk.Frame):
             # Populate treeview and store session data for tooltips
             self.reports_tab_session_lookup = {}  # Store for tooltip access  
             self.reports_tab_original_sessions = sessions_data.copy()  # Store backup for sorting
-            for session in sessions_data:
+            for i, session in enumerate(sessions_data):
+                # Apply alternating row tags
+                tag = "evenrow" if i % 2 == 0 else "oddrow"
                 # Check if this report has screenshots
                 # Check if this report has detailed reports (keep screenshots functionality but don't show column)
                 # Use tree values for consistent report_id matching
@@ -7384,7 +7527,7 @@ class ProspectorPanel(ttk.Frame):
                     eng_materials_display,  # Engineering materials column
                     '💬' if session.get('comment', '').strip() else '',  # Show emoji if comment exists
                     ""  # Enhanced column placeholder
-                ))
+                ), tags=(tag,))
                 
                 # Check detailed report using tree values for consistency
                 # Use column names instead of indices to avoid breakage when columns are added
@@ -7798,8 +7941,11 @@ class ProspectorPanel(ttk.Frame):
             if ev == "ProspectedAsteroid":
                 # Check if this is a startup skip (old event from before app started)
                 if self._startup_skip:
+                    self._startup_skip = False  # Clear flag immediately to process first event
+                    
                     # Check timestamp - if event is more than 10 seconds old, skip it
                     event_time = evt.get("timestamp", "")
+                    
                     if event_time:
                         try:
                             from datetime import datetime, timezone
@@ -7807,13 +7953,16 @@ class ProspectorPanel(ttk.Frame):
                             now_dt = datetime.now(timezone.utc)
                             time_diff = (now_dt - event_dt).total_seconds()
                             
-                            if time_diff > 10:  # Event is older than 10 seconds
-                                self._startup_skip = False
-                                return  # Skip old events
-                        except Exception:
+                            print(f"[STARTUP DEBUG] First ProspectedAsteroid - Age: {time_diff:.1f}s")
+                            
+                            if time_diff > 30:  # Event is older than 30 seconds (increased to handle app restart delays)
+                                print(f"[STARTUP DEBUG] Skipping old event (>{30}s old)")
+                                return  # Skip only old events
+                            else:
+                                print(f"[STARTUP DEBUG] Processing fresh event (<{30}s old)")
+                        except Exception as e:
+                            print(f"[STARTUP DEBUG] Timestamp parse error: {e}, processing anyway")
                             pass  # If timestamp parsing fails, process the event
-                    
-                    self._startup_skip = False  # Clear flag after first event
                 materials_txt, content_txt, time_txt, panel_summary, speak_summary, triggered = self._summaries_from_event(evt)
                 self.history.insert(0, (materials_txt, content_txt, time_txt))
                 
@@ -8029,8 +8178,9 @@ class ProspectorPanel(ttk.Frame):
     def _refresh_table(self) -> None:
         for i in self.tree.get_children():
             self.tree.delete(i)
-        for materials_txt, content_txt, time_txt in self.history:
-            self.tree.insert("", "end", values=(materials_txt, content_txt, time_txt), tags=("darkrow",))
+        for idx, (materials_txt, content_txt, time_txt) in enumerate(self.history):
+            tag = "evenrow" if idx % 2 == 0 else "oddrow"
+            self.tree.insert("", "end", values=(materials_txt, content_txt, time_txt), tags=(tag,))
 
     def _update_mining_statistics(self, evt: Dict[str, Any]) -> None:
         """Update mining statistics with prospector result and refresh display"""
@@ -8099,6 +8249,7 @@ class ProspectorPanel(ttk.Frame):
             displayed_materials = set()
             
             # Update statistics tree with material data (announced materials)
+            row_index = 0
             if summary_data:
                 for material_name, stats in summary_data.items():
                     displayed_materials.add(material_name)
@@ -8135,9 +8286,11 @@ class ProspectorPanel(ttk.Frame):
                     tons_str = f"{material_tons:.1f}" if material_tons > 0 else "—"
                     tph_str = f"{material_tph:.1f}" if material_tph > 0 else "—"
                     
+                    tag = "evenrow" if row_index % 2 == 0 else "oddrow"
                     self.stats_tree.insert("", "end", values=(
                         material_display, tons_str, tph_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits
-                    ), tags=("darkrow",))
+                    ), tags=(tag,))
+                    row_index += 1
             
             # Add materials from cargo that weren't announced (below threshold but still mined)
             for material_name, material_tons in live_materials.items():
@@ -8174,9 +8327,11 @@ class ProspectorPanel(ttk.Frame):
                     quality_hits = "0"
                     
                     # Use same styling as announced materials
+                    tag = "evenrow" if row_index % 2 == 0 else "oddrow"
                     self.stats_tree.insert("", "end", values=(
                         material_display, tons_str, tph_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits
-                    ), tags=("darkrow",))
+                    ), tags=(tag,))
+                    row_index += 1
             
             # Update session summary with live tracking
             total_asteroids = self.session_analytics.get_total_asteroids()
@@ -9660,9 +9815,48 @@ class ProspectorPanel(ttk.Frame):
         self.ToolTip(filter_combo, "Filter bookmarks by material type")
         self.ToolTip(search_entry, "Search bookmarks by system, body, or materials")
 
+        # Configure Bookmarks Treeview style with visible borders
+        style = ttk.Style()
+        style.configure("Bookmarks.Treeview",
+                       rowheight=25,
+                       borderwidth=1,
+                       relief="solid",
+                       bordercolor="#3a3a3a",
+                       fieldbackground="#1e1e1e")
+        style.configure("Bookmarks.Treeview.Heading",
+                       borderwidth=1,
+                       relief="groove",
+                       background="#2a2a2a",
+                       foreground="white",
+                       padding=[5, 5],
+                       anchor="w")
+        style.map("Bookmarks.Treeview",
+                 background=[('selected', '#0078d7')],
+                 foreground=[('selected', 'white')])
+        
+        style.layout("Bookmarks.Treeview.Heading", [
+            ('Treeheading.cell', {'sticky': 'nswe'}),
+            ('Treeheading.border', {'sticky':'nswe', 'children': [
+                ('Treeheading.padding', {'sticky':'nswe', 'children': [
+                    ('Treeheading.image', {'side':'right', 'sticky':''}),
+                    ('Treeheading.text', {'sticky':'we'})
+                ]})
+            ]})
+        ])
+
+        # Create wrapper frame for bordered table
+        tree_frame_bookmarks = ttk.Frame(main_frame, relief="solid", borderwidth=1)
+        tree_frame_bookmarks.grid(row=1, column=0, sticky="nsew")
+        tree_frame_bookmarks.grid_columnconfigure(0, weight=1)
+        tree_frame_bookmarks.grid_rowconfigure(0, weight=1)
+
         # Create bookmarks treeview with multiple selection enabled
-        self.bookmarks_tree = ttk.Treeview(main_frame, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "target_material", "overlap", "notes"), show="headings", height=16, selectmode="extended")
-        self.bookmarks_tree.grid(row=1, column=0, sticky="nsew")
+        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "target_material", "overlap", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
+        self.bookmarks_tree.grid(row=0, column=0, sticky="nsew")
+        
+        # Configure row tags for alternating colors
+        self.bookmarks_tree.tag_configure('oddrow', background='#1e1e1e')
+        self.bookmarks_tree.tag_configure('evenrow', background='#252525')
         
         # Ensure multiple selection is properly configured
         self.bookmarks_tree.configure(selectmode="extended")
@@ -9671,15 +9865,15 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.focus_set()
         
         # Configure column headings
-        self.bookmarks_tree.heading("last_mined", text="Last Mined")
-        self.bookmarks_tree.heading("system", text="System")
-        self.bookmarks_tree.heading("body", text="Planet/Ring")
-        self.bookmarks_tree.heading("hotspot", text="Ring Type")
-        self.bookmarks_tree.heading("materials", text="Minerals Found")
-        self.bookmarks_tree.heading("avg_yield", text="Avg Yield %")
-        self.bookmarks_tree.heading("target_material", text="Overlap Minerals")
-        self.bookmarks_tree.heading("overlap", text="Overlap")
-        self.bookmarks_tree.heading("notes", text="Notes")
+        self.bookmarks_tree.heading("last_mined", text="Last Mined", anchor="w")
+        self.bookmarks_tree.heading("system", text="System", anchor="w")
+        self.bookmarks_tree.heading("body", text="Planet/Ring", anchor="w")
+        self.bookmarks_tree.heading("hotspot", text="Ring Type", anchor="w")
+        self.bookmarks_tree.heading("materials", text="Minerals Found", anchor="w")
+        self.bookmarks_tree.heading("avg_yield", text="Avg Yield %", anchor="w")
+        self.bookmarks_tree.heading("target_material", text="Overlap Minerals", anchor="w")
+        self.bookmarks_tree.heading("overlap", text="Overlap", anchor="w")
+        self.bookmarks_tree.heading("notes", text="Notes", anchor="w")
         
         # Configure column widths
         self.bookmarks_tree.column("last_mined", width=100, stretch=False, anchor="center")
@@ -9722,8 +9916,8 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.bind("<ButtonRelease-1>", save_bookmarks_widths)
 
         # Add vertical scrollbar
-        v_scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.bookmarks_tree.yview)
-        v_scrollbar.grid(row=1, column=1, sticky="ns")
+        v_scrollbar = ttk.Scrollbar(tree_frame_bookmarks, orient="vertical", command=self.bookmarks_tree.yview)
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
         self.bookmarks_tree.configure(yscrollcommand=v_scrollbar.set)
 
         # Add horizontal scrollbar
@@ -9834,6 +10028,7 @@ class ProspectorPanel(ttk.Frame):
         search_text = self.bookmark_search_var.get().lower() if hasattr(self, 'bookmark_search_var') else ""
         
         # Filter and display bookmarks
+        row_index = 0
         for bookmark in self.bookmarks_data:
             # Apply filter
             if filter_value == "High Yield (>350 T/hr)":
@@ -9902,6 +10097,7 @@ class ProspectorPanel(ttk.Frame):
             overlap_type = bookmark.get('overlap_type', '')
             overlap_display = {'': '', '2x': '⭐⭐', '3x': '⭐⭐⭐'}.get(overlap_type, '')
             
+            tag = "evenrow" if row_index % 2 == 0 else "oddrow"
             self.bookmarks_tree.insert("", "end", values=(
                 bookmark.get('last_mined', ''),
                 bookmark.get('system', ''),
@@ -9912,7 +10108,8 @@ class ProspectorPanel(ttk.Frame):
                 bookmark.get('target_material', ''),
                 overlap_display,
                 notes_display
-            ))
+            ), tags=(tag,))
+            row_index += 1
 
     def _on_bookmark_double_click(self, event) -> None:
         """Handle double-click on bookmark tree - only edit if clicking on an item, not header"""

@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "system": "wwww",
+    "body": "ff",
+    "hotspot": "",
+    "materials": "",
+    "avg_yield": "e",
+    "target_material": "Grandidierite",
+    "overlap_type": "",
+    "last_mined": "",
+    "notes": "",
+    "date_added": "2025-11-17"
+  },
+  {
+    "system": "54543534535353",
+    "body": "35",
+    "hotspot": "Rocky",
+    "materials": "35",
+    "avg_yield": "",
+    "target_material": "",
+    "overlap_type": "",
+    "last_mined": "",
+    "notes": "",
+    "date_added": "2025-11-17"
+  }
+]
