@@ -727,6 +727,38 @@ class ProspectorPanel(ttk.Frame):
             self.last_carrier_name
         )
         self.session_body.set(body_display)
+        
+        # Update distance display using Ring Finder's calculator
+        self._update_distance_display()
+    
+    def _update_distance_display(self) -> None:
+        """Update distance display by using Ring Finder's distance calculator"""
+        try:
+            # Get Ring Finder from main app
+            if self.main_app and hasattr(self.main_app, 'ring_finder'):
+                ring_finder = self.main_app.ring_finder
+                system_name = self.last_system or self.session_system.get()
+                
+                if system_name and hasattr(ring_finder, '_update_sol_distance'):
+                    # Call Ring Finder's distance calculation
+                    ring_finder._update_sol_distance(system_name)
+                    # Schedule a delayed copy to ensure Ring Finder updates first
+                    self.after(50, lambda: self._copy_distance_from_ring_finder(ring_finder))
+                else:
+                    self.distance_info_label.config(text="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
+            else:
+                self.distance_info_label.config(text="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
+        except Exception as e:
+            print(f"[DEBUG] Error updating distance display: {e}")
+            self.distance_info_label.config(text="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
+    
+    def _copy_distance_from_ring_finder(self, ring_finder) -> None:
+        """Copy the distance text from Ring Finder after it updates"""
+        try:
+            if hasattr(ring_finder, 'distance_info_var'):
+                self.distance_info_label.config(text=ring_finder.distance_info_var.get())
+        except Exception as e:
+            print(f"[DEBUG] Error copying distance from Ring Finder: {e}")
     
     def _update_ship_info_display(self) -> None:
         """Update the ship info display with current ship data from cargo monitor"""
@@ -1284,12 +1316,22 @@ class ProspectorPanel(ttk.Frame):
         rep.rowconfigure(4, weight=1)  # Updated for new ship info row
         nb.add(rep, text="Mining Analytics")
 
-        # --- Ship Info Row (displays current ship name, ident, and type) ---
-        ship_info_row = ttk.Frame(rep)
-        ship_info_row.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(2, 4))
+        # --- Distance and Ship Info Row ---
+        distance_ship_row = ttk.Frame(rep)
+        distance_ship_row.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(2, 4))
+        distance_ship_row.columnconfigure(1, weight=1)  # Allow middle to expand
         
-        ttk.Label(ship_info_row, text="🚀", font=("Segoe UI", 9)).pack(side="left", padx=(0, 4))
-        self.ship_info_label = ttk.Label(ship_info_row, text="", font=("Segoe UI", 9, "bold"), foreground="#FFB84D")
+        # Distance info on the left - will be populated from Ring Finder's distance calculator
+        ttk.Label(distance_ship_row, text="Distances:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
+        self.distance_info_label = tk.Label(distance_ship_row, text="➤ Sol: --- | Home: --- | Fleet Carrier: ---",
+                                font=("Segoe UI", 9), foreground="#ffaa00", bg="#1e1e1e")
+        self.distance_info_label.pack(side="left")
+        
+        # Ship info on the right side of the same row
+        ship_info_frame = ttk.Frame(distance_ship_row)
+        ship_info_frame.pack(side="right", padx=(20, 0))
+        ttk.Label(ship_info_frame, text="Ship:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
+        self.ship_info_label = ttk.Label(ship_info_frame, text="", font=("Segoe UI", 9, "bold"), foreground="#FFB84D")
         self.ship_info_label.pack(side="left")
 
         # --- System and Location Name Entry Row ---
@@ -1306,7 +1348,7 @@ class ProspectorPanel(ttk.Frame):
         self.ToolTip(self.system_entry, "Current system name. (Can also be entered manually)")
 
         ttk.Label(sysbody_row, text="Planet/Ring:", font=("Segoe UI", 9)).grid(row=0, column=2, sticky="w", padx=(0, 2))
-        self.body_entry = ttk.Entry(sysbody_row, textvariable=self.session_body, width=35)
+        self.body_entry = ttk.Entry(sysbody_row, textvariable=self.session_body, width=15)
         self.body_entry.grid(row=0, column=3, sticky="w")
         self.ToolTip(self.body_entry, "Current location: rings, planets, stations, or carriers. (Can also be entered manually)")
 
@@ -1398,6 +1440,20 @@ class ProspectorPanel(ttk.Frame):
         
         tree_frame_prospector.grid_columnconfigure(0, weight=1)
         tree_frame_prospector.grid_rowconfigure(0, weight=1)
+        
+        # Add column header tooltips for Prospector Reports table
+        def prospector_motion_handler(event):
+            self._show_prospector_header_tooltip(event, self.tree)
+        
+        self.tree.bind("<Motion>", prospector_motion_handler)
+        
+        def hide_prospector_tooltip(event):
+            if hasattr(self, '_prospector_tooltip_window') and self._prospector_tooltip_window:
+                self._prospector_tooltip_window.destroy()
+                self._prospector_tooltip_window = None
+                self._current_prospector_tooltip_column = None
+        
+        self.tree.bind("<Leave>", hide_prospector_tooltip)
 
         # --- Live Mining Statistics Section ---
         ttk.Label(rep, text="Mineral Analysis:", font=("Segoe UI", 10, "bold")).grid(row=5, column=0, sticky="w", pady=(10, 4))
@@ -1442,7 +1498,7 @@ class ProspectorPanel(ttk.Frame):
                                        show="headings", height=5, style="MineralAnalysis.Treeview")
         self.stats_tree.tag_configure('oddrow', background='#1e1e1e')
         self.stats_tree.tag_configure('evenrow', background='#252525')
-        self.stats_tree.heading("material", text="Mineral", anchor="w")
+        self.stats_tree.heading("material", text="Mineral (Threshold%)", anchor="w")
         self.stats_tree.heading("tons", text="Tons", anchor="w")
         self.stats_tree.heading("tph", text="T/hr", anchor="w")
         self.stats_tree.heading("avg_all", text="Avg % (All)", anchor="w")
@@ -1451,7 +1507,7 @@ class ProspectorPanel(ttk.Frame):
         self.stats_tree.heading("latest_pct", text="Latest %", anchor="w")
         self.stats_tree.heading("count", text="Hits", anchor="w")
         
-        self.stats_tree.column("material", width=100, minwidth=80, anchor="w", stretch=False)
+        self.stats_tree.column("material", width=135, minwidth=110, anchor="w", stretch=False)
         self.stats_tree.column("tons", width=65, minwidth=50, anchor="center", stretch=False)
         self.stats_tree.column("tph", width=65, minwidth=50, anchor="center", stretch=False)
         self.stats_tree.column("avg_all", width=95, minwidth=70, anchor="center", stretch=False)
@@ -1505,8 +1561,19 @@ class ProspectorPanel(ttk.Frame):
         stats_xscrollbar.grid(row=1, column=0, sticky="ew")
         self.stats_tree.configure(xscrollcommand=stats_xscrollbar.set)
         
-        # Add tooltip for Material Analysis table
-        self._setup_stats_tree_tooltips(self.stats_tree)
+        # Add column header tooltips for Material Analysis table
+        def mineral_motion_handler(event):
+            self._show_mineral_header_tooltip(event, self.stats_tree)
+        
+        self.stats_tree.bind("<Motion>", mineral_motion_handler)
+        
+        def hide_mineral_tooltip(event):
+            if hasattr(self, '_mineral_tooltip_window') and self._mineral_tooltip_window:
+                self._mineral_tooltip_window.destroy()
+                self._mineral_tooltip_window = None
+                self._current_mineral_tooltip_column = None
+        
+        self.stats_tree.bind("<Leave>", hide_mineral_tooltip)
         
         # Session summary labels
         summary_frame = ttk.Frame(stats_frame)
@@ -5666,14 +5733,14 @@ class ProspectorPanel(ttk.Frame):
                 column = tree.identify_column(event.x)
                 
                 tooltips = {
-                    "#1": "Mineral name with announcement threshold\nExample: Platinum (20%)",
-                    "#2": "Total tons collected this session",
-                    "#3": "Tons per hour (mining rate)\nBased on session elapsed time",
-                    "#4": "Average % across ALL prospected asteroids\n(includes below-threshold results)",
-                    "#5": "Average % for asteroids meeting threshold\n(only quality finds)",
-                    "#6": "Highest percentage found this session",
-                    "#7": "Most recent prospector result",
-                    "#8": "Number of asteroids meeting threshold"
+                    "#1": "Shows material name with your announcement threshold\nExample: Platinum (27%) means you're only alerted when\nasteroids have 27% or higher Platinum content",
+                    "#2": "Total tons of this material collected this session",
+                    "#3": "Mining rate: Tons per hour for this material",
+                    "#4": "Average % across ALL asteroids you prospected\n(includes low-quality asteroids below threshold)",
+                    "#5": "Average % only for asteroids AT OR ABOVE threshold\n(your quality finds that triggered announcements)",
+                    "#6": "Highest % found this session for this material",
+                    "#7": "Most recent prospector scan result for this material",
+                    "#8": "Number of asteroids that met your threshold\n(quality finds that triggered announcements)"
                 }
                 
                 tooltip_text = tooltips.get(column)
@@ -7004,6 +7071,105 @@ class ProspectorPanel(ttk.Frame):
                     self._current_tooltip_column = column
         except Exception as e:
             print(f"Tooltip error: {e}")
+
+    def _show_prospector_header_tooltip(self, event, tree):
+        """Show tooltip for Prospector Reports column headers"""
+        try:
+            region = tree.identify_region(event.x, event.y)
+            column = tree.identify_column(event.x)
+            
+            if region != "heading" or not column:
+                if hasattr(self, '_prospector_tooltip_window') and self._prospector_tooltip_window:
+                    self._prospector_tooltip_window.destroy()
+                    self._prospector_tooltip_window = None
+                    self._current_prospector_tooltip_column = None
+                return
+            
+            if hasattr(self, '_current_prospector_tooltip_column') and self._current_prospector_tooltip_column == column:
+                return
+            
+            if hasattr(self, '_prospector_tooltip_window') and self._prospector_tooltip_window:
+                self._prospector_tooltip_window.destroy()
+                self._prospector_tooltip_window = None
+            
+            if region == "heading" and column:
+                column_tooltips = {
+                    "#1": "Minerals found in this asteroid with their percentages",
+                    "#2": "Material content quality and remaining percentage",
+                    "#3": "Time when this asteroid was scanned"
+                }
+                
+                tooltip_text = column_tooltips.get(column)
+                if tooltip_text:
+                    x = event.x_root + 10
+                    y = event.y_root + 10
+                    
+                    self._prospector_tooltip_window = tk.Toplevel(tree)
+                    self._prospector_tooltip_window.wm_overrideredirect(True)
+                    self._prospector_tooltip_window.wm_geometry(f"+{x}+{y}")
+                    self._prospector_tooltip_window.configure(background="#ffffe0")
+                    self._prospector_tooltip_window.wm_attributes("-topmost", True)
+                    
+                    label = tk.Label(self._prospector_tooltip_window, text=tooltip_text,
+                                   background="#ffffe0", relief=tk.SOLID, borderwidth=1,
+                                   font=("Segoe UI", 9), justify=tk.LEFT, wraplength=300)
+                    label.pack(ipadx=5, ipady=3)
+                    
+                    self._current_prospector_tooltip_column = column
+        except Exception as e:
+            print(f"Prospector tooltip error: {e}")
+
+    def _show_mineral_header_tooltip(self, event, tree):
+        """Show tooltip for Mineral Analysis column headers"""
+        try:
+            region = tree.identify_region(event.x, event.y)
+            column = tree.identify_column(event.x)
+            
+            if region != "heading" or not column:
+                if hasattr(self, '_mineral_tooltip_window') and self._mineral_tooltip_window:
+                    self._mineral_tooltip_window.destroy()
+                    self._mineral_tooltip_window = None
+                    self._current_mineral_tooltip_column = None
+                return
+            
+            if hasattr(self, '_current_mineral_tooltip_column') and self._current_mineral_tooltip_column == column:
+                return
+            
+            if hasattr(self, '_mineral_tooltip_window') and self._mineral_tooltip_window:
+                self._mineral_tooltip_window.destroy()
+                self._mineral_tooltip_window = None
+            
+            if region == "heading" and column:
+                column_tooltips = {
+                    "#1": "Material name with your announcement threshold\nExample: Platinum (27%) means you're only alerted when\nasteroids have 27% or higher Platinum content",
+                    "#2": "Total tons of this material collected this session",
+                    "#3": "Mining rate: Tons per hour for this material",
+                    "#4": "Average % across ALL asteroids you prospected\n(includes low-quality asteroids below threshold)",
+                    "#5": "Average % only for asteroids AT OR ABOVE threshold\n(your quality finds that triggered announcements)",
+                    "#6": "Highest % found this session for this material",
+                    "#7": "Most recent prospector scan result for this material",
+                    "#8": "Number of asteroids that met your threshold\n(quality finds that triggered announcements)"
+                }
+                
+                tooltip_text = column_tooltips.get(column)
+                if tooltip_text:
+                    x = event.x_root + 10
+                    y = event.y_root + 10
+                    
+                    self._mineral_tooltip_window = tk.Toplevel(tree)
+                    self._mineral_tooltip_window.wm_overrideredirect(True)
+                    self._mineral_tooltip_window.wm_geometry(f"+{x}+{y}")
+                    self._mineral_tooltip_window.configure(background="#ffffe0")
+                    self._mineral_tooltip_window.wm_attributes("-topmost", True)
+                    
+                    label = tk.Label(self._mineral_tooltip_window, text=tooltip_text,
+                                   background="#ffffe0", relief=tk.SOLID, borderwidth=1,
+                                   font=("Segoe UI", 9), justify=tk.LEFT, wraplength=350)
+                    label.pack(ipadx=5, ipady=3)
+                    
+                    self._current_mineral_tooltip_column = column
+        except Exception as e:
+            print(f"Mineral tooltip error: {e}")
 
     def _on_date_filter_changed(self, event=None) -> None:
         """Handle date filter dropdown change"""
@@ -9379,29 +9545,35 @@ class ProspectorPanel(ttk.Frame):
             pass  # Continue without icon if there's an issue
         
         # Center dialog on parent window
-        dialog.transient(self.winfo_toplevel())
+        # Use main app window if available, otherwise fall back to winfo_toplevel
+        parent = self.main_app if self.main_app is not None else self.winfo_toplevel()
+        dialog.transient(parent)
         dialog.grab_set()
         
-        # Position dialog centered on parent window using simpler method
+        # Position dialog centered on parent window
         # Force both windows to update their geometry info
-        parent = self.winfo_toplevel()
         parent.update_idletasks()
         dialog.update_idletasks()
         
-        # Get actual window positions using winfo methods
-        parent_x = parent.winfo_rootx()
-        parent_y = parent.winfo_rooty()
+        # Get parent window geometry
+        parent_x = parent.winfo_x()
+        parent_y = parent.winfo_y()
         parent_width = parent.winfo_width()
         parent_height = parent.winfo_height()
         
-        dialog_width = dialog.winfo_reqwidth()
-        dialog_height = dialog.winfo_reqheight()
+        # Get dialog dimensions
+        dialog_width = 400  # Fixed from geometry setting
+        dialog_height = 150  # Fixed from geometry setting
         
-        # Center dialog on parent
+        # Calculate center position
         x = parent_x + (parent_width - dialog_width) // 2
         y = parent_y + (parent_height - dialog_height) // 2
         
-        dialog.geometry(f"+{x}+{y}")
+        # Ensure dialog stays on screen
+        x = max(0, x)
+        y = max(0, y)
+        
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         
         result = [None]  # Use list to store result for closure
         
