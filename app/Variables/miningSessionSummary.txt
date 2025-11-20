@@ -1,2 +1,2 @@
-Session: Col 285 Sector YF-O d6-85 — 5A Ring — 00:00:00 — Total 0t (Single Session)
-Ship: Mega Bumper - Type-11 Prospector | No refined materials.
+Session: Col 285 Sector YF-O d6-85 — 4 A Ring — 00:00:00 — Total 8t (Single Session)
+Ship: Mega Bumper - Type-11 Prospector | Platinum 8t (53259.56 t/hr)

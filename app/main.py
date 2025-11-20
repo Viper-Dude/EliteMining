@@ -1,3 +1,23 @@
+def center_window(child, parent):
+    """Center `child` (Toplevel) on `parent` (Tk or Toplevel)."""
+    print(f"[DEBUG] Parent object: {parent}")
+    print(f"[DEBUG] Parent type: {type(parent)}")
+    parent.update_idletasks()
+    child.update_idletasks()
+    pw = parent.winfo_width()
+    ph = parent.winfo_height()
+    px = parent.winfo_rootx()
+    py = parent.winfo_rooty()
+    cw = child.winfo_width()
+    ch = child.winfo_height()
+    print(f"[DEBUG] Parent geometry: x={px}, y={py}, w={pw}, h={ph}")
+    print(f"[DEBUG] Dialog geometry: w={cw}, h={ch}")
+    # For diagnosis, optionally force centering on root window
+    # import tkinter as tk; root = tk._default_root; if root: parent = root
+    x = px + (pw - cw) // 2
+    y = py + (ph - ch) // 2
+    print(f"[DEBUG] Centered dialog position: x={x}, y={y}")
+    child.geometry(f"+{x}+{y}")
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -48,7 +68,84 @@ import logging
 import logging
 from logging.handlers import RotatingFileHandler
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, filedialog, messagebox
+def centered_yesno_dialog(parent, title, message):
+    """Show a Yes/No dialog centered over parent window. Returns True for Yes, False for No."""
+    dialog = tk.Toplevel(parent)
+    dialog.withdraw()  # Prevent flicker while we layout and center
+    try:
+        from app_utils import get_app_icon_path
+        icon_path = get_app_icon_path()
+        if icon_path and icon_path.endswith('.ico'):
+            dialog.iconbitmap(icon_path)
+        elif icon_path:
+            dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+    except Exception:
+        pass
+    dialog.title(title)
+    dialog.resizable(False, False)
+    label = tk.Label(dialog, text=message, padx=20, pady=20)
+    label.pack()
+    btn_frame = tk.Frame(dialog)
+    btn_frame.pack(pady=(0, 15))
+    result = {'value': None}
+    def on_yes():
+        result['value'] = True
+        dialog.destroy()
+    def on_no():
+        result['value'] = False
+        dialog.destroy()
+    yes_btn = tk.Button(btn_frame, text="Yes", width=10, command=on_yes)
+    yes_btn.pack(side=tk.LEFT, padx=10)
+    no_btn = tk.Button(btn_frame, text="No", width=10, command=on_no)
+    no_btn.pack(side=tk.LEFT, padx=10)
+    # Center after widgets are packed
+    top_parent = parent.winfo_toplevel() if parent else None
+    if top_parent:
+        center_window(dialog, top_parent)
+    dialog.deiconify()  # Show centered immediately
+    # Now set modal behavior
+    dialog.transient(parent)
+    dialog.grab_set()
+    dialog.attributes('-topmost', True)
+    dialog.lift()
+    dialog.focus_force()
+    dialog.wait_window()
+    return result['value']
+
+def centered_info_dialog(parent, title, message):
+    """Show an Info dialog centered over parent window. Returns when OK pressed."""
+    dialog = tk.Toplevel(parent)
+    dialog.withdraw()  # Prevent flicker while laying out
+    try:
+        from app_utils import get_app_icon_path
+        icon_path = get_app_icon_path()
+        if icon_path and icon_path.endswith('.ico'):
+            dialog.iconbitmap(icon_path)
+        elif icon_path:
+            dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+    except Exception:
+        pass
+    dialog.title(title)
+    dialog.resizable(False, False)
+    label = tk.Label(dialog, text=message, padx=20, pady=20)
+    label.pack()
+    btn_frame = tk.Frame(dialog)
+    btn_frame.pack(pady=(0, 15))
+    def on_ok():
+        dialog.destroy()
+    ok_btn = tk.Button(btn_frame, text="OK", width=10, command=on_ok)
+    ok_btn.pack()
+    top_parent = parent.winfo_toplevel() if parent else None
+    if top_parent:
+        center_window(dialog, top_parent)
+    dialog.deiconify()  # Show centered
+    dialog.transient(parent)
+    dialog.grab_set()
+    dialog.attributes('-topmost', True)
+    dialog.lift()
+    dialog.focus_force()
+    dialog.wait_window()
 from typing import Dict, Optional, Any, List
 import sys
 import threading
@@ -526,7 +623,7 @@ def _atomic_write_text(path: str, text: str) -> None:
         tmp_path = path + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(text)
-        # On Windows, replace is atomic for same-volume paths (Python 3.8+).
+            # On Windows, replace is atomic for same-volume paths (Python 3.8+).
         os.replace(tmp_path, path)
     except Exception as e:
         try:
@@ -595,19 +692,13 @@ class RefineryDialog:
             
         self.result = None
         
-        # Create dialog window
+        # Create dialog window (withdraw first to avoid flicker)
         self.dialog = tk.Toplevel(parent)
+        self.dialog.withdraw()
         self.dialog.title("Add Refinery Contents")
         self.dialog.geometry("600x650")
         self.dialog.configure(bg="#1e1e1e")
         self.dialog.resizable(True, True)  # Allow resizing so user can adjust if needed
-        self.dialog.transient(parent)
-        self.dialog.grab_set()
-        
-        # Force window to appear on top
-        self.dialog.attributes('-topmost', True)
-        self.dialog.lift()
-        self.dialog.focus_force()
         
         # Set icon using the same method as main app
         try:
@@ -675,6 +766,13 @@ class RefineryDialog:
         self.dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         
         self._create_ui()
+        # Now show dialog centered and make it modal
+        self.dialog.deiconify()
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        self.dialog.attributes('-topmost', True)
+        self.dialog.lift()
+        self.dialog.focus_force()
         
     def _create_ui(self):
         """Create the refinery dialog UI"""
@@ -2801,11 +2899,11 @@ cargo panel forces Elite to write detailed inventory data.
                         
                         # Show confirmation
                         print(f"Refinery contents applied: {len(result)} materials, {refinery_total} tons total")
-                        messagebox.showinfo("Refinery Contents Added", 
-                                          f"Added {refinery_total} tons from refinery.\n"
-                                          f"New total: {self.current_cargo} tons\n\n"
-                                          f"These materials will be included in mining reports and statistics.",
-                                          parent=parent_window)
+                        from app_utils import centered_message
+                        centered_message(parent_window, "Refinery Contents Added",
+                                         f"Added {refinery_total} tons from refinery.\n"
+                                         f"New total: {self.current_cargo} tons\n\n"
+                                         f"These materials will be included in mining reports and statistics.")
                     
                 except Exception as e:
                     print(f"Error showing refinery dialog: {e}")
@@ -2861,10 +2959,10 @@ cargo panel forces Elite to write detailed inventory data.
                 parent_window = self.cargo_window
             
             # Ask if user wants to add refinery materials - use parent directly
-            add_refinery = messagebox.askyesno(
-                "Refinery Materials", 
-                "Do you have any additional materials in your refinery that you want to add to this session?",
-                parent=parent_window
+            add_refinery = centered_yesno_dialog(
+                parent_window,
+                "Refinery Materials",
+                "Do you have any additional materials in your refinery that you want to add to this session?"
             )
             
             # Mark that we've shown the prompt for this transfer
@@ -2894,10 +2992,10 @@ cargo panel forces Elite to write detailed inventory data.
                         print(f"[Refinery Multi-Session] Total added from refinery: {refinery_total}t")
                         
                         # Show confirmation
-                        messagebox.showinfo("Refinery Contents Added", 
-                                          f"Added {refinery_total} tons from refinery.\n\n"
-                                          f"These materials will be included in your multi-session mining report.",
-                                          parent=parent_window)
+                        from app_utils import centered_message
+                        centered_message(parent_window, "Refinery Contents Added",
+                                         f"Added {refinery_total} tons from refinery.\n\n"
+                                         f"These materials will be included in your multi-session mining report.")
                         
                         # DON'T call update_callback here - it triggers report generation!
                         # In multi-session mode, reports are only generated when ending the session
@@ -4864,10 +4962,11 @@ class App(tk.Tk):
             if success:
                 item_count = len(self.cargo_monitor.cargo_items)
                 total_weight = self.cargo_monitor.current_cargo
-                messagebox.showinfo("Reset Complete", 
-                    f"Cargo hold reset to actual game state.\n\n"
-                    f"Found: {item_count} item types\n"
-                    f"Total: {total_weight} tons")
+                from app_utils import centered_message
+                centered_message(self, "Reset Complete", 
+                                 f"Cargo hold reset to actual game state.\n\n"
+                                 f"Found: {item_count} item types\n"
+                                 f"Total: {total_weight} tons")
             else:
                 messagebox.showwarning("Reset Issue", 
                     "Cargo hold was cleared but no game data was found.\n"
@@ -5582,8 +5681,8 @@ class App(tk.Tk):
                 cfg = self.prospector_panel._load_cfg()
                 data = cfg.get('announce_preset_1')
                 if not data:
-                    from tkinter import messagebox
-                    messagebox.showinfo("Load Preset 1", "No Preset 1 saved yet.")
+                    from app_utils import centered_message
+                    centered_message(self, "Load Preset 1", "No Preset 1 saved yet.")
                     return
                 
                 self.prospector_panel.announce_map = data.get('announce_map', {}).copy()
@@ -5642,8 +5741,8 @@ class App(tk.Tk):
                 cfg = self.prospector_panel._load_cfg()
                 data = cfg.get(f'announce_preset_{num}')
                 if not data:
-                    from tkinter import messagebox
-                    messagebox.showinfo(f"Load Preset {num}", f"No Preset {num} saved yet.")
+                    from app_utils import centered_message
+                    centered_message(self, f"Load Preset {num}", f"No Preset {num} saved yet.")
                     return
                 
                 # Merge preset data with current materials to preserve new materials
@@ -7039,14 +7138,16 @@ class App(tk.Tk):
     def _overwrite_selected(self) -> None:
         sel = self._get_selected_preset()
         if not sel:
-            messagebox.showinfo("No preset selected", "Choose a preset to overwrite.")
+            from app_utils import centered_message
+            centered_message(self, "No preset selected", "Choose a preset to overwrite.")
             return
         
         # Confirm overwrite
-        if not messagebox.askyesno("Confirm Overwrite", 
-                                  f"This will overwrite preset '{sel}' with current settings.\n\n"
-                                  f"This action cannot be undone.\n\n"
-                                  f"Continue?"):
+        from app_utils import centered_askyesno
+        if not centered_askyesno(self, "Confirm Overwrite", 
+                      f"This will overwrite preset '{sel}' with current settings.\n\n"
+                      f"This action cannot be undone.\n\n"
+                      f"Continue?"):
             return
             
         with open(self._settings_path(sel), "w", encoding="utf-8") as f:
@@ -7056,13 +7157,15 @@ class App(tk.Tk):
     def _rename_selected_preset(self) -> None:
         old = self._get_selected_preset()
         if not old:
-            messagebox.showinfo("No preset selected", "Choose a preset to rename.")
+            from app_utils import centered_message
+            centered_message(self, "No preset selected", "Choose a preset to rename.")
             return
             
         # Confirm rename action
-        if not messagebox.askyesno("Confirm Rename", 
-                                  f"Rename preset '{old}'?\n\n"
-                                  f"You'll be asked for the new name next."):
+        from app_utils import centered_askyesno
+        if not centered_askyesno(self, "Confirm Rename", 
+                      f"Rename preset '{old}'?\n\n"
+                      f"You'll be asked for the new name next."):
             return
             
         new = self._ask_preset_name(initial=old)
@@ -7357,7 +7460,8 @@ class App(tk.Tk):
                 # Update Home/FC distances
                 self._update_home_fc_distances()
             else:
-                messagebox.showinfo("No Current System", "No current system detected.\n\nMake sure Elite Dangerous is running and you're in a system.")
+                from app_utils import centered_message
+                centered_message(self, "No Current System", "No current system detected.\n\nMake sure Elite Dangerous is running and you're in a system.")
                 self.distance_status_label.config(text="⚠ No current system detected", fg="#ffaa00")
         except Exception as e:
             print(f"Error getting current system: {e}")
@@ -7369,7 +7473,8 @@ class App(tk.Tk):
         if home:
             self.distance_system_b.set(home)
         else:
-            messagebox.showinfo("No Home System", "Please set your home system first in Configuration section below.")
+            from app_utils import centered_message
+            centered_message(self, "No Home System", "Please set your home system first in Configuration section below.")
     
     def _distance_use_fc(self):
         """Fill System B with fleet carrier system"""
@@ -7377,7 +7482,8 @@ class App(tk.Tk):
         if fc:
             self.distance_system_b.set(fc)
         else:
-            messagebox.showinfo("No Fleet Carrier", "Please set your fleet carrier location first, or use Auto-detect.")
+            from app_utils import centered_message
+            centered_message(self, "No Fleet Carrier", "Please set your fleet carrier location first, or use Auto-detect.")
     
     def _distance_set_home(self, event=None):
         """Save home system to config (called by Enter key)"""
@@ -7629,7 +7735,8 @@ class App(tk.Tk):
         sel = self._get_selected_preset()
         if not sel:
             return
-        if messagebox.askyesno("Delete preset", f"Delete preset '{sel}'?"):
+        from app_utils import centered_askyesno
+        if centered_askyesno(self, "Delete preset", f"Delete preset '{sel}'?"):
             try:
                 os.remove(self._settings_path(sel))
                 self._refresh_preset_list()
@@ -7670,7 +7777,8 @@ class App(tk.Tk):
     def _export_selected_preset(self) -> None:
         sel = self._get_selected_preset()
         if not sel:
-            messagebox.showinfo("No preset selected", "Choose a preset to export.")
+            from app_utils import centered_message
+            centered_message(self, "No preset selected", "Choose a preset to export.")
             return
         src = self._settings_path(sel)
         if not os.path.exists(src):
@@ -7705,7 +7813,8 @@ class App(tk.Tk):
         
         # Check if preset already exists
         if os.path.exists(dest):
-            if not messagebox.askyesno("Preset Exists", 
+            from app_utils import centered_askyesno
+            if not centered_askyesno(self, "Preset Exists", 
                                       f"A preset named '{name}' already exists.\n\n"
                                       f"Do you want to overwrite it?"):
                 return
@@ -7935,7 +8044,8 @@ class App(tk.Tk):
             }
             save_api_upload_settings(settings)
             self._update_api_status()
-            messagebox.showinfo("Saved", "API upload settings saved successfully!")
+            from app_utils import centered_message
+            centered_message(self, "Saved", "API upload settings saved successfully!")
         except ValueError as e:
             messagebox.showerror("Error", str(e))
         except Exception as e:
@@ -7952,12 +8062,14 @@ class App(tk.Tk):
             uploader = APIUploader()
             success, message = uploader.test_connection()
             
+            from app_utils import centered_message
             if success:
-                messagebox.showinfo("Connection Test", f"✓ {message}")
+                centered_message(self, "Connection Test", f"✓ {message}")
             else:
-                messagebox.showwarning("Connection Test", f"✗ {message}")
+                centered_message(self, "Connection Test", f"✗ {message}")
         except Exception as e:
-            messagebox.showerror("Connection Test", f"Error: {e}")
+            from app_utils import centered_message
+            centered_message(self, "Connection Test", f"Error: {e}")
     
     def _bulk_upload_api_data(self) -> None:
         """Bulk upload all sessions and hotspots"""
@@ -7966,23 +8078,21 @@ class App(tk.Tk):
             return
         
         # Confirm action
-        result = messagebox.askyesno(
-            "Bulk Upload",
-            "This will upload all mining sessions and hotspots to the server.\n\n"
-            "This may take several minutes depending on your data.\n\n"
-            "Continue?"
-        )
+        from app_utils import centered_askyesno
+        result = centered_askyesno(self, "Bulk Upload",
+                                   "This will upload all mining sessions and hotspots to the server.\n\n"
+                                   "This may take several minutes depending on your data.\n\n"
+                                   "Continue?")
         
         if not result:
             return
         
         # TODO: Implement bulk upload in Phase 5
         # For now, show a placeholder
-        messagebox.showinfo(
-            "Coming Soon",
-            "Bulk upload functionality will be implemented in Phase 5.\n\n"
-            "For now, new sessions will be uploaded automatically when you end a mining session."
-        )
+        from app_utils import centered_message
+        centered_message(self, "Coming Soon",
+                         "Bulk upload functionality will be implemented in Phase 5.\n\n"
+                         "For now, new sessions will be uploaded automatically when you end a mining session.")
     
     def _update_api_status(self) -> None:
         """Update API status label"""
@@ -8135,13 +8245,12 @@ class App(tk.Tk):
                 progress.destroy()
                 
                 # Show results
-                messagebox.showinfo(
-                    "Import Complete", 
-                    f"Successfully imported:\n"
-                    f"• {stats['systems_visited']} visited systems\n"
-                    f"• {stats['hotspots_found']} hotspots\n"
-                    f"• Processed {stats['files_processed']} journal files"
-                )
+                from app_utils import centered_message
+                centered_message(self, "Import Complete",
+                                 f"Successfully imported:\n"
+                                 f"• {stats['systems_visited']} visited systems\n"
+                                 f"• {stats['hotspots_found']} hotspots\n"
+                                 f"• Processed {stats['files_processed']} journal files")
             
             # Run in thread to keep UI responsive
             threading.Thread(target=process_files, daemon=True).start()
@@ -9226,8 +9335,8 @@ class App(tk.Tk):
                 }
                 zipf.writestr("backup_manifest.json", json.dumps(manifest, indent=2))
             
-            messagebox.showinfo("Backup Complete", 
-                              f"Backup created successfully!\n\nLocation: {backup_path}")
+            from app_utils import centered_message
+            centered_message(self, "Backup Complete", f"Backup created successfully!\n\nLocation: {backup_path}")
             self._set_status(f"Backup created: {os.path.basename(backup_path)}")
             
         except Exception as e:
@@ -9444,7 +9553,8 @@ class App(tk.Tk):
                     return
                 
                 # Confirm action
-                result = messagebox.askyesno("Confirm Restore", 
+                from app_utils import centered_askyesno
+                result = centered_askyesno(self, "Confirm Restore", 
                                            "Are you sure you want to restore the selected items?\n\n"
                                            "This will overwrite existing files!")
                 if not result:
@@ -9587,8 +9697,8 @@ class App(tk.Tk):
             
             if restored_items:
                 items_text = ", ".join(restored_items)
-                messagebox.showinfo("Restore Complete", 
-                                  f"Successfully restored:\n{items_text}")
+                from app_utils import centered_message
+                centered_message(self, "Restore Complete", f"Successfully restored:\n{items_text}")
                 self._set_status(f"Restored from backup: {items_text}")
             else:
                 messagebox.showwarning("Nothing Restored", "No items were restored from the backup.")

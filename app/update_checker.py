@@ -130,13 +130,14 @@ class UpdateChecker:
     def _show_update_dialog(self, latest_version: str, download_url: str, parent_window):
         """Show update available dialog"""
         try:
-            result = messagebox.askyesno(
+            from app_utils import centered_askyesno
+            result = centered_askyesno(
+                parent_window,
                 "Update Available",
                 f"A new version of EliteMining is available!\n\n"
                 f"Current version: {self.current_version}\n"
                 f"Latest version: {latest_version}\n\n"
-                f"Would you like to download the update?",
-                parent=parent_window
+                f"Would you like to download the update?"
             )
             
             if result and download_url:
@@ -147,11 +148,8 @@ class UpdateChecker:
     def _show_no_updates_dialog(self, parent_window):
         """Show no updates available dialog"""
         try:
-            messagebox.showinfo(
-                "No Updates",
-                f"You are running the latest version ({self.current_version})",
-                parent=parent_window
-            )
+            from app_utils import centered_message
+            centered_message(parent_window, "No Updates", f"You are running the latest version ({self.current_version})")
         except:
             pass
     

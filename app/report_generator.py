@@ -62,6 +62,91 @@ class ReportGenerator:
         # Create directories
         os.makedirs(self.enhanced_reports_dir, exist_ok=True)
         os.makedirs(self.screenshots_dir, exist_ok=True)
+
+    def _derive_total_finds(self, session_data):
+        """Derive/return total hits (number of asteroids that contained tracked materials)
+
+        Priority:
+        1. session_data['total_finds'] explicit numeric field
+        2. derive from 'hit_rate' and 'asteroids_prospected' (rounded)
+        3. return None if not derivable
+        """
+        try:
+            # Explicit value if present
+            explicit_total = None
+            if 'total_finds' in session_data and session_data.get('total_finds') not in (None, '', '—'):
+                try:
+                    explicit_total = int(float(str(session_data.get('total_finds')).strip()))
+                except Exception:
+                    explicit_total = None
+            # If explicit value is provided and >0, prefer it. If explicit is 0, prefer derived if available.
+            if explicit_total is not None and explicit_total > 0:
+                return explicit_total
+
+            # Derive from hit rate and asteroids prospected
+            ap_raw = session_data.get('asteroids_prospected') or session_data.get('asteroids') or session_data.get('prospects') or session_data.get('prospected')
+            hr_raw = session_data.get('hit_rate') or session_data.get('hit_rate_percent')
+            if ap_raw in (None, '', '—') or hr_raw in (None, '', '—'):
+                return None
+
+            try:
+                ap_val = int(str(ap_raw).strip())
+            except Exception:
+                ap_val = 0
+            try:
+                hr_val = float(str(hr_raw).replace('%', '').strip())
+            except Exception:
+                hr_val = 0.0
+
+            if ap_val > 0 and hr_val > 0:
+                derived = int(round(ap_val * (hr_val / 100.0)))
+                if derived > 0:
+                    return derived
+                # If explicit was 0 and derived is 0, treat as 0
+                if explicit_total is not None:
+                    return explicit_total
+                return None
+            # If derived not possible and explicit provided, return explicit (may be 0)
+            if explicit_total is not None:
+                return explicit_total
+            return None
+        except Exception:
+            return None
+
+    def _compute_tons_per_asteroid(self, session_data):
+        """Compute average tons per asteroid using the preferred denominator (hits then prospected)
+
+        Returns (tons_per_asteroid_float_or_None, used_denominator)
+        used_denominator can be 'hits', 'prospected' or None
+        """
+        try:
+            # Try to get total tons from known fields
+            total_raw = session_data.get('total_tons') if session_data.get('total_tons') is not None else session_data.get('tons') if session_data.get('tons') is not None else session_data.get('total') if session_data.get('total') is not None else 0
+            try:
+                total_tons = float(str(total_raw).replace('—', '0').replace(',', ''))
+            except Exception:
+                total_tons = 0.0
+
+            if total_tons <= 0:
+                return (None, None)
+
+            # 1) Use explicit hits
+            hits = self._derive_total_finds(session_data)
+            if hits is not None and hits > 0:
+                return (total_tons / hits, 'hits')
+
+            # 2) Use asteroids_prospected fallback
+            ap_raw = session_data.get('asteroids_prospected') or session_data.get('asteroids') or session_data.get('prospects') or session_data.get('prospected')
+            try:
+                ap_int = int(str(ap_raw).strip())
+            except Exception:
+                ap_int = 0
+            if ap_int > 0:
+                return (total_tons / ap_int, 'prospected')
+
+            return (None, None)
+        except Exception:
+            return (None, None)
         
     def _safe_float(self, value, default=0.0):
         """Safely convert any value to float for formatting"""
@@ -986,6 +1071,26 @@ class ReportGenerator:
             # Clean up session_type (remove parentheses if present)
             session_type = session_type.replace("(", "").replace(")", "")
         
+        # Add Total Hits and Tons/Asteroid to session stats
+        # Use derive/compute helpers
+        derived_hits = self._derive_total_finds(session_data)
+        tons_per_asteroid_val, tons_per_source = self._compute_tons_per_asteroid(session_data)
+
+        # Pretty formatting for hits and tons/asteroid
+        # Normalize derived_hits display - avoid showing 'None' as string
+        if derived_hits is not None:
+            total_hits_display = str(derived_hits)
+        else:
+            raw_total_finds = session_data.get('total_finds')
+            if raw_total_finds not in (None, '', '—'):
+                try:
+                    total_hits_display = str(int(float(str(raw_total_finds).strip())))
+                except Exception:
+                    total_hits_display = str(raw_total_finds)
+            else:
+                total_hits_display = '—'
+        tons_per_display = f"{self._safe_float(tons_per_asteroid_val):.1f}t" if tons_per_asteroid_val is not None else '—'
+
         stats_html = f"""
         <div class="stat-card">
             <div class="stat-value">{session_type}</div>
@@ -1010,6 +1115,14 @@ class ReportGenerator:
         <div class="stat-card">
             <div class="stat-value">{materials_count}</div>
             <div class="stat-label">Mineral Types</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{total_hits_display}</div>
+            <div class="stat-label">Total Hits</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{tons_per_display}</div>
+            <div class="stat-label">Tons/Asteroid</div>
         </div>
         """
         
@@ -1870,8 +1983,17 @@ class ReportGenerator:
                     """
                 
                 # Hit Rate - asteroid selection accuracy
+                # Ensure hit_rate is converted to numeric before comparisons
                 hit_rate = session_data.get('hit_rate_percent', 0)
-                if hit_rate and hit_rate > 0:
+                try:
+                    if isinstance(hit_rate, str):
+                        hit_rate = float(hit_rate.replace('%', '').strip()) if hit_rate not in ('', '—') else 0.0
+                except Exception:
+                    try:
+                        hit_rate = float(hit_rate)
+                    except Exception:
+                        hit_rate = 0.0
+                if hit_rate and float(hit_rate) > 0:
                     analytics_html += f"""
                     <div class="stat-card" title="Percentage of asteroids that contained your target materials above announcement thresholds. Shows how accurate you are at selecting profitable asteroids. Higher rates mean better targeting skills and less wasted prospector limpets.">
                         <div class="stat-value">{self._safe_float(hit_rate):.1f}%</div>
@@ -1890,13 +2012,53 @@ class ReportGenerator:
                     </div>
                     """
                 
+                hits = None
                 if asteroids_prospected and asteroids_prospected > 0:
-                    tons_per_asteroid = total_tons / asteroids_prospected
+                    # Compute average tons per asteroid using the most accurate denominator available.
+                    # Prefer explicit 'total_finds' (actual asteroids that contained materials/hits).
+                    # If 'total_finds' not available but hit_rate is present, derive hits = asteroids_prospected * hit_rate/100.
+                    # Fallback to legacy behavior: divide by asteroids_prospected.
+                    hits = None
+                    if 'total_finds' in session_data and isinstance(session_data.get('total_finds'), (int, float)) and session_data.get('total_finds') > 0:
+                        hits = int(session_data.get('total_finds'))
+                    elif hit_rate is not None and isinstance(hit_rate, (int, float)) and hit_rate > 0:
+                        try:
+                            hits = int(round(float(asteroids_prospected) * (float(hit_rate) / 100.0)))
+                        except Exception:
+                            hits = None
+                    else:
+                        try:
+                            hits = int(asteroids_prospected)
+                        except Exception:
+                            hits = None
+
+                    if hits and hits > 0:
+                        tons_per_asteroid = total_tons / hits
+                        label = "Tons/Asteroid (per hit)"
+                        help_text = "🎯 Average tons of valuable materials per asteroid that contained tracked materials (uses total hits when available)."
+                    else:
+                        try:
+                            tons_per_asteroid = total_tons / float(asteroids_prospected)
+                        except Exception:
+                            tons_per_asteroid = 0.0
+                        label = "Tons/Asteroid"
+                        help_text = "🎯 Average yield per asteroid prospected (fallback - hits unavailable)"
+
                     analytics_html += f"""
-                    <div class="stat-card" title="Average tons of valuable materials found per asteroid that you prospected. This shows how good you are at selecting profitable asteroids. Higher values indicate better asteroid selection skills.">
+                    <div class="stat-card" title="{help_text}">
                         <div class="stat-value">{self._safe_float(tons_per_asteroid):.1f}t</div>
-                        <div class="stat-label">Tons/Asteroid</div>
-                        <div class="stat-help">🎯 Average yield per asteroid prospected</div>
+                        <div class="stat-label">{label}</div>
+                        <div class="stat-help">{help_text}</div>
+                    </div>
+                    """
+
+                # Also show Total Hits in Advanced Analytics if available
+                if hits and hits > 0:
+                    analytics_html += f"""
+                    <div class="stat-card" title="Number of asteroids containing tracked materials (hits)">
+                        <div class="stat-value">{hits}</div>
+                        <div class="stat-label">Total Hits</div>
+                        <div class="stat-help">🔎 Asteroids that contained tracked materials during this session</div>
                     </div>
                     """
                 
@@ -2398,6 +2560,23 @@ class ReportGenerator:
             ])
             
             properties.extend(base_props)
+            # Add Total Hits and Tons/Asteroid
+            derived_hits = self._derive_total_finds(session_data)
+            derived_tpa, _ = self._compute_tons_per_asteroid(session_data)
+            # Normalize display values for raw data table
+            if derived_hits is not None:
+                total_hits_raw_display = str(derived_hits)
+            else:
+                raw_total_finds = session_data.get('total_finds')
+                if raw_total_finds not in (None, '', '—'):
+                    try:
+                        total_hits_raw_display = str(int(float(str(raw_total_finds).strip())))
+                    except Exception:
+                        total_hits_raw_display = str(raw_total_finds)
+                else:
+                    total_hits_raw_display = '—'
+            properties.append(("Total Hits", total_hits_raw_display))
+            properties.append(("Tons/Asteroid", f"{self._safe_float(derived_tpa):.1f}t" if derived_tpa is not None else '—'))
             
             # Add engineering materials if any were collected
             engineering_materials = session_data.get('engineering_materials', {})
@@ -2438,6 +2617,24 @@ class ReportGenerator:
                 properties.append(("Engineering Materials", f"{eng_list} - Total: {total_pieces} pieces"))
             
             properties.append(("Data Source", "Detailed mining session data"))
+        # Add raw fields for total hits and tons/asteroid for original session format as well
+        derived_hits = self._derive_total_finds(session_data)
+        derived_tpa, _ = self._compute_tons_per_asteroid(session_data)
+        if not any(p[0] == 'Total Hits' for p in properties):
+            if derived_hits is not None:
+                total_hits_raw_display = str(derived_hits)
+            else:
+                raw_total_finds = session_data.get('total_finds')
+                if raw_total_finds not in (None, '', '—'):
+                    try:
+                        total_hits_raw_display = str(int(float(str(raw_total_finds).strip())))
+                    except Exception:
+                        total_hits_raw_display = str(raw_total_finds)
+                else:
+                    total_hits_raw_display = '—'
+            properties.append(("Total Hits", total_hits_raw_display))
+        if not any(p[0] == 'Tons/Asteroid' for p in properties):
+            properties.append(("Tons/Asteroid", f"{self._safe_float(derived_tpa):.1f}t" if derived_tpa is not None else '—'))
         
         for prop, value in properties:
             table_html += f"""

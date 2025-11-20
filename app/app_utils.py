@@ -7,6 +7,10 @@ import os
 import sys
 import tkinter as tk
 from typing import Optional
+from typing import Any
+import datetime as dt
+from tkinter import ttk, messagebox
+import tkinter as tk
 
 
 # ==================== PATH UTILITIES ====================
@@ -205,6 +209,96 @@ def set_window_icon(window: tk.Tk | tk.Toplevel) -> bool:
     except Exception:
         # Icon setting failed, but don't crash the application
         return False
+
+
+# ==================== Centered Dialog Helpers ====================
+def _center_child_over_parent(child: tk.Toplevel, parent: Optional[tk.Widget]) -> None:
+    try:
+        if parent:
+            parent.update_idletasks()
+            child.update_idletasks()
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            px = parent.winfo_rootx()
+            py = parent.winfo_rooty()
+            cw = child.winfo_width()
+            ch = child.winfo_height()
+            x = px + (pw - cw) // 2
+            y = py + (ph - ch) // 2
+        else:
+            child.update_idletasks()
+            sw = child.winfo_screenwidth()
+            sh = child.winfo_screenheight()
+            cw = child.winfo_width()
+            ch = child.winfo_height()
+            x = (sw - cw) // 2
+            y = (sh - ch) // 2
+        child.geometry(f"+{x}+{y}")
+    except Exception:
+        try:
+            # Best-effort fallback
+            child.geometry(f"+{(child.winfo_screenwidth() // 2) - 200}+{(child.winfo_screenheight() // 2) - 100}")
+        except Exception:
+            pass
+
+
+def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon: str = 'info') -> None:
+    """Show a centered info/warning/error dialog. Icon can be 'info', 'warning', or 'error'."""
+    dialog = tk.Toplevel(parent)
+    dialog.withdraw()
+    dialog.title(title)
+    dialog.resizable(False, False)
+    set_window_icon(dialog)
+    # Message label with wraplength for consistent width
+    label = tk.Label(dialog, text=message, padx=20, pady=20, justify="left", wraplength=420)
+    label.pack()
+    btn_frame = tk.Frame(dialog)
+    btn_frame.pack(pady=(0, 12))
+    def on_ok():
+        dialog.destroy()
+    ok_btn = tk.Button(btn_frame, text="OK", width=12, command=on_ok)
+    ok_btn.pack()
+    _center_child_over_parent(dialog, parent)
+    dialog.deiconify()
+    dialog.transient(parent)
+    dialog.grab_set()
+    dialog.attributes('-topmost', True)
+    dialog.lift()
+    dialog.focus_force()
+    dialog.wait_window()
+
+
+def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> bool:
+    """Show a centered Yes/No dialog and return True if Yes."""
+    dialog = tk.Toplevel(parent)
+    dialog.withdraw()
+    dialog.title(title)
+    dialog.resizable(False, False)
+    set_window_icon(dialog)
+    label = tk.Label(dialog, text=message, padx=20, pady=20, justify="left", wraplength=420)
+    label.pack()
+    btn_frame = tk.Frame(dialog)
+    btn_frame.pack(pady=(0, 12))
+    result = {'value': False}
+    def on_yes():
+        result['value'] = True
+        dialog.destroy()
+    def on_no():
+        result['value'] = False
+        dialog.destroy()
+    yes_btn = tk.Button(btn_frame, text="Yes", width=10, command=on_yes)
+    yes_btn.pack(side=tk.LEFT, padx=8)
+    no_btn = tk.Button(btn_frame, text="No", width=10, command=on_no)
+    no_btn.pack(side=tk.LEFT, padx=8)
+    _center_child_over_parent(dialog, parent)
+    dialog.deiconify()
+    dialog.transient(parent)
+    dialog.grab_set()
+    dialog.attributes('-topmost', True)
+    dialog.lift()
+    dialog.focus_force()
+    dialog.wait_window()
+    return result['value']
 
 
 # ==================== LEGACY COMPATIBILITY ====================

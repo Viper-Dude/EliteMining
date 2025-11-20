@@ -126,7 +126,10 @@ class APIUploader:
             materials_tracked_str = self._extract_field(content, r'Minerals Tracked:\s*(\d+)')
             data['materials_tracked'] = int(materials_tracked_str) if materials_tracked_str else 0
             
-            total_finds_str = self._extract_field(content, r'Total Material Finds:\s*(\d+)')
+            total_finds_str = self._extract_field(content, r'Total Material Hits:\s*(\d+)')
+            if not total_finds_str:
+                # Fallback to legacy label
+                total_finds_str = self._extract_field(content, r'Total Material Finds:\s*(\d+)')
             data['total_finds'] = int(total_finds_str) if total_finds_str else 0
             
             hit_rate_str = self._extract_field(content, r'Hit Rate:\s*([\d.]+)%')
@@ -247,10 +250,17 @@ class APIUploader:
         #   • Average: 15.3%
         #   • Best: 32.8%
         #   • Finds: 15x
-        pattern = rf'{material_name}:\s*•\s*Average:\s*([\d.]+)%\s*•\s*Best:\s*([\d.]+)%\s*•\s*Finds:\s*(\d+)x'
-        match = re.search(pattern, content, re.DOTALL)
-        if match:
-            return float(match.group(1)), float(match.group(2)), int(match.group(3))
+        # Try new 'Hits' pattern first, then fallback to legacy 'Finds' with optional trailing 'x'
+        patterns = [
+            rf'{material_name}:\s*•\s*Average:\s*([\d.]+)%\s*•\s*Best:\s*([\d.]+)%\s*•\s*Hits:\s*(\d+)',
+            rf'{material_name}:\s*•\s*Average:\s*([\d.]+)%\s*•\s*Best:\s*([\d.]+)%\s*•\s*Finds:\s*(\d+)x?'
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                return float(match.group(1)), float(match.group(2)), int(match.group(3))
+
         return 0.0, 0.0, 0
     
     def _parse_mineral_performance(self, content: str) -> Dict[str, Dict[str, float]]:
@@ -262,7 +272,7 @@ class APIUploader:
             section_text = mineral_section.group(1)
             
             # Pattern to match material blocks
-            material_blocks = re.finditer(r'(\w+):\s*•\s*Average:\s*([\d.]+)%\s*•\s*Best:\s*([\d.]+)%\s*•\s*Finds:\s*(\d+)x', section_text, re.DOTALL)
+            material_blocks = re.finditer(r'(\w+):\s*•\s*Average:\s*([\d.]+)%\s*•\s*Best:\s*([\d.]+)%\s*•\s*Hits:\s*(\d+)', section_text, re.DOTALL)
             
             for match in material_blocks:
                 material_name = match.group(1)

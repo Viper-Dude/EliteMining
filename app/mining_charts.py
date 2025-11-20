@@ -161,17 +161,13 @@ class MiningChartsPanel:
                                      width=7, style="Charts.TButton")
         export_charts_btn.pack(side="left", padx=(0, 3))
         
-        export_data_btn = ttk.Button(export_controls, text="📄 CSV", command=self.export_data_csv, 
-                                   width=7, style="Charts.TButton")
-        export_data_btn.pack(side="left", padx=(0, 3))
-        
-        export_all_btn = ttk.Button(export_controls, text="💾 All", command=self.export_all, 
-                                  width=6, style="Charts.TButton")
+        # Note: CSV/data export removed for Mining Analytics (not needed)
+        export_all_btn = ttk.Button(export_controls, text="💾 All", command=self.export_charts_png, 
+                      width=6, style="Charts.TButton")
         export_all_btn.pack(side="left")
-        
+
         # Store export buttons for tooltip setup later
         self.export_charts_btn = export_charts_btn
-        self.export_data_btn = export_data_btn
         self.export_all_btn = export_all_btn
         
         # Charts container with notebook for tabs (BELOW controls)
@@ -546,46 +542,22 @@ class MiningChartsPanel:
             self.bar_fig.savefig(bar_path, dpi=300, bbox_inches='tight', 
                                facecolor='#2b2b2b', edgecolor='none')
             
-            messagebox.showinfo("Export Complete", 
-                              f"Charts exported successfully!\n\n"
-                              f"Timeline: {os.path.basename(timeline_path)}\n"
-                              f"Comparison: {os.path.basename(bar_path)}\n\n"
-                              f"Location: {export_dir}")
+            from app_utils import centered_message
+            centered_message(None, "Export Complete",
+                             f"Charts exported successfully!\n\n"
+                             f"Timeline: {os.path.basename(timeline_path)}\n"
+                             f"Comparison: {os.path.basename(bar_path)}\n\n"
+                             f"Location: {export_dir}")
             
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to export charts:\n{str(e)}")
     
     def export_data_csv(self):
-        """Export mining data as CSV files"""
+        """CSV export deprecated: data CSV export disabled for Mining Analytics."""
         try:
-            # Ask user for directory
-            export_dir = filedialog.askdirectory(
-                title="Select folder to save data",
-                initialdir=os.path.expanduser("~/Desktop")
-            )
-            
-            if not export_dir:
-                return
-            
-            # Generate timestamp for unique filenames
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            
-            # Export summary data
-            summary_path = os.path.join(export_dir, f"Mining_Summary_{timestamp}.csv")
-            self._export_summary_csv(summary_path)
-            
-            # Export detailed timeline data
-            timeline_path = os.path.join(export_dir, f"Mining_Timeline_Data_{timestamp}.csv")
-            self._export_timeline_csv(timeline_path)
-            
-            messagebox.showinfo("Export Complete", 
-                              f"Data exported successfully!\n\n"
-                              f"Summary: {os.path.basename(summary_path)}\n"
-                              f"Timeline: {os.path.basename(timeline_path)}\n\n"
-                              f"Location: {export_dir}")
-            
-        except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to export data:\n{str(e)}")
+            messagebox.showinfo("Export Disabled", "CSV data export has been removed from Mining Analytics.")
+        except Exception:
+            print("CSV data export attempted but is disabled.")
     
     def export_all(self):
         """Export both charts and data"""
@@ -602,7 +574,7 @@ class MiningChartsPanel:
             # Generate timestamp for unique filenames
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             
-            # Export charts
+            # Export charts only (data CSV export disabled)
             timeline_chart_path = os.path.join(export_dir, f"Mining_Timeline_{timestamp}.png")
             self.timeline_fig.savefig(timeline_chart_path, dpi=300, bbox_inches='tight', 
                                     facecolor='#2b2b2b', edgecolor='none')
@@ -611,18 +583,11 @@ class MiningChartsPanel:
             self.bar_fig.savefig(bar_chart_path, dpi=300, bbox_inches='tight', 
                                facecolor='#2b2b2b', edgecolor='none')
             
-            # Export data
-            summary_path = os.path.join(export_dir, f"Mining_Summary_{timestamp}.csv")
-            self._export_summary_csv(summary_path)
-            
-            timeline_path = os.path.join(export_dir, f"Mining_Timeline_Data_{timestamp}.csv")
-            self._export_timeline_csv(timeline_path)
-            
-            messagebox.showinfo("Export Complete", 
-                              f"All data exported successfully!\n\n"
-                              f"Charts: {os.path.basename(timeline_chart_path)}, {os.path.basename(bar_chart_path)}\n"
-                              f"Data: {os.path.basename(summary_path)}, {os.path.basename(timeline_path)}\n\n"
-                              f"Location: {export_dir}")
+            from app_utils import centered_message
+            centered_message(None, "Export Complete",
+                             f"Charts exported successfully!\n\n"
+                             f"Charts: {os.path.basename(timeline_chart_path)}, {os.path.basename(bar_chart_path)}\n\n"
+                             f"Location: {export_dir}\n\nNote: CSV data export has been disabled.")
             
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to export all data:\n{str(e)}")
@@ -709,10 +674,8 @@ class MiningChartsPanel:
             # Export button tooltips
             if hasattr(self, 'export_charts_btn') and self.export_charts_btn:
                 self.ToolTip(self.export_charts_btn, "Export charts as PNG images")
-            if hasattr(self, 'export_data_btn') and self.export_data_btn:
-                self.ToolTip(self.export_data_btn, "Export data as CSV files")
             if hasattr(self, 'export_all_btn') and self.export_all_btn:
-                self.ToolTip(self.export_all_btn, "Export both charts and data")
+                self.ToolTip(self.export_all_btn, "Export charts (data CSV export disabled)")
         except Exception as e:
             print(f"Warning: Could not setup tooltips for charts: {e}")
 
