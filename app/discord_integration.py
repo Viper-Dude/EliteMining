@@ -181,6 +181,55 @@ def format_mining_report_embed(session_data: dict) -> dict:
     # Get material breakdown from session data
     material_breakdown = get_material_breakdown(session_data)
     
+    # Compute derived total hits and tons per asteroid where possible
+    def _derive_hits(sd: dict):
+        # Prefer explicit total_finds, else derive from asteroids_prospected * hit_rate
+        total = sd.get('total_finds')
+        try:
+            if total not in (None, '', '—'):
+                return int(float(str(total).strip()))
+        except Exception:
+            pass
+        # Derive
+        try:
+            ap = sd.get('asteroids_prospected') or sd.get('asteroids') or sd.get('prospects')
+            hr = sd.get('hit_rate') or sd.get('hit_rate_percent')
+            if ap is None or ap == '' or hr is None or hr == '':
+                return None
+            ap_int = int(str(ap).strip())
+            hr_val = float(str(hr).replace('%', '').strip())
+            derived = int(round(ap_int * (hr_val / 100.0)))
+            return derived if derived > 0 else None
+        except Exception:
+            return None
+
+    def _compute_tpa(sd: dict, hits: int | None):
+        try:
+            total_raw = sd.get('total_tons') if sd.get('total_tons') is not None else sd.get('tons') if sd.get('tons') is not None else sd.get('total') if sd.get('total') is not None else 0
+            total = float(str(total_raw).replace('t', '').replace(',', '').strip())
+            if hits and hits > 0:
+                return total / hits
+            # fallback to asteroids prospected
+            ap = sd.get('asteroids_prospected') or sd.get('asteroids') or sd.get('prospects')
+            try:
+                ap_int = int(str(ap).strip())
+            except Exception:
+                ap_int = 0
+            if ap_int > 0:
+                return total / ap_int
+            return None
+        except Exception:
+            return None
+
+    total_hits_derived = _derive_hits(session_data)
+    tons_per_asteroid = _compute_tpa(session_data, total_hits_derived)
+
+    # Include computed values in the session data for portability/use in embeds
+    if total_hits_derived is not None:
+        session_data['total_finds'] = total_hits_derived
+    if tons_per_asteroid is not None:
+        session_data['tons_per'] = f"{tons_per_asteroid:.1f}t"
+
     # Build description with username, optional comment, and material breakdown
     description = f"System/Ring: **{system}** at **{body}**\n\n**Shared by:** {discord_username}"
     if discord_comment:
@@ -234,6 +283,17 @@ def format_mining_report_embed(session_data: dict) -> dict:
             {
                 "name": "Hit Rate (% Above Min Threshold)",
                 "value": hit_rate,
+                "inline": True
+            }
+            ,
+            {
+                "name": "Total Hits",
+                "value": str(session_data.get('total_finds', '—')),
+                "inline": True
+            },
+            {
+                "name": "Tons/Asteroid",
+                "value": str(session_data.get('tons_per', '—')),
                 "inline": True
             }
         ],

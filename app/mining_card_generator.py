@@ -380,9 +380,14 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
             # Row 3: Minerals Tracked | Total Hits
             if materials_tracked > 0:
                 draw.text((col1_x, y_position), f"Minerals Tracked: {materials_tracked}", fill=TEXT_COLOR, font=body_font)
-            if total_finds > 0:
-                draw.text((col2_x, y_position), f"Total Hits: {total_finds}", fill=TEXT_COLOR, font=body_font)
+            if total_finds and int(total_finds) > 0:
+                draw.text((col2_x, y_position), f"Total Hits: {int(total_finds)}", fill=TEXT_COLOR, font=body_font)
             y_position += LINE_HEIGHT
+            # Optional row: Tons per Asteroid (display under Total Hits if available)
+            tons_per_ast = session_data.get('tons_per_asteroid')
+            if tons_per_ast is not None:
+                draw.text((col2_x, y_position), f"Tons/Asteroid: {tons_per_ast:.1f}t", fill=TEXT_COLOR, font=body_font)
+                y_position += LINE_HEIGHT
             
             # Row 4: Hit Rate | Prospecting Speed
             if hit_rate > 0:
@@ -556,7 +561,7 @@ def create_card_from_session(cargo_session_data, session_info, output_path, cmdr
             'engineering_materials_total': cargo_session_data.get('engineering_materials_total', 0),
             'engineering_materials_list': cargo_session_data.get('engineering_materials_list', []),
             'materials_tracked': cargo_session_data.get('materials_tracked', 0),
-            'total_finds': cargo_session_data.get('total_finds', 0),
+            'total_finds': cargo_session_data.get('total_finds', 0) if cargo_session_data.get('total_finds') not in (None, '', '—') else 0,
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'materials_mined': {}
         }
@@ -564,6 +569,34 @@ def create_card_from_session(cargo_session_data, session_info, output_path, cmdr
         # Calculate TPH
         session_duration_hours = cargo_session_data.get('session_duration', 0) / 3600.0
         card_data['tph'] = card_data['total_tons'] / session_duration_hours if session_duration_hours > 0 else 0
+        # Calculate Tons/Asteroid (prefer total_finds if >0, derive otherwise)
+        try:
+            total_finds_val = cargo_session_data.get('total_finds')
+            if total_finds_val in (None, '', '—'):
+                # Derive from hit_rate_percent and asteroids_prospected
+                ap = cargo_session_data.get('asteroids_prospected') or cargo_session_data.get('asteroids') or cargo_session_data.get('prospects')
+                hr = cargo_session_data.get('hit_rate') or cargo_session_data.get('hit_rate_percent')
+                if ap and hr:
+                    try:
+                        ap_i = int(str(ap).strip())
+                        hr_v = float(str(hr).replace('%', '').strip())
+                        derived_hits = int(round(ap_i * (hr_v / 100.0)))
+                        total_finds_val = derived_hits if derived_hits > 0 else 0
+                    except Exception:
+                        total_finds_val = 0
+                else:
+                    total_finds_val = 0
+            else:
+                try:
+                    total_finds_val = int(float(str(total_finds_val).strip()))
+                except Exception:
+                    total_finds_val = 0
+            if total_finds_val > 0:
+                card_data['tons_per_asteroid'] = card_data['total_tons'] / total_finds_val
+            else:
+                card_data['tons_per_asteroid'] = None
+        except Exception:
+            card_data['tons_per_asteroid'] = None
         
         # Build materials dict with tons and tph - handle both dict and numeric formats
         materials_mined = cargo_session_data.get('materials_mined', {})
