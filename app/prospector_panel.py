@@ -1555,8 +1555,7 @@ class ProspectorPanel(ttk.Frame):
                        rowheight=25,
                        borderwidth=1,
                        relief="solid",
-                       bordercolor="#3a3a3a",
-                       fieldbackground="#1e1e1e")
+                       bordercolor="#3a3a3a")
         style.configure("MineralAnalysis.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
@@ -1636,7 +1635,6 @@ class ProspectorPanel(ttk.Frame):
         
         self.stats_tree.bind("<ButtonRelease-1>", save_mineral_analysis_widths)
         
-        self.stats_tree.tag_configure("darkrow", background="#1e1e1e", foreground="#e6e6e6")
         self.stats_tree.grid(row=0, column=0, sticky="ew")
         
         # Add vertical scrollbar for Material Analysis
@@ -9295,7 +9293,7 @@ class ProspectorPanel(ttk.Frame):
                         self.stats_tree.insert("", "end", values=(material_display, tons_str, tph_str, tons_per_str), tags=(tag,))
                     except Exception:
                         pass
-                    row_index += 1
+                row_index += 1
             
             # Update session summary with live tracking
             total_asteroids = self.session_analytics.get_total_asteroids()
@@ -10514,80 +10512,89 @@ class ProspectorPanel(ttk.Frame):
         # Stop mining analytics
         self.session_analytics.stop_session()
         
-        # Ask if user wants to add refinery materials BEFORE ending session tracking
-        # Skip for multi-session mode (refinery already captured after each transfer/sale)
-        from tkinter import messagebox
-        is_multi_session = bool(self.multi_session_var.get())
+        # Wrap dialog section in try-except to ensure button states are always restored
+        cargo_session_data = None
+        session_comment = ""
         
-        if self.main_app and hasattr(self.main_app, 'cargo_monitor') and not is_multi_session:
-            from main import centered_yesno_dialog
-            add_refinery = centered_yesno_dialog(
-                self.winfo_toplevel(),
-                "Refinery Materials",
-                "Do you have any additional materials in your refinery that you want to add to this session?"
+        try:
+            # Ask if user wants to add refinery materials BEFORE ending session tracking
+            # Skip for multi-session mode (refinery already captured after each transfer/sale)
+            from tkinter import messagebox
+            is_multi_session = bool(self.multi_session_var.get())
+            
+            if self.main_app and hasattr(self.main_app, 'cargo_monitor') and not is_multi_session:
+                from main import centered_yesno_dialog
+                add_refinery = centered_yesno_dialog(
+                    self.winfo_toplevel(),
+                    "Refinery Materials",
+                    "Do you have any additional materials in your refinery that you want to add to this session?"
+                )
+                
+                if add_refinery:
+                    try:
+                        # Import here to avoid circular import
+                        from main import RefineryDialog
+                        dialog = RefineryDialog(
+                            parent=self.winfo_toplevel(),
+                            cargo_monitor=self.main_app.cargo_monitor,
+                            current_cargo_items=self.main_app.cargo_monitor.cargo_items.copy()
+                        )
+                        refinery_result = dialog.show()
+                        
+                        if refinery_result:  # User added refinery contents
+                            # Store refinery materials in cargo monitor for session tracking
+                            if not hasattr(self.main_app.cargo_monitor, 'refinery_contents'):
+                                self.main_app.cargo_monitor.refinery_contents = {}
+                            for material_name, quantity in refinery_result.items():
+                                if material_name in self.main_app.cargo_monitor.refinery_contents:
+                                    self.main_app.cargo_monitor.refinery_contents[material_name] += quantity
+                                else:
+                                    self.main_app.cargo_monitor.refinery_contents[material_name] = quantity
+                            
+                            # DON'T add to cargo_items - refinery materials are tracked separately
+                            # This prevents double-counting in end_session_tracking()
+                            
+                            # Update display to show current cargo (without refinery materials in main display)
+                            self.main_app.cargo_monitor.update_display()
+                            
+                            # Trigger update callback to refresh integrated cargo display
+                            if self.main_app.cargo_monitor.update_callback:
+                                self.main_app.cargo_monitor.update_callback()
+                            
+                            print(f"Added refinery materials before session end: {refinery_result}")
+                            
+                    except Exception as e:
+                        print(f"Error showing refinery dialog: {e}")
+            
+            # Get cargo tracking data for material breakdown (NOW with refinery materials included)
+            if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
+                cargo_session_data = self.main_app.cargo_monitor.end_session_tracking()
+                
+            # Ask if user wants to add a comment
+            main_parent = self.winfo_toplevel()
+            add_comment = centered_yesno_dialog(
+                main_parent,
+                "Session Comment",
+                "Would you like to add a comment to this mining session?"
             )
             
-            if add_refinery:
-                try:
-                    # Import here to avoid circular import
-                    from main import RefineryDialog
-                    dialog = RefineryDialog(
-                        parent=self.winfo_toplevel(),
-                        cargo_monitor=self.main_app.cargo_monitor,
-                        current_cargo_items=self.main_app.cargo_monitor.cargo_items.copy()
-                    )
-                    refinery_result = dialog.show()
-                    
-                    if refinery_result:  # User added refinery contents
-                        # Store refinery materials in cargo monitor for session tracking
-                        if not hasattr(self.main_app.cargo_monitor, 'refinery_contents'):
-                            self.main_app.cargo_monitor.refinery_contents = {}
-                        for material_name, quantity in refinery_result.items():
-                            if material_name in self.main_app.cargo_monitor.refinery_contents:
-                                self.main_app.cargo_monitor.refinery_contents[material_name] += quantity
-                            else:
-                                self.main_app.cargo_monitor.refinery_contents[material_name] = quantity
-                        
-                        # DON'T add to cargo_items - refinery materials are tracked separately
-                        # This prevents double-counting in end_session_tracking()
-                        
-                        # Update display to show current cargo (without refinery materials in main display)
-                        self.main_app.cargo_monitor.update_display()
-                        
-                        # Trigger update callback to refresh integrated cargo display
-                        if self.main_app.cargo_monitor.update_callback:
-                            self.main_app.cargo_monitor.update_callback()
-                        
-                        print(f"Added refinery materials before session end: {refinery_result}")
-                        
-                except Exception as e:
-                    print(f"Error showing refinery dialog: {e}")
-        
-        # Get cargo tracking data for material breakdown (NOW with refinery materials included)
-        cargo_session_data = None
-        if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
-            cargo_session_data = self.main_app.cargo_monitor.end_session_tracking()
+            if add_comment:
+                session_comment = self._show_comment_dialog()
             
-        # Ask if user wants to add a comment
-        main_parent = self.winfo_toplevel()
-        add_comment = centered_yesno_dialog(
-            main_parent,
-            "Session Comment",
-            "Would you like to add a comment to this mining session?"
-        )
+            # Update session totals with any refinery materials that were added
+            if cargo_session_data and 'materials_mined' in cargo_session_data:
+                for material_name, quantity in cargo_session_data['materials_mined'].items():
+                    if material_name in self.session_totals:
+                        self.session_totals[material_name] = max(self.session_totals[material_name], quantity)
+                    else:
+                        self.session_totals[material_name] = quantity
         
-        session_comment = ""
-        if add_comment:
-            session_comment = self._show_comment_dialog()
+        except Exception as e:
+            print(f"Error during session end dialogs: {e}")
+            import traceback
+            traceback.print_exc()
         
-        # Update session totals with any refinery materials that were added
-        if cargo_session_data and 'materials_mined' in cargo_session_data:
-            for material_name, quantity in cargo_session_data['materials_mined'].items():
-                if material_name in self.session_totals:
-                    self.session_totals[material_name] = max(self.session_totals[material_name], quantity)
-                else:
-                    self.session_totals[material_name] = quantity
-        
+        # ALWAYS restore button states, even if there was an error above
         self._set_status("Session ended.")
         
         self.start_btn.config(state="normal")

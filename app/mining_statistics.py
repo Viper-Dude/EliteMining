@@ -96,10 +96,8 @@ class SessionAnalytics:
     
     def reset_session(self) -> None:
         """Reset all session statistics"""
-        for stats in self.material_stats.values():
-            stats.reset()
-        for stats in self.material_stats_all.values():
-            stats.reset()
+        self.material_stats.clear()
+        self.material_stats_all.clear()
         self.total_asteroids_prospected = 0
         self.asteroids_with_materials = 0
         self.session_start_time = None

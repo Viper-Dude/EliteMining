@@ -7522,6 +7522,10 @@ class App(tk.Tk):
                     
                     # Update distances after detection
                     self._update_home_fc_distances()
+                    
+                    # Refresh Mining Analytics distance display if it exists
+                    if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, '_update_distance_display'):
+                        self.prospector_panel._update_distance_display()
                 else:
                     self._set_status("No fleet carrier found in journals")
                     messagebox.showwarning("Not Found", 

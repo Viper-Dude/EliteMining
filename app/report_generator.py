@@ -287,6 +287,7 @@ class ReportGenerator:
             tpa = (tons / hits) if hits and hits > 0 else None
             entries.append({
                 "material": material_name,
+                "display_name": self._expand_material_name(material_name),
                 "tons": tons,
                 "hits": hits,
                 "hits_estimated": hits_estimated,
@@ -300,6 +301,20 @@ class ReportGenerator:
                 pass
 
         return sorted(entries, key=lambda e: e["tons"], reverse=True)
+
+    def _expand_material_name(self, name: str) -> str:
+        """Expand common material abbreviations to full names for display."""
+        if not name:
+            return name
+        map = {
+            'plat': 'Platinum', 'pt': 'Platinum', 'platinum': 'Platinum',
+            'osmi': 'Osmium', 'os': 'Osmium', 'osmium': 'Osmium',
+            'pain': 'Painite', 'pn': 'Painite', 'painite': 'Painite',
+            'pd': 'Palladium', 'pall': 'Palladium', 'palladium': 'Palladium',
+            'au': 'Gold', 'gold': 'Gold', 'ag': 'Silver', 'silver': 'Silver'
+        }
+        key = str(name).strip().lower()
+        return map.get(key, name)
         
     def _get_logo_path(self):
         """Get correct logo path for both dev and installer versions"""
@@ -1958,7 +1973,7 @@ class ReportGenerator:
                         
                         analytics_html += f"""
                         <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
-                            <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{material}</div>
+                            <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{self._expand_material_name(material)}</div>
                             <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
                         </div>
                         """
@@ -2009,7 +2024,7 @@ class ReportGenerator:
                         
                         analytics_html += f"""
                         <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
-                            <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{material}</div>
+                            <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{self._expand_material_name(material)}</div>
                             <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
                         </div>
                         """
@@ -2035,8 +2050,8 @@ class ReportGenerator:
                     
                     analytics_html += f"""
                     <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-value">{top_material}</div>
+                            <div class="stat-card">
+                                <div class="stat-value">{self._expand_material_name(top_material)}</div>
                             <div class="stat-label">Most Mined Material</div>
                         </div>
                         <div class="stat-card">
@@ -2068,7 +2083,7 @@ class ReportGenerator:
                         percentage = (quantity / total_tons) * 100 if total_tons > 0 else 0
                         analytics_html += f"""
                         <div style="background: var(--card-bg); padding: 10px; border-radius: 5px; border: 1px solid var(--card-border); text-align: center;">
-                            <div style="font-weight: bold; color: var(--stat-value-color);">{material}</div>
+                            <div style="font-weight: bold; color: var(--stat-value-color);">{self._expand_material_name(material)}</div>
                             <div style="color: var(--text-color);">{self._safe_float(quantity):.1f}t ({self._safe_float(percentage):.1f}%)</div>
                         </div>
                         """
@@ -2091,7 +2106,7 @@ class ReportGenerator:
                     tpa_display = f"{self._safe_float(entry['tpa']):.2f}t" if entry['tpa'] is not None else '—'
                     row_html += f"""
                         <tr>
-                            <td>{entry['material']}</td>
+                            <td>{entry.get('display_name', entry['material'])}</td>
                             <td>{self._safe_float(entry['tons']):.1f}t</td>
                             <td>{hits_display}</td>
                             <td>{tpa_display}</td>
@@ -2581,7 +2596,7 @@ class ReportGenerator:
             mat_tph = (quantity / session_duration_hours) if session_duration_hours > 0 else 0
             table_html += f"""
                 <tr>
-                    <td>{material}</td>
+                    <td>{self._expand_material_name(material)}</td>
                     <td>{quantity:.1f}</td>
                     <td>{mat_tph:.1f}</td>
                     <td>{percentage:.1f}%</td>
@@ -2725,7 +2740,7 @@ class ReportGenerator:
         if session_data.get('data_source') == 'Report Entry':
             # Detailed report from tree data - show relevant mining statistics
             materials_count = len(session_data.get('materials_mined', {}))
-            materials_list = ', '.join(session_data.get('materials_mined', {}).keys()) if materials_count > 0 else 'None recorded'
+            materials_list = ', '.join([self._expand_material_name(m) for m in session_data.get('materials_mined', {}).keys()]) if materials_count > 0 else 'None recorded'
             
             base_props = [
                 ("Report Date", session_data.get('date', 'Unknown')),
@@ -2826,7 +2841,8 @@ class ReportGenerator:
                 hits_text = f", Hits: {entry['hits']}" if entry['hits'] is not None else ''
                 tpa_value = entry['tpa']
                 tpa_text = f"{self._safe_float(tpa_value):.2f}t" if tpa_value is not None else '—'
-                rates.append(f"{entry['material']}: {self._safe_float(entry['tons']):.1f}t ({tpa_text}{hits_text})")
+                display = entry.get('display_name', entry['material'])
+                rates.append(f"{display}: {self._safe_float(entry['tons']):.1f}t ({tpa_text}{hits_text})")
             properties.append(("Material Tons/Asteroid", "; ".join(rates)))
         
         for prop, value in properties:
