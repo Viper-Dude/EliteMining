@@ -1,2 +1,2 @@
-Session: Col 285 Sector XF-O d6-101 — C 1 A Ring — 00:00:58 — Total 7t (Multi-Session)
-Ship: Mega Bumper - Type-11 Prospector | Platinum 7t (424.27 t/hr)
+Session: Col 285 Sector XF-O d6-101 — C 1 A Ring — 00:08:03 — Total 78t (Single Session)
+Ship: Mega Bumper - Type-11 Prospector | Osmium 12t (89.26 t/hr); Platinum 66t (490.92 t/hr)

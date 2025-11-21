@@ -3331,12 +3331,25 @@ cargo panel forces Elite to write detailed inventory data.
                 item_name = type_localized if type_localized else type_name.replace("_", " ").title()
                 count = event.get("Count", 0)
                 
+                # Try to find the item in cargo (exact match or case-insensitive)
+                found_key = None
                 if item_name in self.cargo_items:
-                    new_qty = max(0, self.cargo_items[item_name] - count)
+                    found_key = item_name
+                else:
+                    # Try case-insensitive match or partial match for drones/limpets
+                    for key in self.cargo_items.keys():
+                        if (key.lower() == item_name.lower() or 
+                            ("drone" in type_name.lower() and "limpet" in key.lower()) or
+                            ("limpet" in item_name.lower() and "limpet" in key.lower())):
+                            found_key = key
+                            break
+                
+                if found_key:
+                    new_qty = max(0, self.cargo_items[found_key] - count)
                     if new_qty > 0:
-                        self.cargo_items[item_name] = new_qty
+                        self.cargo_items[found_key] = new_qty
                     else:
-                        del self.cargo_items[item_name]
+                        del self.cargo_items[found_key]
                     
                     self.current_cargo = sum(self.cargo_items.values())
                     self.update_display()

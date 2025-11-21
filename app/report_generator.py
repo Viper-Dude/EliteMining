@@ -2141,13 +2141,14 @@ class ReportGenerator:
                             <strong>💡 Understanding Your Mining Metrics:</strong><br>
                             These metrics help you evaluate and compare different mining sessions. Hover over each card for detailed explanations.<br><br>
                             <strong>🎯 Ring Quality Assessment:</strong><br>
-                            • <strong>Excellent (≥500 t/h):</strong> Outstanding locations worth bookmarking<br>
-                            • <strong>Good (≥350 t/h):</strong> Solid performance, worth returning to<br>
-                            • <strong>Fair (≥200 t/h):</strong> Minimum acceptable mining rate<br>
-                            • <strong>Poor (&lt;200 t/h):</strong> Not worth the time investment - find better spots!<br><br>
+                            • <strong>Excellent (≥1000 t/h + ≥20 t/asteroid):</strong> Elite mining locations worth bookmarking<br>
+                            • <strong>Good (≥750 t/h + ≥15 t/asteroid):</strong> Solid performance worth returning to<br>
+                            • <strong>Fair (≥500 t/h + ≥10 t/asteroid):</strong> Acceptable mining efficiency<br>
+                            • <strong>Poor (&lt;500 t/h or &lt;10 t/asteroid):</strong> Suboptimal - find better spots!<br><br>
                             <strong>📊 Complete Scoring System (100 points total):</strong><br>
-                            • <strong>TPH (70%):</strong> ≥500=70pts, ≥350=50pts, ≥200=30pts, &lt;200=10pts<br>
-                            • <strong>Materials (30%):</strong> &gt;3types=30pts, &gt;2types=25pts, &gt;1type=15pts, 1type=5pts<br>
+                            • <strong>TPH (50%):</strong> ≥1000=50pts, ≥750=35pts, ≥500=20pts, &lt;500=5pts<br>
+                            • <strong>Yield Quality (30%):</strong> ≥20t/ast=30pts, ≥15t/ast=20pts, ≥10t/ast=10pts, &lt;10t/ast=3pts<br>
+                            • <strong>Materials (20%):</strong> &gt;3types=20pts, &gt;2types=15pts, &gt;1type=8pts, 1type=3pts<br>
                             <em>Final Rating: Excellent=85-100pts, Good=65-84pts, Fair=45-64pts, Poor=&lt;45pts</em>
                         </p>
                     </div>
@@ -2258,47 +2259,63 @@ class ReportGenerator:
                     </div>
                     """
                 
-                # Ring Quality Assessment - simplified to focus on what actually matters
+                # Ring Quality Assessment - 3-factor system optimized for modern ships
                 ring_quality = "Poor"
                 quality_explanation = ""
                 quality_score = 0
                 
-                # Factor 1: TPH (70% weight) - The primary performance indicator
-                if tph >= 500:
-                    quality_score += 70
-                elif tph >= 350:
+                # Factor 1: TPH (50% weight) - Primary speed indicator
+                if tph >= 1000:
                     quality_score += 50
-                elif tph >= 200:
-                    quality_score += 30
-                else:
-                    quality_score += 10
-                
-                # Factor 2: Material Diversity (30% weight) - Independent engineering value
-                materials_count = len(session_data.get('materials_mined', {}))
-                if materials_count > 3:
-                    quality_score += 30
-                elif materials_count > 2:
-                    quality_score += 25
-                elif materials_count > 1:
-                    quality_score += 15
+                elif tph >= 750:
+                    quality_score += 35
+                elif tph >= 500:
+                    quality_score += 20
                 else:
                     quality_score += 5
                 
-                # Determine overall ring quality with simplified thresholds
+                # Factor 2: Tons/Asteroid (30% weight) - Yield quality indicator
+                tons_per_asteroid = 0.0
+                if hits and hits > 0:
+                    tons_per_asteroid = total_tons / hits
+                elif asteroids_prospected and asteroids_prospected > 0:
+                    tons_per_asteroid = total_tons / asteroids_prospected
+                
+                if tons_per_asteroid >= 20:
+                    quality_score += 30
+                elif tons_per_asteroid >= 15:
+                    quality_score += 20
+                elif tons_per_asteroid >= 10:
+                    quality_score += 10
+                else:
+                    quality_score += 3
+                
+                # Factor 3: Material Diversity (20% weight) - Engineering value
+                materials_count = len(session_data.get('materials_mined', {}))
+                if materials_count > 3:
+                    quality_score += 20
+                elif materials_count > 2:
+                    quality_score += 15
+                elif materials_count > 1:
+                    quality_score += 8
+                else:
+                    quality_score += 3
+                
+                # Determine overall ring quality with 3-factor assessment
                 if quality_score >= 85:
                     ring_quality = "Excellent"
-                    quality_explanation = f"Outstanding mining location - {tph:.1f} t/h with {materials_count} material types"
+                    quality_explanation = f"Elite mining location - {tph:.1f} t/h, {tons_per_asteroid:.1f} t/asteroid, {materials_count} material types"
                 elif quality_score >= 65:
                     ring_quality = "Good"
-                    quality_explanation = f"Solid mining location - {tph:.1f} t/h with {materials_count} material types"
+                    quality_explanation = f"Solid mining location - {tph:.1f} t/h, {tons_per_asteroid:.1f} t/asteroid, {materials_count} material types"
                 elif quality_score >= 45:
                     ring_quality = "Fair" 
-                    quality_explanation = f"Decent mining spot - {tph:.1f} t/h with {materials_count} material types"
+                    quality_explanation = f"Acceptable mining spot - {tph:.1f} t/h, {tons_per_asteroid:.1f} t/asteroid, {materials_count} material types"
                 else:
-                    quality_explanation = f"Poor mining location - {tph:.1f} t/h with {materials_count} material types"
+                    quality_explanation = f"Suboptimal mining location - {tph:.1f} t/h, {tons_per_asteroid:.1f} t/asteroid, {materials_count} material types"
                 
                 analytics_html += f"""
-                <div class="stat-card" title="Overall assessment of this mining location based primarily on tons per hour performance and material diversity for engineering needs. Excellent/Good locations are worth bookmarking for future mining sessions.">
+                <div class="stat-card" title="Overall assessment of this mining location based on three key factors: speed (TPH 50%), yield quality (Tons/Asteroid 30%), and material diversity for engineering (20%). Excellent/Good locations are worth bookmarking for future mining sessions.">
                     <div class="stat-value">{ring_quality}</div>
                     <div class="stat-label">Ring Quality</div>
                     <div class="stat-help">💎 {quality_explanation}</div>

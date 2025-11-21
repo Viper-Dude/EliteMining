@@ -1491,7 +1491,7 @@ class ProspectorPanel(ttk.Frame):
         self.tree.heading("time", text="Time", anchor="w")
         self.tree.column("materials", width=400, minwidth=150, anchor="w", stretch=False)
         self.tree.column("content", width=180, minwidth=100, anchor="w", stretch=False)
-        self.tree.column("time", width=80, minwidth=60, anchor="center", stretch=True)
+        self.tree.column("time", width=80, minwidth=60, anchor="w", stretch=True)
         
         # Load saved column widths from config
         try:
@@ -1597,14 +1597,14 @@ class ProspectorPanel(ttk.Frame):
         self.stats_tree.heading("count", text="Hits", anchor="w")
         
         self.stats_tree.column("material", width=135, minwidth=110, anchor="w", stretch=False)
-        self.stats_tree.column("tons", width=65, minwidth=50, anchor="center", stretch=False)
-        self.stats_tree.column("tph", width=65, minwidth=50, anchor="center", stretch=False)
-        self.stats_tree.column("tons_per", width=85, minwidth=60, anchor="center", stretch=False)
-        self.stats_tree.column("avg_all", width=95, minwidth=70, anchor="center", stretch=False)
-        self.stats_tree.column("avg_pct", width=130, minwidth=100, anchor="center", stretch=False)
-        self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="center", stretch=False)
-        self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="center", stretch=False)
-        self.stats_tree.column("count", width=65, minwidth=50, anchor="center", stretch=True)
+        self.stats_tree.column("tons", width=65, minwidth=50, anchor="w", stretch=False)
+        self.stats_tree.column("tph", width=65, minwidth=50, anchor="w", stretch=False)
+        self.stats_tree.column("tons_per", width=85, minwidth=60, anchor="w", stretch=False)
+        self.stats_tree.column("avg_all", width=95, minwidth=70, anchor="w", stretch=False)
+        self.stats_tree.column("avg_pct", width=130, minwidth=100, anchor="w", stretch=False)
+        self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="w", stretch=False)
+        self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="w", stretch=False)
+        self.stats_tree.column("count", width=65, minwidth=50, anchor="w", stretch=True)
         
         # Load saved column widths from config
         try:
@@ -9156,150 +9156,113 @@ class ProspectorPanel(ttk.Frame):
                     live_materials = self.main_app.cargo_monitor.get_live_session_materials() or {}
                 except Exception as e:
                     print(f"[DEBUG] Error getting live materials: {e}")
-            # Merge all minerals so each appears only once
-            all_materials = set()
-            if summary_data:
-                all_materials.update(summary_data.keys())
-            if hasattr(self.session_analytics, 'material_stats_all'):
-                all_materials.update(self.session_analytics.material_stats_all.keys())
             # Calculate session duration for TPH
             elapsed_hours = 0.0
             elapsed_str = self.session_elapsed.get()
             if elapsed_str and elapsed_str != "00:00:00":
                 time_parts = elapsed_str.split(":")
                 elapsed_hours = int(time_parts[0]) + int(time_parts[1])/60 + int(time_parts[2])/3600
+            
+            # Track which materials have been displayed
+            displayed_materials = set()
             row_index = 0
-            for material_name in sorted(all_materials):
-                stats = summary_data.get(material_name) if summary_data and material_name in summary_data else None
-                material_stats_all = self.session_analytics.material_stats_all.get(material_name) if hasattr(self.session_analytics, 'material_stats_all') else None
-                avg_all_pct = "0.0%"
-                if material_stats_all:
-                    avg_all = material_stats_all.get_average_percentage()
-                    avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
-                avg_pct = f"{stats['avg_percentage']:.1f}%" if stats and stats['avg_percentage'] > 0 else "0.0%"
-                best_pct = f"{stats['best_percentage']:.1f}%" if stats and stats['best_percentage'] > 0 else "0.0%"
-                latest_pct = f"{stats['latest_percentage']:.1f}%" if stats and stats['latest_percentage'] > 0 else "0.0%"
-                quality_hits = str(stats['quality_hits']) if stats else "0"
-                threshold = self.min_pct_map.get(material_name, self.threshold.get())
-                material_display = f"{material_name} ({threshold:.1f}%)"
-                # Try live cargo data, then session data, then analytics
-                material_tons = None
-                material_tph = None
-                if self.session_active:
-                    # Try several ways to find the tons value from live cargo monitor
-                    try:
-                        # 1) Direct match (English name)
-                        material_tons = live_materials.get(material_name)
-                    except Exception:
-                        material_tons = None
-
-                    # 2) Try localized name mapping from CargoMonitor (English -> Localized)
-                    if material_tons is None and hasattr(self, 'main_app') and getattr(self.main_app, 'cargo_monitor', None):
-                        try:
-                            localized_map = getattr(self.main_app.cargo_monitor, 'materials_localized_names', {}) or {}
-                            localized = localized_map.get(material_name)
-                            if localized:
-                                material_tons = live_materials.get(localized)
-                        except Exception:
-                            pass
-
-                    # 3) Case-insensitive lookup among live_materials keys
-                    if material_tons is None and isinstance(live_materials, dict):
-                        try:
-                            for k, v in live_materials.items():
-                                if k and k.lower() == material_name.lower():
-                                    material_tons = v
-                                    break
-                        except Exception:
-                            pass
-
-                    # 4) Fallback to analytics object if available
-                    if material_tons is None and hasattr(self.session_analytics, 'get_material_statistics'):
-                        stats_obj = self.session_analytics.get_material_statistics(material_name)
-                        if stats_obj and hasattr(stats_obj, 'get_total_tons'):
-                            try:
-                                material_tons = stats_obj.get_total_tons()
-                            except Exception:
-                                material_tons = None
-                if material_tons is None and hasattr(self, 'last_session_data'):
-                    saved = self.last_session_data.get(material_name, {})
-                    material_tons = saved.get('tons', 0.0)
-                    material_tph = saved.get('tph', 0.0)
-                if material_tons is None:
-                    material_tons = 0.0
-                if material_tph is None:
-                    material_tph = material_tons / elapsed_hours if elapsed_hours > 0 and material_tons > 0 else 0.0
-                tons_str = f"{material_tons:.1f}" if material_tons > 0 else "—"
-                tph_str = f"{material_tph:.1f}" if material_tph > 0 else "—"
-                tons_per_val = None
-                try:
+            
+            # First, display materials that met threshold (announced materials)
+            if summary_data:
+                for material_name in sorted(summary_data.keys()):
+                    displayed_materials.add(material_name)
+                    stats = summary_data.get(material_name)
+                    material_stats_all = self.session_analytics.material_stats_all.get(material_name) if hasattr(self.session_analytics, 'material_stats_all') else None
+                    avg_all_pct = "0.0%"
+                    if material_stats_all:
+                        avg_all = material_stats_all.get_average_percentage()
+                        avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
+                    avg_pct = f"{stats['avg_percentage']:.1f}%" if stats and stats['avg_percentage'] > 0 else "0.0%"
+                    best_pct = f"{stats['best_percentage']:.1f}%" if stats and stats['best_percentage'] > 0 else "0.0%"
+                    latest_pct = f"{stats['latest_percentage']:.1f}%" if stats and stats['latest_percentage'] > 0 else "0.0%"
+                    quality_hits = str(stats['quality_hits']) if stats else "0"
+                    threshold = self.min_pct_map.get(material_name, self.threshold.get())
+                    material_display = f"{material_name} ({threshold:.1f}%)"
+                    
+                    # Get tons and TPH for this material
+                    material_tons = None
+                    material_tph = None
+                    if not self.session_active and hasattr(self, 'last_session_data'):
+                        # Session ended - use saved data
+                        saved = self.last_session_data.get(material_name, {})
+                        material_tons = saved.get('tons', 0.0)
+                        material_tph = saved.get('tph', 0.0)
+                    else:
+                        # Live session - use cargo data
+                        material_tons = live_materials.get(material_name, 0.0)
+                        material_tph = material_tons / elapsed_hours if elapsed_hours > 0 and material_tons > 0 else 0.0
+                    
+                    tons_str = f"{material_tons:.1f}" if material_tons > 0 else "—"
+                    tph_str = f"{material_tph:.1f}" if material_tph > 0 else "—"
+                    
+                    # Calculate Tons/Asteroid
+                    tons_per_val = None
                     hits_count = 0
-                    qh = stats.get('quality_hits') if stats else None
                     try:
+                        qh = stats.get('quality_hits')
                         if qh is not None:
                             hits_count = int(float(qh))
                     except Exception:
                         hits_count = 0
-                    if hits_count <= 0 and material_stats_all and hasattr(material_stats_all, 'get_find_count'):
-                        try:
-                            hits_count = int(material_stats_all.get_find_count())
-                        except Exception:
-                            hits_count = 0
+                    
                     if hits_count > 0 and material_tons > 0:
-                        # Show Tons per Hit (tons divided by hits)
                         try:
                             tons_per_val = material_tons / hits_count
                         except Exception:
                             tons_per_val = None
-                except Exception:
-                    tons_per_val = None
-                
-                # Force tons_per_str to "—" if hits are 0, regardless of tons_per_val
-                if hits_count <= 0:
-                    tons_per_str = "—"
-                else:
-                    tons_per_str = f"{tons_per_val:.1f}" if (tons_per_val is not None) else "—"
-                
-                tag = "evenrow" if row_index % 2 == 0 else "oddrow"
-                cols = list(self.stats_tree["columns"]) if hasattr(self, 'stats_tree') and self.stats_tree is not None else []
-                vals = []
-                for col in cols:
-                    if col == 'material':
-                        vals.append(material_display)
-                    elif col == 'tons':
-                        vals.append(tons_str)
-                    elif col == 'tph':
-                        vals.append(tph_str)
-                    elif col == 'tons_per':
-                        vals.append(tons_per_str)
-                    elif col == 'avg_all':
-                        vals.append(avg_all_pct)
-                    elif col == 'avg_pct':
-                        vals.append(avg_pct)
-                    elif col == 'best_pct':
-                        vals.append(best_pct)
-                    elif col == 'latest_pct':
-                        vals.append(latest_pct)
-                    elif col == 'count':
-                        try:
-                            vals.append(str(int(float(quality_hits))) if quality_hits is not None else '0')
-                        except Exception:
-                            vals.append(str(quality_hits))
+                    
+                    tons_per_str = "—" if hits_count <= 0 else (f"{tons_per_val:.1f}" if tons_per_val is not None else "—")
+                    
+                    tag = "evenrow" if row_index % 2 == 0 else "oddrow"
+                    self.stats_tree.insert("", "end", values=(
+                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits
+                    ), tags=(tag,))
+                    row_index += 1
+            
+            # Second, add materials from cargo that weren't announced (below threshold but still mined)
+            for material_name, material_tons in live_materials.items():
+                if material_name not in displayed_materials and material_tons > 0:
+                    # This material was mined but never announced (below threshold)
+                    threshold = self.min_pct_map.get(material_name, self.threshold.get())
+                    material_display = f"{material_name} ({threshold:.1f}%)"
+                    tons_str = f"{material_tons:.1f}"
+                    
+                    material_tph = 0.0
+                    if elapsed_hours > 0:
+                        material_tph = material_tons / elapsed_hours
+                    tph_str = f"{material_tph:.1f}" if material_tph > 0 else "—"
+                    
+                    # Check if we have prospector data in material_stats_all (all prospected asteroids)
+                    material_stats_all = self.session_analytics.material_stats_all.get(material_name)
+                    if material_stats_all and material_stats_all.get_find_count() > 0:
+                        # Material was prospected but never met threshold - show ALL stats
+                        avg_all = material_stats_all.get_average_percentage()
+                        avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
+                        best = material_stats_all.get_best_percentage()
+                        best_pct = f"{best:.1f}%" if best and best > 0 else "0.0%"
+                        latest = material_stats_all.get_latest_percentage()
+                        latest_pct = f"{latest:.1f}%" if latest and latest > 0 else "0.0%"
                     else:
-                        vals.append('')
-                try:
-                    log.debug(f"Inserting stats row - cols={cols}")
-                    log.debug(f"Inserting stats row - vals={vals}")
-                except Exception:
-                    pass
-                try:
-                    self.stats_tree.insert("", "end", values=tuple(vals), tags=(tag,))
-                except Exception:
-                    try:
-                        self.stats_tree.insert("", "end", values=(material_display, tons_str, tph_str, tons_per_str), tags=(tag,))
-                    except Exception:
-                        pass
-                row_index += 1
+                        # No prospector data at all
+                        avg_all_pct = "—"
+                        best_pct = "—"
+                        latest_pct = "—"
+                    
+                    # These always show "—" and 0 for below-threshold materials
+                    avg_pct = "—"
+                    quality_hits = "0"
+                    tons_per_str = "—"
+                    
+                    tag = "evenrow" if row_index % 2 == 0 else "oddrow"
+                    self.stats_tree.insert("", "end", values=(
+                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits
+                    ), tags=(tag,))
+                    row_index += 1
             
             # Update session summary with live tracking
             total_asteroids = self.session_analytics.get_total_asteroids()
