@@ -72,7 +72,8 @@ class ReportGenerator:
         Priority:
         1. session_data['total_finds'] explicit numeric field
         2. derive from 'hit_rate' and 'asteroids_prospected' (rounded)
-        3. return None if not derivable
+        3. sum 'hits' from mineral_performance data
+        4. return None if not derivable
         """
         try:
             # Explicit value if present
@@ -95,26 +96,46 @@ class ReportGenerator:
             # Derive from hit rate and asteroids prospected
             ap_raw = session_data.get('asteroids_prospected') or session_data.get('asteroids') or session_data.get('prospects') or session_data.get('prospected')
             hr_raw = session_data.get('hit_rate') or session_data.get('hit_rate_percent')
-            if ap_raw in (None, '', '—') or hr_raw in (None, '', '—'):
-                return None
+            if ap_raw not in (None, '', '—') and hr_raw not in (None, '', '—'):
+                try:
+                    ap_val = int(str(ap_raw).strip())
+                except Exception:
+                    ap_val = 0
+                try:
+                    hr_val = float(str(hr_raw).replace('%', '').strip())
+                except Exception:
+                    hr_val = 0.0
 
-            try:
-                ap_val = int(str(ap_raw).strip())
-            except Exception:
-                ap_val = 0
-            try:
-                hr_val = float(str(hr_raw).replace('%', '').strip())
-            except Exception:
-                hr_val = 0.0
+                if ap_val > 0 and hr_val > 0:
+                    derived = int(round(ap_val * (hr_val / 100.0)))
+                    if derived > 0:
+                        return derived
 
-            if ap_val > 0 and hr_val > 0:
-                derived = int(round(ap_val * (hr_val / 100.0)))
-                if derived > 0:
-                    return derived
-                # If explicit was 0 and derived is 0, treat as 0
-                if explicit_total is not None:
-                    return explicit_total
-                return None
+            # Try to sum from mineral_performance data
+            mineral_perf = session_data.get('mineral_performance', {})
+            if mineral_perf and isinstance(mineral_perf, dict):
+                total_hits = 0
+                for material_data in mineral_perf.values():
+                    if isinstance(material_data, dict):
+                        hits = material_data.get('hits') or material_data.get('total_hits') or material_data.get('count') or material_data.get('finds')
+                        if hits:
+                            try:
+                                total_hits += int(hits)
+                            except Exception:
+                                pass
+                if total_hits > 0:
+                    return total_hits
+            
+            # Try to build and sum from material TPA entries (this will use the latest logic)
+            try:
+                material_entries = self._build_material_tpa_entries(session_data)
+                if material_entries:
+                    total_from_entries = sum(e['hits'] for e in material_entries if e['hits'] and not e.get('hits_estimated'))
+                    if total_from_entries > 0:
+                        return total_from_entries
+            except Exception:
+                pass
+
             # If derived not possible and explicit provided, return explicit (may be 0)
             if explicit_total is not None:
                 return explicit_total
@@ -139,12 +160,20 @@ class ReportGenerator:
             if total_tons <= 0:
                 return (None, None)
 
-            # 1) Use explicit hits
+            # 1) Use explicit hits from derive
             hits = self._derive_total_finds(session_data)
             if hits is not None and hits > 0:
                 return (total_tons / hits, 'hits')
 
-            # 2) Use asteroids_prospected fallback
+            # 2) Try to compute from per-material data
+            material_entries = self._build_material_tpa_entries(session_data)
+            if material_entries:
+                total_material_tons = sum(e['tons'] for e in material_entries if e['tons'])
+                total_material_hits = sum(e['hits'] for e in material_entries if e['hits'])
+                if total_material_hits > 0 and total_material_tons > 0:
+                    return (total_material_tons / total_material_hits, 'hits')
+
+            # 3) Use asteroids_prospected fallback
             ap_raw = session_data.get('asteroids_prospected') or session_data.get('asteroids') or session_data.get('prospects') or session_data.get('prospected')
             try:
                 ap_int = int(str(ap_raw).strip())
@@ -195,18 +224,24 @@ class ReportGenerator:
         if not perf_data:
             return None
 
+        # Exact match (case-sensitive)
         if material_name in perf_data:
             return perf_data[material_name]
 
-        normalized = material_name.lower()
+        # Case-insensitive exact match
+        normalized = material_name.lower().strip()
         for name, value in perf_data.items():
-            lowered = name.lower()
-            if normalized == lowered:
+            if name.lower().strip() == normalized:
                 return value
+        
+        # Fuzzy matching (substring, prefix)
+        for name, value in perf_data.items():
+            lowered = name.lower().strip()
             if lowered.startswith(normalized) or normalized.startswith(lowered):
                 return value
             if normalized in lowered or lowered in normalized:
                 return value
+        
         return None
 
     def _extract_material_hits(self, perf_entry):
@@ -263,6 +298,16 @@ class ReportGenerator:
             perf_entry = self._find_performance_entry(material_name, perf_data)
             hits = self._extract_material_hits(perf_entry)
             hits_estimated = False
+            
+            # Debug: log when performance entry is not found or has no hits
+            if perf_data:
+                try:
+                    if perf_entry is None:
+                        self.log.debug(f"[REPORT] No perf_entry for '{material_name}'. Available in mineral_performance: {list(perf_data.keys())}")
+                    else:
+                        self.log.debug(f"[REPORT] Material '{material_name}': perf_entry={perf_entry}, extracted hits={hits}, tons={tons}")
+                except Exception:
+                    pass
             if hits is None or hits == 0:
                 # Try estimating hits based on total finds proportionally using tonnage
                 if total_finds and total_tons > 0:
@@ -2198,13 +2243,14 @@ class ReportGenerator:
                     </div>
                     """
                 
-                if prospectors_used > 0:
-                    tons_per_prospector = total_tons / prospectors_used
+                # Tons/Asteroid - key metric for comparing mining locations
+                tons_per_asteroid_display, _ = self._compute_tons_per_asteroid(session_data)
+                if tons_per_asteroid_display is not None and tons_per_asteroid_display > 0:
                     analytics_html += f"""
-                    <div class="stat-card" title="How efficient your prospector limpets are. Shows tons of valuable materials found per prospector limpet used. Higher numbers mean you're better at targeting asteroids with good materials rather than wasting prospectors on empty rocks.">
-                        <div class="stat-value">{self._safe_float(tons_per_prospector):.1f}t</div>
-                        <div class="stat-label">Efficiency per Prospector</div>
-                        <div class="stat-help">💡 Tons found per prospector used</div>
+                    <div class="stat-card" title="Average tons of valuable materials per asteroid that contained tracked materials. This is the key metric for comparing different mining locations - higher values mean richer asteroids and better mining spots.">
+                        <div class="stat-value">{self._safe_float(tons_per_asteroid_display):.1f}t</div>
+                        <div class="stat-label">Tons/Asteroid</div>
+                        <div class="stat-help">💎 Average yield per asteroid hit</div>
                     </div>
                     """
                 

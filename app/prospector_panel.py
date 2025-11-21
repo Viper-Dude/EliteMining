@@ -13750,6 +13750,14 @@ class ProspectorPanel(ttk.Frame):
                 'data_source': 'Report Entry'
             }
             enhanced_session_data['mineral_performance'] = session_data.get('mineral_performance', {})
+            
+            # Debug: log mineral_performance content
+            if enhanced_session_data['mineral_performance']:
+                print(f"DEBUG: mineral_performance has {len(enhanced_session_data['mineral_performance'])} entries: {list(enhanced_session_data['mineral_performance'].keys())}")
+                for mat, data in enhanced_session_data['mineral_performance'].items():
+                    print(f"  {mat}: {data}")
+            else:
+                print("DEBUG: mineral_performance is EMPTY or missing from session_data")
 
             # Ensure total_finds / total_hits and tons_per values are present for the HTML report
             try:
@@ -13835,7 +13843,7 @@ class ProspectorPanel(ttk.Frame):
                             print(f"DEBUG: Successfully parsed filtered yields: {filtered_yields_from_text}")
                         else:
                             print("DEBUG: No filtered yields found in session file")
-                        # Also parse total hits/finds from the TXT file if available
+                        # Also parse total hits/finds and mineral_performance from the TXT file if available
                         try:
                             with open(session_text_file, 'r', encoding='utf-8') as tfh:
                                 txt_content = tfh.read()
@@ -13847,8 +13855,51 @@ class ProspectorPanel(ttk.Frame):
                                     if parsed_hits > 0:
                                         enhanced_session_data['total_finds'] = parsed_hits
                                         print(f"DEBUG: Parsed Total Material Hits from text: {parsed_hits}")
+                                
+                                # Parse mineral_performance section from text file
+                                mineral_performance = {}
+                                lines = txt_content.split('\n')
+                                in_performance = False
+                                current_mineral = None
+                                for line in lines:
+                                    if '--- Mineral Performance ---' in line:
+                                        in_performance = True
+                                        continue
+                                    if in_performance:
+                                        if line.startswith('===') or line.startswith('Overall Quality:'):
+                                            break
+                                        if line.strip() and not line.startswith('  ') and ':' in line and line.strip().endswith(':'):
+                                            # Mineral name line like "Platinum:"
+                                            current_mineral = line.strip().rstrip(':')
+                                            mineral_performance[current_mineral] = {'avg': 0, 'best': 0, 'finds': 0}
+                                        elif current_mineral:
+                                            if '• Average:' in line:
+                                                try:
+                                                    avg_val = float(line.split(':')[1].split('%')[0].strip())
+                                                    mineral_performance[current_mineral]['avg'] = avg_val
+                                                except:
+                                                    pass
+                                            elif '• Best:' in line:
+                                                try:
+                                                    best_val = float(line.split(':')[1].split('%')[0].strip())
+                                                    mineral_performance[current_mineral]['best'] = best_val
+                                                except:
+                                                    pass
+                                            elif '• Hits:' in line or '• Finds:' in line:
+                                                try:
+                                                    raw_val = line.split(':', 1)[1].strip().replace('x', '')
+                                                    hits_val = int(raw_val)
+                                                    mineral_performance[current_mineral]['finds'] = hits_val
+                                                except:
+                                                    pass
+                                
+                                if mineral_performance:
+                                    enhanced_session_data['mineral_performance'] = mineral_performance
+                                    print(f"DEBUG: Parsed mineral_performance from text: {list(mineral_performance.keys())}")
+                                    for mat, data in mineral_performance.items():
+                                        print(f"  {mat}: {data}")
                         except Exception as e:
-                            print(f"DEBUG: Could not parse total hits from session file: {e}")
+                            print(f"DEBUG: Could not parse total hits/mineral_performance from session file: {e}")
                     else:
                         print(f"DEBUG: Session text file not found. Searched for system: {session_data.get('system', 'N/A')}, body: {session_data.get('body', 'N/A')}")
                             
