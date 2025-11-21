@@ -9253,7 +9253,13 @@ class ProspectorPanel(ttk.Frame):
                             tons_per_val = None
                 except Exception:
                     tons_per_val = None
-                tons_per_str = f"{tons_per_val:.1f}" if (tons_per_val is not None) else "—"
+                
+                # Force tons_per_str to "—" if hits are 0, regardless of tons_per_val
+                if hits_count <= 0:
+                    tons_per_str = "—"
+                else:
+                    tons_per_str = f"{tons_per_val:.1f}" if (tons_per_val is not None) else "—"
+                
                 tag = "evenrow" if row_index % 2 == 0 else "oddrow"
                 cols = list(self.stats_tree["columns"]) if hasattr(self, 'stats_tree') and self.stats_tree is not None else []
                 vals = []
