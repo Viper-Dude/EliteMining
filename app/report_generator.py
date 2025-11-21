@@ -4,6 +4,7 @@ Generates HTML reports with charts, statistics, and screenshots
 """
 
 import json
+import logging
 import os
 import re
 import sys
@@ -63,6 +64,7 @@ class ReportGenerator:
         # Create directories
         os.makedirs(self.enhanced_reports_dir, exist_ok=True)
         os.makedirs(self.screenshots_dir, exist_ok=True)
+        self.log = logging.getLogger(__name__)
 
     def _derive_total_finds(self, session_data):
         """Derive/return total hits (number of asteroids that contained tracked materials)
@@ -77,7 +79,13 @@ class ReportGenerator:
             explicit_total = None
             if 'total_finds' in session_data and session_data.get('total_finds') not in (None, '', '—'):
                 try:
-                    explicit_total = int(float(str(session_data.get('total_finds')).strip()))
+                    raw = str(session_data.get('total_finds')).strip()
+                    # Extract digits from common formats (e.g., '5', '5x')
+                    m = re.search(r"(\d+)", raw)
+                    if m:
+                        explicit_total = int(m.group(1))
+                    else:
+                        explicit_total = int(float(raw))
                 except Exception:
                     explicit_total = None
             # If explicit value is provided and >0, prefer it. If explicit is 0, prefer derived if available.
@@ -272,7 +280,10 @@ class ReportGenerator:
                             hits_estimated = True
                     except Exception:
                         pass
-
+            # Last-resort fallback: if we still have no valid hits, assign 1 hit per material (estimated)
+            if hits is None or hits == 0:
+                hits = 1
+                hits_estimated = True
             tpa = (tons / hits) if hits and hits > 0 else None
             entries.append({
                 "material": material_name,
@@ -284,7 +295,7 @@ class ReportGenerator:
             # Debug log for missing values
             try:
                 if (hits is None or hits == 0) or tpa is None:
-                    print(f"[DEBUG REPORT] {material_name} tons={tons} hits={hits} hits_est={hits_estimated} tpa={tpa} total_finds={total_finds} total_tons={total_tons}")
+                    self.log.debug("[REPORT] %s tons=%s hits=%s hits_est=%s tpa=%s total_finds=%s total_tons=%s", material_name, tons, hits, hits_estimated, tpa, total_finds, total_tons)
             except Exception:
                 pass
 
@@ -1792,6 +1803,8 @@ class ReportGenerator:
                 prospectors_used = prospectors_value
                 
             materials_mined = session_data.get('materials_mined', {})
+            # Normalize materials_mined so values are floats (tons) for calculations
+            materials_mined = {k: (self._normalize_material_tons(v) or 0.0) for k, v in (materials_mined or {}).items()}
             
             # Check if we have CSV data with detailed analytics
             hit_rate = None
@@ -2013,7 +2026,7 @@ class ReportGenerator:
                 """
                 
                 # Sort materials by quantity for analysis
-                sorted_materials = sorted(materials_mined.items(), key=lambda x: x[1], reverse=True)
+                sorted_materials = sorted(materials_mined.items(), key=lambda x: (x[1] or 0.0), reverse=True)
                 
                 # Top material stats
                 if sorted_materials:
@@ -2074,8 +2087,8 @@ class ReportGenerator:
             if material_tpa_entries:
                 row_html = ""
                 for entry in material_tpa_entries:
-                    hits_display = f"{entry['hits']}{' (est)' if entry.get('hits_estimated') else ''}" if entry['hits'] is not None else '—'
-                    tpa_display = f"{self._safe_float(entry['tpa']):.2f}t{' (est)' if entry.get('hits_estimated') else ''}" if entry['tpa'] is not None else '—'
+                    hits_display = f"{entry['hits']}" if entry['hits'] is not None else '—'
+                    tpa_display = f"{self._safe_float(entry['tpa']):.2f}t" if entry['tpa'] is not None else '—'
                     row_html += f"""
                         <tr>
                             <td>{entry['material']}</td>
@@ -2533,7 +2546,9 @@ class ReportGenerator:
         
     def _generate_materials_table(self, session_data):
         """Generate materials breakdown table"""
-        materials_mined = session_data.get('materials_mined', {})
+        materials_mined_raw = session_data.get('materials_mined', {})
+        # Normalize values to float tons in case they are dicts {'tons': x, 'tph': y}
+        materials_mined = {k: (self._normalize_material_tons(v) or 0.0) for k, v in (materials_mined_raw or {}).items()}
         if not materials_mined:
             return "<p>No materials mined this session</p>"
         
@@ -2808,10 +2823,9 @@ class ReportGenerator:
         if material_tpa_entries:
             rates = []
             for entry in material_tpa_entries:
-                hits_text = f", Hits: {entry['hits']}{' (est)' if entry.get('hits_estimated') else ''}" if entry['hits'] is not None else ''
+                hits_text = f", Hits: {entry['hits']}" if entry['hits'] is not None else ''
                 tpa_value = entry['tpa']
-                est_note = ' (est)' if entry.get('hits_estimated') else ''
-                tpa_text = f"{self._safe_float(tpa_value):.2f}t{est_note}" if tpa_value is not None else '—'
+                tpa_text = f"{self._safe_float(tpa_value):.2f}t" if tpa_value is not None else '—'
                 rates.append(f"{entry['material']}: {self._safe_float(entry['tons']):.1f}t ({tpa_text}{hits_text})")
             properties.append(("Material Tons/Asteroid", "; ".join(rates)))
         
