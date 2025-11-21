@@ -5,6 +5,7 @@ Creates visual PNG cards from mining session data
 """
 
 import os
+import re
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
@@ -257,6 +258,7 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
         
         # Materials list
         materials_mined = session_data.get('materials_mined', {})
+        mineral_performance = session_data.get('mineral_performance', {})
         if materials_mined:
             # Sort by quantity (highest first) - handle both dict and numeric values
             # Convert all materials to normalized format first
@@ -303,6 +305,18 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
                 
                 # Tons and t/hr
                 stats_text = f"{tons:.0f}t  ({mat_tph:.1f} t/hr)"
+                perf_entry = mineral_performance.get(material_name, {})
+                hits_raw = perf_entry.get('finds') or perf_entry.get('hits')
+                hits = 0
+                if isinstance(hits_raw, (int, float)):
+                    hits = int(hits_raw)
+                elif isinstance(hits_raw, str):
+                    match = re.search(r"(\d+)", hits_raw)
+                    if match:
+                        hits = int(match.group(1))
+                if hits > 0 and tons > 0:
+                    tons_per_asteroid = tons / hits
+                    stats_text += f"  |  {tons_per_asteroid:.2f} t/asteroid"
                 stats_bbox = draw.textbbox((0, 0), stats_text, font=body_font)
                 stats_width = stats_bbox[2] - stats_bbox[0]
                 draw.text((CARD_WIDTH - PADDING - 120 - stats_width, y_position), stats_text, fill=TEXT_COLOR, font=body_font)
@@ -377,13 +391,13 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
                 draw.text((col2_x, y_position), f"Asteroids: {asteroids_prospected}", fill=TEXT_COLOR, font=body_font)
             y_position += LINE_HEIGHT
             
-            # Row 3: Minerals Tracked | Total Hits
+            # Row 3: Minerals Tracked | Total Asteroids
             if materials_tracked > 0:
                 draw.text((col1_x, y_position), f"Minerals Tracked: {materials_tracked}", fill=TEXT_COLOR, font=body_font)
             if total_finds and int(total_finds) > 0:
-                draw.text((col2_x, y_position), f"Total Hits: {int(total_finds)}", fill=TEXT_COLOR, font=body_font)
+                draw.text((col2_x, y_position), f"Total Asteroids: {int(total_finds)}", fill=TEXT_COLOR, font=body_font)
             y_position += LINE_HEIGHT
-            # Optional row: Tons per Asteroid (display under Total Hits if available)
+            # Optional row: Tons per Asteroid (display under Total Asteroids if available)
             tons_per_ast = session_data.get('tons_per_asteroid')
             if tons_per_ast is not None:
                 draw.text((col2_x, y_position), f"Tons/Asteroid: {tons_per_ast:.1f}t", fill=TEXT_COLOR, font=body_font)
@@ -430,7 +444,7 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
                 )
                 
                 # Header text
-                headers = ["Mineral", "Avg %", "Best %", "Hits"]
+                headers = ["Mineral", "Avg %", "Best %", "Asteroids"]
                 x_pos = table_x + 10
                 for i, header in enumerate(headers):
                     draw.text((x_pos, y_position + 8), header, fill=HEADER_COLOR, font=body_font)

@@ -5,6 +5,7 @@ Generates HTML reports with charts, statistics, and screenshots
 
 import json
 import os
+import re
 import sys
 import base64
 import webbrowser
@@ -154,6 +155,140 @@ class ReportGenerator:
             return float(value)
         except (ValueError, TypeError):
             return default
+
+    def _normalize_material_tons(self, raw_value):
+        """Normalize a material value to a float tonnage"""
+        if raw_value is None:
+            return None
+
+        if isinstance(raw_value, dict):
+            for key in ("tons", "quantity", "value", "total"):
+                candidate = raw_value.get(key)
+                if candidate is not None:
+                    return self._normalize_material_tons(candidate)
+            return None
+
+        if isinstance(raw_value, str):
+            sanitized = raw_value.replace('t', '').replace(',', '').strip()
+            if sanitized == '':
+                return None
+            try:
+                return float(sanitized)
+            except ValueError:
+                return None
+
+        if isinstance(raw_value, (int, float)):
+            return float(raw_value)
+
+        return None
+
+    def _find_performance_entry(self, material_name, perf_data):
+        """Find mineral performance entry using fuzzy match on names"""
+        if not perf_data:
+            return None
+
+        if material_name in perf_data:
+            return perf_data[material_name]
+
+        normalized = material_name.lower()
+        for name, value in perf_data.items():
+            lowered = name.lower()
+            if normalized == lowered:
+                return value
+            if lowered.startswith(normalized) or normalized.startswith(lowered):
+                return value
+            if normalized in lowered or lowered in normalized:
+                return value
+        return None
+
+    def _extract_material_hits(self, perf_entry):
+        """Return an integer hit count for a material if available"""
+        if perf_entry is None:
+            return None
+
+        if isinstance(perf_entry, (int, float)):
+            return int(perf_entry)
+
+        if isinstance(perf_entry, str):
+            match = re.search(r"(\d+)", perf_entry)
+            if match:
+                return int(match.group(1))
+            return None
+
+        if isinstance(perf_entry, dict):
+            for key in ("finds", "hits", "find_count", "finds_count"):
+                value = perf_entry.get(key)
+                if value is not None:
+                    return self._extract_material_hits(value)
+
+        return None
+
+    def _build_material_tpa_entries(self, session_data):
+        """Return per-material tons, hits, and tons per asteroid"""
+        materials = session_data.get("materials_mined", {}) or {}
+        if not materials:
+            return []
+
+        perf_data = session_data.get("mineral_performance", {}) or {}
+        entries = []
+
+        total_tons = sum([self._normalize_material_tons(v) or 0.0 for v in materials.values()])
+        total_finds = None
+        try:
+            total_finds = int(session_data.get('total_finds') or self._derive_total_finds(session_data) or 0)
+        except Exception:
+            total_finds = None
+
+        hit_rate_global = None
+        try:
+            hr = session_data.get('hit_rate') or session_data.get('hit_rate_percent')
+            if hr is not None and hr != '—':
+                hit_rate_global = float(str(hr).replace('%', '').strip())
+        except Exception:
+            hit_rate_global = None
+
+        for material_name, raw_value in materials.items():
+            tons = self._normalize_material_tons(raw_value)
+            if tons is None:
+                continue
+
+            perf_entry = self._find_performance_entry(material_name, perf_data)
+            hits = self._extract_material_hits(perf_entry)
+            hits_estimated = False
+            if hits is None or hits == 0:
+                # Try estimating hits based on total finds proportionally using tonnage
+                if total_finds and total_tons > 0:
+                    est = int(round(total_finds * (tons / total_tons)))
+                    if est <= 0:
+                        est = 1
+                    hits = est
+                    hits_estimated = True
+                elif hit_rate_global is not None and session_data.get('asteroids_prospected'):
+                    try:
+                        asts = int(session_data.get('asteroids_prospected'))
+                        est = int(round(asts * (hit_rate_global / 100.0) * (tons / total_tons))) if total_tons > 0 else None
+                        if est and est > 0:
+                            hits = est
+                            hits_estimated = True
+                    except Exception:
+                        pass
+
+            tpa = (tons / hits) if hits and hits > 0 else None
+            entries.append({
+                "material": material_name,
+                "tons": tons,
+                "hits": hits,
+                "hits_estimated": hits_estimated,
+                "tpa": tpa
+            })
+            # Debug log for missing values
+            try:
+                if (hits is None or hits == 0) or tpa is None:
+                    print(f"[DEBUG REPORT] {material_name} tons={tons} hits={hits} hits_est={hits_estimated} tpa={tpa} total_finds={total_finds} total_tons={total_tons}")
+            except Exception:
+                pass
+
+        return sorted(entries, key=lambda e: e["tons"], reverse=True)
         
     def _get_logo_path(self):
         """Get correct logo path for both dev and installer versions"""
@@ -1935,6 +2070,39 @@ class ReportGenerator:
                 
                 analytics_html += "</div>"
             
+            material_tpa_entries = self._build_material_tpa_entries(session_data)
+            if material_tpa_entries:
+                row_html = ""
+                for entry in material_tpa_entries:
+                    hits_display = f"{entry['hits']}{' (est)' if entry.get('hits_estimated') else ''}" if entry['hits'] is not None else '—'
+                    tpa_display = f"{self._safe_float(entry['tpa']):.2f}t{' (est)' if entry.get('hits_estimated') else ''}" if entry['tpa'] is not None else '—'
+                    row_html += f"""
+                        <tr>
+                            <td>{entry['material']}</td>
+                            <td>{self._safe_float(entry['tons']):.1f}t</td>
+                            <td>{hits_display}</td>
+                            <td>{tpa_display}</td>
+                        </tr>
+                    """
+                analytics_html += f"""
+                <div style=\"background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);\">
+                    <h3 style=\"margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;\">🧾 Per-Material Tons/Asteroid</h3>
+                    <table class=\"data-table\">
+                        <thead>
+                            <tr>
+                                <th>Material</th>
+                                <th>Tonnage</th>
+                                <th>Hits</th>
+                                <th>Tons/Asteroid</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {row_html}
+                        </tbody>
+                    </table>
+                </div>
+                """
+
             # Efficiency Metrics Section
             if duration_minutes > 0 and total_tons > 0:
                 analytics_html += """
@@ -2635,6 +2803,17 @@ class ReportGenerator:
             properties.append(("Total Hits", total_hits_raw_display))
         if not any(p[0] == 'Tons/Asteroid' for p in properties):
             properties.append(("Tons/Asteroid", f"{self._safe_float(derived_tpa):.1f}t" if derived_tpa is not None else '—'))
+
+        material_tpa_entries = self._build_material_tpa_entries(session_data)
+        if material_tpa_entries:
+            rates = []
+            for entry in material_tpa_entries:
+                hits_text = f", Hits: {entry['hits']}{' (est)' if entry.get('hits_estimated') else ''}" if entry['hits'] is not None else ''
+                tpa_value = entry['tpa']
+                est_note = ' (est)' if entry.get('hits_estimated') else ''
+                tpa_text = f"{self._safe_float(tpa_value):.2f}t{est_note}" if tpa_value is not None else '—'
+                rates.append(f"{entry['material']}: {self._safe_float(entry['tons']):.1f}t ({tpa_text}{hits_text})")
+            properties.append(("Material Tons/Asteroid", "; ".join(rates)))
         
         for prop, value in properties:
             table_html += f"""

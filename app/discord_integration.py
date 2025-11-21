@@ -3,8 +3,9 @@ Discord webhook integration for EliteMining
 Allows users to share mining reports to Discord channels via webhooks
 """
 
-import requests
 import json
+import re
+import requests
 from datetime import datetime
 from config import _load_cfg
 
@@ -127,6 +128,66 @@ def get_material_breakdown(session_data: dict) -> str:
         return ""
 
 
+def parse_mineral_performance_from_report(report_content: str) -> dict:
+    """Extract mineral performance stats (tons, hits, tons/asteroid) from a report"""
+    if not report_content:
+        return {}
+
+    performance = {}
+    in_analysis = False
+    in_performance = False
+    current_material = None
+
+    for line in report_content.splitlines():
+        stripped = line.strip()
+        if not in_analysis:
+            if "=== MINERAL ANALYSIS ===" in line:
+                in_analysis = True
+            continue
+
+        if not in_performance:
+            if "--- Mineral Performance ---" in line:
+                in_performance = True
+            continue
+
+        if stripped.startswith("===") and "MINERAL ANALYSIS" not in stripped:
+            break
+
+        if stripped.endswith(":") and not stripped.startswith("•"):
+            current_material = stripped.rstrip(":")
+            performance[current_material] = {"tons": None, "hits": None, "tons_per_hit": None}
+            continue
+
+        if not current_material or not stripped.startswith("•"):
+            continue
+
+        value_part = stripped.split(":", 1)[1].strip() if ":" in stripped else ""
+
+        if "Tons/Hit" in stripped or "Tons/Asteroid" in stripped:
+            match = re.search(r"(\d+\.?\d*)", value_part)
+            if match:
+                try:
+                    performance[current_material]["tons_per_hit"] = float(match.group(1))
+                except Exception:
+                    pass
+        elif "Tons:" in stripped and "t" in value_part:
+            tons_match = re.search(r"(\d+\.?\d*)", value_part)
+            if tons_match:
+                try:
+                    performance[current_material]["tons"] = float(tons_match.group(1))
+                except Exception:
+                    pass
+        elif "Hits:" in stripped or "Finds:" in stripped:
+            hits_match = re.search(r"(\d+)", value_part)
+            if hits_match:
+                try:
+                    performance[current_material]["hits"] = int(hits_match.group(1))
+                except Exception:
+                    pass
+
+    return performance
+
+
 def is_discord_enabled() -> bool:
     """Check if Discord integration is enabled and configured"""
     enabled = get_config_value("discord_enabled", False)
@@ -187,7 +248,10 @@ def format_mining_report_embed(session_data: dict) -> dict:
         total = sd.get('total_finds')
         try:
             if total not in (None, '', '—'):
-                return int(float(str(total).strip()))
+                val = int(float(str(total).strip()))
+                # If explicit is 0, try to derive
+                if val > 0:
+                    return val
         except Exception:
             pass
         # Derive
@@ -238,11 +302,36 @@ def format_mining_report_embed(session_data: dict) -> dict:
     if material_breakdown:
         description += f"\n\n**Materials Mined:**\n{material_breakdown}"
     
+    mineral_perf_stats = parse_mineral_performance_from_report(session_data.get('report_content', ''))
+    perf_lines = []
+    for name, stats in mineral_perf_stats.items():
+        details = []
+        tons = stats.get('tons')
+        if tons is not None:
+            details.append(f"{tons:.1f}t")
+        tons_per_hit = stats.get('tons_per_hit')
+        hits = stats.get('hits')
+        if tons_per_hit is None and hits and tons is not None:
+            try:
+                tons_per_hit = tons / hits
+            except Exception:
+                tons_per_hit = None
+        if tons_per_hit is not None:
+            details.append(f"{tons_per_hit:.2f} t/asteroid")
+        if details:
+            perf_lines.append(f"{name}: {' | '.join(details)}")
+    if perf_lines:
+        description += "\n\n**Mineral Performance**\n" + "\n".join(perf_lines)
+
     # Create Discord embed
+    try:
+        tons_value = float(str(tons).replace('t', ''))
+    except Exception:
+        tons_value = 0.0
     embed = {
         "title": f"Elite Mining Report - {system}",
         "description": description,
-        "color": 0x00ff00 if float(tons.replace('t', '')) > 0 else 0xff6600,  # Green if successful, orange if no mining
+        "color": 0x00ff00 if tons_value > 0 else 0xff6600,  # Green if successful, orange if no mining
         "timestamp": datetime.now().isoformat(),
         "fields": [
             {
@@ -266,12 +355,12 @@ def format_mining_report_embed(session_data: dict) -> dict:
                 "inline": True
             },
             {
-                "name": "Materials Mined (Types)",
+                "name": "Minerals",
                 "value": f"{materials} types",
                 "inline": True
             },
             {
-                "name": "Prospector Limpets Used",
+                "name": "Prospected",
                 "value": str(prospectors_used),
                 "inline": True
             },
@@ -287,7 +376,7 @@ def format_mining_report_embed(session_data: dict) -> dict:
             }
             ,
             {
-                "name": "Total Hits",
+                "name": "Total Asteroids Mined",
                 "value": str(session_data.get('total_finds', '—')),
                 "inline": True
             },
