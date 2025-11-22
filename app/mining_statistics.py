@@ -182,6 +182,12 @@ class SessionAnalytics:
         if not self.session_active:
             return
         
+        # Skip depleted asteroids - they shouldn't count as prospected or as hits
+        remaining = event.get('Remaining', 100.0)
+        if remaining < 0.01:  # Depleted if remaining resources < 0.01
+            log.debug("Skipping depleted asteroid (Remaining: {:.2f})".format(remaining))
+            return
+        
         # Extract materials from Elite Dangerous event format
         materials_found = {}
         if 'Materials' in event:
