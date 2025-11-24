@@ -609,6 +609,15 @@ class ProspectorPanel(ttk.Frame):
         """Stub method - announcements panel moved to Settings tab"""
         pass
 
+    def _get_current_system(self) -> str:
+        """Get current system from centralized app source or fallback to local tracking"""
+        if self.main_app and hasattr(self.main_app, 'get_current_system'):
+            system = self.main_app.get_current_system()
+            if system:
+                return system
+        # Fallback to locally tracked system
+        return self.last_system or ""
+
     # --- CFG passthrough ---
     def _load_cfg(self) -> Dict[str, Any]:
         return _load_cfg()
@@ -746,8 +755,9 @@ class ProspectorPanel(ttk.Frame):
     def _update_location_display(self) -> None:
         """Update the location display with current context"""
         # Update system field if we have one and it's empty
-        if self.last_system and not self.session_system.get():
-            self.session_system.set(self.last_system)
+        current_system = self._get_current_system()
+        if current_system and not self.session_system.get():
+            self.session_system.set(current_system)
         
         # Update body field
         body_display = _extract_location_display(
@@ -767,7 +777,7 @@ class ProspectorPanel(ttk.Frame):
             # Get Ring Finder from main app
             if self.main_app and hasattr(self.main_app, 'ring_finder'):
                 ring_finder = self.main_app.ring_finder
-                system_name = self.last_system or self.session_system.get()
+                system_name = self._get_current_system() or self.session_system.get()
                 
                 if system_name and hasattr(ring_finder, '_update_sol_distance'):
                     # Call Ring Finder's distance calculation
@@ -830,11 +840,15 @@ class ProspectorPanel(ttk.Frame):
                 self.main_app.update_current_system(self.last_system)
     
     def _read_initial_location_from_journal(self) -> None:
-        """Read the most recent journal file to populate initial system/body location on startup"""
+        """Read the most recent journal file to populate initial system/body location on startup
+        
+        Uses timestamp comparison to find the LATEST system event (handles CarrierJump after Location)
+        """
         if not self.journal_dir or not os.path.isdir(self.journal_dir):
             return
         
-        try:# Find the most recent journal file
+        try:
+            # Find the most recent journal file
             journal_files = [f for f in os.listdir(self.journal_dir) if f.startswith("Journal.") and f.endswith(".log")]
             if not journal_files:
                 return
@@ -843,65 +857,77 @@ class ProspectorPanel(ttk.Frame):
             journal_files.sort(reverse=True)
             latest_journal = os.path.join(self.journal_dir, journal_files[0])
             
-            # Read journal backwards to find most recent Location or FSDJump event
+            # Read journal backwards to find most recent location event
             with open(latest_journal, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             
-            # Process from end to beginning to find most recent location
-            for line in reversed(lines[-500:]):  # Check last 500 lines (~1-2 hours of gameplay)
+            # Scan more lines to handle cases where CarrierJump comes after Location
+            latest_event = None
+            latest_timestamp = None
+            
+            # Check last 1000 lines to ensure we get CarrierJump if it exists
+            for line in reversed(lines[-1000:]):
                 try:
                     entry = json.loads(line.strip())
                     event_type = entry.get("event", "")
                     
-                    # Found location - extract system and body
-                    if event_type == "Location":
-                        self.last_system = entry.get("StarSystem", "")
-                        body_name = entry.get("Body", "")
-                        body_type = entry.get("BodyType", "")
-                        
-                        if body_name:
-                            self.last_body = body_name
-                            self.last_body_type = body_type
-                        
-                        # Stop after finding location
-                        break
-                    
-                    elif event_type == "SupercruiseExit":
-                        # Dropped from supercruise - this has body info!
-                        self.last_system = entry.get("StarSystem", "")
-                        body_name = entry.get("Body", "")
-                        body_type = entry.get("BodyType", "")
-                        
-                        if body_name:
-                            self.last_body = body_name
-                            self.last_body_type = body_type
-                        
-                        # Stop after finding supercruise exit
-                        break
-                    
-                    elif event_type == "FSDJump":
-                        self.last_system = entry.get("StarSystem", "")
-                        # After jump, we don't know the body yet
-                        break
-                    
-                    elif event_type == "SupercruiseEntry":
-                        # Just entered supercruise - clear body info
+                    # Look for system-changing events
+                    if event_type in ('FSDJump', 'Location', 'SupercruiseExit', 'SupercruiseEntry', 'Docked', 'CarrierJump'):
                         system = entry.get("StarSystem", "")
-                        if system:
-                            self.last_system = system
-                        break
+                        if not system:
+                            continue
                         
+                        timestamp_str = entry.get("timestamp", "")
+                        
+                        # Track the latest event by timestamp
+                        if timestamp_str:
+                            try:
+                                from datetime import datetime
+                                event_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                                
+                                if latest_timestamp is None or event_time > latest_timestamp:
+                                    latest_timestamp = event_time
+                                    
+                                    # For body info, prefer SupercruiseExit or Location
+                                    body_name = entry.get("Body", "")
+                                    body_type = entry.get("BodyType", "")
+                                    
+                                    latest_event = {
+                                        'system': system,
+                                        'body': body_name,
+                                        'body_type': body_type
+                                    }
+                            except Exception:
+                                # Fallback: just use first system event if timestamp parsing fails
+                                if latest_event is None:
+                                    latest_event = {
+                                        'system': system,
+                                        'body': entry.get("Body", ""),
+                                        'body_type': entry.get("BodyType", "")
+                                    }
+                        else:
+                            # No timestamp, use if we haven't found anything
+                            if latest_event is None:
+                                latest_event = {
+                                    'system': system,
+                                    'body': entry.get("Body", ""),
+                                    'body_type': entry.get("BodyType", "")
+                                }
+                            
                 except (json.JSONDecodeError, KeyError):
                     continue
             
             # If we found system/body, save them (UI widgets don't exist yet)
-            if self.last_system:
+            if latest_event:
+                self.last_system = latest_event['system']
+                self.last_body = latest_event['body']
+                self.last_body_type = latest_event['body_type']
+                
                 print(f"[STARTUP] Found system from journal: {self.last_system}")
                 if self.last_body:
                     print(f"[STARTUP] Found body from journal: {self.last_body} (type: {self.last_body_type})")
                 else:
                     print(f"[STARTUP] No body found in journal")
-                # Note: UI will be updated later when widgets are created
                     
         except Exception as e:
             print(f"Error reading initial location from journal: {e}")
@@ -2073,15 +2099,6 @@ class ProspectorPanel(ttk.Frame):
         # Create the reports panel content
         self._create_reports_panel(reports)
 
-        # Bookmarks tab - Mining location bookmarks
-        bookmarks = ttk.Frame(nb, padding=8)
-        nb.add(bookmarks, text="⭐ Bookmarks")
-        bookmarks.columnconfigure(0, weight=1)
-        bookmarks.rowconfigure(0, weight=1)
-        
-        # Create the bookmarks panel content
-        self._create_bookmarks_panel(bookmarks)
-
         # Statistics tab - Session statistics and analytics
         statistics = ttk.Frame(nb, padding=8)
         nb.add(statistics, text="📊 Statistics")
@@ -2278,18 +2295,16 @@ class ProspectorPanel(ttk.Frame):
         try:
             from config import load_mining_analysis_column_widths
             saved_widths = load_mining_analysis_column_widths()
-            print(f"[DEBUG] Loading saved column widths: {saved_widths}")
             if saved_widths:
                 for col_name, width in saved_widths.items():
                     try:
                         tree.column(col_name, width=width)
-                        print(f"[DEBUG] Applied width {width} to column {col_name}")
                     except Exception as e:
-                        print(f"[DEBUG] Could not set width for {col_name}: {e}")
+                        pass
             else:
-                print("[DEBUG] No saved column widths found, using defaults")
+                pass
         except Exception as e:
-            print(f"[DEBUG] Could not load saved column widths: {e}")
+            pass
 
         # Bind column resize event to save widths
         def save_column_widths(event=None):
@@ -3948,6 +3963,9 @@ class ProspectorPanel(ttk.Frame):
             # Refresh the Reports tab instead of opening new window
             self._refresh_reports_tab()
             
+            # Refresh the Statistics tab to show updated Top 3 Systems
+            self._refresh_session_statistics()
+            
             if not silent:
                 self._set_status(f"CSV rebuilt with {len(sessions)} sessions.")
             
@@ -5201,7 +5219,7 @@ class ProspectorPanel(ttk.Frame):
         if timestamp is None:
             timestamp = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         
-        sysname = (self.session_system.get().strip() or self.last_system or "Unknown").replace(" ", "_")
+        sysname = (self.session_system.get().strip() or self._get_current_system() or "Unknown").replace(" ", "_")
         body = (self.session_body.get().strip() or self.last_body or "Unknown").replace(" ", "_")
         fname = f"Session_{timestamp}_{sysname}_{body}.txt"
         os.makedirs(self.reports_dir, exist_ok=True)
@@ -6785,18 +6803,16 @@ class ProspectorPanel(ttk.Frame):
         try:
             from config import load_mining_analysis_column_widths
             saved_widths = load_mining_analysis_column_widths()
-            print(f"[DEBUG] Loading saved column widths for Reports Tab: {saved_widths}")
             if saved_widths:
                 for col_name, width in saved_widths.items():
                     try:
                         self.reports_tree_tab.column(col_name, width=width)
-                        print(f"[DEBUG] Applied width {width} to Reports Tab column {col_name}")
                     except Exception as e:
-                        print(f"[DEBUG] Could not set width for Reports Tab column {col_name}: {e}")
+                        pass
             else:
-                print("[DEBUG] No saved column widths found for Reports Tab, using defaults")
+                pass
         except Exception as e:
-            print(f"[DEBUG] Could not load saved column widths for Reports Tab: {e}")
+            pass
 
         # Bind column resize event to save widths
         def save_column_widths_tab(event=None):
@@ -8655,9 +8671,26 @@ class ProspectorPanel(ttk.Frame):
             # Track Fleet Carrier location changes
             if ev == "CarrierLocation":
                 carrier_system = evt.get("StarSystem")
-                if carrier_system and hasattr(self.app, 'distance_fc_system'):
-                    print(f"[FLEET CARRIER] Detected FC jump to: {carrier_system}")
-                    self.app.distance_fc_system.set(carrier_system)
+                if carrier_system:
+                    print(f"[FLEET CARRIER] CarrierLocation: system={carrier_system}")
+                    
+                    # Update fleet carrier system in distance calculator
+                    if hasattr(self.app, 'distance_fc_system'):
+                        self.app.distance_fc_system.set(carrier_system)
+                    
+                    # ALSO UPDATE PLAYER'S CURRENT SYSTEM since CarrierLocation indicates where the player is
+                    self.last_system = carrier_system
+                    self.session_system.set(self.last_system)
+                    
+                    # Get coordinates if available
+                    coords = None
+                    if "StarPos" in evt:
+                        coords = tuple(evt["StarPos"])
+                    
+                    # Notify main app - centralized system update
+                    if self.main_app and hasattr(self.main_app, 'update_current_system'):
+                        self.main_app.update_current_system(self.last_system, coords)
+                    
                     # Update distances in Distance Calculator (non-blocking)
                     if hasattr(self.app, '_update_home_fc_distances'):
                         self.app.after(100, self.app._update_home_fc_distances)
@@ -8804,17 +8837,14 @@ class ProspectorPanel(ttk.Frame):
                     pass
                     
             elif ev in ("CarrierJump", "CarrierLocation"):
-                # Fleet carrier jump - we're now at the carrier
+                # Fleet carrier jump - update carrier context
+                print(f"[DEBUG] Processing {ev} event: {evt.get('StarSystem', 'NO_SYSTEM')}")  # Debug
                 carrier_name = evt.get("StationName", "") or evt.get("CarrierName", "")
                 if carrier_name:
                     self.last_carrier_name = carrier_name
                     self.last_station_name = ""
                     
-                    # Update system and body from carrier jump
-                    if evt.get("StarSystem"):
-                        self.last_system = evt.get("StarSystem")
-                        self.session_system.set(self.last_system)
-                    
+                    # Update body info from carrier event
                     body_name = evt.get("Body") or evt.get("BodyName")
                     if body_name:
                         self.last_body = body_name
@@ -9369,12 +9399,12 @@ class ProspectorPanel(ttk.Frame):
         
         # Check for cargo full + idle condition if feature is enabled
         self._check_cargo_full_idle()
-
     def _session_start(self) -> None:
         if self.session_active:
             return
-        if self.last_system and not self.session_system.get():
-            self.session_system.set(self.last_system)
+        current_system = self._get_current_system()
+        if current_system and not self.session_system.get():
+            self.session_system.set(current_system)
         if self.last_body and not self.session_body.get():
             body_display = _extract_location_display(
                 self.last_body, 
@@ -11517,6 +11547,11 @@ class ProspectorPanel(ttk.Frame):
         self.stats_labels = {}
         
         # Overall Statistics (Left Column)
+        # Add "Session Overview" header
+        session_header = tk.Label(left_column, text="Session Overview", font=("Consolas", 10, "bold"), 
+                                 fg="#ffaa00", bg="#2b2b2b", anchor="w")
+        session_header.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5), padx=(0, 10))
+        
         stats_data = [
             ("Total Sessions:", "total_sessions"),
             ("Total Mining Time:", "total_time"),
@@ -11531,48 +11566,71 @@ class ProspectorPanel(ttk.Frame):
             # Label
             label = tk.Label(left_column, text=label_text, font=("Consolas", 10), 
                            fg="#cccccc", bg="#2b2b2b", anchor="w")
-            label.grid(row=i, column=0, sticky="w", pady=2, padx=(0, 10))
+            label.grid(row=1+i, column=0, sticky="w", pady=2, padx=(0, 10))
             
             # Value
             value_label = tk.Label(left_column, text="0", font=("Consolas", 10, "bold"), 
                                  fg="#00ff00", bg="#2b2b2b", anchor="w")
-            value_label.grid(row=i, column=1, sticky="w", pady=2)
+            value_label.grid(row=1+i, column=1, sticky="w", pady=2)
             self.stats_labels[key] = value_label
         
-        # Records (Right Column)
-        performers_data = [
-            ("T/hr:", "best_session_tph"),
-            ("System:", "best_session_system"),
-            ("Session(t):", "best_tonnage"),
+        # Add separator line
+        separator = tk.Frame(left_column, height=1, bg="#444444")
+        separator.grid(row=8, column=0, columnspan=2, sticky="ew", pady=8, padx=(0, 10))
+        
+        # Add "Best Records" header
+        best_header = tk.Label(left_column, text="Best Records", font=("Consolas", 10, "bold"), 
+                              fg="#ffaa00", bg="#2b2b2b", anchor="w")
+        best_header.grid(row=9, column=0, columnspan=2, sticky="w", pady=(5, 2), padx=(0, 10))
+        
+        # Best records data
+        best_records_data = [
+            ("Best T/hr:", "best_session_tph"),
+            ("Best System:", "best_session_system"),
+            ("Most Mined Ton Session:", "best_tonnage"),
             ("Most Mined System:", "most_mined_system"),
-            ("Minerals:", "most_collected_material")
+            ("Most Mined Minerals:", "most_collected_material")
         ]
         
-        for i, (label_text, key) in enumerate(performers_data):
+        for i, (label_text, key) in enumerate(best_records_data):
             # Label
-            label = tk.Label(right_column, text=label_text, font=("Consolas", 10), 
+            label = tk.Label(left_column, text=label_text, font=("Consolas", 10), 
                            fg="#cccccc", bg="#2b2b2b", anchor="w")
-            label.grid(row=i, column=0, sticky="w", pady=2, padx=(0, 10))
+            label.grid(row=10+i, column=0, sticky="w", pady=2, padx=(0, 10))
             
             # Value
-            value_label = tk.Label(right_column, text="None", font=("Consolas", 10, "bold"), 
-                                 fg="#ffaa00", bg="#2b2b2b", anchor="w", 
-                                 wraplength=400, justify="left")
-            value_label.grid(row=i, column=1, sticky="w", pady=2)
+            value_label = tk.Label(left_column, text="0", font=("Consolas", 10, "bold"), 
+                                 fg="#00ff00", bg="#2b2b2b", anchor="w")
+            value_label.grid(row=10+i, column=1, sticky="w", pady=2)
             self.stats_labels[key] = value_label
         
-        # Refresh button
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(pady=(15, 0))
+        # Records (Right Column) - Top 5 Best Systems only
+        top_systems_title = tk.Label(right_column, text="Top 5 Best Systems (T/hr)", font=("Consolas", 10, "bold"), 
+                                    fg="#cccccc", bg="#2b2b2b", anchor="w")
+        top_systems_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 2), padx=(0, 10))
         
-        refresh_btn = tk.Button(button_frame, text="🔄 Refresh Statistics", 
-                               command=self._refresh_session_statistics,
-                               bg="#2a5a2a", fg="#ffffff", 
-                               activebackground="#3a6a3a", activeforeground="#ffffff",
-                               relief="solid", bd=1, cursor="hand2", pady=5, padx=10,
-                               highlightbackground="#1a3a1a", highlightcolor="#1a3a1a")
-        refresh_btn.pack()
-        self.ToolTip(refresh_btn, "Refresh statistics from all mining session reports")
+        # Create labels for top 5 systems (3 lines per system: System|Body, Material, then metrics)
+        row_offset = 0
+        for rank in range(1, 6):
+            # Line 1: Rank. System | Body
+            system_label = tk.Label(right_column, text=f"{rank}. — | —", font=("Consolas", 10), 
+                                   fg="#ffffff", bg="#2b2b2b", anchor="w", wraplength=350, justify="left")
+            system_label.grid(row=1+row_offset, column=0, columnspan=2, sticky="w", pady=(2, 0), padx=(0, 10))
+            self.stats_labels[f'top_system_{rank}_line1'] = system_label
+            
+            # Line 2: Material (indented to align below system name, after "1. ")
+            material_label = tk.Label(right_column, text="—", font=("Consolas", 10), 
+                                     fg="#ffaa00", bg="#2b2b2b", anchor="w", wraplength=350, justify="left")
+            material_label.grid(row=1+row_offset+1, column=0, columnspan=2, sticky="w", pady=(0, 0), padx=(15, 0))
+            self.stats_labels[f'top_system_{rank}_line2'] = material_label
+            
+            # Line 3: Metrics indented (T/Asteroid, TPH)
+            metrics_label = tk.Label(right_column, text="—", font=("Consolas", 10), 
+                                    fg="#00ff00", bg="#2b2b2b", anchor="w", wraplength=350, justify="left")
+            metrics_label.grid(row=1+row_offset+2, column=0, columnspan=2, sticky="w", pady=(0, 2), padx=(15, 0))
+            self.stats_labels[f'top_system_{rank}_line3'] = metrics_label
+            
+            row_offset += 3
         
         # Initial statistics load
         self._refresh_session_statistics()
@@ -11725,6 +11783,21 @@ class ProspectorPanel(ttk.Frame):
             stats['avg_tph'] = total_tph_sum / valid_tph_sessions if valid_tph_sessions > 0 else 0
             stats['avg_hit_rate'] = total_hit_rate_sum / valid_hit_rate_sessions if valid_hit_rate_sessions > 0 else 0
             
+            # Calculate average tons per asteroid from all sessions
+            total_tons_per = 0
+            valid_tpa_sessions = 0
+            for session in sessions:
+                try:
+                    total_tons = float(session.get('total_tons', 0) or 0)
+                    asteroids = int(session.get('asteroids_prospected', 0) or 0)
+                    if asteroids > 0 and total_tons > 0:
+                        tons_per = total_tons / asteroids
+                        total_tons_per += tons_per
+                        valid_tpa_sessions += 1
+                except (ValueError, TypeError):
+                    continue
+            stats['avg_tons_per_asteroid'] = total_tons_per / valid_tpa_sessions if valid_tpa_sessions > 0 else 0
+            
             # Find most mined system (by tonnage)
             if stats['system_stats']:
                 most_mined = max(stats['system_stats'].items(), key=lambda x: x[1]['tonnage'])
@@ -11798,6 +11871,83 @@ class ProspectorPanel(ttk.Frame):
         except:
             return 0.0
     
+    def _calculate_ring_quality_rating(self, tph, tons_per_asteroid):
+        """Calculate ring quality rating based on TPH and tons/asteroid.
+        
+        Returns: (rating_name, color_hex)
+        - Excellent: TPH >= 800 AND T/ast >= 20
+        - Good: TPH >= 600 AND T/ast >= 15
+        - Fair: TPH >= 400 AND T/ast >= 10
+        - Poor: Below Fair threshold
+        """
+        try:
+            tph = float(tph or 0)
+            tons_per_asteroid = float(tons_per_asteroid or 0)
+            
+            if tph >= 800 and tons_per_asteroid >= 20:
+                return ("EXCELLENT", "#2d5a3d", "#a8d5ba")
+            elif tph >= 600 and tons_per_asteroid >= 15:
+                return ("GOOD", "#1c4a5e", "#8fd4e8")
+            elif tph >= 400 and tons_per_asteroid >= 10:
+                return ("FAIR", "#5e4e1c", "#f0d896")
+            else:
+                return ("POOR", "#5e1c24", "#f5a5ae")
+        except (ValueError, TypeError):
+            return ("No data", "#2b2b2b", "#888888")
+    
+    def _get_top_systems_from_csv(self, limit=5):
+        """Get top N unique systems by tons_per_asteroid from CSV (no duplicate system/body combos).
+        
+        Returns list of dicts with system, body, tons_per, tph, material
+        """
+        try:
+            import csv
+            csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
+            
+            if not os.path.exists(csv_path):
+                return []
+            
+            sessions = []
+            seen_systems = set()  # Track unique system|body combinations
+            
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    try:
+                        system = row.get('system', '')
+                        body = row.get('body', '')
+                        system_key = f"{system}|{body}"
+                        
+                        # Skip if we've already seen this system|body combination
+                        if system_key in seen_systems:
+                            continue
+                        
+                        total_tons = float(row.get('total_tons', 0) or 0)
+                        asteroids = int(row.get('asteroids_prospected', 0) or 1)
+                        tons_per = total_tons / asteroids if asteroids > 0 else 0
+                        
+                        if tons_per > 0:
+                            best_material = row.get('best_material', 'Unknown')
+                            
+                            sessions.append({
+                                'system': system,
+                                'body': body,
+                                'tons_per': tons_per,
+                                'tph': float(row.get('overall_tph', 0) or 0),
+                                'material': best_material
+                            })
+                            seen_systems.add(system_key)
+                    except (ValueError, TypeError):
+                        continue
+            
+            # Sort by T/hr (TPH) descending
+            sessions.sort(key=lambda x: x['tph'], reverse=True)
+            
+            return sessions[:limit]
+        except Exception as e:
+            print(f"Error getting top systems: {e}")
+            return []
+    
     def _refresh_session_statistics(self):
         """Update the statistics display with current data"""
         try:
@@ -11817,6 +11967,11 @@ class ProspectorPanel(ttk.Frame):
                 self.stats_labels['best_tonnage'].config(text="0")
                 self.stats_labels['avg_hit_rate'].config(text="0%")
                 self.stats_labels['total_asteroids'].config(text="0")
+                # Clear top 5 systems
+                for rank in range(1, 6):
+                    self.stats_labels[f'top_system_{rank}_line1'].config(text=f"{rank}. — | —")
+                    self.stats_labels[f'top_system_{rank}_line2'].config(text="—")
+                    self.stats_labels[f'top_system_{rank}_line3'].config(text="—")
                 return
             
             # Update overall statistics
@@ -11859,6 +12014,26 @@ class ProspectorPanel(ttk.Frame):
             self.stats_labels['best_tonnage'].config(text=f"{stats['best_session']['tonnage']:.1f}")
             self.stats_labels['avg_hit_rate'].config(text=f"{stats['avg_hit_rate']:.1f}%")
             self.stats_labels['total_asteroids'].config(text=str(stats['total_asteroids']))
+            
+            # Update Top 5 Systems: Line 1=System|Body, Line 2=Material, Line 3=Metrics
+            top_systems = self._get_top_systems_from_csv(limit=5)
+            for rank in range(1, 6):
+                if rank <= len(top_systems):
+                    sys_data = top_systems[rank - 1]
+                    # Line 1: Rank. System | Body
+                    line1_text = f"{rank}. {sys_data['system']} | {sys_data['body']}"
+                    # Line 2: Material with label
+                    line2_text = f"Minerals: {sys_data['material']}"
+                    # Line 3: Metrics (T/Asteroid and TPH only)
+                    line3_text = f"{sys_data['tons_per']:.1f} T/Asteroid  |  {sys_data['tph']:.1f} T/hr"
+                else:
+                    line1_text = f"{rank}. — | —"
+                    line2_text = "—"
+                    line3_text = "—"
+                
+                self.stats_labels[f'top_system_{rank}_line1'].config(text=line1_text)
+                self.stats_labels[f'top_system_{rank}_line2'].config(text=line2_text)
+                self.stats_labels[f'top_system_{rank}_line3'].config(text=line3_text)
             
             self._set_status(f"Statistics updated: {stats['total_sessions']} sessions analyzed")
             

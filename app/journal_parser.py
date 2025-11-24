@@ -444,6 +444,9 @@ class JournalParser:
                     else:
                         log.warning(f"Ring metadata not available for {system_name} - {body_name}")
             
+            # Track if we're adding truly NEW hotspots (not previously scanned)
+            hotspots_are_new = False
+            
             # Process each signal (material hotspot)
             for signal in signals:
                 signal_type = signal.get('Type', '')
@@ -458,6 +461,20 @@ class JournalParser:
                     
                     # Normalize material name to prevent duplicates (e.g., "tritium" -> "Tritium")
                     material_name = self.normalize_material_name(raw_material_name)
+                    
+                    # Check if this hotspot already exists
+                    import sqlite3
+                    with sqlite3.connect(self.user_db.db_path) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute('''
+                            SELECT id FROM hotspot_data 
+                            WHERE system_name = ? AND body_name = ? AND material_name = ?
+                        ''', (system_name, body_name, material_name))
+                        existing = cursor.fetchone()
+                    
+                    # If hotspot doesn't exist, it's a new discovery
+                    if not existing:
+                        hotspots_are_new = True
                     
                     self.user_db.add_hotspot_data(
                         system_name=system_name,
@@ -478,8 +495,9 @@ class JournalParser:
                     log.debug(f"Added hotspot: {system_name} - {body_name} - {material_name} ({count})")
                     
                     # Trigger callback if provided (for UI updates)
-                    if self.on_hotspot_added:
-                        self.on_hotspot_added()
+                    # Pass True ONLY if at least one hotspot was NEW (not already in database)
+                    if self.on_hotspot_added and hotspots_are_new:
+                        self.on_hotspot_added(is_new_discovery=True)
                     
         except Exception as e:
             log.error(f"Error processing SAASignalsFound event: {e}")
@@ -589,13 +607,11 @@ class JournalParser:
                     if current_system:
                         stats['systems_visited'] += 1
                         file_stats['visits'] += 1
-                        
                 elif event_type == 'Location':
                     current_system = self.process_location(event)
                     if current_system:
                         stats['systems_visited'] += 1
                         file_stats['visits'] += 1
-                        
                 elif event_type == 'CarrierJump':
                     # Fleet carrier jumps also change current system
                     carrier_system = event.get('StarSystem', '')
@@ -726,6 +742,87 @@ class JournalParser:
         except Exception as e:
             log.error(f"Error getting recent ring scans: {e}")
             return []
+
+    def get_last_known_system(self) -> Optional[str]:
+        """Scan journal files for the most recent system location event by timestamp.
+        
+        Compares timestamps to find the actual LATEST event that includes system info.
+        Priority: FSDJump, Location, Docked > CarrierJump (based on timestamp, not order).
+        This handles cases where old Location events exist after a CarrierJump.
+        """
+        files = self.find_journal_files()
+        if not files:
+            return self._get_system_from_status_json()
+        
+        latest_event = None
+        latest_timestamp = None
+        
+        # Scan all events to find the most recent one that includes system info
+        for file_path in reversed(files):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                
+                # Scan backwards in the file
+                for line in reversed(lines):
+                    try:
+                        event = json.loads(line.strip())
+                    except Exception:
+                        continue
+                    
+                    event_type = event.get('event', '')
+                    
+                    # Look for system-changing events
+                    if event_type in ('FSDJump', 'Location', 'Docked', 'CarrierJump'):
+                        system = event.get('StarSystem')
+                        if not system:
+                            continue
+                        
+                        timestamp_str = event.get('timestamp', '')
+                        
+                        # Track the latest event by timestamp
+                        if timestamp_str:
+                            try:
+                                from datetime import datetime
+                                event_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                                
+                                if latest_timestamp is None or event_time > latest_timestamp:
+                                    latest_timestamp = event_time
+                                    latest_event = (event_type, system)
+                            except Exception:
+                                # Fallback: just use the first one we find
+                                if latest_event is None:
+                                    latest_event = (event_type, system)
+                        else:
+                            # No timestamp, use if we haven't found anything
+                            if latest_event is None:
+                                latest_event = (event_type, system)
+                
+            except Exception:
+                continue
+        
+        if latest_event:
+            event_type, system = latest_event
+            return system
+        
+        # Final fallback: check Status.json for current system
+        return self._get_system_from_status_json()
+    
+    def _get_system_from_status_json(self) -> Optional[str]:
+        """Read the current system from Status.json if available"""
+        try:
+            status_json_path = os.path.join(self.journal_dir, "Status.json")
+            if not os.path.exists(status_json_path):
+                return None
+            
+            with open(status_json_path, 'r', encoding='utf-8') as f:
+                status_data = json.load(f)
+                system = status_data.get('StarSystem')
+                if system:
+                    return system
+        except Exception:
+            pass
+        return None
 
 
 def create_journal_parser_from_config(prospector_panel) -> Optional[JournalParser]:

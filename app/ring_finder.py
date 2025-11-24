@@ -99,8 +99,7 @@ class RingFinder:
     
     ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter
     
-    def __init__(self, parent_frame: ttk.Frame, prospector_panel=None, app_dir: Optional[str] = None, tooltip_class=None, distance_calculator=None):
-        print("DEBUG: RingFinder.__init__ called")
+    def __init__(self, parent_frame: ttk.Frame, prospector_panel=None, app_dir: Optional[str] = None, tooltip_class=None, distance_calculator=None, user_db=None):
         self.parent = parent_frame
         self.prospector_panel = prospector_panel  # Reference to get current system
         self.systems_data = {}  # System coordinates cache
@@ -108,7 +107,6 @@ class RingFinder:
         self.app_dir = app_dir  # Store app_dir for galaxy database access
         self.db_ready = False  # Track database initialization status
         self.distance_calculator = distance_calculator  # Distance calculator for Sol distance
-        print(f"DEBUG: distance_calculator = {distance_calculator}")
         
         # Use main app's ToolTip class if provided, otherwise use local one
         global ToolTip
@@ -118,22 +116,24 @@ class RingFinder:
         # Initialize local database manager
         self.local_db = LocalSystemsDatabase()
         
-        # Initialize user database for hotspot data with correct app directory
-        if app_dir:
+        # Initialize user database for hotspot data
+        # If user_db is provided (from main app), reuse it to avoid duplicate initialization
+        if user_db:
+            self.user_db = user_db
+            
+            # Initialize EDSM integration with the shared database path
+            self.edsm = EDSMIntegration(self.user_db.db_path)
+        elif app_dir:
             # Use provided app directory to construct database path
             data_dir = os.path.join(app_dir, "data")
             db_path = os.path.join(data_dir, "user_data.db")
-            print(f"DEBUG: RingFinder using explicit database path: {db_path}")
-            print(f"DEBUG: Current working directory: {os.getcwd()}")
             self.user_db = UserDatabase(db_path)
             
             # Initialize EDSM integration for automatic metadata fallback
             self.edsm = EDSMIntegration(db_path)
         else:
             # Fall back to default path resolution
-            print("DEBUG: RingFinder using default database path resolution")
             self.user_db = UserDatabase()
-            print(f"DEBUG: RingFinder actual database path: {self.user_db.db_path}")
             
             # Initialize EDSM integration with default path
             self.edsm = EDSMIntegration(self.user_db.db_path)
@@ -278,9 +278,33 @@ class RingFinder:
         # Single smart search input
         ttk.Label(search_frame, text="Reference System:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.system_var = tk.StringVar()
-        self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=35)
+        # Clear selection when the reference system value changes (prevents auto-selection)
+        try:
+            self.system_var.trace_add('write', lambda *args: (self.system_entry.selection_clear(), self.parent.focus_set()))
+        except Exception:
+            # Fallback for older Python versions
+            try:
+                self.system_var.trace('w', lambda *args: (self.system_entry.selection_clear(), self.parent.focus_set()))
+            except Exception:
+                pass
+        self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=35, takefocus=False)
         self.system_entry.bind('<Return>', lambda e: self.search_hotspots())
         self.system_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        # Ensure the system entry does not keep a selection when mapped/visible
+        try:
+            self.system_entry.bind('<Map>', lambda e: self.system_entry.selection_clear())
+            self.system_entry.bind('<Visibility>', lambda e: self.system_entry.selection_clear())
+            self.system_entry.bind('<FocusOut>', lambda e: self.system_entry.selection_clear())
+            self.system_entry.bind('<FocusIn>', lambda e: self.system_entry.selection_clear())
+        except Exception:
+            pass
+        # Remove focus and selection from entry on startup (focus top-level window)
+        try:
+            top = self.parent.winfo_toplevel()
+            self.parent.after(100, lambda: self.system_entry.selection_clear())
+            self.parent.after(100, lambda: top.focus_set())
+        except Exception:
+            pass
         
         # For compatibility, current_system_var points to the same system_var
         self.current_system_var = self.system_var
@@ -570,6 +594,11 @@ class RingFinder:
         self.results_tree.bind("<Button-3>", self._show_context_menu)
         
         print("DEBUG: setup_ui completed successfully")
+        # Debug: Print which widget has initial focus (helpful to track why entries are highlighted)
+        try:
+            self.parent.after(500, lambda: print(f"[DEBUG] RingFinder initial focus: {self.parent.winfo_toplevel().focus_get()}"))
+        except Exception:
+            pass
     
     def _sort_column(self, col, reverse):
         """Sort treeview column"""
@@ -1008,6 +1037,16 @@ class RingFinder:
         """
         self._is_auto_refresh = auto_refresh
         print(f"[SEARCH DEBUG] search_hotspots() called (auto_refresh={auto_refresh})")
+        
+        # Log the caller for debugging unexpected searches
+        if auto_refresh:
+            import traceback
+            stack = traceback.extract_stack()
+            # Find the most relevant caller (skip internal frames)
+            for frame in reversed(stack[-5:-1]):
+                if 'ring_finder.py' in frame.filename:
+                    print(f"[SEARCH DEBUG] Called from: {frame.name} at line {frame.lineno}")
+                    break
         
         reference_system = self.system_var.get().strip()
         print(f"[SEARCH DEBUG] Reference system: '{reference_system}'")
@@ -3177,10 +3216,8 @@ class RingFinder:
                             # Then check for auto-search triggers
                             self._check_journal_event_for_auto_search(line)
                         cargo_monitor.process_journal_event = enhanced_process
-                
-                print(f"[AUTO-SEARCH] Setup complete, monitoring journal events")
         except Exception as e:
-            print(f"[AUTO-SEARCH] Failed to setup monitoring: {e}")
+            pass
 
     def _check_journal_event_for_auto_search(self, line: str):
         """Check journal events for FSD jumps and trigger auto-search"""
@@ -3192,28 +3229,56 @@ class RingFinder:
             event = json.loads(line.strip())
             event_type = event.get("event", "")
             
+            # Log ALL events that contain StarSystem for debugging
+            if 'StarSystem' in event:
+                current_system = event.get("StarSystem")
+                print(f"[AUTO-SEARCH DEBUG] Event '{event_type}' has StarSystem: {current_system}, Last Monitored: {self.last_monitored_system}")
+            
+            # ONLY trigger on FSDJump (jump events), NOT on Scan/SAASignalsFound!
             if event_type == "FSDJump":
                 current_system = event.get("StarSystem")
+                print(f"[AUTO-SEARCH] FSDJump detected: {current_system}")
                 if current_system and current_system != self.last_monitored_system:
+                    print(f"[AUTO-SEARCH] ✓ NEW SYSTEM: {current_system} (was: {self.last_monitored_system})")
                     self.last_monitored_system = current_system
                     # Schedule auto-search in main thread
                     self.parent.after(1000, lambda: self._auto_search_new_system(current_system))
+                else:
+                    print(f"[AUTO-SEARCH] ✗ SAME SYSTEM: already in {current_system}")
                     
         except Exception as e:
-            pass  # Silent fail
+            print(f"[AUTO-SEARCH ERROR] {e}")  # Log errors instead of silent fail
 
     def _auto_search_new_system(self, system_name: str):
         """Auto-populate reference system and trigger search silently"""
         try:
+            print(f"[AUTO-SEARCH] _auto_search_new_system called for: {system_name}")
             # Update reference system field
             self.system_var.set(system_name)
             
+            # Reset previous_results so new search doesn't highlight as "changed"
+            # (we're in a completely new system, so all results are legitimately new to this location)
+            self.previous_results = set()
+            print(f"[AUTO-SEARCH] Reset previous_results to prevent false highlighting on new system")
+            
+            # Reset the CargoMonitor's refresh tracking so rings in new system can refresh
+            if hasattr(self, 'prospector_panel') and self.prospector_panel:
+                main_app = getattr(self.prospector_panel, 'main_app', None)
+                if main_app and hasattr(main_app, 'cargo_monitor'):
+                    cargo_monitor = main_app.cargo_monitor
+                    cargo_monitor._last_refreshed_rings = set()
+                    print(f"[AUTO-SEARCH] Reset _last_refreshed_rings to allow refreshes on new rings in new system")
+            
             # Trigger search with current settings - but only if not already searching
             if self.search_btn['state'] == 'normal':
-                self.search_hotspots()
+                print(f"[AUTO-SEARCH] Triggering search_hotspots with auto_refresh=False (manual search on new system)")
+                self.search_hotspots(auto_refresh=False)
+            else:
+                print(f"[AUTO-SEARCH] Search button is not normal state, skipping auto-search")
                 
         except Exception as e:
             # Silent fail - let user search manually if auto-search fails
+            print(f"[AUTO-SEARCH ERROR] Failed to auto-search: {e}")
             pass
 
     def _load_auto_search_state(self) -> bool:

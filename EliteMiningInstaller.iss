@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.5.8
+AppVersion=v4.5.9.beta1
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -204,7 +204,19 @@ begin
   end;
   
   { Method 4: Check standard Program Files locations }
-  if DirExists(ExpandConstant('{pf}\VoiceAttack 2')) then
+  { Check 64-bit Program Files explicitly first (C:\Program Files) }
+  if DirExists('C:\Program Files\VoiceAttack 2') then
+  begin
+    VADetected := True;
+    Result := 'C:\Program Files\VoiceAttack 2\Apps';
+  end
+  else if DirExists('C:\Program Files\VoiceAttack') then
+  begin
+    VADetected := True;
+    Result := 'C:\Program Files\VoiceAttack\Apps';
+  end
+  { Then check using Inno Setup constants }
+  else if DirExists(ExpandConstant('{pf}\VoiceAttack 2')) then
   begin
     VADetected := True;
     Result := ExpandConstant('{pf}\VoiceAttack 2\Apps');
@@ -240,14 +252,21 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
   SelectedPath: String;
+  ParentPath: String;
 begin
   Result := True;
   if CurPageID = wpSelectDir then
   begin
     SelectedPath := WizardForm.DirEdit.Text;
     
+    { Remove trailing \EliteMining if present to check parent folder }
+    if Copy(SelectedPath, Length(SelectedPath) - Length('EliteMining') + 1, Length('EliteMining')) = 'EliteMining' then
+      ParentPath := Copy(SelectedPath, 1, Length(SelectedPath) - Length('\EliteMining'))
+    else
+      ParentPath := SelectedPath;
+    
     { Validate if user selected a VoiceAttack folder }
-    if FileExists(SelectedPath + '\VoiceAttack.exe') then
+    if FileExists(ParentPath + '\VoiceAttack.exe') then
     begin
       { Valid VoiceAttack installation - update detection flag }
       VADetected := True;

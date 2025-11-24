@@ -603,7 +603,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.5.8"
+APP_VERSION = "v4.5.9.beta1"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1566,9 +1566,13 @@ class CargoMonitor:
         self.refresh_ship_capacity()
         logging.basicConfig(filename="debug_log.txt", level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
     
-    def _on_hotspot_added(self):
-        """Callback triggered when new hotspot data is added to database"""
-        print("[HOTSPOT DEBUG] _on_hotspot_added callback triggered")
+    def _on_hotspot_added(self, is_new_discovery: bool = False):
+        """Callback triggered when new hotspot data is added to database
+        
+        Args:
+            is_new_discovery: True if these are newly discovered hotspots (not already in database)
+        """
+        print(f"[HOTSPOT DEBUG] _on_hotspot_added callback triggered (is_new_discovery={is_new_discovery})")
         try:
             # Access main app through main_app_ref if this is called from CargoMonitor
             main_app = getattr(self, 'main_app_ref', self)
@@ -1587,7 +1591,15 @@ class CargoMonitor:
                 
             # Ring Finder exists - refresh it now
             print("✓ Hotspot added - refreshing Ring Finder database info")
-            main_app._refresh_ring_finder()
+            main_app._refresh_ring_finder(is_new_discovery=is_new_discovery)
+            
+            # Auto-search refresh: Only if NEW hotspots were discovered
+            if is_new_discovery:
+                scanned_system = getattr(main_app, '_current_saa_system', None)
+                scanned_body = getattr(main_app, '_current_saa_body', None)
+                if scanned_system and hasattr(main_app, 'cargo_monitor'):
+                    print(f"[AUTO-REFRESH DEBUG] SAASignalsFound processing complete, checking auto-refresh for system: {scanned_system}, body: {scanned_body}")
+                    main_app.cargo_monitor._check_auto_refresh_ring_finder(scanned_system, scanned_body, is_new_discovery=True)
             
             # IMMEDIATE EDSM FALLBACK: Fill missing metadata for newly scanned system
             # This ensures auto-refresh shows complete data after the 5-second delay
@@ -1620,9 +1632,21 @@ class CargoMonitor:
             # Log error but don't break other functionality
             print(f"Warning: Failed to refresh Ring Finder after hotspot add: {e}")
     
-    def _check_auto_refresh_ring_finder(self, scanned_system: str):
-        """Check if Ring Finder should auto-refresh after ring scan - no delay for first scan, 2s delay for subsequent scans"""
+    def _check_auto_refresh_ring_finder(self, scanned_system: str, scanned_body: str = None, hotspots_were_new: bool = False):
+        """Check if Ring Finder should auto-refresh after ring scan
+        
+        Args:
+            scanned_system: System name where ring was scanned
+            scanned_body: Body/ring name
+            hotspots_were_new: True if hotspots were newly discovered (not already in database)
+        """
         try:
+            # CRITICAL: Only refresh if NEW hotspots were actually discovered
+            # Existing hotspots or proximity re-scans should NOT trigger refresh
+            if not hotspots_were_new:
+                print(f"[AUTO-REFRESH DEBUG] Hotspots not new for {scanned_system} {scanned_body} - skipping refresh")
+                return
+            
             # Access main app to get Ring Finder
             main_app = getattr(self, 'main_app_ref', self)
             
@@ -3455,6 +3479,10 @@ cargo panel forces Elite to write detailed inventory data.
                     
                     print(f"🔍 Processing SAASignalsFound: {body_name} in {scanned_system}")
                     
+                    # Store context for hotspot callback to use
+                    self._current_saa_system = scanned_system
+                    self._current_saa_body = body_name
+                    
                     self.journal_parser.process_saa_signals_found(event, scanned_system)
                     
                     # Show notification in status (if available)
@@ -3469,10 +3497,6 @@ cargo panel forces Elite to write detailed inventory data.
                             )
                     
                     print(f"✓ SAASignalsFound processed successfully")
-                    
-                    # Auto-search refresh: Check if Ring Finder should update results
-                    print(f"[AUTO-REFRESH DEBUG] SAASignalsFound processing complete, checking auto-refresh for system: {scanned_system}")
-                    self._check_auto_refresh_ring_finder(scanned_system)
                     
                 except Exception as saa_err:
                     print(f"Warning: Failed to process SAASignalsFound event: {saa_err}")
@@ -4564,8 +4588,14 @@ class App(tk.Tk):
             file_watcher.add_watch(journal_dir, self._on_journal_file_change)
             print(f"✅ Watching journal directory for Market.json updates")
 
-        # Build UI
+        # Build UI - ProspectorPanel will scan latest journal and populate current_system
         self._build_ui()
+        
+        # Set current system from ProspectorPanel's scan (already done during UI build)
+        # ProspectorPanel._read_initial_location_from_journal() scans the latest file efficiently
+        # Use that result instead of doing another expensive full-file scan
+        if self.prospector_panel and self.prospector_panel.last_system:
+            self.current_system = self.prospector_panel.last_system
         
         # Initialize VoiceAttack variables after UI is built
         self.after(500, self._initialize_va_variables)
@@ -4602,6 +4632,11 @@ class App(tk.Tk):
 
         self.notebook = ttk.Notebook(content_frame)
         self.notebook.grid(row=0, column=0, sticky="nsew")
+        # Clear focus when switching tabs to prevent entries from being auto-selected
+        try:
+            self.notebook.bind('<<NotebookTabChanged>>', lambda e: self.after(50, lambda: import_btn.focus_set()))
+        except Exception:
+            pass
 
         # Mining Session tab (moved from Dashboard, with all its sub-tabs)
         mining_session_tab = ttk.Frame(self.notebook, padding=8)
@@ -4629,6 +4664,11 @@ class App(tk.Tk):
         voiceattack_tab = ttk.Frame(self.notebook, padding=8)
         self._build_voiceattack_controls_tab(voiceattack_tab)
         self.notebook.add(voiceattack_tab, text="VoiceAttack Controls")
+        
+        # Bookmarks tab - Mining location bookmarks
+        bookmarks_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_bookmarks_tab(bookmarks_tab)
+        self.notebook.add(bookmarks_tab, text="Bookmarks")
         
         # Auto-populate marketplace system after UI is built
         self.after(3000, self._populate_marketplace_system)
@@ -4661,6 +4701,8 @@ class App(tk.Tk):
             cursor="hand2"
         )
         import_btn.grid(row=0, column=0, sticky="w")
+        # Expose import button for focus control from other methods
+        self.import_btn = import_btn
         ToolTip(import_btn, "Import current game settings\nThis reads your current in-game configuration")
         
         apply_btn = tk.Button(
@@ -4698,6 +4740,19 @@ class App(tk.Tk):
         self.after(100, self._import_all_from_txt)
         # Set up tracing AFTER loading from .txt files
         self.after(200, self._setup_announcement_tracing)
+
+        # Ensure focus is on a neutral button to prevent initial Entry highlights
+        try:
+            self.after(300, lambda: import_btn.focus_set())
+        except Exception:
+            pass
+
+        # Clear selection on ring finder and distance calculator entries after UI stabilized
+        try:
+            if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_entry'):
+                self.after(300, lambda: self.ring_finder.system_entry.selection_clear())
+        except Exception:
+            pass
         
         # Initialize color menu display after UI is built
         self.after(200, self._update_color_menu_display)
@@ -4707,6 +4762,12 @@ class App(tk.Tk):
         
         # Reset window size for better tab layout - smaller window size
         self.after(50, lambda: self.geometry("1200x700"))
+
+        # Debug: Print which widget has initial focus to diagnose why entry fields are highlighted
+        try:
+            self.after(600, lambda: print(f"[DEBUG] Main initial focus: {self.focus_get()}"))
+        except Exception:
+            pass
 
     def _create_integrated_cargo_monitor(self, parent_frame):
         """
@@ -4945,8 +5006,12 @@ class App(tk.Tk):
             import traceback
             traceback.print_exc()
 
-    def _refresh_ring_finder(self):
-        """Refresh Ring Finder database info and cache after hotspot added"""
+    def _refresh_ring_finder(self, is_new_discovery: bool = False):
+        """Refresh Ring Finder database info and cache after hotspot added
+        
+        Args:
+            is_new_discovery: True if newly discovered hotspots (should trigger auto-refresh)
+        """
         try:
             if hasattr(self, 'ring_finder') and self.ring_finder:
                 # Update database info counter
@@ -4960,6 +5025,11 @@ class App(tk.Tk):
                 # Clear the pending refresh flag
                 if hasattr(self, '_pending_ring_finder_refresh'):
                     self._pending_ring_finder_refresh = False
+                
+                # Pass is_new_discovery info to auto-refresh check
+                if is_new_discovery and hasattr(self.cargo_monitor, '_check_auto_refresh_ring_finder'):
+                    # This will be called with the is_new_discovery flag
+                    pass
         except Exception as e:
             print(f"Warning: Ring Finder refresh failed: {e}")
 
@@ -5383,6 +5453,15 @@ class App(tk.Tk):
         mining_controls_tab = ttk.Frame(self.voiceattack_notebook, padding=8)
         self._build_timers_tab(mining_controls_tab)
         self.voiceattack_notebook.add(mining_controls_tab, text="Mining Controls")
+
+    def _build_bookmarks_tab(self, frame: ttk.Frame) -> None:
+        """Build the Bookmarks tab - Mining location bookmarks"""
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(0, weight=1)
+        
+        # Use the prospector panel's bookmarks functionality
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            self.prospector_panel._create_bookmarks_panel(frame)
 
     def _build_announcements_tab(self, frame: ttk.Frame) -> None:
         """Build the Announcements settings tab with full material functionality"""
@@ -7235,11 +7314,30 @@ class App(tk.Tk):
         row = 0
         ttk.Label(config_frame, text="Current System:", font=("Segoe UI", 9, "bold")).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_current_system = tk.StringVar(value="---")
+        # Clear selection when current system updates (prevents auto-selection of readonly entry)
+        try:
+            self.distance_current_system.trace_add('write', lambda *args: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None, self.import_btn.focus_set() if hasattr(self, 'import_btn') else None))
+        except Exception:
+            try:
+                self.distance_current_system.trace('w', lambda *args: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None, self.import_btn.focus_set() if hasattr(self, 'import_btn') else None))
+            except Exception:
+                pass
         current_display = tk.Entry(config_frame, textvariable=self.distance_current_system, 
                                    bg="#2d2d2d", fg="#00ff00", font=("Segoe UI", 9, "bold"),
-                                   state="readonly", readonlybackground="#2d2d2d")
+                       state="readonly", readonlybackground="#2d2d2d", takefocus=False)
         current_display.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         ToolTip(current_display, "Your current system (updates automatically on FSD jump)")
+        # Make the display available for selection-clear later
+        self.distance_current_display = current_display
+        # Avoid the Current System entry being selected when displayed
+        try:
+            current_display.bind('<Map>', lambda e: current_display.selection_clear())
+            current_display.bind('<Visibility>', lambda e: current_display.selection_clear())
+            current_display.bind('<FocusIn>', lambda e: current_display.selection_clear())
+        except Exception:
+            pass
+        # Remove highlight from Current System entry
+        config_frame.after(100, lambda: current_display.selection_clear())
         
         # Current system Sol distance label
         self.current_sol_label = tk.Label(config_frame, text="", 
@@ -7363,11 +7461,14 @@ class App(tk.Tk):
         # Calculate button (or auto-calculate on change)
         row += 1
         calc_btn = tk.Button(calc_frame, text="Calculate Distance", command=self._calculate_distances,
-                           bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                           activeforeground="#ffffff", relief="ridge", bd=1, padx=12, pady=4,
-                           font=("Segoe UI", 9, "bold"), cursor="hand2")
+                   bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                   activeforeground="#ffffff", relief="ridge", bd=1, padx=12, pady=4,
+                   font=("Segoe UI", 9, "bold"), cursor="hand2")
         calc_btn.grid(row=row, column=0, columnspan=3, pady=(8, 3))
         ToolTip(calc_btn, "Calculate distances between systems (or press Enter)")
+
+        # Set focus to the Calculate Distance button after UI is built
+        calc_frame.after(100, calc_btn.focus_set)
         
         # Status/Loading indicator
         row += 1
@@ -8799,6 +8900,13 @@ class App(tk.Tk):
             y = (screen_height - 650) // 2
             self.geometry(f"1100x650+{x}+{y}")
         
+        # After window shown, ensure no input selection remains and focus a neutral button
+        try:
+            self.after(150, lambda: self.import_btn.focus_set() if hasattr(self, 'import_btn') else None)
+            self.after(150, lambda: (self.ring_finder.system_entry.selection_clear() if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_entry') else None))
+            self.after(150, lambda: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None))
+        except Exception:
+            pass
         self.after(50, lambda: self.state("zoomed") if zoomed else None)
 
     def _check_config_migration(self):
@@ -9733,14 +9841,12 @@ class App(tk.Tk):
 
     def _setup_ring_finder(self, parent_frame):
         """Setup the ring finder tab"""
-        print("DEBUG: _setup_ring_finder called")
         try:
             # Pass the correct app directory to Ring Finder for proper database path
             # Only use va_root path in installer mode, None in dev mode for consistent database location
             app_dir = os.path.join(self.va_root, "app") if getattr(sys, 'frozen', False) and hasattr(self, 'va_root') and self.va_root else None
-            print(f"DEBUG: About to create RingFinder, distance_calculator={self.distance_calculator}")
-            self.ring_finder = RingFinder(parent_frame, self.prospector_panel, app_dir, ToolTip, self.distance_calculator)
-            print("DEBUG: RingFinder created successfully")
+            # Pass shared user_db from CargoMonitor to avoid duplicate database initialization
+            self.ring_finder = RingFinder(parent_frame, self.prospector_panel, app_dir, ToolTip, self.distance_calculator, self.cargo_monitor.user_db)
             
             # Check if there were any pending hotspot additions while Ring Finder was being created
             if getattr(self, '_pending_ring_finder_refresh', False):
@@ -11476,8 +11582,8 @@ class App(tk.Tk):
                 print("No journal files found, skipping initial import")
                 self._set_status("No journal files found - check journal folder in Settings", 8000)
         else:
-            # Not first run - do incremental auto-scan
-            self._run_auto_scan_background()
+            # Not first run - do incremental auto-scan, passing state to avoid duplicate load
+            self._run_auto_scan_background(state)
     
     def _show_first_run_welcome_dialog(self, journal_count, all_journals):
         """Show welcome dialog for first-time users"""
@@ -11710,8 +11816,12 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         thread = threading.Thread(target=scan_with_progress, daemon=True)
         thread.start()
     
-    def _run_auto_scan_background(self):
-        """Run auto-scan in background thread"""
+    def _run_auto_scan_background(self, state=None):
+        """Run auto-scan in background thread
+        
+        Args:
+            state: Optional pre-loaded JournalScanState to avoid duplicate load
+        """
         import threading
         from incremental_journal_scanner import IncrementalJournalScanner
         
@@ -11723,8 +11833,8 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
                 journal_dir = self.cargo_monitor.journal_dir
                 user_db = self.cargo_monitor.user_db
                 
-                # Create scanner (callback per-hotspot would be too frequent from background thread)
-                scanner = IncrementalJournalScanner(journal_dir, user_db)
+                # Create scanner with pre-loaded state (callback per-hotspot would be too frequent from background thread)
+                scanner = IncrementalJournalScanner(journal_dir, user_db, state=state)
                 
                 # Scan new entries
                 files, events = scanner.scan_new_entries(
@@ -11769,6 +11879,29 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         
         return None
     
+    def _set_current_system_from_journal(self) -> None:
+        """Set current system from journal after UI is built (robust against FC jumps/docked)"""
+        try:
+            from journal_parser import JournalParser
+            
+            # Get journal directory from prospector panel
+            if not hasattr(self, 'prospector_panel') or not self.prospector_panel:
+                return
+            
+            journal_dir = self.prospector_panel.journal_dir
+            if not journal_dir or not os.path.isdir(journal_dir):
+                return
+            
+            parser = JournalParser(journal_dir)
+            last_system = parser.get_last_known_system()
+            
+            if last_system:
+                # Use update_current_system to notify all components
+                self.update_current_system(last_system)
+                
+        except Exception:
+            pass
+    
     def update_current_system(self, system_name: str, coords: Optional[tuple] = None) -> None:
         """Centralized method to update current system - notifies all interested components"""
         if not system_name:
@@ -11790,6 +11923,18 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
             self.distance_current_system.set(system_name)
             # Trigger distance updates to home/FC
             self.after(0, self._update_home_fc_distances)
+        
+        # 3. Update Mining Analytics (prospector panel) session system
+        if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, 'session_system'):
+            self.prospector_panel.session_system.set(system_name)
+        
+        # Clear any selection that might have been applied and set neutral focus
+        try:
+            self.after(50, lambda: (self.ring_finder.system_entry.selection_clear() if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_entry') else None))
+            self.after(50, lambda: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None))
+            self.after(50, lambda: (self.import_btn.focus_set() if hasattr(self, 'import_btn') else None))
+        except Exception:
+            pass
         
         print(f"[SYSTEM] Updated current system: {system_name}")
 
