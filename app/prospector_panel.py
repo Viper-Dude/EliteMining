@@ -772,32 +772,16 @@ class ProspectorPanel(ttk.Frame):
         self._update_distance_display()
     
     def _update_distance_display(self) -> None:
-        """Update distance display by using Ring Finder's distance calculator"""
+        """Update distance display using centralized Distance Calculator"""
         try:
-            # Get Ring Finder from main app
-            if self.main_app and hasattr(self.main_app, 'ring_finder'):
-                ring_finder = self.main_app.ring_finder
-                system_name = self._get_current_system() or self.session_system.get()
-                
-                if system_name and hasattr(ring_finder, '_update_sol_distance'):
-                    # Call Ring Finder's distance calculation
-                    ring_finder._update_sol_distance(system_name)
-                    # Schedule a delayed copy to ensure Ring Finder updates first
-                    self.after(50, lambda: self._copy_distance_from_ring_finder(ring_finder))
-                else:
-                    self.distance_info_label.config(text="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
+            # Get distance info from main app's Distance Calculator (already calculated)
+            if self.main_app and hasattr(self.main_app, 'get_distance_info_text'):
+                distance_text = self.main_app.get_distance_info_text()
+                self.distance_info_label.config(text=distance_text)
             else:
                 self.distance_info_label.config(text="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
         except Exception as e:
             self.distance_info_label.config(text="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
-    
-    def _copy_distance_from_ring_finder(self, ring_finder) -> None:
-        """Copy the distance text from Ring Finder after it updates"""
-        try:
-            if hasattr(ring_finder, 'distance_info_var'):
-                self.distance_info_label.config(text=ring_finder.distance_info_var.get())
-        except Exception as e:
-            print(f"[DEBUG] Error copying distance from Ring Finder: {e}")
     
     def _update_ship_info_display(self) -> None:
         """Update the ship info display with current ship data from cargo monitor"""
@@ -5250,8 +5234,11 @@ class ProspectorPanel(ttk.Frame):
             asteroids_count = session_info['asteroids_prospected']
             materials_tracked = len(material_summary)
             total_finds = session_info['total_finds']
+            core_asteroids = session_info.get('core_asteroids', 0)
             
             parts.append(f"Asteroids Prospected: {asteroids_count}")
+            if core_asteroids > 0:
+                parts.append(f"Core Asteroids Found: {core_asteroids}")
             parts.append(f"Minerals Tracked: {materials_tracked}")
             parts.append(f"Total Material Hits: {total_finds}")
             
@@ -5668,7 +5655,7 @@ class ProspectorPanel(ttk.Frame):
             except ValueError:
                 continue
     
-    def _show_prospector_overlay_or_standard(self, standard_msg: str, panel_summary: str, materials_txt: str, content_txt: str):
+    def _show_prospector_overlay_or_standard(self, standard_msg: str, panel_summary: str, materials_txt: str, content_txt: str, core_material: str = ""):
         """
         Show overlay based on mode setting.
         
@@ -5680,6 +5667,7 @@ class ProspectorPanel(ttk.Frame):
             panel_summary: Filtered materials (above threshold only)
             materials_txt: ALL materials (unfiltered)
             content_txt: Content and remaining text
+            core_material: Core/motherlode material name if detected (empty string if not)
         """
         from config import _load_cfg
         cfg = _load_cfg()
@@ -5691,10 +5679,10 @@ class ProspectorPanel(ttk.Frame):
             # Pass materials and content separately to formatter
             if show_all:
                 # Show ALL materials (unfiltered)
-                enhanced_msg = self._format_enhanced_overlay_ex(materials_txt, content_txt)
+                enhanced_msg = self._format_enhanced_overlay_ex(materials_txt, content_txt, core_material)
             else:
                 # Show only materials above threshold (filtered) - use panel_summary
-                enhanced_msg = self._format_enhanced_overlay(panel_summary)
+                enhanced_msg = self._format_enhanced_overlay(panel_summary, core_material)
             
             self.text_overlay.show_message(enhanced_msg)
         else:
@@ -5702,7 +5690,7 @@ class ProspectorPanel(ttk.Frame):
             if standard_msg:
                 self.text_overlay.show_message(standard_msg)
     
-    def _format_enhanced_overlay(self, panel_summary: str) -> str:
+    def _format_enhanced_overlay(self, panel_summary: str, core_material: str = "") -> str:
         """
         Format panel_summary text in Elite Dangerous game style.
         Input: "Low — Bertrandite 16.2%, Indite 13.7% — Remaining 100.00%"
@@ -5715,6 +5703,11 @@ class ProspectorPanel(ttk.Frame):
         LIQUID OXYGEN 1.8%
         
         MATERIAL CONTENT: LOW
+        CORE DETECTED: ALEXANDRITE  (if core asteroid)
+        
+        Args:
+            panel_summary: Filtered materials summary string
+            core_material: Core/motherlode material name if detected
         """
         import re
         
@@ -5771,18 +5764,23 @@ class ProspectorPanel(ttk.Frame):
         if content:
             lines.append(f"MATERIAL CONTENT: {content.upper()}")
         
+        # Add core detected line if motherlode present (matching game format)
+        if core_material:
+            lines.append(f"CORE DETECTED: {core_material.upper()}")
+        
         result = "\n".join(lines)
         print(f"[Enhanced Overlay] Output lines count: {len(lines)}")
         print(f"[Enhanced Overlay] Output repr: {repr(result)}")
         return result
     
-    def _format_enhanced_overlay_ex(self, materials_txt: str, content_txt: str) -> str:
+    def _format_enhanced_overlay_ex(self, materials_txt: str, content_txt: str, core_material: str = "") -> str:
         """
         Format materials and content separately for enhanced overlay (show_all mode).
         
         Args:
             materials_txt: "Water 5.8%, Liquid Oxygen 7.1%, Lithium Hydroxide 4.9%"
             content_txt: "Low — Remaining 100.00%"
+            core_material: Core/motherlode material name if detected
         """
         import re
         
@@ -5823,6 +5821,10 @@ class ProspectorPanel(ttk.Frame):
         # Add content at the end
         if content:
             lines.append(f"MATERIAL CONTENT: {content.upper()}")
+        
+        # Add core detected line if motherlode present (matching game format)
+        if core_material:
+            lines.append(f"CORE DETECTED: {core_material.upper()}")
         
         result = "\n".join(lines)
         log.debug(f"[Enhanced Overlay EX] Output:\n{result}")
@@ -9003,7 +9005,8 @@ class ProspectorPanel(ttk.Frame):
                         tts_msg = ""  # No TTS, but still show overlay
                     
                     # Show overlay with both filtered and unfiltered data
-                    self._show_prospector_overlay_or_standard(tts_msg, panel_summary, materials_txt, content_txt)
+                    # Pass mother (core material) for enhanced overlay display
+                    self._show_prospector_overlay_or_standard(tts_msg, panel_summary, materials_txt, content_txt, mother)
                 
                 # TTS announcement (only if triggered)
                 if core_msg and noncore_msg:
@@ -14094,6 +14097,8 @@ class ProspectorPanel(ttk.Frame):
                     # Parse filtered yields from session text file (mineral_performance already parsed earlier)
                     if session_text_file and os.path.exists(session_text_file):
                         print(f"DEBUG: Attempting to parse filtered yields from: {session_text_file}")
+                        # IMPORTANT: Add session_file_path for HTML report to parse additional analytics
+                        enhanced_session_data['session_file_path'] = session_text_file
                         filtered_yields_from_text = self._parse_filtered_yields_from_session_file(session_text_file)
                         if filtered_yields_from_text:
                             enhanced_session_data['filtered_yields'] = filtered_yields_from_text
@@ -14252,6 +14257,8 @@ class ProspectorPanel(ttk.Frame):
 
             # If a text report path was provided, parse it for total hits as well
             if text_report_path and os.path.exists(text_report_path):
+                # IMPORTANT: Add session_file_path for HTML report to parse additional analytics
+                enhanced_session_data['session_file_path'] = text_report_path
                 try:
                     with open(text_report_path, 'r', encoding='utf-8') as tf:
                         txt_content = tf.read()

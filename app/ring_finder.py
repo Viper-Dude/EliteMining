@@ -748,45 +748,20 @@ class RingFinder:
     
             
     def _update_sol_distance(self, system_name: str):
-        """Update distance info label for reference system (Sol, Home, FC)"""
-        if not self.distance_calculator or not system_name:
-            self.distance_info_var.set("➤ Sol: --- | Home: --- | FC: ---")
-            return
-        
+        """Update distance info label using centralized Distance Calculator"""
         try:
-            # Get main app to access Distance Calculator variables
+            # Get main app to access centralized distance info
             main_app = None
             if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, 'main_app'):
                 main_app = self.prospector_panel.main_app
             
-            if not main_app:
+            if main_app and hasattr(main_app, 'get_distance_info_text'):
+                # Use centralized distance info (already calculated in Distance Calculator tab)
+                distance_text = main_app.get_distance_info_text()
+                self.distance_info_var.set(distance_text)
+            else:
                 self.distance_info_var.set("➤ Sol: --- | Home: --- | Fleet Carrier: ---")
-                return
-            
-            # Get Sol distance
-            sol_dist, _ = self.distance_calculator.get_distance_to_sol(system_name)
-            sol_text = f"{sol_dist:.2f} LY" if sol_dist is not None else "---"
-            
-            # Get Home distance - use SAME variable as Distance Calculator
-            home_system = main_app.distance_home_system.get().strip() if hasattr(main_app, 'distance_home_system') else ""
-            if home_system:
-                home_dist, _, _ = self.distance_calculator.get_distance_between_systems(system_name, home_system)
-                home_text = f"{home_dist:.2f} LY" if home_dist is not None else "---"
-            else:
-                home_text = "---"
-            
-            # Get FC distance - use SAME variable as Distance Calculator
-            fc_system = main_app.distance_fc_system.get().strip() if hasattr(main_app, 'distance_fc_system') else ""
-            if fc_system:
-                fc_dist, _, _ = self.distance_calculator.get_distance_between_systems(system_name, fc_system)
-                fc_text = f"{fc_dist:.2f} LY" if fc_dist is not None else "---"
-            else:
-                fc_text = "---"
-            
-            # Update label (values only)
-            self.distance_info_var.set(f"➤ Sol: {sol_text} | Home: {home_text} | Fleet Carrier: {fc_text}")
         except Exception as e:
-            print(f"Warning: Failed to calculate distances: {e}")
             self.distance_info_var.set("➤ Sol: --- | Home: --- | Fleet Carrier: ---")
     
     def _auto_detect_system(self):
@@ -1029,27 +1004,22 @@ class RingFinder:
         except Exception as e:
             print(f"DEBUG: Error loading ring finder settings: {e}")
     
-    def search_hotspots(self, auto_refresh=False):
+    def search_hotspots(self, auto_refresh=False, highlight_body=None):
         """Search for mining hotspots using reference system as center point
         
         Args:
-            auto_refresh: True if called from auto-refresh after scanning, False for manual search
+            auto_refresh: DEPRECATED - use highlight_body instead
+            highlight_body: Specific body/ring name to highlight (e.g., 'Omicron Capricorni B 1 A Ring')
+                           Only this ring will be highlighted green. None = no highlighting.
         """
-        self._is_auto_refresh = auto_refresh
-        print(f"[SEARCH DEBUG] search_hotspots() called (auto_refresh={auto_refresh})")
-        
-        # Log the caller for debugging unexpected searches
-        if auto_refresh:
-            import traceback
-            stack = traceback.extract_stack()
-            # Find the most relevant caller (skip internal frames)
-            for frame in reversed(stack[-5:-1]):
-                if 'ring_finder.py' in frame.filename:
-                    print(f"[SEARCH DEBUG] Called from: {frame.name} at line {frame.lineno}")
-                    break
+        # Store highlight_body for use in _update_results
+        self._highlight_body = highlight_body
+        self._is_auto_refresh = auto_refresh  # Keep for backwards compatibility but prefer highlight_body
         
         reference_system = self.system_var.get().strip()
-        print(f"[SEARCH DEBUG] Reference system: '{reference_system}'")
+        
+        # Update Sol distance for reference system
+        self._update_sol_distance(reference_system)
         
         # Update Sol distance for reference system
         self._update_sol_distance(reference_system)
@@ -2773,17 +2743,25 @@ class RingFinder:
             body_name = hotspot.get("bodyName", hotspot.get("body", ""))
             current_results.add((system_name, body_name))
         
-        # Identify new entries (only highlight during auto-refresh, not manual searches)
-        is_auto = hasattr(self, '_is_auto_refresh') and self._is_auto_refresh
-        print(f"DEBUG: is_auto_refresh={is_auto}, hasattr={hasattr(self, '_is_auto_refresh')}, value={getattr(self, '_is_auto_refresh', None)}")
+        # Identify entries to highlight - ONLY the specific scanned body, not set comparison
+        highlight_body = getattr(self, '_highlight_body', None)
+        self._highlight_body = None  # Reset after reading
+        self._is_auto_refresh = False  # Reset legacy flag
         
-        if is_auto:
-            new_entries = current_results - self.previous_results
-            self._is_auto_refresh = False  # Reset flag
-            print(f"DEBUG: AUTO-REFRESH - Comparing {len(current_results)} current vs {len(self.previous_results)} previous")
-        else:
-            new_entries = set()
-        print(f"DEBUG: Found {len(new_entries)} new entries to highlight")
+        new_entries = set()
+        if highlight_body:
+            # Normalize highlight_body to match database format (without system prefix)
+            # Database stores "7 A Ring" not "Bridge 7 A Ring"
+            reference_system = self.system_var.get().strip()
+            normalized_highlight = highlight_body
+            if reference_system and highlight_body.lower().startswith(reference_system.lower()):
+                normalized_highlight = highlight_body[len(reference_system):].strip()
+            normalized_highlight = ' '.join(normalized_highlight.split())  # Ensure proper spacing
+            
+            # Only highlight the specific body that was just scanned
+            for system_name, body_name in current_results:
+                if body_name == normalized_highlight:
+                    new_entries.add((system_name, body_name))
         
         # Clear existing results completely
         for item in self.results_tree.get_children():
@@ -3013,9 +2991,6 @@ class RingFinder:
             
         # Set status message
         self.status_var.set(status_msg)
-        
-        # Update previous results for next comparison
-        self.previous_results = current_results
         
         # Auto-scroll to first new entry if found (without selecting it)
         if hasattr(self, '_first_new_item'):
@@ -3252,14 +3227,10 @@ class RingFinder:
     def _auto_search_new_system(self, system_name: str):
         """Auto-populate reference system and trigger search silently"""
         try:
-            print(f"[AUTO-SEARCH] _auto_search_new_system called for: {system_name}")
+            import time
+            self._system_jump_time = time.time()  # Track when we jumped
             # Update reference system field
             self.system_var.set(system_name)
-            
-            # Reset previous_results so new search doesn't highlight as "changed"
-            # (we're in a completely new system, so all results are legitimately new to this location)
-            self.previous_results = set()
-            print(f"[AUTO-SEARCH] Reset previous_results to prevent false highlighting on new system")
             
             # Reset the CargoMonitor's refresh tracking so rings in new system can refresh
             if hasattr(self, 'prospector_panel') and self.prospector_panel:
@@ -3267,18 +3238,13 @@ class RingFinder:
                 if main_app and hasattr(main_app, 'cargo_monitor'):
                     cargo_monitor = main_app.cargo_monitor
                     cargo_monitor._last_refreshed_rings = set()
-                    print(f"[AUTO-SEARCH] Reset _last_refreshed_rings to allow refreshes on new rings in new system")
             
-            # Trigger search with current settings - but only if not already searching
+            # Trigger search with current settings - no highlighting (just location change)
             if self.search_btn['state'] == 'normal':
-                print(f"[AUTO-SEARCH] Triggering search_hotspots with auto_refresh=False (manual search on new system)")
-                self.search_hotspots(auto_refresh=False)
-            else:
-                print(f"[AUTO-SEARCH] Search button is not normal state, skipping auto-search")
+                self.search_hotspots()  # No highlight_body = no highlighting
                 
         except Exception as e:
             # Silent fail - let user search manually if auto-search fails
-            print(f"[AUTO-SEARCH ERROR] Failed to auto-search: {e}")
             pass
 
     def _load_auto_search_state(self) -> bool:

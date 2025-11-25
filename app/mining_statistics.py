@@ -81,6 +81,7 @@ class SessionAnalytics:
         self.session_start_time: Optional[datetime] = None
         self.total_asteroids_prospected = 0
         self.asteroids_with_materials = 0
+        self.core_asteroids_found = 0  # Track core asteroids (motherlode detected)
         
     def start_session(self) -> None:
         """Start a new mining session"""
@@ -92,7 +93,7 @@ class SessionAnalytics:
     def stop_session(self) -> None:
         """Stop the current mining session"""
         self.session_active = False
-        log.info(f"Mining session stopped. Total asteroids: {self.total_asteroids_prospected}")
+        log.info(f"Mining session stopped. Total asteroids: {self.total_asteroids_prospected}, Core: {self.core_asteroids_found}")
     
     def reset_session(self) -> None:
         """Reset all session statistics"""
@@ -100,6 +101,7 @@ class SessionAnalytics:
         self.material_stats_all.clear()
         self.total_asteroids_prospected = 0
         self.asteroids_with_materials = 0
+        self.core_asteroids_found = 0
         self.session_start_time = None
         log.debug("Session statistics reset")
     
@@ -201,13 +203,16 @@ class SessionAnalytics:
                 if material_name and percentage > 0:
                     materials_found[material_name] = percentage
         
-        # CORE ASTEROID FIX: Also check for motherlode material (core asteroids)
+        # CORE ASTEROID DETECTION: Check for motherlode material (core asteroids)
         # The motherlode material is stored separately and must be included in Mat Types count
         mother_localized = event.get('MotherlodeMaterial_Localised', '').strip()
         mother_raw = event.get('MotherlodeMaterial', '').strip()
         motherlode_material = mother_localized if mother_localized else mother_raw
         
+        # Track core asteroid count
         if motherlode_material:
+            self.core_asteroids_found += 1
+            log.debug(f"Core asteroid detected: {motherlode_material} (total: {self.core_asteroids_found})")
             # For core asteroids, the motherlode material should be counted as a material type
             # Use 0.0 to distinguish motherlode (core) from surface materials
             # This ensures it's counted in "Mat Types" but shows as 0% in analytics
@@ -303,7 +308,8 @@ class SessionAnalytics:
             'asteroids_prospected': self.total_asteroids_prospected,
             'asteroids_with_materials': self.asteroids_with_materials,
             'materials_tracked': len(self.material_stats),
-            'total_finds': sum(stats.get_find_count() for stats in self.material_stats.values())
+            'total_finds': sum(stats.get_find_count() for stats in self.material_stats.values()),
+            'core_asteroids': self.core_asteroids_found
         }
     
     def get_total_asteroids(self) -> int:
@@ -316,7 +322,8 @@ class SessionAnalytics:
             'total_asteroids': self.total_asteroids_prospected,
             'hit_rate': (self.asteroids_with_materials / max(1, self.total_asteroids_prospected)) * 100,
             'materials_found': len(self.material_stats),
-            'session_duration': (datetime.now() - self.session_start_time).total_seconds() / 60 if self.session_start_time else 0
+            'session_duration': (datetime.now() - self.session_start_time).total_seconds() / 60 if self.session_start_time else 0,
+            'core_asteroids': self.core_asteroids_found
         }
 
 # Helper functions for formatting and filtering

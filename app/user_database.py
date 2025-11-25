@@ -233,6 +233,76 @@ class UserDatabase:
             traceback.print_exc()
             raise
         
+        # Migration v4.5.9: Clean up incorrectly extracted system names
+        # Due to a bug in system name extraction from ring body names, some entries
+        # were stored with wrong system names (e.g., "Omicron Capricorni B B" instead of "Omicron Capricorni B")
+        # 
+        # The bug pattern: System "X Y" with body "Z 3 A Ring" was incorrectly stored as
+        # system "X Y Z" with body "3 A Ring" when current_system was not available.
+        # 
+        # Detection: Find system names ending with " X" (space + single letter) where body
+        # starts with a number, and a matching correct entry exists.
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Find potentially incorrect entries:
+                # - System name ends with space + single uppercase letter (A-Z)
+                # - Body name starts with a digit
+                # Pattern: "System Name X" | "1 A Ring" should be "System Name" | "X 1 A Ring"
+                cursor.execute('''
+                    SELECT DISTINCT h1.system_name, h1.body_name
+                    FROM hotspot_data h1
+                    WHERE h1.system_name GLOB '* [A-Z]'
+                    AND h1.body_name GLOB '[0-9]*'
+                ''')
+                potential_duplicates = cursor.fetchall()
+                
+                if not potential_duplicates:
+                    return
+                
+                total_deleted = 0
+                systems_cleaned = set()
+                
+                for wrong_system, wrong_body in potential_duplicates:
+                    # Extract the letter suffix from wrong system name
+                    # e.g., "Omicron Capricorni B B" -> suffix="B", correct_system="Omicron Capricorni B"
+                    parts = wrong_system.rsplit(' ', 1)
+                    if len(parts) != 2:
+                        continue
+                    correct_system, letter_suffix = parts
+                    
+                    # Build what the correct body name should be
+                    # e.g., wrong_body="4 B Ring", correct_body="B 4 B Ring"
+                    correct_body = f"{letter_suffix} {wrong_body}"
+                    
+                    # Check if the correct entry exists
+                    cursor.execute('''
+                        SELECT COUNT(*) FROM hotspot_data 
+                        WHERE system_name = ? AND body_name = ?
+                    ''', (correct_system, correct_body))
+                    
+                    if cursor.fetchone()[0] > 0:
+                        # Correct entry exists - this is a confirmed duplicate, delete the wrong one
+                        cursor.execute('''
+                            DELETE FROM hotspot_data 
+                            WHERE system_name = ? AND body_name = ?
+                        ''', (wrong_system, wrong_body))
+                        deleted = cursor.rowcount
+                        if deleted > 0:
+                            total_deleted += deleted
+                            systems_cleaned.add(wrong_system)
+                
+                if total_deleted > 0:
+                    conn.commit()
+                    print(f"[MIGRATION v4.5.9] ✅ Cleaned up {total_deleted} duplicate entries from {len(systems_cleaned)} incorrectly named system(s)")
+                    for sys in sorted(systems_cleaned):
+                        log.info(f"[Migration v4.5.9] Cleaned duplicates from '{sys}'")
+                    
+        except Exception as e:
+            print(f"[MIGRATION v4.5.9 ERROR] {e}")
+            log.error(f"[Migration v4.5.9] Error: {e}")
+        
     def _create_tables(self) -> None:
         """Create database tables if they don't exist"""
         try:

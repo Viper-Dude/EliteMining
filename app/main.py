@@ -603,7 +603,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.5.9.beta1"
+APP_VERSION = "v4.5.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1572,7 +1572,6 @@ class CargoMonitor:
         Args:
             is_new_discovery: True if these are newly discovered hotspots (not already in database)
         """
-        print(f"[HOTSPOT DEBUG] _on_hotspot_added callback triggered (is_new_discovery={is_new_discovery})")
         try:
             # Access main app through main_app_ref if this is called from CargoMonitor
             main_app = getattr(self, 'main_app_ref', self)
@@ -1582,24 +1581,20 @@ class CargoMonitor:
                                  main_app.ring_finder is not None and
                                  hasattr(main_app.ring_finder, '_update_database_info'))
             
-            print(f"[HOTSPOT DEBUG] ring_finder_ready: {ring_finder_ready}")
-            
             if not ring_finder_ready:
                 main_app._pending_ring_finder_refresh = True
-                print("✓ Hotspot added to database (Ring Finder refresh pending)")
                 return
                 
             # Ring Finder exists - refresh it now
-            print("✓ Hotspot added - refreshing Ring Finder database info")
             main_app._refresh_ring_finder(is_new_discovery=is_new_discovery)
             
             # Auto-search refresh: Only if NEW hotspots were discovered
             if is_new_discovery:
-                scanned_system = getattr(main_app, '_current_saa_system', None)
-                scanned_body = getattr(main_app, '_current_saa_body', None)
-                if scanned_system and hasattr(main_app, 'cargo_monitor'):
-                    print(f"[AUTO-REFRESH DEBUG] SAASignalsFound processing complete, checking auto-refresh for system: {scanned_system}, body: {scanned_body}")
-                    main_app.cargo_monitor._check_auto_refresh_ring_finder(scanned_system, scanned_body, is_new_discovery=True)
+                # Get scanned system/body from CargoMonitor (self), not main_app
+                scanned_system = getattr(self, '_current_saa_system', None)
+                scanned_body = getattr(self, '_current_saa_body', None)
+                if scanned_system:
+                    self._check_auto_refresh_ring_finder(scanned_system, scanned_body, hotspots_were_new=True)
             
             # IMMEDIATE EDSM FALLBACK: Fill missing metadata for newly scanned system
             # This ensures auto-refresh shows complete data after the 5-second delay
@@ -1644,22 +1639,15 @@ class CargoMonitor:
             # CRITICAL: Only refresh if NEW hotspots were actually discovered
             # Existing hotspots or proximity re-scans should NOT trigger refresh
             if not hotspots_were_new:
-                print(f"[AUTO-REFRESH DEBUG] Hotspots not new for {scanned_system} {scanned_body} - skipping refresh")
                 return
             
             # Access main app to get Ring Finder
             main_app = getattr(self, 'main_app_ref', self)
             
-            # Debug: Check what we have
-            print(f"[AUTO-REFRESH DEBUG] has ring_finder: {hasattr(main_app, 'ring_finder')}")
-            print(f"[AUTO-REFRESH DEBUG] ring_finder is None: {getattr(main_app, 'ring_finder', None) is None}")
-            print(f"[AUTO-REFRESH DEBUG] has auto_search_var: {hasattr(getattr(main_app, 'ring_finder', None), 'auto_search_var')}")
-            
             # Check if Ring Finder exists and auto-search is enabled
             if not (hasattr(main_app, 'ring_finder') and 
                    main_app.ring_finder is not None and
                    hasattr(main_app.ring_finder, 'auto_search_var')):
-                print(f"[AUTO-REFRESH DEBUG] Ring Finder not ready - exiting")
                 return
             
             ring_finder = main_app.ring_finder
@@ -1704,11 +1692,12 @@ class CargoMonitor:
                 ring_finder.status_var.set(f"Found new hotspots - search in 2s")
             
             # Schedule the actual refresh with appropriate delay
-            def do_delayed_refresh():
+            def do_delayed_refresh(body_to_highlight=scanned_body):
                 try:
                     if delay > 0:  # Only update status if there was a delay
                         ring_finder.status_var.set(f"Found new hotspots - updating results")
-                    ring_finder.search_hotspots(auto_refresh=True)
+                    # Pass the specific scanned body so ONLY that ring gets highlighted
+                    ring_finder.search_hotspots(highlight_body=body_to_highlight)
                     # Clear status after 3 seconds
                     ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
                     self._auto_refresh_timer = None  # Clear timer reference
@@ -2795,10 +2784,10 @@ cargo panel forces Elite to write detailed inventory data.
                         if system_name:
                             self.current_system = system_name
                             location_found = True
-                            # Update distance calculator home/FC distances
-                            if hasattr(self, '_update_home_fc_distances'):
+                            # Update distance calculator home/FC distances in main app
+                            if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_home_fc_distances'):
                                 try:
-                                    self._update_home_fc_distances()
+                                    self.main_app_ref._update_home_fc_distances()
                                 except:
                                     pass
                             continue
@@ -3419,10 +3408,10 @@ cargo panel forces Elite to write detailed inventory data.
                 if system_name:
                     self.current_system = system_name
                     
-                    # Update distance calculator home/FC distances
-                    if hasattr(self, '_update_home_fc_distances'):
+                    # Update distance calculator home/FC distances in main app
+                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_home_fc_distances'):
                         try:
-                            self._update_home_fc_distances()
+                            self.main_app_ref._update_home_fc_distances()
                         except:
                             pass
                     
@@ -7832,9 +7821,51 @@ class App(tk.Tk):
             else:
                 self.distance_to_fc_label.config(text="")
                 self.fc_sol_label.config(text="")
+            
+            # Notify Mining Session and Ring Finder to update their distance displays
+            if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, '_update_distance_display'):
+                self.prospector_panel._update_distance_display()
+            
+            if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, '_update_sol_distance'):
+                self.ring_finder._update_sol_distance(current_system)
                 
         except Exception as e:
             print(f"Error updating home/FC distances: {e}")
+    
+    def get_distance_info_text(self) -> str:
+        """Get formatted distance info string for display in other tabs
+        
+        Returns distance info in format: "➤ Sol: X.XX LY | Home: Y.YY LY | Fleet Carrier: Z.ZZ LY"
+        This provides a centralized way for Mining Session and Ring Finder to display
+        distance information without recalculating.
+        """
+        try:
+            # Extract distances from the Distance Calculator labels
+            sol_text = self.current_sol_label.cget("text") if hasattr(self, 'current_sol_label') else ""
+            home_text = self.distance_to_home_label.cget("text") if hasattr(self, 'distance_to_home_label') else ""
+            fc_text = self.distance_to_fc_label.cget("text") if hasattr(self, 'distance_to_fc_label') else ""
+            
+            # Parse distances from label text (format: "➤ XX.XX LY from Sol/current")
+            sol_ly = "---"
+            home_ly = "---"
+            fc_ly = "---"
+            
+            if sol_text and "LY" in sol_text:
+                # Extract number from "➤ XX.XX LY from Sol"
+                sol_ly = sol_text.split("LY")[0].replace("➤", "").strip()
+            
+            if home_text and "LY" in home_text:
+                # Extract number from "➤ XX.XX LY from current"
+                home_ly = home_text.split("LY")[0].replace("➤", "").strip()
+            
+            if fc_text and "LY" in fc_text:
+                # Extract number from "➤ XX.XX LY from current"
+                fc_ly = fc_text.split("LY")[0].replace("➤", "").strip()
+            
+            return f"➤ Sol: {sol_ly} LY | Home: {home_ly} LY | Fleet Carrier: {fc_ly} LY"
+            
+        except Exception as e:
+            return "➤ Sol: --- | Home: --- | Fleet Carrier: ---"
     
     # ==================== END DISTANCE CALCULATOR ====================
 

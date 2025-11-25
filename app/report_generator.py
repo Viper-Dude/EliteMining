@@ -1254,6 +1254,19 @@ class ReportGenerator:
             except:
                 prospectors_used = 0
         
+        # Asteroids prospected - try to get from session_data or parse from text file
+        asteroids_prospected = session_data.get('asteroids_prospected')
+        if asteroids_prospected is None:
+            # Try to parse from session text file
+            session_text_data = self._parse_session_analytics_from_text(session_data)
+            if session_text_data:
+                asteroids_prospected = session_text_data.get('asteroids_prospected')
+        if isinstance(asteroids_prospected, str):
+            try:
+                asteroids_prospected = int(asteroids_prospected) if asteroids_prospected != '—' else None
+            except:
+                asteroids_prospected = None
+        
         # Materials count
         materials_count = session_data.get('materials', 0)
         if isinstance(materials_count, str):
@@ -1296,6 +1309,7 @@ class ReportGenerator:
             else:
                 total_hits_display = '—'
         tons_per_display = f"{self._safe_float(tons_per_asteroid_val):.1f}t" if tons_per_asteroid_val is not None else '—'
+        asteroids_display = str(asteroids_prospected) if asteroids_prospected is not None else '—'
 
         stats_html = f"""
         <div class="stat-card">
@@ -1319,6 +1333,10 @@ class ReportGenerator:
             <div class="stat-label">Prospectors Used</div>
         </div>
         <div class="stat-card">
+            <div class="stat-value">{asteroids_display}</div>
+            <div class="stat-label">Asteroids Prospected</div>
+        </div>
+        <div class="stat-card">
             <div class="stat-value">{materials_count}</div>
             <div class="stat-label">Mineral Types</div>
         </div>
@@ -1329,6 +1347,38 @@ class ReportGenerator:
         <div class="stat-card">
             <div class="stat-value">{tons_per_display}</div>
             <div class="stat-label">Tons/Asteroid</div>
+        </div>
+        """
+        
+        # Add Ship Info card if available
+        ship_name = session_data.get('ship_name', '')
+        if ship_name:
+            # Parse ship name and type from format "Ship Name - Ship Type"
+            if ' - ' in ship_name:
+                ship_display_name, ship_type = ship_name.rsplit(' - ', 1)
+            else:
+                ship_display_name = ship_name
+                ship_type = ''
+            
+            # Check for scoring adjustments
+            ship_name_lower = ship_name.lower()
+            is_type_11 = 'type-11 prospector' in ship_name_lower
+            
+            # Build adjustment note
+            if is_type_11:
+                adjustment_note = "⚖️ +50% TPH thresholds"
+            else:
+                adjustment_note = ""
+            
+            ship_tooltip = f"Ship used for this mining session: {ship_name}"
+            if is_type_11:
+                ship_tooltip += ". Type-11 Prospector has faster mining mechanics, so TPH scoring thresholds are increased by 50% (1200/900/600 instead of 800/600/400)."
+            
+            stats_html += f"""
+        <div class="stat-card" title="{ship_tooltip}">
+            <div class="stat-value" style="font-size: 1.2em;">{ship_display_name if ship_display_name else ship_type}</div>
+            <div class="stat-label">🚀 Ship</div>
+            <div class="stat-help">{ship_type if ship_display_name and ship_type else ''}{' • ' + adjustment_note if adjustment_note and ship_type else adjustment_note}</div>
         </div>
         """
         
@@ -1913,6 +1963,14 @@ class ReportGenerator:
                 except:
                     asteroids_prospected = None
             
+            # Get core asteroids count for mining type detection
+            core_asteroids = session_data.get('core_asteroids', 0)
+            if session_text_data and core_asteroids == 0:
+                core_asteroids = session_text_data.get('core_asteroids', 0)
+            # Store in session_data for scoring logic to access
+            session_data['core_asteroids'] = core_asteroids
+            session_data['asteroids_prospected'] = asteroids_prospected
+            
             # Prospecting Performance Section
             if any([hit_rate is not None, avg_quality is not None, asteroids_prospected is not None]):
                 analytics_html += """
@@ -2178,7 +2236,35 @@ class ReportGenerator:
 
             # Efficiency Metrics Section
             if duration_minutes > 0 and total_tons > 0:
-                analytics_html += """
+                # Detect ship type for threshold adjustments
+                ship_name_str = session_data.get('ship_name', '').lower()
+                is_type_11_ship = 'type-11 prospector' in ship_name_str
+                
+                # Check if this is a core mining session
+                core_asteroids_count = session_data.get('core_asteroids', 0)
+                asteroids_for_core_check = session_data.get('asteroids_prospected', 0)
+                is_core_session = False
+                if core_asteroids_count > 0 and asteroids_for_core_check > 0:
+                    core_ratio = core_asteroids_count / asteroids_for_core_check
+                    is_core_session = core_ratio > 0.3
+                
+                # Build dynamic scoring explanation based on adjustments
+                if is_core_session:
+                    scoring_note = """<br><br>
+                            <strong>⚖️ Core Mining Detected:</strong> TPH thresholds adjusted for core mining mechanics (120/90/60 t/hr instead of 800/600/400)."""
+                    tph_thresholds = "≥120=70pts, ≥90=50pts, ≥60=30pts, &lt;60=10pts (Core Mining)"
+                    tpa_thresholds = "≥20t/ast=30pts, ≥15t/ast=20pts, ≥10t/ast=10pts, &lt;10t/ast=5pts"
+                elif is_type_11_ship:
+                    scoring_note = """<br><br>
+                            <strong>⚖️ Type-11 Prospector Detected:</strong> Both TPH and T/Asteroid thresholds increased by 25% to account for faster mining mechanics."""
+                    tph_thresholds = "≥1000=70pts, ≥750=50pts, ≥500=30pts, &lt;500=10pts (Type-11)"
+                    tpa_thresholds = "≥25t/ast=30pts, ≥19t/ast=20pts, ≥12t/ast=10pts, &lt;12t/ast=5pts (Type-11)"
+                else:
+                    scoring_note = ""
+                    tph_thresholds = "≥800=70pts, ≥600=50pts, ≥400=30pts, &lt;400=10pts"
+                    tpa_thresholds = "≥20t/ast=30pts, ≥15t/ast=20pts, ≥10t/ast=10pts, &lt;10t/ast=5pts"
+                
+                analytics_html += f"""
                 <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
                     <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">⚡ Efficiency Breakdown</h3>
                     <div style="background: #2a2a2a; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #4CAF50;">
@@ -2186,18 +2272,52 @@ class ReportGenerator:
                             <strong>💡 Understanding Your Mining Metrics:</strong><br>
                             These metrics help you evaluate and compare different mining sessions. Hover over each card for detailed explanations.<br><br>
                             <strong>🎯 Ring Quality Assessment:</strong><br>
-                            • <strong>Excellent (≥800 t/h + ≥20 t/asteroid):</strong> Outstanding locations worth bookmarking<br>
-                            • <strong>Good (≥600 t/h + ≥15 t/asteroid):</strong> Solid performance worth returning to<br>
-                            • <strong>Fair (≥400 t/h + ≥10 t/asteroid):</strong> Acceptable mining efficiency<br>
-                            • <strong>Poor (&lt;400 t/h or &lt;10 t/asteroid):</strong> Suboptimal - find better spots!<br><br>
-                            <strong>📊 Complete Scoring System (100 points total):</strong><br>
-                            • <strong>TPH (70%):</strong> ≥800=70pts, ≥600=50pts, ≥400=30pts, &lt;400=10pts<br>
-                            • <strong>Yield Quality (30%):</strong> ≥20t/ast=30pts, ≥15t/ast=20pts, ≥10t/ast=10pts, &lt;10t/ast=5pts<br>
-                            <em>Final Rating: Excellent=85-100pts, Good=65-84pts, Fair=45-64pts, Poor=&lt;45pts</em>
+                            • <strong>Excellent:</strong> Outstanding locations worth bookmarking<br>
+                            • <strong>Good:</strong> Solid performance worth returning to<br>
+                            • <strong>Fair:</strong> Acceptable mining efficiency<br>
+                            • <strong>Poor:</strong> Suboptimal - find better spots!<br><br>
+                            <strong>📊 Scoring System (100 points total):</strong><br>
+                            • <strong>TPH (70%):</strong> {tph_thresholds}<br>
+                            • <strong>Yield Quality (30%):</strong> {tpa_thresholds}<br>
+                            <em>Final Rating: Excellent=85-100pts, Good=65-84pts, Fair=45-64pts, Poor=&lt;45pts</em>{scoring_note}
                         </p>
                     </div>
                     <div class="stats-grid">
                 """
+                
+                # Add Ship card with adjustment indicator in Efficiency section
+                ship_name_full = session_data.get('ship_name', '')
+                if ship_name_full:
+                    if ' - ' in ship_name_full:
+                        ship_display, ship_type_display = ship_name_full.rsplit(' - ', 1)
+                    else:
+                        ship_display = ship_name_full
+                        ship_type_display = ''
+                    
+                    # Build adjustment badge
+                    if is_core_session:
+                        adjustment_badge = '<span style="background: #9C27B0; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 5px;">Core Mining</span>'
+                        ship_help = "⚖️ Core mining thresholds applied"
+                    elif is_type_11_ship:
+                        adjustment_badge = '<span style="background: #FF9800; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 5px;">+50% TPH</span>'
+                        ship_help = "⚖️ Type-11 threshold adjustment"
+                    else:
+                        adjustment_badge = ""
+                        ship_help = "Standard scoring thresholds"
+                    
+                    ship_tooltip = f"Mining ship: {ship_name_full}."
+                    if is_type_11_ship and not is_core_session:
+                        ship_tooltip += " Type-11 has +50% TPH thresholds (1200/900/600)."
+                    elif is_core_session:
+                        ship_tooltip += " Core mining detected - using core thresholds (120/90/60)."
+                    
+                    analytics_html += f"""
+                    <div class="stat-card" title="{ship_tooltip}">
+                        <div class="stat-value" style="font-size: 1.1em;">{ship_display if ship_display else ship_type_display}{adjustment_badge}</div>
+                        <div class="stat-label">🚀 Mining Ship</div>
+                        <div class="stat-help">{ship_type_display + ' • ' if ship_display and ship_type_display else ''}{ship_help}</div>
+                    </div>
+                    """
                 
                 # Calculate various efficiency metrics using correct TPH from session data
                 tph_value = session_data.get('tph', 0)
@@ -2310,12 +2430,50 @@ class ReportGenerator:
                 quality_explanation = ""
                 quality_score = 0
                 
+                # Check if using Type-11 Prospector - apply +75% TPH threshold adjustment
+                # Type-11 has faster mining mechanics, so higher TPH thresholds for same score
+                # ship_name format from TXT report: "Mega Bumper - Type-11 Prospector"
+                ship_name_str = session_data.get('ship_name', '').lower()
+                is_type_11 = 'type-11 prospector' in ship_name_str
+                
+                # Check if this is a core mining session
+                # Core mining has much lower TPH (max ~150 t/hr) vs laser mining (800+ t/hr)
+                core_asteroids = session_data.get('core_asteroids', 0)
+                asteroids_prospected_for_core = session_data.get('asteroids_prospected', 0)
+                is_core_mining = False
+                
+                if core_asteroids > 0 and asteroids_prospected_for_core > 0:
+                    # If >30% of asteroids were core asteroids, consider it a core mining session
+                    core_ratio = core_asteroids / asteroids_prospected_for_core
+                    is_core_mining = core_ratio > 0.3
+                
+                # Determine TPH thresholds based on mining type
+                if is_core_mining:
+                    # Core mining thresholds (max ~150 t/hr)
+                    tph_excellent = 120
+                    tph_good = 90
+                    tph_fair = 60
+                    mining_type_note = " (Core Mining)"
+                elif is_type_11:
+                    # Type-11 laser mining (+25% thresholds)
+                    # Type-11 extracts ~25% more per asteroid based on real-world data
+                    tph_excellent = 1000  # 800 * 1.25
+                    tph_good = 750        # 600 * 1.25
+                    tph_fair = 500        # 400 * 1.25
+                    mining_type_note = " (Type-11 adjusted)"
+                else:
+                    # Standard laser mining thresholds
+                    tph_excellent = 800
+                    tph_good = 600
+                    tph_fair = 400
+                    mining_type_note = ""
+                
                 # Factor 1: TPH (70% weight) - Primary speed indicator
-                if tph >= 800:
+                if tph >= tph_excellent:
                     quality_score += 70
-                elif tph >= 600:
+                elif tph >= tph_good:
                     quality_score += 50
-                elif tph >= 400:
+                elif tph >= tph_fair:
                     quality_score += 30
                 else:
                     quality_score += 10
@@ -2326,11 +2484,24 @@ class ReportGenerator:
                 if ring_tons_per_asteroid is None:
                     ring_tons_per_asteroid = tons_per_asteroid  # Fallback to local calculation
                 
-                if ring_tons_per_asteroid >= 20:
+                # Determine T/Asteroid thresholds based on mining type
+                # Type-11 extracts ~25% more per asteroid (HAZ: 20-30 vs 18-20, Normal: 15-20 vs 12-15)
+                if is_type_11 and not is_core_mining:
+                    # Type-11 T/Asteroid thresholds (+25%)
+                    tpa_excellent = 25  # 20 * 1.25
+                    tpa_good = 19       # 15 * 1.25 (rounded)
+                    tpa_fair = 12       # 10 * 1.25 (rounded)
+                else:
+                    # Standard T/Asteroid thresholds (also used for core mining)
+                    tpa_excellent = 20
+                    tpa_good = 15
+                    tpa_fair = 10
+                
+                if ring_tons_per_asteroid >= tpa_excellent:
                     quality_score += 30
-                elif ring_tons_per_asteroid >= 15:
+                elif ring_tons_per_asteroid >= tpa_good:
                     quality_score += 20
-                elif ring_tons_per_asteroid >= 10:
+                elif ring_tons_per_asteroid >= tpa_fair:
                     quality_score += 10
                 else:
                     quality_score += 5
@@ -2338,18 +2509,27 @@ class ReportGenerator:
                 # Determine overall ring quality with 2-factor assessment
                 if quality_score >= 85:
                     ring_quality = "Excellent"
-                    quality_explanation = f"Outstanding mining location - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid"
+                    quality_explanation = f"Outstanding mining location - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid{mining_type_note}"
                 elif quality_score >= 65:
                     ring_quality = "Good"
-                    quality_explanation = f"Solid mining location - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid"
+                    quality_explanation = f"Solid mining location - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid{mining_type_note}"
                 elif quality_score >= 45:
                     ring_quality = "Fair" 
-                    quality_explanation = f"Acceptable mining spot - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid"
+                    quality_explanation = f"Acceptable mining spot - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid{mining_type_note}"
                 else:
-                    quality_explanation = f"Suboptimal mining location - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid"
+                    quality_explanation = f"Suboptimal mining location - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid{mining_type_note}"
+                
+                # Update tooltip to mention mining type adjustments
+                tooltip_base = "Overall assessment of this mining location based on two key factors: speed (TPH 70%) and yield quality (Tons/Asteroid 30%). Excellent/Good locations are worth bookmarking for future mining sessions."
+                if is_core_mining:
+                    tooltip_extra = " Core mining session detected: TPH thresholds adjusted for slower core mining mechanics (120/90/60 t/hr)."
+                elif is_type_11:
+                    tooltip_extra = " Type-11 Prospector detected: Both TPH (+25%: 1000/750/500) and T/Asteroid (+25%: 25/19/12) thresholds adjusted for faster mining mechanics."
+                else:
+                    tooltip_extra = ""
                 
                 analytics_html += f"""
-                <div class="stat-card" title="Overall assessment of this mining location based on two key factors: speed (TPH 70%) and yield quality (Tons/Asteroid 30%). Excellent/Good locations are worth bookmarking for future mining sessions.">
+                <div class="stat-card" title="{tooltip_base}{tooltip_extra}">
                     <div class="stat-value">{ring_quality}</div>
                     <div class="stat-label">Ring Quality</div>
                     <div class="stat-help">💎 {quality_explanation}</div>
@@ -2466,18 +2646,23 @@ class ReportGenerator:
             if hit_rate_match:
                 analytics_data['hit_rate'] = float(hit_rate_match.group(1))
             
-            # Parse average quality
-            avg_quality_match = re.search(r'Average Quality:\s*([\d.]+)%', content)
+            # Parse average/overall quality (TXT uses "Overall Quality")
+            avg_quality_match = re.search(r'(?:Average|Overall) Quality:\s*([\d.]+)%', content)
             if avg_quality_match:
                 analytics_data['avg_quality'] = float(avg_quality_match.group(1))
             
             # Parse asteroids prospected
-            asteroids_match = re.search(r'(\d+)\s+asteroids? prospected', content, re.IGNORECASE)
+            asteroids_match = re.search(r'Asteroids Prospected:\s*(\d+)', content)
             if asteroids_match:
                 analytics_data['asteroids_prospected'] = int(asteroids_match.group(1))
             
-            # Parse best material
-            best_material_match = re.search(r'Best Material:\s*([^(\n]+)', content)
+            # Parse core asteroids found (for core mining detection)
+            core_asteroids_match = re.search(r'Core Asteroids Found:\s*(\d+)', content)
+            if core_asteroids_match:
+                analytics_data['core_asteroids'] = int(core_asteroids_match.group(1))
+            
+            # Parse best material/performer (TXT uses "Best Performer")
+            best_material_match = re.search(r'Best (?:Material|Performer):\s*([^(\n]+)', content)
             if best_material_match:
                 analytics_data['best_material'] = best_material_match.group(1).strip()
             
@@ -2826,6 +3011,42 @@ class ReportGenerator:
                     total_hits_raw_display = '—'
             properties.append(("Total Hits", total_hits_raw_display))
             properties.append(("Tons/Asteroid", f"{self._safe_float(derived_tpa):.1f}t" if derived_tpa is not None else '—'))
+            
+            # Add prospecting analytics from TXT file
+            session_text_data = self._parse_session_analytics_from_text(session_data)
+            
+            # Prospectors Used
+            prospectors_used = session_data.get('prospectors', session_data.get('prospects', session_data.get('prospectors_used')))
+            if prospectors_used is not None and str(prospectors_used) not in ('', '0', '—'):
+                properties.append(("Prospectors Used", str(prospectors_used)))
+            
+            # Asteroids Prospected
+            asteroids_prospected = session_data.get('asteroids_prospected')
+            if asteroids_prospected is None and session_text_data:
+                asteroids_prospected = session_text_data.get('asteroids_prospected')
+            if asteroids_prospected is not None:
+                properties.append(("Asteroids Prospected", str(asteroids_prospected)))
+            
+            # Hit Rate
+            hit_rate = session_data.get('hit_rate_percent')
+            if hit_rate is None and session_text_data:
+                hit_rate = session_text_data.get('hit_rate')
+            if hit_rate is not None:
+                properties.append(("Hit Rate", f"{self._safe_float(hit_rate):.1f}%"))
+            
+            # Average Quality
+            avg_quality = session_data.get('avg_quality_percent')
+            if avg_quality is None and session_text_data:
+                avg_quality = session_text_data.get('avg_quality')
+            if avg_quality is not None:
+                properties.append(("Average Quality", f"{self._safe_float(avg_quality):.1f}%"))
+            
+            # Best Performer
+            best_material = session_data.get('best_material')
+            if best_material is None and session_text_data:
+                best_material = session_text_data.get('best_material')
+            if best_material:
+                properties.append(("Best Performer", best_material))
             
             # Add engineering materials if any were collected
             engineering_materials = session_data.get('engineering_materials', {})

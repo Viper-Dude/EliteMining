@@ -462,14 +462,21 @@ class JournalParser:
                     # Normalize material name to prevent duplicates (e.g., "tritium" -> "Tritium")
                     material_name = self.normalize_material_name(raw_material_name)
                     
-                    # Check if this hotspot already exists
+                    # Normalize body_name to match how it's stored in database
+                    # (database stores without system name prefix, e.g., "B 1 A Ring" not "Omicron Capricorni B B 1 A Ring")
+                    normalized_body_name = body_name
+                    if system_name and body_name.lower().startswith(system_name.lower()):
+                        normalized_body_name = body_name[len(system_name):].strip()
+                    normalized_body_name = ' '.join(normalized_body_name.split())  # Ensure proper spacing
+                    
+                    # Check if this hotspot already exists (using normalized body name)
                     import sqlite3
                     with sqlite3.connect(self.user_db.db_path) as conn:
                         cursor = conn.cursor()
                         cursor.execute('''
                             SELECT id FROM hotspot_data 
                             WHERE system_name = ? AND body_name = ? AND material_name = ?
-                        ''', (system_name, body_name, material_name))
+                        ''', (system_name, normalized_body_name, material_name))
                         existing = cursor.fetchone()
                     
                     # If hotspot doesn't exist, it's a new discovery
