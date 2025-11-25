@@ -1392,30 +1392,42 @@ class CargoMonitor:
         self.capacity_changed_callback = capacity_changed_callback  # Callback when cargo capacity changes
         self.ship_info_changed_callback = ship_info_changed_callback  # Callback when ship info changes
         
-        # Engineering materials grade mapping (Raw materials from mining only)
+        # Engineering materials grade mapping (Raw materials from mining)
+        # Grades: 1=Very Common, 2=Common, 3=Standard, 4=Rare
+        # Note: Some materials marked "Planet only" in wiki may still drop from asteroids
         self.MATERIAL_GRADES = {
-            "Antimony": 2,
-            "Arsenic": 2,
-            "Boron": 3,
-            "Cadmium": 3,
+            # Grade 1 - Very Common
             "Carbon": 1,
-            "Chromium": 2,
-            "Germanium": 2,
             "Iron": 1,
             "Lead": 1,
-            "Manganese": 2,
             "Nickel": 1,
-            "Niobium": 3,
             "Phosphorus": 1,
-            "Polonium": 4,
             "Rhenium": 1,
-            "Selenium": 4,
             "Sulphur": 1,
-            "Tin": 3,
-            "Tungsten": 3,
+            # Grade 2 - Common
+            "Arsenic": 2,
+            "Chromium": 2,
+            "Germanium": 2,
+            "Manganese": 2,
             "Vanadium": 2,
             "Zinc": 2,
-            "Zirconium": 2
+            "Zirconium": 2,
+            # Grade 3 - Standard
+            "Boron": 3,
+            "Cadmium": 3,
+            "Mercury": 3,
+            "Molybdenum": 3,
+            "Niobium": 3,
+            "Tin": 3,
+            "Tungsten": 3,
+            # Grade 4 - Rare
+            "Antimony": 4,
+            "Polonium": 4,
+            "Ruthenium": 4,
+            "Selenium": 4,
+            "Technetium": 4,
+            "Tellurium": 4,
+            "Yttrium": 4
         }
         
         # Load saved window position
