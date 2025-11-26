@@ -14,6 +14,9 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+# Set up logging for this module
+log = logging.getLogger(__name__)
+
 # Chart generation imports
 try:
     import matplotlib
@@ -1150,6 +1153,16 @@ class ReportGenerator:
     def generate_report(self, session_data, include_charts=True, include_screenshots=True, include_statistics=True):
         """Generate enhanced HTML report"""
         try:
+            import time
+            
+            # Small delay to ensure all data is written (timing issue in compiled version)
+            time.sleep(0.2)
+            
+            # Log incoming session data for debugging
+            log.info(f"[Report Generator] Starting report generation...")
+            log.info(f"[Report Generator] Session data keys: {list(session_data.keys())}")
+            log.info(f"[Report Generator] asteroids_prospected in input: {session_data.get('asteroids_prospected')}")
+            
             # Get logo
             logo_path = self._get_logo_path()
             logo_section = ""
@@ -1209,7 +1222,9 @@ class ReportGenerator:
             return html_content
             
         except Exception as e:
-            print(f"Error generating report: {e}")
+            log.error(f"Error generating report: {e}")
+            import traceback
+            log.error(f"Traceback: {traceback.format_exc()}")
             return None
             
     def _generate_session_stats(self, session_data):
@@ -1256,16 +1271,26 @@ class ReportGenerator:
         
         # Asteroids prospected - try to get from session_data or parse from text file
         asteroids_prospected = session_data.get('asteroids_prospected')
+        
+        # Debug logging for asteroids_prospected
+        log.info(f"[Report Generator] asteroids_prospected from session_data: {asteroids_prospected}")
+        
         if asteroids_prospected is None:
+            log.info("[Report Generator] asteroids_prospected is None, trying to parse from text file...")
             # Try to parse from session text file
             session_text_data = self._parse_session_analytics_from_text(session_data)
             if session_text_data:
                 asteroids_prospected = session_text_data.get('asteroids_prospected')
+                log.info(f"[Report Generator] asteroids_prospected from text file: {asteroids_prospected}")
+            else:
+                log.info("[Report Generator] No session text data found")
         if isinstance(asteroids_prospected, str):
             try:
                 asteroids_prospected = int(asteroids_prospected) if asteroids_prospected != '—' else None
+                log.info(f"[Report Generator] asteroids_prospected after int conversion: {asteroids_prospected}")
             except:
                 asteroids_prospected = None
+                log.warning("[Report Generator] Failed to convert asteroids_prospected to int")
         
         # Materials count
         materials_count = session_data.get('materials', 0)

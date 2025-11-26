@@ -20,6 +20,13 @@
 - RES column now includes mineral abbreviation like the Overlap column
 - Improved dark theme styling for Set Overlap and Set RES dialogs
 
+### How to Add/Remove Overlaps and RES Sites
+1. Right-click any ring in the search results
+2. Select **Set Overlap...** or **Set RES...**
+3. Choose a mineral and overlap type (2x/3x) or RES level (Hazardous/High/Low)
+4. To remove, select **"None"** and click Save
+5. Data is saved locally and appears in future searches
+
 ### Bookmarks Tab
 - Added **RES Site** column to bookmarks table
 - Changed Overlap column format from star icons to **"Plat 2x"** format

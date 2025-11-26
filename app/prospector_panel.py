@@ -11440,22 +11440,12 @@ class ProspectorPanel(ttk.Frame):
             
             # Sync overlap/RES to database for Ring Finder integration
             try:
-                print(f"[BOOKMARK SYNC] Attempting to sync to database...")
-                print(f"[BOOKMARK SYNC] main_app: {self.main_app is not None}")
-                if self.main_app:
-                    print(f"[BOOKMARK SYNC] has cargo_monitor: {hasattr(self.main_app, 'cargo_monitor')}")
-                    if hasattr(self.main_app, 'cargo_monitor'):
-                        print(f"[BOOKMARK SYNC] has user_db: {hasattr(self.main_app.cargo_monitor, 'user_db')}")
-                
                 if self.main_app and hasattr(self.main_app, 'cargo_monitor') and hasattr(self.main_app.cargo_monitor, 'user_db'):
                     user_db = self.main_app.cargo_monitor.user_db
                     target_mat = target_material_var.get()
                     overlap_type = overlap_var.get()
                     res_site = res_var.get()
                     res_mat = res_material_var.get()
-                    
-                    print(f"[BOOKMARK SYNC] target_mat={target_mat}, overlap_type={overlap_type}")
-                    print(f"[BOOKMARK SYNC] res_site={res_site}, res_mat={res_mat}")
                     
                     # Get previous values to clear if changed
                     prev_target_mat = bookmark_data.get('target_material', '') if bookmark_data else ''
@@ -11473,9 +11463,7 @@ class ProspectorPanel(ttk.Frame):
                     
                     # Sync RES to database if both RES material and RES site are set
                     if res_mat and res_site:
-                        print(f"[BOOKMARK SYNC] Calling set_res_tag({system}, {body}, {res_mat}, {res_site})")
                         user_db.set_res_tag(system, body, res_mat, res_site)
-                        print(f"[BOOKMARK SYNC] set_res_tag completed")
                     elif res_mat and not res_site:
                         # Clear RES if material set but no RES site
                         user_db.set_res_tag(system, body, res_mat, None)
@@ -14182,6 +14170,8 @@ class ProspectorPanel(ttk.Frame):
                 'engineering_materials': engineering_materials_dict,  # Add engineering materials
                 'comment': session_data.get('comment', ''),
                 'screenshots': [],
+                # CRITICAL: Add session_file_path for report generator to parse asteroids_prospected
+                'session_file_path': session_text_file if session_text_file and os.path.exists(session_text_file) else None,
                 # Add analytics data from CSV for HTML reports
                 'hit_rate_percent': session_data.get('hit_rate_percent'),
                 'avg_quality_percent': session_data.get('avg_quality_percent'),
@@ -14199,6 +14189,11 @@ class ProspectorPanel(ttk.Frame):
                 'session_type': self._extract_session_type_from_data(session_data),
                 'data_source': 'Report Entry'
             }
+            
+            # Debug logging for asteroids_prospected and session_file_path
+            print(f"[HTML Report] Building enhanced_session_data - asteroids_prospected from session_data: {session_data.get('asteroids_prospected')}")
+            print(f"[HTML Report] session_file_path: {enhanced_session_data.get('session_file_path')}")
+            print(f"[HTML Report] enhanced_session_data asteroids_prospected: {enhanced_session_data.get('asteroids_prospected')}")
             enhanced_session_data['mineral_performance'] = session_data.get('mineral_performance', {})
             
             # Debug: log mineral_performance content
