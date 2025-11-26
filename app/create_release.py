@@ -228,6 +228,19 @@ class ReleaseBuilder:
                     arc_name = "EliteMining/app/data/database_metadata.json"
                     zipf.write(metadata_path, arc_name)
                     print(f"✅ Added: EliteMining/app/data/database_metadata.json")
+                
+                # Add overlap and RES site CSV files for migration
+                overlaps_csv = self.project_root / "app" / "data" / "overlaps.csv"
+                if overlaps_csv.exists():
+                    arc_name = "EliteMining/app/data/overlaps.csv"
+                    zipf.write(overlaps_csv, arc_name)
+                    print(f"✅ Added: EliteMining/app/data/overlaps.csv")
+                
+                res_csv = self.project_root / "app" / "data" / "res_sites.csv"
+                if res_csv.exists():
+                    arc_name = "EliteMining/app/data/res_sites.csv"
+                    zipf.write(res_csv, arc_name)
+                    print(f"✅ Added: EliteMining/app/data/res_sites.csv")
             
             print(f"✅ ZIP package created successfully: {zip_path}")
             return True

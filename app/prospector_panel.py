@@ -175,7 +175,7 @@ def _extract_material_percent(m: Dict[str, Any]) -> Optional[float]:
             return None
     return None
 
-def _extract_location_display(full_body_name: str, body_type: str = "", station_name: str = "", carrier_name: str = "") -> str:
+def _extract_location_display(full_body_name: str, body_type: str = "", station_name: str = "", carrier_name: str = "", system_name: str = "") -> str:
     """Extract contextual location information for the Body/Ring field.
     
     Shows different information based on context:
@@ -190,6 +190,7 @@ def _extract_location_display(full_body_name: str, body_type: str = "", station_
         body_type: Optional body type (e.g., 'PlanetaryRing', 'Planet', 'Star')
         station_name: Optional station name if docked
         carrier_name: Optional fleet carrier name/callsign
+        system_name: Optional current system name to strip from body name
     
     Returns:
         Appropriate display name for the location context
@@ -218,19 +219,51 @@ def _extract_location_display(full_body_name: str, body_type: str = "", station_
     if not full_body_name:
         return ""
     
+    # Strip system name prefix from body name if provided
+    # "HIP 72681 A" with system "HIP 72681" -> "A"
+    # "HIP 72681 2 A Ring" with system "HIP 72681" -> "2 A Ring"
+    body_name = full_body_name
+    if system_name and full_body_name.startswith(system_name):
+        body_name = full_body_name[len(system_name):].strip()
+        if not body_name:
+            body_name = full_body_name  # Keep original if nothing left
+    
     # Priority 3: Asteroid rings (mining context)
-    if body_type == "PlanetaryRing" or "Ring" in full_body_name:
+    if body_type == "PlanetaryRing" or "Ring" in body_name:
         # First try to match patterns like "AB 2 B Ring" (planet letters + number + ring letter)
         # Use [A-Z]+ to match one or more uppercase letters (A, B, AB, ABC, etc.)
-        ring_match = re.search(r'\b([A-Z]+\s+\d+\s+[A-Za-z]\s+Ring)$', full_body_name)
+        ring_match = re.search(r'\b([A-Z]+\s+\d+\s+[A-Za-z]\s+Ring)$', body_name)
         if ring_match:
             return ring_match.group(1)
         # Fallback for simpler patterns like "2 A Ring" - match number at start
-        ring_match = re.search(r'\b(\d+\s+[A-Za-z]\s+Ring)$', full_body_name)
+        ring_match = re.search(r'\b(\d+\s+[A-Za-z]\s+Ring)$', body_name)
         if ring_match:
             return ring_match.group(1)
+        # If body_name already looks like a clean ring name, return it
+        if re.match(r'^[A-Z]?\s*\d*\s*[A-Za-z]?\s*Ring$', body_name.strip()):
+            return body_name.strip()
     
-    # Priority 4: Extract just the body designation from system + body names
+    # Priority 4: If we already stripped system name, the remaining body_name is likely clean
+    if system_name and body_name != full_body_name:
+        # body_name is already the extracted part (e.g., "A", "2", "2 A Ring")
+        if body_name:
+            # Single letter planet (A, B, C, etc.)
+            if len(body_name) == 1 and body_name.isalpha():
+                return body_name.upper()
+            # Number only (planet 1, 2, 3, etc.)
+            if body_name.isdigit():
+                return body_name
+            # Number + letter (2 A, 3 B, etc.) - likely a moon or ring
+            parts = body_name.split()
+            if len(parts) == 2 and parts[0].isdigit() and len(parts[1]) == 1 and parts[1].isalpha():
+                if body_type == "PlanetaryRing" or "Ring" in full_body_name:
+                    return f"{parts[0]} {parts[1].upper()} Ring"
+                else:
+                    return f"{parts[0]} {parts[1].upper()}"
+            # Otherwise return as-is
+            return body_name
+    
+    # Priority 5: Extract just the body designation from system + body names (fallback)
     # Remove system name prefix to show just the body part
     # Examples: 
     # "Col 285 Sector WP-E c12-17 3 a" -> "3A" or "3A Ring" (if it's a ring)
@@ -759,12 +792,13 @@ class ProspectorPanel(ttk.Frame):
         if current_system and not self.session_system.get():
             self.session_system.set(current_system)
         
-        # Update body field
+        # Update body field - pass system name for better filtering
         body_display = _extract_location_display(
             self.last_body or "", 
             self.last_body_type, 
             self.last_station_name, 
-            self.last_carrier_name
+            self.last_carrier_name,
+            current_system or self.session_system.get() or ""
         )
         self.session_body.set(body_display)
         
@@ -8737,7 +8771,8 @@ class ProspectorPanel(ttk.Frame):
                         self.last_body or "", 
                         self.last_body_type, 
                         self.last_station_name, 
-                        self.last_carrier_name
+                        self.last_carrier_name,
+                        self.last_system or self.session_system.get() or ""
                     )
                     self.session_body.set(body_display)
                     
@@ -8755,7 +8790,8 @@ class ProspectorPanel(ttk.Frame):
                                 body_name, 
                                 self.last_body_type, 
                                 self.last_station_name, 
-                                self.last_carrier_name
+                                self.last_carrier_name,
+                                self.last_system or self.session_system.get() or ""
                             )
                             self.session_body.set(body_display)
                     
@@ -8776,7 +8812,8 @@ class ProspectorPanel(ttk.Frame):
                                 self.last_body, 
                                 self.last_body_type, 
                                 self.last_station_name, 
-                                self.last_carrier_name
+                                self.last_carrier_name,
+                                self.last_system or self.session_system.get() or ""
                             )
                             self.session_body.set(body_display)
                             
@@ -8799,7 +8836,8 @@ class ProspectorPanel(ttk.Frame):
                             self.last_body or "", 
                             self.last_body_type, 
                             self.last_station_name, 
-                            self.last_carrier_name
+                            self.last_carrier_name,
+                            self.last_system or self.session_system.get() or ""
                         )
                         self.session_body.set(body_display)
                     
@@ -8830,7 +8868,8 @@ class ProspectorPanel(ttk.Frame):
                         self.last_body or "", 
                         self.last_body_type, 
                         self.last_station_name, 
-                        self.last_carrier_name
+                        self.last_carrier_name,
+                        self.last_system or self.session_system.get() or ""
                     )
                     self.session_body.set(body_display)
                     # Debug removed
@@ -8856,7 +8895,8 @@ class ProspectorPanel(ttk.Frame):
                             body_name, 
                             self.last_body_type, 
                             self.last_station_name, 
-                            self.last_carrier_name
+                            self.last_carrier_name,
+                            self.last_system or self.session_system.get() or ""
                         )
                         self.session_body.set(body_display)
                         
@@ -8886,7 +8926,8 @@ class ProspectorPanel(ttk.Frame):
                             self.last_body, 
                             self.last_body_type, 
                             self.last_station_name, 
-                            self.last_carrier_name
+                            self.last_carrier_name,
+                            self.last_system or self.session_system.get() or ""
                         )
                         self.session_body.set(body_display)
 
@@ -9043,7 +9084,8 @@ class ProspectorPanel(ttk.Frame):
                                 self.last_body, 
                                 self.last_body_type, 
                                 self.last_station_name, 
-                                self.last_carrier_name
+                                self.last_carrier_name,
+                                self.last_system or self.session_system.get() or ""
                             )
                             self.session_body.set(body_display)
                             # PRESERVE mining location for report (won't be overwritten by docking)
@@ -9413,7 +9455,8 @@ class ProspectorPanel(ttk.Frame):
                 self.last_body, 
                 self.last_body_type, 
                 self.last_station_name, 
-                self.last_carrier_name
+                self.last_carrier_name,
+                current_system or self.session_system.get() or ""
             )
             self.session_body.set(body_display)
         
@@ -10878,7 +10921,7 @@ class ProspectorPanel(ttk.Frame):
         tree_frame_bookmarks.grid_rowconfigure(0, weight=1)
 
         # Create bookmarks treeview with multiple selection enabled
-        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "target_material", "overlap", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
+        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
         self.bookmarks_tree.grid(row=0, column=0, sticky="nsew")
         
         # Configure row tags for alternating colors
@@ -10898,8 +10941,8 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.heading("hotspot", text="Ring Type", anchor="w")
         self.bookmarks_tree.heading("materials", text="Minerals Found", anchor="w")
         self.bookmarks_tree.heading("avg_yield", text="Avg Yield %", anchor="w")
-        self.bookmarks_tree.heading("target_material", text="Overlap Minerals", anchor="w")
         self.bookmarks_tree.heading("overlap", text="Overlap", anchor="w")
+        self.bookmarks_tree.heading("res_site", text="RES Site", anchor="w")
         self.bookmarks_tree.heading("notes", text="Notes", anchor="w")
         
         # Configure column widths
@@ -10909,8 +10952,8 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.column("hotspot", width=100, stretch=False, anchor="w")
         self.bookmarks_tree.column("materials", width=200, stretch=False, anchor="w")
         self.bookmarks_tree.column("avg_yield", width=80, stretch=False, anchor="center")
-        self.bookmarks_tree.column("target_material", width=120, stretch=False, anchor="w")
-        self.bookmarks_tree.column("overlap", width=70, stretch=False, anchor="center")
+        self.bookmarks_tree.column("overlap", width=80, stretch=False, anchor="w")
+        self.bookmarks_tree.column("res_site", width=80, stretch=False, anchor="w")
         self.bookmarks_tree.column("notes", width=50, stretch=False, anchor="center")  # Narrower for emoji
 
         # Load saved column widths from config
@@ -10931,7 +10974,7 @@ class ProspectorPanel(ttk.Frame):
             try:
                 from config import save_bookmarks_column_widths
                 widths = {}
-                for col in ["last_mined", "system", "body", "hotspot", "materials", "avg_yield", "target_material", "overlap", "notes"]:
+                for col in ["last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "notes"]:
                     try:
                         widths[col] = self.bookmarks_tree.column(col, "width")
                     except:
@@ -10987,7 +11030,7 @@ class ProspectorPanel(ttk.Frame):
                 print(f"Bookmark sorting error for column {col}: {e}")
 
         # Bind column headers to sorting
-        for col in ("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "target_material", "overlap", "notes"):
+        for col in ("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "notes"):
             self.bookmarks_tree.heading(col, command=lambda c=col: sort_bookmark_col(c))
 
         # Buttons frame
@@ -11043,6 +11086,26 @@ class ProspectorPanel(ttk.Frame):
     def _on_bookmark_search_changed(self, event=None) -> None:
         """Handle bookmark search text change"""
         self._refresh_bookmarks()
+
+    def _abbreviate_material_for_bookmark(self, material_name: str) -> str:
+        """Abbreviate material name for bookmark display"""
+        abbreviations = {
+            'Alexandrite': 'Alex',
+            'Benitoite': 'Beni',
+            'Bromellite': 'Brom',
+            'Grandidierite': 'Gran',
+            'Low Temperature Diamonds': 'LTD',
+            'Low-Temperature Diamonds': 'LTD',
+            'Monazite': 'Mona',
+            'Musgravite': 'Musg',
+            'Painite': 'Pain',
+            'Platinum': 'Plat',
+            'Rhodplumsite': 'Rhod',
+            'Serendibite': 'Sere',
+            'Tritium': 'Trit',
+            'Void Opals': 'Opals'
+        }
+        return abbreviations.get(material_name, material_name[:4] if len(material_name) > 4 else material_name)
 
     def _refresh_bookmarks(self) -> None:
         """Refresh the bookmarks display with current filter/search"""
@@ -11121,8 +11184,27 @@ class ProspectorPanel(ttk.Frame):
             notes = bookmark.get('notes', '')
             notes_display = '💬' if notes.strip() else ''  # Show emoji if notes exist
             
+            # Format overlap display as "Material Type" (e.g., "Plat 2x")
+            target_material = bookmark.get('target_material', '')
             overlap_type = bookmark.get('overlap_type', '')
-            overlap_display = {'': '', '2x': '⭐⭐', '3x': '⭐⭐⭐'}.get(overlap_type, '')
+            if target_material and overlap_type:
+                # Abbreviate material name for display
+                mat_abbr = self._abbreviate_material_for_bookmark(target_material)
+                overlap_display = f"{mat_abbr} {overlap_type}"
+            else:
+                overlap_display = ''
+            
+            # Format RES site display as "Type Material" (e.g., "HAZ Plat")
+            res_site = bookmark.get('res_site', '')
+            res_material = bookmark.get('res_material', '')
+            if res_site and res_material:
+                mat_abbr = self._abbreviate_material_for_bookmark(res_material)
+                res_abbr = {'Hazardous': 'HAZ', 'High': 'High', 'Low': 'Low'}.get(res_site, res_site)
+                res_display = f"{res_abbr} {mat_abbr}"
+            elif res_site:
+                res_display = res_site
+            else:
+                res_display = ''
             
             tag = "evenrow" if row_index % 2 == 0 else "oddrow"
             self.bookmarks_tree.insert("", "end", values=(
@@ -11132,8 +11214,8 @@ class ProspectorPanel(ttk.Frame):
                 bookmark.get('hotspot', ''),
                 bookmark.get('materials', ''),
                 bookmark.get('avg_yield', ''),
-                bookmark.get('target_material', ''),
                 overlap_display,
+                res_display,
                 notes_display
             ), tags=(tag,))
             row_index += 1
@@ -11260,19 +11342,78 @@ class ProspectorPanel(ttk.Frame):
         overlap_combo['values'] = ('', '2x', '3x')
         overlap_combo.grid(row=6, column=1, sticky="w", pady=(0, 5))
         
+        # RES Site field
+        ttk.Label(frame, text="RES Site:").grid(row=7, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        res_var = tk.StringVar(value=bookmark_data.get('res_site', '') if bookmark_data else '')
+        res_combo = ttk.Combobox(frame, textvariable=res_var, width=32, state="readonly")
+        res_combo['values'] = ('', 'Hazardous', 'High', 'Low')
+        res_combo.grid(row=7, column=1, sticky="w", pady=(0, 5))
+        
+        # RES Minerals dropdown field (separate from Overlap Minerals)
+        ttk.Label(frame, text="RES Minerals:").grid(row=8, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        res_material_var = tk.StringVar(value=bookmark_data.get('res_material', '') if bookmark_data else '')
+        
+        # Same materials list for RES
+        res_materials = ['', 'Alexandrite', 'Benitoite', 'Bromellite', 'Grandidierite', 'Low-Temperature Diamonds', 
+                        'Monazite', 'Musgravite', 'Painite', 'Platinum', 'Void Opals', 'Tritium']
+        
+        res_material_combo = ttk.Combobox(frame, textvariable=res_material_var, width=32, state="readonly")
+        res_material_combo['values'] = tuple(res_materials)
+        res_material_combo.grid(row=8, column=1, sticky="w", pady=(0, 5))
+        
         # Notes field
-        ttk.Label(frame, text="Notes:").grid(row=7, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text="Notes:").grid(row=9, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
         notes_text = tk.Text(frame, width=35, height=4, insertbackground="#ffffff")  # White cursor for visibility
-        notes_text.grid(row=7, column=1, sticky="w", pady=(0, 10))
+        notes_text.grid(row=9, column=1, sticky="w", pady=(0, 10))
         if bookmark_data:
             notes_text.insert("1.0", bookmark_data.get('notes', ''))
+        
+        # Pre-load overlap/RES from database if editing existing bookmark with system/body
+        def load_from_database():
+            """Load overlap and RES values from database for current system/body/material"""
+            try:
+                system = system_var.get().strip()
+                body = body_var.get().strip()
+                material = target_material_var.get()
+                
+                if not system or not body or not material:
+                    return
+                
+                if self.main_app and hasattr(self.main_app, 'cargo_monitor') and hasattr(self.main_app.cargo_monitor, 'user_db'):
+                    user_db = self.main_app.cargo_monitor.user_db
+                    
+                    # Load overlap from database
+                    db_overlap = user_db.get_overlap_tag(system, body, material)
+                    if db_overlap and not overlap_var.get():
+                        overlap_var.set(db_overlap)
+                    
+                    # Load RES from database
+                    db_res = user_db.get_res_tag(system, body, material)
+                    if db_res and not res_var.get():
+                        res_var.set(db_res)
+            except Exception as e:
+                print(f"Error loading from database: {e}")
+        
+        # Bind material change to reload from database
+        def on_material_change(*args):
+            try:
+                if dialog.winfo_exists():
+                    load_from_database()
+            except:
+                pass  # Dialog was closed
+        
+        target_material_var.trace_add('write', on_material_change)
+        
+        # Initial load from database if editing existing bookmark
+        if bookmark_data:
+            load_from_database()
         
         # Remove the column weight so fields don't expand
         # frame.columnconfigure(1, weight=1)  # Commented out to prevent expansion
         
         # Buttons
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=8, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=10, column=0, columnspan=2, pady=(10, 0))
         
         def save_bookmark():
             system = system_var.get().strip()
@@ -11290,10 +11431,59 @@ class ProspectorPanel(ttk.Frame):
                 'avg_yield': yield_var.get().strip(),
                 'target_material': target_material_var.get(),
                 'overlap_type': overlap_var.get(),
+                'res_site': res_var.get(),
+                'res_material': res_material_var.get(),
                 'last_mined': bookmark_data.get('last_mined', '') if bookmark_data else '',
                 'notes': notes_text.get("1.0", "end-1c").strip(),
                 'date_added': bookmark_data.get('date_added', dt.datetime.now().strftime('%Y-%m-%d')) if bookmark_data else dt.datetime.now().strftime('%Y-%m-%d')
             }
+            
+            # Sync overlap/RES to database for Ring Finder integration
+            try:
+                print(f"[BOOKMARK SYNC] Attempting to sync to database...")
+                print(f"[BOOKMARK SYNC] main_app: {self.main_app is not None}")
+                if self.main_app:
+                    print(f"[BOOKMARK SYNC] has cargo_monitor: {hasattr(self.main_app, 'cargo_monitor')}")
+                    if hasattr(self.main_app, 'cargo_monitor'):
+                        print(f"[BOOKMARK SYNC] has user_db: {hasattr(self.main_app.cargo_monitor, 'user_db')}")
+                
+                if self.main_app and hasattr(self.main_app, 'cargo_monitor') and hasattr(self.main_app.cargo_monitor, 'user_db'):
+                    user_db = self.main_app.cargo_monitor.user_db
+                    target_mat = target_material_var.get()
+                    overlap_type = overlap_var.get()
+                    res_site = res_var.get()
+                    res_mat = res_material_var.get()
+                    
+                    print(f"[BOOKMARK SYNC] target_mat={target_mat}, overlap_type={overlap_type}")
+                    print(f"[BOOKMARK SYNC] res_site={res_site}, res_mat={res_mat}")
+                    
+                    # Get previous values to clear if changed
+                    prev_target_mat = bookmark_data.get('target_material', '') if bookmark_data else ''
+                    prev_res_mat = bookmark_data.get('res_material', '') if bookmark_data else ''
+                    
+                    # Sync overlap to database if both material and overlap type are set
+                    if target_mat and overlap_type:
+                        user_db.set_overlap_tag(system, body, target_mat, overlap_type)
+                    elif target_mat and not overlap_type:
+                        # Clear overlap if material set but no overlap type
+                        user_db.set_overlap_tag(system, body, target_mat, None)
+                    # Clear previous overlap if material changed
+                    if prev_target_mat and prev_target_mat != target_mat:
+                        user_db.set_overlap_tag(system, body, prev_target_mat, None)
+                    
+                    # Sync RES to database if both RES material and RES site are set
+                    if res_mat and res_site:
+                        print(f"[BOOKMARK SYNC] Calling set_res_tag({system}, {body}, {res_mat}, {res_site})")
+                        user_db.set_res_tag(system, body, res_mat, res_site)
+                        print(f"[BOOKMARK SYNC] set_res_tag completed")
+                    elif res_mat and not res_site:
+                        # Clear RES if material set but no RES site
+                        user_db.set_res_tag(system, body, res_mat, None)
+                    # Clear previous RES if material changed or cleared
+                    if prev_res_mat and prev_res_mat != res_mat:
+                        user_db.set_res_tag(system, body, prev_res_mat, None)
+            except Exception as e:
+                print(f"Error syncing bookmark to database: {e}")
             
             if bookmark_index is not None:
                 # Edit existing bookmark

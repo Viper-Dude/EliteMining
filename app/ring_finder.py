@@ -278,33 +278,11 @@ class RingFinder:
         # Single smart search input
         ttk.Label(search_frame, text="Reference System:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.system_var = tk.StringVar()
-        # Clear selection when the reference system value changes (prevents auto-selection)
-        try:
-            self.system_var.trace_add('write', lambda *args: (self.system_entry.selection_clear(), self.parent.focus_set()))
-        except Exception:
-            # Fallback for older Python versions
-            try:
-                self.system_var.trace('w', lambda *args: (self.system_entry.selection_clear(), self.parent.focus_set()))
-            except Exception:
-                pass
-        self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=35, takefocus=False)
+        self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=35)
         self.system_entry.bind('<Return>', lambda e: self.search_hotspots())
         self.system_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
-        # Ensure the system entry does not keep a selection when mapped/visible
-        try:
-            self.system_entry.bind('<Map>', lambda e: self.system_entry.selection_clear())
-            self.system_entry.bind('<Visibility>', lambda e: self.system_entry.selection_clear())
-            self.system_entry.bind('<FocusOut>', lambda e: self.system_entry.selection_clear())
-            self.system_entry.bind('<FocusIn>', lambda e: self.system_entry.selection_clear())
-        except Exception:
-            pass
-        # Remove focus and selection from entry on startup (focus top-level window)
-        try:
-            top = self.parent.winfo_toplevel()
-            self.parent.after(100, lambda: self.system_entry.selection_clear())
-            self.parent.after(100, lambda: top.focus_set())
-        except Exception:
-            pass
+        # Clear selection only on focus out to prevent unwanted text selection
+        self.system_entry.bind('<FocusOut>', lambda e: self.system_entry.selection_clear())
         
         # For compatibility, current_system_var points to the same system_var
         self.current_system_var = self.system_var
@@ -385,6 +363,30 @@ class RingFinder:
         distance_combo = ttk.Combobox(right_filters_frame_row1, textvariable=self.distance_var, width=8, state="readonly")
         distance_combo['values'] = ("10", "50", "100", "150", "200", "300")
         distance_combo.pack(side="left")
+        
+        # Overlaps Only checkbox - filters to show only overlap entries
+        self.overlaps_only_var = tk.BooleanVar(value=False)
+        self.overlaps_only_cb = tk.Checkbutton(right_filters_frame_row1, text="Overlaps Only",
+                                               variable=self.overlaps_only_var,
+                                               command=self._on_overlaps_only_changed,
+                                               bg="#1e1e1e", fg="#e0e0e0",
+                                               activebackground="#2e2e2e", activeforeground="#ffffff",
+                                               selectcolor="#1e1e1e", relief="flat",
+                                               font=("Segoe UI", 8, "normal"))
+        self.overlaps_only_cb.pack(side="left", padx=(26, 0))
+        ToolTip(self.overlaps_only_cb, "When checked, only shows rings with known overlaps\n(ignores distance limit)")
+        
+        # RES Only checkbox - filters to show only RES site entries
+        self.res_only_var = tk.BooleanVar(value=False)
+        self.res_only_cb = tk.Checkbutton(right_filters_frame_row1, text="RES Only",
+                                          variable=self.res_only_var,
+                                          command=self._on_res_only_changed,
+                                          bg="#1e1e1e", fg="#e0e0e0",
+                                          activebackground="#2e2e2e", activeforeground="#ffffff",
+                                          selectcolor="#1e1e1e", relief="flat",
+                                          font=("Segoe UI", 8, "normal"))
+        self.res_only_cb.pack(side="left", padx=(10, 0))
+        ToolTip(self.res_only_cb, "When checked, only shows rings with RES sites\n(Hazardous, High, Low - ignores distance limit)")
         
         # Max Results filter - in sub-frame with fixed label width to align dropdowns
         ttk.Label(right_filters_frame_row2, text="Max Results:", width=15, anchor="e").pack(side="left", padx=(0, 5))
@@ -485,7 +487,7 @@ class RingFinder:
                  foreground=[('selected', 'white')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Visited", "Planet/Ring", "Ring Type", "Hotspots", "Density")
+        columns = ("Distance", "LS", "System", "Visited", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Density")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
         
         # Set column widths - similar to EDTOOLS layout
@@ -496,6 +498,8 @@ class RingFinder:
             "Planet/Ring": 100,
             "Ring Type": 120,
             "Hotspots": 150,  # Reduced from 200 to 150
+            "Overlap": 80,
+            "RES Site": 80,
             "Visited": 60,
             "Density": 110
         }
@@ -515,6 +519,10 @@ class RingFinder:
                 self.results_tree.column(col, width=column_widths[col], minwidth=80, anchor="w", stretch=False)
             elif col == "Hotspots":
                 self.results_tree.column(col, width=column_widths[col], minwidth=100, anchor="w", stretch=False)
+            elif col == "Overlap":
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
+            elif col == "RES Site":
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Visited":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "LS":
@@ -736,6 +744,16 @@ class RingFinder:
         }
         
         return display_mapping.get(material_name, material_name)
+    
+    def _on_overlaps_only_changed(self):
+        """Handle Overlaps Only checkbox change - disable RES Only if enabled"""
+        if self.overlaps_only_var.get():
+            self.res_only_var.set(False)
+    
+    def _on_res_only_changed(self):
+        """Handle RES Only checkbox change - disable Overlaps Only if enabled"""
+        if self.res_only_var.get():
+            self.overlaps_only_var.set(False)
         
     def _preload_data(self):
         """Preload systems data in background"""
@@ -1004,6 +1022,327 @@ class RingFinder:
         except Exception as e:
             print(f"DEBUG: Error loading ring finder settings: {e}")
     
+    def _get_all_overlaps_for_search(self, reference_system: str, reference_coords: Dict, specific_material: str) -> List[Dict]:
+        """Get all overlap entries for Overlaps Only mode (no distance filter)
+        
+        Args:
+            reference_system: Current reference system name
+            reference_coords: Reference system coordinates for distance calculation
+            specific_material: Material filter (or "All Minerals")
+            
+        Returns:
+            List of all overlap hotspot entries sorted by distance
+        """
+        import sqlite3
+        import math
+        
+        try:
+            overlaps = []
+            coord_cache = {}  # Cache for galaxy database lookups
+            seen_rings = set()  # Track which rings we've already added
+            
+            with sqlite3.connect(self.user_db.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Query overlap entries
+                if specific_material == RingFinder.ALL_MINERALS:
+                    cursor.execute('''
+                        SELECT system_name, body_name, material_name, overlap_tag,
+                               ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
+                        FROM hotspot_data 
+                        WHERE overlap_tag IS NOT NULL
+                    ''')
+                else:
+                    cursor.execute('''
+                        SELECT system_name, body_name, material_name, overlap_tag,
+                               ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
+                        FROM hotspot_data 
+                        WHERE overlap_tag IS NOT NULL AND material_name = ?
+                    ''', (specific_material,))
+                
+                rows = cursor.fetchall()
+            
+            for row in rows:
+                system_name, body_name, material_name, overlap_tag, ring_type, ls_distance, density, x, y, z, hotspot_count = row
+                
+                # Skip if we've already added this ring (avoid duplicates when multiple materials have overlaps)
+                ring_key = (system_name, body_name)
+                if ring_key in seen_rings:
+                    continue
+                seen_rings.add(ring_key)
+                
+                # Try to get coordinates if missing
+                if x is None or y is None or z is None:
+                    # Check cache first
+                    if system_name in coord_cache:
+                        coords = coord_cache[system_name]
+                    else:
+                        # Try galaxy database
+                        coords = self._get_system_coords_from_galaxy_db(system_name)
+                        coord_cache[system_name] = coords
+                    
+                    if coords:
+                        x, y, z = coords['x'], coords['y'], coords['z']
+                
+                # Calculate distance
+                distance = 999.9
+                if reference_coords and x is not None and y is not None and z is not None:
+                    distance = math.sqrt((x - reference_coords['x'])**2 + (y - reference_coords['y'])**2 + (z - reference_coords['z'])**2)
+                    distance = round(distance, 1)
+                
+                # Format LS distance
+                ls_display = "No data"
+                if ls_distance is not None and ls_distance != 0:
+                    try:
+                        ls_display = f"{int(float(ls_distance)):,}"
+                    except:
+                        pass
+                else:
+                    # Try to get LS from another hotspot entry for the same ring
+                    try:
+                        with sqlite3.connect(self.user_db.db_path) as conn2:
+                            cursor2 = conn2.cursor()
+                            cursor2.execute('''
+                                SELECT ls_distance FROM hotspot_data 
+                                WHERE system_name = ? AND body_name = ? AND ls_distance IS NOT NULL AND ls_distance > 0
+                                LIMIT 1
+                            ''', (system_name, body_name))
+                            result = cursor2.fetchone()
+                            if result and result[0]:
+                                ls_display = f"{int(float(result[0])):,}"
+                    except:
+                        pass
+                
+                # Get ALL hotspots for this ring and format them for display
+                hotspots_display = self._get_ring_hotspots_display(system_name, body_name)
+                
+                overlaps.append({
+                    'systemName': system_name,
+                    'bodyName': body_name,
+                    'type': hotspots_display,  # Use formatted hotspots display
+                    'count': hotspot_count or 0,
+                    'distance': distance,
+                    'ring_type': ring_type or "No data",
+                    'ls': ls_display,  # Display uses 'ls' key
+                    'ls_distance': ls_distance,  # Keep raw value for EDSM compatibility
+                    'density': density,
+                    'data_source': 'Overlap Database',
+                    'overlap_tag': overlap_tag
+                })
+            
+            # Sort by distance
+            overlaps.sort(key=lambda x: x.get('distance', 999.9))
+            
+            # Fill missing metadata (LS distance, ring type) using EDSM
+            # Limit to first 30 systems to avoid slow searches
+            if overlaps:
+                try:
+                    self._fill_missing_metadata_edsm(overlaps, max_systems=30)
+                except Exception as e:
+                    print(f" DEBUG: EDSM metadata fill failed: {e}")
+            
+            return overlaps
+            
+        except Exception as e:
+            print(f"Error getting overlaps for search: {e}")
+            return []
+    
+    def _get_ring_hotspots_display(self, system_name: str, body_name: str) -> str:
+        """Get formatted hotspots display for a ring (e.g., 'Plat (3), Pain (2)')
+        
+        Args:
+            system_name: Star system name
+            body_name: Ring body name
+            
+        Returns:
+            Formatted string of all hotspots in the ring
+        """
+        import sqlite3
+        try:
+            with sqlite3.connect(self.user_db.db_path) as conn:
+                cursor = conn.cursor()
+                # Get all materials for this ring, including those with count 0
+                # Also check for res_tag or overlap_tag to know if it's a known hotspot
+                cursor.execute('''
+                    SELECT material_name, hotspot_count, res_tag, overlap_tag 
+                    FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ?
+                    ORDER BY hotspot_count DESC, material_name
+                ''', (system_name, body_name))
+                rows = cursor.fetchall()
+            
+            if not rows:
+                return "-"
+            
+            parts = []
+            for material_name, count, res_tag, overlap_tag in rows:
+                abbr = self._abbreviate_material_for_display(material_name)
+                if count and count > 0:
+                    parts.append(f"{abbr} ({count})")
+                elif res_tag or overlap_tag:
+                    # CSV-imported RES/Overlap entries - show (1) as minimum
+                    parts.append(f"{abbr} (1)")
+                else:
+                    # Other entries without count - just show material
+                    parts.append(abbr)
+            
+            return ", ".join(parts) if parts else "-"
+            
+        except Exception as e:
+            print(f"Error getting ring hotspots display: {e}")
+            return "-"
+    
+    def _get_all_res_for_search(self, reference_system: str, reference_coords: Dict, specific_material: str) -> List[Dict]:
+        """Get all RES site entries for RES Only mode (no distance filter)
+        
+        Args:
+            reference_system: Current reference system name
+            reference_coords: Reference system coordinates for distance calculation
+            specific_material: Material filter (or "All Minerals")
+            
+        Returns:
+            List of all RES site hotspot entries sorted by distance
+        """
+        import sqlite3
+        import math
+        
+        try:
+            res_sites = []
+            coord_cache = {}  # Cache for galaxy database lookups
+            seen_rings = set()  # Track which rings we've already added
+            
+            with sqlite3.connect(self.user_db.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Query RES entries
+                if specific_material == RingFinder.ALL_MINERALS:
+                    cursor.execute('''
+                        SELECT system_name, body_name, material_name, res_tag, overlap_tag,
+                               ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
+                        FROM hotspot_data 
+                        WHERE res_tag IS NOT NULL
+                    ''')
+                else:
+                    cursor.execute('''
+                        SELECT system_name, body_name, material_name, res_tag, overlap_tag,
+                               ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
+                        FROM hotspot_data 
+                        WHERE res_tag IS NOT NULL AND material_name = ?
+                    ''', (specific_material,))
+                
+                rows = cursor.fetchall()
+            
+            for row in rows:
+                system_name, body_name, material_name, res_tag, overlap_tag, ring_type, ls_distance, density, x, y, z, hotspot_count = row
+                
+                # Skip if we've already added this ring (avoid duplicates when multiple materials have RES)
+                ring_key = (system_name, body_name)
+                if ring_key in seen_rings:
+                    continue
+                seen_rings.add(ring_key)
+                
+                # Try to get coordinates if missing
+                if x is None or y is None or z is None:
+                    # Check cache first
+                    if system_name in coord_cache:
+                        coords = coord_cache[system_name]
+                    else:
+                        # Try galaxy database
+                        coords = self._get_system_coords_from_galaxy_db(system_name)
+                        coord_cache[system_name] = coords
+                    
+                    if coords:
+                        x, y, z = coords['x'], coords['y'], coords['z']
+                
+                # Calculate distance
+                distance = 999.9
+                if reference_coords and x is not None and y is not None and z is not None:
+                    distance = math.sqrt((x - reference_coords['x'])**2 + (y - reference_coords['y'])**2 + (z - reference_coords['z'])**2)
+                    distance = round(distance, 1)
+                
+                # Format LS distance
+                ls_display = "No data"
+                if ls_distance is not None and ls_distance != 0:
+                    try:
+                        ls_display = f"{int(float(ls_distance)):,}"
+                    except:
+                        pass
+                else:
+                    # Try to get LS from another hotspot entry for the same ring
+                    try:
+                        with sqlite3.connect(self.user_db.db_path) as conn2:
+                            cursor2 = conn2.cursor()
+                            cursor2.execute('''
+                                SELECT ls_distance FROM hotspot_data 
+                                WHERE system_name = ? AND body_name = ? AND ls_distance IS NOT NULL AND ls_distance > 0
+                                LIMIT 1
+                            ''', (system_name, body_name))
+                            result = cursor2.fetchone()
+                            if result and result[0]:
+                                ls_display = f"{int(float(result[0])):,}"
+                    except:
+                        pass
+                
+                # Get ALL hotspots for this ring and format them for display
+                hotspots_display = self._get_ring_hotspots_display(system_name, body_name)
+                
+                # Abbreviate RES tag for display
+                res_display = self._abbreviate_res_tag(res_tag)
+                
+                res_sites.append({
+                    'systemName': system_name,
+                    'bodyName': body_name,
+                    'type': hotspots_display,  # Use formatted hotspots display
+                    'count': hotspot_count or 0,
+                    'distance': distance,
+                    'ring_type': ring_type or "No data",
+                    'ls': ls_display,
+                    'ls_distance': ls_distance,
+                    'density': density,
+                    'data_source': 'RES Database',
+                    'overlap_tag': overlap_tag,
+                    'res_tag': res_display
+                })
+            
+            # Sort by distance
+            res_sites.sort(key=lambda x: x.get('distance', 999.9))
+            
+            # Fill missing metadata using EDSM
+            if res_sites:
+                try:
+                    self._fill_missing_metadata_edsm(res_sites, max_systems=30)
+                except Exception as e:
+                    print(f" DEBUG: EDSM metadata fill failed: {e}")
+            
+            return res_sites
+            
+        except Exception as e:
+            print(f"Error getting RES sites for search: {e}")
+            return []
+    
+    def _abbreviate_res_tag(self, res_tag: str) -> str:
+        """Abbreviate RES tag for display
+        
+        Args:
+            res_tag: Full RES type (Hazardous, High, Low)
+            
+        Returns:
+            Abbreviated string (Haz, High, Low)
+        """
+        if not res_tag:
+            return ""
+        
+        abbreviations = {
+            'Hazardous': 'HAZ',
+            'hazardous': 'HAZ',
+            'High': 'High',
+            'high': 'High',
+            'Low': 'Low',
+            'low': 'Low'
+        }
+        
+        return abbreviations.get(res_tag, res_tag)
+    
     def search_hotspots(self, auto_refresh=False, highlight_body=None):
         """Search for mining hotspots using reference system as center point
         
@@ -1079,17 +1418,28 @@ class RingFinder:
                     break
 
         if not self.current_system_coords:
-            # Try to get coordinates from galaxy database first, then EDSM as last resort
+            # Try to get coordinates from galaxy database first
             galaxy_coords = self._get_system_coords_from_galaxy_db(reference_system)
             if galaxy_coords:
                 self.current_system_coords = galaxy_coords
                 print(f" DEBUG: Using galaxy database coordinates for '{reference_system}'")
             else:
-                # Only use EDSM as final fallback
-                # EDSM disabled - only use galaxy database as fallback
-                # self.current_system_coords = self._get_system_coords_from_edsm(reference_system)
-                if self.current_system_coords:
-                    print(f" DEBUG: Using EDSM coordinates for '{reference_system}' (galaxy db not available)")
+                # Try visited_systems table in user database
+                try:
+                    visited_coords = self.user_db._get_coordinates_from_visited_systems(reference_system)
+                    if visited_coords:
+                        # Convert tuple (x, y, z) to dict {'x': ..., 'y': ..., 'z': ...}
+                        self.current_system_coords = {'x': visited_coords[0], 'y': visited_coords[1], 'z': visited_coords[2]}
+                        print(f" DEBUG: Using visited_systems coordinates for '{reference_system}': {self.current_system_coords}")
+                except Exception as e:
+                    print(f" DEBUG: Error getting visited_systems coords: {e}")
+                
+                if not self.current_system_coords:
+                    # Use EDSM as final fallback
+                    edsm_coords = self._get_system_coords_from_edsm(reference_system)
+                    if edsm_coords:
+                        self.current_system_coords = edsm_coords
+                        print(f" DEBUG: Using EDSM coordinates for '{reference_system}' (final fallback)")
 
             if not self.current_system_coords:
                 self.status_var.set(f"Warning: '{reference_system}' coordinates not found - distances may be inaccurate")
@@ -1127,10 +1477,20 @@ class RingFinder:
             
             # Set the reference system coords for this worker thread
             self.current_system_coords = reference_coords
-            hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results)
             
-            # Apply min hotspots filter if needed
-            if min_hotspots > 1 and specific_material != RingFinder.ALL_MINERALS:
+            # Overlaps Only mode: Show only overlap entries (ignore distance)
+            if self.overlaps_only_var.get():
+                hotspots = self._get_all_overlaps_for_search(reference_system, reference_coords, specific_material)
+                print(f" DEBUG: Overlaps Only mode - found {len(hotspots)} overlap locations")
+            # RES Only mode: Show only RES site entries (ignore distance)
+            elif self.res_only_var.get():
+                hotspots = self._get_all_res_for_search(reference_system, reference_coords, specific_material)
+                print(f" DEBUG: RES Only mode - found {len(hotspots)} RES locations")
+            else:
+                hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results)
+            
+            # Apply min hotspots filter if needed (skip for overlaps/RES only mode)
+            if min_hotspots > 1 and specific_material != RingFinder.ALL_MINERALS and not self.overlaps_only_var.get() and not self.res_only_var.get():
                 original_count = len(hotspots)
                 hotspots = [h for h in hotspots if h.get('count', 1) >= min_hotspots]
                 filtered_count = len(hotspots)
@@ -1185,9 +1545,11 @@ class RingFinder:
                 ring_type = hotspot.get('ring_type')
                 ls_distance = hotspot.get('ls_distance')
                 
-                # Skip if ring_type is "No data" - not a real missing value
+                # Normalize "No data" strings to None for comparison
                 if ring_type == "No data":
                     ring_type = None
+                if ls_distance == "No data" or ls_distance is None:
+                    ls_distance = None
                 
                 if ring_type is None or ls_distance is None:
                     if system_name:
@@ -2890,6 +3252,9 @@ class RingFinder:
                 else:
                     # Regular count display
                     hotspot_count_display = str(hotspot.get("count", "-"))
+            elif "Overlap" in data_source or "RES" in data_source:
+                # Overlap/RES data - use the pre-formatted type field which has all materials
+                hotspot_count_display = hotspot.get("type", "-")
             elif "count" in hotspot:
                 # User database hotspots - show the count  
                 hotspot_count_display = str(hotspot.get("count", "-"))
@@ -2946,6 +3311,13 @@ class RingFinder:
                 row_tag = 'evenrow' if row_index % 2 == 0 else 'oddrow'
                 tags = (row_tag,)
             
+            # Get overlap display for this ring (filtered by current material selection)
+            current_material_filter = self.specific_material_var.get()
+            overlap_display = self._get_overlap_display(system_name, ring_name, current_material_filter)
+            
+            # Get RES display for this ring (filtered by current material selection)
+            res_display = self._get_res_display(system_name, ring_name, current_material_filter)
+            
             item_id = self.results_tree.insert("", "end", values=(
                 hotspot.get('distance', 'No data'),
                 ls_val,
@@ -2954,6 +3326,8 @@ class RingFinder:
                 ring_name,
                 ring_type_val,
                 hotspot_count_display,
+                overlap_display,
+                res_display,
                 density_formatted
             ), tags=tags)
             
@@ -3031,6 +3405,9 @@ class RingFinder:
                                    selectcolor=MENU_COLORS["selectcolor"])
         self.context_menu.add_command(label="Copy System Name", command=self._copy_system_name)
         self.context_menu.add_separator()
+        self.context_menu.add_command(label="Set Overlap...", command=self._show_overlap_dialog)
+        self.context_menu.add_command(label="Set RES...", command=self._show_res_dialog)
+        self.context_menu.add_separator()
         self.context_menu.add_command(label="Bookmark This Location", command=self._bookmark_selected)
     
     def _show_context_menu(self, event):
@@ -3104,11 +3481,13 @@ class RingFinder:
                 self.status_var.set("Invalid ring data for bookmarking")
                 return
 
-            # Extract data from columns: Distance, LS, System, Visited, Ring, Ring Type, Hotspots, etc.
+            # Extract data from columns: Distance, LS, System, Visited, Ring, Ring Type, Hotspots, Overlap, RES Site, Density
             system_name = values[2]  # System column
             ring_name = values[4]    # Ring column
             ring_type = values[5] if len(values) > 5 else ""  # Ring Type column
             hotspots = values[6] if len(values) > 6 else ""   # Hotspots column
+            overlap_display = values[7] if len(values) > 7 else ""  # Overlap column
+            res_display = values[8] if len(values) > 8 else ""  # RES Site column
 
             if not system_name or system_name in ["Unknown", ""]:
                 self.status_var.set("Cannot bookmark location with unknown system")
@@ -3123,6 +3502,34 @@ class RingFinder:
             if hotspots and hotspots not in ["None", "No data", ""]:
                 # Convert abbreviated materials back to full names for bookmark
                 materials = self._expand_abbreviated_materials(hotspots)
+            
+            # Parse overlap info from display (e.g., "Plat 2x" -> material="Platinum", type="2x")
+            target_material = ""
+            overlap_type = ""
+            if overlap_display and overlap_display not in ["None", "No data", ""]:
+                # Parse first overlap entry (e.g., "Plat 2x" or "Plat 2x, Pain 3x")
+                first_overlap = overlap_display.split(',')[0].strip()
+                parts = first_overlap.rsplit(' ', 1)  # Split from right to get "Plat" and "2x"
+                if len(parts) == 2:
+                    abbr, otype = parts
+                    target_material = self._expand_abbreviated_materials(abbr)
+                    overlap_type = otype
+            
+            # Parse RES info from display (e.g., "HAZ Plat" -> res_site="Hazardous", res_material="Platinum")
+            res_site = ""
+            res_material = ""
+            if res_display and res_display not in ["None", "No data", ""]:
+                # Parse first RES entry (e.g., "HAZ Plat" or "HAZ Plat, High LTD")
+                first_res = res_display.split(',')[0].strip()
+                parts = first_res.split(' ', 1)  # Split from left to get "HAZ" and "Plat"
+                if len(parts) >= 1:
+                    res_abbr = parts[0]
+                    # Expand RES abbreviation
+                    res_map = {'HAZ': 'Hazardous', 'High': 'High', 'Low': 'Low'}
+                    res_site = res_map.get(res_abbr, res_abbr)
+                    # Extract RES material (separate from overlap material)
+                    if len(parts) == 2:
+                        res_material = self._expand_abbreviated_materials(parts[1])
 
             # Get access to the prospector panel's bookmark dialog
             if self.prospector_panel and hasattr(self.prospector_panel, '_show_bookmark_dialog'):
@@ -3133,6 +3540,10 @@ class RingFinder:
                     'hotspot': ring_type,  # Ring type as hotspot info
                     'materials': materials,
                     'avg_yield': '',  # No yield data from ring finder
+                    'target_material': target_material,
+                    'overlap_type': overlap_type,
+                    'res_site': res_site,
+                    'res_material': res_material,
                     'last_mined': '',  # No mining date from ring finder
                     'notes': ''  # Empty notes by default
                 })
@@ -3145,11 +3556,27 @@ class RingFinder:
             self.status_var.set(f"Error bookmarking location: {e}")
 
     def _expand_abbreviated_materials(self, hotspots_text: str) -> str:
-        """Convert abbreviated materials back to full names for bookmarks"""
+        """Convert abbreviated materials back to full names for bookmarks and overlap tags"""
         # Reverse mapping of abbreviations to full names
+        # Includes both 3-char and 4-char abbreviations
         expansions = {
+            # 4-char abbreviations (from _abbreviate_material_for_display)
+            'Alex': 'Alexandrite',
+            'Beni': 'Benitoite',
+            'Brom': 'Bromellite',
+            'Gran': 'Grandidierite',
+            'LTD': 'Low Temperature Diamonds',
+            'Mona': 'Monazite',
+            'Musg': 'Musgravite',
+            'Pain': 'Painite',
+            'Plat': 'Platinum',
+            'Rhod': 'Rhodplumsite',
+            'Sere': 'Serendibite',
+            'Trit': 'Tritium',
+            'Opals': 'Void Opals',
+            # 3-char legacy abbreviations
             'Pt': 'Platinum', 'Pai': 'Painite', 'Ale': 'Alexandrite', 'Tri': 'Tritium',
-            'LTD': 'Low Temperature Diamonds', 'VO': 'Void Opals', 'Rho': 'Rhodplumsite',
+            'VO': 'Void Opals', 'Rho': 'Rhodplumsite',
             'Ser': 'Serendibite', 'Mon': 'Monazite', 'Mur': 'Musgravite', 'Ben': 'Benitoite',
             'Jer': 'Jadeite', 'Red': 'Red Beryl', 'Tai': 'Taaffeite', 'Gra': 'Grandidierite',
             'Opa': 'Opal', 'Osm': 'Osmium', 'Pla': 'Platinum', 'Pal': 'Palladium',
@@ -3288,3 +3715,470 @@ class RingFinder:
             
         # Clear status after 5 seconds
         self.parent.after(5000, lambda: self.status_var.set(""))
+
+    def _get_overlap_display(self, system_name: str, body_name: str, material_filter: str = None) -> str:
+        """Get formatted overlap display string for a ring
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            material_filter: If set, only show overlap for this material (not "All Minerals")
+            
+        Returns:
+            Formatted string like "Plat 2x, Pain 3x" or empty string
+        """
+        try:
+            overlaps = self.user_db.get_overlaps_for_ring(system_name, body_name)
+            if not overlaps:
+                return ""
+            
+            # If filtering by specific material, only show that material's overlap
+            if material_filter and material_filter != RingFinder.ALL_MINERALS:
+                # Filter overlaps to only the selected material
+                filtered_overlaps = []
+                for overlap in overlaps:
+                    mat_name = overlap['material_name'].lower()
+                    filter_name = material_filter.lower()
+                    # Match by name (handle variations like "Low Temp Diamonds" vs "Low Temperature Diamonds")
+                    if mat_name == filter_name or filter_name in mat_name or mat_name in filter_name:
+                        filtered_overlaps.append(overlap)
+                overlaps = filtered_overlaps
+            
+            if not overlaps:
+                return ""
+            
+            # Format each overlap with abbreviated material name
+            display_parts = []
+            for overlap in overlaps:
+                material = overlap['material_name']
+                tag = overlap['overlap_tag']
+                # Abbreviate the material name
+                abbr = self._abbreviate_material_for_display(material)
+                # Handle case where abbreviation returns same string (not in dict)
+                if abbr == material:
+                    # Use first 4 chars as fallback abbreviation
+                    abbr = material[:4] if len(material) > 4 else material
+                display_parts.append(f"{abbr} {tag}")
+            
+            return ", ".join(display_parts)
+        except Exception as e:
+            print(f"Error getting overlap display: {e}")
+            return ""
+
+    def _get_res_display(self, system_name: str, body_name: str, material_filter: str = None) -> str:
+        """Get formatted RES display string for a ring
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            material_filter: If set, only show RES for this material (not "All Minerals")
+            
+        Returns:
+            Formatted string like "Haz" or "High" or empty string
+        """
+        try:
+            res_sites = self.user_db.get_res_for_ring(system_name, body_name)
+            if not res_sites:
+                return ""
+            
+            # If filtering by specific material, only show that material's RES
+            if material_filter and material_filter != RingFinder.ALL_MINERALS:
+                # Filter RES to only the selected material
+                filtered_res = []
+                for res in res_sites:
+                    mat_name = res['material_name'].lower()
+                    filter_name = material_filter.lower()
+                    # Match by name
+                    if mat_name == filter_name or filter_name in mat_name or mat_name in filter_name:
+                        filtered_res.append(res)
+                res_sites = filtered_res
+            
+            if not res_sites:
+                return ""
+            
+            # Format RES tags with material abbreviation (RES type first, then material)
+            display_parts = []
+            for res in res_sites:
+                material = res['material_name']
+                tag = res['res_tag']
+                # Abbreviate the material name
+                abbr = self._abbreviate_material_for_display(material)
+                # Handle case where abbreviation returns same string (not in dict)
+                if abbr == material:
+                    # Use first 4 chars as fallback abbreviation
+                    abbr = material[:4] if len(material) > 4 else material
+                res_abbr = self._abbreviate_res_tag(tag)
+                if res_abbr:
+                    display_parts.append(f"{res_abbr} {abbr}")
+            
+            return ", ".join(display_parts)
+        except Exception as e:
+            print(f"Error getting RES display: {e}")
+            return ""
+
+    def _show_overlap_dialog(self):
+        """Show dialog to tag overlap for selected hotspot"""
+        try:
+            selection = self.results_tree.selection()
+            if not selection:
+                self.status_var.set("No ring selected")
+                return
+            
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if not values or len(values) < 7:
+                self.status_var.set("Invalid selection")
+                return
+            
+            # Extract data from columns: Distance, LS, System, Visited, Ring, Ring Type, Hotspots, Overlap, Density
+            system_name = values[2]  # System column
+            ring_name = values[4]    # Ring column
+            hotspots_str = values[6] # Hotspots column - contains materials like "Plat(3), Pain(2)"
+            
+            if not system_name or not ring_name:
+                self.status_var.set("Cannot tag: missing system or ring info")
+                return
+            
+            # Parse materials from hotspots string
+            materials = self._parse_materials_from_hotspots(hotspots_str)
+            if not materials:
+                self.status_var.set("No materials found in this ring")
+                return
+            
+            # Expand abbreviated names to full names for dropdown
+            full_materials = [self._expand_abbreviated_materials(m) for m in materials]
+            
+            # Create dialog
+            dialog = tk.Toplevel(self.parent)
+            dialog.title("Set Overlap")
+            dialog.resizable(False, False)
+            dialog.transient(self.parent.winfo_toplevel())
+            
+            # Set app icon
+            try:
+                from app_utils import get_app_icon_path
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+            
+            frame = ttk.Frame(dialog, padding=15)
+            frame.pack(fill="both", expand=True)
+            
+            # Header
+            ttk.Label(frame, text=f"Set Overlap for:", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
+            
+            # Material dropdown - use full names
+            ttk.Label(frame, text="Mineral:").grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
+            material_var = tk.StringVar()
+            material_combo = ttk.Combobox(frame, textvariable=material_var, width=25, state="readonly")
+            material_combo['values'] = full_materials
+            material_combo.grid(row=2, column=1, sticky="w", pady=5)
+            
+            # Pre-select material based on current filter
+            current_filter = self.specific_material_var.get()
+            if current_filter != RingFinder.ALL_MINERALS:
+                # Try to find matching material in dropdown
+                for mat in full_materials:
+                    if current_filter.lower() in mat.lower() or mat.lower() in current_filter.lower():
+                        material_var.set(mat)
+                        break
+            if not material_var.get() and full_materials:
+                material_var.set(full_materials[0])
+            
+            # Overlap selection
+            ttk.Label(frame, text="Overlap:").grid(row=3, column=0, sticky="w", pady=5, padx=(0, 10))
+            overlap_var = tk.StringVar(value="None")
+            
+            overlap_frame = tk.Frame(frame, bg="#1e1e1e")
+            overlap_frame.grid(row=3, column=1, sticky="w", pady=5)
+            
+            # Dark themed radio buttons
+            rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
+                        "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
+            tk.Radiobutton(overlap_frame, text="None", variable=overlap_var, value="None", **rb_style).pack(side="left", padx=(0, 10))
+            tk.Radiobutton(overlap_frame, text="2x", variable=overlap_var, value="2x", **rb_style).pack(side="left", padx=(0, 10))
+            tk.Radiobutton(overlap_frame, text="3x", variable=overlap_var, value="3x", **rb_style).pack(side="left")
+            
+            # Load current overlap value when material changes
+            def on_material_change(*args):
+                mat = material_var.get()
+                if mat:
+                    # Full name is already in dropdown, use directly
+                    current_tag = self.user_db.get_overlap_tag(system_name, ring_name, mat)
+                    overlap_var.set(current_tag if current_tag else "None")
+            
+            material_var.trace_add('write', on_material_change)
+            on_material_change()  # Initialize
+            
+            # Buttons
+            button_frame = ttk.Frame(frame)
+            button_frame.grid(row=4, column=0, columnspan=2, pady=(15, 0))
+            
+            def save():
+                mat = material_var.get()
+                if not mat:
+                    return
+                # Full name is already in dropdown, use directly
+                tag = overlap_var.get()
+                tag_value = tag if tag != "None" else None
+                
+                success = self.user_db.set_overlap_tag(system_name, ring_name, mat, tag_value)
+                if success:
+                    self.status_var.set(f"Overlap tagged: {mat} = {tag}")
+                    # Refresh the current row's overlap display
+                    self._refresh_row_overlap(item, system_name, ring_name)
+                else:
+                    self.status_var.set(f"Failed to save overlap tag")
+                dialog.destroy()
+            
+            def cancel():
+                dialog.destroy()
+            
+            save_btn = tk.Button(button_frame, text="Save", command=save,
+                                bg="#2a5a2a", fg="#ffffff", 
+                                activebackground="#3a6a3a", activeforeground="#ffffff",
+                                relief="solid", bd=1, cursor="hand2", 
+                                pady=6, padx=15, font=("Segoe UI", 9))
+            save_btn.pack(side="left", padx=(0, 8))
+            
+            cancel_btn = tk.Button(button_frame, text="Cancel", command=cancel,
+                                  bg="#5a2a2a", fg="#ffffff", 
+                                  activebackground="#6a3a3a", activeforeground="#ffffff",
+                                  relief="solid", bd=1, cursor="hand2", 
+                                  pady=6, padx=15, font=("Segoe UI", 9))
+            cancel_btn.pack(side="left")
+            
+            # Center dialog
+            dialog.update_idletasks()
+            w = dialog.winfo_width()
+            h = dialog.winfo_height()
+            parent = self.parent.winfo_toplevel()
+            px = parent.winfo_x()
+            py = parent.winfo_y()
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            x = px + (pw // 2) - (w // 2)
+            y = py + (ph // 2) - (h // 2)
+            dialog.geometry(f"+{x}+{y}")
+            
+            dialog.grab_set()
+            dialog.focus_set()
+            
+        except Exception as e:
+            print(f"Error showing overlap dialog: {e}")
+            import traceback
+            traceback.print_exc()
+            self.status_var.set(f"Error: {e}")
+
+    def _parse_materials_from_hotspots(self, hotspots_str: str) -> List[str]:
+        """Parse material names from hotspots display string
+        
+        Args:
+            hotspots_str: String like "Plat(3), Pain(2), Alex(1)" or "Platinum (3)"
+            
+        Returns:
+            List of material names
+        """
+        if not hotspots_str or hotspots_str in ["-", "No data", "None"]:
+            return []
+        
+        materials = []
+        # Split by comma
+        parts = hotspots_str.split(',')
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            # Remove count suffix like "(3)"
+            if '(' in part:
+                mat = part.split('(')[0].strip()
+            else:
+                mat = part.strip()
+            if mat:
+                materials.append(mat)
+        
+        return materials
+
+    def _refresh_row_overlap(self, item_id: str, system_name: str, ring_name: str):
+        """Refresh the overlap column for a specific row"""
+        try:
+            overlap_display = self._get_overlap_display(system_name, ring_name)
+            # Get current values and update overlap column (index 7)
+            values = list(self.results_tree.item(item_id, 'values'))
+            if len(values) >= 8:
+                values[7] = overlap_display
+                self.results_tree.item(item_id, values=values)
+        except Exception as e:
+            print(f"Error refreshing row overlap: {e}")
+
+    def _show_res_dialog(self):
+        """Show dialog to add RES site for selected hotspot"""
+        try:
+            selection = self.results_tree.selection()
+            if not selection:
+                self.status_var.set("No ring selected")
+                return
+            
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if not values or len(values) < 7:
+                self.status_var.set("Invalid selection")
+                return
+            
+            # Extract data from columns: Distance, LS, System, Visited, Ring, Ring Type, Hotspots, Overlap, RES, Density
+            system_name = values[2]  # System column
+            ring_name = values[4]    # Ring column
+            hotspots_str = values[6] # Hotspots column - contains materials like "Plat(3), Pain(2)"
+            
+            if not system_name or not ring_name:
+                self.status_var.set("Cannot add RES: missing system or ring info")
+                return
+            
+            # Parse materials from hotspots string
+            materials = self._parse_materials_from_hotspots(hotspots_str)
+            if not materials:
+                self.status_var.set("No materials found in this ring")
+                return
+            
+            # Expand abbreviated names to full names for dropdown
+            full_materials = [self._expand_abbreviated_materials(m) for m in materials]
+            
+            # Create dialog
+            dialog = tk.Toplevel(self.parent)
+            dialog.title("Set RES Site")
+            dialog.resizable(False, False)
+            dialog.transient(self.parent.winfo_toplevel())
+            
+            # Set app icon
+            try:
+                from app_utils import get_app_icon_path
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+            
+            frame = ttk.Frame(dialog, padding=15)
+            frame.pack(fill="both", expand=True)
+            
+            # Header
+            ttk.Label(frame, text=f"Set RES Site for:", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
+            
+            # Material dropdown - use full names
+            ttk.Label(frame, text="Mineral:").grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
+            material_var = tk.StringVar()
+            material_combo = ttk.Combobox(frame, textvariable=material_var, width=25, state="readonly")
+            material_combo['values'] = full_materials
+            material_combo.grid(row=2, column=1, sticky="w", pady=5)
+            
+            # Pre-select material based on current filter
+            current_filter = self.specific_material_var.get()
+            if current_filter != RingFinder.ALL_MINERALS:
+                # Try to find matching material in dropdown
+                for mat in full_materials:
+                    if current_filter.lower() in mat.lower() or mat.lower() in current_filter.lower():
+                        material_var.set(mat)
+                        break
+            if not material_var.get() and full_materials:
+                material_var.set(full_materials[0])
+            
+            # RES type selection
+            ttk.Label(frame, text="RES Type:").grid(row=3, column=0, sticky="w", pady=5, padx=(0, 10))
+            res_var = tk.StringVar(value="None")
+            
+            res_frame = tk.Frame(frame, bg="#1e1e1e")
+            res_frame.grid(row=3, column=1, sticky="w", pady=5)
+            
+            # Dark themed radio buttons
+            rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
+                        "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
+            tk.Radiobutton(res_frame, text="None", variable=res_var, value="None", **rb_style).pack(side="left", padx=(0, 8))
+            tk.Radiobutton(res_frame, text="Haz", variable=res_var, value="Hazardous", **rb_style).pack(side="left", padx=(0, 8))
+            tk.Radiobutton(res_frame, text="High", variable=res_var, value="High", **rb_style).pack(side="left", padx=(0, 8))
+            tk.Radiobutton(res_frame, text="Low", variable=res_var, value="Low", **rb_style).pack(side="left")
+            
+            # Load current RES value when material changes
+            def on_material_change(*args):
+                mat = material_var.get()
+                if mat:
+                    current_tag = self.user_db.get_res_tag(system_name, ring_name, mat)
+                    res_var.set(current_tag if current_tag else "None")
+            
+            material_var.trace_add('write', on_material_change)
+            on_material_change()  # Initialize
+            
+            # Buttons
+            button_frame = ttk.Frame(frame)
+            button_frame.grid(row=4, column=0, columnspan=2, pady=(15, 0))
+            
+            def save():
+                mat = material_var.get()
+                if not mat:
+                    return
+                tag = res_var.get()
+                tag_value = tag if tag != "None" else None
+                
+                success = self.user_db.set_res_tag(system_name, ring_name, mat, tag_value)
+                if success:
+                    self.status_var.set(f"RES tagged: {mat} = {tag}")
+                    # Refresh the current row's RES display
+                    self._refresh_row_res(item, system_name, ring_name)
+                else:
+                    self.status_var.set(f"Failed to save RES tag")
+                dialog.destroy()
+            
+            def cancel():
+                dialog.destroy()
+            
+            save_btn = tk.Button(button_frame, text="Save", command=save,
+                                bg="#2a5a2a", fg="#ffffff", 
+                                activebackground="#3a6a3a", activeforeground="#ffffff",
+                                relief="solid", bd=1, cursor="hand2", 
+                                pady=6, padx=15, font=("Segoe UI", 9))
+            save_btn.pack(side="left", padx=(0, 8))
+            
+            cancel_btn = tk.Button(button_frame, text="Cancel", command=cancel,
+                                  bg="#5a2a2a", fg="#ffffff", 
+                                  activebackground="#6a3a3a", activeforeground="#ffffff",
+                                  relief="solid", bd=1, cursor="hand2", 
+                                  pady=6, padx=15, font=("Segoe UI", 9))
+            cancel_btn.pack(side="left")
+            
+            # Center dialog
+            dialog.update_idletasks()
+            w = dialog.winfo_width()
+            h = dialog.winfo_height()
+            parent = self.parent.winfo_toplevel()
+            px = parent.winfo_x()
+            py = parent.winfo_y()
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            x = px + (pw // 2) - (w // 2)
+            y = py + (ph // 2) - (h // 2)
+            dialog.geometry(f"+{x}+{y}")
+            
+            dialog.grab_set()
+            dialog.focus_set()
+            
+        except Exception as e:
+            print(f"Error showing RES dialog: {e}")
+            import traceback
+            traceback.print_exc()
+            self.status_var.set(f"Error: {e}")
+
+    def _refresh_row_res(self, item_id: str, system_name: str, ring_name: str):
+        """Refresh the RES column for a specific row"""
+        try:
+            res_display = self._get_res_display(system_name, ring_name)
+            # Get current values and update RES column (index 8)
+            values = list(self.results_tree.item(item_id, 'values'))
+            if len(values) >= 9:
+                values[8] = res_display
+                self.results_tree.item(item_id, values=values)
+        except Exception as e:
+            print(f"Error refreshing row RES: {e}")
+

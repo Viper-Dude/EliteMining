@@ -84,16 +84,64 @@ class UserDatabase:
         self.db_path = db_path
         self._create_tables()
         self._run_migrations()
+    
+    def _get_migration_version(self, migration_name: str) -> int:
+        """Get the version number for a specific migration"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                # Create migration tracking table if it doesn't exist
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS migration_history (
+                        migration_name TEXT PRIMARY KEY,
+                        version INTEGER DEFAULT 0,
+                        applied_at TEXT
+                    )
+                ''')
+                cursor.execute('SELECT version FROM migration_history WHERE migration_name = ?', (migration_name,))
+                result = cursor.fetchone()
+                return result[0] if result else 0
+        except Exception:
+            return 0
+    
+    def _set_migration_version(self, migration_name: str, version: int) -> None:
+        """Set the version number for a specific migration"""
+        try:
+            from datetime import datetime
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT OR REPLACE INTO migration_history (migration_name, version, applied_at)
+                    VALUES (?, ?, ?)
+                ''', (migration_name, version, datetime.now().isoformat()))
+                conn.commit()
+        except Exception as e:
+            print(f"[MIGRATION] Error setting migration version: {e}")
         
     def _run_migrations(self) -> None:
-        """Run database migrations silently on startup"""
+        """Run database migrations silently on startup (only runs each migration once)"""
         try:
-            print("[MIGRATION] Checking for database migrations...")
-            log.info("[Migration] Checking for database migrations...")
             # Migration v4.4.6: Normalize material names to fix language duplicates
             self._migrate_material_names_v446()
-            print("[MIGRATION] Migration check complete")
-            log.info("[Migration] Migration check complete")
+            
+            # v4.6.0: Apply overlap data from CSV file (version 2 - fixed path)
+            if self._get_migration_version('overlap_csv') < 2:
+                log.info("[Migration] Applying overlap data from CSV...")
+                print("[MIGRATION] Applying overlap data from CSV...")
+                self._apply_overlap_data_from_csv()
+                self._set_migration_version('overlap_csv', 2)
+            else:
+                log.info("[Migration] Overlap CSV already applied (version 2)")
+            
+            # v4.6.0: Apply RES site data from CSV file (version 2 - fixed path)
+            if self._get_migration_version('res_csv') < 2:
+                log.info("[Migration] Applying RES site data from CSV...")
+                print("[MIGRATION] Applying RES site data from CSV...")
+                self._apply_res_data_from_csv()
+                self._set_migration_version('res_csv', 2)
+            else:
+                log.info("[Migration] RES CSV already applied (version 2)")
+                
         except Exception as e:
             print(f"[MIGRATION ERROR] {e}")
             log.error(f"[Migration] Error during migration: {e}")
@@ -302,6 +350,232 @@ class UserDatabase:
         except Exception as e:
             print(f"[MIGRATION v4.5.9 ERROR] {e}")
             log.error(f"[Migration v4.5.9] Error: {e}")
+    
+    def _apply_overlap_data_from_csv(self) -> None:
+        """Apply overlap data from CSV file to hotspot entries
+        
+        Reads overlaps.csv from app/data folder and:
+        1. Updates existing entries with overlap_tag (preserves user-set values)
+        2. Inserts new entries for systems not in database
+        
+        CSV format: System,Body,Material,Overlap
+        """
+        import csv
+        from datetime import datetime
+        
+        try:
+            # Find the overlaps.csv file
+            # Try relative to app/data directory first, then check common locations
+            csv_paths = [
+                os.path.join(os.path.dirname(__file__), 'data', 'overlaps.csv'),
+                os.path.join(get_app_data_dir(), 'data', 'overlaps.csv'),  # For installed version
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), 'app', 'data', 'overlaps.csv'),
+            ]
+            
+            # Log all paths being checked
+            log.info(f"[Overlap CSV] Searching for overlaps.csv...")
+            for path in csv_paths:
+                exists = os.path.exists(path)
+                log.info(f"[Overlap CSV] Checking: {path} - {'EXISTS' if exists else 'NOT FOUND'}")
+            
+            csv_path = None
+            for path in csv_paths:
+                if os.path.exists(path):
+                    csv_path = path
+                    break
+            
+            if not csv_path:
+                # No CSV file found - this is normal for fresh installs
+                log.warning("[Overlap CSV] No overlaps.csv found in any location")
+                print("[MIGRATION] Warning: overlaps.csv not found")
+                return
+            
+            log.info(f"[Overlap CSV] Using: {csv_path}")
+            print(f"[MIGRATION] Found overlaps.csv at: {csv_path}")
+            
+            updated_count = 0
+            inserted_count = 0
+            skipped_count = 0
+            scan_date = datetime.now().strftime('%Y-%m-%d')
+            
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    
+                    for row in reader:
+                        system_name = row.get('System', '').strip()
+                        body_name = row.get('Body', '').strip()
+                        material = row.get('Material', '').strip()
+                        overlap = row.get('Overlap', '').strip()
+                        
+                        if not all([system_name, body_name, material, overlap]):
+                            continue
+                        
+                        # Normalize body name
+                        body_name = self._normalize_body_name(body_name, system_name)
+                        
+                        # Check if entry exists
+                        cursor.execute('''
+                            SELECT overlap_tag FROM hotspot_data 
+                            WHERE system_name = ? AND body_name = ? AND material_name = ?
+                        ''', (system_name, body_name, material))
+                        
+                        result = cursor.fetchone()
+                        
+                        if result is None:
+                            # Entry doesn't exist - INSERT new entry with overlap data
+                            cursor.execute('''
+                                INSERT INTO hotspot_data 
+                                (system_name, body_name, material_name, hotspot_count, scan_date, 
+                                 overlap_tag, coord_source, data_source)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ''', (system_name, body_name, material, 0, scan_date, 
+                                  overlap, 'overlap_csv', 'Overlap CSV Import'))
+                            inserted_count += 1
+                            continue
+                        
+                        current_tag = result[0]
+                        if current_tag is not None:
+                            # User already has a tag set - don't overwrite
+                            skipped_count += 1
+                            continue
+                        
+                        # Apply the overlap tag to existing entry
+                        cursor.execute('''
+                            UPDATE hotspot_data 
+                            SET overlap_tag = ?
+                            WHERE system_name = ? AND body_name = ? AND material_name = ?
+                        ''', (overlap, system_name, body_name, material))
+                        
+                        if cursor.rowcount > 0:
+                            updated_count += 1
+                    
+                    conn.commit()
+            
+            total = updated_count + inserted_count
+            if total > 0:
+                print(f"[OVERLAP DATA] Applied {total} overlaps ({updated_count} updated, {inserted_count} inserted)")
+                log.info(f"[Overlap Data] Applied {total} overlaps ({updated_count} updated, {inserted_count} inserted)")
+                
+        except Exception as e:
+            # Don't fail startup if CSV processing fails
+            print(f"[OVERLAP DATA] Warning: Could not apply overlap data: {e}")
+            log.warning(f"[Overlap Data] Could not apply overlap data: {e}")
+    
+    def _apply_res_data_from_csv(self) -> None:
+        """Apply RES (Resource Extraction Site) data from CSV file to hotspot entries
+        
+        Reads res_sites.csv from app/data folder and:
+        1. Updates existing entries with res_tag (preserves user-set values)
+        2. Inserts new entries for systems not in database
+        
+        CSV format: System,Body,Material,RES
+        RES values: Hazardous, High, Low
+        """
+        import csv
+        from datetime import datetime
+        
+        try:
+            # Find the res_sites.csv file
+            csv_paths = [
+                os.path.join(os.path.dirname(__file__), 'data', 'res_sites.csv'),
+                os.path.join(get_app_data_dir(), 'data', 'res_sites.csv'),  # For installed version
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), 'app', 'data', 'res_sites.csv'),
+            ]
+            
+            # Log all paths being checked
+            log.info(f"[RES CSV] Searching for res_sites.csv...")
+            for path in csv_paths:
+                exists = os.path.exists(path)
+                log.info(f"[RES CSV] Checking: {path} - {'EXISTS' if exists else 'NOT FOUND'}")
+            
+            csv_path = None
+            for path in csv_paths:
+                if os.path.exists(path):
+                    csv_path = path
+                    break
+            
+            if not csv_path:
+                # No CSV file found - this is normal for fresh installs
+                log.warning("[RES CSV] No res_sites.csv found in any location")
+                print("[MIGRATION] Warning: res_sites.csv not found")
+                return
+            
+            log.info(f"[RES CSV] Using: {csv_path}")
+            print(f"[MIGRATION] Found res_sites.csv at: {csv_path}")
+            
+            updated_count = 0
+            inserted_count = 0
+            skipped_count = 0
+            scan_date = datetime.now().strftime('%Y-%m-%d')
+            
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    
+                    for row in reader:
+                        system_name = row.get('System', '').strip()
+                        body_name = row.get('Body', '').strip()
+                        material = row.get('Material', '').strip()
+                        res_type = row.get('RES', '').strip()
+                        
+                        if not all([system_name, body_name, material, res_type]):
+                            continue
+                        
+                        # Normalize body name
+                        body_name = self._normalize_body_name(body_name, system_name)
+                        
+                        # Check if entry exists
+                        cursor.execute('''
+                            SELECT res_tag FROM hotspot_data 
+                            WHERE system_name = ? AND body_name = ? AND material_name = ?
+                        ''', (system_name, body_name, material))
+                        
+                        result = cursor.fetchone()
+                        
+                        if result is None:
+                            # Entry doesn't exist - INSERT new entry with RES data
+                            cursor.execute('''
+                                INSERT INTO hotspot_data 
+                                (system_name, body_name, material_name, hotspot_count, scan_date, 
+                                 res_tag, coord_source, data_source)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ''', (system_name, body_name, material, 0, scan_date, 
+                                  res_type, 'res_csv', 'RES CSV Import'))
+                            inserted_count += 1
+                            continue
+                        
+                        current_tag = result[0]
+                        if current_tag is not None:
+                            # User already has a tag set - don't overwrite
+                            skipped_count += 1
+                            continue
+                        
+                        # Apply the RES tag to existing entry
+                        cursor.execute('''
+                            UPDATE hotspot_data 
+                            SET res_tag = ?
+                            WHERE system_name = ? AND body_name = ? AND material_name = ?
+                        ''', (res_type, system_name, body_name, material))
+                        
+                        if cursor.rowcount > 0:
+                            updated_count += 1
+                    
+                    conn.commit()
+            
+            total = updated_count + inserted_count
+            if total > 0:
+                print(f"[RES DATA] Applied {total} RES sites ({updated_count} updated, {inserted_count} inserted)")
+                log.info(f"[RES Data] Applied {total} RES sites ({updated_count} updated, {inserted_count} inserted)")
+                
+        except Exception as e:
+            # Don't fail startup if CSV processing fails
+            print(f"[RES DATA] Warning: Could not apply RES data: {e}")
+            log.warning(f"[RES Data] Could not apply RES data: {e}")
         
     def _create_tables(self) -> None:
         """Create database tables if they don't exist"""
@@ -383,6 +657,18 @@ class UserDatabase:
                 try:
                     conn.execute('ALTER TABLE hotspot_data ADD COLUMN density REAL')
                     print("Added density column to hotspot_data")
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
+                
+                try:
+                    conn.execute('ALTER TABLE hotspot_data ADD COLUMN overlap_tag TEXT')
+                    print("Added overlap_tag column to hotspot_data")
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
+                
+                try:
+                    conn.execute('ALTER TABLE hotspot_data ADD COLUMN res_tag TEXT')
+                    print("Added res_tag column to hotspot_data")
                 except sqlite3.OperationalError:
                     pass  # Column already exists
                 
@@ -943,6 +1229,198 @@ class UserDatabase:
         """
         visit_data = self.is_system_visited(system_name)
         return visit_data is not None
+    
+    def set_overlap_tag(self, system_name: str, body_name: str, material_name: str, overlap_tag: Optional[str]) -> bool:
+        """Set overlap tag for a specific hotspot
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            material_name: Name of the material (e.g., "Platinum")
+            overlap_tag: Overlap value ('2x', '3x') or None to clear
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Normalize body name
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Try UPDATE first
+                cursor.execute('''
+                    UPDATE hotspot_data 
+                    SET overlap_tag = ?
+                    WHERE system_name = ? AND body_name = ? AND material_name = ?
+                ''', (overlap_tag, system_name, body_name, material_name))
+                
+                # If no row updated and we have a value to set, INSERT new row
+                if cursor.rowcount == 0 and overlap_tag:
+                    from datetime import datetime
+                    scan_date = datetime.now().strftime('%Y-%m-%d')
+                    cursor.execute('''
+                        INSERT INTO hotspot_data 
+                        (system_name, body_name, material_name, hotspot_count, scan_date, overlap_tag)
+                        VALUES (?, ?, ?, 1, ?, ?)
+                    ''', (system_name, body_name, material_name, scan_date, overlap_tag))
+                
+                conn.commit()
+                return True
+        except Exception as e:
+            log.error(f"Error setting overlap tag: {e}")
+            return False
+    
+    def get_overlap_tag(self, system_name: str, body_name: str, material_name: str) -> Optional[str]:
+        """Get overlap tag for a specific hotspot
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            material_name: Name of the material
+            
+        Returns:
+            Overlap tag ('2x', '3x') or None if not set
+        """
+        try:
+            # Normalize body name
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT overlap_tag FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ? AND material_name = ?
+                ''', (system_name, body_name, material_name))
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            log.error(f"Error getting overlap tag: {e}")
+            return None
+    
+    def set_res_tag(self, system_name: str, body_name: str, material_name: str, res_tag: Optional[str]) -> bool:
+        """Set RES tag for a specific hotspot
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            material_name: Name of the material (e.g., "Platinum")
+            res_tag: RES value ('Hazardous', 'High', 'Low') or None to clear
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Normalize body name
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Try UPDATE first
+                cursor.execute('''
+                    UPDATE hotspot_data 
+                    SET res_tag = ?
+                    WHERE system_name = ? AND body_name = ? AND material_name = ?
+                ''', (res_tag, system_name, body_name, material_name))
+                
+                # If no row updated and we have a value to set, INSERT new row
+                if cursor.rowcount == 0 and res_tag:
+                    from datetime import datetime
+                    scan_date = datetime.now().strftime('%Y-%m-%d')
+                    cursor.execute('''
+                        INSERT INTO hotspot_data 
+                        (system_name, body_name, material_name, hotspot_count, scan_date, res_tag)
+                        VALUES (?, ?, ?, 1, ?, ?)
+                    ''', (system_name, body_name, material_name, scan_date, res_tag))
+                
+                conn.commit()
+                return True
+        except Exception as e:
+            log.error(f"Error setting RES tag: {e}")
+            return False
+    
+    def get_res_tag(self, system_name: str, body_name: str, material_name: str) -> Optional[str]:
+        """Get RES tag for a specific hotspot
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            material_name: Name of the material
+            
+        Returns:
+            RES tag ('Hazardous', 'High', 'Low') or None if not set
+        """
+        try:
+            # Normalize body name
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT res_tag FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ? AND material_name = ?
+                ''', (system_name, body_name, material_name))
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            log.error(f"Error getting RES tag: {e}")
+            return None
+    
+    def get_overlaps_for_ring(self, system_name: str, body_name: str) -> List[Dict]:
+        """Get all overlap tags for a ring
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            
+        Returns:
+            List of dicts with material_name and overlap_tag for materials with tags
+        """
+        try:
+            # Normalize body name
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT material_name, overlap_tag FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ? AND overlap_tag IS NOT NULL
+                    ORDER BY material_name
+                ''', (system_name, body_name))
+                results = cursor.fetchall()
+                return [{'material_name': r[0], 'overlap_tag': r[1]} for r in results]
+        except Exception as e:
+            log.error(f"Error getting overlaps for ring: {e}")
+            return []
+    
+    def get_res_for_ring(self, system_name: str, body_name: str) -> List[Dict]:
+        """Get all RES tags for a ring
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            
+        Returns:
+            List of dicts with material_name and res_tag for materials with RES tags
+        """
+        try:
+            # Normalize body name
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT material_name, res_tag FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ? AND res_tag IS NOT NULL
+                    ORDER BY material_name
+                ''', (system_name, body_name))
+                results = cursor.fetchall()
+                return [{'material_name': r[0], 'res_tag': r[1]} for r in results]
+        except Exception as e:
+            log.error(f"Error getting RES for ring: {e}")
+            return []
     
     def get_database_stats(self) -> Dict[str, int]:
         """Get statistics about the database contents

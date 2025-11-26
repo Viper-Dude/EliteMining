@@ -186,6 +186,16 @@ The Hotspot Finder provides access to a comprehensive database of 61,000+ confir
 - **Distance-Based Results** – Filter by jump range (up to 500 LY) to find nearby opportunities
 - **Ring Composition Details** – View ring density and distance from arrival (LS) with comma-separated formatting
 - **Smart Sorting** – Results ranked by distance, hotspot overlaps, and ring density
+- **Overlap Tracking** – Add and find hotspot overlaps (2x, 3x) for higher yield mining locations
+- **RES Site Tracking** – Add Resource Extraction Sites (Hazardous, High, Low) for combat mining
+- **Pre-loaded Overlap & RES Data** – Ships with 161 known overlaps and 71 RES site locations
+
+### Setting & Managing Overlap/RES Data
+- **Set Overlap** – Right-click any ring to set hotspot overlaps (2x, 3x) for specific minerals
+- **Set RES** – Right-click any ring to set Resource Extraction Sites (Hazardous, High, Low)
+- **Remove Overlap/RES** – Select "None" in the Set Overlap/RES dialog to remove existing entries
+- **Bookmarks** – Overlap and RES data saved in bookmarks also syncs to the Ring Finder database
+- Data is stored locally and appears in all future searches
 
 Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.
 

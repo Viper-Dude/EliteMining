@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.5.9
+AppVersion=v4.6.0
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -38,6 +38,10 @@ Source: "dist\EliteMining.exe"; DestDir: "{app}\Configurator"; Flags: ignorevers
 ; Local systems database (~14 MB) - populated systems within the bubble for fast searches
 Source: "app\data\galaxy_systems.db"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "app\data\database_metadata.json"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
+
+; v4.6.0+: Overlap and RES site data CSV files for migration
+Source: "app\data\overlaps.csv"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "app\data\res_sites.csv"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; v4.1.8+: Use smart version checking instead of forced overwrite
 ; Database will only update if new version > existing version, with automatic backup
