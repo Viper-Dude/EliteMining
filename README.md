@@ -147,12 +147,12 @@ Configure Elite Dangerous firegroups (A-H) and fire buttons (Primary/Secondary) 
 - **Weapons** – Defense firegroup configuration
 - **Sub-surface Displacement Missile** – Deposit extraction
 
-### Timers & Toggles
+### Mining Controls
 
 Control mining sequence timing and automated behaviors:
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-timers_toggles.png" width="600"><br>  
-*Timers and toggles for mining automation sequences.*
+*Mining controls for automation sequences.*
 
 **Timers:** Configure duration for laser periods, pauses, and delays (1-50 seconds range)
 
