@@ -1343,16 +1343,18 @@ class RingFinder:
         
         return abbreviations.get(res_tag, res_tag)
     
-    def search_hotspots(self, auto_refresh=False, highlight_body=None):
+    def search_hotspots(self, auto_refresh=False, highlight_body=None, highlight_system=None):
         """Search for mining hotspots using reference system as center point
         
         Args:
             auto_refresh: DEPRECATED - use highlight_body instead
-            highlight_body: Specific body/ring name to highlight (e.g., 'Omicron Capricorni B 1 A Ring')
-                           Only this ring will be highlighted green. None = no highlighting.
+            highlight_body: Specific body/ring name to highlight (e.g., '1 A Ring')
+            highlight_system: Specific system name for the body (e.g., 'Synuefe XR-H d11-45')
+                           Only this exact system+ring will be highlighted green. None = no highlighting.
         """
-        # Store highlight_body for use in _update_results
+        # Store highlight info for use in _update_results
         self._highlight_body = highlight_body
+        self._highlight_system = highlight_system
         self._is_auto_refresh = auto_refresh  # Keep for backwards compatibility but prefer highlight_body
         
         reference_system = self.system_var.get().strip()
@@ -3105,24 +3107,25 @@ class RingFinder:
             body_name = hotspot.get("bodyName", hotspot.get("body", ""))
             current_results.add((system_name, body_name))
         
-        # Identify entries to highlight - ONLY the specific scanned body, not set comparison
+        # Identify entries to highlight - ONLY the specific scanned system+body
         highlight_body = getattr(self, '_highlight_body', None)
+        highlight_system = getattr(self, '_highlight_system', None)
         self._highlight_body = None  # Reset after reading
+        self._highlight_system = None  # Reset after reading
         self._is_auto_refresh = False  # Reset legacy flag
         
         new_entries = set()
-        if highlight_body:
+        if highlight_body and highlight_system:
             # Normalize highlight_body to match database format (without system prefix)
             # Database stores "7 A Ring" not "Bridge 7 A Ring"
-            reference_system = self.system_var.get().strip()
             normalized_highlight = highlight_body
-            if reference_system and highlight_body.lower().startswith(reference_system.lower()):
-                normalized_highlight = highlight_body[len(reference_system):].strip()
+            if highlight_system and highlight_body.lower().startswith(highlight_system.lower()):
+                normalized_highlight = highlight_body[len(highlight_system):].strip()
             normalized_highlight = ' '.join(normalized_highlight.split())  # Ensure proper spacing
             
-            # Only highlight the specific body that was just scanned
+            # Only highlight the exact system+body that was just scanned
             for system_name, body_name in current_results:
-                if body_name == normalized_highlight:
+                if body_name == normalized_highlight and system_name.lower() == highlight_system.lower():
                     new_entries.add((system_name, body_name))
         
         # Clear existing results completely

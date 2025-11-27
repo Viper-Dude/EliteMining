@@ -603,7 +603,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.6.0"
+APP_VERSION = "v4.6.1"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1704,12 +1704,12 @@ class CargoMonitor:
                 ring_finder.status_var.set(f"Found new hotspots - search in 2s")
             
             # Schedule the actual refresh with appropriate delay
-            def do_delayed_refresh(body_to_highlight=scanned_body):
+            def do_delayed_refresh(body_to_highlight=scanned_body, system_to_highlight=scanned_system):
                 try:
                     if delay > 0:  # Only update status if there was a delay
                         ring_finder.status_var.set(f"Found new hotspots - updating results")
-                    # Pass the specific scanned body so ONLY that ring gets highlighted
-                    ring_finder.search_hotspots(highlight_body=body_to_highlight)
+                    # Pass the specific scanned system+body so ONLY that ring gets highlighted
+                    ring_finder.search_hotspots(highlight_body=body_to_highlight, highlight_system=system_to_highlight)
                     # Clear status after 3 seconds
                     ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
                     self._auto_refresh_timer = None  # Clear timer reference
