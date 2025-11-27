@@ -49,7 +49,7 @@ Full-featured mining companion with GUI controls:
 - **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
 - **Hotspot Finder** – Search 61,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
 - **Overlaps** – Find and tag double/triple hotspot overlaps for maximum yield  
-- **RES Sites** – Locate Resource Extraction Sites (Hazardous, High, Low) for combat mining  
+- **RES Sites** – Locate Resource Extraction Sites (Hazardous, High, Low)  
 - **Commodity Market** – Find the best sell prices for your mined commodities with real-time market data and distance calculations  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports
 
@@ -189,7 +189,7 @@ The Hotspot Finder provides access to a comprehensive database of 61,000+ confir
 - **Ring Composition Details** – View ring density and distance from arrival (LS) with comma-separated formatting
 - **Smart Sorting** – Results ranked by distance, hotspot overlaps, and ring density
 - **Overlap Tracking** – Add and find hotspot overlaps (2x, 3x) for higher yield mining locations
-- **RES Site Tracking** – Add Resource Extraction Sites (Hazardous, High, Low) for combat mining
+- **RES Site Tracking** – Add and find Resource Extraction Sites (Hazardous, High, Low) for combat mining
 - **Pre-loaded Overlap & RES Data** – Ships with 161 known overlaps and 71 RES site locations
 
 ### Setting & Managing Overlap/RES Data
