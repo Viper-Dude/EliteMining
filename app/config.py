@@ -569,3 +569,15 @@ def save_distance_calculator_systems(system_a: str, system_b: str) -> None:
     cfg["distance_calculator_system_a"] = system_a.strip()
     cfg["distance_calculator_system_b"] = system_b.strip()
     _save_cfg(cfg)
+
+# Theme settings
+def load_theme() -> str:
+    """Load current theme setting. Default is 'elite_orange'."""
+    cfg = _load_cfg()
+    return cfg.get("theme", "elite_orange")
+
+def save_theme(theme: str) -> None:
+    """Save theme setting"""
+    cfg = _load_cfg()
+    cfg["theme"] = theme
+    _save_cfg(cfg)

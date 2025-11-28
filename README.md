@@ -186,8 +186,8 @@ The Hotspot Finder provides access to a comprehensive database of 61,000+ confir
 - **Pre-loaded Database** – 61,000+ hotspots with minerals types, ring densities
 - **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
 - **Distance-Based Results** – Filter by jump range (up to 500 LY) to find nearby opportunities
-- **Ring Composition Details** – View ring density and distance from arrival (LS) with comma-separated formatting
-- **Smart Sorting** – Results ranked by distance, hotspot overlaps, and ring density
+- **Ring Composition Details** – View distance from arrival (LS) with comma-separated formatting
+- **Smart Sorting** – Results ranked by distance and hotspot overlaps
 - **Overlap Tracking** – Add and find hotspot overlaps (2x, 3x) for higher yield mining locations
 - **RES Site Tracking** – Add and find Resource Extraction Sites (Hazardous, High, Low) for combat mining
 - **Pre-loaded Overlap & RES Data** – Ships with 161 known overlaps and 71 RES site locations

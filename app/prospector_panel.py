@@ -1464,16 +1464,20 @@ class ProspectorPanel(ttk.Frame):
         distance_ship_row.columnconfigure(1, weight=1)  # Allow middle to expand
         
         # Distance info on the left - will be populated from Ring Finder's distance calculator
+        from config import load_theme
+        _pp_theme = load_theme()
+        _pp_bg = "#0a0a0a" if _pp_theme == "elite_orange" else "#1e1e1e"
+        
         ttk.Label(distance_ship_row, text="Distances:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
         self.distance_info_label = tk.Label(distance_ship_row, text="➤ Sol: --- | Home: --- | Fleet Carrier: ---",
-                                font=("Segoe UI", 9), foreground="#ffaa00", bg="#1e1e1e")
+                                font=("Segoe UI", 9), foreground="#ffcc00", bg=_pp_bg)
         self.distance_info_label.pack(side="left")
         
         # Ship info on the right side of the same row
         ship_info_frame = ttk.Frame(distance_ship_row)
         ship_info_frame.pack(side="right", padx=(20, 0))
         ttk.Label(ship_info_frame, text="Ship:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
-        self.ship_info_label = ttk.Label(ship_info_frame, text="", font=("Segoe UI", 9, "bold"), foreground="#FFB84D")
+        self.ship_info_label = ttk.Label(ship_info_frame, text="", font=("Segoe UI", 9, "bold"), foreground="#ffcc00")
         self.ship_info_label.pack(side="left")
 
         # --- System and Location Name Entry Row ---
@@ -1503,24 +1507,44 @@ class ProspectorPanel(ttk.Frame):
 
         ttk.Label(rep, text="Prospector Reports:", font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 4))
 
-        # Configure Prospector Reports Treeview style with visible borders
+        # Configure Prospector Reports Treeview style based on theme
+        from config import load_theme
+        pp_theme = load_theme()
         style = ttk.Style()
+        
+        if pp_theme == "elite_orange":
+            tree_bg = "#0a0a0a"
+            tree_fg = "#ff8c00"
+            header_bg = "#1a1a1a"
+            selection_bg = "#ff6600"
+            selection_fg = "#000000"
+            alt_row_bg = "#151515"
+        else:
+            tree_bg = "#1e1e1e"
+            tree_fg = "#e6e6e6"
+            header_bg = "#2a2a2a"
+            selection_bg = "#0078d7"
+            selection_fg = "#ffffff"
+            alt_row_bg = "#282828"
+        
         style.configure("ProspectorReports.Treeview",
                        rowheight=25,
                        borderwidth=1,
                        relief="solid",
-                       bordercolor="#3a3a3a",
-                       fieldbackground="#1e1e1e")
+                       bordercolor="#333333",
+                       background=tree_bg,
+                       foreground=tree_fg,
+                       fieldbackground=tree_bg)
         style.configure("ProspectorReports.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
-                       background="#2a2a2a",
-                       foreground="white",
+                       background=header_bg,
+                       foreground=tree_fg,
                        padding=[5, 5],
                        anchor="w")
         style.map("ProspectorReports.Treeview",
-                 background=[('selected', '#0078d7')],
-                 foreground=[('selected', 'white')])
+                 background=[('selected', selection_bg)],
+                 foreground=[('selected', selection_fg)])
         
         style.layout("ProspectorReports.Treeview.Heading", [
             ('Treeheading.cell', {'sticky': 'nswe'}),
@@ -1537,8 +1561,8 @@ class ProspectorPanel(ttk.Frame):
         tree_frame_prospector.grid(row=4, column=0, sticky="nsew")
 
         self.tree = ttk.Treeview(tree_frame_prospector, columns=("materials", "content", "time"), show="headings", height=5, style="ProspectorReports.Treeview")
-        self.tree.tag_configure('oddrow', background='#1e1e1e')
-        self.tree.tag_configure('evenrow', background='#252525')
+        self.tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
+        self.tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
         self.tree.heading("materials", text="Minerals", anchor="w")
         self.tree.heading("content", text="Asteroid Content", anchor="w")
         self.tree.heading("time", text="Time", anchor="w")
@@ -1603,22 +1627,25 @@ class ProspectorPanel(ttk.Frame):
         stats_frame.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(0, 0))
         stats_frame.columnconfigure(0, weight=1)
         
-        # Configure Mineral Analysis Treeview style with visible borders
+        # Configure Mineral Analysis Treeview style (theme-aware - uses same vars from ProspectorReports)
         style.configure("MineralAnalysis.Treeview",
                        rowheight=25,
                        borderwidth=1,
                        relief="solid",
-                       bordercolor="#3a3a3a")
+                       bordercolor="#333333",
+                       background=tree_bg,
+                       foreground=tree_fg,
+                       fieldbackground=tree_bg)
         style.configure("MineralAnalysis.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
-                       background="#2a2a2a",
-                       foreground="white",
+                       background=header_bg,
+                       foreground=tree_fg,
                        padding=[5, 5],
                        anchor="w")
         style.map("MineralAnalysis.Treeview",
-                 background=[('selected', '#0078d7')],
-                 foreground=[('selected', 'white')])
+                 background=[('selected', selection_bg)],
+                 foreground=[('selected', selection_fg)])
         
         style.layout("MineralAnalysis.Treeview.Heading", [
             ('Treeheading.cell', {'sticky': 'nswe'}),
@@ -1637,8 +1664,8 @@ class ProspectorPanel(ttk.Frame):
         # Statistics tree for live percentage yields
         self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"), 
                            show="headings", height=5, style="MineralAnalysis.Treeview")
-        self.stats_tree.tag_configure('oddrow', background='#1e1e1e')
-        self.stats_tree.tag_configure('evenrow', background='#252525')
+        self.stats_tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
+        self.stats_tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
         self.stats_tree.heading("material", text="Mineral (Threshold%)", anchor="w")
         self.stats_tree.heading("tons", text="Tons", anchor="w")
         self.stats_tree.heading("tph", text="T/hr", anchor="w")
@@ -2218,24 +2245,44 @@ class ProspectorPanel(ttk.Frame):
         frame.columnconfigure(0, weight=1)
         frame.rowconfigure(0, weight=1)
 
-        # Configure Reports Treeview style with visible borders
+        # Configure Reports Treeview style (theme-aware)
+        from config import load_theme
+        _rpt_theme = load_theme()
         style = ttk.Style()
+        
+        if _rpt_theme == "elite_orange":
+            _rpt_bg = "#0a0a0a"
+            _rpt_fg = "#ff8c00"
+            _rpt_hdr = "#1a1a1a"
+            _rpt_sel_bg = "#ff6600"
+            _rpt_sel_fg = "#000000"
+            _rpt_alt = "#151515"
+        else:
+            _rpt_bg = "#1e1e1e"
+            _rpt_fg = "#e6e6e6"
+            _rpt_hdr = "#2a2a2a"
+            _rpt_sel_bg = "#0078d7"
+            _rpt_sel_fg = "#ffffff"
+            _rpt_alt = "#282828"
+        
         style.configure("Reports.Treeview",
                        rowheight=25,
                        borderwidth=1,
                        relief="solid",
-                       bordercolor="#3a3a3a",
-                       fieldbackground="#1e1e1e")
+                       bordercolor="#333333",
+                       background=_rpt_bg,
+                       foreground=_rpt_fg,
+                       fieldbackground=_rpt_bg)
         style.configure("Reports.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
-                       background="#2a2a2a",
-                       foreground="white",
+                       background=_rpt_hdr,
+                       foreground=_rpt_fg,
                        padding=[5, 5],
                        anchor="w")
         style.map("Reports.Treeview",
-                 background=[('selected', '#0078d7')],
-                 foreground=[('selected', 'white')])
+                 background=[('selected', _rpt_sel_bg)],
+                 foreground=[('selected', _rpt_sel_fg)])
         
         # Add subtle column separation via heading relief
         style.layout("Reports.Treeview.Heading", [
@@ -2258,9 +2305,9 @@ class ProspectorPanel(ttk.Frame):
         tree = ttk.Treeview(tree_frame_popup, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "tons_per", "asteroids", "hit_rate", "quality", "cargo", "prospectors", "comment", "enhanced"), show="headings", height=16, style="Reports.Treeview")
         tree.grid(row=0, column=0, sticky="nsew")
         
-        # Configure row tags for alternating colors
-        tree.tag_configure('oddrow', background='#1e1e1e')
-        tree.tag_configure('evenrow', background='#252525')
+        # Configure row tags for alternating colors (theme-aware)
+        tree.tag_configure('oddrow', background=_rpt_bg, foreground=_rpt_fg)
+        tree.tag_configure('evenrow', background=_rpt_alt, foreground=_rpt_fg)
         
         # Bind double-click to edit comments
         tree.bind("<Double-1>", self._edit_comment_popup)
@@ -6679,24 +6726,44 @@ class ProspectorPanel(ttk.Frame):
         
         self.ToolTip(date_filter_combo, "Filter sessions by date, yield performance, hit rate, or materials")
 
-        # Configure Reports tab Treeview style with visible borders
+        # Configure Reports tab Treeview style (theme-aware)
+        from config import load_theme
+        _tab_theme = load_theme()
         style = ttk.Style()
+        
+        if _tab_theme == "elite_orange":
+            _tab_bg = "#0a0a0a"
+            _tab_fg = "#ff8c00"
+            _tab_hdr = "#1a1a1a"
+            _tab_sel_bg = "#ff6600"
+            _tab_sel_fg = "#000000"
+            _tab_alt = "#151515"
+        else:
+            _tab_bg = "#1e1e1e"
+            _tab_fg = "#e6e6e6"
+            _tab_hdr = "#2a2a2a"
+            _tab_sel_bg = "#0078d7"
+            _tab_sel_fg = "#ffffff"
+            _tab_alt = "#282828"
+        
         style.configure("ReportsTab.Treeview",
                        rowheight=25,
                        borderwidth=1,
                        relief="solid",
-                       bordercolor="#3a3a3a",
-                       fieldbackground="#1e1e1e")
+                       bordercolor="#333333",
+                       background=_tab_bg,
+                       foreground=_tab_fg,
+                       fieldbackground=_tab_bg)
         style.configure("ReportsTab.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
-                       background="#2a2a2a",
-                       foreground="white",
+                       background=_tab_hdr,
+                       foreground=_tab_fg,
                        padding=[5, 5],
                        anchor="w")
         style.map("ReportsTab.Treeview",
-                 background=[('selected', '#0078d7')],
-                 foreground=[('selected', 'white')])
+                 background=[('selected', _tab_sel_bg)],
+                 foreground=[('selected', _tab_sel_fg)])
         
         style.layout("ReportsTab.Treeview.Heading", [
             ('Treeheading.cell', {'sticky': 'nswe'}),
@@ -6718,9 +6785,9 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
         self.reports_tree_tab.grid(row=0, column=0, sticky="nsew")
         
-        # Configure row tags for alternating colors
-        self.reports_tree_tab.tag_configure('oddrow', background='#1e1e1e')
-        self.reports_tree_tab.tag_configure('evenrow', background='#252525')
+        # Configure row tags for alternating colors (theme-aware)
+        self.reports_tree_tab.tag_configure('oddrow', background=_tab_bg, foreground=_tab_fg)
+        self.reports_tree_tab.tag_configure('evenrow', background=_tab_alt, foreground=_tab_fg)
         
         # Configure column headings
         self.reports_tree_tab.heading("date", text="Date/Time", anchor="w")
@@ -10910,24 +10977,44 @@ class ProspectorPanel(ttk.Frame):
         self.ToolTip(filter_combo, "Filter bookmarks by material type")
         self.ToolTip(search_entry, "Search bookmarks by system, body, or materials")
 
-        # Configure Bookmarks Treeview style with visible borders
+        # Configure Bookmarks Treeview style (theme-aware)
+        from config import load_theme
+        _bm_theme = load_theme()
         style = ttk.Style()
+        
+        if _bm_theme == "elite_orange":
+            _bm_bg = "#0a0a0a"
+            _bm_fg = "#ff8c00"
+            _bm_hdr = "#1a1a1a"
+            _bm_sel_bg = "#ff6600"
+            _bm_sel_fg = "#000000"
+            _bm_alt = "#151515"
+        else:
+            _bm_bg = "#1e1e1e"
+            _bm_fg = "#e6e6e6"
+            _bm_hdr = "#2a2a2a"
+            _bm_sel_bg = "#0078d7"
+            _bm_sel_fg = "#ffffff"
+            _bm_alt = "#282828"
+        
         style.configure("Bookmarks.Treeview",
                        rowheight=25,
                        borderwidth=1,
                        relief="solid",
-                       bordercolor="#3a3a3a",
-                       fieldbackground="#1e1e1e")
+                       bordercolor="#333333",
+                       background=_bm_bg,
+                       foreground=_bm_fg,
+                       fieldbackground=_bm_bg)
         style.configure("Bookmarks.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
-                       background="#2a2a2a",
-                       foreground="white",
+                       background=_bm_hdr,
+                       foreground=_bm_fg,
                        padding=[5, 5],
                        anchor="w")
         style.map("Bookmarks.Treeview",
-                 background=[('selected', '#0078d7')],
-                 foreground=[('selected', 'white')])
+                 background=[('selected', _bm_sel_bg)],
+                 foreground=[('selected', _bm_sel_fg)])
         
         style.layout("Bookmarks.Treeview.Heading", [
             ('Treeheading.cell', {'sticky': 'nswe'}),
@@ -10949,9 +11036,9 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
         self.bookmarks_tree.grid(row=0, column=0, sticky="nsew")
         
-        # Configure row tags for alternating colors
-        self.bookmarks_tree.tag_configure('oddrow', background='#1e1e1e')
-        self.bookmarks_tree.tag_configure('evenrow', background='#252525')
+        # Configure row tags for alternating colors (theme-aware)
+        self.bookmarks_tree.tag_configure('oddrow', background=_bm_bg, foreground=_bm_fg)
+        self.bookmarks_tree.tag_configure('evenrow', background=_bm_alt, foreground=_bm_fg)
         
         # Ensure multiple selection is properly configured
         self.bookmarks_tree.configure(selectmode="extended")
@@ -11534,26 +11621,27 @@ class ProspectorPanel(ttk.Frame):
         system_entry.focus()
         
         # Center and show the dialog now that all widgets are created
-        try:
-            _center_child_over_parent(dialog, self.winfo_toplevel())
-        except Exception:
-            # Fallback: simple center using geometry if helper fails
-            try:
-                dialog.update_idletasks()
-                w = dialog.winfo_width()
-                h = dialog.winfo_height()
-                parent = self.winfo_toplevel()
-                px = parent.winfo_x()
-                py = parent.winfo_y()
-                pw = parent.winfo_width()
-                ph = parent.winfo_height()
-                x = px + (pw // 2) - (w // 2)
-                y = py + (ph // 2) - (h // 2)
-                dialog.geometry(f"{w}x{h}+{x}+{y}")
-            except Exception:
-                pass
-        dialog.transient(self)
+        dialog.update_idletasks()
+        main_parent = self.winfo_toplevel()
+        main_parent.update_idletasks()
+        
+        # Get dialog size
+        dialog_width = dialog.winfo_reqwidth()
+        dialog_height = dialog.winfo_reqheight()
+        
+        # Get parent position and size
+        parent_x = main_parent.winfo_rootx()
+        parent_y = main_parent.winfo_rooty()
+        parent_width = main_parent.winfo_width()
+        parent_height = main_parent.winfo_height()
+        
+        # Calculate centered position
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+        
+        dialog.geometry(f"+{x}+{y}")
         dialog.deiconify()
+        dialog.transient(main_parent)
         dialog.grab_set()
 
     def _delete_bookmark(self) -> None:
@@ -11570,44 +11658,11 @@ class ProspectorPanel(ttk.Frame):
         else:
             confirm_message = f"Are you sure you want to delete {bookmark_count} bookmarks?"
         
-        # Confirm deletion
-        import tkinter as tk
-        from main import center_window
+        # Confirm deletion using centered dialog
+        from main import centered_yesno_dialog
         main_parent = self.winfo_toplevel()
-        dialog = tk.Toplevel(main_parent)
-        dialog.withdraw()
-        dialog.title("Confirm Delete")
-        dialog.resizable(False, False)
-        try:
-            from app_utils import get_app_icon_path
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                dialog.iconbitmap(icon_path)
-            elif icon_path:
-                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
-        except Exception:
-            pass
-        label = tk.Label(dialog, text=confirm_message, padx=20, pady=20)
-        label.pack()
-        btn_frame = tk.Frame(dialog)
-        btn_frame.pack(pady=(0, 15))
-        result = {'value': None}
-        def on_yes():
-            result['value'] = True
-            dialog.destroy()
-        def on_no():
-            result['value'] = False
-            dialog.destroy()
-        yes_btn = tk.Button(btn_frame, text="Yes", width=10, command=on_yes)
-        yes_btn.pack(side=tk.LEFT, padx=10)
-        no_btn = tk.Button(btn_frame, text="No", width=10, command=on_no)
-        no_btn.pack(side=tk.LEFT, padx=10)
-        center_window(dialog, main_parent)
-        dialog.deiconify()
-        dialog.transient(main_parent)
-        dialog.grab_set()
-        dialog.wait_window()
-        if not result['value']:
+        
+        if not centered_yesno_dialog(main_parent, "Confirm Delete", confirm_message):
             return
         
         # Collect all bookmarks to delete

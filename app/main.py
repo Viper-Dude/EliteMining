@@ -71,6 +71,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 def centered_yesno_dialog(parent, title, message):
     """Show a Yes/No dialog centered over parent window. Returns True for Yes, False for No."""
+    from tkinter import ttk
+    
     dialog = tk.Toplevel(parent)
     dialog.withdraw()  # Prevent flicker while we layout and center
     try:
@@ -84,10 +86,16 @@ def centered_yesno_dialog(parent, title, message):
         pass
     dialog.title(title)
     dialog.resizable(False, False)
-    label = tk.Label(dialog, text=message, padx=20, pady=20)
-    label.pack()
-    btn_frame = tk.Frame(dialog)
-    btn_frame.pack(pady=(0, 15))
+    
+    # Use ttk frame for themed look
+    frame = ttk.Frame(dialog, padding=20)
+    frame.pack(fill="both", expand=True)
+    
+    ttk.Label(frame, text=message, font=("Segoe UI", 10)).pack(pady=(0, 15))
+    
+    btn_frame = ttk.Frame(frame)
+    btn_frame.pack()
+    
     result = {'value': None}
     def on_yes():
         result['value'] = True
@@ -95,21 +103,41 @@ def centered_yesno_dialog(parent, title, message):
     def on_no():
         result['value'] = False
         dialog.destroy()
-    yes_btn = tk.Button(btn_frame, text="Yes", width=10, command=on_yes)
-    yes_btn.pack(side=tk.LEFT, padx=10)
-    no_btn = tk.Button(btn_frame, text="No", width=10, command=on_no)
-    no_btn.pack(side=tk.LEFT, padx=10)
-    # Center after widgets are packed
-    top_parent = parent.winfo_toplevel() if parent else None
-    if top_parent:
-        center_window(dialog, top_parent)
+    
+    yes_btn = ttk.Button(btn_frame, text="Yes", width=10, command=on_yes)
+    yes_btn.pack(side=tk.LEFT, padx=(0, 10))
+    no_btn = ttk.Button(btn_frame, text="No", width=10, command=on_no)
+    no_btn.pack(side=tk.LEFT)
+    
+    # Keyboard bindings
+    dialog.bind("<Return>", lambda e: on_yes())
+    dialog.bind("<Escape>", lambda e: on_no())
+    
+    # Center on parent window manually
+    dialog.update_idletasks()
+    dialog_width = dialog.winfo_reqwidth()
+    dialog_height = dialog.winfo_reqheight()
+    
+    # Get parent's actual position and size
+    parent.update_idletasks()
+    parent_x = parent.winfo_rootx()
+    parent_y = parent.winfo_rooty()
+    parent_width = parent.winfo_width()
+    parent_height = parent.winfo_height()
+    
+    # Calculate centered position
+    x = parent_x + (parent_width - dialog_width) // 2
+    y = parent_y + (parent_height - dialog_height) // 2
+    
+    dialog.geometry(f"+{x}+{y}")
     dialog.deiconify()  # Show centered immediately
+    
     # Now set modal behavior
     dialog.transient(parent)
     dialog.grab_set()
     dialog.attributes('-topmost', True)
     dialog.lift()
-    dialog.focus_force()
+    yes_btn.focus_set()
     dialog.wait_window()
     return result['value']
 
@@ -603,7 +631,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.6.1"
+APP_VERSION = "v4.6.2"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4228,28 +4256,7 @@ class App(tk.Tk):
                         foreground="#ffffff",
                         arrowcolor="#ffffff")
 
-        # --- Dark style for Entry fields ---
-        style.configure("TEntry",
-                        fieldbackground="#1e1e1e",
-                        foreground="#ffffff",
-                        insertcolor="#ffffff")
-
-        style.configure("Treeview",
-                        background="#1e1e1e",
-                        fieldbackground="#1e1e1e",
-                        foreground="#e6e6e6",
-                        borderwidth=0)
-        style.map("Treeview",
-                   background=[("selected", "#444444")],
-                   foreground=[("selected", "#ffffff")])
-
-        style.configure("Treeview.Heading",
-                        background="#333333",
-                        foreground="#ffffff",
-                        relief="raised")
-        style.map("Treeview.Heading",
-                   background=[("active", "#444444"), ("pressed", "#222222")],
-                   foreground=[("active", "#ffffff"), ("pressed", "#ffffff")])
+        # NOTE: TEntry and Treeview styling moved to after theme_colors is defined (see below)
 
         # --- Dark style for Scrollbars ---
         style.configure("Vertical.TScrollbar",
@@ -4272,11 +4279,7 @@ class App(tk.Tk):
         style.map("Vertical.Scrollbar.thumb",
                   background=[("active", "#666666")])
 
-        # If Treeview exists, configure darkrow tag
-        try:
-            self.tree.tag_configure("darkrow", background="#1e1e1e", foreground="#e6e6e6")
-        except Exception:
-            pass
+        # NOTE: darkrow tag configured later after tree is created
 
         # --- Green accent button style (like ring finder buttons) ---
         style.configure("Accent.TButton",
@@ -4329,41 +4332,92 @@ class App(tk.Tk):
                    foreground=[("selected", "#ffffff")])
 
 
-        # --- Dark theme setup with custom Dark.TButton style ---
-        try:
-            self.tk.call("source", os.path.join(get_app_data_dir(), "sun-valley.tcl"))
-            self.tk.call("set_theme", "dark")
-        except Exception:
+        # --- Theme setup based on config ---
+        from config import load_theme
+        self.current_theme = load_theme()  # 'elite_orange' or 'dark_gray'
+        
+        if self.current_theme == "elite_orange":
+            # Elite Orange theme (Classic ED HUD)
+            dark_bg = "#0a0a0a"      # near black
+            dark_fg = "#ff8c00"      # orange text
+            accent = "#1a1a1a"       # dark gray
+            btn_fg = "#ff8c00"
+            selection_bg = "#ff6600"
+            selection_fg = "#000000"
+        else:
+            # Dark Gray theme (original)
             dark_bg = "#1e1e1e"
             dark_fg = "#e6e6e6"
             accent = "#2d2d2d"
-            style.configure(".", background=dark_bg, foreground=dark_fg)
-            style.configure("TLabel", background=dark_bg, foreground=dark_fg)
-            style.configure("TFrame", background=dark_bg)
-            style.configure("TNotebook", background=accent)
-            style.configure("TNotebook.Tab", background=accent, foreground=dark_fg)
-            style.map("TNotebook.Tab", background=[("selected", dark_bg)])
+            btn_fg = "#ffffff"
+            selection_bg = "#444444"
+            selection_fg = "#ffffff"
+        
+        # Store theme colors for access elsewhere
+        self.theme_colors = {
+            "bg": dark_bg,
+            "fg": dark_fg,
+            "accent": accent,
+            "selection_bg": selection_bg,
+            "selection_fg": selection_fg
+        }
+        
+        style.configure(".", background=dark_bg, foreground=dark_fg)
+        style.configure("TLabel", background=dark_bg, foreground=dark_fg)
+        style.configure("TFrame", background=dark_bg)
+        style.configure("TNotebook", background=accent)
+        style.configure("TNotebook.Tab", background=accent, foreground=dark_fg)
+        style.map("TNotebook.Tab", background=[("selected", dark_bg)])
 
-            # Custom dark button style
-            style.configure("Dark.TButton", background="#444444", foreground="#ffffff", font=("Segoe UI", 9, "bold"))
-            style.map("Dark.TButton",
-                       background=[("active", "#555555"), ("disabled", "#2a2a2a")],
-                       foreground=[("disabled", "#666666")])
+        # Custom dark button style
+        style.configure("Dark.TButton", background="#333333", foreground=btn_fg, font=("Segoe UI", 9, "bold"))
+        style.map("Dark.TButton",
+                   background=[("active", "#444444"), ("disabled", "#1a1a1a")],
+                   foreground=[("disabled", "#666666")])
 
-            style.configure("TCheckbutton", background=dark_bg, foreground=dark_fg)
-            style.configure("TRadiobutton", background=dark_bg, foreground=dark_fg)
-            style.configure("TCombobox", fieldbackground=dark_bg, background=accent, foreground="#ffffff")
-            style.map("TCombobox", fieldbackground=[("readonly", dark_bg)], foreground=[("readonly", "#ffffff")])
+        style.configure("TCheckbutton", background=dark_bg, foreground=dark_fg)
+        style.configure("TRadiobutton", background=dark_bg, foreground=dark_fg)
+        style.configure("TCombobox", fieldbackground=dark_bg, background=accent, foreground=dark_fg)
+        style.map("TCombobox", fieldbackground=[("readonly", dark_bg)], foreground=[("readonly", dark_fg)])
 
-            # Apply dark theme to classic widgets too
-            self.option_add("*Listbox.background", dark_bg)
-            self.option_add("*Listbox.foreground", dark_fg)
-            self.option_add("*Entry.background", "#ffffff")  # White background for better readability
-            self.option_add("*Entry.foreground", "#000000")  # Black text for contrast
-            self.option_add("*Text.background", dark_bg)
-            self.option_add("*Text.foreground", dark_fg)
-            self.option_add("*TMenubutton.background", dark_bg)
-            self.option_add("*TMenubutton.foreground", dark_fg)
+        # Apply dark theme to classic widgets too
+        self.option_add("*Listbox.background", dark_bg)
+        self.option_add("*Listbox.foreground", dark_fg)
+        self.option_add("*Entry.background", accent)
+        self.option_add("*Entry.foreground", dark_fg)
+        self.option_add("*Text.background", dark_bg)
+        self.option_add("*Text.foreground", dark_fg)
+        self.option_add("*TMenubutton.background", dark_bg)
+        self.option_add("*TMenubutton.foreground", dark_fg)
+        self.option_add("*Checkbutton.background", dark_bg)
+        self.option_add("*Checkbutton.foreground", dark_fg)
+        self.option_add("*Checkbutton.selectColor", "#333333")
+        self.option_add("*Checkbutton.activeBackground", dark_bg)
+        self.option_add("*Checkbutton.activeForeground", dark_fg)
+
+        # --- Dark style for Entry fields (theme-aware) ---
+        style.configure("TEntry",
+                        fieldbackground=dark_bg,
+                        foreground=dark_fg,
+                        insertcolor=dark_fg)
+
+        # Global Treeview styling (theme-aware)
+        style.configure("Treeview",
+                        background=dark_bg,
+                        fieldbackground=dark_bg,
+                        foreground=dark_fg,
+                        borderwidth=0)
+        style.map("Treeview",
+                   background=[("selected", selection_bg)],
+                   foreground=[("selected", selection_fg)])
+
+        style.configure("Treeview.Heading",
+                        background=accent,
+                        foreground=dark_fg,
+                        relief="raised")
+        style.map("Treeview.Heading",
+                   background=[("active", "#333333"), ("pressed", dark_bg)],
+                   foreground=[("active", dark_fg), ("pressed", dark_fg)])
 
         self.title(f"{APP_TITLE} — {APP_VERSION}")
         self.resizable(True, True)
@@ -4701,9 +4755,9 @@ class App(tk.Tk):
             activeforeground="#ffffff",
             relief="ridge",         # Subtle raised effect
             bd=1,                   
-            padx=14,                
-            pady=6,
-            font=("Segoe UI", 9, "normal"),  
+            padx=8,                
+            pady=3,
+            font=("Segoe UI", 8, "normal"),  
             cursor="hand2"
         )
         import_btn.grid(row=0, column=0, sticky="w")
@@ -4721,9 +4775,9 @@ class App(tk.Tk):
             activeforeground="#ffffff",
             relief="ridge",         # Subtle raised effect
             bd=1,                   
-            padx=14,                
-            pady=6,
-            font=("Segoe UI", 9, "normal"),  
+            padx=8,                
+            pady=3,
+            font=("Segoe UI", 8, "normal"),  
             cursor="hand2"
         )
         apply_btn.grid(row=0, column=1, sticky="w", padx=(10, 0))
@@ -4751,6 +4805,26 @@ class App(tk.Tk):
         self.system_label_value.grid(row=0, column=3, sticky="w")
         self.route_label_prefix.grid(row=0, column=4, sticky="e")
         self.route_label_value.grid(row=0, column=5, sticky="w")
+        
+        # Theme toggle button - in its own column for independent positioning
+        self.theme_toggle_btn = tk.Button(
+            actions,
+            text="Toggle Theme",
+            command=self._toggle_theme,
+            bg="#333333",
+            fg="#ffcc00",
+            activebackground="#444444",
+            activeforeground="#ffcc00",
+            relief="solid",
+            bd=1,
+            highlightbackground="#ff6600",
+            highlightthickness=1,
+            padx=8,
+            pady=2,
+            font=("Segoe UI", 8),
+            cursor="hand2"
+        )
+        self.theme_toggle_btn.grid(row=0, column=4, sticky="e", padx=(15, 5))
         
         # Load CMDR name in background
         self.after(500, self._update_cmdr_system_display)
@@ -4831,11 +4905,13 @@ class App(tk.Tk):
         content_frame.columnconfigure(0, weight=1)
         content_frame.rowconfigure(0, weight=1)
         
-        # Cargo text widget with bigger font and better alignment
+        # Cargo text widget (theme-aware)
+        _cargo_bg = self.theme_colors["bg"]
+        _cargo_fg = self.theme_colors["fg"]
         self.integrated_cargo_text = tk.Text(
             content_frame,
-            bg="#1e1e1e",
-            fg="#ffffff",
+            bg=_cargo_bg,
+            fg=_cargo_fg,
             font=("Consolas", 9, "normal"),  # Monospace font for perfect alignment
             relief="flat",
             bd=0,
@@ -5175,26 +5251,28 @@ class App(tk.Tk):
                 ttk.Label(frame, text="—").grid(row=row, column=3, sticky="w")
             row += 1
 
-        # Tip card (light grey) with bullets
-        card = tk.Frame(frame, bg="#1e1e1e", borderwidth=0, relief="flat", highlightthickness=0, highlightbackground="#1e1e1e")
+        # Tip card with bullets - use theme colors
+        theme_bg = self.theme_colors["bg"]
+        theme_fg = self.theme_colors["fg"]
+        card = tk.Frame(frame, bg=theme_bg, borderwidth=0, relief="flat", highlightthickness=0, highlightbackground=theme_bg)
         card.grid(row=row, column=0, columnspan=4, sticky="nsew")
         frame.rowconfigure(row, weight=1)
         card.columnconfigure(0, weight=1)
 
-        # Important notice (yellow)
+        # Important notice (always yellow for visibility)
         important_label = tk.Label(
             card, 
             text="⚠ Important: Mining automation requires all firegroups (A-H) in-game to be populated - empty groups prevent switching.",
             font=("Segoe UI", 9, "bold"), 
             anchor="w", 
-            bg="#1e1e1e", 
+            bg=theme_bg, 
             fg="#ffcc00",
             wraplength=600,
             justify="left"
         )
-        important_label.grid(row=0, column=0, sticky="w", padx=8, pady=(20, 8))
+        important_label.grid(row=0, column=0, sticky="w", padx=8, pady=(60, 8))
 
-        tip_header = tk.Label(card, text="Tips/help:", font=("Segoe UI", 9, "bold"), anchor="w", bg="#1e1e1e", fg="#ffffff", borderwidth=0, relief="flat", highlightthickness=0)
+        tip_header = tk.Label(card, text="Tips/help:", font=("Segoe UI", 9, "bold"), anchor="w", bg=theme_bg, fg=theme_fg, borderwidth=0, relief="flat", highlightthickness=0)
         tip_header.grid(row=1, column=0, sticky="w", padx=8, pady=(10, 2))
 
         tips = [
@@ -5210,8 +5288,8 @@ class App(tk.Tk):
                 text=f"• {tip}",
                 wraplength=600,
                 justify="left",
-                fg="#ffffff",
-                bg="#1e1e1e",
+                fg=theme_fg,
+                bg=theme_bg,
                 font=("Segoe UI", 9),
             )
             lbl.grid(row=r, column=0, sticky="w", padx=16, pady=1)
@@ -5225,7 +5303,7 @@ class App(tk.Tk):
         frame.bind("<Configure>", _on_cfg_resize)
         
         # --- EliteMining logo at bottom left (outside card, anchored) ---
-        logo_frame = tk.Frame(frame, bg="#1e1e1e")
+        logo_frame = tk.Frame(frame, bg=theme_bg)
         logo_frame.grid(row=row+1, column=0, columnspan=4, sticky="sw", padx=8, pady=(5, 8))
         
         try:
@@ -5245,7 +5323,7 @@ class App(tk.Tk):
                     img = Image.open(logo_path)
                     img = img.resize((200, 35), Image.Resampling.LANCZOS)
                     self.fg_logo_photo = ImageTk.PhotoImage(img)
-                    logo_label = tk.Label(logo_frame, image=self.fg_logo_photo, bg="#1e1e1e", cursor="hand2")
+                    logo_label = tk.Label(logo_frame, image=self.fg_logo_photo, bg=theme_bg, cursor="hand2")
                     logo_label.pack(anchor="w")
                     
                     def open_github(event=None):
@@ -5256,7 +5334,7 @@ class App(tk.Tk):
                     self.fg_logo_photo = tk.PhotoImage(file=logo_path)
                     scale_factor = max(1, self.fg_logo_photo.width() // 200)
                     self.fg_logo_photo = self.fg_logo_photo.subsample(scale_factor, scale_factor)
-                    logo_label = tk.Label(logo_frame, image=self.fg_logo_photo, bg="#1e1e1e", cursor="hand2")
+                    logo_label = tk.Label(logo_frame, image=self.fg_logo_photo, bg=theme_bg, cursor="hand2")
                     logo_label.pack(anchor="w")
                     
                     def open_github(event=None):
@@ -5533,6 +5611,10 @@ class App(tk.Tk):
                 ann_scrollbar.grid(row=0, column=1, sticky="ns")
                 self.ann_mat_tree.configure(yscrollcommand=ann_scrollbar.set)
 
+                # Configure alternating row colors
+                self.ann_mat_tree.tag_configure('oddrow', background='#1e1e1e')
+                self.ann_mat_tree.tag_configure('evenrow', background='#252525')
+
                 # Create spinboxes for per-material thresholds
                 self._ann_minpct_spin = {}
                 self._ann_minpct_vars = {}
@@ -5549,12 +5631,14 @@ class App(tk.Tk):
                     return _on_change
 
                 # Populate with materials and create spinboxes
+                row_idx = 0
                 for mat in KNOWN_MATERIALS:
                     flag = "✓" if self.prospector_panel.announce_map.get(mat, True) else "—"
+                    row_tag = 'evenrow' if row_idx % 2 == 0 else 'oddrow'
                     if mat in CORE_ONLY:
-                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""))
+                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""), tags=(row_tag,))
                     else:
-                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""))
+                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""), tags=(row_tag,))
                         
                         # Create spinbox for non-core materials
                         v = self.prospector_panel.min_pct_map.get(mat, 0.0)
@@ -5569,6 +5653,7 @@ class App(tk.Tk):
                             textvariable=self._ann_minpct_vars[mat],
                             command=_on_ann_minpct_change_factory(mat)
                         )
+                    row_idx += 1
 
                 # Add double-click handler to toggle announcement
                 def _ann_toggle_announce(event):
@@ -5916,6 +6001,38 @@ class App(tk.Tk):
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text="Keep application window always on top of other windows", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+        
+        # Theme toggle option
+        theme_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        theme_frame.grid(row=r, column=0, sticky="w")
+        
+        tk.Label(theme_frame, text="Theme:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left", padx=(4, 10))
+        
+        current_theme_text = "Elite Orange" if self.current_theme == "elite_orange" else "Dark Gray"
+        self.theme_label = tk.Label(theme_frame, text=current_theme_text, bg="#1e1e1e", fg="#ffcc00", font=("Segoe UI", 9, "bold"))
+        self.theme_label.pack(side="left", padx=(0, 15))
+        
+        theme_toggle_settings = tk.Button(
+            theme_frame,
+            text="Toggle Theme",
+            command=self._toggle_theme,
+            bg="#333333",
+            fg="#ffcc00",
+            activebackground="#444444",
+            activeforeground="#ffcc00",
+            relief="flat",
+            bd=1,
+            padx=8,
+            pady=2,
+            font=("Segoe UI", 9),
+            cursor="hand2"
+        )
+        theme_toggle_settings.pack(side="left")
+        r += 1
+        
+        tk.Label(scrollable_frame, text="Switch between Elite Orange and Dark Gray themes (requires restart)", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
@@ -9054,18 +9171,18 @@ class App(tk.Tk):
                 self.geometry(f"1200x700+{x}+{y}")
         else:
             # No saved geometry, center on screen with default size
-            self.geometry("1100x650")
+            self.geometry("1183x680")
             self.update_idletasks()
             screen_width = self.winfo_screenwidth()
             screen_height = self.winfo_screenheight()
-            x = (screen_width - 1100) // 2
-            y = (screen_height - 650) // 2
-            self.geometry(f"1100x650+{x}+{y}")
+            x = (screen_width - 1183) // 2
+            y = (screen_height - 680) // 2
+            self.geometry(f"1183x680+{x}+{y}")
             
             # Show window after geometry is set
             self.deiconify()
-            y = (screen_height - 650) // 2
-            self.geometry(f"1100x650+{x}+{y}")
+            y = (screen_height - 680) // 2
+            self.geometry(f"1183x680+{x}+{y}")
         
         # After window shown, ensure no input selection remains and focus a neutral button
         try:
@@ -9143,6 +9260,108 @@ class App(tk.Tk):
         except Exception as e:
             log.error(f"Config migration check failed: {e}", exc_info=True)
             # Continue startup even if migration fails
+
+    def _toggle_theme(self) -> None:
+        """Toggle between Elite Orange and Dark Gray themes"""
+        from config import save_theme
+        from app_utils import get_app_icon_path
+        import tkinter as tk
+        from tkinter import ttk
+        
+        # Toggle theme
+        if self.current_theme == "elite_orange":
+            new_theme = "dark_gray"
+            theme_name = "Dark Gray"
+        else:
+            new_theme = "elite_orange"
+            theme_name = "Elite Orange"
+        
+        # Save new theme
+        save_theme(new_theme)
+        
+        # Create custom centered dialog
+        dialog = tk.Toplevel(self)
+        dialog.title("Theme Changed")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        
+        # Set app icon
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+            elif icon_path:
+                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+        except Exception:
+            pass
+        
+        # Dialog content
+        frame = ttk.Frame(dialog, padding=20)
+        frame.pack(fill="both", expand=True)
+        
+        ttk.Label(frame, text=f"Theme changed to {theme_name}.", 
+                  font=("Segoe UI", 10, "bold")).pack(pady=(0, 5))
+        ttk.Label(frame, text="Restart EliteMining now to apply the new theme?",
+                  font=("Segoe UI", 9)).pack(pady=(0, 15))
+        
+        # Buttons
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack()
+        
+        def on_yes():
+            dialog.destroy()
+            self._restart_app()
+        
+        def on_no():
+            dialog.destroy()
+        
+        yes_btn = ttk.Button(btn_frame, text="Yes", command=on_yes, width=10)
+        yes_btn.pack(side="left", padx=(0, 10))
+        no_btn = ttk.Button(btn_frame, text="No", command=on_no, width=10)
+        no_btn.pack(side="left")
+        
+        # Center dialog on main window
+        dialog.update_idletasks()
+        dialog_width = dialog.winfo_width()
+        dialog_height = dialog.winfo_height()
+        main_x = self.winfo_x()
+        main_y = self.winfo_y()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+        
+        x = main_x + (main_width - dialog_width) // 2
+        y = main_y + (main_height - dialog_height) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Focus on Yes button
+        yes_btn.focus_set()
+        dialog.bind("<Return>", lambda e: on_yes())
+        dialog.bind("<Escape>", lambda e: on_no())
+    
+    def _restart_app(self) -> None:
+        """Restart the application"""
+        import sys
+        import os
+        import subprocess
+        
+        # Save any pending data before restart
+        try:
+            if hasattr(self, 'prospector_panel') and self.prospector_panel.session_active:
+                self.prospector_panel._session_stop()
+        except Exception as e:
+            print(f"Error saving session before restart: {e}")
+        
+        # Get the current script and Python executable
+        python = sys.executable
+        script = os.path.abspath(sys.argv[0])
+        
+        # Use subprocess with proper argument handling for paths with spaces
+        subprocess.Popen([python, script])
+        
+        # Close the current window
+        self.destroy()
+        sys.exit(0)
 
     def _on_close(self) -> None:
         # Check if mining session is active
@@ -10224,30 +10443,47 @@ class App(tk.Tk):
         # Define columns (removed St Dist due to API data inaccuracies)
         columns = ("location", "type", "pad", "distance", "demand", "price", "updated")
         
-        # Configure Marketplace Treeview style with visible borders
+        # Configure Marketplace Treeview style (theme-aware)
+        from config import load_theme
+        _mkt_theme = load_theme()
         style = ttk.Style()
+        
+        if _mkt_theme == "elite_orange":
+            _mkt_bg = "#0a0a0a"
+            _mkt_fg = "#ff8c00"
+            _mkt_hdr = "#1a1a1a"
+            _mkt_sel_bg = "#ff6600"
+            _mkt_sel_fg = "#000000"
+        else:
+            _mkt_bg = "#1e1e1e"
+            _mkt_fg = "#e6e6e6"
+            _mkt_hdr = "#2a2a2a"
+            _mkt_sel_bg = "#0078d7"
+            _mkt_sel_fg = "#ffffff"
         
         # Main treeview styling
         style.configure("Marketplace.Treeview",
                        rowheight=25,
                        borderwidth=1,
                        relief="solid",
-                       bordercolor="#3a3a3a",
-                       fieldbackground="#1e1e1e")
+                       bordercolor="#333333",
+                       background=_mkt_bg,
+                       foreground=_mkt_fg,
+                       fieldbackground=_mkt_bg)
         
         # Column header styling with borders
         style.configure("Marketplace.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",  # Creates visible column separators
-                       background="#2a2a2a",
-                       foreground="white",
+                       background=_mkt_hdr,
+                       foreground=_mkt_fg,
                        padding=[5, 5],
                        anchor="w")  # Left-align all headers
         
         # Row selection styling
         style.map("Marketplace.Treeview",
-                 background=[('selected', '#0078d7')],
-                 foreground=[('selected', 'white')])
+                 background=[('selected', _mkt_sel_bg)],
+                 foreground=[('selected', _mkt_sel_fg)])
         
         # Add subtle column separation via heading relief
         style.layout("Marketplace.Treeview.Heading", [

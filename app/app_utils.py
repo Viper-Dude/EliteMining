@@ -244,41 +244,79 @@ def _center_child_over_parent(child: tk.Toplevel, parent: Optional[tk.Widget]) -
 
 def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon: str = 'info') -> None:
     """Show a centered info/warning/error dialog. Icon can be 'info', 'warning', or 'error'."""
+    from tkinter import ttk
+    
     dialog = tk.Toplevel(parent)
     dialog.withdraw()
     dialog.title(title)
     dialog.resizable(False, False)
     set_window_icon(dialog)
-    # Message label with wraplength for consistent width
-    label = tk.Label(dialog, text=message, padx=20, pady=20, justify="left", wraplength=420)
-    label.pack()
-    btn_frame = tk.Frame(dialog)
-    btn_frame.pack(pady=(0, 12))
+    
+    # Use ttk frame for themed look
+    frame = ttk.Frame(dialog, padding=20)
+    frame.pack(fill="both", expand=True)
+    
+    ttk.Label(frame, text=message, font=("Segoe UI", 10), wraplength=420, justify="left").pack(pady=(0, 15))
+    
+    btn_frame = ttk.Frame(frame)
+    btn_frame.pack()
+    
     def on_ok():
         dialog.destroy()
-    ok_btn = tk.Button(btn_frame, text="OK", width=12, command=on_ok)
+    
+    ok_btn = ttk.Button(btn_frame, text="OK", width=12, command=on_ok)
     ok_btn.pack()
-    _center_child_over_parent(dialog, parent)
+    
+    # Keyboard binding
+    dialog.bind("<Return>", lambda e: on_ok())
+    dialog.bind("<Escape>", lambda e: on_ok())
+    
+    # Center on parent window manually
+    dialog.update_idletasks()
+    dialog_width = dialog.winfo_reqwidth()
+    dialog_height = dialog.winfo_reqheight()
+    
+    if parent:
+        parent.update_idletasks()
+        parent_x = parent.winfo_rootx()
+        parent_y = parent.winfo_rooty()
+        parent_width = parent.winfo_width()
+        parent_height = parent.winfo_height()
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+    else:
+        x = (dialog.winfo_screenwidth() - dialog_width) // 2
+        y = (dialog.winfo_screenheight() - dialog_height) // 2
+    
+    dialog.geometry(f"+{x}+{y}")
     dialog.deiconify()
     dialog.transient(parent)
     dialog.grab_set()
     dialog.attributes('-topmost', True)
     dialog.lift()
-    dialog.focus_force()
+    ok_btn.focus_set()
     dialog.wait_window()
 
 
 def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> bool:
     """Show a centered Yes/No dialog and return True if Yes."""
+    from tkinter import ttk
+    
     dialog = tk.Toplevel(parent)
     dialog.withdraw()
     dialog.title(title)
     dialog.resizable(False, False)
     set_window_icon(dialog)
-    label = tk.Label(dialog, text=message, padx=20, pady=20, justify="left", wraplength=420)
-    label.pack()
-    btn_frame = tk.Frame(dialog)
-    btn_frame.pack(pady=(0, 12))
+    
+    # Use ttk frame for themed look
+    frame = ttk.Frame(dialog, padding=20)
+    frame.pack(fill="both", expand=True)
+    
+    ttk.Label(frame, text=message, font=("Segoe UI", 10), wraplength=420, justify="left").pack(pady=(0, 15))
+    
+    btn_frame = ttk.Frame(frame)
+    btn_frame.pack()
+    
     result = {'value': False}
     def on_yes():
         result['value'] = True
@@ -286,17 +324,40 @@ def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> 
     def on_no():
         result['value'] = False
         dialog.destroy()
-    yes_btn = tk.Button(btn_frame, text="Yes", width=10, command=on_yes)
-    yes_btn.pack(side=tk.LEFT, padx=8)
-    no_btn = tk.Button(btn_frame, text="No", width=10, command=on_no)
-    no_btn.pack(side=tk.LEFT, padx=8)
-    _center_child_over_parent(dialog, parent)
+    
+    yes_btn = ttk.Button(btn_frame, text="Yes", width=10, command=on_yes)
+    yes_btn.pack(side=tk.LEFT, padx=(0, 10))
+    no_btn = ttk.Button(btn_frame, text="No", width=10, command=on_no)
+    no_btn.pack(side=tk.LEFT)
+    
+    # Keyboard bindings
+    dialog.bind("<Return>", lambda e: on_yes())
+    dialog.bind("<Escape>", lambda e: on_no())
+    
+    # Center on parent window manually
+    dialog.update_idletasks()
+    dialog_width = dialog.winfo_reqwidth()
+    dialog_height = dialog.winfo_reqheight()
+    
+    if parent:
+        parent.update_idletasks()
+        parent_x = parent.winfo_rootx()
+        parent_y = parent.winfo_rooty()
+        parent_width = parent.winfo_width()
+        parent_height = parent.winfo_height()
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+    else:
+        x = (dialog.winfo_screenwidth() - dialog_width) // 2
+        y = (dialog.winfo_screenheight() - dialog_height) // 2
+    
+    dialog.geometry(f"+{x}+{y}")
     dialog.deiconify()
     dialog.transient(parent)
     dialog.grab_set()
     dialog.attributes('-topmost', True)
     dialog.lift()
-    dialog.focus_force()
+    yes_btn.focus_set()
     dialog.wait_window()
     return result['value']
 

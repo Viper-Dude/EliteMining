@@ -1,2 +1,2 @@
-Session: Col 285 Sector XF-O d6-101 — C 1 A Ring — 00:08:03 — Total 78t (Single Session)
-Ship: Mega Bumper - Type-11 Prospector | Osmium 12t (89.26 t/hr); Platinum 66t (490.92 t/hr)
+Session: Wregoe JX-J c22-13 — Unknown Body — 00:00:00 — Total 0t (Single Session)
+Ship: Mega Bumper - Type-11 Prospector | No refined materials.

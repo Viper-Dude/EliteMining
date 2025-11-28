@@ -250,17 +250,23 @@ class RingFinder:
         distance_header = ttk.Frame(self.scrollable_frame)
         distance_header.pack(fill="x", padx=10, pady=(0, 5))
         
+        # Get theme colors
+        from config import load_theme
+        rf_theme = load_theme()
+        rf_bg = "#0a0a0a" if rf_theme == "elite_orange" else "#1e1e1e"
+        rf_value_fg = "#ffcc00"  # Yellow for values in both themes
+        
         ttk.Label(distance_header, text="Distances:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
         
         self.distance_info_var = tk.StringVar(value="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
         distance_info_label = tk.Label(distance_header, textvariable=self.distance_info_var,
-                                font=("Segoe UI", 9), foreground="#ffaa00", bg="#1e1e1e")
+                                font=("Segoe UI", 9), foreground=rf_value_fg, bg=rf_bg)
         distance_info_label.pack(side="left")
         
         # Database info on same line, right-aligned
         self.db_info_var = tk.StringVar(value="Total: ... hotspots in ... systems")
         db_info_label = tk.Label(distance_header, textvariable=self.db_info_var,
-                                font=("Segoe UI", 8, "italic"), foreground="#888888", bg="#1e1e1e")
+                                font=("Segoe UI", 8, "italic"), foreground="#888888", bg=rf_bg)
         db_info_label.pack(side="right")
         
         search_frame = ttk.Frame(self.scrollable_frame)
@@ -461,30 +467,47 @@ class RingFinder:
         tree_frame = ttk.Frame(results_frame, relief="solid", borderwidth=1)
         tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
         
-        # Configure RingFinder Treeview style with visible borders
+        # Configure RingFinder Treeview style based on theme
+        from config import load_theme
+        current_theme = load_theme()
         style = ttk.Style()
+        
+        if current_theme == "elite_orange":
+            tree_bg = "#0a0a0a"
+            tree_fg = "#ff8c00"
+            header_bg = "#1a1a1a"
+            selection_bg = "#ff6600"
+            selection_fg = "#000000"
+        else:
+            tree_bg = "#1e1e1e"
+            tree_fg = "#e6e6e6"
+            header_bg = "#2a2a2a"
+            selection_bg = "#0078d7"
+            selection_fg = "#ffffff"
         
         # Main treeview styling
         style.configure("RingFinder.Treeview",
                        rowheight=25,
                        borderwidth=1,
                        relief="solid",
-                       bordercolor="#3a3a3a",
-                       fieldbackground="#1e1e1e")
+                       bordercolor="#333333",
+                       background=tree_bg,
+                       foreground=tree_fg,
+                       fieldbackground=tree_bg)
         
         # Column header styling with borders
         style.configure("RingFinder.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
-                       background="#2a2a2a",
-                       foreground="white",
+                       background=header_bg,
+                       foreground=tree_fg,
                        padding=[5, 5],
                        anchor="w")
         
         # Row selection styling
         style.map("RingFinder.Treeview",
-                 background=[('selected', '#0078d7')],
-                 foreground=[('selected', 'white')])
+                 background=[('selected', selection_bg)],
+                 foreground=[('selected', selection_fg)])
         
         # Results treeview with enhanced columns including source
         columns = ("Distance", "LS", "System", "Visited", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Density")
@@ -528,7 +551,8 @@ class RingFinder:
             elif col == "LS":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Density":
-                self.results_tree.column(col, width=column_widths[col], minwidth=90, anchor="w", stretch=True)
+                # Hide density column - data is unreliable
+                self.results_tree.column(col, width=0, minwidth=0, anchor="w", stretch=False)
         
         # Load saved column widths from config
         try:
@@ -536,6 +560,9 @@ class RingFinder:
             saved_widths = load_ring_finder_column_widths()
             if saved_widths:
                 for col_name, width in saved_widths.items():
+                    # Skip Density column - always hidden
+                    if col_name == "Density":
+                        continue
                     try:
                         self.results_tree.column(col_name, width=width)
                     except:
@@ -559,9 +586,13 @@ class RingFinder:
         
         self.results_tree.bind("<ButtonRelease-1>", save_ring_finder_widths)
         
-        # Configure row tags for alternating colors
-        self.results_tree.tag_configure('oddrow', background='#1e1e1e')
-        self.results_tree.tag_configure('evenrow', background='#252525')
+        # Configure row tags for alternating colors (theme-aware)
+        if current_theme == "elite_orange":
+            self.results_tree.tag_configure('oddrow', background='#0a0a0a', foreground='#ff8c00')
+            self.results_tree.tag_configure('evenrow', background='#151515', foreground='#ff8c00')
+        else:
+            self.results_tree.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6')
+            self.results_tree.tag_configure('evenrow', background='#282828', foreground='#e6e6e6')
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.results_tree.yview)
