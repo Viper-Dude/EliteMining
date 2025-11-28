@@ -1,17 +1,19 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** November 27, 2025
+**Release Date:** November 28, 2025
 
 ## New Features
 
 ### About Tab
 - Added new **About** tab with app info, version, and credits
 - Quick links to Discord, Reddit, GitHub, Documentation, and Report Bug
+- Added PayPal donation button with support message (anchored bottom-right)
 
 ### Status Bar
 - Added **CMDR name** display (reads from journal files)
 - Added **Current System** display with live updates
 - Added **Systems In Route** counter - updates in real-time when plotting/clearing routes
 - Improved button tooltips for Import/Apply buttons
+- Mixed colors: white labels with yellow values for better readability
 
 ### Distance Calculator
 - **Refresh Locations** button now updates both current system and fleet carrier from journals
@@ -19,6 +21,10 @@
 
 ### VoiceAttack Controls
 - Swapped tab order: Mining Controls now appears before Firegroups & Fire Buttons
+- Added important notice about firegroup automation requirements
+- Added new tips: "Clear and Jump" command usage, "Stop all profile commands" tip
+- Streamlined Useful Links section - removed external mining tool links
+- EliteMining logo anchored at bottom-left for consistent visibility
 
 ### Mining Session
 - Planet/Ring field no longer shows system name when at a star - only shows actual ring/planet names
