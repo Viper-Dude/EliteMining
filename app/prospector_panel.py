@@ -938,14 +938,23 @@ class ProspectorPanel(ttk.Frame):
             # If we found system/body, save them (UI widgets don't exist yet)
             if latest_event:
                 self.last_system = latest_event['system']
-                self.last_body = latest_event['body']
-                self.last_body_type = latest_event['body_type']
+                body_name = latest_event['body']
+                body_type = latest_event['body_type']
+                
+                # Only set last_body if it's not just the system name (i.e., we're at a ring/planet, not a star)
+                is_star = body_type == "Star" or body_name == self.last_system
+                if body_name and not is_star:
+                    self.last_body = body_name
+                    self.last_body_type = body_type
+                else:
+                    self.last_body = ""
+                    self.last_body_type = ""
                 
                 print(f"[STARTUP] Found system from journal: {self.last_system}")
                 if self.last_body:
                     print(f"[STARTUP] Found body from journal: {self.last_body} (type: {self.last_body_type})")
                 else:
-                    print(f"[STARTUP] No body found in journal")
+                    print(f"[STARTUP] No body found in journal (at star or system)")
                     
         except Exception as e:
             print(f"Error reading initial location from journal: {e}")
@@ -8758,14 +8767,27 @@ class ProspectorPanel(ttk.Frame):
                 
                 # Update body from events that contain Body data  
                 body_name = evt.get("Body") or evt.get("BodyName")
+                body_type = evt.get("BodyType", "")
+                system_name = evt.get("StarSystem") or self.last_system or ""
+                
+                # Only set last_body if it's not just the system name (i.e., we're at a ring/planet, not a star)
+                # Stars have BodyType "Star" and their name often matches or is very similar to system name
                 if body_name:
-                    self.last_body = body_name
+                    # Skip if body is exactly the system name or body is a Star type
+                    is_star = body_type == "Star" or body_name == system_name
+                    if not is_star:
+                        self.last_body = body_name
+                        self.last_body_type = body_type
+                    elif ev == "FSDJump":
+                        # Clear body when jumping to a new system (we're at the arrival star)
+                        self.last_body = ""
+                        self.last_body_type = ""
                 
                 # Check Status.json for real-time location after Location/FSDJump events
                 self._check_status_location_fields()
                 
                 # Only update location display if we have meaningful context
-                # Priority: Fleet Carrier > Station > Body
+                # Priority: Fleet Carrier > Station > Body (only if body is not empty)
                 if self.last_carrier_name or self.last_station_name or self.last_body:
                     body_display = _extract_location_display(
                         self.last_body or "", 
@@ -8775,6 +8797,9 @@ class ProspectorPanel(ttk.Frame):
                         self.last_system or self.session_system.get() or ""
                     )
                     self.session_body.set(body_display)
+                else:
+                    # No meaningful body context - clear the field
+                    self.session_body.set("")
                     
             elif ev in ("ApproachBody",):
                 # Body-only events - but don't override fleet carrier context while navigating

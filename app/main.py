@@ -4679,6 +4679,11 @@ class App(tk.Tk):
         self._build_settings_notebook(settings_tab)
         self.notebook.add(settings_tab, text="Settings")
 
+        # About tab
+        about_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_about_tab(about_tab)
+        self.notebook.add(about_tab, text="About")
+
         # Actions row (global)
         actions = ttk.Frame(content_frame)
         actions.grid(row=1, column=0, sticky="w", pady=(8, 0))
@@ -4704,7 +4709,7 @@ class App(tk.Tk):
         import_btn.grid(row=0, column=0, sticky="w")
         # Expose import button for focus control from other methods
         self.import_btn = import_btn
-        ToolTip(import_btn, "Import current game settings\nThis reads your current in-game configuration")
+        ToolTip(import_btn, "Read VoiceAttack settings from game files\n(Firegroups, Mining Controls, Announcements)")
         
         apply_btn = tk.Button(
             actions, 
@@ -4722,15 +4727,33 @@ class App(tk.Tk):
             cursor="hand2"
         )
         apply_btn.grid(row=0, column=1, sticky="w", padx=(10, 0))
-        ToolTip(apply_btn, "Send your current settings to the game via VoiceAttack\nThis writes configuration to variable files that VoiceAttack uses")
-
-        # VoiceAttack integration label on same line
-        va_label = tk.Label(actions, text="VoiceAttack integration: Sync settings with game files",
-                           fg="gray", bg="#1e1e1e", font=("Segoe UI", 8, "italic"))
-        va_label.grid(row=0, column=2, sticky="w", padx=(20, 0))
+        ToolTip(apply_btn, "Save settings to VoiceAttack variable files\nPress after:\n• Selecting a Ship Preset\n• Changing any settings in Mining Controls or Firegroups tab")
 
         # Configure column weights for proper spacing
-        actions.grid_columnconfigure(3, weight=1)  # Expandable space
+        actions.grid_columnconfigure(2, weight=1)  # Expandable space
+        
+        # CMDR/System info container (right side) - uses frame for mixed colors
+        info_frame = tk.Frame(actions, bg="#1e1e1e")
+        info_frame.grid(row=0, column=3, sticky="e", padx=(10, 5))
+        
+        # Labels for mixed colors (white labels, yellow values)
+        self.cmdr_label_prefix = tk.Label(info_frame, text="CMDR:", fg="white", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
+        self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
+        self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
+        self.system_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
+        self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
+        self.route_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
+        
+        # Grid them horizontally (tighter spacing)
+        self.cmdr_label_prefix.grid(row=0, column=0, sticky="e")
+        self.cmdr_label_value.grid(row=0, column=1, sticky="w")
+        self.system_label_prefix.grid(row=0, column=2, sticky="e")
+        self.system_label_value.grid(row=0, column=3, sticky="w")
+        self.route_label_prefix.grid(row=0, column=4, sticky="e")
+        self.route_label_value.grid(row=0, column=5, sticky="w")
+        
+        # Load CMDR name in background
+        self.after(500, self._update_cmdr_system_display)
 
         # Status bar - span both columns
         self.status = tk.StringVar(value=f"{APP_TITLE} {APP_VERSION} | Installation: {self.va_root}")
@@ -5158,14 +5181,29 @@ class App(tk.Tk):
         frame.rowconfigure(row, weight=1)
         card.columnconfigure(0, weight=1)
 
+        # Important notice (yellow)
+        important_label = tk.Label(
+            card, 
+            text="⚠ Important: Mining automation requires all firegroups (A-H) in-game to be populated - empty groups prevent switching.",
+            font=("Segoe UI", 9, "bold"), 
+            anchor="w", 
+            bg="#1e1e1e", 
+            fg="#ffcc00",
+            wraplength=600,
+            justify="left"
+        )
+        important_label.grid(row=0, column=0, sticky="w", padx=8, pady=(20, 8))
+
         tip_header = tk.Label(card, text="Tips/help:", font=("Segoe UI", 9, "bold"), anchor="w", bg="#1e1e1e", fg="#ffffff", borderwidth=0, relief="flat", highlightthickness=0)
-        tip_header.grid(row=0, column=0, sticky="w", padx=8, pady=(20, 2))
+        tip_header.grid(row=1, column=0, sticky="w", padx=8, pady=(10, 2))
 
         tips = [
             "For core mining, Set Pulse Wave Analyser and Prospector Limpet to the same firegroup with different Fire Buttons.",
             "Set your collector limpets to the same firegroup as your mining lasers and MVR.",
+            '"Clear and Jump" clears mass lock then enters supercruise, jumps to selected system, or drop from supercruise.',
+            'Use "Stop all profile commands" in VoiceAttack to interrupt any active sequence.',
         ]
-        r = 1
+        r = 2
         for tip in tips:
             lbl = tk.Label(
                 card,
@@ -5179,248 +5217,53 @@ class App(tk.Tk):
             lbl.grid(row=r, column=0, sticky="w", padx=16, pady=1)
             r += 1
 
-        # Useful Links section
-        links_header = tk.Label(card, text="Useful Links:", font=("Segoe UI", 9, "bold"), anchor="w", bg="#1e1e1e", fg="#ffffff", borderwidth=0, relief="flat", highlightthickness=0)
-        links_header.grid(row=r, column=0, sticky="w", padx=8, pady=(15, 2))
-        r += 1
-
-        # Create links with click functionality
-        import webbrowser
-        
-        def open_miners_tool():
-            webbrowser.open("https://edtools.cc/miner")
-        
-        def open_edmining():
-            webbrowser.open("https://edmining.com/")
-        
-        def open_elite_miners_reddit():
-            webbrowser.open("https://www.reddit.com/r/EliteMiners/")
-        
-        def open_discord():
-            webbrowser.open("https://discord.gg/5dsF3UshRR")
-        
-        # Miners Tool link
-        miners_link = tk.Label(
-            card,
-            text="• Miners Tool (edtools.cc/miner) - Mining optimization tools",
-            wraplength=600,
-            justify="left",
-            fg="#e0e0e0",
-            bg="#1e1e1e",
-            font=("Segoe UI", 9, "italic"),
-            cursor="hand2"
-        )
-        miners_link.grid(row=r, column=0, sticky="w", padx=16, pady=1)
-        miners_link.bind("<Button-1>", lambda e: open_miners_tool())
-        ToolTip(miners_link, "Click to open Miners Tool website\nHelps with mining optimization and route planning")
-        r += 1
-        
-        # EDMining link
-        edmining_link = tk.Label(
-            card,
-            text="• EDMining (edmining.com) - Mining database and tools",
-            wraplength=600,
-            justify="left",
-            fg="#e0e0e0",
-            bg="#1e1e1e",
-            font=("Segoe UI", 9, "italic"),
-            cursor="hand2"
-        )
-        edmining_link.grid(row=r, column=0, sticky="w", padx=16, pady=1)
-        edmining_link.bind("<Button-1>", lambda e: open_edmining())
-        ToolTip(edmining_link, "Click to open EDMining website\nComprehensive mining database and community tools")
-        r += 1
-        
-        # Elite Miners Reddit link
-        reddit_link = tk.Label(
-            card,
-            text="• Elite Miners Reddit (r/EliteMiners) - Mining community",
-            wraplength=600,
-            justify="left",
-            fg="#e0e0e0",
-            bg="#1e1e1e",
-            font=("Segoe UI", 9, "italic"),
-            cursor="hand2"
-        )
-        reddit_link.grid(row=r, column=0, sticky="w", padx=16, pady=1)
-        reddit_link.bind("<Button-1>", lambda e: open_elite_miners_reddit())
-        ToolTip(reddit_link, "Click to open Elite Miners Reddit community\nDiscussions, tips, and support from fellow miners")
-        r += 1
-        
-        # EliteMining Discord link with icon
-        discord_frame = tk.Frame(card, bg="#1e1e1e")
-        discord_frame.grid(row=r, column=0, sticky="w", padx=16, pady=1)
-        
-        try:
-            discord_icon_path = os.path.join(get_app_data_dir(), "Images", "Discord-Symbol-Blurple.png")
-            if os.path.exists(discord_icon_path):
-                from PIL import Image, ImageTk
-                discord_img = Image.open(discord_icon_path)
-                discord_img = discord_img.resize((16, 16), Image.Resampling.LANCZOS)
-                discord_photo = ImageTk.PhotoImage(discord_img)
-                
-                discord_icon = tk.Label(discord_frame, image=discord_photo, bg="#1e1e1e", cursor="hand2")
-                discord_icon.image = discord_photo  # Keep a reference
-                discord_icon.grid(row=0, column=0, sticky="w")
-                discord_icon.bind("<Button-1>", lambda e: open_discord())
-                ToolTip(discord_icon, "Click to join EliteMining Discord server\nCommunity chat, support, and mining discussions")
-                
-                discord_text = tk.Label(
-                    discord_frame,
-                    text=" EliteMining Discord - Join our community chat",
-                    wraplength=580,
-                    justify="left",
-                    fg="#e0e0e0",
-                    bg="#1e1e1e",
-                    font=("Segoe UI", 9, "italic"),
-                    cursor="hand2"
-                )
-                discord_text.grid(row=0, column=1, sticky="w")
-                discord_text.bind("<Button-1>", lambda e: open_discord())
-                ToolTip(discord_text, "Click to join EliteMining Discord server\nCommunity chat, support, and mining discussions")
-            else:
-                # Fallback to text-only link if icon not found
-                discord_text_only = tk.Label(
-                    card,
-                    text="• EliteMining Discord - Join our community chat",
-                    wraplength=600,
-                    justify="left",
-                    fg="#e0e0e0",
-                    bg="#1e1e1e",
-                    font=("Segoe UI", 9, "italic"),
-                    cursor="hand2"
-                )
-                discord_text_only.grid(row=r, column=0, sticky="w", padx=16, pady=1)
-                discord_text_only.bind("<Button-1>", lambda e: open_discord())
-                ToolTip(discord_text_only, "Click to join EliteMining Discord server\nCommunity chat, support, and mining discussions")
-        except Exception as e:
-            # Fallback to text-only link if any error occurs
-            print(f"[DEBUG] Discord icon loading failed: {e}")
-            import traceback
-            traceback.print_exc()
-            discord_text_only = tk.Label(
-                card,
-                text="• EliteMining Discord - Join our community chat",
-                wraplength=600,
-                justify="left",
-                fg="#e0e0e0",
-                bg="#1e1e1e",
-                font=("Segoe UI", 9, "italic"),
-                cursor="hand2"
-            )
-            discord_text_only.grid(row=r, column=0, sticky="w", padx=16, pady=1)
-            discord_text_only.bind("<Button-1>", lambda e: open_discord())
-            ToolTip(discord_text_only, "Click to join EliteMining Discord server\nCommunity chat, support, and mining discussions")
-        
-        r += 1
-
-        # --- Add spacer row to push logos section to bottom of Tip card ---
-        card.rowconfigure(r, weight=1)
-        r += 1
-        
-        # --- Support message and logos at bottom ---
-        support_frame = tk.Frame(card, bg="#1e1e1e")
-        support_frame.grid(row=r, column=0, sticky="sew", padx=8, pady=(5, 12))
-        support_frame.columnconfigure(0, weight=0)  # Logo fixed width
-        support_frame.columnconfigure(1, weight=1)  # Text expands
-        support_frame.columnconfigure(2, weight=0)  # PayPal fixed width
-        
-        # --- EliteMining logo on the left ---
-        try:
-            # import os removed (already imported globally)
-            import sys
-            
-            # Use consistent path detection like config.py
-            if getattr(sys, 'frozen', False):
-                # Running as compiled executable - images are in app folder
-                exe_dir = os.path.dirname(sys.executable)
-                parent_dir = os.path.dirname(exe_dir)
-                logo_path = os.path.join(parent_dir, 'app', 'Images', 'EliteMining_txt_logo_transp_resize.png')
-            else:
-                # Running in development mode
-                logo_path = os.path.join(os.path.dirname(__file__), 'Images', 'EliteMining_txt_logo_transp_resize.png')
-            
-            try:
-                from PIL import Image, ImageTk
-                if os.path.exists(logo_path):
-                    img = Image.open(logo_path)
-                    # Resize with much smaller height for compact appearance
-                    img = img.resize((200, 35), Image.Resampling.LANCZOS)
-                    self.logo_photo = ImageTk.PhotoImage(img)
-                    logo_label = tk.Label(support_frame, image=self.logo_photo, bg="#1e1e1e", cursor="hand2")
-                    logo_label.grid(row=0, column=0, sticky="s", padx=(0, 15), pady=(15, 0))
-                    
-                    # Make logo clickable to open GitHub
-                    def open_github(event=None):
-                        webbrowser.open("https://github.com/Viper-Dude/EliteMining")
-                    logo_label.bind("<Button-1>", open_github)
-            except ImportError:
-                # Fallback to tkinter PhotoImage with subsample for resizing
-                if os.path.exists(logo_path):
-                    self.logo_photo = tk.PhotoImage(file=logo_path)
-                    # Subsample to make it smaller (roughly equivalent to 200x70)
-                    scale_factor = max(1, self.logo_photo.width() // 200)
-                    self.logo_photo = self.logo_photo.subsample(scale_factor, scale_factor)
-                    logo_label = tk.Label(support_frame, image=self.logo_photo, bg="#1e1e1e", cursor="hand2")
-                    logo_label.grid(row=0, column=0, sticky="s", padx=(0, 15), pady=(15, 0))
-                    
-                    # Make logo clickable to open GitHub
-                    def open_github(event=None):
-                        webbrowser.open("https://github.com/Viper-Dude/EliteMining")
-                    logo_label.bind("<Button-1>", open_github)
-                else:
-                    # Show text fallback if file doesn't exist - also make it clickable
-                    logo_text = tk.Label(support_frame, text="EliteMining", font=("Segoe UI", 12, "bold"), fg="#cccccc", bg="#1e1e1e", cursor="hand2")
-                    logo_text.grid(row=0, column=0, sticky="s", padx=(0, 15), pady=(15, 0))
-                    
-                    def open_github(event=None):
-                        webbrowser.open("https://github.com/Viper-Dude/EliteMining")
-                    logo_text.bind("<Button-1>", open_github)
-        except Exception as e:
-            # Show text fallback if loading failed - also make it clickable
-            logo_text = tk.Label(support_frame, text="EliteMining", font=("Segoe UI", 12, "bold"), fg="#cccccc", bg="#1e1e1e", cursor="hand2")
-            logo_text.grid(row=0, column=0, sticky="sw", padx=(0, 25), pady=(0, 0))
-            
-            def open_github(event=None):
-                webbrowser.open("https://github.com/Viper-Dude/EliteMining")
-            logo_text.bind("<Button-1>", open_github)
-        
-        # Support text in the center - aligned to bottom
-        support_text = tk.Label(
-            support_frame,
-            text="This software is totally free, but if you want to support the\ndeveloper and future updates, your contribution would be greatly appreciated.",
-            wraplength=300,
-            justify="left",
-            fg="#cccccc",
-            bg="#1e1e1e",
-            font=("Segoe UI", 7, "italic"),
-        )
-        support_text.grid(row=0, column=1, sticky="s", padx=(10, 5), pady=(15, 0))
-
-        # --- PayPal donate button on the right ---
-        import webbrowser
-        try:
-            paypal_img = tk.PhotoImage(file=os.path.join(get_app_data_dir(), "Images", "paypal.png"))
-            if paypal_img.width() > 50:
-                scale = max(1, paypal_img.width() // 50)
-                paypal_img = paypal_img.subsample(scale, scale)
-            btn = tk.Label(support_frame, image=paypal_img, cursor="hand2", bg="#1e1e1e")
-            btn.image = paypal_img
-            btn.grid(row=0, column=2, sticky="s", padx=(10, 8), pady=(15, 0))
-            def open_paypal(event=None):
-                webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=NZQTA4TGPDSC6")
-            btn.bind("<Button-1>", open_paypal)
-        except Exception as e:
-            print("PayPal widget failed:", e)
-
-        r += 1
-
         def _on_cfg_resize(evt):
             wrap = max(320, min(evt.width - 60, 1000))
             for child in card.winfo_children():
                 if isinstance(child, tk.Label) and child is not tip_header:
                     child.config(wraplength=wrap)
         frame.bind("<Configure>", _on_cfg_resize)
+        
+        # --- EliteMining logo at bottom left (outside card, anchored) ---
+        logo_frame = tk.Frame(frame, bg="#1e1e1e")
+        logo_frame.grid(row=row+1, column=0, columnspan=4, sticky="sw", padx=8, pady=(5, 8))
+        
+        try:
+            import sys
+            import webbrowser
+            
+            if getattr(sys, 'frozen', False):
+                exe_dir = os.path.dirname(sys.executable)
+                parent_dir = os.path.dirname(exe_dir)
+                logo_path = os.path.join(parent_dir, 'app', 'Images', 'EliteMining_txt_logo_transp_resize.png')
+            else:
+                logo_path = os.path.join(os.path.dirname(__file__), 'Images', 'EliteMining_txt_logo_transp_resize.png')
+            
+            try:
+                from PIL import Image, ImageTk
+                if os.path.exists(logo_path):
+                    img = Image.open(logo_path)
+                    img = img.resize((200, 35), Image.Resampling.LANCZOS)
+                    self.fg_logo_photo = ImageTk.PhotoImage(img)
+                    logo_label = tk.Label(logo_frame, image=self.fg_logo_photo, bg="#1e1e1e", cursor="hand2")
+                    logo_label.pack(anchor="w")
+                    
+                    def open_github(event=None):
+                        webbrowser.open("https://github.com/Viper-Dude/EliteMining")
+                    logo_label.bind("<Button-1>", open_github)
+            except ImportError:
+                if os.path.exists(logo_path):
+                    self.fg_logo_photo = tk.PhotoImage(file=logo_path)
+                    scale_factor = max(1, self.fg_logo_photo.width() // 200)
+                    self.fg_logo_photo = self.fg_logo_photo.subsample(scale_factor, scale_factor)
+                    logo_label = tk.Label(logo_frame, image=self.fg_logo_photo, bg="#1e1e1e", cursor="hand2")
+                    logo_label.pack(anchor="w")
+                    
+                    def open_github(event=None):
+                        webbrowser.open("https://github.com/Viper-Dude/EliteMining")
+                    logo_label.bind("<Button-1>", open_github)
+        except Exception:
+            pass
 
     # ---------- Interface Options tab ----------
     def _build_settings_notebook(self, frame: ttk.Frame) -> None:
@@ -5439,21 +5282,166 @@ class App(tk.Tk):
         self._build_interface_options_tab(general_tab)
         self.settings_notebook.add(general_tab, text="General Settings")
 
+    # ---------- About tab ----------
+    def _build_about_tab(self, frame: ttk.Frame) -> None:
+        """Build the About tab with app info, links, and credits"""
+        import webbrowser
+        from version import __version__, __build_date__
+        
+        # Main container - use grid for proper anchoring
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(0, weight=1)  # Content area expands
+        frame.rowconfigure(1, weight=0)  # Bottom support section stays fixed
+        
+        # Main content container - centered, scrollable area
+        main_container = tk.Frame(frame, bg="#1e1e1e")
+        main_container.grid(row=0, column=0, sticky="nsew", padx=20, pady=(20, 10))
+        
+        # Center content frame
+        center_frame = tk.Frame(main_container, bg="#1e1e1e")
+        center_frame.pack(expand=True)
+        
+        # App title and version
+        title_frame = tk.Frame(center_frame, bg="#1e1e1e")
+        title_frame.pack(pady=(0, 10))
+        
+        # Try to load text logo image
+        try:
+            from path_utils import get_images_dir
+            from PIL import Image, ImageTk
+            import os
+            logo_path = os.path.join(get_images_dir(), "EliteMining_txt_logo_transp_resize.png")
+            if os.path.exists(logo_path):
+                img = Image.open(logo_path)
+                # Resize to reasonable width (260px) maintaining aspect ratio
+                orig_width, orig_height = img.size
+                new_width = 260
+                new_height = int(orig_height * (new_width / orig_width))
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                self._about_text_logo = ImageTk.PhotoImage(img)
+                logo_label = tk.Label(title_frame, image=self._about_text_logo, bg="#1e1e1e")
+                logo_label.pack(pady=(0, 5))
+            else:
+                # Fallback to text
+                tk.Label(title_frame, text="EliteMining", font=("Segoe UI", 18, "bold"), 
+                         fg="#ffcc00", bg="#1e1e1e").pack()
+        except Exception:
+            # Fallback to text on error
+            tk.Label(title_frame, text="EliteMining", font=("Segoe UI", 18, "bold"), 
+                     fg="#ffcc00", bg="#1e1e1e").pack()
+        
+        tk.Label(title_frame, text=f"Version {__version__}", font=("Segoe UI", 10), 
+                 fg="#888888", bg="#1e1e1e").pack()
+        
+        # Description
+        tk.Label(center_frame, text="Mining companion for Elite Dangerous", 
+                 font=("Segoe UI", 11), fg="#e0e0e0", bg="#1e1e1e").pack(pady=(10, 20))
+        
+        # Separator
+        tk.Frame(center_frame, height=1, bg="#444444", width=400).pack(pady=10)
+        
+        # Copyright and license
+        tk.Label(center_frame, text="© 2024-2025 CMDR ViperDude", 
+                 font=("Segoe UI", 10), fg="#e0e0e0", bg="#1e1e1e").pack()
+        tk.Label(center_frame, text="Licensed under GNU General Public License v3.0", 
+                 font=("Segoe UI", 9), fg="#888888", bg="#1e1e1e").pack()
+        
+        # Separator
+        tk.Frame(center_frame, height=1, bg="#444444", width=400).pack(pady=15)
+        
+        # Links section
+        links_frame = tk.Frame(center_frame, bg="#1e1e1e")
+        links_frame.pack(pady=10)
+        
+        # Define links
+        links = [
+            ("Discord", "https://discord.gg/5dsF3UshRR"),
+            ("Reddit", "https://www.reddit.com/r/EliteDangerous/comments/1oflji3/elitemining_free_mining_hotspot_finder_app/"),
+            ("GitHub", "https://github.com/Viper-Dude/EliteMining"),
+            ("Documentation", "https://github.com/Viper-Dude/EliteMining#readme"),
+            ("Report Bug", "https://github.com/Viper-Dude/EliteMining/issues/new"),
+        ]
+        
+        def open_link(url):
+            webbrowser.open(url)
+        
+        for label, url in links:
+            btn = tk.Button(links_frame, text=label, 
+                           command=lambda u=url: open_link(u),
+                           bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
+                           activeforeground="#ffffff", relief="ridge", bd=1, 
+                           padx=12, pady=4, font=("Segoe UI", 9), cursor="hand2",
+                           width=12)
+            btn.pack(side="left", padx=5)
+        
+        # Separator
+        tk.Frame(center_frame, height=1, bg="#444444", width=400).pack(pady=15)
+        
+        # Credits section
+        credits_frame = tk.Frame(center_frame, bg="#1e1e1e")
+        credits_frame.pack(pady=10)
+        
+        tk.Label(credits_frame, text="Credits", font=("Segoe UI", 10, "bold"), 
+                 fg="#ffcc00", bg="#1e1e1e").pack()
+        
+        credits = [
+            "EliteVA by Somfic",
+            "Ardent API by Iain Collins",
+            "EDData API by gOOvER | CMDR Shyvin",
+            "EDCD/EDDN Community",
+        ]
+        
+        for credit in credits:
+            tk.Label(credits_frame, text=f"- {credit}", font=("Segoe UI", 9), 
+                     fg="#aaaaaa", bg="#1e1e1e").pack(anchor="w", padx=20)
+        
+        # Support/Donate section - anchored at bottom right of frame
+        support_frame = tk.Frame(frame, bg="#1e1e1e")
+        support_frame.grid(row=1, column=0, sticky="se", padx=20, pady=(5, 15))
+        
+        # Support text on the left
+        support_text = tk.Label(
+            support_frame,
+            text="This app is free. Support future updates with a donation.",
+            wraplength=350,
+            justify="left",
+            fg="#cccccc",
+            bg="#1e1e1e",
+            font=("Segoe UI", 9, "italic"),
+        )
+        support_text.pack(side="left")
+        
+        # PayPal donate button on the right
+        try:
+            from path_utils import get_app_data_dir
+            paypal_img = tk.PhotoImage(file=os.path.join(get_app_data_dir(), "Images", "paypal.png"))
+            if paypal_img.width() > 50:
+                scale = max(1, paypal_img.width() // 50)
+                paypal_img = paypal_img.subsample(scale, scale)
+            paypal_btn = tk.Label(support_frame, image=paypal_img, cursor="hand2", bg="#1e1e1e")
+            paypal_btn.image = paypal_img
+            paypal_btn.pack(side="left", padx=(15, 0))
+            def open_paypal(event=None):
+                webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=NZQTA4TGPDSC6")
+            paypal_btn.bind("<Button-1>", open_paypal)
+        except Exception as e:
+            print(f"About tab PayPal widget failed: {e}")
+
     def _build_voiceattack_controls_tab(self, frame: ttk.Frame) -> None:
-        """Build the VoiceAttack Controls tab with Firegroups and Mining Controls"""
+        """Build the VoiceAttack Controls tab with Mining Controls and Firegroups"""
         # Create a notebook for VoiceAttack sub-tabs
         self.voiceattack_notebook = ttk.Notebook(frame)
         self.voiceattack_notebook.pack(fill="both", expand=True)
-
-        # === FIREGROUPS & FIRE BUTTONS SUB-TAB ===
-        firegroups_tab = ttk.Frame(self.voiceattack_notebook, padding=8)
-        self._build_fg_tab(firegroups_tab)
-        self.voiceattack_notebook.add(firegroups_tab, text="Firegroups & Fire Buttons")
 
         # === MINING CONTROLS SUB-TAB ===
         mining_controls_tab = ttk.Frame(self.voiceattack_notebook, padding=8)
         self._build_timers_tab(mining_controls_tab)
         self.voiceattack_notebook.add(mining_controls_tab, text="Mining Controls")
+
+        # === FIREGROUPS & FIRE BUTTONS SUB-TAB ===
+        firegroups_tab = ttk.Frame(self.voiceattack_notebook, padding=8)
+        self._build_fg_tab(firegroups_tab)
+        self.voiceattack_notebook.add(firegroups_tab, text="Firegroups & Fire Buttons")
 
     def _build_bookmarks_tab(self, frame: ttk.Frame) -> None:
         """Build the Bookmarks tab - Mining location bookmarks"""
@@ -6782,8 +6770,11 @@ class App(tk.Tk):
             self.va_variables.initialize_jumps_left()
             print("✅ Initialized VoiceAttack variables (jumpsleft.txt)")
             
-            # Start polling
+            # Start polling for VA variables
             self.after(2000, self._poll_va_variables)
+            
+            # Start polling for route status (CMDR/system display updates)
+            self.after(2000, self._poll_route_status)
         except Exception as e:
             log.error(f"Error initializing VA variables: {e}")
     
@@ -6859,21 +6850,31 @@ class App(tk.Tk):
                 self.after(2000, self._poll_route_status)
                 return
             
-            # Check NavRoute.json for cleared route
+            route_changed = False
+            
+            # Check NavRoute.json for changes (modification time AND content)
             navroute_path = os.path.join(journal_dir, "NavRoute.json")
             if os.path.exists(navroute_path):
                 try:
-                    with open(navroute_path, 'r', encoding='utf-8') as f:
-                        navroute_data = json.load(f)
-                        route = navroute_data.get('Route', [])
-                        if len(route) == 0:
-                            # Route cleared
-                            current_value = self._read_var_text("jumpsleft")
-                            if current_value != "0":
-                                self._write_jumps_left(0)
-                                log.debug("[Poll] Route cleared, set to 0")
-                except Exception:
-                    pass
+                    mtime = os.path.getmtime(navroute_path)
+                    cached_mtime = getattr(self, '_navroute_mtime', 0)
+                    
+                    if mtime != cached_mtime:
+                        self._navroute_mtime = mtime
+                        
+                        # Read route count from file
+                        with open(navroute_path, 'r', encoding='utf-8') as f:
+                            navroute_data = json.load(f)
+                            route = navroute_data.get('Route', [])
+                            route_count = max(0, len(route) - 1) if route else 0
+                            
+                            cached_count = getattr(self, '_cached_route_count', -1)
+                            if route_count != cached_count:
+                                self._cached_route_count = route_count
+                                route_changed = True
+                                print(f"[DEBUG POLL] NavRoute changed: {cached_count} -> {route_count} jumps")
+                except Exception as e:
+                    print(f"[DEBUG POLL] Error reading NavRoute: {e}")
             
             # Check latest journal for FSDTarget
             journal_files = [f for f in os.listdir(journal_dir) if f.startswith('Journal.') and f.endswith('.log')]
@@ -6899,27 +6900,131 @@ class App(tk.Tk):
                                 if event_type == 'FSDTarget':
                                     jumps = event.get('RemainingJumpsInRoute')
                                     if jumps is not None:
-                                        current_value = self._read_var_text("jumpsleft")
-                                        if current_value != str(jumps):
+                                        # Check if route count changed from cached value
+                                        cached_jumps = getattr(self, '_cached_route_jumps', None)
+                                        if cached_jumps != jumps:
+                                            self._cached_route_jumps = jumps
                                             self._write_jumps_left(jumps)
                                             log.debug(f"[Poll] Route update: {jumps} jumps")
+                                            route_changed = True
                                     break
                                 elif event_type in ['NavRouteClear', 'Docked', 'Touchdown']:
-                                    current_value = self._read_var_text("jumpsleft")
-                                    if current_value != "0":
+                                    cached_jumps = getattr(self, '_cached_route_jumps', None)
+                                    if cached_jumps != 0:
+                                        self._cached_route_jumps = 0
                                         self._write_jumps_left(0)
                                         log.debug(f"[Poll] {event_type}, set to 0")
+                                        route_changed = True
                                     break
                             except json.JSONDecodeError:
                                 continue
                 except Exception:
                     pass
+            
+            # Update display if route changed
+            if route_changed and hasattr(self, 'cmdr_label_value'):
+                print(f"[DEBUG POLL] Route changed, updating display")
+                self.after(0, self._update_cmdr_system_display)
         
         except Exception as e:
             log.error(f"Error polling route status: {e}")
         
         # Schedule next poll
         self.after(2000, self._poll_route_status)
+
+    def _update_cmdr_system_display(self) -> None:
+        """Update commander name and current system display"""
+        try:
+            cmdr_name = ""
+            current_system = ""
+            jumps_remaining = 0
+            
+            # Get CMDR name from journal
+            if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
+                if not hasattr(self, '_cached_cmdr_name'):
+                    from journal_parser import JournalParser
+                    parser = JournalParser(self.prospector_panel.journal_dir)
+                    self._cached_cmdr_name = parser.get_commander_name()
+                
+                cmdr_name = self._cached_cmdr_name or ""
+            
+            # Get current system from centralized source
+            current_system = self.get_current_system() or ""
+            
+            # Get remaining jumps - use FSDTarget from journal (accurate count during travel)
+            # NavRoute.json only updates when plotting, not during jumps
+            if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
+                journal_dir = self.prospector_panel.journal_dir
+                found_route_event = False
+                
+                # Scan journal for most recent route-related event
+                journal_files = [f for f in os.listdir(journal_dir) 
+                               if f.startswith('Journal.') and f.endswith('.log')]
+                if journal_files:
+                    journal_files.sort(reverse=True)
+                    latest_journal = os.path.join(journal_dir, journal_files[0])
+                    try:
+                        with open(latest_journal, 'r', encoding='utf-8') as f:
+                            f.seek(0, 2)
+                            file_size = f.tell()
+                            f.seek(max(0, file_size - 30720))  # Last 30KB
+                            lines = f.readlines()
+                            
+                            for line in reversed(lines):
+                                line = line.strip()
+                                if not line:
+                                    continue
+                                try:
+                                    event = json.loads(line)
+                                    event_type = event.get('event')
+                                    
+                                    if event_type == 'FSDTarget':
+                                        # Most accurate - gives remaining jumps
+                                        jumps_remaining = event.get('RemainingJumpsInRoute', 0)
+                                        found_route_event = True
+                                        break
+                                    elif event_type == 'NavRouteClear':
+                                        # Route was cleared
+                                        jumps_remaining = 0
+                                        found_route_event = True
+                                        break
+                                    elif event_type == 'NavRoute':
+                                        # New route plotted but no FSDTarget yet - check NavRoute.json
+                                        navroute_path = os.path.join(journal_dir, "NavRoute.json")
+                                        if os.path.exists(navroute_path):
+                                            try:
+                                                with open(navroute_path, 'r', encoding='utf-8') as nf:
+                                                    navroute_data = json.load(nf)
+                                                    route = navroute_data.get('Route', [])
+                                                    if route:
+                                                        # Route includes current system, so remaining jumps = len - 1
+                                                        jumps_remaining = len(route) - 1
+                                            except Exception:
+                                                pass
+                                        found_route_event = True
+                                        break
+                                except (json.JSONDecodeError, ValueError):
+                                    continue
+                    except Exception as e:
+                        print(f"Error reading journal for route: {e}")
+                
+                print(f"[DEBUG ROUTE] jumps_remaining={jumps_remaining}, found_event={found_route_event}")
+            
+            # Update individual labels (white prefix, yellow value)
+            self.cmdr_label_value.config(text=cmdr_name)
+            
+            if current_system:
+                self.system_label_prefix.config(text="| Current System: ")
+                self.system_label_value.config(text=current_system)
+            else:
+                self.system_label_prefix.config(text="")
+                self.system_label_value.config(text="")
+            
+            self.route_label_prefix.config(text="| Systems In Route: ")
+            self.route_label_value.config(text=str(jumps_remaining))
+            
+        except Exception as e:
+            print(f"Error updating CMDR/system display: {e}")
 
     def _import_all_from_txt(self) -> None:
         found: List[str] = []
@@ -7390,15 +7495,15 @@ class App(tk.Tk):
                                      font=("Segoe UI", 8), fg="#888888", bg="#1e1e1e", anchor="w")
         self.fc_sol_label.pack(side="left", padx=(10, 0))
         
-        # Auto-detect FC button
+        # Refresh locations button (current system + FC)
         row += 1
-        auto_fc_btn = tk.Button(config_frame, text="Refresh FC Location", 
-                               command=self._distance_auto_detect_fc,
+        auto_fc_btn = tk.Button(config_frame, text="Refresh Locations", 
+                               command=self._distance_refresh_locations,
                                bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
                                activeforeground="#ffffff", relief="ridge", bd=1, padx=8, pady=3,
                                font=("Segoe UI", 8, "normal"), cursor="hand2")
         auto_fc_btn.grid(row=row, column=0, columnspan=4, pady=(8, 0))
-        ToolTip(auto_fc_btn, "Scan journal files to update fleet carrier location")
+        ToolTip(auto_fc_btn, "Scan journal files to update current system and fleet carrier location")
         
         # Calculator section
         calc_frame = ttk.LabelFrame(main_container, text="System Distance Calculator", padding=10)
@@ -7610,49 +7715,68 @@ class App(tk.Tk):
             # Update distances (provides visual confirmation)
             self._update_home_fc_distances()
     
-    def _distance_auto_detect_fc(self):
-        """Auto-detect fleet carrier from journals"""
+    def _distance_refresh_locations(self):
+        """Refresh current system and fleet carrier from journals"""
         try:
             # Set journal directory for tracker
             if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
                 self.fc_tracker.set_journal_directory(self.prospector_panel.journal_dir)
                 
                 # Show scanning message
-                self._set_status("Scanning journals for fleet carrier...")
-                self.update()
+                self._set_status("Scanning journals...")
                 
-                # Scan journals
-                carrier_system = self.fc_tracker.scan_journals_for_carrier()
+                # Run in background thread to avoid UI freeze
+                import threading
+                def scan_thread():
+                    try:
+                        results = []
+                        
+                        # 1. Refresh current system from journals
+                        from journal_parser import JournalParser
+                        parser = JournalParser(self.prospector_panel.journal_dir)
+                        current_system = parser.get_last_known_system()
+                        
+                        # 2. Scan for fleet carrier
+                        carrier_system = self.fc_tracker.scan_journals_for_carrier()
+                        carrier_info = self.fc_tracker.get_carrier_info() if carrier_system else None
+                        
+                        # Update UI on main thread
+                        def update_ui():
+                            if current_system:
+                                self.update_current_system(current_system)
+                                results.append(f"System: {current_system}")
+                            
+                            if carrier_system:
+                                self.distance_fc_system.set(carrier_system)
+                                carrier_name = carrier_info.get('carrier_name') if carrier_info else None
+                                if carrier_name:
+                                    results.append(f"FC '{carrier_name}': {carrier_system}")
+                                else:
+                                    results.append(f"FC: {carrier_system}")
+                            
+                            # Update distances after detection
+                            self._update_home_fc_distances()
+                            
+                            # Refresh Mining Analytics distance display if it exists
+                            if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, '_update_distance_display'):
+                                self.prospector_panel._update_distance_display()
+                            
+                            # Show results
+                            if results:
+                                self._set_status(" | ".join(results))
+                            else:
+                                self._set_status("No locations found in journals")
+                        
+                        self.after(0, update_ui)
+                    except Exception as e:
+                        self.after(0, lambda: self._set_status(f"Error: {e}"))
                 
-                if carrier_system:
-                    self.distance_fc_system.set(carrier_system)
-                    carrier_info = self.fc_tracker.get_carrier_info()
-                    carrier_name = carrier_info.get('carrier_name') if carrier_info else None
-                    
-                    # Show appropriate status message
-                    if carrier_name:
-                        self._set_status(f"Fleet Carrier '{carrier_name}' found in {carrier_system}")
-                    else:
-                        self._set_status(f"Fleet Carrier found in {carrier_system}")
-                    
-                    # Update distances after detection
-                    self._update_home_fc_distances()
-                    
-                    # Refresh Mining Analytics distance display if it exists
-                    if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, '_update_distance_display'):
-                        self.prospector_panel._update_distance_display()
-                else:
-                    self._set_status("No fleet carrier found in journals")
-                    messagebox.showwarning("Not Found", 
-                                      "No fleet carrier location found in recent journal files.\n\n" 
-                                      "Make sure you have:\n"
-                                      "• Jumped your carrier recently, or\n"
-                                      "• Docked at your carrier recently")
+                threading.Thread(target=scan_thread, daemon=True).start()
             else:
                 messagebox.showwarning("No Journal Directory", 
                                      "Journal directory not set. Please configure it in Settings → General Settings → Journal Files.")
         except Exception as e:
-            print(f"Error auto-detecting FC: {e}")
+            print(f"Error refreshing locations: {e}")
             messagebox.showerror("Error", f"Failed to scan journals: {e}")
     
     def _save_distance_systems(self):
@@ -7688,7 +7812,7 @@ class App(tk.Tk):
             self.update()
             
             # Reset labels
-            self.distance_ab_label.config(text="➤ Distance A ↔ B: Calculating...", fg="#cccccc")
+            self.distance_ab_label.config(text=f"➤ Distance {system_a or 'A'} ↔ {system_b or 'B'}: Calculating...", fg="#cccccc")
             self.distance_a_sol_label.config(text="➤ Distance to Sol: ---", fg="#ffffff")
             self.distance_a_coords_label.config(text="➤ Coordinates: ---", fg="#ffffff")
             self.distance_b_sol_label.config(text="➤ Distance to Sol: ---", fg="#ffffff")
@@ -7715,11 +7839,11 @@ class App(tk.Tk):
             if sys_a_info and sys_b_info:
                 distance_ab = self.distance_calculator.calculate_distance(sys_a_info, sys_b_info)
                 if distance_ab is not None:
-                    self.distance_ab_label.config(text=f"➤ Distance A ↔ B: {distance_ab:.2f} LY", fg="#ffcc00")
+                    self.distance_ab_label.config(text=f"➤ Distance {system_a} ↔ {system_b}: {distance_ab:.2f} LY", fg="#ffcc00")
                 else:
-                    self.distance_ab_label.config(text="➤ Distance A ↔ B: Calculation failed", fg="#ff6666")
+                    self.distance_ab_label.config(text=f"➤ Distance {system_a} ↔ {system_b}: Calculation failed", fg="#ff6666")
             else:
-                self.distance_ab_label.config(text="➤ Distance A ↔ B: Need both systems", fg="#cccccc")
+                self.distance_ab_label.config(text=f"➤ Distance {system_a or 'A'} ↔ {system_b or 'B'}: Need both systems", fg="#cccccc")
             
             # System A info
             if sys_a_info:
@@ -11970,6 +12094,10 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         # 3. Update Mining Analytics (prospector panel) session system
         if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, 'session_system'):
             self.prospector_panel.session_system.set(system_name)
+        
+        # 4. Update CMDR/System display in actions bar
+        if hasattr(self, 'cmdr_system_label'):
+            self.after(0, self._update_cmdr_system_display)
         
         # Clear any selection that might have been applied and set neutral focus
         try:

@@ -831,6 +831,42 @@ class JournalParser:
             pass
         return None
 
+    def get_commander_name(self) -> Optional[str]:
+        """Get the commander name from the most recent journal file.
+        
+        Looks for Commander or LoadGame events which contain the CMDR name.
+        
+        Returns:
+            Commander name or None if not found
+        """
+        files = self.find_journal_files()
+        if not files:
+            return None
+        
+        # Check the most recent journal files (usually only need 1-2)
+        for file_path in reversed(files[-3:]):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        try:
+                            event = json.loads(line.strip())
+                            event_type = event.get('event', '')
+                            
+                            if event_type == 'Commander':
+                                name = event.get('Name')
+                                if name:
+                                    return name
+                            elif event_type == 'LoadGame':
+                                name = event.get('Commander')
+                                if name:
+                                    return name
+                        except json.JSONDecodeError:
+                            continue
+            except Exception:
+                continue
+        
+        return None
+
 
 def create_journal_parser_from_config(prospector_panel) -> Optional[JournalParser]:
     """Create a JournalParser instance using the configuration from prospector panel
