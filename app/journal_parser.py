@@ -500,11 +500,11 @@ class JournalParser:
                     )
                     
                     log.debug(f"Added hotspot: {system_name} - {body_name} - {material_name} ({count})")
-                    
-                    # Trigger callback if provided (for UI updates)
-                    # Pass True ONLY if at least one hotspot was NEW (not already in database)
-                    if self.on_hotspot_added and hotspots_are_new:
-                        self.on_hotspot_added(is_new_discovery=True)
+            
+            # Trigger callback ONCE after all hotspots are processed (not inside loop)
+            # Pass True ONLY if at least one hotspot was NEW (not already in database)
+            if self.on_hotspot_added and hotspots_are_new:
+                self.on_hotspot_added(is_new_discovery=True)
                     
         except Exception as e:
             log.error(f"Error processing SAASignalsFound event: {e}")
