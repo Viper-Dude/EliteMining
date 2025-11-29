@@ -7083,14 +7083,14 @@ class ProspectorPanel(ttk.Frame):
                 # Get session data from selected item
                 item = selected[0]
                 values = self.reports_tree_tab.item(item, 'values')
-                if len(values) < 5:
+                if len(values) < 6:
                     self._set_status("Invalid session data for bookmarking")
                     return
                 
                 # Extract system and body from session
-                # Column order: date(0), duration(1), ship(2), system(3), body(4)
-                system = values[3]  # System column (correct index)
-                body = values[4]    # Body column (correct index)
+                # Column order: date(0), duration(1), session_type(2), ship(3), system(4), body(5)
+                system = values[4]  # System column
+                body = values[5]    # Body column
                 
                 if system in ["Unknown", ""] or body in ["Unknown", ""]:
                     self._set_status("Cannot bookmark location with unknown system or body")
