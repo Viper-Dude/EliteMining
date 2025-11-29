@@ -4,7 +4,7 @@
 ## New Features & Improvements
 
 ### Auto Tab Switching
-- Automatically switches between Hotspots Finder and Mining Session tabs based on session activity (enable in Hotspots Finder or Settings tab)
+- Automatically switches between the Hotspots Finder and Mining Session tabs based on session activity (can be enabled in the Hotspots Finder or Settings tab; enabled by default).
 
 ### Orange Theme Fixes
 - Improved and refined the orange theme styling across the app.

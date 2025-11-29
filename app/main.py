@@ -4525,7 +4525,7 @@ class App(tk.Tk):
         self.auto_scan_journals.trace('w', self._on_auto_scan_toggle)
         
         # Auto-switch tabs on ring entry/exit
-        self.auto_switch_tabs = tk.IntVar(value=0)  # Default disabled
+        self.auto_switch_tabs = tk.IntVar(value=1)  # Default enabled
         self._load_auto_switch_tabs_preference()
         self.auto_switch_tabs.trace('w', self._on_auto_switch_tabs_toggle)
         
@@ -8404,7 +8404,7 @@ class App(tk.Tk):
     def _load_auto_switch_tabs_preference(self) -> None:
         """Load auto-switch tabs preference from config"""
         cfg = _load_cfg()
-        enabled = cfg.get("auto_switch_tabs", False)  # Default to disabled
+        enabled = cfg.get("auto_switch_tabs", True)  # Default to enabled
         self.auto_switch_tabs.set(1 if enabled else 0)
         print(f"Loaded auto-switch tabs preference: {enabled}")
     
