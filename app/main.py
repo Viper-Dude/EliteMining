@@ -4436,7 +4436,7 @@ class App(tk.Tk):
         try:
             # Make window more recognizable to Windows tools like PowerToys
             self.attributes('-toolwindow', False)  # Show in taskbar
-            self.focus_force()  # Ensure window gets focus
+            # Don't use focus_force() - it steals focus from game when app starts
         except Exception as e:
             print(f"Window attributes setup failed: {e}")
 
@@ -4693,10 +4693,13 @@ class App(tk.Tk):
         self.notebook = ttk.Notebook(content_frame)
         self.notebook.grid(row=0, column=0, sticky="nsew")
         # Clear focus when switching tabs to prevent entries from being auto-selected
-        try:
-            self.notebook.bind('<<NotebookTabChanged>>', lambda e: self.after(50, lambda: import_btn.focus_set()))
-        except Exception:
-            pass
+        def _clear_entry_focus(event=None):
+            try:
+                # Focus the notebook itself to remove selection from entry widgets
+                self.notebook.focus_set()
+            except Exception:
+                pass
+        self.notebook.bind('<<NotebookTabChanged>>', _clear_entry_focus)
 
         # Mining Session tab (moved from Dashboard, with all its sub-tabs)
         mining_session_tab = ttk.Frame(self.notebook, padding=8)
