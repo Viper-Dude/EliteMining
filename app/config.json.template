@@ -13,6 +13,7 @@
   "text_overlay_size": "Normal",
   "text_overlay_duration": 12,
   "stay_on_top": true,
+  "auto_switch_tabs": false,
   "tts_voice": "IVONA 2 Brian OEM",
   "discord_webhook_url": "https://discord.com/api/webhooks/1431645227634131005/ZtoPZTa-_d1hYrP11FZbP_jBpb4nVo8e8HSMK3i33-7Nmu94wm7Xzc3GUEb2nPfr0DcO",
   "discord_enabled": true,

@@ -320,12 +320,22 @@ class RingFinder:
         auto_search_enabled = self._load_auto_search_state()
         self.auto_search_var.set(auto_search_enabled)
         
+        # Get theme for checkbox styling
+        from config import load_theme
+        _cb_theme = load_theme()
+        if _cb_theme == "elite_orange":
+            _cb_bg = "#000000"  # Black background for orange theme
+            _cb_select = "#000000"
+        else:
+            _cb_bg = "#1e1e1e"
+            _cb_select = "#1e1e1e"
+        
         self.auto_search_cb = tk.Checkbutton(buttons_frame, text="Auto-Search", 
                                            variable=self.auto_search_var,
                                            command=self._save_auto_search_state,
-                                           bg="#1e1e1e", fg="#e0e0e0", 
+                                           bg=_cb_bg, fg="#e0e0e0", 
                                            activebackground="#2e2e2e", activeforeground="#ffffff",
-                                           selectcolor="#1e1e1e", relief="flat",
+                                           selectcolor=_cb_select, relief="flat",
                                            font=("Segoe UI", 8, "normal"))
         self.auto_search_cb.pack(side="left")
         
@@ -334,6 +344,27 @@ class RingFinder:
                "Automatically search for hotspots when arriving in a new system.\n"
                "Uses your last search settings (ring type, mineral, distance).\n"
                "Updates reference system from game status.")
+        
+        # Auto-switch tabs checkbox (synced with main app settings)
+        self.auto_switch_tabs_var = tk.BooleanVar(value=False)
+        
+        # Load auto-switch tabs state from main app
+        self._load_auto_switch_tabs_state()
+        
+        self.auto_switch_tabs_cb = tk.Checkbutton(buttons_frame, text="Auto-Switch Tabs", 
+                                           variable=self.auto_switch_tabs_var,
+                                           command=self._on_auto_switch_tabs_toggle,
+                                           bg=_cb_bg, fg="#e0e0e0", 
+                                           activebackground="#2e2e2e", activeforeground="#ffffff",
+                                           selectcolor=_cb_select, relief="flat",
+                                           font=("Segoe UI", 8, "normal"))
+        self.auto_switch_tabs_cb.pack(side="left", padx=(18, 0))
+        
+        # Tooltip for auto-switch tabs
+        ToolTip(self.auto_switch_tabs_cb, 
+               "Automatically switch tabs based on game state:\n"
+               "- Switch to Mining Session when dropping into a ring\n"
+               "- Switch to Hotspots Finder when entering supercruise or jumping")
 
         # Ring Type filter
         ttk.Label(search_frame, text="Ring Type:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
@@ -375,9 +406,9 @@ class RingFinder:
         self.overlaps_only_cb = tk.Checkbutton(right_filters_frame_row1, text="Overlaps Only",
                                                variable=self.overlaps_only_var,
                                                command=self._on_overlaps_only_changed,
-                                               bg="#1e1e1e", fg="#e0e0e0",
+                                               bg=_cb_bg, fg="#e0e0e0",
                                                activebackground="#2e2e2e", activeforeground="#ffffff",
-                                               selectcolor="#1e1e1e", relief="flat",
+                                               selectcolor=_cb_select, relief="flat",
                                                font=("Segoe UI", 8, "normal"))
         self.overlaps_only_cb.pack(side="left", padx=(26, 0))
         ToolTip(self.overlaps_only_cb, "When checked, only shows rings with known overlaps\n(ignores distance limit)")
@@ -387,9 +418,9 @@ class RingFinder:
         self.res_only_cb = tk.Checkbutton(right_filters_frame_row1, text="RES Only",
                                           variable=self.res_only_var,
                                           command=self._on_res_only_changed,
-                                          bg="#1e1e1e", fg="#e0e0e0",
+                                          bg=_cb_bg, fg="#e0e0e0",
                                           activebackground="#2e2e2e", activeforeground="#ffffff",
-                                          selectcolor="#1e1e1e", relief="flat",
+                                          selectcolor=_cb_select, relief="flat",
                                           font=("Segoe UI", 8, "normal"))
         self.res_only_cb.pack(side="left", padx=(10, 0))
         ToolTip(self.res_only_cb, "When checked, only shows rings with RES sites\n(Hazardous, High, Low - ignores distance limit)")
@@ -448,7 +479,7 @@ class RingFinder:
         # Search limitations info text (bottom of search controls)
         info_text = tk.Label(search_frame, 
                             text="ℹ Search covers bubble systems. Data grows as you scan and import history  |  'No data' = Information not available",
-                            fg="#cccccc", bg="#1e1e1e", font=("Segoe UI", 8, "italic"), 
+                            fg="#cccccc", bg=_cb_bg, font=("Segoe UI", 8, "italic"), 
                             justify="left")
         info_text.grid(row=4, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
         
@@ -473,7 +504,7 @@ class RingFinder:
         style = ttk.Style()
         
         if current_theme == "elite_orange":
-            tree_bg = "#0a0a0a"
+            tree_bg = "#1e1e1e"
             tree_fg = "#ff8c00"
             header_bg = "#1a1a1a"
             selection_bg = "#ff6600"
@@ -509,6 +540,31 @@ class RingFinder:
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
         
+        # Combobox styling for orange theme - make arrow button visible
+        if current_theme == "elite_orange":
+            style.configure("TCombobox",
+                           fieldbackground="#1e1e1e",
+                           background="#4a3000",  # Dark orange for dropdown button
+                           foreground="#ff8c00",
+                           arrowcolor="#ff8c00")
+            style.map("TCombobox",
+                     fieldbackground=[('readonly', '#1e1e1e')],
+                     background=[('readonly', '#4a3000')],
+                     foreground=[('readonly', '#ff8c00')],
+                     arrowcolor=[('readonly', '#ff8c00')])
+            
+            # Spinbox styling for orange theme - make arrow buttons visible
+            style.configure("TSpinbox",
+                           fieldbackground="#1e1e1e",
+                           background="#4a3000",  # Dark orange for arrow buttons
+                           foreground="#ff8c00",
+                           arrowcolor="#ff8c00")
+            style.map("TSpinbox",
+                     fieldbackground=[('readonly', '#1e1e1e')],
+                     background=[('readonly', '#4a3000')],
+                     foreground=[('readonly', '#ff8c00')],
+                     arrowcolor=[('readonly', '#ff8c00')])
+        
         # Results treeview with enhanced columns including source
         columns = ("Distance", "LS", "System", "Visited", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Density")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
@@ -527,9 +583,17 @@ class RingFinder:
             "Density": 110
         }
         
+        # Map internal column names to display names
+        column_display_names = {
+            "Distance": "Dist (LY)",
+            "Planet/Ring": "Location",
+            "Ring Type": "Type"
+        }
+        
         for col in columns:
-            # Left-align headers
-            self.results_tree.heading(col, text=col, anchor="w", command=lambda c=col: self._sort_column(c, False))
+            # Left-align headers - use display name if mapped, otherwise use column name
+            display_name = column_display_names.get(col, col)
+            self.results_tree.heading(col, text=display_name, anchor="w", command=lambda c=col: self._sort_column(c, False))
             
             # Configure columns - all left-aligned for consistency
             if col == "Distance":
@@ -588,8 +652,8 @@ class RingFinder:
         
         # Configure row tags for alternating colors (theme-aware)
         if current_theme == "elite_orange":
-            self.results_tree.tag_configure('oddrow', background='#0a0a0a', foreground='#ff8c00')
-            self.results_tree.tag_configure('evenrow', background='#151515', foreground='#ff8c00')
+            self.results_tree.tag_configure('oddrow', background='#1e1e1e', foreground='#ff8c00')
+            self.results_tree.tag_configure('evenrow', background='#252525', foreground='#ff8c00')
         else:
             self.results_tree.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6')
             self.results_tree.tag_configure('evenrow', background='#282828', foreground='#e6e6e6')
@@ -1383,9 +1447,11 @@ class RingFinder:
             highlight_system: Specific system name for the body (e.g., 'Synuefe XR-H d11-45')
                            Only this exact system+ring will be highlighted green. None = no highlighting.
         """
-        # Store highlight info for use in _update_results
-        self._highlight_body = highlight_body
-        self._highlight_system = highlight_system
+        # Store highlight info for use in _update_results (accumulate multiple highlights)
+        if not hasattr(self, '_pending_highlights'):
+            self._pending_highlights = set()
+        if highlight_body and highlight_system:
+            self._pending_highlights.add((highlight_system.lower(), highlight_body))
         self._is_auto_refresh = auto_refresh  # Keep for backwards compatibility but prefer highlight_body
         
         reference_system = self.system_var.get().strip()
@@ -3138,15 +3204,13 @@ class RingFinder:
             body_name = hotspot.get("bodyName", hotspot.get("body", ""))
             current_results.add((system_name, body_name))
         
-        # Identify entries to highlight - ONLY the specific scanned system+body
-        highlight_body = getattr(self, '_highlight_body', None)
-        highlight_system = getattr(self, '_highlight_system', None)
-        self._highlight_body = None  # Reset after reading
-        self._highlight_system = None  # Reset after reading
+        # Identify entries to highlight - support multiple scanned rings
+        pending_highlights = getattr(self, '_pending_highlights', set())
+        self._pending_highlights = set()  # Reset after reading
         self._is_auto_refresh = False  # Reset legacy flag
         
         new_entries = set()
-        if highlight_body and highlight_system:
+        for highlight_system, highlight_body in pending_highlights:
             # Normalize highlight_body to match database format (without system prefix)
             # Database stores "7 A Ring" not "Bridge 7 A Ring"
             normalized_highlight = highlight_body
@@ -3432,11 +3496,25 @@ class RingFinder:
     
     def _create_context_menu(self):
         """Create the right-click context menu for results"""
+        # Get theme-aware menu colors
+        from config import load_theme
+        current_theme = load_theme()
+        if current_theme == "elite_orange":
+            menu_bg = "#1e1e1e"
+            menu_fg = "#ff8c00"
+            menu_active_bg = "#ff6600"
+            menu_active_fg = "#000000"
+        else:
+            menu_bg = MENU_COLORS["bg"]
+            menu_fg = MENU_COLORS["fg"]
+            menu_active_bg = MENU_COLORS["activebackground"]
+            menu_active_fg = MENU_COLORS["activeforeground"]
+        
         self.context_menu = tk.Menu(self.parent, tearoff=0,
-                                   bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
-                                   activebackground=MENU_COLORS["activebackground"], 
-                                   activeforeground=MENU_COLORS["activeforeground"],
-                                   selectcolor=MENU_COLORS["selectcolor"])
+                                   bg=menu_bg, fg=menu_fg,
+                                   activebackground=menu_active_bg, 
+                                   activeforeground=menu_active_fg,
+                                   selectcolor=menu_active_bg)
         self.context_menu.add_command(label="Copy System Name", command=self._copy_system_name)
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Set Overlap...", command=self._show_overlap_dialog)
@@ -3729,6 +3807,35 @@ class RingFinder:
                 f.write("1" if self.auto_search_var.get() else "0")
         except Exception as e:
             pass
+
+    def _load_auto_switch_tabs_state(self):
+        """Load auto-switch tabs state from main app config"""
+        try:
+            if self.prospector_panel and hasattr(self.prospector_panel, 'main_app'):
+                main_app = self.prospector_panel.main_app
+                if main_app and hasattr(main_app, 'auto_switch_tabs'):
+                    self.auto_switch_tabs_var.set(bool(main_app.auto_switch_tabs.get()))
+                    return
+            # Fall back to config file
+            from config import load_config
+            cfg = load_config()
+            self.auto_switch_tabs_var.set(cfg.get("auto_switch_tabs", False))
+        except Exception as e:
+            pass
+
+    def _on_auto_switch_tabs_toggle(self):
+        """Called when auto-switch tabs checkbox is toggled - sync with main app"""
+        try:
+            enabled = self.auto_switch_tabs_var.get()
+            
+            # Sync with main app's setting
+            if self.prospector_panel and hasattr(self.prospector_panel, 'main_app'):
+                main_app = self.prospector_panel.main_app
+                if main_app and hasattr(main_app, 'auto_switch_tabs'):
+                    main_app.auto_switch_tabs.set(1 if enabled else 0)
+                    # The trace will handle saving to config
+        except Exception as e:
+            print(f"[AUTO-TAB] Error syncing auto-switch tabs: {e}")
 
     def _startup_auto_search(self):
         """Perform auto-search on startup if enabled"""

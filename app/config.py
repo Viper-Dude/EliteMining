@@ -22,13 +22,11 @@ def _get_config_path() -> str:
         exe_dir = os.path.dirname(sys.executable)  # .../Configurator
         parent_dir = os.path.dirname(exe_dir)      # .../EliteMining
         
-        # Primary: installed version location
+        # Primary: installed version location - ONLY use this for installed version
         installed_config = os.path.join(parent_dir, "config.json")
         possible_paths.append(installed_config)
         
-        # Fallback: check for development config to migrate settings
-        dev_build_config = os.path.join(parent_dir, "app", "config.json")
-        possible_paths.append(dev_build_config)
+        # NOTE: Removed dev fallback to prevent accidentally loading wrong config
     else:
         # Running in development mode - always use dev folder config
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -38,10 +36,13 @@ def _get_config_path() -> str:
     # Use the first existing config file, or the first path for new installs
     for path in possible_paths:
         if os.path.exists(path):
+            print(f"[CONFIG] Using config file: {path}")
             return path
     
     # If no existing config found, use the first path (installed > development)
-    return possible_paths[0] if possible_paths else os.path.join(os.path.expanduser("~"), "Documents", "EliteMining", "config.json")
+    result_path = possible_paths[0] if possible_paths else os.path.join(os.path.expanduser("~"), "Documents", "EliteMining", "config.json")
+    print(f"[CONFIG] No existing config found, will create: {result_path}")
+    return result_path
 
 CONFIG_FILE = _get_config_path()
 log = logging.getLogger("EliteMining.Config")

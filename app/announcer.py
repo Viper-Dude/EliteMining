@@ -45,8 +45,39 @@ def list_voices():
         print(f"[ANNOUNCER ERROR] Failed to list voices: {e}")
         return []
 
+def _set_voice_without_save(name: str) -> bool:
+    """Set TTS voice without saving to config (for loading saved settings)"""
+    global _selected_voice
+    if not _initialize_tts():
+        return False
+    
+    try:
+        available_voices = [v.GetDescription() for v in _voices]
+        if name not in available_voices:
+            return False
+        
+        for v in _voices:
+            if v.GetDescription() == name:
+                _speaker.Voice = v
+                _selected_voice = name
+                return True
+    except Exception:
+        return False
+    return False
+
+def _set_volume_without_save(vol: int):
+    """Set TTS volume without saving to config (for loading saved settings)"""
+    if not _initialize_tts():
+        return
+    
+    try:
+        vol = max(0, min(100, int(vol)))
+        _speaker.Volume = vol
+    except Exception:
+        pass
+
 def set_voice(name: str):
-    """Set TTS voice by name"""
+    """Set TTS voice by name and save to config"""
     global _selected_voice
     if not _initialize_tts():
         return False
@@ -71,7 +102,7 @@ def set_voice(name: str):
     return False
 
 def set_volume(vol: int):
-    """Set TTS volume (0-100)"""
+    """Set TTS volume (0-100) and save to config"""
     if not _initialize_tts():
         return
     
@@ -117,17 +148,18 @@ def load_saved_settings():
     vol = cfg.get("tts_volume", 100)
     
     # Always set volume first (safer)
-    set_volume(vol)
+    _set_volume_without_save(vol)
     
     # Try to set saved voice, but fall back gracefully if it fails
     if name:
-        success = set_voice(name)
+        success = _set_voice_without_save(name)
         if not success:
-            # Try to use the first available voice as fallback
+            # Voice not found - use system default but DON'T save to config
+            # This preserves the user's preferred voice in config for when it becomes available
+            print(f"[ANNOUNCER] Saved voice '{name}' not available, using system default (not saving)")
             available_voices = list_voices()
             if available_voices:
-                fallback_voice = available_voices[0]
-                set_voice(fallback_voice)
+                _set_voice_without_save(available_voices[0])
     else:
         pass  # No saved voice found, using system default
 

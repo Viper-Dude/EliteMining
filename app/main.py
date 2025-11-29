@@ -631,7 +631,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.6.2"
+APP_VERSION = "v4.6.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4421,7 +4421,7 @@ class App(tk.Tk):
 
         self.title(f"{APP_TITLE} — {APP_VERSION}")
         self.resizable(True, True)
-        self.minsize(850, 680)  # Increased height to ensure status bar is visible
+        self.minsize(950, 680)  # Minimum width to fit theme button text
         
         # Withdraw window initially to prevent flash on wrong monitor
         self.withdraw()
@@ -4523,6 +4523,11 @@ class App(tk.Tk):
         self.auto_scan_journals = tk.IntVar(value=1)  # Default enabled
         self._load_auto_scan_preference()
         self.auto_scan_journals.trace('w', self._on_auto_scan_toggle)
+        
+        # Auto-switch tabs on ring entry/exit
+        self.auto_switch_tabs = tk.IntVar(value=0)  # Default disabled
+        self._load_auto_switch_tabs_preference()
+        self.auto_switch_tabs.trace('w', self._on_auto_switch_tabs_toggle)
         
         # Auto-start session on first prospector launch
         self.auto_start_session = tk.IntVar(value=1)  # Default enabled
@@ -4787,16 +4792,21 @@ class App(tk.Tk):
         actions.grid_columnconfigure(2, weight=1)  # Expandable space
         
         # CMDR/System info container (right side) - uses frame for mixed colors
-        info_frame = tk.Frame(actions, bg="#1e1e1e")
+        # Use black background for orange theme
+        from config import load_theme
+        _info_theme = load_theme()
+        _info_bg = "#000000" if _info_theme == "elite_orange" else "#1e1e1e"
+        
+        info_frame = tk.Frame(actions, bg=_info_bg)
         info_frame.grid(row=0, column=3, sticky="e", padx=(10, 5))
         
         # Labels for mixed colors (white labels, yellow values)
-        self.cmdr_label_prefix = tk.Label(info_frame, text="CMDR:", fg="white", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
-        self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
-        self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
-        self.system_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
-        self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
-        self.route_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg="#1e1e1e", font=("Segoe UI", 9, "bold"))
+        self.cmdr_label_prefix = tk.Label(info_frame, text="CMDR:", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.system_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.route_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         
         # Grid them horizontally (tighter spacing)
         self.cmdr_label_prefix.grid(row=0, column=0, sticky="e")
@@ -4806,10 +4816,14 @@ class App(tk.Tk):
         self.route_label_prefix.grid(row=0, column=4, sticky="e")
         self.route_label_value.grid(row=0, column=5, sticky="w")
         
-        # Theme toggle button - in its own column for independent positioning
+        # Theme toggle button - shows current theme name
+        from config import load_theme
+        _current_theme = load_theme()
+        _theme_btn_text = "Orange Theme" if _current_theme == "elite_orange" else "Dark Theme"
+        
         self.theme_toggle_btn = tk.Button(
             actions,
-            text="Toggle Theme",
+            text=_theme_btn_text,
             command=self._toggle_theme,
             bg="#333333",
             fg="#ffcc00",
@@ -4858,8 +4872,11 @@ class App(tk.Tk):
         # Update journal label after everything is initialized
         self.after(150, self._update_journal_label)
         
-        # Reset window size for better tab layout - smaller window size
-        self.after(50, lambda: self.geometry("1200x700"))
+        # Note: Window geometry is handled by _restore_window_geometry() called later
+        # Don't override here as it breaks saved geometry on restart
+        
+        # Start on Hotspots Finder tab by default
+        self.after(100, lambda: self.switch_to_tab('hotspots_finder'))
 
         # Debug: Print which widget has initial focus to diagnose why entry fields are highlighted
         try:
@@ -5365,6 +5382,11 @@ class App(tk.Tk):
         """Build the About tab with app info, links, and credits"""
         import webbrowser
         from version import __version__, __build_date__
+        from config import load_theme
+        
+        # Theme-aware background color
+        _about_theme = load_theme()
+        _about_bg = "#000000" if _about_theme == "elite_orange" else "#1e1e1e"
         
         # Main container - use grid for proper anchoring
         frame.columnconfigure(0, weight=1)
@@ -5372,15 +5394,15 @@ class App(tk.Tk):
         frame.rowconfigure(1, weight=0)  # Bottom support section stays fixed
         
         # Main content container - centered, scrollable area
-        main_container = tk.Frame(frame, bg="#1e1e1e")
+        main_container = tk.Frame(frame, bg=_about_bg)
         main_container.grid(row=0, column=0, sticky="nsew", padx=20, pady=(20, 10))
         
         # Center content frame
-        center_frame = tk.Frame(main_container, bg="#1e1e1e")
+        center_frame = tk.Frame(main_container, bg=_about_bg)
         center_frame.pack(expand=True)
         
         # App title and version
-        title_frame = tk.Frame(center_frame, bg="#1e1e1e")
+        title_frame = tk.Frame(center_frame, bg=_about_bg)
         title_frame.pack(pady=(0, 10))
         
         # Try to load text logo image
@@ -5397,38 +5419,38 @@ class App(tk.Tk):
                 new_height = int(orig_height * (new_width / orig_width))
                 img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 self._about_text_logo = ImageTk.PhotoImage(img)
-                logo_label = tk.Label(title_frame, image=self._about_text_logo, bg="#1e1e1e")
+                logo_label = tk.Label(title_frame, image=self._about_text_logo, bg=_about_bg)
                 logo_label.pack(pady=(0, 5))
             else:
                 # Fallback to text
                 tk.Label(title_frame, text="EliteMining", font=("Segoe UI", 18, "bold"), 
-                         fg="#ffcc00", bg="#1e1e1e").pack()
+                         fg="#ffcc00", bg=_about_bg).pack()
         except Exception:
             # Fallback to text on error
             tk.Label(title_frame, text="EliteMining", font=("Segoe UI", 18, "bold"), 
-                     fg="#ffcc00", bg="#1e1e1e").pack()
+                     fg="#ffcc00", bg=_about_bg).pack()
         
         tk.Label(title_frame, text=f"Version {__version__}", font=("Segoe UI", 10), 
-                 fg="#888888", bg="#1e1e1e").pack()
+                 fg="#888888", bg=_about_bg).pack()
         
         # Description
         tk.Label(center_frame, text="Mining companion for Elite Dangerous", 
-                 font=("Segoe UI", 11), fg="#e0e0e0", bg="#1e1e1e").pack(pady=(10, 20))
+                 font=("Segoe UI", 11), fg="#e0e0e0", bg=_about_bg).pack(pady=(10, 20))
         
         # Separator
         tk.Frame(center_frame, height=1, bg="#444444", width=400).pack(pady=10)
         
         # Copyright and license
         tk.Label(center_frame, text="© 2024-2025 CMDR ViperDude", 
-                 font=("Segoe UI", 10), fg="#e0e0e0", bg="#1e1e1e").pack()
+                 font=("Segoe UI", 10), fg="#e0e0e0", bg=_about_bg).pack()
         tk.Label(center_frame, text="Licensed under GNU General Public License v3.0", 
-                 font=("Segoe UI", 9), fg="#888888", bg="#1e1e1e").pack()
+                 font=("Segoe UI", 9), fg="#888888", bg=_about_bg).pack()
         
         # Separator
         tk.Frame(center_frame, height=1, bg="#444444", width=400).pack(pady=15)
         
         # Links section
-        links_frame = tk.Frame(center_frame, bg="#1e1e1e")
+        links_frame = tk.Frame(center_frame, bg=_about_bg)
         links_frame.pack(pady=10)
         
         # Define links
@@ -5443,24 +5465,31 @@ class App(tk.Tk):
         def open_link(url):
             webbrowser.open(url)
         
+        # Theme-aware button colors
+        _btn_bg = "#1a1a1a" if _about_theme == "elite_orange" else "#2a3a4a"
+        _btn_fg = "#ff9900" if _about_theme == "elite_orange" else "#e0e0e0"
+        _btn_active_bg = "#2a2a2a" if _about_theme == "elite_orange" else "#3a4a5a"
+        _btn_active_fg = "#ffcc00" if _about_theme == "elite_orange" else "#ffffff"
+        _btn_border = "#ff6600" if _about_theme == "elite_orange" else "#555555"
+        
         for label, url in links:
             btn = tk.Button(links_frame, text=label, 
                            command=lambda u=url: open_link(u),
-                           bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
-                           activeforeground="#ffffff", relief="ridge", bd=1, 
+                           bg=_btn_bg, fg=_btn_fg, activebackground=_btn_active_bg,
+                           activeforeground=_btn_active_fg, relief="ridge", bd=1, 
                            padx=12, pady=4, font=("Segoe UI", 9), cursor="hand2",
-                           width=12)
+                           width=12, highlightbackground=_btn_border, highlightthickness=1)
             btn.pack(side="left", padx=5)
         
         # Separator
         tk.Frame(center_frame, height=1, bg="#444444", width=400).pack(pady=15)
         
         # Credits section
-        credits_frame = tk.Frame(center_frame, bg="#1e1e1e")
+        credits_frame = tk.Frame(center_frame, bg=_about_bg)
         credits_frame.pack(pady=10)
         
         tk.Label(credits_frame, text="Credits", font=("Segoe UI", 10, "bold"), 
-                 fg="#ffcc00", bg="#1e1e1e").pack()
+                 fg="#ffcc00", bg=_about_bg).pack()
         
         credits = [
             "EliteVA by Somfic",
@@ -5471,10 +5500,10 @@ class App(tk.Tk):
         
         for credit in credits:
             tk.Label(credits_frame, text=f"- {credit}", font=("Segoe UI", 9), 
-                     fg="#aaaaaa", bg="#1e1e1e").pack(anchor="w", padx=20)
+                     fg="#aaaaaa", bg=_about_bg).pack(anchor="w", padx=20)
         
         # Support/Donate section - anchored at bottom right of frame
-        support_frame = tk.Frame(frame, bg="#1e1e1e")
+        support_frame = tk.Frame(frame, bg=_about_bg)
         support_frame.grid(row=1, column=0, sticky="se", padx=20, pady=(5, 15))
         
         # Support text on the left
@@ -5484,7 +5513,7 @@ class App(tk.Tk):
             wraplength=350,
             justify="left",
             fg="#cccccc",
-            bg="#1e1e1e",
+            bg=_about_bg,
             font=("Segoe UI", 9, "italic"),
         )
         support_text.pack(side="left")
@@ -5496,7 +5525,7 @@ class App(tk.Tk):
             if paypal_img.width() > 50:
                 scale = max(1, paypal_img.width() // 50)
                 paypal_img = paypal_img.subsample(scale, scale)
-            paypal_btn = tk.Label(support_frame, image=paypal_img, cursor="hand2", bg="#1e1e1e")
+            paypal_btn = tk.Label(support_frame, image=paypal_img, cursor="hand2", bg=_about_bg)
             paypal_btn.image = paypal_img
             paypal_btn.pack(side="left", padx=(15, 0))
             def open_paypal(event=None):
@@ -5553,6 +5582,16 @@ class App(tk.Tk):
                 toggles_frame = ttk.Frame(main_controls)
                 toggles_frame.pack(side="left", padx=(0, 20))
                 
+                # Get theme for checkbox styling
+                from config import load_theme
+                _ann_cb_theme = load_theme()
+                if _ann_cb_theme == "elite_orange":
+                    _ann_cb_bg = "#000000"  # Black background for orange theme
+                    _ann_cb_select = "#000000"
+                else:
+                    _ann_cb_bg = "#1e1e1e"
+                    _ann_cb_select = "#1e1e1e"
+                
                 # Add announcement toggles if available
                 if hasattr(self, 'announcement_vars') and self.announcement_vars:
                     ttk.Label(toggles_frame, text="Announcement Types:", font=("Segoe UI", 9, "bold")).pack(anchor="w")
@@ -5561,8 +5600,8 @@ class App(tk.Tk):
                         if name in self.announcement_vars:
                             checkbox = tk.Checkbutton(toggles_frame, text=name, 
                                                     variable=self.announcement_vars[name], 
-                                                    bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", 
-                                                    activebackground="#1e1e1e", activeforeground="#ffffff", 
+                                                    bg=_ann_cb_bg, fg="#ffffff", selectcolor=_ann_cb_select, 
+                                                    activebackground=_ann_cb_bg, activeforeground="#ffffff", 
                                                     highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                                                     padx=4, pady=1, anchor="w")
                             checkbox.pack(anchor="w", padx=(10, 0))
@@ -5947,8 +5986,13 @@ class App(tk.Tk):
                 print(f"Error loading preset {num}: {e}")
 
     def _build_interface_options_tab(self, frame: ttk.Frame) -> None:
+        # Theme-aware background color
+        from config import load_theme
+        _gs_theme = load_theme()
+        _gs_bg = "#000000" if _gs_theme == "elite_orange" else "#1e1e1e"
+        
         # Create a canvas and scrollbar for scrollable content
-        canvas = tk.Canvas(frame, bg="#1e1e1e", highlightthickness=0)
+        canvas = tk.Canvas(frame, bg=_gs_bg, highlightthickness=0)
         scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
 
@@ -5984,39 +6028,41 @@ class App(tk.Tk):
         
         # Tooltips option
         tk.Checkbutton(scrollable_frame, text="Enable Tooltips", variable=self.tooltips_enabled, 
-                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      bg=_gs_bg, fg="#ffffff", selectcolor=_gs_bg, activebackground=_gs_bg, 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
-                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
-                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground=_gs_bg, 
+                      highlightcolor=_gs_bg, takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Show helpful tooltips when hovering over buttons and controls", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Show helpful tooltips when hovering over buttons and controls", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # Stay on top option
         tk.Checkbutton(scrollable_frame, text="Stay on Top", variable=self.stay_on_top, 
-                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      bg=_gs_bg, fg="#ffffff", selectcolor=_gs_bg, activebackground=_gs_bg, 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
-                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
-                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground=_gs_bg, 
+                      highlightcolor=_gs_bg, takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Keep application window always on top of other windows", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Keep application window always on top of other windows", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # Theme toggle option
-        theme_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        theme_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         theme_frame.grid(row=r, column=0, sticky="w")
         
-        tk.Label(theme_frame, text="Theme:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left", padx=(4, 10))
+        tk.Label(theme_frame, text="Theme:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left", padx=(4, 10))
         
         current_theme_text = "Elite Orange" if self.current_theme == "elite_orange" else "Dark Gray"
-        self.theme_label = tk.Label(theme_frame, text=current_theme_text, bg="#1e1e1e", fg="#ffcc00", font=("Segoe UI", 9, "bold"))
+        self.theme_label = tk.Label(theme_frame, text=current_theme_text, bg=_gs_bg, fg="#ffcc00", font=("Segoe UI", 9, "bold"))
         self.theme_label.pack(side="left", padx=(0, 15))
         
+        # Button shows current theme name
+        _settings_theme_btn_text = "Orange Theme" if _gs_theme == "elite_orange" else "Dark Theme"
         theme_toggle_settings = tk.Button(
             theme_frame,
-            text="Toggle Theme",
+            text=_settings_theme_btn_text,
             command=self._toggle_theme,
             bg="#333333",
             fg="#ffcc00",
@@ -6032,7 +6078,7 @@ class App(tk.Tk):
         theme_toggle_settings.pack(side="left")
         r += 1
         
-        tk.Label(scrollable_frame, text="Switch between Elite Orange and Dark Gray themes (requires restart)", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Switch between Elite Orange and Dark Gray themes (requires restart)", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
@@ -6048,13 +6094,13 @@ class App(tk.Tk):
         # EDDN send enable/disable
         tk.Checkbutton(scrollable_frame, text="✓ Send Event Information to EDDN", variable=self.eddn_send_enabled, 
                       command=self._on_eddn_send_toggle,
-                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text="Share market data with the Elite Dangerous community via EDDN (Elite Dangerous Data Network)", 
-                 wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
@@ -6069,39 +6115,43 @@ class App(tk.Tk):
         
         # Text overlay enable/disable
         tk.Checkbutton(scrollable_frame, text="Enable Text Overlay", variable=self.text_overlay_enabled, 
-                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Announcements text overlay (same text that goes to TTS)", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Announcements text overlay (same text that goes to TTS)", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 8))
         r += 1
         
         # Text brightness slider
-        transparency_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        transparency_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         transparency_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(transparency_frame, text="Text Brightness:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(transparency_frame, text="Text Brightness:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        _slider_trough = "#1a1a1a" if _gs_theme == "elite_orange" else "#444444"
+        _slider_active = "#ff6600" if _gs_theme == "elite_orange" else "#444444"
+        _slider_fg = "#ff8c00" if _gs_theme == "elite_orange" else "#ffffff"
         self.transparency_scale = tk.Scale(transparency_frame, from_=10, to=100, orient="horizontal", 
-                                         variable=self.text_overlay_transparency, bg="#1e1e1e", fg="#ffffff", 
-                                         activebackground="#444444", highlightthickness=0, length=120,
-                                         troughcolor="#444444", font=("Segoe UI", 8))
+                                         variable=self.text_overlay_transparency, bg=_gs_bg, fg=_slider_fg, 
+                                         activebackground=_slider_active, highlightthickness=0, length=120,
+                                         troughcolor=_slider_trough, font=("Segoe UI", 8),
+                                         sliderrelief="flat", sliderlength=20)
         self.transparency_scale.pack(side="left", padx=(8, 0))
-        tk.Label(transparency_frame, text="%", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(transparency_frame, text="%", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         r += 1
-        tk.Label(scrollable_frame, text="Adjust text brightness/opacity", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Adjust text brightness/opacity", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Text color selection with actual colors shown
-        color_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        color_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         color_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(color_frame, text="Text Color:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(color_frame, text="Text Color:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Create custom OptionMenu with colored options
         self.color_menu = tk.OptionMenu(color_frame, self.text_overlay_color, *self.color_options.keys())
         self.color_menu.configure(
-            bg="#1e1e1e", 
+            bg=_gs_bg, 
             fg="#ffffff", 
             activebackground="#444444",
             activeforeground="#ffffff",
@@ -6132,68 +6182,69 @@ class App(tk.Tk):
                 font=("Segoe UI", 9, "bold")
             )
         r += 1
-        tk.Label(scrollable_frame, text="Choose text color ", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Choose text color ", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Text size selection
-        size_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        size_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         size_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(size_frame, text="Text Size:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(size_frame, text="Text Size:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         self.size_combo = ttk.Combobox(size_frame, textvariable=self.text_overlay_size, 
                                       values=list(self.size_options.keys()), 
                                       state="readonly", width=12, font=("Segoe UI", 8))
         self.size_combo.pack(side="left", padx=(8, 0))
         r += 1
-        tk.Label(scrollable_frame, text="Choose text size for better readability", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Choose text size for better readability", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Display duration slider
-        duration_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        duration_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         duration_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(duration_frame, text="Display Duration:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(duration_frame, text="Display Duration:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         self.duration_scale = tk.Scale(duration_frame, from_=5, to=30, orient="horizontal", 
-                                     variable=self.text_overlay_duration, bg="#1e1e1e", fg="#ffffff", 
-                                     activebackground="#444444", highlightthickness=0, length=140,
-                                     troughcolor="#444444", font=("Segoe UI", 8))
+                                     variable=self.text_overlay_duration, bg=_gs_bg, fg=_slider_fg, 
+                                     activebackground=_slider_active, highlightthickness=0, length=140,
+                                     troughcolor=_slider_trough, font=("Segoe UI", 8),
+                                     sliderrelief="flat", sliderlength=20)
         self.duration_scale.pack(side="left", padx=(8, 0))
-        tk.Label(duration_frame, text="seconds", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(duration_frame, text="seconds", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         r += 1
-        tk.Label(scrollable_frame, text="How long text stays visible on screen (5-30 seconds)", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="How long text stays visible on screen (5-30 seconds)", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Overlay mode selection (Standard vs Enhanced Prospector)
-        mode_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        mode_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         mode_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(mode_frame, text="Overlay Mode:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(mode_frame, text="Overlay Mode:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Radio buttons for mode selection
         tk.Radiobutton(mode_frame, text="Standard Text", value="standard", variable=self.overlay_mode,
-                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
                       padx=4, pady=2, anchor="w").pack(side="left", padx=(8, 0))
         tk.Radiobutton(mode_frame, text="Enhanced Prospector", value="enhanced", variable=self.overlay_mode,
-                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
                       padx=4, pady=2, anchor="w").pack(side="left", padx=(8, 0))
         r += 1
         tk.Label(scrollable_frame, text="Standard: Simple text (only when announced) | Enhanced: Game-style display (every prospector fire)",
-                 wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                 wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Show all materials checkbox (for enhanced mode) - HIDDEN but functionality preserved
         # tk.Checkbutton(scrollable_frame, text="Enhanced Mode: Show All Materials (uncheck to only show materials above threshold)",
         #               variable=self.prospector_show_all,
-        #               bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+        #               bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
         #               activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
         #               padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
         #               highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         # r += 1
         # tk.Label(scrollable_frame, text="Only affects Enhanced mode - controls whether to display all materials or filter by threshold",
-        #          wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        #          wraplength=760, justify="left", fg="gray", bg=_gs_bg,
         #          font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         # r += 1
         
@@ -6207,10 +6258,10 @@ class App(tk.Tk):
         r += 1
         
         # TTS Voice selection (moved from announcements panel)
-        tk.Label(scrollable_frame, text="TTS Voice:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).grid(row=r, column=0, sticky="w", pady=(4, 4))
+        tk.Label(scrollable_frame, text="TTS Voice:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).grid(row=r, column=0, sticky="w", pady=(4, 4))
         r += 1
         
-        voice_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        voice_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         voice_frame.grid(row=r, column=0, sticky="w", pady=(0, 4))
         
         # Get voice list from announcer
@@ -6244,10 +6295,10 @@ class App(tk.Tk):
         
         r += 1
         # Volume control
-        vol_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        vol_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         vol_frame.grid(row=r, column=0, sticky="w", pady=(6, 4))
         
-        tk.Label(vol_frame, text="Volume:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(vol_frame, text="Volume:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Initialize voice volume variable if not exists
         if not hasattr(self, 'voice_volume'):
@@ -6266,10 +6317,11 @@ class App(tk.Tk):
                 print(f"Error changing TTS volume: {e}")
         
         vol_slider = tk.Scale(vol_frame, from_=0, to=100, orient="horizontal", 
-                             variable=self.voice_volume, bg="#1e1e1e", fg="#ffffff",
-                             activebackground="#444444", highlightthickness=0, 
-                             troughcolor="#444444", font=("Segoe UI", 8),
-                             command=_on_volume_change, length=200)
+                             variable=self.voice_volume, bg=_gs_bg, fg=_slider_fg,
+                             activebackground=_slider_active, highlightthickness=0, 
+                             troughcolor=_slider_trough, font=("Segoe UI", 8),
+                             command=_on_volume_change, length=200,
+                             sliderrelief="flat", sliderlength=20)
         vol_slider.pack(side="left", padx=(8, 0))
         
         # TTS Fix button
@@ -6334,7 +6386,7 @@ class App(tk.Tk):
         self.after(100, self._refresh_voice_list)
         
         r += 1
-        tk.Label(scrollable_frame, text="Configure Text-to-Speech voice and volume for announcements", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Configure Text-to-Speech voice and volume for announcements", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
@@ -6348,12 +6400,12 @@ class App(tk.Tk):
         r += 1
         
         # Journal folder path setting
-        journal_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        journal_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         journal_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(journal_frame, text="Journal folder:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(journal_frame, text="Journal folder:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Initialize journal label (will be updated after prospector panel creation)
-        self.journal_lbl = tk.Label(journal_frame, text="(not set)", fg="gray", bg="#1e1e1e", font=("Segoe UI", 9))
+        self.journal_lbl = tk.Label(journal_frame, text="(not set)", fg="gray", bg=_gs_bg, font=("Segoe UI", 9))
         self.journal_lbl.pack(side="left", padx=(6, 0))
         
         journal_btn = tk.Button(journal_frame, text="Change…", command=self._change_journal_dir,
@@ -6371,7 +6423,7 @@ class App(tk.Tk):
         ToolTip(import_btn, "Import visited systems and hotspots from existing journal files")
         
         r += 1
-        tk.Label(scrollable_frame, text="Path to Elite Dangerous journal files for prospector monitoring", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Path to Elite Dangerous journal files for prospector monitoring", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
@@ -6382,7 +6434,7 @@ class App(tk.Tk):
             text="Ask to import history when changing journal folder",
             variable=self.ask_import_on_path_change,
             command=self._save_import_prompt_preference,
-            bg="#1e1e1e",
+            bg=_gs_bg,
             fg="#ffffff",
             selectcolor="#34495e",
             activebackground="#1e1e1e",
@@ -6398,12 +6450,23 @@ class App(tk.Tk):
         
         # Auto-scan journals on startup checkbox
         tk.Checkbutton(scrollable_frame, text="Auto-scan Journals on Startup", variable=self.auto_scan_journals, 
-                      bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Automatically check for new mining data in Elite Dangerous journals when the app starts. Disable if you prefer manual imports via Settings → Import History", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Automatically check for new mining data in Elite Dangerous journals when the app starts. Disable if you prefer manual imports via Settings → Import History", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+        
+        # Auto-switch tabs on ring entry/exit checkbox
+        tk.Checkbutton(scrollable_frame, text="Auto-switch Tabs on Ring Entry/Exit", variable=self.auto_switch_tabs, 
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
+                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+        r += 1
+        tk.Label(scrollable_frame, text="Automatically switch to Mining Session tab when dropping into a ring, and to Hotspots Finder when entering supercruise or jumping to another system", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -6417,16 +6480,16 @@ class App(tk.Tk):
         r += 1
         
         # Screenshots folder path setting
-        screenshots_folder_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        screenshots_folder_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         screenshots_folder_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(screenshots_folder_frame, text="Screenshots folder:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(screenshots_folder_frame, text="Screenshots folder:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Create StringVar for screenshots folder path
         self.screenshots_folder_path = tk.StringVar()
         self.screenshots_folder_path.set(_load_cfg().get('screenshots_folder', os.path.join(os.path.expanduser("~"), "Pictures")))
         
         # Initialize screenshots folder label (will be updated with actual path)
-        self.screenshots_folder_lbl = tk.Label(screenshots_folder_frame, text=self.screenshots_folder_path.get(), fg="gray", bg="#1e1e1e", font=("Segoe UI", 9))
+        self.screenshots_folder_lbl = tk.Label(screenshots_folder_frame, text=self.screenshots_folder_path.get(), fg="gray", bg=_gs_bg, font=("Segoe UI", 9))
         self.screenshots_folder_lbl.pack(side="left", padx=(6, 0))
         
         screenshots_btn = tk.Button(screenshots_folder_frame, text="Change…", command=self._change_screenshots_folder,
@@ -6437,7 +6500,7 @@ class App(tk.Tk):
         ToolTip(screenshots_btn, "Select the default folder for importing screenshots\nUsually located in: Documents\\Pictures")
         
         r += 1
-        tk.Label(scrollable_frame, text="Default folder for selecting screenshots when adding them to reports", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Default folder for selecting screenshots when adding them to reports", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -6451,24 +6514,24 @@ class App(tk.Tk):
         # r += 1
         # 
         # # EDSM signup instructions
-        # instructions_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        # instructions_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         # instructions_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
         # 
-        # tk.Label(instructions_frame, text="1. Sign up at EDSM:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w")
+        # tk.Label(instructions_frame, text="1. Sign up at EDSM:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w")
         # 
         # # EDSM link
         # import webbrowser
-        # edsm_link = tk.Label(instructions_frame, text="https://www.edsm.net/", bg="#1e1e1e", fg="#4da6ff", font=("Segoe UI", 9, "underline"), cursor="hand2")
+        # edsm_link = tk.Label(instructions_frame, text="https://www.edsm.net/", bg=_gs_bg, fg="#4da6ff", font=("Segoe UI", 9, "underline"), cursor="hand2")
         # edsm_link.pack(anchor="w", padx=(15, 0))
         # edsm_link.bind("<Button-1>", lambda e: webbrowser.open("https://www.edsm.net/"))
         # 
-        # tk.Label(instructions_frame, text="2. Log in → Account settings → API key", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
-        # tk.Label(instructions_frame, text="3. Paste the key here:", bg="#1e1e1e", fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
+        # tk.Label(instructions_frame, text="2. Log in → Account settings → API key", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
+        # tk.Label(instructions_frame, text="3. Paste the key here:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
         # 
         # r += 1
         # 
         # # EDSM API key input
-        # api_key_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        # api_key_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         # api_key_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
         # 
         # # Initialize EDSM API key variable
@@ -6495,7 +6558,7 @@ class App(tk.Tk):
         # 
         # r += 1
         # tk.Label(scrollable_frame, text="Required for Ring Finder to search nearby systems for comprehensive results.", 
-        #          wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        #          wraplength=760, justify="left", fg="gray", bg=_gs_bg,
         #          font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         # r += 1
 
@@ -6523,7 +6586,7 @@ class App(tk.Tk):
         r += 1
         
         # API Upload enable/disable with consent message (DISABLED FOR NOW)
-        api_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        api_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         api_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
         
         # Initialize API variables
@@ -6539,7 +6602,7 @@ class App(tk.Tk):
         api_check = tk.Checkbutton(api_frame, text="Enable API Upload (Not Yet Available)", 
                                    variable=self.api_upload_enabled,
                                    command=self._on_api_upload_toggle,
-                                   bg="#1e1e1e", fg="#888888", selectcolor="#1e1e1e", 
+                                   bg=_gs_bg, fg="#888888", selectcolor="#1e1e1e", 
                                    activebackground="#1e1e1e", activeforeground="#888888", 
                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                                    padx=4, pady=2, anchor="w", state="disabled")
@@ -6560,27 +6623,27 @@ class App(tk.Tk):
         r += 1
         
         # CMDR Name (DISABLED)
-        cmdr_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        cmdr_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         cmdr_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        tk.Label(cmdr_frame, text="CMDR Name:", bg="#1e1e1e", fg="#888888", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(cmdr_frame, text="CMDR Name:", bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         cmdr_entry = tk.Entry(cmdr_frame, textvariable=self.api_cmdr_name, 
                              bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=30, state="disabled")
         cmdr_entry.pack(side="left", padx=(8, 0))
         r += 1
         
         # API Endpoint URL (DISABLED)
-        endpoint_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        endpoint_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         endpoint_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        tk.Label(endpoint_frame, text="API Endpoint:", bg="#1e1e1e", fg="#888888", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(endpoint_frame, text="API Endpoint:", bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         endpoint_entry = tk.Entry(endpoint_frame, textvariable=self.api_endpoint_url, 
                                  bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=50, state="disabled")
         endpoint_entry.pack(side="left", padx=(8, 0))
         r += 1
         
         # API Key (DISABLED)
-        apikey_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        apikey_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         apikey_frame.grid(row=r, column=0, sticky="w", pady=(4, 8))
-        tk.Label(apikey_frame, text="API Key:", bg="#1e1e1e", fg="#888888", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(apikey_frame, text="API Key:", bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         apikey_entry = tk.Entry(apikey_frame, textvariable=self.api_key, 
                                bg="#2d2d2d", fg="#888888", font=("Consolas", 9), width=50, show="*", state="disabled")
         apikey_entry.pack(side="left", padx=(8, 0))
@@ -6597,7 +6660,7 @@ class App(tk.Tk):
         r += 1
         
         # Buttons frame
-        api_buttons_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        api_buttons_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         api_buttons_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
         
         # Test Connection button (DISABLED)
@@ -6626,13 +6689,13 @@ class App(tk.Tk):
         
         # Status label
         self.api_status_label = tk.Label(scrollable_frame, text="", 
-                                         bg="#1e1e1e", fg="gray", font=("Segoe UI", 8))
+                                         bg=_gs_bg, fg="gray", font=("Segoe UI", 8))
         self.api_status_label.grid(row=r, column=0, sticky="w", pady=(4, 4))
         self._update_api_status()
         r += 1
         
         tk.Label(scrollable_frame, text="Share mining data with the community for aggregation and analytics", 
-                wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+                wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -6646,7 +6709,7 @@ class App(tk.Tk):
         r += 1
         
         # Backup and Restore buttons frame
-        backup_frame = tk.Frame(scrollable_frame, bg="#1e1e1e")
+        backup_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         backup_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
         
         backup_btn = tk.Button(backup_frame, text="📦 Backup", command=self._show_backup_dialog,
@@ -6666,7 +6729,7 @@ class App(tk.Tk):
         ToolTip(restore_btn, "Restore from backup zip file\nSelect which data to restore and handle conflicts")
         
         r += 1
-        tk.Label(scrollable_frame, text="Backup and restore ship presets, reports, and bookmarks", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Backup and restore ship presets, reports, and bookmarks", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -6687,7 +6750,7 @@ class App(tk.Tk):
                               font=("Segoe UI", 9, "normal"), cursor="hand2")
         update_btn.grid(row=r, column=0, sticky="w", pady=(4, 0))
         r += 1
-        tk.Label(scrollable_frame, text="Check GitHub for newer versions of EliteMining", wraplength=760, justify="left", fg="gray", bg="#1e1e1e",
+        tk.Label(scrollable_frame, text="Check GitHub for newer versions of EliteMining", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -6878,6 +6941,18 @@ class App(tk.Tk):
         path = idx.get(key, os.path.join(self.vars_dir, base_without_txt + ".txt"))
         _atomic_write_text(path, text)
     
+    def _write_jumps_left(self, jumps: int) -> None:
+        """Write jumpsleft.txt - wrapper for VA variables"""
+        try:
+            if hasattr(self, 'va_variables') and self.va_variables:
+                self.va_variables.update_jumps_left(jumps)
+            else:
+                # Fallback: write directly to file
+                jumps_file = os.path.join(self.vars_dir, "jumpsleft.txt")
+                _atomic_write_text(jumps_file, str(jumps))
+        except Exception as e:
+            print(f"[ROUTE] Error writing jumpsleft: {e}")
+    
     def _initialize_va_variables(self) -> None:
         """Initialize VoiceAttack variables manager"""
         try:
@@ -6942,10 +7017,8 @@ class App(tk.Tk):
                             
                             if event_type == 'FSDTarget':
                                 jumps_remaining = event.get('RemainingJumpsInRoute', 0)
-                                log.info(f"Found active route on startup: {jumps_remaining} jumps remaining")
                                 break
-                            elif event_type in ['NavRouteClear', 'Docked', 'Touchdown']:
-                                # Route was cleared or arrived
+                            elif event_type == 'NavRouteClear':
                                 jumps_remaining = 0
                                 break
                         except json.JSONDecodeError:
@@ -6968,9 +7041,11 @@ class App(tk.Tk):
                 return
             
             route_changed = False
+            navroute_file_changed = False
             
-            # Check NavRoute.json for changes (modification time AND content)
+            # Check NavRoute.json for changes (modification time)
             navroute_path = os.path.join(journal_dir, "NavRoute.json")
+            
             if os.path.exists(navroute_path):
                 try:
                     mtime = os.path.getmtime(navroute_path)
@@ -6978,69 +7053,76 @@ class App(tk.Tk):
                     
                     if mtime != cached_mtime:
                         self._navroute_mtime = mtime
-                        
-                        # Read route count from file
-                        with open(navroute_path, 'r', encoding='utf-8') as f:
-                            navroute_data = json.load(f)
-                            route = navroute_data.get('Route', [])
-                            route_count = max(0, len(route) - 1) if route else 0
-                            
-                            cached_count = getattr(self, '_cached_route_count', -1)
-                            if route_count != cached_count:
-                                self._cached_route_count = route_count
-                                route_changed = True
-                                print(f"[DEBUG POLL] NavRoute changed: {cached_count} -> {route_count} jumps")
+                        navroute_file_changed = True
                 except Exception as e:
-                    print(f"[DEBUG POLL] Error reading NavRoute: {e}")
+                    print(f"[ROUTE] Error checking NavRoute: {e}")
             
-            # Check latest journal for FSDTarget
-            journal_files = [f for f in os.listdir(journal_dir) if f.startswith('Journal.') and f.endswith('.log')]
-            if journal_files:
-                journal_files.sort(reverse=True)
-                latest_journal = os.path.join(journal_dir, journal_files[0])
-                
-                try:
-                    with open(latest_journal, 'r', encoding='utf-8') as f:
-                        f.seek(0, 2)
-                        file_size = f.tell()
-                        f.seek(max(0, file_size - 5120))  # Last 5KB
-                        lines = f.readlines()
-                        
-                        # Scan backwards for latest FSDTarget
-                        for line in reversed(lines):
-                            if not line.strip():
-                                continue
-                            try:
-                                event = json.loads(line)
-                                event_type = event.get('event')
-                                
-                                if event_type == 'FSDTarget':
-                                    jumps = event.get('RemainingJumpsInRoute')
-                                    if jumps is not None:
-                                        # Check if route count changed from cached value
+            # Always scan journal for FSDTarget (authoritative source)
+            if True:
+                # Check latest journal for FSDTarget
+                journal_files = [f for f in os.listdir(journal_dir) if f.startswith('Journal.') and f.endswith('.log')]
+                if journal_files:
+                    journal_files.sort(reverse=True)
+                    latest_journal = os.path.join(journal_dir, journal_files[0])
+                    
+                    try:
+                        with open(latest_journal, 'r', encoding='utf-8') as f:
+                            f.seek(0, 2)
+                            file_size = f.tell()
+                            f.seek(max(0, file_size - 5120))  # Last 5KB
+                            lines = f.readlines()
+                            
+                            # Scan backwards for latest route-related event
+                            for line in reversed(lines):
+                                if not line.strip():
+                                    continue
+                                try:
+                                    event = json.loads(line)
+                                    event_type = event.get('event')
+                                    
+                                    # Priority order: FSDTarget > NavRoute > FSDJump > NavRouteClear
+                                    if event_type == 'FSDTarget':
+                                        jumps = event.get('RemainingJumpsInRoute')
+                                        if jumps is not None:
+                                            cached_jumps = getattr(self, '_cached_route_jumps', None)
+                                            if cached_jumps != jumps:
+                                                self._cached_route_jumps = jumps
+                                                self._write_jumps_left(jumps)
+                                                route_changed = True
+                                        break
+                                    elif event_type == 'NavRoute':
+                                        # New route plotted - first entry is current system
+                                        if os.path.exists(navroute_path):
+                                            try:
+                                                with open(navroute_path, 'r', encoding='utf-8') as nf:
+                                                    navroute_data = json.load(nf)
+                                                    route = navroute_data.get('Route', [])
+                                                    jumps = max(0, len(route) - 1) if route else 0
+                                                    cached_jumps = getattr(self, '_cached_route_jumps', None)
+                                                    if cached_jumps != jumps:
+                                                        self._cached_route_jumps = jumps
+                                                        self._write_jumps_left(jumps)
+                                                        route_changed = True
+                                            except Exception:
+                                                pass
+                                        break
+                                    elif event_type == 'FSDJump':
+                                        # FSDJump doesn't have count - continue scanning for FSDTarget
+                                        continue
+                                    elif event_type in ['NavRouteClear', 'Docked', 'Touchdown']:
                                         cached_jumps = getattr(self, '_cached_route_jumps', None)
-                                        if cached_jumps != jumps:
-                                            self._cached_route_jumps = jumps
-                                            self._write_jumps_left(jumps)
-                                            log.debug(f"[Poll] Route update: {jumps} jumps")
+                                        if cached_jumps != 0:
+                                            self._cached_route_jumps = 0
+                                            self._write_jumps_left(0)
                                             route_changed = True
-                                    break
-                                elif event_type in ['NavRouteClear', 'Docked', 'Touchdown']:
-                                    cached_jumps = getattr(self, '_cached_route_jumps', None)
-                                    if cached_jumps != 0:
-                                        self._cached_route_jumps = 0
-                                        self._write_jumps_left(0)
-                                        log.debug(f"[Poll] {event_type}, set to 0")
-                                        route_changed = True
-                                    break
-                            except json.JSONDecodeError:
-                                continue
-                except Exception:
-                    pass
+                                        break
+                                except json.JSONDecodeError:
+                                    continue
+                    except Exception:
+                        pass
             
             # Update display if route changed
             if route_changed and hasattr(self, 'cmdr_label_value'):
-                print(f"[DEBUG POLL] Route changed, updating display")
                 self.after(0, self._update_cmdr_system_display)
         
         except Exception as e:
@@ -7054,7 +7136,6 @@ class App(tk.Tk):
         try:
             cmdr_name = ""
             current_system = ""
-            jumps_remaining = 0
             
             # Get CMDR name from journal
             if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
@@ -7068,64 +7149,8 @@ class App(tk.Tk):
             # Get current system from centralized source
             current_system = self.get_current_system() or ""
             
-            # Get remaining jumps - use FSDTarget from journal (accurate count during travel)
-            # NavRoute.json only updates when plotting, not during jumps
-            if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
-                journal_dir = self.prospector_panel.journal_dir
-                found_route_event = False
-                
-                # Scan journal for most recent route-related event
-                journal_files = [f for f in os.listdir(journal_dir) 
-                               if f.startswith('Journal.') and f.endswith('.log')]
-                if journal_files:
-                    journal_files.sort(reverse=True)
-                    latest_journal = os.path.join(journal_dir, journal_files[0])
-                    try:
-                        with open(latest_journal, 'r', encoding='utf-8') as f:
-                            f.seek(0, 2)
-                            file_size = f.tell()
-                            f.seek(max(0, file_size - 30720))  # Last 30KB
-                            lines = f.readlines()
-                            
-                            for line in reversed(lines):
-                                line = line.strip()
-                                if not line:
-                                    continue
-                                try:
-                                    event = json.loads(line)
-                                    event_type = event.get('event')
-                                    
-                                    if event_type == 'FSDTarget':
-                                        # Most accurate - gives remaining jumps
-                                        jumps_remaining = event.get('RemainingJumpsInRoute', 0)
-                                        found_route_event = True
-                                        break
-                                    elif event_type == 'NavRouteClear':
-                                        # Route was cleared
-                                        jumps_remaining = 0
-                                        found_route_event = True
-                                        break
-                                    elif event_type == 'NavRoute':
-                                        # New route plotted but no FSDTarget yet - check NavRoute.json
-                                        navroute_path = os.path.join(journal_dir, "NavRoute.json")
-                                        if os.path.exists(navroute_path):
-                                            try:
-                                                with open(navroute_path, 'r', encoding='utf-8') as nf:
-                                                    navroute_data = json.load(nf)
-                                                    route = navroute_data.get('Route', [])
-                                                    if route:
-                                                        # Route includes current system, so remaining jumps = len - 1
-                                                        jumps_remaining = len(route) - 1
-                                            except Exception:
-                                                pass
-                                        found_route_event = True
-                                        break
-                                except (json.JSONDecodeError, ValueError):
-                                    continue
-                    except Exception as e:
-                        print(f"Error reading journal for route: {e}")
-                
-                print(f"[DEBUG ROUTE] jumps_remaining={jumps_remaining}, found_event={found_route_event}")
+            # Get remaining jumps from cached value (set by _poll_route_status)
+            jumps_remaining = getattr(self, '_cached_route_jumps', 0) or 0
             
             # Update individual labels (white prefix, yellow value)
             self.cmdr_label_value.config(text=cmdr_name)
@@ -7513,7 +7538,11 @@ class App(tk.Tk):
         from fleet_carrier_tracker import get_fleet_carrier_tracker
         from config import (load_home_system, save_home_system,
                            load_fleet_carrier_system, save_fleet_carrier_system,
-                           load_distance_calculator_systems)
+                           load_distance_calculator_systems, load_theme)
+        
+        # Theme-aware background color
+        _dc_theme = load_theme()
+        _dc_bg = "#000000" if _dc_theme == "elite_orange" else "#1e1e1e"
         
         # Get calculator instance
         self.distance_calculator = get_distance_calculator()
@@ -7696,7 +7725,7 @@ class App(tk.Tk):
         # Status/Loading indicator
         row += 1
         self.distance_status_label = tk.Label(calc_frame, text="", 
-                                              font=("Segoe UI", 8, "italic"), fg="#888888", bg="#1e1e1e")
+                                              font=("Segoe UI", 8, "italic"), fg="#888888", bg=_dc_bg)
         self.distance_status_label.grid(row=row, column=0, columnspan=3, pady=(0, 5))
         
         # Results section
@@ -7706,7 +7735,7 @@ class App(tk.Tk):
         # Distance A ↔ B
         row = 0
         self.distance_ab_label = tk.Label(results_frame, text="➤ Distance A ↔ B: ---", 
-                                         font=("Segoe UI", 11, "bold"), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+                                         font=("Segoe UI", 11, "bold"), fg="#ffcc00", bg=_dc_bg, anchor="w")
         self.distance_ab_label.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         
         # Separator
@@ -7717,32 +7746,32 @@ class App(tk.Tk):
         # System A Info with system name on same line (left column)
         row += 1
         self.distance_system_a_name = tk.Label(results_frame, text="System A Info: ---", 
-                                               font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg="#1e1e1e", anchor="w")
+                                               font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
         self.distance_system_a_name.grid(row=row, column=0, sticky="w", padx=(0, 20), pady=(5, 0))
         
         # System B Info with system name on same line (right column)
         self.distance_system_b_name = tk.Label(results_frame, text="System B Info: ---", 
-                                               font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg="#1e1e1e", anchor="w")
+                                               font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
         self.distance_system_b_name.grid(row=row, column=1, sticky="w", pady=(5, 0))
         
         # Distance to Sol - side by side
         row += 1
         self.distance_a_sol_label = tk.Label(results_frame, text="➤ Distance to Sol: ---", 
-                                             font=("Segoe UI", 9), fg="#ffffff", bg="#1e1e1e", anchor="w")
+                                             font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_a_sol_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
         
         self.distance_b_sol_label = tk.Label(results_frame, text="➤ Distance to Sol: ---", 
-                                             font=("Segoe UI", 9), fg="#ffffff", bg="#1e1e1e", anchor="w")
+                                             font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_b_sol_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
         
         # Coordinates - side by side
         row += 1
         self.distance_a_coords_label = tk.Label(results_frame, text="➤ Coordinates: ---", 
-                                                font=("Segoe UI", 9), fg="#ffffff", bg="#1e1e1e", anchor="w")
+                                                font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_a_coords_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
         
         self.distance_b_coords_label = tk.Label(results_frame, text="➤ Coordinates: ---", 
-                                                font=("Segoe UI", 9), fg="#ffffff", bg="#1e1e1e", anchor="w")
+                                                font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_b_coords_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
         
         results_frame.columnconfigure(0, weight=1)
@@ -8371,6 +8400,59 @@ class App(tk.Tk):
         enabled = bool(self.auto_scan_journals.get())
         self._save_auto_scan_preference()
         self._set_status(f"Auto-scan on startup {'enabled' if enabled else 'disabled'}")
+    
+    def _load_auto_switch_tabs_preference(self) -> None:
+        """Load auto-switch tabs preference from config"""
+        cfg = _load_cfg()
+        enabled = cfg.get("auto_switch_tabs", False)  # Default to disabled
+        self.auto_switch_tabs.set(1 if enabled else 0)
+        print(f"Loaded auto-switch tabs preference: {enabled}")
+    
+    def _save_auto_switch_tabs_preference(self) -> None:
+        """Save auto-switch tabs preference to config"""
+        from config import update_config_value
+        update_config_value("auto_switch_tabs", bool(self.auto_switch_tabs.get()))
+        print(f"Saved auto-switch tabs preference: {bool(self.auto_switch_tabs.get())}")
+    
+    def _on_auto_switch_tabs_toggle(self, *args) -> None:
+        """Called when auto-switch tabs checkbox is toggled"""
+        enabled = bool(self.auto_switch_tabs.get())
+        self._save_auto_switch_tabs_preference()
+        self._set_status(f"Auto-switch tabs on ring entry/exit {'enabled' if enabled else 'disabled'}")
+        
+        # Sync with Ring Finder checkbox if it exists
+        if hasattr(self, 'ring_finder') and self.ring_finder:
+            if hasattr(self.ring_finder, 'auto_switch_tabs_var'):
+                self.ring_finder.auto_switch_tabs_var.set(enabled)
+    
+    def switch_to_tab(self, tab_name: str) -> None:
+        """Switch to a specific tab by name
+        
+        Args:
+            tab_name: One of 'mining_session', 'hotspots_finder', 'commodity_market', 
+                      'distance_calculator', 'voiceattack', 'bookmarks', 'settings', 'about'
+        """
+        try:
+            if not hasattr(self, 'notebook'):
+                return
+            
+            # Map tab names to their indices (based on order added in _build_content_area)
+            tab_indices = {
+                'mining_session': 0,
+                'hotspots_finder': 1,
+                'commodity_market': 2,
+                'distance_calculator': 3,
+                'voiceattack': 4,
+                'bookmarks': 5,
+                'settings': 6,
+                'about': 7
+            }
+            
+            if tab_name in tab_indices:
+                self.notebook.select(tab_indices[tab_name])
+                print(f"[AUTO-TAB] Switched to tab: {tab_name}")
+        except Exception as e:
+            print(f"[AUTO-TAB] Error switching to tab {tab_name}: {e}")
     
     def _load_auto_start_preference(self) -> None:
         """Load auto-start session preference from config"""
@@ -9133,6 +9215,8 @@ class App(tk.Tk):
         geom = wcfg.get("geometry")
         zoomed = wcfg.get("zoomed", False)
         
+        print(f"[DEBUG] Restoring geometry: {geom}, zoomed: {zoomed}")
+        
         if geom:
             try:
                 # Parse geometry string: WIDTHxHEIGHT+X+Y
@@ -9151,8 +9235,17 @@ class App(tk.Tk):
                         x = (screen_width - width) // 2
                         y = (screen_height - height) // 2
                         geom = f"{width}x{height}+{x}+{y}"
-                
-                self.geometry(geom)
+                    
+                    self.geometry(geom)
+                else:
+                    # Geometry string doesn't have position, use default centered
+                    self.geometry("1220x700")
+                    self.update_idletasks()
+                    screen_width = self.winfo_screenwidth()
+                    screen_height = self.winfo_screenheight()
+                    x = (screen_width - 1220) // 2
+                    y = (screen_height - 700) // 2
+                    self.geometry(f"1220x700+{x}+{y}")
                 
                 # Restore zoomed/maximized state
                 if zoomed:
@@ -9160,29 +9253,31 @@ class App(tk.Tk):
                     
                 # Show window after geometry is set
                 self.deiconify()
+                print(f"[DEBUG] Window shown with geometry")
             except Exception as e:
+                print(f"[DEBUG] Geometry restore error: {e}")
                 # If saved geometry fails, center on screen with default size
-                self.geometry("1200x700")
+                self.geometry("1220x700")
                 self.update_idletasks()
                 screen_width = self.winfo_screenwidth()
                 screen_height = self.winfo_screenheight()
-                x = (screen_width - 1100) // 2
-                y = (screen_height - 650) // 2
-                self.geometry(f"1200x700+{x}+{y}")
+                x = (screen_width - 1220) // 2
+                y = (screen_height - 700) // 2
+                self.geometry(f"1220x700+{x}+{y}")
+                self.deiconify()
         else:
+            print(f"[DEBUG] No saved geometry, using defaults")
             # No saved geometry, center on screen with default size
-            self.geometry("1183x680")
+            self.geometry("1220x700")
             self.update_idletasks()
             screen_width = self.winfo_screenwidth()
             screen_height = self.winfo_screenheight()
-            x = (screen_width - 1183) // 2
-            y = (screen_height - 680) // 2
-            self.geometry(f"1183x680+{x}+{y}")
+            x = (screen_width - 1220) // 2
+            y = (screen_height - 700) // 2
+            self.geometry(f"1220x700+{x}+{y}")
             
             # Show window after geometry is set
             self.deiconify()
-            y = (screen_height - 680) // 2
-            self.geometry(f"1183x680+{x}+{y}")
         
         # After window shown, ensure no input selection remains and focus a neutral button
         try:
@@ -9344,6 +9439,19 @@ class App(tk.Tk):
         import sys
         import os
         import subprocess
+        
+        # Save window geometry before restart
+        try:
+            from config import save_window_geometry
+            is_zoomed = self.state() == "zoomed"
+            if is_zoomed:
+                self.state("normal")
+                self.update_idletasks()
+            geometry = self.geometry()
+            save_window_geometry({"geometry": geometry, "zoomed": is_zoomed})
+            print(f"Saved window geometry before restart: {geometry}, zoomed: {is_zoomed}")
+        except Exception as e:
+            print(f"Error saving window geometry before restart: {e}")
         
         # Save any pending data before restart
         try:
@@ -10262,21 +10370,31 @@ class App(tk.Tk):
         self.marketplace_sell_mode = tk.BooleanVar(value=cfg.get('marketplace_sell_mode', True))
         self.marketplace_buy_mode = tk.BooleanVar(value=cfg.get('marketplace_buy_mode', False))
         
+        # Get theme for checkbox/radiobutton styling
+        from config import load_theme
+        _mkt_cb_theme = load_theme()
+        if _mkt_cb_theme == "elite_orange":
+            _mkt_cb_bg = "#000000"  # Black background for orange theme
+            _mkt_cb_select = "#000000"
+        else:
+            _mkt_cb_bg = "#1e1e1e"
+            _mkt_cb_select = "#1e1e1e"
+        
         # Row 0: Search Mode (Near/Galaxy) + Sell/Buy
-        row0_frame = tk.Frame(search_frame, bg="#1e1e1e")
+        row0_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
         row0_frame.grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
         rb1 = tk.Radiobutton(row0_frame, text="Near System (500 LY)", variable=self.marketplace_search_mode,
-                      value="near_system", bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e",
-                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      value="near_system", bg=_mkt_cb_bg, fg="#ffffff", selectcolor=_mkt_cb_select,
+                      activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         rb1.pack(side="left", padx=(0, 15))
         rb1.config(takefocus=0)
         ToolTip(rb1, "Search within 500 LY of reference system - returns all matching stations in range")
         
         rb2 = tk.Radiobutton(row0_frame, text="Galaxy-Wide (Top 30)", variable=self.marketplace_search_mode,
-                      value="galaxy_wide", bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e",
-                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      value="galaxy_wide", bg=_mkt_cb_bg, fg="#ffffff", selectcolor=_mkt_cb_select,
+                      activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         rb2.pack(side="left", padx=(0, 20))
         rb2.config(takefocus=0)
@@ -10285,21 +10403,21 @@ class App(tk.Tk):
         ttk.Separator(row0_frame, orient="vertical").pack(side="left", fill="y", padx=(0, 15))
         
         sell_cb = tk.Checkbutton(row0_frame, text="Sell", variable=self.marketplace_sell_mode,
-                      command=self._on_sell_mode_toggle, bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
-                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      command=self._on_sell_mode_toggle, bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
+                      activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         sell_cb.pack(side="left", padx=(0, 10))
         ToolTip(sell_cb, "Search for stations buying this commodity (where you can sell)")
         
         buy_cb = tk.Checkbutton(row0_frame, text="Buy", variable=self.marketplace_buy_mode,
-                      command=self._on_buy_mode_toggle, bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
-                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      command=self._on_buy_mode_toggle, bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
+                      activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         buy_cb.pack(side="left")
         ToolTip(buy_cb, "Search for stations selling this commodity (where you can buy)")
         
         # Row 1: Reference System + Commodity
-        row1_frame = tk.Frame(search_frame, bg="#1e1e1e")
+        row1_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
         row1_frame.grid(row=1, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
         # Fixed-width label for perfect alignment with Station: below
@@ -10312,7 +10430,8 @@ class App(tk.Tk):
         self.marketplace_use_current_btn = tk.Button(row1_frame, text="Use Current", 
                                     command=self._use_current_system_marketplace,
                                     bg="#4a3a2a", fg="#e0e0e0", activebackground="#5a4a3a", activeforeground="#ffffff",
-                                    relief="ridge", bd=1, padx=6, pady=2, font=("Segoe UI", 8), cursor="hand2")
+                                    relief="ridge", bd=1, padx=6, pady=2, font=("Segoe UI", 8), cursor="hand2",
+                                    highlightbackground=_mkt_cb_bg, highlightcolor=_mkt_cb_bg)
         self.marketplace_use_current_btn.pack(side="left", padx=(0, 20))
         
         ttk.Label(row1_frame, text="Commodity:").pack(side="left", padx=(0, 5))
@@ -10330,7 +10449,7 @@ class App(tk.Tk):
         commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         
         # Row 2: All filters (aligned with Row 1)
-        row2_frame = tk.Frame(search_frame, bg="#1e1e1e")
+        row2_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
         row2_frame.grid(row=2, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
         # Station label with same width as "Ref. System:" for perfect alignment
@@ -10352,8 +10471,8 @@ class App(tk.Tk):
         self.marketplace_exclude_carriers = tk.BooleanVar(value=cfg.get('marketplace_exclude_carriers', True))
         exclude_cb = tk.Checkbutton(row2_frame, text="Exclude Carriers", variable=self.marketplace_exclude_carriers,
                       command=self._save_marketplace_preferences,
-                      bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
-                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
+                      activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         exclude_cb.pack(side="left", padx=(0, 10))
         ToolTip(exclude_cb, "Exclude Fleet Carriers from search results")
@@ -10361,8 +10480,8 @@ class App(tk.Tk):
         self.marketplace_large_pad_only = tk.BooleanVar(value=cfg.get('marketplace_large_pad_only', False))
         large_pad_cb = tk.Checkbutton(row2_frame, text="Large Pads", variable=self.marketplace_large_pad_only,
                       command=self._save_marketplace_preferences,
-                      bg="#1e1e1e", fg="#e0e0e0", selectcolor="#2d2d2d",
-                      activebackground="#1e1e1e", activeforeground="#ffffff",
+                      bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
+                      activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         large_pad_cb.pack(side="left", padx=(0, 15))
         ToolTip(large_pad_cb, "Show only stations with Large landing pads")
@@ -10404,20 +10523,20 @@ class App(tk.Tk):
         # edtools_btn.grid(row=4, column=0, columnspan=5, pady=(5, 5))
         
         # Results section with help text on same line as label
-        results_header = tk.Frame(main_container, bg="#1e1e1e")
+        results_header = tk.Frame(main_container, bg=_mkt_cb_bg)
         results_header.pack(fill="x", pady=(10, 0))
         
         tk.Label(results_header, text="Search Results", 
-                bg="#1e1e1e", fg="#ffffff", 
+                bg=_mkt_cb_bg, fg="#ffffff", 
                 font=("Segoe UI", 10, "bold")).pack(side="left")
         
         tk.Label(results_header, text="  •  Right-click rows for options",
-                bg="#1e1e1e", fg="#888888",
+                bg=_mkt_cb_bg, fg="#888888",
                 font=("Segoe UI", 8)).pack(side="left")
         
         # Status label (moved to header, right side)
         self.marketplace_total_label = tk.Label(results_header, text="Enter system and commodity, then click Search",
-                                               bg="#1e1e1e", fg="gray", font=("TkDefaultFont", 8))
+                                               bg=_mkt_cb_bg, fg="gray", font=("TkDefaultFont", 8))
         self.marketplace_total_label.pack(side="right")
         
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
@@ -10449,7 +10568,7 @@ class App(tk.Tk):
         style = ttk.Style()
         
         if _mkt_theme == "elite_orange":
-            _mkt_bg = "#0a0a0a"
+            _mkt_bg = "#1e1e1e"
             _mkt_fg = "#ff8c00"
             _mkt_hdr = "#1a1a1a"
             _mkt_sel_bg = "#ff6600"
@@ -10603,11 +10722,25 @@ class App(tk.Tk):
     
     def _create_marketplace_context_menu(self):
         """Create right-click context menu for marketplace results"""
+        # Get theme-aware menu colors
+        from config import load_theme
+        current_theme = load_theme()
+        if current_theme == "elite_orange":
+            menu_bg = "#1e1e1e"
+            menu_fg = "#ff8c00"
+            menu_active_bg = "#ff6600"
+            menu_active_fg = "#000000"
+        else:
+            menu_bg = MENU_COLORS["bg"]
+            menu_fg = MENU_COLORS["fg"]
+            menu_active_bg = MENU_COLORS["activebackground"]
+            menu_active_fg = MENU_COLORS["activeforeground"]
+        
         self.marketplace_context_menu = tk.Menu(self, tearoff=0,
-                                               bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
-                                               activebackground=MENU_COLORS["activebackground"],
-                                               activeforeground=MENU_COLORS["activeforeground"],
-                                               selectcolor=MENU_COLORS["selectcolor"])
+                                               bg=menu_bg, fg=menu_fg,
+                                               activebackground=menu_active_bg,
+                                               activeforeground=menu_active_fg,
+                                               selectcolor=menu_active_bg)
         self.marketplace_context_menu.add_command(label="Open in Inara", command=self._open_inara_from_menu)
         self.marketplace_context_menu.add_command(label="Open in EDSM", command=self._open_edsm_from_menu)
         self.marketplace_context_menu.add_separator()
@@ -12332,7 +12465,7 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
             self.prospector_panel.session_system.set(system_name)
         
         # 4. Update CMDR/System display in actions bar
-        if hasattr(self, 'cmdr_system_label'):
+        if hasattr(self, 'system_label_value'):
             self.after(0, self._update_cmdr_system_display)
         
         # Clear any selection that might have been applied and set neutral focus

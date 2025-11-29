@@ -533,6 +533,9 @@ class ProspectorPanel(ttk.Frame):
         self.session_start: Optional[dt.datetime] = None
         self.session_pause_started: Optional[dt.datetime] = None
         self.session_paused_seconds: float = 0.0
+        
+        # Auto-switch tabs: pending switch to ring finder after session ends
+        self._pending_ring_finder_switch = False
         self.session_system = tk.StringVar(value="")
         self.session_body = tk.StringVar(value="")
         self.session_mining_body = ""  # Preserved mining location (won't be overwritten by docking events)
@@ -1513,12 +1516,12 @@ class ProspectorPanel(ttk.Frame):
         style = ttk.Style()
         
         if pp_theme == "elite_orange":
-            tree_bg = "#0a0a0a"
+            tree_bg = "#1e1e1e"
             tree_fg = "#ff8c00"
             header_bg = "#1a1a1a"
             selection_bg = "#ff6600"
             selection_fg = "#000000"
-            alt_row_bg = "#151515"
+            alt_row_bg = "#252525"
         else:
             tree_bg = "#1e1e1e"
             tree_fg = "#e6e6e6"
@@ -1666,12 +1669,12 @@ class ProspectorPanel(ttk.Frame):
                            show="headings", height=5, style="MineralAnalysis.Treeview")
         self.stats_tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.stats_tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
-        self.stats_tree.heading("material", text="Mineral (Threshold%)", anchor="w")
+        self.stats_tree.heading("material", text="Mineral (Thr%)", anchor="w")
         self.stats_tree.heading("tons", text="Tons", anchor="w")
         self.stats_tree.heading("tph", text="T/hr", anchor="w")
-        self.stats_tree.heading("tons_per", text="Tons/Asteroid", anchor="w")
+        self.stats_tree.heading("tons_per", text="T/Ast", anchor="w")
         self.stats_tree.heading("avg_all", text="Avg % (All)", anchor="w")
-        self.stats_tree.heading("avg_pct", text="Avg % (≥Threshold)", anchor="w")
+        self.stats_tree.heading("avg_pct", text="Avg % (≥Thr)", anchor="w")
         self.stats_tree.heading("best_pct", text="Best %", anchor="w")
         self.stats_tree.heading("latest_pct", text="Latest %", anchor="w")
         self.stats_tree.heading("count", text="Hits", anchor="w")
@@ -1800,6 +1803,16 @@ class ProspectorPanel(ttk.Frame):
         options_frame = ttk.Frame(controls_frame)
         options_frame.grid(row=1, column=0, sticky="w", pady=(4, 0))
         
+        # Get theme for checkbox styling
+        from config import load_theme
+        _opt_theme = load_theme()
+        if _opt_theme == "elite_orange":
+            _opt_bg = "#000000"  # Black background for orange theme
+            _opt_select = "#000000"
+        else:
+            _opt_bg = "#1e1e1e"
+            _opt_select = "#1e1e1e"
+        
         # Auto-start session checkbox
         auto_start_ui_value = 1 if self.auto_start_on_prospector else 0
         print(f"[DEBUG] UI Init - auto_start boolean: {self.auto_start_on_prospector}, UI value: {auto_start_ui_value}")
@@ -1809,10 +1822,10 @@ class ProspectorPanel(ttk.Frame):
             text="Auto-start", 
             variable=self.auto_start_var,
             # Don't set command yet - will add after setting value
-            bg="#1e1e1e", 
+            bg=_opt_bg, 
             fg="#ffffff", 
-            selectcolor="#1e1e1e", 
-            activebackground="#1e1e1e",
+            selectcolor=_opt_select, 
+            activebackground=_opt_bg,
             activeforeground="#ffffff", 
             highlightthickness=0, 
             bd=0, 
@@ -1838,10 +1851,10 @@ class ProspectorPanel(ttk.Frame):
             text="Prompt when full", 
             variable=self.prompt_on_full_var,
             # Don't set command yet - will add after setting value
-            bg="#1e1e1e", 
+            bg=_opt_bg, 
             fg="#ffffff", 
-            selectcolor="#1e1e1e", 
-            activebackground="#1e1e1e",
+            selectcolor=_opt_select, 
+            activebackground=_opt_bg,
             activeforeground="#ffffff", 
             highlightthickness=0, 
             bd=0, 
@@ -1876,10 +1889,10 @@ class ProspectorPanel(ttk.Frame):
             text="Multi-Session", 
             variable=self.multi_session_var,
             # Don't set command yet - will add after setting value
-            bg="#1e1e1e", 
+            bg=_opt_bg, 
             fg="#ffffff", 
-            selectcolor="#1e1e1e", 
-            activebackground="#1e1e1e",
+            selectcolor=_opt_select, 
+            activebackground=_opt_bg,
             activeforeground="#ffffff", 
             highlightthickness=0, 
             bd=0, 
@@ -2251,12 +2264,12 @@ class ProspectorPanel(ttk.Frame):
         style = ttk.Style()
         
         if _rpt_theme == "elite_orange":
-            _rpt_bg = "#0a0a0a"
+            _rpt_bg = "#1e1e1e"
             _rpt_fg = "#ff8c00"
             _rpt_hdr = "#1a1a1a"
             _rpt_sel_bg = "#ff6600"
             _rpt_sel_fg = "#000000"
-            _rpt_alt = "#151515"
+            _rpt_alt = "#252525"
         else:
             _rpt_bg = "#1e1e1e"
             _rpt_fg = "#e6e6e6"
@@ -6732,12 +6745,12 @@ class ProspectorPanel(ttk.Frame):
         style = ttk.Style()
         
         if _tab_theme == "elite_orange":
-            _tab_bg = "#0a0a0a"
+            _tab_bg = "#1e1e1e"
             _tab_fg = "#ff8c00"
             _tab_hdr = "#1a1a1a"
             _tab_sel_bg = "#ff6600"
             _tab_sel_fg = "#000000"
-            _tab_alt = "#151515"
+            _tab_alt = "#252525"
         else:
             _tab_bg = "#1e1e1e"
             _tab_fg = "#e6e6e6"
@@ -7297,8 +7310,23 @@ class ProspectorPanel(ttk.Frame):
                     if item not in selected_items:
                         self.reports_tree_tab.selection_set(item)
                     
-                    # Create context menu
-                    context_menu = tk.Menu(self.reports_tree_tab, tearoff=0, bg="#2d2d2d", fg="#ffffff")
+                    # Create context menu with theme-aware colors
+                    from config import load_theme
+                    _menu_theme = load_theme()
+                    if _menu_theme == "elite_orange":
+                        _menu_bg = "#1e1e1e"
+                        _menu_fg = "#ff8c00"
+                        _menu_active_bg = "#ff6600"
+                        _menu_active_fg = "#000000"
+                    else:
+                        _menu_bg = "#2d2d2d"
+                        _menu_fg = "#ffffff"
+                        _menu_active_bg = "#404040"
+                        _menu_active_fg = "#ffffff"
+                    context_menu = tk.Menu(self.reports_tree_tab, tearoff=0, 
+                                          bg=_menu_bg, fg=_menu_fg,
+                                          activebackground=_menu_active_bg,
+                                          activeforeground=_menu_active_fg)
                     context_menu.add_command(label="Open Report (TXT)", command=lambda: open_selected())
                     context_menu.add_command(label="Open Detailed Report (HTML)", command=lambda: self._open_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()
@@ -7656,7 +7684,7 @@ class ProspectorPanel(ttk.Frame):
                     "#6": "Planet, ring, or celestial body that was mined",
                     "#7": "Total tons of materials mined",
                     "#8": "Tons per hour mining rate",
-                    "#9": "Finds per ton (Hits / Tons)",
+                    "#9": "Average tons collected per asteroid",
                     "#10": "Total asteroids scanned during the session",
                     "#11": "Number of different mineral types found within the threshold set in announcement panel",
                     "#12": "Total Material Hits — number of asteroids that contained the tracked materials",
@@ -7764,7 +7792,7 @@ class ProspectorPanel(ttk.Frame):
                     "#1": "Material name with your announcement threshold\nExample: Platinum (27%) means you're only alerted when\nasteroids have 27% or higher Platinum content",
                     "#2": "Total tons of this material collected this session",
                     "#3": "Mining rate: Tons per hour for this material",
-                    "#4": "Finds per ton (Hits / Tons) — average finds per ton collected for this material",
+                    "#4": "Average tons collected per asteroid for this material",
                     "#5": "Average % across ALL asteroids you prospected\n(includes low-quality asteroids below threshold)",
                     "#6": "Average % only for asteroids AT OR ABOVE threshold\n(your quality finds that triggered announcements)",
                     "#7": "Highest % found this session for this material",
@@ -8758,6 +8786,9 @@ class ProspectorPanel(ttk.Frame):
                     # Auto-start session on first prospector
                     print(f"[AUTO-START] Prospector launched - auto-starting session")
                     self.after(100, self._session_start)  # Delay slightly to ensure UI is ready
+                    
+                    # Auto-switch to Mining Session tab when launching prospector (same as entering ring)
+                    self._auto_switch_to_mining_tab()
 
             if ev in ("Location", "FSDJump"):
                 # Update system from events that contain StarSystem data
@@ -8779,6 +8810,15 @@ class ProspectorPanel(ttk.Frame):
                 
                 # Update location context
                 self.last_body_type = evt.get("BodyType", "")
+                
+                # Auto-switch to Hotspots Finder on FSD jump (not during startup)
+                if ev == "FSDJump" and not self.startup_processing:
+                    # Check if there's a pending switch from session end
+                    if getattr(self, '_pending_ring_finder_switch', False):
+                        self._pending_ring_finder_switch = False
+                        self._auto_switch_to_ring_finder_delayed()
+                    else:
+                        self._auto_switch_to_ring_finder_tab()
             
             # Track Fleet Carrier location changes
             if ev == "CarrierLocation":
@@ -8908,6 +8948,17 @@ class ProspectorPanel(ttk.Frame):
                                 self.last_system or self.session_system.get() or ""
                             )
                             self.session_body.set(body_display)
+                            
+                            # Note: Auto-switch to Mining Session happens on prospector launch, not ring entry
+                
+                # Handle SupercruiseEntry - auto-switch to Hotspots Finder
+                if ev == "SupercruiseEntry" and not self.startup_processing:
+                    # Check if there's a pending switch from session end
+                    if getattr(self, '_pending_ring_finder_switch', False):
+                        self._pending_ring_finder_switch = False
+                        self._auto_switch_to_ring_finder_delayed()
+                    else:
+                        self._auto_switch_to_ring_finder_tab()
                             
                 # Real-time supercruise events (not during startup)
                 if not self.startup_processing:
@@ -9305,6 +9356,19 @@ class ProspectorPanel(ttk.Frame):
             import traceback
             traceback.print_exc()
 
+    def _abbreviate_material_for_stats(self, material_name: str) -> str:
+        """Abbreviate long material names for Mineral Analysis table display"""
+        abbreviations = {
+            'Methanol Monohydrate Crystals': 'Methanol Cryst',
+            'Low Temperature Diamonds': 'LTD',
+            'Low-Temperature Diamonds': 'LTD',
+            'Lithium Hydroxide': 'Lithium Hydro',
+            'Hydrogen Peroxide': 'H. Peroxide',
+            'Methane Clathrate': 'Methane Clath',
+            'Liquid Oxygen': 'Liq Oxygen',
+        }
+        return abbreviations.get(material_name, material_name)
+
     def _refresh_statistics_display(self) -> None:
         """Refresh the live statistics display"""
         try:
@@ -9349,7 +9413,8 @@ class ProspectorPanel(ttk.Frame):
                     latest_pct = f"{stats['latest_percentage']:.1f}%" if stats and stats['latest_percentage'] > 0 else "0.0%"
                     quality_hits = str(stats['quality_hits']) if stats else "0"
                     threshold = self.min_pct_map.get(material_name, self.threshold.get())
-                    material_display = f"{material_name} ({threshold:.1f}%)"
+                    display_name = self._abbreviate_material_for_stats(material_name)
+                    material_display = f"{display_name} ({threshold:.1f}%)"
                     
                     # Get tons and TPH for this material
                     material_tons = None
@@ -9396,7 +9461,8 @@ class ProspectorPanel(ttk.Frame):
                 if material_name not in displayed_materials and material_tons > 0:
                     # This material was mined but never announced (below threshold)
                     threshold = self.min_pct_map.get(material_name, self.threshold.get())
-                    material_display = f"{material_name} ({threshold:.1f}%)"
+                    display_name = self._abbreviate_material_for_stats(material_name)
+                    material_display = f"{display_name} ({threshold:.1f}%)"
                     tons_str = f"{material_tons:.1f}"
                     
                     material_tph = 0.0
@@ -9536,6 +9602,76 @@ class ProspectorPanel(ttk.Frame):
         
         # Check for cargo full + idle condition if feature is enabled
         self._check_cargo_full_idle()
+    
+    def _auto_switch_to_mining_tab(self) -> None:
+        """Auto-switch to Mining Session tab if the setting is enabled"""
+        try:
+            if self.main_app and hasattr(self.main_app, 'auto_switch_tabs'):
+                if self.main_app.auto_switch_tabs.get():
+                    if hasattr(self.main_app, 'switch_to_tab'):
+                        self.main_app.switch_to_tab('mining_session')
+        except Exception as e:
+            print(f"[AUTO-TAB] Error switching to mining tab: {e}")
+    
+    def _auto_switch_to_ring_finder_tab(self) -> None:
+        """Auto-switch to Hotspots Finder tab if the setting is enabled
+        
+        Note: Will NOT switch if a mining session is active (user is still mining)
+        """
+        try:
+            # Don't switch if a mining session is active
+            if self.session_active:
+                print("[AUTO-TAB] Skipping switch to ring finder - mining session is active")
+                return
+                
+            if self.main_app and hasattr(self.main_app, 'auto_switch_tabs'):
+                if self.main_app.auto_switch_tabs.get():
+                    if hasattr(self.main_app, 'switch_to_tab'):
+                        self.main_app.switch_to_tab('hotspots_finder')
+        except Exception as e:
+            print(f"[AUTO-TAB] Error switching to hotspots finder tab: {e}")
+    
+    def _auto_switch_to_ring_finder_delayed(self) -> None:
+        """Auto-switch to Hotspots Finder tab after a 10 second delay
+        
+        Called when SupercruiseEntry or FSDJump occurs after a session has ended.
+        The delay gives the user time before the tab switches.
+        """
+        try:
+            if self.main_app and hasattr(self.main_app, 'auto_switch_tabs'):
+                if self.main_app.auto_switch_tabs.get():
+                    print("[AUTO-TAB] In supercruise/FSD after session end - will switch to ring finder in 10 seconds")
+                    # Schedule the switch after 10 seconds (10000 ms)
+                    self.after(10000, self._auto_switch_to_ring_finder_tab)
+        except Exception as e:
+            print(f"[AUTO-TAB] Error scheduling delayed switch: {e}")
+    
+    def _set_pending_ring_finder_switch(self) -> None:
+        """Set a flag to switch to Ring Finder on next supercruise/FSD event
+        
+        Called when session ends. If already in supercruise, triggers the delayed
+        switch immediately. Otherwise waits for SupercruiseEntry or FSDJump event.
+        """
+        try:
+            if self.main_app and hasattr(self.main_app, 'auto_switch_tabs'):
+                if self.main_app.auto_switch_tabs.get():
+                    # Check if already in supercruise via Status.json
+                    status_data = self._get_current_status_data()
+                    flags = status_data.get("Flags", 0)
+                    # Flag 16 = Supercruise (bit 4)
+                    in_supercruise = bool(flags & 16)
+                    
+                    if in_supercruise:
+                        # Already in supercruise - trigger delayed switch immediately
+                        print("[AUTO-TAB] Session ended while in supercruise - will switch to ring finder in 10 seconds")
+                        self._auto_switch_to_ring_finder_delayed()
+                    else:
+                        # Not in supercruise - wait for next supercruise/FSD event
+                        self._pending_ring_finder_switch = True
+                        print("[AUTO-TAB] Session ended - will switch to ring finder on next supercruise/FSD jump")
+        except Exception as e:
+            print(f"[AUTO-TAB] Error setting pending switch: {e}")
+
     def _session_start(self) -> None:
         if self.session_active:
             return
@@ -10864,6 +11000,9 @@ class ProspectorPanel(ttk.Frame):
             except Exception as window_error:
                 pass  # Silently handle refresh errors
             
+            # Set pending switch to Ring Finder (will trigger on next supercruise/FSD jump)
+            self._set_pending_ring_finder_switch()
+            
         except Exception as e:
             self._set_status(f"Report save/open failed: {e}")
 
@@ -10983,12 +11122,12 @@ class ProspectorPanel(ttk.Frame):
         style = ttk.Style()
         
         if _bm_theme == "elite_orange":
-            _bm_bg = "#0a0a0a"
+            _bm_bg = "#1e1e1e"
             _bm_fg = "#ff8c00"
             _bm_hdr = "#1a1a1a"
             _bm_sel_bg = "#ff6600"
             _bm_sel_fg = "#000000"
-            _bm_alt = "#151515"
+            _bm_alt = "#252525"
         else:
             _bm_bg = "#1e1e1e"
             _bm_fg = "#e6e6e6"
@@ -11049,8 +11188,8 @@ class ProspectorPanel(ttk.Frame):
         # Configure column headings
         self.bookmarks_tree.heading("last_mined", text="Last Mined", anchor="w")
         self.bookmarks_tree.heading("system", text="System", anchor="w")
-        self.bookmarks_tree.heading("body", text="Planet/Ring", anchor="w")
-        self.bookmarks_tree.heading("hotspot", text="Ring Type", anchor="w")
+        self.bookmarks_tree.heading("body", text="Location", anchor="w")
+        self.bookmarks_tree.heading("hotspot", text="Type", anchor="w")
         self.bookmarks_tree.heading("materials", text="Minerals Found", anchor="w")
         self.bookmarks_tree.heading("avg_yield", text="Avg Yield %", anchor="w")
         self.bookmarks_tree.heading("overlap", text="Overlap", anchor="w")
@@ -11721,8 +11860,23 @@ class ProspectorPanel(ttk.Frame):
 
     def _setup_bookmark_context_menu(self) -> None:
         """Setup right-click context menu for bookmarks tree"""
-        # Create context menu with dark theme styling
-        self.bookmark_context_menu = tk.Menu(self, tearoff=0, bg="#2d2d2d", fg="#ffffff")
+        # Create context menu with theme-aware colors
+        from config import load_theme
+        _menu_theme = load_theme()
+        if _menu_theme == "elite_orange":
+            _menu_bg = "#1e1e1e"
+            _menu_fg = "#ff8c00"
+            _menu_active_bg = "#ff6600"
+            _menu_active_fg = "#000000"
+        else:
+            _menu_bg = "#2d2d2d"
+            _menu_fg = "#ffffff"
+            _menu_active_bg = "#404040"
+            _menu_active_fg = "#ffffff"
+        self.bookmark_context_menu = tk.Menu(self, tearoff=0, 
+                                            bg=_menu_bg, fg=_menu_fg,
+                                            activebackground=_menu_active_bg,
+                                            activeforeground=_menu_active_fg)
         self.bookmark_context_menu.add_command(label="Copy System Name", command=self._copy_system_to_clipboard)
         self.bookmark_context_menu.add_separator()
         self.bookmark_context_menu.add_command(label="Edit Bookmark", command=self._edit_bookmark_dialog)

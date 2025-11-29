@@ -42,6 +42,7 @@ Full-featured mining companion with GUI controls:
 - Mining announcements & notifications  
 - **Engineering materials tracking** – Monitor raw materials by grade
 - **Auto-start mining session** – Automatically begins tracking when you fire your first prospector limpet
+- **Auto-Switch Tabs** – Automatically switches to Mining Session when you fire a prospector, returns to Hotspots Finder after session ends
 - **Cargo full notification** – Prompts you to end session when cargo hold is 100% full and idle for 1 minute
 - Session tracking & history  
 - Ship configuration management  
