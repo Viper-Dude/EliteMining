@@ -631,7 +631,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.6.3"
+APP_VERSION = "v4.6.4"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4445,7 +4445,7 @@ class App(tk.Tk):
 
         # Two-column layout: balanced dashboard + narrower presets sidebar
         self.columnconfigure(0, weight=2, minsize=300)   # Dashboard content (tabs) - balanced
-        self.columnconfigure(1, weight=1, minsize=300)   # Ship Presets sidebar - narrower
+        self.columnconfigure(1, weight=1, minsize=250)   # Ship Presets sidebar - narrower
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=0)      # Status bar
 
@@ -4683,9 +4683,13 @@ class App(tk.Tk):
 
     def _build_ui(self):
         """Build the main user interface"""
+        # Create horizontal paned window for resizable sidebar
+        self.main_paned = ttk.PanedWindow(self, orient="horizontal")
+        self.main_paned.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        
         # Left pane: tabs container
-        content_frame = ttk.Frame(self, padding=(10, 6, 6, 6))
-        content_frame.grid(row=0, column=0, sticky="nsew")
+        content_frame = ttk.Frame(self.main_paned, padding=(10, 6, 6, 6))
+        self.main_paned.add(content_frame, weight=3)  # Add to paned window with higher weight
         content_frame.columnconfigure(0, weight=1)
         content_frame.rowconfigure(0, weight=1)
         content_frame.rowconfigure(1, weight=0)
@@ -4752,47 +4756,9 @@ class App(tk.Tk):
 
         # Create the sidebar (Ship Presets + Cargo Monitor)
         self._create_main_sidebar()
-        
-        import_btn = tk.Button(
-            actions, 
-            text="⬇ Import from Game", 
-            command=self._import_all_from_txt,
-            bg="#3a3a3a",           # Subtle dark gray
-            fg="#e0e0e0", 
-            activebackground="#4a4a4a", 
-            activeforeground="#ffffff",
-            relief="ridge",         # Subtle raised effect
-            bd=1,                   
-            padx=8,                
-            pady=3,
-            font=("Segoe UI", 8, "normal"),  
-            cursor="hand2"
-        )
-        import_btn.grid(row=0, column=0, sticky="w")
-        # Expose import button for focus control from other methods
-        self.import_btn = import_btn
-        ToolTip(import_btn, "Read VoiceAttack settings from game files\n(Firegroups, Mining Controls, Announcements)")
-        
-        apply_btn = tk.Button(
-            actions, 
-            text="⬆ Apply to Game", 
-            command=self._save_all_to_txt,
-            bg="#2a4a2a",           # Subtle green tint
-            fg="#e0e0e0", 
-            activebackground="#3a5a3a", 
-            activeforeground="#ffffff",
-            relief="ridge",         # Subtle raised effect
-            bd=1,                   
-            padx=8,                
-            pady=3,
-            font=("Segoe UI", 8, "normal"),  
-            cursor="hand2"
-        )
-        apply_btn.grid(row=0, column=1, sticky="w", padx=(10, 0))
-        ToolTip(apply_btn, "Save settings to VoiceAttack variable files\nPress after:\n• Selecting a Ship Preset\n• Changing any settings in Mining Controls or Firegroups tab")
 
         # Configure column weights for proper spacing
-        actions.grid_columnconfigure(2, weight=1)  # Expandable space
+        actions.grid_columnconfigure(0, weight=1)  # Expandable space
         
         # CMDR/System info container (right side) - uses frame for mixed colors
         # Use black background for orange theme
@@ -4803,6 +4769,23 @@ class App(tk.Tk):
         info_frame = tk.Frame(actions, bg=_info_bg)
         info_frame.grid(row=0, column=3, sticky="e", padx=(10, 5))
         
+        # EliteMining logo (resized to fit status bar)
+        try:
+            from PIL import Image, ImageTk
+            logo_path = os.path.join(os.path.dirname(__file__), "Images", "EliteMining_txt_logo_transp_resize.png")
+            if os.path.exists(logo_path):
+                logo_img = Image.open(logo_path)
+                # Resize to fit status bar height (smaller to avoid stretched look)
+                target_height = 16
+                aspect_ratio = logo_img.width / logo_img.height
+                target_width = int(target_height * aspect_ratio)
+                logo_img = logo_img.resize((target_width, target_height), Image.LANCZOS)
+                self._status_logo = ImageTk.PhotoImage(logo_img)
+                logo_label = tk.Label(info_frame, image=self._status_logo, bg=_info_bg)
+                logo_label.grid(row=0, column=0, sticky="e", padx=(0, 6))
+        except Exception as e:
+            print(f"Could not load status bar logo: {e}")
+        
         # Labels for mixed colors (white labels, yellow values)
         self.cmdr_label_prefix = tk.Label(info_frame, text="CMDR:", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
@@ -4811,13 +4794,13 @@ class App(tk.Tk):
         self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.route_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         
-        # Grid them horizontally (tighter spacing)
-        self.cmdr_label_prefix.grid(row=0, column=0, sticky="e")
-        self.cmdr_label_value.grid(row=0, column=1, sticky="w")
-        self.system_label_prefix.grid(row=0, column=2, sticky="e")
-        self.system_label_value.grid(row=0, column=3, sticky="w")
-        self.route_label_prefix.grid(row=0, column=4, sticky="e")
-        self.route_label_value.grid(row=0, column=5, sticky="w")
+        # Grid them horizontally (tighter spacing) - shift columns to make room for logo
+        self.cmdr_label_prefix.grid(row=0, column=1, sticky="e")
+        self.cmdr_label_value.grid(row=0, column=2, sticky="w")
+        self.system_label_prefix.grid(row=0, column=3, sticky="e")
+        self.system_label_value.grid(row=0, column=4, sticky="w")
+        self.route_label_prefix.grid(row=0, column=5, sticky="e")
+        self.route_label_value.grid(row=0, column=6, sticky="w")
         
         # Theme toggle button - shows current theme name
         from config import load_theme
@@ -4858,7 +4841,7 @@ class App(tk.Tk):
 
         # Ensure focus is on a neutral button to prevent initial Entry highlights
         try:
-            self.after(300, lambda: import_btn.focus_set())
+            self.after(300, lambda: self.import_btn.focus_set())
         except Exception:
             pass
 
@@ -6761,37 +6744,87 @@ class App(tk.Tk):
 
     def _create_main_sidebar(self) -> None:
         """Create the main Ship Presets and Cargo Monitor sidebar"""
-        # Create the sidebar frame
-        sidebar = ttk.Frame(self, padding=(6, 6, 10, 6))
-        sidebar.grid(row=0, column=1, sticky="nsew")
+        # Create the sidebar frame - add to main paned window
+        sidebar = ttk.Frame(self.main_paned, padding=(6, 6, 10, 6))
         sidebar.columnconfigure(0, weight=1)
         sidebar.rowconfigure(0, weight=1)
+        
+        # Add both panes to the horizontal paned window
+        # Content frame was already created in _build_ui, add it first
+        # Then add sidebar
+        self.main_paned.add(sidebar, weight=1)
+        
+        # Set initial sash position after window is displayed
+        def _set_initial_sash():
+            try:
+                total_width = self.winfo_width()
+                if total_width > 100:  # Only if window has been drawn
+                    # Try to restore saved position first
+                    from config import load_main_sash_position
+                    saved_pos = load_main_sash_position()
+                    if saved_pos is not None and 100 < saved_pos < total_width - 100:
+                        self.main_paned.sashpos(0, saved_pos)
+                    else:
+                        # Default: sidebar ~300px wide
+                        sash_pos = total_width - 300
+                        self.main_paned.sashpos(0, sash_pos)
+            except Exception:
+                pass
+        self.after(200, _set_initial_sash)
+        
+        # Save main sash position when it changes
+        def _on_main_sash_moved(event):
+            try:
+                from config import save_main_sash_position
+                pos = self.main_paned.sashpos(0)
+                if pos > 100:  # Only save valid positions
+                    save_main_sash_position(pos)
+            except Exception:
+                pass
+        self.main_paned.bind("<ButtonRelease-1>", _on_main_sash_moved)
 
         # Create vertical paned window for split layout
         paned_window = ttk.PanedWindow(sidebar, orient="vertical")
         paned_window.grid(row=0, column=0, sticky="nsew")
+        self.sidebar_paned = paned_window  # Store reference for sash positioning
         
         # Top pane - Presets section
         presets_pane = ttk.Frame(paned_window)
         paned_window.add(presets_pane, weight=5)
         presets_pane.columnconfigure(0, weight=1)
-        presets_pane.rowconfigure(2, weight=1)  # Row 2 will be the preset list
+        presets_pane.rowconfigure(2, weight=1)  # Row 2 (preset list) expands
+        presets_pane.rowconfigure(3, weight=0)  # Row 3 (buttons) stays at bottom
 
         # Ship Presets title
-        presets_title = ttk.Label(presets_pane, text="⚙️ Ship Presets (VoiceAttack only)", font=("Segoe UI", 11, "bold"))
+        presets_title = ttk.Label(presets_pane, text="⚙️ Ship Presets (VoiceAttack)", font=("Segoe UI", 10, "bold"))
         presets_title.grid(row=0, column=0, sticky="w", pady=(0, 2))
         
+        # Set minimum height for presets pane to prevent collapse
+        presets_pane.configure(height=200)
+        presets_pane.grid_propagate(True)
+        
         # Help text for preset operations
-        help_text = ttk.Label(presets_pane, text="Right click preset for options", 
+        help_text = ttk.Label(presets_pane, text="Right click for options", 
                              font=("Segoe UI", 8), foreground="#666666")
         help_text.grid(row=1, column=0, sticky="w", pady=(0, 6))
         
-        # Scrollable preset list
-        self.preset_list = ttk.Treeview(presets_pane, columns=("name",), show="headings", selectmode="browse")
-        self.preset_list.heading("name", text="Configuration Presets", anchor="w")
-        self.preset_list.column("name", anchor="w", stretch=True, width=400, minwidth=350)
+        # Configure treeview style for selection highlight (theme-aware)
+        style = ttk.Style()
+        if self.current_theme == "elite_orange":
+            style.map("Treeview",
+                     background=[("selected", "#ff8c00")],
+                     foreground=[("selected", "#000000")])
+        else:
+            style.map("Treeview",
+                     background=[("selected", "#404040")],
+                     foreground=[("selected", "#ffffff")])
+        
+        # Scrollable preset list - hierarchical treeview with ship groups
+        self.preset_list = ttk.Treeview(presets_pane, columns=("name",), show="tree", selectmode="browse")
+        self.preset_list.column("#0", anchor="w", stretch=True, width=280, minwidth=220)
+        self.preset_list.column("name", width=0, stretch=False)  # Hidden column to store full preset name
         self.preset_list.grid(row=2, column=0, sticky="nsew")
-        self.preset_list.bind("<Double-1>", lambda e: self._load_selected_preset())
+        self.preset_list.bind("<Double-1>", self._on_preset_double_click)
         self.preset_list.bind("<Return>", lambda e: self._load_selected_preset())
 
         # Add scrollbar to preset list
@@ -6799,31 +6832,133 @@ class App(tk.Tk):
         preset_scrollbar.grid(row=2, column=1, sticky="ns")
         self.preset_list.configure(yscrollcommand=preset_scrollbar.set)
         presets_pane.columnconfigure(1, weight=0)
+        
+        # Configure row tags for alternating colors (theme-aware)
+        self._configure_preset_list_row_colors()
+        
+        # Import/Apply buttons at the bottom of presets pane
+        preset_buttons_frame = ttk.Frame(presets_pane)
+        preset_buttons_frame.grid(row=3, column=0, columnspan=2, sticky="s", pady=(6, 4))
+        
+        import_btn = tk.Button(
+            preset_buttons_frame, 
+            text="⬇ Import", 
+            command=self._import_all_from_txt,
+            bg="#3a3a3a",
+            fg="#e0e0e0", 
+            activebackground="#4a4a4a", 
+            activeforeground="#ffffff",
+            relief="ridge",
+            bd=1,                   
+            padx=8,                
+            pady=2,
+            font=("Segoe UI", 8, "normal"),  
+            cursor="hand2"
+        )
+        import_btn.grid(row=0, column=0, padx=(0, 4))
+        self.import_btn = import_btn
+        ToolTip(import_btn, "Read VoiceAttack settings from game files\n(Firegroups, Mining Controls, Announcements)")
+        
+        apply_btn = tk.Button(
+            preset_buttons_frame, 
+            text="⬆ Apply", 
+            command=self._save_all_to_txt,
+            bg="#2a4a2a",
+            fg="#e0e0e0", 
+            activebackground="#3a5a3a", 
+            activeforeground="#ffffff",
+            relief="ridge",
+            bd=1,                   
+            padx=8,                
+            pady=2,
+            font=("Segoe UI", 8, "normal"),  
+            cursor="hand2"
+        )
+        apply_btn.grid(row=0, column=1, padx=(4, 0))
+        ToolTip(apply_btn, "Save settings to VoiceAttack variable files\nPress after:\n• Selecting a Ship Preset\n• Changing any settings in Mining Controls or Firegroups tab")
 
-        # Context menu with dark theme
+        # Get theme-aware menu colors
+        from core.constants import get_menu_colors
+        menu_colors = get_menu_colors(self.current_theme)
+        
+        # Context menu with theme-aware colors (for presets)
         self._preset_menu = tk.Menu(self, tearoff=0, 
-                                  bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"], 
-                                  activebackground=MENU_COLORS["activebackground"], 
-                                  activeforeground=MENU_COLORS["activeforeground"],
-                                  selectcolor=MENU_COLORS["selectcolor"])
+                                  bg=menu_colors["bg"], fg=menu_colors["fg"], 
+                                  activebackground=menu_colors["activebackground"], 
+                                  activeforeground=menu_colors["activeforeground"],
+                                  selectcolor=menu_colors["selectcolor"])
         self._preset_menu.add_command(label="Save as New", command=self._save_as_new)
         self._preset_menu.add_command(label="Overwrite", command=self._overwrite_selected)
+        self._preset_menu.add_separator()
+        self._preset_menu.add_command(label="Edit", command=self._edit_selected_preset)
         self._preset_menu.add_command(label="Duplicate", command=self._duplicate_selected_preset)
         self._preset_menu.add_command(label="Rename", command=self._rename_selected_preset)
         self._preset_menu.add_separator()
         self._preset_menu.add_command(label="Export…", command=self._export_selected_preset)
         self._preset_menu.add_command(label="Import…", command=self._import_preset_file)
         self._preset_menu.add_separator()
+        self._preset_menu.add_command(label="Expand All", command=self._expand_all_preset_groups)
+        self._preset_menu.add_command(label="Collapse All", command=self._collapse_all_preset_groups)
+        self._preset_menu.add_separator()
         self._preset_menu.add_command(label="Delete", command=self._delete_selected)
+        
+        # Context menu for empty space (limited options)
+        self._preset_empty_menu = tk.Menu(self, tearoff=0, 
+                                  bg=menu_colors["bg"], fg=menu_colors["fg"], 
+                                  activebackground=menu_colors["activebackground"], 
+                                  activeforeground=menu_colors["activeforeground"],
+                                  selectcolor=menu_colors["selectcolor"])
+        self._preset_empty_menu.add_command(label="Save as New", command=self._save_as_new)
+        self._preset_empty_menu.add_command(label="Import…", command=self._import_preset_file)
+        self._preset_empty_menu.add_separator()
+        self._preset_empty_menu.add_command(label="Expand All", command=self._expand_all_preset_groups)
+        self._preset_empty_menu.add_command(label="Collapse All", command=self._collapse_all_preset_groups)
+        
         self.preset_list.bind("<Button-3>", self._show_preset_menu)
 
         # Bottom pane - Cargo Monitor
         cargo_pane = ttk.Frame(paned_window)
         paned_window.add(cargo_pane, weight=5)
+        
+        # Set minimum height for cargo pane to prevent collapse
+        cargo_pane.configure(height=150)
+        cargo_pane.grid_propagate(True)
+        
         self._create_integrated_cargo_monitor(cargo_pane)
 
         # Refresh the preset list
         self._refresh_preset_list()
+        
+        # Ensure both panes are visible by setting sash position after window is drawn
+        def _ensure_panes_visible():
+            try:
+                # Get the total height of the paned window
+                paned_window.update_idletasks()
+                total_height = paned_window.winfo_height()
+                if total_height > 100:
+                    # Try to restore saved sash position first
+                    from config import load_sidebar_sash_position
+                    saved_pos = load_sidebar_sash_position()
+                    if saved_pos is not None and 50 < saved_pos < total_height - 50:
+                        paned_window.sashpos(0, saved_pos)
+                    else:
+                        # Default: give 60% to presets, 40% to cargo monitor
+                        sash_pos = int(total_height * 0.6)
+                        paned_window.sashpos(0, sash_pos)
+            except Exception:
+                pass
+        self.after(300, _ensure_panes_visible)
+        
+        # Save sash position when it changes
+        def _on_sash_moved(event):
+            try:
+                from config import save_sidebar_sash_position
+                pos = paned_window.sashpos(0)
+                if pos > 50:  # Only save valid positions
+                    save_sidebar_sash_position(pos)
+            except Exception:
+                pass
+        paned_window.bind("<ButtonRelease-1>", _on_sash_moved)
         
     def _refresh_voice_list(self):
         """Refresh the TTS voice dropdown list"""
@@ -7324,9 +7459,88 @@ class App(tk.Tk):
     def _settings_path(self, name: str) -> str:
         return os.path.join(self.settings_dir, f"{name}.json")
 
+    def _configure_preset_list_row_colors(self) -> None:
+        """Configure row colors for preset list based on current theme"""
+        if self.current_theme == "elite_orange":
+            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#ff8c00')
+            self.preset_list.tag_configure('evenrow', background='#252525', foreground='#ff8c00')
+            self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#ffcc00', font=("Segoe UI", 9, "bold"))
+        else:
+            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6')
+            self.preset_list.tag_configure('evenrow', background='#282828', foreground='#e6e6e6')
+            self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#aaaaaa', font=("Segoe UI", 9, "bold"))
+    
+    def _parse_preset_ship_type(self, preset_name: str) -> tuple:
+        """Parse preset name to extract ship type and build variant.
+        
+        Examples:
+            'Adder Test' -> ('Adder', 'Test')
+            'Type-11 Prospector HAZ' -> ('Type-11 Prospector', 'HAZ')
+            'Imperial Cutter 4x lasers' -> ('Imperial Cutter', '4x lasers')
+            'Python Mk II Core Mining' -> ('Python Mk II', 'Core Mining')
+        
+        Returns:
+            (ship_type, variant) tuple
+        """
+        # Known ship types (must match the dropdown list, longest first for proper matching)
+        known_ships = [
+            "Alliance Challenger", "Alliance Chieftain", "Alliance Crusader",
+            "Asp Explorer", "Asp Scout",
+            "Beluga Liner",
+            "Caspian Explorer",
+            "Cobra Mk III", "Cobra Mk IV", "Cobra Mk V",
+            "Corsair",
+            "Diamondback Explorer", "Diamondback Scout",
+            "Dolphin",
+            "Eagle Mk II",
+            "Federal Assault Ship", "Federal Corvette", "Federal Dropship", "Federal Gunship",
+            "Fer-de-Lance",
+            "Hauler",
+            "Imperial Clipper", "Imperial Courier", "Imperial Cutter", "Imperial Eagle",
+            "Keelback",
+            "Krait Mk II", "Krait Phantom",
+            "Mamba", "Mandalay",
+            "Orca",
+            "Panther Clipper Mk II",
+            "Python Mk II", "Python",
+            "Sidewinder Mk I",
+            "Type-11 Prospector", "Type-10 Defender", "Type-9 Heavy", 
+            "Type-8 Transporter", "Type-7 Transporter", "Type-6 Transporter",
+            "Viper Mk III", "Viper Mk IV",
+            "Vulture",
+            "Anaconda", "Adder",  # Short names last
+        ]
+        
+        # Try to match against known ship names
+        name_to_check = preset_name
+        for ship in known_ships:
+            if name_to_check.lower().startswith(ship.lower()):
+                # Found a matching ship
+                variant = name_to_check[len(ship):].strip()
+                # Clean up variant (remove leading separators)
+                if variant.startswith("-") or variant.startswith("_"):
+                    variant = variant[1:].strip()
+                return (ship, variant if variant else "")
+        
+        # No known ship type found - use full name as group
+        return (preset_name, "")
+    
+    def _expand_all_preset_groups(self) -> None:
+        """Expand all ship type groups in the preset list"""
+        for item in self.preset_list.get_children():
+            self.preset_list.item(item, open=True)
+    
+    def _collapse_all_preset_groups(self) -> None:
+        """Collapse all ship type groups in the preset list"""
+        for item in self.preset_list.get_children():
+            self.preset_list.item(item, open=False)
+    
     def _refresh_preset_list(self) -> None:
+        """Refresh preset list with grouped hierarchy by ship type"""
         for item in self.preset_list.get_children():
             self.preset_list.delete(item)
+        
+        # Collect all preset names
         names = []
         try:
             for fn in os.listdir(self.settings_dir):
@@ -7334,8 +7548,66 @@ class App(tk.Tk):
                     names.append(os.path.splitext(fn)[0])
         except Exception:
             pass
-        for n in sorted(names, key=str.casefold):
-            self.preset_list.insert("", "end", values=(PRESET_INDENT + n,))
+        
+        # Group by ship type
+        groups = {}
+        for name in sorted(names, key=str.casefold):
+            ship_type, variant = self._parse_preset_ship_type(name)
+            if ship_type not in groups:
+                groups[ship_type] = []
+            groups[ship_type].append((name, variant))
+        
+        # Insert groups and presets
+        row_idx = 0
+        for ship_type in sorted(groups.keys(), key=str.casefold):
+            presets = groups[ship_type]
+            
+            # Create group header (not selectable for loading)
+            group_id = self.preset_list.insert("", "end", text=f"📁 {ship_type}", 
+                                               open=True, tags=('group',))
+            
+            # Add presets under this group
+            for full_name, variant in presets:
+                row_tag = 'evenrow' if row_idx % 2 == 0 else 'oddrow'
+                # Display variant (or "Default" if empty), store full name in values
+                display_text = variant if variant else "Default"
+                self.preset_list.insert(group_id, "end", text=f"      {display_text}", 
+                                        values=(full_name,), tags=(row_tag,))
+                row_idx += 1
+    
+    def _select_preset_by_name(self, preset_name: str) -> bool:
+        """Find and select a preset by its full name in the hierarchical tree.
+        Returns True if found, False otherwise."""
+        # Search through all groups and their children
+        for group_id in self.preset_list.get_children():
+            for item_id in self.preset_list.get_children(group_id):
+                values = self.preset_list.item(item_id, "values")
+                if values and values[0] == preset_name:
+                    # Found it - expand group, select, and scroll to it
+                    self.preset_list.item(group_id, open=True)
+                    self.preset_list.selection_set(item_id)
+                    self.preset_list.see(item_id)
+                    self.preset_list.focus(item_id)
+                    return True
+        return False
+    
+    def _on_preset_double_click(self, event) -> None:
+        """Handle double-click on preset list - load preset or toggle group"""
+        item = self.preset_list.identify_row(event.y)
+        if not item:
+            return
+        
+        # Check if this is a group header (has children)
+        children = self.preset_list.get_children(item)
+        if children:
+            # It's a group - toggle expand/collapse
+            if self.preset_list.item(item, "open"):
+                self.preset_list.item(item, open=False)
+            else:
+                self.preset_list.item(item, open=True)
+        else:
+            # It's a preset - load it
+            self._load_selected_preset()
 
     def _current_mapping(self) -> Dict[str, Any]:
         # Exclude Core/Non-Core settings from ship presets
@@ -7457,16 +7729,222 @@ class App(tk.Tk):
         dialog.wait_window()
         return result if result else None
 
+    def _ask_new_preset_name(self) -> Optional[str]:
+        """Dialog for creating new preset with Ship Type dropdown and custom name"""
+        # Complete Elite Dangerous ship list (alphabetical)
+        ship_types = [
+            "Adder",
+            "Alliance Challenger",
+            "Alliance Chieftain",
+            "Alliance Crusader",
+            "Anaconda",
+            "Asp Explorer",
+            "Asp Scout",
+            "Beluga Liner",
+            "Caspian Explorer",
+            "Cobra Mk III",
+            "Cobra Mk IV",
+            "Cobra Mk V",
+            "Corsair",
+            "Diamondback Explorer",
+            "Diamondback Scout",
+            "Dolphin",
+            "Eagle Mk II",
+            "Federal Assault Ship",
+            "Federal Corvette",
+            "Federal Dropship",
+            "Federal Gunship",
+            "Fer-de-Lance",
+            "Hauler",
+            "Imperial Clipper",
+            "Imperial Courier",
+            "Imperial Cutter",
+            "Imperial Eagle",
+            "Keelback",
+            "Krait Mk II",
+            "Krait Phantom",
+            "Mamba",
+            "Mandalay",
+            "Orca",
+            "Panther Clipper Mk II",
+            "Python",
+            "Python Mk II",
+            "Sidewinder Mk I",
+            "Type-6 Transporter",
+            "Type-7 Transporter",
+            "Type-8 Transporter",
+            "Type-9 Heavy",
+            "Type-10 Defender",
+            "Type-11 Prospector",
+            "Viper Mk III",
+            "Viper Mk IV",
+            "Vulture",
+            "Other"
+        ]
+        
+        dialog = tk.Toplevel(self)
+        dialog.withdraw()  # Hide while setting up
+        dialog.title("New Ship Preset")
+        dialog.configure(bg="#1e1e1e")
+        dialog.geometry("450x240")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        # Theme-aware accent color
+        if self.current_theme == "elite_orange":
+            accent_color = "#ff8c00"
+            accent_fg = "#000000"
+        else:
+            accent_color = "#4a9eff"
+            accent_fg = "#ffffff"
+        
+        # Configure theme style for combobox
+        style = ttk.Style(dialog)
+        style.configure("Preset.TCombobox", 
+                       fieldbackground="#2d2d2d",
+                       background="#2d2d2d",
+                       foreground="#ffffff",
+                       selectbackground=accent_color,
+                       selectforeground=accent_fg)
+        style.map("Preset.TCombobox",
+                 fieldbackground=[("readonly", "#2d2d2d")],
+                 selectbackground=[("readonly", accent_color)],
+                 selectforeground=[("readonly", accent_fg)])
+        
+        # Set app icon
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+            elif icon_path and icon_path.endswith('.png'):
+                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+        except Exception:
+            pass
+        
+        # Center on parent
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        result = None
+        
+        # Title
+        title_label = tk.Label(dialog, text="💾 Create New Ship Preset", 
+                              bg="#1e1e1e", fg="#ff8c00", 
+                              font=("Segoe UI", 12, "bold"))
+        title_label.pack(pady=(15, 15))
+        
+        # Ship Type selection
+        type_frame = tk.Frame(dialog, bg="#1e1e1e")
+        type_frame.pack(fill="x", padx=25, pady=(0, 10))
+        
+        tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
+                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+        
+        ship_var = tk.StringVar(value=ship_types[0])
+        ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
+                                  state="readonly", width=28, font=("Segoe UI", 10),
+                                  style="Preset.TCombobox")
+        ship_combo.pack(side=tk.LEFT, padx=(15, 0))
+        
+        # Custom name entry
+        name_frame = tk.Frame(dialog, bg="#1e1e1e")
+        name_frame.pack(fill="x", padx=25, pady=10)
+        
+        tk.Label(name_frame, text="Build Name:", bg="#1e1e1e", fg="#ffffff", 
+                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+        
+        name_entry = tk.Entry(name_frame, font=("Segoe UI", 10), width=30,
+                             bg="#2d2d2d", fg="#ffffff", insertbackground=accent_color,
+                             selectbackground=accent_color, selectforeground=accent_fg,
+                             relief="flat", bd=2)
+        name_entry.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Preview
+        preview_frame = tk.Frame(dialog, bg="#1e1e1e")
+        preview_frame.pack(fill="x", padx=25, pady=10)
+        
+        tk.Label(preview_frame, text="Preview:", bg="#1e1e1e", fg="#888888", 
+                font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        
+        preview_label = tk.Label(preview_frame, text="", bg="#1e1e1e", fg=accent_color, 
+                                font=("Segoe UI", 10, "bold"))
+        preview_label.pack(side=tk.LEFT, padx=(10, 0))
+        
+        def update_preview(*args):
+            ship = ship_var.get()
+            name = name_entry.get().strip()
+            if name:
+                preview_label.config(text=f"{ship} {name}")
+            else:
+                preview_label.config(text=f"{ship}")
+        
+        ship_var.trace("w", update_preview)
+        name_entry.bind("<KeyRelease>", update_preview)
+        update_preview()  # Initial preview
+        
+        # Buttons frame
+        btn_frame = tk.Frame(dialog, bg="#1e1e1e")
+        btn_frame.pack(pady=15)
+        
+        def on_ok():
+            nonlocal result
+            ship = ship_var.get()
+            name = name_entry.get().strip()
+            if name:
+                result = f"{ship} {name}"
+            else:
+                result = ship
+            dialog.destroy()
+            
+        def on_cancel():
+            dialog.destroy()
+            
+        ok_btn = tk.Button(btn_frame, text="💾 Save", command=on_ok,
+                          bg=accent_color, fg=accent_fg, font=("Segoe UI", 10, "bold"),
+                          activebackground=accent_color, activeforeground=accent_fg,
+                          width=10, cursor="hand2")
+        ok_btn.pack(side=tk.LEFT, padx=5)
+        
+        cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel,
+                              bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                              activebackground="#4a4a4a", activeforeground="#ffffff",
+                              width=10, cursor="hand2")
+        cancel_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Bind Enter/Escape
+        dialog.bind('<Return>', lambda e: on_ok())
+        dialog.bind('<Escape>', lambda e: on_cancel())
+        
+        # Show dialog
+        dialog.deiconify()
+        name_entry.focus_set()
+        dialog.wait_window()
+        return result if result else None
+
     def _get_selected_preset(self) -> Optional[str]:
+        """Get the selected preset name (not group headers)"""
         sel = self.preset_list.selection()
         if not sel:
             return None
         item_id = sel[0]
-        raw = self.preset_list.item(item_id, "values")[0]
-        return raw.strip()
+        
+        # Check if this is a group header (has children)
+        children = self.preset_list.get_children(item_id)
+        if children:
+            # It's a group, not a preset
+            return None
+        
+        # Get the full preset name from values
+        values = self.preset_list.item(item_id, "values")
+        if values:
+            return values[0]  # Full preset name stored in values
+        return None
 
     def _save_as_new(self) -> None:
-        name = self._ask_preset_name()
+        name = self._ask_new_preset_name()
         if not name:
             return
         path = self._settings_path(name)
@@ -7476,6 +7954,8 @@ class App(tk.Tk):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self._current_mapping(), f, indent=2)
         self._refresh_preset_list()
+        # Select the newly created preset
+        self._select_preset_by_name(name)
         self._set_status(f"Saved new preset '{name}'.")
 
     def _overwrite_selected(self) -> None:
@@ -7496,6 +7976,229 @@ class App(tk.Tk):
         with open(self._settings_path(sel), "w", encoding="utf-8") as f:
             json.dump(self._current_mapping(), f, indent=2)
         self._set_status(f"Overwrote preset '{sel}'.")
+
+    def _edit_selected_preset(self) -> None:
+        """Edit the selected preset - change ship type and build name"""
+        old_name = self._get_selected_preset()
+        if not old_name:
+            from app_utils import centered_message
+            centered_message(self, "No preset selected", "Choose a preset to edit.")
+            return
+        
+        # Parse current name to get ship type and variant
+        detected_ship, detected_variant = self._parse_preset_ship_type(old_name)
+        
+        # Show edit dialog (reuse import dialog logic)
+        new_name = self._ask_edit_preset_name(detected_ship, detected_variant, old_name)
+        if not new_name or new_name == old_name:
+            return
+        
+        # Check if new name already exists
+        new_path = self._settings_path(new_name)
+        if os.path.exists(new_path):
+            messagebox.showerror("Edit failed", f"A preset named '{new_name}' already exists.")
+            return
+        
+        # Rename the file
+        old_path = self._settings_path(old_name)
+        try:
+            os.rename(old_path, new_path)
+            self._refresh_preset_list()
+            self._select_preset_by_name(new_name)
+            self._set_status(f"Updated preset to '{new_name}'.")
+        except Exception as e:
+            messagebox.showerror("Edit failed", str(e))
+
+    def _ask_edit_preset_name(self, detected_ship: str, detected_variant: str, original_name: str) -> Optional[str]:
+        """Dialog for editing preset - change ship type and build name"""
+        # Complete Elite Dangerous ship list (alphabetical)
+        ship_types = [
+            "Adder",
+            "Alliance Challenger", "Alliance Chieftain", "Alliance Crusader",
+            "Anaconda",
+            "Asp Explorer", "Asp Scout",
+            "Beluga Liner",
+            "Caspian Explorer",
+            "Cobra Mk III", "Cobra Mk IV", "Cobra Mk V",
+            "Corsair",
+            "Diamondback Explorer", "Diamondback Scout",
+            "Dolphin",
+            "Eagle Mk II",
+            "Federal Assault Ship", "Federal Corvette", "Federal Dropship", "Federal Gunship",
+            "Fer-de-Lance",
+            "Hauler",
+            "Imperial Clipper", "Imperial Courier", "Imperial Cutter", "Imperial Eagle",
+            "Keelback",
+            "Krait Mk II", "Krait Phantom",
+            "Mamba", "Mandalay",
+            "Orca",
+            "Panther Clipper Mk II",
+            "Python", "Python Mk II",
+            "Sidewinder Mk I",
+            "Type-6 Transporter", "Type-7 Transporter", "Type-8 Transporter",
+            "Type-9 Heavy", "Type-10 Defender", "Type-11 Prospector",
+            "Viper Mk III", "Viper Mk IV",
+            "Vulture",
+            "Other"
+        ]
+        
+        dialog = tk.Toplevel(self)
+        dialog.withdraw()
+        dialog.title("Edit Ship Preset")
+        dialog.configure(bg="#1e1e1e")
+        dialog.geometry("480x280")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        # Theme-aware accent color
+        if self.current_theme == "elite_orange":
+            accent_color = "#ff8c00"
+            accent_fg = "#000000"
+        else:
+            accent_color = "#4a9eff"
+            accent_fg = "#ffffff"
+        
+        # Configure theme style for combobox
+        style = ttk.Style(dialog)
+        style.configure("Preset.TCombobox", 
+                       fieldbackground="#2d2d2d",
+                       background="#2d2d2d",
+                       foreground="#ffffff",
+                       selectbackground=accent_color,
+                       selectforeground=accent_fg)
+        style.map("Preset.TCombobox",
+                 fieldbackground=[("readonly", "#2d2d2d")],
+                 selectbackground=[("readonly", accent_color)],
+                 selectforeground=[("readonly", accent_fg)])
+        
+        # Set app icon
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+        except Exception:
+            pass
+        
+        # Center on parent
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        result = None
+        
+        # Title
+        title_label = tk.Label(dialog, text="✏️ Edit Ship Preset", 
+                              bg="#1e1e1e", fg=accent_color, 
+                              font=("Segoe UI", 12, "bold"))
+        title_label.pack(pady=(15, 5))
+        
+        # Show current name
+        orig_label = tk.Label(dialog, text=f"Current: {original_name}", 
+                             bg="#1e1e1e", fg="#888888", 
+                             font=("Segoe UI", 9))
+        orig_label.pack(pady=(0, 10))
+        
+        # Ship Type selection
+        type_frame = tk.Frame(dialog, bg="#1e1e1e")
+        type_frame.pack(fill="x", padx=25, pady=(0, 10))
+        
+        tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
+                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+        
+        # Find best match for detected ship
+        ship_var = tk.StringVar()
+        if detected_ship in ship_types:
+            ship_var.set(detected_ship)
+        else:
+            # Try case-insensitive match
+            for s in ship_types:
+                if s.lower() == detected_ship.lower():
+                    ship_var.set(s)
+                    break
+            else:
+                ship_var.set(ship_types[0])
+        
+        ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
+                                  state="readonly", width=28, font=("Segoe UI", 10),
+                                  style="Preset.TCombobox")
+        ship_combo.pack(side=tk.LEFT, padx=(15, 0))
+        
+        # Build name entry
+        name_frame = tk.Frame(dialog, bg="#1e1e1e")
+        name_frame.pack(fill="x", padx=25, pady=10)
+        
+        tk.Label(name_frame, text="Build Name:", bg="#1e1e1e", fg="#ffffff", 
+                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+        
+        name_entry = tk.Entry(name_frame, font=("Segoe UI", 10), width=30,
+                             bg="#2d2d2d", fg="#ffffff", insertbackground=accent_color,
+                             selectbackground=accent_color, selectforeground=accent_fg,
+                             relief="flat", bd=2)
+        name_entry.pack(side=tk.LEFT, padx=(10, 0))
+        if detected_variant:
+            name_entry.insert(0, detected_variant)
+        
+        # Preview
+        preview_frame = tk.Frame(dialog, bg="#1e1e1e")
+        preview_frame.pack(fill="x", padx=25, pady=10)
+        
+        tk.Label(preview_frame, text="New Name:", bg="#1e1e1e", fg="#888888", 
+                font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        
+        preview_label = tk.Label(preview_frame, text="", bg="#1e1e1e", fg=accent_color, 
+                                font=("Segoe UI", 10, "bold"))
+        preview_label.pack(side=tk.LEFT, padx=(10, 0))
+        
+        def update_preview(*args):
+            ship = ship_var.get()
+            name = name_entry.get().strip()
+            if name:
+                preview_label.config(text=f"{ship} {name}")
+            else:
+                preview_label.config(text=f"{ship}")
+        
+        ship_var.trace("w", update_preview)
+        name_entry.bind("<KeyRelease>", update_preview)
+        update_preview()
+        
+        # Buttons frame
+        btn_frame = tk.Frame(dialog, bg="#1e1e1e")
+        btn_frame.pack(pady=15)
+        
+        def on_ok():
+            nonlocal result
+            ship = ship_var.get()
+            name = name_entry.get().strip()
+            if name:
+                result = f"{ship} {name}"
+            else:
+                result = ship
+            dialog.destroy()
+            
+        def on_cancel():
+            dialog.destroy()
+            
+        ok_btn = tk.Button(btn_frame, text="✏️ Save", command=on_ok,
+                          bg=accent_color, fg=accent_fg, font=("Segoe UI", 10, "bold"),
+                          activebackground=accent_color, activeforeground=accent_fg,
+                          width=10, cursor="hand2")
+        ok_btn.pack(side=tk.LEFT, padx=5)
+        
+        cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel,
+                              bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                              activebackground="#4a4a4a", activeforeground="#ffffff",
+                              width=10, cursor="hand2")
+        cancel_btn.pack(side=tk.LEFT, padx=5)
+        
+        dialog.bind('<Return>', lambda e: on_ok())
+        dialog.bind('<Escape>', lambda e: on_cancel())
+        
+        dialog.deiconify()
+        name_entry.focus_set()
+        dialog.wait_window()
+        return result
 
     def _rename_selected_preset(self) -> None:
         old = self._get_selected_preset()
@@ -7522,13 +8225,8 @@ class App(tk.Tk):
         try:
             os.rename(old_path, new_path)
             self._refresh_preset_list()
-            for item in self.preset_list.get_children():
-                raw = self.preset_list.item(item, "values")[0].strip()
-                if raw == new:
-                    self.preset_list.selection_set(item)
-                    self.preset_list.see(item)
-                    self.preset_list.item(item, values=(PRESET_INDENT + new,))
-                    break
+            # Find and select the renamed preset in the tree
+            self._select_preset_by_name(new)
             self._set_status(f"Renamed preset to '{new}'.")
         except Exception as e:
             messagebox.showerror("Rename failed", str(e))
@@ -8233,42 +8931,278 @@ class App(tk.Tk):
             messagebox.showerror("Export failed", str(e))
 
     def _import_preset_file(self) -> None:
+        # Remember last import directory
+        if not hasattr(self, '_last_import_dir'):
+            self._last_import_dir = self.settings_dir
+        
         path = filedialog.askopenfilename(
             title="Import preset (.json)",
             filetypes=[("JSON preset", "*.json"), ("All files", "*.*")],
-            initialdir=self.settings_dir
+            initialdir=self._last_import_dir
         )
         if not path:
             return
-            
-        base = os.path.basename(path)
-        name = os.path.splitext(base)[0]
-        dest = os.path.join(self.settings_dir, base)
+        
+        # Remember the directory for next time
+        self._last_import_dir = os.path.dirname(path)
+        
+        # Read and validate the JSON first
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Import failed", f"Could not read preset file:\n{e}")
+            return
+        
+        # Get the original filename as a hint
+        original_name = os.path.splitext(os.path.basename(path))[0]
+        
+        # Try to auto-detect ship type from original name
+        detected_ship, detected_variant = self._parse_preset_ship_type(original_name)
+        
+        # Ask user to confirm/set ship type and build name
+        new_name = self._ask_import_preset_name(detected_ship, detected_variant, original_name)
+        if not new_name:
+            return
+        
+        dest = self._settings_path(new_name)
         
         # Check if preset already exists
         if os.path.exists(dest):
             from app_utils import centered_askyesno
             if not centered_askyesno(self, "Preset Exists", 
-                                      f"A preset named '{name}' already exists.\n\n"
+                                      f"A preset named '{new_name}' already exists.\n\n"
                                       f"Do you want to overwrite it?"):
                 return
         
         try:
-            shutil.copy2(path, dest)
+            # Save with the new name
+            with open(dest, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
             self._refresh_preset_list()
-            self._set_status(f"Imported preset '{name}'. Double-click to load.")
+            self._select_preset_by_name(new_name)
+            self._set_status(f"Imported preset '{new_name}'. Double-click to load.")
         except Exception as e:
             messagebox.showerror("Import preset failed", str(e))
 
+    def _ask_import_preset_name(self, detected_ship: str, detected_variant: str, original_name: str) -> Optional[str]:
+        """Dialog for importing preset - select ship type and build name"""
+        # Complete Elite Dangerous ship list (alphabetical)
+        ship_types = [
+            "Adder",
+            "Alliance Challenger", "Alliance Chieftain", "Alliance Crusader",
+            "Anaconda",
+            "Asp Explorer", "Asp Scout",
+            "Beluga Liner",
+            "Caspian Explorer",
+            "Cobra Mk III", "Cobra Mk IV", "Cobra Mk V",
+            "Corsair",
+            "Diamondback Explorer", "Diamondback Scout",
+            "Dolphin",
+            "Eagle Mk II",
+            "Federal Assault Ship", "Federal Corvette", "Federal Dropship", "Federal Gunship",
+            "Fer-de-Lance",
+            "Hauler",
+            "Imperial Clipper", "Imperial Courier", "Imperial Cutter", "Imperial Eagle",
+            "Keelback",
+            "Krait Mk II", "Krait Phantom",
+            "Mamba", "Mandalay",
+            "Orca",
+            "Panther Clipper Mk II",
+            "Python", "Python Mk II",
+            "Sidewinder Mk I",
+            "Type-6 Transporter", "Type-7 Transporter", "Type-8 Transporter",
+            "Type-9 Heavy", "Type-10 Defender", "Type-11 Prospector",
+            "Viper Mk III", "Viper Mk IV",
+            "Vulture",
+            "Other"
+        ]
+        
+        dialog = tk.Toplevel(self)
+        dialog.withdraw()
+        dialog.title("Import Ship Preset")
+        dialog.configure(bg="#1e1e1e")
+        dialog.geometry("480x280")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        # Theme-aware accent color
+        if self.current_theme == "elite_orange":
+            accent_color = "#ff8c00"
+            accent_fg = "#000000"
+        else:
+            accent_color = "#4a9eff"
+            accent_fg = "#ffffff"
+        
+        # Configure theme style for combobox
+        style = ttk.Style(dialog)
+        style.configure("Preset.TCombobox", 
+                       fieldbackground="#2d2d2d",
+                       background="#2d2d2d",
+                       foreground="#ffffff",
+                       selectbackground=accent_color,
+                       selectforeground=accent_fg)
+        style.map("Preset.TCombobox",
+                 fieldbackground=[("readonly", "#2d2d2d")],
+                 selectbackground=[("readonly", accent_color)],
+                 selectforeground=[("readonly", accent_fg)])
+        
+        # Set app icon
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+        except Exception:
+            pass
+        
+        # Center on parent
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        result = None
+        
+        # Title
+        title_label = tk.Label(dialog, text="📥 Import Ship Preset", 
+                              bg="#1e1e1e", fg=accent_color, 
+                              font=("Segoe UI", 12, "bold"))
+        title_label.pack(pady=(15, 5))
+        
+        # Show original filename
+        orig_label = tk.Label(dialog, text=f"Original: {original_name}", 
+                             bg="#1e1e1e", fg="#888888", 
+                             font=("Segoe UI", 9))
+        orig_label.pack(pady=(0, 10))
+        
+        # Ship Type selection
+        type_frame = tk.Frame(dialog, bg="#1e1e1e")
+        type_frame.pack(fill="x", padx=25, pady=(0, 10))
+        
+        tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
+                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+        
+        # Find best match for detected ship
+        ship_var = tk.StringVar()
+        if detected_ship in ship_types:
+            ship_var.set(detected_ship)
+        else:
+            # Try case-insensitive match
+            for s in ship_types:
+                if s.lower() == detected_ship.lower():
+                    ship_var.set(s)
+                    break
+            else:
+                ship_var.set(ship_types[0])
+        
+        ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
+                                  state="readonly", width=28, font=("Segoe UI", 10),
+                                  style="Preset.TCombobox")
+        ship_combo.pack(side=tk.LEFT, padx=(15, 0))
+        
+        # Build name entry
+        name_frame = tk.Frame(dialog, bg="#1e1e1e")
+        name_frame.pack(fill="x", padx=25, pady=10)
+        
+        tk.Label(name_frame, text="Build Name:", bg="#1e1e1e", fg="#ffffff", 
+                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+        
+        name_entry = tk.Entry(name_frame, font=("Segoe UI", 10), width=30,
+                             bg="#2d2d2d", fg="#ffffff", insertbackground=accent_color,
+                             selectbackground=accent_color, selectforeground=accent_fg,
+                             relief="flat", bd=2)
+        name_entry.pack(side=tk.LEFT, padx=(10, 0))
+        if detected_variant:
+            name_entry.insert(0, detected_variant)
+        
+        # Preview
+        preview_frame = tk.Frame(dialog, bg="#1e1e1e")
+        preview_frame.pack(fill="x", padx=25, pady=10)
+        
+        tk.Label(preview_frame, text="New Name:", bg="#1e1e1e", fg="#888888", 
+                font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        
+        preview_label = tk.Label(preview_frame, text="", bg="#1e1e1e", fg=accent_color, 
+                                font=("Segoe UI", 10, "bold"))
+        preview_label.pack(side=tk.LEFT, padx=(10, 0))
+        
+        def update_preview(*args):
+            ship = ship_var.get()
+            name = name_entry.get().strip()
+            if name:
+                preview_label.config(text=f"{ship} {name}")
+            else:
+                preview_label.config(text=f"{ship}")
+        
+        ship_var.trace("w", update_preview)
+        name_entry.bind("<KeyRelease>", update_preview)
+        update_preview()
+        
+        # Buttons frame
+        btn_frame = tk.Frame(dialog, bg="#1e1e1e")
+        btn_frame.pack(pady=15)
+        
+        def on_ok():
+            nonlocal result
+            ship = ship_var.get()
+            name = name_entry.get().strip()
+            if name:
+                result = f"{ship} {name}"
+            else:
+                result = ship
+            dialog.destroy()
+            
+        def on_cancel():
+            dialog.destroy()
+            
+        ok_btn = tk.Button(btn_frame, text="📥 Import", command=on_ok,
+                          bg=accent_color, fg=accent_fg, font=("Segoe UI", 10, "bold"),
+                          activebackground=accent_color, activeforeground=accent_fg,
+                          width=10, cursor="hand2")
+        ok_btn.pack(side=tk.LEFT, padx=5)
+        
+        cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel,
+                              bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                              activebackground="#4a4a4a", activeforeground="#ffffff",
+                              width=10, cursor="hand2")
+        cancel_btn.pack(side=tk.LEFT, padx=5)
+        
+        dialog.bind('<Return>', lambda e: on_ok())
+        dialog.bind('<Escape>', lambda e: on_cancel())
+        
+        dialog.deiconify()
+        name_entry.focus_set()
+        dialog.wait_window()
+        return result
+
     def _show_preset_menu(self, event) -> None:
+        """Show context menu for presets or empty space"""
         try:
             item = self.preset_list.identify_row(event.y)
-            if item:
+            
+            if not item:
+                # Clicked on empty space - show limited menu
+                self.preset_list.selection_remove(*self.preset_list.selection())
+                self._preset_empty_menu.tk_popup(event.x_root, event.y_root)
+                return
+            
+            # Check if this is a group header (has children)
+            children = self.preset_list.get_children(item)
+            if children:
+                # It's a group header - show limited menu
                 self.preset_list.selection_set(item)
                 self.preset_list.focus(item)
+                self._preset_empty_menu.tk_popup(event.x_root, event.y_root)
+                return
+            
+            # It's a preset - show full menu
+            self.preset_list.selection_set(item)
+            self.preset_list.focus(item)
             self._preset_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self._preset_menu.grab_release()
+            self._preset_empty_menu.grab_release()
 
     # ---------- Tooltip preference handling ----------
     def _load_tooltip_preference(self) -> None:
@@ -12481,7 +13415,74 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         
         print(f"[SYSTEM] Updated current system: {system_name}")
 
+
+def check_single_instance():
+    """
+    Check if another instance of EliteMining is already running.
+    Uses a lock file to prevent multiple instances.
+    Returns True if this is the only instance, False if another is running.
+    """
+    import tempfile
+    import atexit
+    
+    lock_file_path = os.path.join(tempfile.gettempdir(), "EliteMining.lock")
+    
+    try:
+        # Try to create/open the lock file exclusively
+        if os.path.exists(lock_file_path):
+            # Check if the process that created the lock is still running
+            try:
+                with open(lock_file_path, 'r') as f:
+                    pid = int(f.read().strip())
+                
+                # Check if process is still running (Windows-specific)
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+                handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+                if handle:
+                    kernel32.CloseHandle(handle)
+                    # Process is still running
+                    return False
+                # Process not running, we can take over
+            except (ValueError, OSError, FileNotFoundError):
+                # Lock file is invalid or process check failed, take over
+                pass
+        
+        # Create new lock file with our PID
+        with open(lock_file_path, 'w') as f:
+            f.write(str(os.getpid()))
+        
+        # Register cleanup on exit
+        def cleanup_lock():
+            try:
+                if os.path.exists(lock_file_path):
+                    with open(lock_file_path, 'r') as f:
+                        if f.read().strip() == str(os.getpid()):
+                            os.remove(lock_file_path)
+            except:
+                pass
+        
+        atexit.register(cleanup_lock)
+        return True
+        
+    except Exception as e:
+        print(f"[SINGLE-INSTANCE] Error checking instance: {e}")
+        return True  # Allow running on error
+
+
 if __name__ == "__main__":
+    # Check for existing instance
+    if not check_single_instance():
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showwarning(
+            "EliteMining Already Running",
+            "Another instance of EliteMining is already running.\n\n"
+            "Please close the existing instance first, or check your taskbar/system tray."
+        )
+        sys.exit(0)
+    
     try:
         app = App()
         # Restore geometry after all widgets are created

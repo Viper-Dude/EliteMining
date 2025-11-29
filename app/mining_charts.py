@@ -64,6 +64,21 @@ class MiningChartsPanel:
         # Create main frame
         self.frame = ttk.Frame(parent, padding=8)
         
+        # Detect theme for chart colors
+        try:
+            from config import load_theme
+            self.current_theme = load_theme()
+        except Exception:
+            self.current_theme = "dark"
+        
+        # Set background colors based on theme
+        if self.current_theme == "elite_orange":
+            self.chart_bg = '#000000'  # Black background for orange theme
+            self.chart_face = '#000000'
+        else:
+            self.chart_bg = '#2b2b2b'
+            self.chart_face = '#1e1e1e'
+        
         # Chart colors for different materials
         self.material_colors = {
             'Platinum': '#E5E4E2',  # Platinum color
@@ -178,8 +193,8 @@ class MiningChartsPanel:
         timeline_frame = ttk.Frame(charts_notebook, padding=5)
         charts_notebook.add(timeline_frame, text="Yield Timeline")
         
-        self.timeline_fig = Figure(figsize=(7, 3), dpi=100, facecolor='#2b2b2b')
-        self.timeline_ax = self.timeline_fig.add_subplot(111, facecolor='#1e1e1e')
+        self.timeline_fig = Figure(figsize=(7, 3), dpi=100, facecolor=self.chart_bg)
+        self.timeline_ax = self.timeline_fig.add_subplot(111, facecolor=self.chart_face)
         self.timeline_canvas = FigureCanvasTkAgg(self.timeline_fig, timeline_frame)
         self.timeline_canvas.get_tk_widget().pack(fill="both", expand=True)
         
@@ -187,8 +202,8 @@ class MiningChartsPanel:
         bar_frame = ttk.Frame(charts_notebook, padding=5)
         charts_notebook.add(bar_frame, text="Minerals Comparison")
         
-        self.bar_fig = Figure(figsize=(5, 3), dpi=100, facecolor='#2b2b2b')
-        self.bar_ax = self.bar_fig.add_subplot(111, facecolor='#1e1e1e')
+        self.bar_fig = Figure(figsize=(5, 3), dpi=100, facecolor=self.chart_bg)
+        self.bar_ax = self.bar_fig.add_subplot(111, facecolor=self.chart_face)
         self.bar_canvas = FigureCanvasTkAgg(self.bar_fig, bar_frame)
         self.bar_canvas.get_tk_widget().pack(fill="both", expand=True)
         
@@ -207,7 +222,7 @@ class MiningChartsPanel:
         })
         
         # Timeline chart styling
-        self.timeline_ax.set_facecolor('#1e1e1e')
+        self.timeline_ax.set_facecolor(self.chart_face)
         self.timeline_ax.tick_params(colors='white', which='both', labelsize=9)
         self.timeline_ax.spines['bottom'].set_color('white')
         self.timeline_ax.spines['top'].set_color('white')
@@ -218,7 +233,7 @@ class MiningChartsPanel:
         self.timeline_ax.title.set_color('white')
         
         # Bar chart styling
-        self.bar_ax.set_facecolor('#1e1e1e')
+        self.bar_ax.set_facecolor(self.chart_face)
         self.bar_ax.tick_params(colors='white', which='both', labelsize=9)
         self.bar_ax.spines['bottom'].set_color('white')
         self.bar_ax.spines['top'].set_color('white')
@@ -319,18 +334,18 @@ class MiningChartsPanel:
         best_yields = [summary_data[mat]['best_percentage'] for mat in materials]
         colors = [self._get_material_color(mat) for mat in materials]
         
-        # Create grouped bar chart with specific legend colors
+        # Create grouped bar chart with distinct colors for Average vs Best
         x = np.arange(len(materials))
         width = 0.35
         
-        # Define legend colors (Option 4: Light blue to dark blue)
-        legend_color_avg = '#66B2FF'  # Light blue for Average %
-        legend_color_best = '#0066CC'  # Dark blue for Best %
+        # Use distinct colors: Teal/Cyan for Average, Orange for Best (more contrast)
+        avg_bar_color = '#20B2AA'   # Light sea green/teal for Average %
+        best_bar_color = '#ff8c00'  # Orange for Best % (matches theme)
         
         bars1 = self.bar_ax.bar(x - width/2, avg_yields, width, label='Average %', 
-                               color=colors, alpha=0.8, edgecolor='white', linewidth=0.5)
+                               color=avg_bar_color, alpha=0.9, edgecolor='white', linewidth=0.5)
         bars2 = self.bar_ax.bar(x + width/2, best_yields, width, label='Best %', 
-                               color=colors, alpha=0.6, edgecolor='white', linewidth=0.5)
+                               color=best_bar_color, alpha=0.9, edgecolor='white', linewidth=0.5)
         
         # Add value labels on bars with improved spacing
         for bar in bars1:
@@ -360,16 +375,16 @@ class MiningChartsPanel:
         self.bar_ax.set_xticks(x)
         self.bar_ax.set_xticklabels(materials, rotation=15, ha='right', fontsize=9, fontweight='normal')
         
-        # Create custom legend with specific colors
+        # Create custom legend with the bar colors
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor=legend_color_avg, edgecolor='white', label='Average %'),
-            Patch(facecolor=legend_color_best, edgecolor='white', label='Best %')
+            Patch(facecolor=avg_bar_color, edgecolor='white', label='Average %'),
+            Patch(facecolor=best_bar_color, edgecolor='white', label='Best %')
         ]
         
         # Position legend outside the plot area (to the right)
         legend = self.bar_ax.legend(handles=legend_elements, bbox_to_anchor=(1.02, 1), loc='upper left', 
-                                  facecolor='#2b2b2b', edgecolor='white', fontsize=9)
+                                  facecolor=self.chart_bg, edgecolor='white', fontsize=9)
         for text in legend.get_texts():
             text.set_fontweight('normal')
         self.bar_ax.grid(True, alpha=0.3, color='gray', axis='y')
@@ -380,7 +395,7 @@ class MiningChartsPanel:
     
     def _setup_timeline_style(self):
         """Setup timeline chart styling"""
-        self.timeline_ax.set_facecolor('#1e1e1e')
+        self.timeline_ax.set_facecolor(self.chart_face)
         self.timeline_ax.tick_params(colors='white', which='both')
         for spine in self.timeline_ax.spines.values():
             spine.set_color('white')

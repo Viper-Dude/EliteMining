@@ -582,3 +582,25 @@ def save_theme(theme: str) -> None:
     cfg = _load_cfg()
     cfg["theme"] = theme
     _save_cfg(cfg)
+
+def load_sidebar_sash_position() -> Optional[int]:
+    """Load saved sidebar sash position (Ship Presets / Cargo Monitor split)"""
+    cfg = _load_cfg()
+    return cfg.get("sidebar_sash_position")
+
+def save_sidebar_sash_position(position: int) -> None:
+    """Save sidebar sash position"""
+    cfg = _load_cfg()
+    cfg["sidebar_sash_position"] = position
+    _save_cfg(cfg)
+
+def load_main_sash_position() -> Optional[int]:
+    """Load saved main horizontal sash position (content / sidebar split)"""
+    cfg = _load_cfg()
+    return cfg.get("main_sash_position")
+
+def save_main_sash_position(position: int) -> None:
+    """Save main horizontal sash position"""
+    cfg = _load_cfg()
+    cfg["main_sash_position"] = position
+    _save_cfg(cfg)

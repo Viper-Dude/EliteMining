@@ -67,6 +67,28 @@ MENU_COLORS = {
     "selectcolor": "#404040"
 }
 
+# Orange theme menu colors
+MENU_COLORS_ORANGE = {
+    "bg": "#1a1a1a",
+    "fg": "#ff8c00", 
+    "activebackground": "#ff8c00",
+    "activeforeground": "#000000",
+    "selectcolor": "#ff8c00"
+}
+
+def get_menu_colors(theme: str = None) -> dict:
+    """Get menu colors based on theme. If theme is None, try to load from config."""
+    if theme is None:
+        try:
+            from config import load_theme
+            theme = load_theme()
+        except Exception:
+            theme = "dark"
+    
+    if theme == "elite_orange":
+        return MENU_COLORS_ORANGE
+    return MENU_COLORS
+
 # Mining Materials Database
 MINING_MATERIALS = {
     # Core materials (most common)

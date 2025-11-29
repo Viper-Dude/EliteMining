@@ -48,6 +48,7 @@ app/EliteVA/Variables/
 *.key
 .env
 credentials.json
+discord_secrets.py
 
 # VoiceAttack profile
 *.vap

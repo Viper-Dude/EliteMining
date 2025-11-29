@@ -9,6 +9,13 @@ import requests
 from datetime import datetime
 from config import _load_cfg
 
+# Import webhook URL from separate secrets file (not committed to git)
+try:
+    from discord_secrets import DISCORD_WEBHOOK_URL
+except ImportError:
+    # Fallback if secrets file doesn't exist
+    DISCORD_WEBHOOK_URL = ""
+
 
 def get_config_value(key: str, default=None):
     """Helper function to get config values"""
@@ -190,9 +197,8 @@ def parse_mineral_performance_from_report(report_content: str) -> dict:
 
 def is_discord_enabled() -> bool:
     """Check if Discord integration is enabled and configured"""
-    enabled = get_config_value("discord_enabled", False)
-    webhook_url = get_config_value("discord_webhook_url", "")
-    return enabled and webhook_url.strip() != ""
+    # Always enabled since webhook is hardcoded
+    return True
 
 
 def validate_webhook_url(url: str) -> bool:
@@ -414,11 +420,8 @@ def send_discord_report(session_data: dict) -> tuple[bool, str]:
         tuple: (success: bool, message: str)
     """
     
-    # Check if Discord is enabled
-    if not is_discord_enabled():
-        return False, "Discord integration is not enabled or configured"
-    
-    webhook_url = get_config_value("discord_webhook_url", "")
+    # Use hardcoded webhook URL
+    webhook_url = DISCORD_WEBHOOK_URL
     
     # Validate webhook URL
     if not validate_webhook_url(webhook_url):
