@@ -9265,13 +9265,26 @@ class ProspectorPanel(ttk.Frame):
         
         print(f"[ANNOUNCE DEBUG] _summaries_from_event called, materials count: {len(materials)}, threshold: {th}")
 
+        # Abbreviations for long material names in Prospector Reports table
+        material_abbreviations = {
+            'Methanol Monohydrate Crystals': 'Methanol Cryst',
+            'Low Temperature Diamonds': 'LTD',
+            'Low-Temperature Diamonds': 'LTD',
+            'Lithium Hydroxide': 'Lithium Hydro',
+            'Hydrogen Peroxide': 'H. Peroxide',
+            'Methane Clathrate': 'Methane Clath',
+            'Liquid Oxygen': 'Liq Oxygen',
+        }
+
         for m in materials:
             name = _extract_material_name(m)
             pct_val = _extract_material_percent(m)
             pct_text = _fmt_pct(pct_val)
             if not name:
                 continue
-            entry = f"{name} {pct_text}".strip()
+            # Use abbreviated name for display in Prospector Reports table
+            display_name = material_abbreviations.get(name, name)
+            entry = f"{display_name} {pct_text}".strip()
             all_parts.append(entry)
 
             eff_th = float(self.min_pct_map.get(name, th))
@@ -11929,29 +11942,42 @@ class ProspectorPanel(ttk.Frame):
 
     def _create_statistics_panel(self, parent: ttk.Widget) -> None:
         """Create the statistics panel for comprehensive mining analytics"""
+        # Get theme for styling
+        from config import load_theme
+        _stats_theme = load_theme()
+        _stats_bg = "#1a1a1a" if _stats_theme == "elite_orange" else "#2b2b2b"
+        _stats_fg = "#ff9900" if _stats_theme == "elite_orange" else "#ffffff"
+        _stats_border = "#ff6600" if _stats_theme == "elite_orange" else "#555555"
+        
+        # Configure ttk styles for Statistics panel
+        style = ttk.Style()
+        style.configure("Stats.TFrame", background=_stats_bg)
+        style.configure("Stats.TLabelframe", background=_stats_bg)
+        style.configure("Stats.TLabelframe.Label", background=_stats_bg, foreground=_stats_fg, font=("Consolas", 10, "bold"))
+        
         # Main scrollable frame
-        main_frame = ttk.Frame(parent)
+        main_frame = ttk.Frame(parent, style="Stats.TFrame")
         main_frame.pack(fill="both", expand=True, padx=8, pady=8)
         
         # Title
         title_label = tk.Label(main_frame, text="📊 Mining Session Statistics", 
-                              font=("Consolas", 14, "bold"), fg="#ffffff", bg="#2b2b2b")
+                              font=("Consolas", 14, "bold"), fg="#ffffff", bg=_stats_bg)
         title_label.pack(pady=(0, 5))
         
         # Info text
         info_label = tk.Label(main_frame, text="Statistics calculated from saved mining session reports", 
-                             font=("Segoe UI", 9, "italic"), fg="#888888", bg="#2b2b2b")
+                             font=("Segoe UI", 9, "italic"), fg="#888888", bg=_stats_bg)
         info_label.pack(pady=(0, 10))
         
         # Statistics container
-        stats_container = ttk.Frame(main_frame)
+        stats_container = ttk.Frame(main_frame, style="Stats.TFrame")
         stats_container.pack(fill="both", expand=True)
         
         # Two-column layout
-        left_column = ttk.LabelFrame(stats_container, text="Overall Statistics", padding=10)
+        left_column = ttk.LabelFrame(stats_container, text="Overall Statistics", padding=10, style="Stats.TLabelframe")
         left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
-        right_column = ttk.LabelFrame(stats_container, text="Best (Records)", padding=10)
+        right_column = ttk.LabelFrame(stats_container, text="Best (Records)", padding=10, style="Stats.TLabelframe")
         right_column.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         
         stats_container.grid_columnconfigure(0, weight=1)
@@ -11964,7 +11990,7 @@ class ProspectorPanel(ttk.Frame):
         # Overall Statistics (Left Column)
         # Add "Session Overview" header
         session_header = tk.Label(left_column, text="Session Overview", font=("Consolas", 10, "bold"), 
-                                 fg="#ffaa00", bg="#2b2b2b", anchor="w")
+                                 fg="#ffaa00", bg=_stats_bg, anchor="w")
         session_header.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5), padx=(0, 10))
         
         stats_data = [
@@ -11980,12 +12006,12 @@ class ProspectorPanel(ttk.Frame):
         for i, (label_text, key) in enumerate(stats_data):
             # Label
             label = tk.Label(left_column, text=label_text, font=("Consolas", 10), 
-                           fg="#cccccc", bg="#2b2b2b", anchor="w")
+                           fg="#cccccc", bg=_stats_bg, anchor="w")
             label.grid(row=1+i, column=0, sticky="w", pady=2, padx=(0, 10))
             
             # Value
             value_label = tk.Label(left_column, text="0", font=("Consolas", 10, "bold"), 
-                                 fg="#00ff00", bg="#2b2b2b", anchor="w")
+                                 fg="#00ff00", bg=_stats_bg, anchor="w")
             value_label.grid(row=1+i, column=1, sticky="w", pady=2)
             self.stats_labels[key] = value_label
         
@@ -11995,7 +12021,7 @@ class ProspectorPanel(ttk.Frame):
         
         # Add "Best Records" header
         best_header = tk.Label(left_column, text="Best Records", font=("Consolas", 10, "bold"), 
-                              fg="#ffaa00", bg="#2b2b2b", anchor="w")
+                              fg="#ffaa00", bg=_stats_bg, anchor="w")
         best_header.grid(row=9, column=0, columnspan=2, sticky="w", pady=(5, 2), padx=(0, 10))
         
         # Best records data
@@ -12010,18 +12036,18 @@ class ProspectorPanel(ttk.Frame):
         for i, (label_text, key) in enumerate(best_records_data):
             # Label
             label = tk.Label(left_column, text=label_text, font=("Consolas", 10), 
-                           fg="#cccccc", bg="#2b2b2b", anchor="w")
+                           fg="#cccccc", bg=_stats_bg, anchor="w")
             label.grid(row=10+i, column=0, sticky="w", pady=2, padx=(0, 10))
             
             # Value
             value_label = tk.Label(left_column, text="0", font=("Consolas", 10, "bold"), 
-                                 fg="#00ff00", bg="#2b2b2b", anchor="w")
+                                 fg="#00ff00", bg=_stats_bg, anchor="w")
             value_label.grid(row=10+i, column=1, sticky="w", pady=2)
             self.stats_labels[key] = value_label
         
         # Records (Right Column) - Top 5 Best Systems only
         top_systems_title = tk.Label(right_column, text="Top 5 Best Systems (T/hr)", font=("Consolas", 10, "bold"), 
-                                    fg="#cccccc", bg="#2b2b2b", anchor="w")
+                                    fg="#cccccc", bg=_stats_bg, anchor="w")
         top_systems_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 2), padx=(0, 10))
         
         # Create labels for top 5 systems (3 lines per system: System|Body, Material, then metrics)
@@ -12029,19 +12055,19 @@ class ProspectorPanel(ttk.Frame):
         for rank in range(1, 6):
             # Line 1: Rank. System | Body
             system_label = tk.Label(right_column, text=f"{rank}. — | —", font=("Consolas", 10), 
-                                   fg="#ffffff", bg="#2b2b2b", anchor="w", wraplength=350, justify="left")
+                                   fg="#ffffff", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
             system_label.grid(row=1+row_offset, column=0, columnspan=2, sticky="w", pady=(2, 0), padx=(0, 10))
             self.stats_labels[f'top_system_{rank}_line1'] = system_label
             
             # Line 2: Material (indented to align below system name, after "1. ")
             material_label = tk.Label(right_column, text="—", font=("Consolas", 10), 
-                                     fg="#ffaa00", bg="#2b2b2b", anchor="w", wraplength=350, justify="left")
+                                     fg="#ffaa00", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
             material_label.grid(row=1+row_offset+1, column=0, columnspan=2, sticky="w", pady=(0, 0), padx=(15, 0))
             self.stats_labels[f'top_system_{rank}_line2'] = material_label
             
             # Line 3: Metrics indented (T/Asteroid, TPH)
             metrics_label = tk.Label(right_column, text="—", font=("Consolas", 10), 
-                                    fg="#00ff00", bg="#2b2b2b", anchor="w", wraplength=350, justify="left")
+                                    fg="#00ff00", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
             metrics_label.grid(row=1+row_offset+2, column=0, columnspan=2, sticky="w", pady=(0, 2), padx=(15, 0))
             self.stats_labels[f'top_system_{rank}_line3'] = metrics_label
             

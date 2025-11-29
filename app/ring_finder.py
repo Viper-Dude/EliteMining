@@ -181,8 +181,13 @@ class RingFinder:
             'Benitoite': 'Beni',
             'Bromellite': 'Brom',
             'Grandidierite': 'Gran',
+            'Hydrogen Peroxide': 'H. Peroxide',
+            'Liquid Oxygen': 'Liq Oxygen',
+            'Lithium Hydroxide': 'Lithium Hydro',
             'Low Temp Diamonds': 'LTD',
             'Low Temperature Diamonds': 'LTD',  # Database version
+            'Methane Clathrate': 'Methane Clath',
+            'Methanol Monohydrate Crystals': 'Methanol Cryst',
             'Monazite': 'Mona',
             'Musgravite': 'Musg',
             'Painite': 'Pain',

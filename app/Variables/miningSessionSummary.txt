@@ -1,2 +1,2 @@
-Session: Col 173 Sector MJ-P d6-46 — 8 A Ring — 00:00:46 — Total 0t (Single Session)
-Ship: Mega Bumper - Type-11 Prospector | No refined materials.
+Session: Col 173 Sector RR-O b37-3 — AB 5 B Ring — 00:04:27 — Total 37t (Single Session)
+Ship: Mega Bumper - Type-11 Prospector | Bromellite 24t (321.38 t/hr); Tritium 13t (174.08 t/hr)
