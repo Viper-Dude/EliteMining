@@ -604,3 +604,35 @@ def save_main_sash_position(position: int) -> None:
     cfg = _load_cfg()
     cfg["main_sash_position"] = position
     _save_cfg(cfg)
+
+def load_preset_expanded_groups() -> list:
+    """Load list of expanded ship preset groups"""
+    cfg = _load_cfg()
+    return cfg.get("preset_expanded_groups", [])
+
+def save_preset_expanded_groups(groups: list) -> None:
+    """Save list of expanded ship preset groups"""
+    cfg = _load_cfg()
+    cfg["preset_expanded_groups"] = groups
+    _save_cfg(cfg)
+
+# Layout version for migration - increment when layout changes require reset
+LAYOUT_VERSION = 3  # v4.6.4 - fixed sash initialization timing
+
+def migrate_layout_settings() -> None:
+    """Check and migrate layout settings when upgrading versions.
+    Resets sash positions if layout version has changed."""
+    cfg = _load_cfg()
+    saved_layout_version = cfg.get("layout_version", 0)
+    
+    if saved_layout_version < LAYOUT_VERSION:
+        # Reset sash positions to defaults for new layout
+        if "sidebar_sash_position" in cfg:
+            del cfg["sidebar_sash_position"]
+        if "main_sash_position" in cfg:
+            del cfg["main_sash_position"]
+        
+        # Update layout version
+        cfg["layout_version"] = LAYOUT_VERSION
+        _save_cfg(cfg)
+        print(f"[CONFIG] Layout migrated to version {LAYOUT_VERSION} - sash positions reset to defaults")

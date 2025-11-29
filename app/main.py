@@ -4772,7 +4772,8 @@ class App(tk.Tk):
         # EliteMining logo (resized to fit status bar)
         try:
             from PIL import Image, ImageTk
-            logo_path = os.path.join(os.path.dirname(__file__), "Images", "EliteMining_txt_logo_transp_resize.png")
+            from path_utils import get_images_dir
+            logo_path = os.path.join(get_images_dir(), "EliteMining_txt_logo_transp_resize.png")
             if os.path.exists(logo_path):
                 logo_img = Image.open(logo_path)
                 # Resize to fit status bar height (smaller to avoid stretched look)
@@ -5304,47 +5305,6 @@ class App(tk.Tk):
                 if isinstance(child, tk.Label) and child is not tip_header:
                     child.config(wraplength=wrap)
         frame.bind("<Configure>", _on_cfg_resize)
-        
-        # --- EliteMining logo at bottom left (outside card, anchored) ---
-        logo_frame = tk.Frame(frame, bg=theme_bg)
-        logo_frame.grid(row=row+1, column=0, columnspan=4, sticky="sw", padx=8, pady=(5, 8))
-        
-        try:
-            import sys
-            import webbrowser
-            
-            if getattr(sys, 'frozen', False):
-                exe_dir = os.path.dirname(sys.executable)
-                parent_dir = os.path.dirname(exe_dir)
-                logo_path = os.path.join(parent_dir, 'app', 'Images', 'EliteMining_txt_logo_transp_resize.png')
-            else:
-                logo_path = os.path.join(os.path.dirname(__file__), 'Images', 'EliteMining_txt_logo_transp_resize.png')
-            
-            try:
-                from PIL import Image, ImageTk
-                if os.path.exists(logo_path):
-                    img = Image.open(logo_path)
-                    img = img.resize((200, 35), Image.Resampling.LANCZOS)
-                    self.fg_logo_photo = ImageTk.PhotoImage(img)
-                    logo_label = tk.Label(logo_frame, image=self.fg_logo_photo, bg=theme_bg, cursor="hand2")
-                    logo_label.pack(anchor="w")
-                    
-                    def open_github(event=None):
-                        webbrowser.open("https://github.com/Viper-Dude/EliteMining")
-                    logo_label.bind("<Button-1>", open_github)
-            except ImportError:
-                if os.path.exists(logo_path):
-                    self.fg_logo_photo = tk.PhotoImage(file=logo_path)
-                    scale_factor = max(1, self.fg_logo_photo.width() // 200)
-                    self.fg_logo_photo = self.fg_logo_photo.subsample(scale_factor, scale_factor)
-                    logo_label = tk.Label(logo_frame, image=self.fg_logo_photo, bg=theme_bg, cursor="hand2")
-                    logo_label.pack(anchor="w")
-                    
-                    def open_github(event=None):
-                        webbrowser.open("https://github.com/Viper-Dude/EliteMining")
-                    logo_label.bind("<Button-1>", open_github)
-        except Exception:
-            pass
 
     # ---------- Interface Options tab ----------
     def _build_settings_notebook(self, frame: ttk.Frame) -> None:
@@ -6754,30 +6714,118 @@ class App(tk.Tk):
         # Then add sidebar
         self.main_paned.add(sidebar, weight=1)
         
-        # Set initial sash position after window is displayed
-        def _set_initial_sash():
-            try:
-                total_width = self.winfo_width()
-                if total_width > 100:  # Only if window has been drawn
-                    # Try to restore saved position first
-                    from config import load_main_sash_position
-                    saved_pos = load_main_sash_position()
-                    if saved_pos is not None and 100 < saved_pos < total_width - 100:
-                        self.main_paned.sashpos(0, saved_pos)
-                    else:
-                        # Default: sidebar ~300px wide
-                        sash_pos = total_width - 300
-                        self.main_paned.sashpos(0, sash_pos)
-            except Exception:
-                pass
-        self.after(200, _set_initial_sash)
+        # Flag to prevent saving sash position until initial layout is complete
+        self._sash_initialized = False
+        self._sidebar_sash_initialized = False
         
-        # Save main sash position when it changes
+        # Store sidebar reference for later sash setup
+        self._sidebar_frame = sidebar
+        
+        # Set initial main sash position after window is displayed
+        def _set_initial_sash(retry_count=0):
+            try:
+                self.update_idletasks()
+                total_width = self.winfo_width()
+                print(f"[SASH] Setting initial main sash. Total width: {total_width}, retry: {retry_count}")
+                
+                if total_width < 400:
+                    if retry_count < 10:
+                        self.after(200, lambda: _set_initial_sash(retry_count + 1))
+                        return
+                    else:
+                        print(f"[SASH] ERROR: Window width still {total_width} after {retry_count} retries")
+                        return
+                
+                # Minimum widths
+                min_content_width = 600
+                min_sidebar_width = 280
+                
+                # Try to restore saved position first
+                from config import load_main_sash_position
+                saved_pos = load_main_sash_position()
+                print(f"[SASH] Saved position: {saved_pos}")
+                
+                # Validate saved position ensures both areas have minimum width
+                if (saved_pos is not None and 
+                    saved_pos >= min_content_width and 
+                    saved_pos <= total_width - min_sidebar_width):
+                    self.main_paned.sashpos(0, saved_pos)
+                    print(f"[SASH] Using saved position: {saved_pos}")
+                else:
+                    # Default: sidebar ~300px wide
+                    sash_pos = total_width - 300
+                    # Ensure minimums
+                    sash_pos = max(sash_pos, min_content_width)
+                    sash_pos = min(sash_pos, total_width - min_sidebar_width)
+                    self.main_paned.sashpos(0, sash_pos)
+                    print(f"[SASH] Using default position: {sash_pos}")
+                
+                # Mark sash as initialized - now saving is allowed
+                self._sash_initialized = True
+                
+                # Now set up the sidebar sash after main sash is done
+                self.after(100, _set_sidebar_sash)
+                    
+            except Exception as e:
+                print(f"Error setting main sash: {e}")
+        
+        # Set sidebar sash AFTER main sash is set
+        def _set_sidebar_sash(retry_count=0):
+            try:
+                self.update_idletasks()
+                paned_window = self.sidebar_paned
+                total_height = paned_window.winfo_height()
+                sidebar_width = self._sidebar_frame.winfo_width()
+                print(f"[SASH] Setting sidebar sash. Height: {total_height}, Sidebar width: {sidebar_width}, retry: {retry_count}")
+                
+                # If height is too small, the sidebar isn't laid out yet - retry
+                if total_height < 100 or sidebar_width < 50:
+                    if retry_count < 15:
+                        self.after(200, lambda: _set_sidebar_sash(retry_count + 1))
+                        return
+                    else:
+                        print(f"[SASH] ERROR: Sidebar height {total_height}, width {sidebar_width} after {retry_count} retries")
+                        return
+                
+                # Minimum heights for each pane
+                min_presets_height = 150
+                min_cargo_height = 120
+                
+                # Try to restore saved sash position first
+                from config import load_sidebar_sash_position
+                saved_pos = load_sidebar_sash_position()
+                print(f"[SASH] Sidebar saved position: {saved_pos}")
+                
+                # Validate saved position ensures both panes have minimum height
+                if (saved_pos is not None and 
+                    saved_pos >= min_presets_height and 
+                    saved_pos <= total_height - min_cargo_height):
+                    paned_window.sashpos(0, saved_pos)
+                    print(f"[SASH] Using saved sidebar position: {saved_pos}")
+                else:
+                    # Default: give 60% to presets, 40% to cargo monitor
+                    sash_pos = int(total_height * 0.6)
+                    # Ensure minimum heights
+                    sash_pos = max(sash_pos, min_presets_height)
+                    sash_pos = min(sash_pos, total_height - min_cargo_height)
+                    paned_window.sashpos(0, sash_pos)
+                    print(f"[SASH] Using default sidebar position: {sash_pos}")
+                
+                self._sidebar_sash_initialized = True
+            except Exception as e:
+                print(f"Error setting sidebar sash: {e}")
+        
+        # Delay to ensure window geometry is fully applied
+        self.after(500, _set_initial_sash)
+        
+        # Save main sash position when it changes (only after initialization)
         def _on_main_sash_moved(event):
+            if not getattr(self, '_sash_initialized', False):
+                return  # Don't save during initial layout
             try:
                 from config import save_main_sash_position
                 pos = self.main_paned.sashpos(0)
-                if pos > 100:  # Only save valid positions
+                if pos > 200:  # Only save valid positions
                     save_main_sash_position(pos)
             except Exception:
                 pass
@@ -6826,6 +6874,9 @@ class App(tk.Tk):
         self.preset_list.grid(row=2, column=0, sticky="nsew")
         self.preset_list.bind("<Double-1>", self._on_preset_double_click)
         self.preset_list.bind("<Return>", lambda e: self._load_selected_preset())
+        # Save expand/collapse state when user clicks arrow icons (delay to ensure state is updated)
+        self.preset_list.bind("<<TreeviewOpen>>", lambda e: self.after(10, self._save_preset_expanded_state))
+        self.preset_list.bind("<<TreeviewClose>>", lambda e: self.after(10, self._save_preset_expanded_state))
 
         # Add scrollbar to preset list
         preset_scrollbar = ttk.Scrollbar(presets_pane, orient="vertical", command=self.preset_list.yview)
@@ -6929,36 +6980,18 @@ class App(tk.Tk):
         # Refresh the preset list
         self._refresh_preset_list()
         
-        # Ensure both panes are visible by setting sash position after window is drawn
-        def _ensure_panes_visible():
-            try:
-                # Get the total height of the paned window
-                paned_window.update_idletasks()
-                total_height = paned_window.winfo_height()
-                if total_height > 100:
-                    # Try to restore saved sash position first
-                    from config import load_sidebar_sash_position
-                    saved_pos = load_sidebar_sash_position()
-                    if saved_pos is not None and 50 < saved_pos < total_height - 50:
-                        paned_window.sashpos(0, saved_pos)
-                    else:
-                        # Default: give 60% to presets, 40% to cargo monitor
-                        sash_pos = int(total_height * 0.6)
-                        paned_window.sashpos(0, sash_pos)
-            except Exception:
-                pass
-        self.after(300, _ensure_panes_visible)
-        
-        # Save sash position when it changes
-        def _on_sash_moved(event):
+        # Save sidebar sash position when it changes (only after initialization)
+        def _on_sidebar_sash_moved(event):
+            if not getattr(self, '_sidebar_sash_initialized', False):
+                return  # Don't save during initial layout
             try:
                 from config import save_sidebar_sash_position
                 pos = paned_window.sashpos(0)
-                if pos > 50:  # Only save valid positions
+                if pos > 100:  # Only save valid positions
                     save_sidebar_sash_position(pos)
             except Exception:
                 pass
-        paned_window.bind("<ButtonRelease-1>", _on_sash_moved)
+        paned_window.bind("<ButtonRelease-1>", _on_sidebar_sash_moved)
         
     def _refresh_voice_list(self):
         """Refresh the TTS voice dropdown list"""
@@ -7529,14 +7562,45 @@ class App(tk.Tk):
         """Expand all ship type groups in the preset list"""
         for item in self.preset_list.get_children():
             self.preset_list.item(item, open=True)
+        self._save_preset_expanded_state()
     
     def _collapse_all_preset_groups(self) -> None:
         """Collapse all ship type groups in the preset list"""
         for item in self.preset_list.get_children():
             self.preset_list.item(item, open=False)
+        self._save_preset_expanded_state()
+    
+    def _save_preset_expanded_state(self) -> None:
+        """Save which preset groups are expanded to config"""
+        from config import save_preset_expanded_groups
+        expanded = []
+        for item in self.preset_list.get_children():
+            if self.preset_list.item(item, "open"):
+                group_text = self.preset_list.item(item, "text")
+                if group_text.startswith("📁 "):
+                    expanded.append(group_text[2:].strip())
+        save_preset_expanded_groups(expanded)
     
     def _refresh_preset_list(self) -> None:
         """Refresh preset list with grouped hierarchy by ship type"""
+        from config import load_preset_expanded_groups
+        
+        # Remember which groups were expanded before refresh
+        expanded_groups = set()
+        for item in self.preset_list.get_children():
+            if self.preset_list.item(item, "open"):
+                # Get the group name (remove the folder emoji prefix)
+                group_text = self.preset_list.item(item, "text")
+                if group_text.startswith("📁 "):
+                    expanded_groups.add(group_text[2:].strip())
+        
+        # If no groups exist yet (first load), load from config or default to all collapsed
+        first_load = len(expanded_groups) == 0 and len(self.preset_list.get_children()) == 0
+        if first_load:
+            saved_expanded = load_preset_expanded_groups()
+            if saved_expanded:
+                expanded_groups = set(saved_expanded)
+        
         for item in self.preset_list.get_children():
             self.preset_list.delete(item)
         
@@ -7562,9 +7626,13 @@ class App(tk.Tk):
         for ship_type in sorted(groups.keys(), key=str.casefold):
             presets = groups[ship_type]
             
+            # Determine if this group should be expanded
+            # Preserve previous state or use saved config state
+            should_expand = ship_type in expanded_groups
+            
             # Create group header (not selectable for loading)
             group_id = self.preset_list.insert("", "end", text=f"📁 {ship_type}", 
-                                               open=True, tags=('group',))
+                                               open=should_expand, tags=('group',))
             
             # Add presets under this group
             for full_name, variant in presets:
@@ -7605,6 +7673,7 @@ class App(tk.Tk):
                 self.preset_list.item(item, open=False)
             else:
                 self.preset_list.item(item, open=True)
+            self._save_preset_expanded_state()
         else:
             # It's a preset - load it
             self._load_selected_preset()
@@ -10286,6 +10355,13 @@ class App(tk.Tk):
                     
             else:
                 log.info(f"Config is up to date at version {current_version}")
+            
+            # Also run layout migration (separate from config version migration)
+            try:
+                from config import migrate_layout_settings
+                migrate_layout_settings()
+            except Exception as layout_error:
+                log.warning(f"Layout migration failed: {layout_error}")
                 
             log.info(f"=== CONFIG MIGRATION CHECK END === {datetime.now().isoformat()}")
                 

@@ -10,12 +10,10 @@
 - **Import Dialog:** When importing old presets, you can now properly categorize them with Ship Type + Build Name
 - **Import/Apply Buttons:** Moved inside the Ship Presets panel for better organization
 
+![Ship Presets](https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png)
+
 > **Note:** Existing presets need to be edited/regrouped to fit the new format. Use right-click → Edit on each preset to assign the correct Ship Type.
 
-### UI Improvements
-- Added EliteMining logo to the status bar
-- Mining Analytics charts now use black background for Orange theme
-- Bar chart colors improved: Teal for Average %, Orange for Best % (more distinct)
 
 ### Security FIX
 - Discord webhooks security fix 
