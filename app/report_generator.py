@@ -37,6 +37,36 @@ except ImportError:
 
 
 class ReportGenerator:
+    # Material-specific TPH thresholds for fair scoring across different materials
+    # Each material has different natural yield rates, so "Excellent" means different TPH
+    MATERIAL_TPH_THRESHOLDS = {
+        # Metallic Ring (Laser Mining) - ordered by yield potential
+        'Platinum': {'excellent': 800, 'good': 600, 'fair': 400},
+        'Painite': {'excellent': 600, 'good': 450, 'fair': 300},
+        'Osmium': {'excellent': 400, 'good': 300, 'fair': 200},
+        'Palladium': {'excellent': 400, 'good': 300, 'fair': 200},
+        'Gold': {'excellent': 350, 'good': 250, 'fair': 150},
+        'Silver': {'excellent': 350, 'good': 250, 'fair': 150},
+        
+        # Icy Ring (Laser Mining)
+        'Bromellite': {'excellent': 500, 'good': 350, 'fair': 200},
+        'Tritium': {'excellent': 400, 'good': 300, 'fair': 200},
+        
+        # Core Mining (any ring) - much lower TPH is normal
+        'Void Opals': {'excellent': 120, 'good': 90, 'fair': 60, 'is_core': True},
+        'Low Temperature Diamonds': {'excellent': 120, 'good': 90, 'fair': 60, 'is_core': True},
+        'Alexandrite': {'excellent': 120, 'good': 90, 'fair': 60, 'is_core': True},
+        'Musgravite': {'excellent': 120, 'good': 90, 'fair': 60, 'is_core': True},
+        'Monazite': {'excellent': 120, 'good': 90, 'fair': 60, 'is_core': True},
+        'Benitoite': {'excellent': 120, 'good': 90, 'fair': 60, 'is_core': True},
+        'Serendibite': {'excellent': 120, 'good': 90, 'fair': 60, 'is_core': True},
+        'Grandidierite': {'excellent': 120, 'good': 90, 'fair': 60, 'is_core': True},
+        'Rhodplumsite': {'excellent': 120, 'good': 90, 'fair': 60, 'is_core': True},
+    }
+    
+    # Default thresholds for unknown materials (use Platinum as baseline)
+    DEFAULT_THRESHOLDS = {'excellent': 800, 'good': 600, 'fair': 400}
+    
     def __init__(self, main_app=None):
         self.main_app = main_app
         
@@ -222,6 +252,50 @@ class ReportGenerator:
 
         return None
 
+    def _get_primary_material_and_thresholds(self, session_data):
+        """
+        Detect the primary material being mined (by highest TPH) and return appropriate thresholds.
+        
+        Returns: (primary_material_name, thresholds_dict, is_core_material)
+        """
+        try:
+            materials_mined_raw = session_data.get('materials_mined', {})
+            session_duration_hours = session_data.get('session_duration', 0) / 3600.0
+            
+            if not materials_mined_raw or session_duration_hours <= 0:
+                return (None, self.DEFAULT_THRESHOLDS, False)
+            
+            # Calculate TPH for each material
+            material_tphs = {}
+            for mat_name, value in materials_mined_raw.items():
+                # Skip summary entries
+                if mat_name.lower() in ['total cargo collected', 'total', 'cargo collected', 'total refined']:
+                    continue
+                    
+                tons = self._normalize_material_tons(value)
+                if tons and tons > 0:
+                    tph = tons / session_duration_hours
+                    # Expand material name for matching
+                    expanded_name = self._expand_material_name(mat_name)
+                    material_tphs[expanded_name] = tph
+            
+            if not material_tphs:
+                return (None, self.DEFAULT_THRESHOLDS, False)
+            
+            # Find material with highest TPH
+            primary_material = max(material_tphs, key=material_tphs.get)
+            primary_tph = material_tphs[primary_material]
+            
+            # Get thresholds for this material
+            thresholds = self.MATERIAL_TPH_THRESHOLDS.get(primary_material, self.DEFAULT_THRESHOLDS)
+            is_core = thresholds.get('is_core', False)
+            
+            return (primary_material, thresholds, is_core)
+            
+        except Exception as e:
+            log.error(f"Error detecting primary material: {e}")
+            return (None, self.DEFAULT_THRESHOLDS, False)
+
     def _find_performance_entry(self, material_name, perf_data):
         """Find mineral performance entry using fuzzy match on names"""
         if not perf_data:
@@ -355,11 +429,26 @@ class ReportGenerator:
         if not name:
             return name
         map = {
+            # Metallic ring materials
             'plat': 'Platinum', 'pt': 'Platinum', 'platinum': 'Platinum',
             'osmi': 'Osmium', 'os': 'Osmium', 'osmium': 'Osmium',
             'pain': 'Painite', 'pn': 'Painite', 'painite': 'Painite',
             'pd': 'Palladium', 'pall': 'Palladium', 'palladium': 'Palladium',
-            'au': 'Gold', 'gold': 'Gold', 'ag': 'Silver', 'silver': 'Silver'
+            'au': 'Gold', 'gold': 'Gold', 'ag': 'Silver', 'silver': 'Silver',
+            # Icy ring materials
+            'brom': 'Bromellite', 'bromellite': 'Bromellite',
+            'trit': 'Tritium', 'tritium': 'Tritium',
+            'ltd': 'Low Temperature Diamonds', 'low temperature diamonds': 'Low Temperature Diamonds',
+            'lowtemperaturediamonds': 'Low Temperature Diamonds',
+            # Core materials
+            'vo': 'Void Opals', 'void opals': 'Void Opals', 'voidopals': 'Void Opals',
+            'alex': 'Alexandrite', 'alexandrite': 'Alexandrite',
+            'musg': 'Musgravite', 'musgravite': 'Musgravite',
+            'mono': 'Monazite', 'monazite': 'Monazite',
+            'beni': 'Benitoite', 'benitoite': 'Benitoite',
+            'seren': 'Serendibite', 'serendibite': 'Serendibite',
+            'grand': 'Grandidierite', 'grandidierite': 'Grandidierite',
+            'rhod': 'Rhodplumsite', 'rhodplumsite': 'Rhodplumsite',
         }
         key = str(name).strip().lower()
         return map.get(key, name)
@@ -2265,28 +2354,43 @@ class ReportGenerator:
                 ship_name_str = session_data.get('ship_name', '').lower()
                 is_type_11_ship = 'type-11 prospector' in ship_name_str
                 
+                # Detect primary material for scoring thresholds
+                primary_material, base_thresholds, is_core_material = self._get_primary_material_and_thresholds(session_data)
+                
                 # Check if this is a core mining session
                 core_asteroids_count = session_data.get('core_asteroids', 0)
                 asteroids_for_core_check = session_data.get('asteroids_prospected', 0)
-                is_core_session = False
-                if core_asteroids_count > 0 and asteroids_for_core_check > 0:
+                is_core_session = is_core_material
+                if not is_core_material and core_asteroids_count > 0 and asteroids_for_core_check > 0:
                     core_ratio = core_asteroids_count / asteroids_for_core_check
                     is_core_session = core_ratio > 0.3
                 
-                # Build dynamic scoring explanation based on adjustments
+                # Build dynamic scoring explanation based on material and ship
+                type_11_mult = 1.25 if is_type_11_ship and not is_core_session else 1.0
+                
                 if is_core_session:
-                    scoring_note = """<br><br>
-                            <strong>⚖️ Core Mining Detected:</strong> TPH thresholds adjusted for core mining mechanics (120/90/60 t/hr instead of 800/600/400)."""
-                    tph_thresholds = "≥120=70pts, ≥90=50pts, ≥60=30pts, &lt;60=10pts (Core Mining)"
+                    scoring_note = f"""<br><br>
+                            <strong>⚖️ Core Mining Detected ({primary_material or 'Unknown'}):</strong> TPH thresholds set for core mining (120/90/60 t/hr)."""
+                    tph_thresholds = "≥120=70pts, ≥90=50pts, ≥60=30pts, &lt;60=10pts (Core)"
                     tpa_thresholds = "≥20t/ast=30pts, ≥15t/ast=20pts, ≥10t/ast=10pts, &lt;10t/ast=5pts"
                 elif is_type_11_ship:
-                    scoring_note = """<br><br>
-                            <strong>⚖️ Type-11 Prospector Detected:</strong> Both TPH and T/Asteroid thresholds increased by 25% to account for faster mining mechanics."""
-                    tph_thresholds = "≥1000=70pts, ≥750=50pts, ≥500=30pts, &lt;500=10pts (Type-11)"
+                    exc = int(base_thresholds['excellent'] * type_11_mult)
+                    good = int(base_thresholds['good'] * type_11_mult)
+                    fair = int(base_thresholds['fair'] * type_11_mult)
+                    scoring_note = f"""<br><br>
+                            <strong>⚖️ {primary_material or 'Material'} + Type-11:</strong> TPH thresholds adjusted for material type and Type-11 (×1.25)."""
+                    tph_thresholds = f"≥{exc}=70pts, ≥{good}=50pts, ≥{fair}=30pts, &lt;{fair}=10pts"
                     tpa_thresholds = "≥25t/ast=30pts, ≥19t/ast=20pts, ≥12t/ast=10pts, &lt;12t/ast=5pts (Type-11)"
                 else:
-                    scoring_note = ""
-                    tph_thresholds = "≥800=70pts, ≥600=50pts, ≥400=30pts, &lt;400=10pts"
+                    exc = base_thresholds['excellent']
+                    good = base_thresholds['good']
+                    fair = base_thresholds['fair']
+                    if primary_material:
+                        scoring_note = f"""<br><br>
+                            <strong>⚖️ {primary_material} Mining:</strong> TPH thresholds adjusted for this material type."""
+                    else:
+                        scoring_note = ""
+                    tph_thresholds = f"≥{exc}=70pts, ≥{good}=50pts, ≥{fair}=30pts, &lt;{fair}=10pts"
                     tpa_thresholds = "≥20t/ast=30pts, ≥15t/ast=20pts, ≥10t/ast=10pts, &lt;10t/ast=5pts"
                 
                 analytics_html += f"""
@@ -2294,17 +2398,15 @@ class ReportGenerator:
                     <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">⚡ Efficiency Breakdown</h3>
                     <div style="background: #2a2a2a; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #4CAF50;">
                         <p style="color: #cccccc; margin: 0; font-size: 13px;">
-                            <strong>💡 Understanding Your Mining Metrics:</strong><br>
-                            These metrics help you evaluate and compare different mining sessions. Hover over each card for detailed explanations.<br><br>
-                            <strong>🎯 Ring Quality Assessment:</strong><br>
-                            • <strong>Excellent:</strong> Outstanding locations worth bookmarking<br>
-                            • <strong>Good:</strong> Solid performance worth returning to<br>
-                            • <strong>Fair:</strong> Acceptable mining efficiency<br>
-                            • <strong>Poor:</strong> Suboptimal - find better spots!<br><br>
-                            <strong>📊 Scoring System (100 points total):</strong><br>
-                            • <strong>TPH (70%):</strong> {tph_thresholds}<br>
-                            • <strong>Yield Quality (30%):</strong> {tpa_thresholds}<br>
-                            <em>Final Rating: Excellent=85-100pts, Good=65-84pts, Fair=45-64pts, Poor=&lt;45pts</em>{scoring_note}
+                            <strong>💡 Material-Aware Scoring:</strong><br>
+                            Ring Quality is scored based on your <strong>primary material</strong> ({primary_material or 'Unknown'}). Different materials have different "Excellent" thresholds - Bromellite at 500 t/hr is just as impressive as Platinum at 800 t/hr!<br><br>
+                            <strong>🎯 Ring Quality Ratings:</strong><br>
+                            • <strong>Excellent:</strong> Outstanding for this material - bookmark it!<br>
+                            • <strong>Good:</strong> Solid performance for this material<br>
+                            • <strong>Fair:</strong> Acceptable efficiency<br>
+                            • <strong>Poor:</strong> Below average - try a different spot<br><br>
+                            <strong>📊 Scoring (100 pts):</strong> TPH (70%): {tph_thresholds} | Yield (30%): {tpa_thresholds}<br>
+                            <em>Excellent=85+pts, Good=65-84pts, Fair=45-64pts, Poor=&lt;45pts</em>{scoring_note}
                         </p>
                     </div>
                     <div class="stats-grid">
@@ -2450,50 +2552,47 @@ class ReportGenerator:
                     </div>
                     """
                 
-                # Ring Quality Assessment - 2-factor system focused on mining performance
+                # Ring Quality Assessment - Material-aware scoring system
+                # Different materials have different natural yield rates, so we score based on primary material
                 ring_quality = "Poor"
                 quality_explanation = ""
                 quality_score = 0
                 
-                # Check if using Type-11 Prospector - apply +75% TPH threshold adjustment
-                # Type-11 has faster mining mechanics, so higher TPH thresholds for same score
-                # ship_name format from TXT report: "Mega Bumper - Type-11 Prospector"
+                # Check if using Type-11 Prospector - apply ×1.25 TPH threshold multiplier
                 ship_name_str = session_data.get('ship_name', '').lower()
                 is_type_11 = 'type-11 prospector' in ship_name_str
+                type_11_multiplier = 1.25 if is_type_11 else 1.0
                 
-                # Check if this is a core mining session
-                # Core mining has much lower TPH (max ~150 t/hr) vs laser mining (800+ t/hr)
+                # Detect primary material and get appropriate thresholds
+                primary_material, base_thresholds, is_core_material = self._get_primary_material_and_thresholds(session_data)
+                
+                # Check if this is a core mining session (from core asteroid count)
                 core_asteroids = session_data.get('core_asteroids', 0)
                 asteroids_prospected_for_core = session_data.get('asteroids_prospected', 0)
-                is_core_mining = False
+                is_core_mining = is_core_material
                 
-                if core_asteroids > 0 and asteroids_prospected_for_core > 0:
-                    # If >30% of asteroids were core asteroids, consider it a core mining session
+                if not is_core_material and core_asteroids > 0 and asteroids_prospected_for_core > 0:
                     core_ratio = core_asteroids / asteroids_prospected_for_core
                     is_core_mining = core_ratio > 0.3
                 
-                # Determine TPH thresholds based on mining type
-                if is_core_mining:
-                    # Core mining thresholds (max ~150 t/hr)
+                # Apply Type-11 multiplier to thresholds (not for core mining)
+                if is_type_11 and not is_core_mining:
+                    tph_excellent = base_thresholds['excellent'] * type_11_multiplier
+                    tph_good = base_thresholds['good'] * type_11_multiplier
+                    tph_fair = base_thresholds['fair'] * type_11_multiplier
+                    mining_type_note = f" ({primary_material or 'Unknown'}, Type-11)"
+                elif is_core_mining:
                     tph_excellent = 120
                     tph_good = 90
                     tph_fair = 60
-                    mining_type_note = " (Core Mining)"
-                elif is_type_11:
-                    # Type-11 laser mining (+25% thresholds)
-                    # Type-11 extracts ~25% more per asteroid based on real-world data
-                    tph_excellent = 1000  # 800 * 1.25
-                    tph_good = 750        # 600 * 1.25
-                    tph_fair = 500        # 400 * 1.25
-                    mining_type_note = " (Type-11 adjusted)"
+                    mining_type_note = f" ({primary_material or 'Core'}, Core Mining)"
                 else:
-                    # Standard laser mining thresholds
-                    tph_excellent = 800
-                    tph_good = 600
-                    tph_fair = 400
-                    mining_type_note = ""
+                    tph_excellent = base_thresholds['excellent']
+                    tph_good = base_thresholds['good']
+                    tph_fair = base_thresholds['fair']
+                    mining_type_note = f" ({primary_material})" if primary_material else ""
                 
-                # Factor 1: TPH (70% weight) - Primary speed indicator
+                # Factor 1: TPH (70% weight) - Primary speed indicator (material-adjusted)
                 if tph >= tph_excellent:
                     quality_score += 70
                 elif tph >= tph_good:
@@ -2504,20 +2603,35 @@ class ReportGenerator:
                     quality_score += 10
                 
                 # Factor 2: Tons/Asteroid (30% weight) - Yield quality indicator
-                # Use the same calculation as Session Summary for consistency
                 ring_tons_per_asteroid, _ = self._compute_tons_per_asteroid(session_data)
                 if ring_tons_per_asteroid is None:
                     ring_tons_per_asteroid = tons_per_asteroid  # Fallback to local calculation
                 
-                # Determine T/Asteroid thresholds based on mining type
-                # Type-11 extracts ~25% more per asteroid (HAZ: 20-30 vs 18-20, Normal: 15-20 vs 12-15)
+                # T/Asteroid thresholds - adjusted for icy ring materials (lower natural yield)
+                # Icy ring materials like Bromellite have ~50% lower T/Asteroid than metallic
+                icy_materials = ['Bromellite', 'Tritium', 'Low Temperature Diamonds']
+                is_icy_material = primary_material in icy_materials
+                
                 if is_type_11 and not is_core_mining:
-                    # Type-11 T/Asteroid thresholds (+25%)
-                    tpa_excellent = 25  # 20 * 1.25
-                    tpa_good = 19       # 15 * 1.25 (rounded)
-                    tpa_fair = 12       # 10 * 1.25 (rounded)
+                    if is_icy_material:
+                        # Icy ring T/Asteroid thresholds (lower due to material properties)
+                        tpa_excellent = 18
+                        tpa_good = 14
+                        tpa_fair = 10
+                    else:
+                        # Metallic ring T/Asteroid thresholds
+                        tpa_excellent = 25
+                        tpa_good = 19
+                        tpa_fair = 12
                 else:
-                    # Standard T/Asteroid thresholds (also used for core mining)
+                    if is_icy_material:
+                        tpa_excellent = 15
+                        tpa_good = 11
+                        tpa_fair = 8
+                    else:
+                        tpa_excellent = 20
+                        tpa_good = 15
+                        tpa_fair = 10
                     tpa_excellent = 20
                     tpa_good = 15
                     tpa_fair = 10
@@ -2531,7 +2645,7 @@ class ReportGenerator:
                 else:
                     quality_score += 5
                 
-                # Determine overall ring quality with 2-factor assessment
+                # Determine overall ring quality
                 if quality_score >= 85:
                     ring_quality = "Excellent"
                     quality_explanation = f"Outstanding mining location - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid{mining_type_note}"
@@ -2544,14 +2658,14 @@ class ReportGenerator:
                 else:
                     quality_explanation = f"Suboptimal mining location - {tph:.1f} t/h, {ring_tons_per_asteroid:.1f} t/asteroid{mining_type_note}"
                 
-                # Update tooltip to mention mining type adjustments
-                tooltip_base = "Overall assessment of this mining location based on two key factors: speed (TPH 70%) and yield quality (Tons/Asteroid 30%). Excellent/Good locations are worth bookmarking for future mining sessions."
+                # Build tooltip with material-specific thresholds
+                tooltip_base = f"Ring quality scored based on your primary material ({primary_material or 'Unknown'}). Different materials have different 'Excellent' thresholds."
                 if is_core_mining:
-                    tooltip_extra = " Core mining session detected: TPH thresholds adjusted for slower core mining mechanics (120/90/60 t/hr)."
+                    tooltip_extra = f" Core mining detected: TPH thresholds 120/90/60 t/hr."
                 elif is_type_11:
-                    tooltip_extra = " Type-11 Prospector detected: Both TPH (+25%: 1000/750/500) and T/Asteroid (+25%: 25/19/12) thresholds adjusted for faster mining mechanics."
+                    tooltip_extra = f" Type-11 ×1.25: TPH thresholds {tph_excellent:.0f}/{tph_good:.0f}/{tph_fair:.0f} t/hr for {primary_material or 'this material'}."
                 else:
-                    tooltip_extra = ""
+                    tooltip_extra = f" TPH thresholds: {tph_excellent:.0f}/{tph_good:.0f}/{tph_fair:.0f} t/hr for {primary_material or 'this material'}."
                 
                 analytics_html += f"""
                 <div class="stat-card" title="{tooltip_base}{tooltip_extra}">

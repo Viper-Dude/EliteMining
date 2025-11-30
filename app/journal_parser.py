@@ -867,6 +867,77 @@ class JournalParser:
         
         return None
 
+    def get_systems_visited(self) -> Optional[int]:
+        """Get the systems visited count from the most recent Statistics event in journal.
+        
+        The game writes a Statistics event containing Exploration data with Systems_Visited.
+        
+        Returns:
+            Number of systems visited or None if not found
+        """
+        files = self.find_journal_files()
+        if not files:
+            return None
+        
+        # Check recent journal files (Statistics event is written periodically)
+        for file_path in reversed(files[-5:]):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    # Read file in reverse order to find most recent Statistics event
+                    lines = f.readlines()
+                    for line in reversed(lines):
+                        try:
+                            event = json.loads(line.strip())
+                            if event.get('event') == 'Statistics':
+                                exploration = event.get('Exploration', {})
+                                systems_visited = exploration.get('Systems_Visited')
+                                if systems_visited is not None:
+                                    return systems_visited
+                        except json.JSONDecodeError:
+                            continue
+            except Exception:
+                continue
+        
+        return None
+
+    def count_system_visits(self, system_name: str) -> int:
+        """Count how many times a system has been visited by scanning all journal files.
+        
+        Counts FSDJump and Location events to the specified system across ALL journal files.
+        
+        Args:
+            system_name: Name of the star system to count visits for
+            
+        Returns:
+            Number of times the system was visited (FSDJump events to that system)
+        """
+        files = self.find_journal_files()
+        if not files:
+            return 0
+        
+        visit_count = 0
+        system_name_lower = system_name.lower()
+        
+        for file_path in files:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        try:
+                            event = json.loads(line.strip())
+                            event_type = event.get('event', '')
+                            
+                            # Count FSDJump events to this system
+                            if event_type == 'FSDJump':
+                                star_system = event.get('StarSystem', '')
+                                if star_system.lower() == system_name_lower:
+                                    visit_count += 1
+                        except json.JSONDecodeError:
+                            continue
+            except Exception:
+                continue
+        
+        return visit_count
+
 
 def create_journal_parser_from_config(prospector_panel) -> Optional[JournalParser]:
     """Create a JournalParser instance using the configuration from prospector panel

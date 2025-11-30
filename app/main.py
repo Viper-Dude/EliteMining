@@ -191,6 +191,93 @@ from journal_parser import JournalParser
 from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir, get_variables_dir, get_ship_presets_dir
 from path_utils import get_ship_presets_dir, get_reports_dir
 
+# ============================================================================
+# CENTRALIZED THEME COLOR CONFIGURATION
+# ============================================================================
+# Adjust these values to customize the Elite Orange theme appearance.
+# All orange/accent colors throughout the app will use these values.
+
+THEME_ELITE_ORANGE = {
+    # Main background colors
+    "bg": "#000000",              # Pure black background
+    "bg_dark": "#0a0a0a",         # Slightly lighter black for contrast
+    "bg_accent": "#1a1a1a",       # Dark gray for panels/accents
+    
+    # Orange text colors (adjust brightness here)
+    "fg": "#ff8c00",              # Primary orange text (Dark Orange)
+    "fg_bright": "#ffa500",       # Brighter orange for highlights
+    "fg_dim": "#cc7000",          # Dimmer orange for secondary text
+    "fg_muted": "#888888",        # Gray for disabled/help text
+    
+    # Selection colors
+    "selection_bg": "#ff6600",    # Orange selection background
+    "selection_fg": "#000000",    # Black text on selection
+    
+    # Button colors
+    "btn_bg": "#333333",          # Button background
+    "btn_bg_hover": "#444444",    # Button hover
+    "btn_bg_disabled": "#1a1a1a", # Button disabled
+    "btn_fg": "#ff8c00",          # Button text (orange)
+    "btn_fg_disabled": "#666666", # Disabled button text
+    
+    # Treeview/Table colors
+    "tree_bg": "#000000",         # Tree background
+    "tree_fg": "#ff8c00",         # Tree text
+    "tree_selected_bg": "#ff6600", # Selected row
+    "tree_selected_fg": "#000000", # Selected row text
+    "tree_heading_bg": "#1a1a1a", # Column headers
+    "tree_heading_fg": "#ffa500", # Column header text
+    
+    # Tip/info colors
+    "tip_fg": "#ffa500",          # Tip text (bright orange)
+    "help_fg": "#888888",         # Help text (gray)
+}
+
+THEME_DARK_GRAY = {
+    # Main background colors
+    "bg": "#1e1e1e",              # Dark gray background
+    "bg_dark": "#1e1e1e",         # Same as bg
+    "bg_accent": "#2d2d2d",       # Lighter gray for panels
+    
+    # Text colors
+    "fg": "#e6e6e6",              # Light gray text
+    "fg_bright": "#ffffff",       # White for highlights
+    "fg_dim": "#cccccc",          # Dimmer for secondary
+    "fg_muted": "gray",           # Gray for help text
+    
+    # Selection colors
+    "selection_bg": "#444444",    # Gray selection
+    "selection_fg": "#ffffff",    # White text on selection
+    
+    # Button colors
+    "btn_bg": "#333333",
+    "btn_bg_hover": "#444444",
+    "btn_bg_disabled": "#1a1a1a",
+    "btn_fg": "#ffffff",
+    "btn_fg_disabled": "#666666",
+    
+    # Treeview/Table colors
+    "tree_bg": "#1e1e1e",
+    "tree_fg": "#e6e6e6",
+    "tree_selected_bg": "#444444",
+    "tree_selected_fg": "#ffffff",
+    "tree_heading_bg": "#2d2d2d",
+    "tree_heading_fg": "#ffffff",
+    
+    # Tip/info colors
+    "tip_fg": "#ffa500",          # Orange tips
+    "help_fg": "gray",
+}
+
+def get_theme_colors(theme_name: str) -> dict:
+    """Get the color dictionary for the specified theme."""
+    if theme_name == "elite_orange":
+        return THEME_ELITE_ORANGE
+    else:
+        return THEME_DARK_GRAY
+
+# ============================================================================
+
 # --- Simple Tooltip class with global enable/disable ---
 class ToolTip:
     tooltips_enabled = True  # Global tooltip enable/disable flag
@@ -631,7 +718,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.6.4"
+APP_VERSION = "v4.6.5"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4336,31 +4423,19 @@ class App(tk.Tk):
         from config import load_theme
         self.current_theme = load_theme()  # 'elite_orange' or 'dark_gray'
         
-        if self.current_theme == "elite_orange":
-            # Elite Orange theme (Classic ED HUD)
-            dark_bg = "#0a0a0a"      # near black
-            dark_fg = "#ff8c00"      # orange text
-            accent = "#1a1a1a"       # dark gray
-            btn_fg = "#ff8c00"
-            selection_bg = "#ff6600"
-            selection_fg = "#000000"
-        else:
-            # Dark Gray theme (original)
-            dark_bg = "#1e1e1e"
-            dark_fg = "#e6e6e6"
-            accent = "#2d2d2d"
-            btn_fg = "#ffffff"
-            selection_bg = "#444444"
-            selection_fg = "#ffffff"
+        # Get centralized theme colors (defined at top of file)
+        theme = get_theme_colors(self.current_theme)
         
-        # Store theme colors for access elsewhere
-        self.theme_colors = {
-            "bg": dark_bg,
-            "fg": dark_fg,
-            "accent": accent,
-            "selection_bg": selection_bg,
-            "selection_fg": selection_fg
-        }
+        # Extract commonly used colors for convenience
+        dark_bg = theme["bg"]
+        dark_fg = theme["fg"]
+        accent = theme["bg_accent"]
+        btn_fg = theme["btn_fg"]
+        selection_bg = theme["selection_bg"]
+        selection_fg = theme["selection_fg"]
+        
+        # Store full theme colors for access elsewhere
+        self.theme_colors = theme
         
         style.configure(".", background=dark_bg, foreground=dark_fg)
         style.configure("TLabel", background=dark_bg, foreground=dark_fg)
@@ -4369,11 +4444,14 @@ class App(tk.Tk):
         style.configure("TNotebook.Tab", background=accent, foreground=dark_fg)
         style.map("TNotebook.Tab", background=[("selected", dark_bg)])
 
-        # Custom dark button style
-        style.configure("Dark.TButton", background="#333333", foreground=btn_fg, font=("Segoe UI", 9, "bold"))
+        # Custom dark button style (uses centralized theme colors)
+        style.configure("Dark.TButton", 
+                        background=theme["btn_bg"], 
+                        foreground=theme["btn_fg"], 
+                        font=("Segoe UI", 9, "bold"))
         style.map("Dark.TButton",
-                   background=[("active", "#444444"), ("disabled", "#1a1a1a")],
-                   foreground=[("disabled", "#666666")])
+                   background=[("active", theme["btn_bg_hover"]), ("disabled", theme["btn_bg_disabled"])],
+                   foreground=[("disabled", theme["btn_fg_disabled"])])
 
         style.configure("TCheckbutton", background=dark_bg, foreground=dark_fg)
         style.configure("TRadiobutton", background=dark_bg, foreground=dark_fg)
@@ -4391,7 +4469,7 @@ class App(tk.Tk):
         self.option_add("*TMenubutton.foreground", dark_fg)
         self.option_add("*Checkbutton.background", dark_bg)
         self.option_add("*Checkbutton.foreground", dark_fg)
-        self.option_add("*Checkbutton.selectColor", "#333333")
+        self.option_add("*Checkbutton.selectColor", theme["btn_bg"])
         self.option_add("*Checkbutton.activeBackground", dark_bg)
         self.option_add("*Checkbutton.activeForeground", dark_fg)
 
@@ -4421,7 +4499,7 @@ class App(tk.Tk):
 
         self.title(f"{APP_TITLE} — {APP_VERSION}")
         self.resizable(True, True)
-        self.minsize(950, 680)  # Minimum width to fit theme button text
+        self.minsize(1050, 680)  # Minimum width to fit all status bar info
         
         # Withdraw window initially to prevent flash on wrong monitor
         self.withdraw()
@@ -4688,7 +4766,8 @@ class App(tk.Tk):
         self.main_paned.grid(row=0, column=0, columnspan=2, sticky="nsew")
         
         # Left pane: tabs container
-        content_frame = ttk.Frame(self.main_paned, padding=(10, 6, 6, 6))
+        # Bottom padding reduced to 0 to align with sidebar/status bar
+        content_frame = ttk.Frame(self.main_paned, padding=(10, 6, 6, 0))
         self.main_paned.add(content_frame, weight=3)  # Add to paned window with higher weight
         content_frame.columnconfigure(0, weight=1)
         content_frame.rowconfigure(0, weight=1)
@@ -4696,6 +4775,29 @@ class App(tk.Tk):
 
         self.notebook = ttk.Notebook(content_frame)
         self.notebook.grid(row=0, column=0, sticky="nsew")
+        
+        # Theme toggle button - will be placed in actions row below
+        from config import load_theme
+        _current_theme = load_theme()
+        # Button shows what you'll switch TO (opposite of current)
+        _theme_btn_text = "Dark Theme" if _current_theme == "elite_orange" else "Orange Theme"
+        # Style button to match current theme
+        if _current_theme == "elite_orange":
+            _btn_bg, _btn_fg = "#1a1a1a", "#ff8c00"
+            _btn_active_bg, _btn_active_fg = "#ff8c00", "#000000"
+        else:
+            _btn_bg, _btn_fg = "#2d2d2d", "#ffffff"
+            _btn_active_bg, _btn_active_fg = "#3d3d3d", "#ffffff"
+        
+        # Store theme button config for later placement in actions row
+        self._theme_btn_config = {
+            "text": _theme_btn_text,
+            "bg": _btn_bg,
+            "fg": _btn_fg,
+            "activebackground": _btn_active_bg,
+            "activeforeground": _btn_active_fg
+        }
+        
         # Clear focus when switching tabs to prevent entries from being auto-selected
         def _clear_entry_focus(event=None):
             try:
@@ -4758,7 +4860,10 @@ class App(tk.Tk):
         self._create_main_sidebar()
 
         # Configure column weights for proper spacing
-        actions.grid_columnconfigure(0, weight=1)  # Expandable space
+        actions.grid_columnconfigure(0, weight=0)  # Left side fixed
+        actions.grid_columnconfigure(1, weight=1)  # Expandable space in middle
+        actions.grid_columnconfigure(2, weight=0)  # Info frame fixed
+        actions.grid_columnconfigure(3, weight=0)  # Theme button fixed
         
         # CMDR/System info container (right side) - uses frame for mixed colors
         # Use black background for orange theme
@@ -4767,7 +4872,7 @@ class App(tk.Tk):
         _info_bg = "#000000" if _info_theme == "elite_orange" else "#1e1e1e"
         
         info_frame = tk.Frame(actions, bg=_info_bg)
-        info_frame.grid(row=0, column=3, sticky="e", padx=(10, 5))
+        info_frame.grid(row=0, column=2, sticky="e", padx=(10, 5))
         
         # EliteMining logo (resized to fit status bar)
         try:
@@ -4792,40 +4897,24 @@ class App(tk.Tk):
         self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.system_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.visits_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.visits_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.route_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.total_systems_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.total_systems_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         
         # Grid them horizontally (tighter spacing) - shift columns to make room for logo
         self.cmdr_label_prefix.grid(row=0, column=1, sticky="e")
         self.cmdr_label_value.grid(row=0, column=2, sticky="w")
         self.system_label_prefix.grid(row=0, column=3, sticky="e")
         self.system_label_value.grid(row=0, column=4, sticky="w")
-        self.route_label_prefix.grid(row=0, column=5, sticky="e")
-        self.route_label_value.grid(row=0, column=6, sticky="w")
-        
-        # Theme toggle button - shows current theme name
-        from config import load_theme
-        _current_theme = load_theme()
-        _theme_btn_text = "Orange Theme" if _current_theme == "elite_orange" else "Dark Theme"
-        
-        self.theme_toggle_btn = tk.Button(
-            actions,
-            text=_theme_btn_text,
-            command=self._toggle_theme,
-            bg="#333333",
-            fg="#ffcc00",
-            activebackground="#444444",
-            activeforeground="#ffcc00",
-            relief="solid",
-            bd=1,
-            highlightbackground="#ff6600",
-            highlightthickness=1,
-            padx=8,
-            pady=2,
-            font=("Segoe UI", 8),
-            cursor="hand2"
-        )
-        self.theme_toggle_btn.grid(row=0, column=4, sticky="e", padx=(15, 5))
+        self.visits_label_prefix.grid(row=0, column=5, sticky="e")
+        self.visits_label_value.grid(row=0, column=6, sticky="w")
+        self.route_label_prefix.grid(row=0, column=7, sticky="e")
+        self.route_label_value.grid(row=0, column=8, sticky="w")
+        self.total_systems_label_prefix.grid(row=0, column=9, sticky="e")
+        self.total_systems_label_value.grid(row=0, column=10, sticky="w")
         
         # Load CMDR name in background
         self.after(500, self._update_cmdr_system_display)
@@ -4865,12 +4954,6 @@ class App(tk.Tk):
         # Start on Hotspots Finder tab by default
         self.after(100, lambda: self.switch_to_tab('hotspots_finder'))
 
-        # Debug: Print which widget has initial focus to diagnose why entry fields are highlighted
-        try:
-            self.after(600, lambda: print(f"[DEBUG] Main initial focus: {self.focus_get()}"))
-        except Exception:
-            pass
-
     def _create_integrated_cargo_monitor(self, parent_frame):
         """
         Create integrated cargo monitor in the bottom pane.
@@ -4886,9 +4969,9 @@ class App(tk.Tk):
         
         # Create a LabelFrame to provide visual border around cargo monitor
         cargo_frame = ttk.LabelFrame(parent_frame, text="🚛 Cargo Monitor", padding=6)
-        cargo_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+        cargo_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=(2, 0))  # sticky="nsew" - expand in all directions
         cargo_frame.columnconfigure(0, weight=1)
-        cargo_frame.rowconfigure(1, weight=1)
+        cargo_frame.rowconfigure(1, weight=1)  # Content row expands
         
         # Simple header without buttons
         header_frame = ttk.Frame(cargo_frame)
@@ -4903,11 +4986,11 @@ class App(tk.Tk):
                                                  font=("Segoe UI", 10))
         self.integrated_cargo_summary.grid(row=0, column=1, sticky="w", padx=(6, 0))
         
-        # Compact content area - much smaller height
+        # Content area - expandable
         content_frame = ttk.Frame(cargo_frame)
         content_frame.grid(row=1, column=0, sticky="nsew")
         content_frame.columnconfigure(0, weight=1)
-        content_frame.rowconfigure(0, weight=1)
+        content_frame.rowconfigure(0, weight=1)  # Text widget row expands
         
         # Cargo text widget (theme-aware)
         _cargo_bg = self.theme_colors["bg"]
@@ -4921,8 +5004,8 @@ class App(tk.Tk):
             bd=0,
             highlightthickness=0,
             wrap="word",  # Enable word wrap for better text flow
-            height=8,  # Increased from 3 to 8 lines for more cargo display space
-            width=45   # Further increased width to show complete cargo info
+            height=6,  # Minimum height - will expand with pane
+            width=45   # Width for complete cargo info
         )
         self.integrated_cargo_text.grid(row=0, column=0, sticky="nsew")
         
@@ -6004,16 +6087,23 @@ class App(tk.Tk):
         self.theme_label = tk.Label(theme_frame, text=current_theme_text, bg=_gs_bg, fg="#ffcc00", font=("Segoe UI", 9, "bold"))
         self.theme_label.pack(side="left", padx=(0, 15))
         
-        # Button shows current theme name
-        _settings_theme_btn_text = "Orange Theme" if _gs_theme == "elite_orange" else "Dark Theme"
+        # Button shows what you'll switch TO (opposite of current)
+        _settings_theme_btn_text = "Dark Theme" if _gs_theme == "elite_orange" else "Orange Theme"
+        # Style to match current theme
+        if _gs_theme == "elite_orange":
+            _sbtn_bg, _sbtn_fg = "#1a1a1a", "#ff8c00"
+            _sbtn_active_bg, _sbtn_active_fg = "#ff8c00", "#000000"
+        else:
+            _sbtn_bg, _sbtn_fg = "#333333", "#ffffff"
+            _sbtn_active_bg, _sbtn_active_fg = "#444444", "#ffffff"
         theme_toggle_settings = tk.Button(
             theme_frame,
             text=_settings_theme_btn_text,
             command=self._toggle_theme,
-            bg="#333333",
-            fg="#ffcc00",
-            activebackground="#444444",
-            activeforeground="#ffcc00",
+            bg=_sbtn_bg,
+            fg=_sbtn_fg,
+            activebackground=_sbtn_active_bg,
+            activeforeground=_sbtn_active_fg,
             relief="flat",
             bd=1,
             padx=8,
@@ -6705,9 +6795,11 @@ class App(tk.Tk):
     def _create_main_sidebar(self) -> None:
         """Create the main Ship Presets and Cargo Monitor sidebar"""
         # Create the sidebar frame - add to main paned window
-        sidebar = ttk.Frame(self.main_paned, padding=(6, 6, 10, 6))
+        # Reduced bottom padding (6,6,10,0) so cargo monitor aligns with app bottom
+        sidebar = ttk.Frame(self.main_paned, padding=(6, 6, 10, 0))
         sidebar.columnconfigure(0, weight=1)
-        sidebar.rowconfigure(0, weight=1)
+        sidebar.rowconfigure(0, weight=1)  # Paned window expands
+        sidebar.rowconfigure(1, weight=0)  # Theme button row fixed
         
         # Add both panes to the horizontal paned window
         # Content frame was already created in _build_ui, add it first
@@ -6726,31 +6818,27 @@ class App(tk.Tk):
             try:
                 self.update_idletasks()
                 total_width = self.winfo_width()
-                print(f"[SASH] Setting initial main sash. Total width: {total_width}, retry: {retry_count}")
                 
                 if total_width < 400:
                     if retry_count < 10:
                         self.after(200, lambda: _set_initial_sash(retry_count + 1))
                         return
                     else:
-                        print(f"[SASH] ERROR: Window width still {total_width} after {retry_count} retries")
                         return
                 
                 # Minimum widths
                 min_content_width = 600
-                min_sidebar_width = 280
+                min_sidebar_width = 200  # Reduced from 280 - allow narrower sidebar
                 
                 # Try to restore saved position first
                 from config import load_main_sash_position
                 saved_pos = load_main_sash_position()
-                print(f"[SASH] Saved position: {saved_pos}")
                 
                 # Validate saved position ensures both areas have minimum width
                 if (saved_pos is not None and 
                     saved_pos >= min_content_width and 
                     saved_pos <= total_width - min_sidebar_width):
                     self.main_paned.sashpos(0, saved_pos)
-                    print(f"[SASH] Using saved position: {saved_pos}")
                 else:
                     # Default: sidebar ~300px wide
                     sash_pos = total_width - 300
@@ -6758,7 +6846,6 @@ class App(tk.Tk):
                     sash_pos = max(sash_pos, min_content_width)
                     sash_pos = min(sash_pos, total_width - min_sidebar_width)
                     self.main_paned.sashpos(0, sash_pos)
-                    print(f"[SASH] Using default position: {sash_pos}")
                 
                 # Mark sash as initialized - now saving is allowed
                 self._sash_initialized = True
@@ -6776,7 +6863,6 @@ class App(tk.Tk):
                 paned_window = self.sidebar_paned
                 total_height = paned_window.winfo_height()
                 sidebar_width = self._sidebar_frame.winfo_width()
-                print(f"[SASH] Setting sidebar sash. Height: {total_height}, Sidebar width: {sidebar_width}, retry: {retry_count}")
                 
                 # If height is too small, the sidebar isn't laid out yet - retry
                 if total_height < 100 or sidebar_width < 50:
@@ -6784,7 +6870,6 @@ class App(tk.Tk):
                         self.after(200, lambda: _set_sidebar_sash(retry_count + 1))
                         return
                     else:
-                        print(f"[SASH] ERROR: Sidebar height {total_height}, width {sidebar_width} after {retry_count} retries")
                         return
                 
                 # Minimum heights for each pane
@@ -6794,14 +6879,12 @@ class App(tk.Tk):
                 # Try to restore saved sash position first
                 from config import load_sidebar_sash_position
                 saved_pos = load_sidebar_sash_position()
-                print(f"[SASH] Sidebar saved position: {saved_pos}")
                 
                 # Validate saved position ensures both panes have minimum height
                 if (saved_pos is not None and 
                     saved_pos >= min_presets_height and 
                     saved_pos <= total_height - min_cargo_height):
                     paned_window.sashpos(0, saved_pos)
-                    print(f"[SASH] Using saved sidebar position: {saved_pos}")
                 else:
                     # Default: give 60% to presets, 40% to cargo monitor
                     sash_pos = int(total_height * 0.6)
@@ -6809,7 +6892,6 @@ class App(tk.Tk):
                     sash_pos = max(sash_pos, min_presets_height)
                     sash_pos = min(sash_pos, total_height - min_cargo_height)
                     paned_window.sashpos(0, sash_pos)
-                    print(f"[SASH] Using default sidebar position: {sash_pos}")
                 
                 self._sidebar_sash_initialized = True
             except Exception as e:
@@ -6971,13 +7053,42 @@ class App(tk.Tk):
 
         # Bottom pane - Cargo Monitor
         cargo_pane = ttk.Frame(paned_window)
-        paned_window.add(cargo_pane, weight=5)
+        paned_window.add(cargo_pane, weight=1)  # weight=1 - allow expansion when sash moved
         
-        # Set minimum height for cargo pane to prevent collapse
-        cargo_pane.configure(height=150)
-        cargo_pane.grid_propagate(True)
+        # Configure cargo pane - allow vertical expansion
+        cargo_pane.columnconfigure(0, weight=1)
+        cargo_pane.rowconfigure(0, weight=1)  # Allow row to expand
         
         self._create_integrated_cargo_monitor(cargo_pane)
+
+        # Theme toggle button below cargo monitor (styled to match current theme)
+        theme_btn_frame = ttk.Frame(sidebar)
+        theme_btn_frame.grid(row=1, column=0, sticky="e", pady=(6, 6))
+        
+        # Get theme-appropriate colors (subtle styling)
+        if self.current_theme == "elite_orange":
+            _tbtn_bg, _tbtn_fg = "#2a2a2a", "#d4a020"  # Darker bg, muted yellow-orange text
+            _tbtn_active_bg, _tbtn_active_fg = "#3a3a3a", "#ffcc00"
+        else:
+            _tbtn_bg, _tbtn_fg = "#252525", "#999999"  # Darker bg, muted gray text
+            _tbtn_active_bg, _tbtn_active_fg = "#353535", "#cccccc"
+        
+        self.theme_toggle_btn = tk.Button(
+            theme_btn_frame,
+            text=self._theme_btn_config["text"],
+            command=self._toggle_theme,
+            bg=_tbtn_bg,
+            fg=_tbtn_fg,
+            activebackground=_tbtn_active_bg,
+            activeforeground=_tbtn_active_fg,
+            relief="solid",
+            bd=1,
+            padx=10,
+            pady=2,
+            font=("Segoe UI", 8),
+            cursor="hand2"
+        )
+        self.theme_toggle_btn.pack()
 
         # Refresh the preset list
         self._refresh_preset_list()
@@ -7022,10 +7133,6 @@ class App(tk.Tk):
     def _build_timers_tab(self, frame: ttk.Frame) -> None:
         frame.columnconfigure(0, weight=1)
         
-        # DEBUG: Print TIMERS order
-        print("DEBUG: TIMERS keys order:", list(TIMERS.keys()))
-        print("DEBUG: timer_vars keys order:", list(self.timer_vars.keys()))
-        
         # Timers section
         ttk.Label(frame, text="Timers", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
         r = 1
@@ -7056,9 +7163,14 @@ class App(tk.Tk):
         toggles_header.grid(row=r, column=0, sticky="ew", pady=(0, 8))
         toggles_header.columnconfigure(1, weight=1)  # Make middle column expand
         
+        # Theme-aware colors for toggles
+        _toggle_bg = "#000000" if self.current_theme == "elite_orange" else "#1e1e1e"
+        _toggle_fg = "#ff8c00" if self.current_theme == "elite_orange" else "#ffffff"
+        _toggle_tip_fg = "#ffa500"
+        
         ttk.Label(toggles_header, text="Toggles", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
         tk.Label(toggles_header, text="💡 Tip: Use 'Stop all profile commands' in VoiceAttack to interrupt any active sequence", 
-                 fg="#ffa500", bg="#1e1e1e", font=("Segoe UI", 8, "italic")).grid(row=0, column=1, sticky="")
+                 fg=_toggle_tip_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).grid(row=0, column=1, sticky="")
         r += 1
         
         for name, (_fname, helptext) in TOGGLES.items():
@@ -7066,13 +7178,14 @@ class App(tk.Tk):
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
             checkbox = tk.Checkbutton(rowf, text=f"Enable {name}", variable=self.toggle_vars[name], 
-                                    bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", 
-                                    activebackground="#1e1e1e", activeforeground="#ffffff", 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             
-            tk.Label(rowf, text=helptext, fg="gray", bg="#1e1e1e",
+            _help_fg = "#888888" if self.current_theme == "elite_orange" else "gray"
+            tk.Label(rowf, text=helptext, fg=_help_fg, bg=_toggle_bg,
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
 
@@ -7325,18 +7438,44 @@ class App(tk.Tk):
             # Get remaining jumps from cached value (set by _poll_route_status)
             jumps_remaining = getattr(self, '_cached_route_jumps', 0) or 0
             
+            # Get visit count for CURRENT system from database
+            visits_count = 0
+            if current_system and hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db') and self.cargo_monitor.user_db:
+                try:
+                    visit_data = self.cargo_monitor.user_db.is_system_visited(current_system)
+                    if visit_data:
+                        visits_count = visit_data.get('visit_count', 0)
+                except Exception:
+                    pass
+            
             # Update individual labels (white prefix, yellow value)
             self.cmdr_label_value.config(text=cmdr_name)
             
             if current_system:
-                self.system_label_prefix.config(text="| Current System: ")
+                self.system_label_prefix.config(text="| Current Syst: ")
                 self.system_label_value.config(text=current_system)
             else:
                 self.system_label_prefix.config(text="")
                 self.system_label_value.config(text="")
             
-            self.route_label_prefix.config(text="| Systems In Route: ")
+            self.visits_label_prefix.config(text="| Visits: ")
+            self.visits_label_value.config(text=str(visits_count))
+            
+            self.route_label_prefix.config(text="| Syst In Route: ")
             self.route_label_value.config(text=str(jumps_remaining))
+            
+            # Get total systems visited from journal Statistics event (accurate game data)
+            total_systems = 0
+            if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
+                try:
+                    from journal_parser import JournalParser
+                    parser = JournalParser(self.prospector_panel.journal_dir)
+                    total_systems = parser.get_systems_visited() or 0
+                except:
+                    pass
+            
+            self.total_systems_label_prefix.config(text="| Tot Syst: ")
+            self.total_systems_label_value.config(text=str(total_systems))
             
         except Exception as e:
             print(f"Error updating CMDR/system display: {e}")
@@ -8309,11 +8448,12 @@ class App(tk.Tk):
         config_frame = ttk.LabelFrame(main_container, text="Configuration", padding=10)
         config_frame.pack(fill="x", pady=(0, 10))
         
-        # Configure column weights: label, input (limited expand), button, distance info
+        # Configure column weights: label, input (limited expand), button, distance info, visits
         config_frame.columnconfigure(0, weight=0, minsize=120)  # Label column (fixed)
         config_frame.columnconfigure(1, weight=0, minsize=250)  # Input column (fixed width)
         config_frame.columnconfigure(2, weight=0)  # Button column (fixed)
-        config_frame.columnconfigure(3, weight=1)  # Distance info column (expands instead)
+        config_frame.columnconfigure(3, weight=1)  # Distance info column (expands)
+        config_frame.columnconfigure(4, weight=0, minsize=80)  # Visits column (fixed)
         
         # Current System Display (always updated, read-only)
         row = 0
@@ -8349,6 +8489,11 @@ class App(tk.Tk):
                                          font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="w")
         self.current_sol_label.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
         
+        # Visits count label (separate column, aligned vertically)
+        self.distance_visits_label = tk.Label(config_frame, text="", 
+                                              font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="e")
+        self.distance_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
+        
         # Home System
         row += 1
         ttk.Label(config_frame, text="Home System:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
@@ -8372,6 +8517,11 @@ class App(tk.Tk):
                                        font=("Segoe UI", 8), fg="#888888", bg="#1e1e1e", anchor="w")
         self.home_sol_label.pack(side="left", padx=(10, 0))
         
+        # Home visits label (column 4, aligned with current system visits)
+        self.home_visits_label = tk.Label(config_frame, text="", 
+                                          font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="e")
+        self.home_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
+        
         # Fleet Carrier System (auto-detected, read-only)
         row += 1
         ttk.Label(config_frame, text="Fleet Carrier:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
@@ -8393,6 +8543,11 @@ class App(tk.Tk):
         self.fc_sol_label = tk.Label(fc_info_frame, text="", 
                                      font=("Segoe UI", 8), fg="#888888", bg="#1e1e1e", anchor="w")
         self.fc_sol_label.pack(side="left", padx=(10, 0))
+        
+        # FC visits label (column 4, aligned with other visits)
+        self.fc_visits_label = tk.Label(config_frame, text="", 
+                                        font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="e")
+        self.fc_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
         
         # Refresh locations button (current system + FC)
         row += 1
@@ -8516,6 +8671,16 @@ class App(tk.Tk):
         self.distance_b_sol_label = tk.Label(results_frame, text="➤ Distance to Sol: ---", 
                                              font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_b_sol_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
+        
+        # Visits count - side by side
+        row += 1
+        self.distance_a_visits_label = tk.Label(results_frame, text="➤ Visits: ---", 
+                                                font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
+        self.distance_a_visits_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
+        
+        self.distance_b_visits_label = tk.Label(results_frame, text="➤ Visits: ---", 
+                                                font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
+        self.distance_b_visits_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
         
         # Coordinates - side by side
         row += 1
@@ -8755,6 +8920,14 @@ class App(tk.Tk):
                     text=f"➤ Coordinates: X: {sys_a_info['x']:.2f}, Y: {sys_a_info['y']:.2f}, Z: {sys_a_info['z']:.2f}",
                     fg="#ffffff"
                 )
+                # System A visits count
+                if hasattr(self, 'distance_a_visits_label') and hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                    try:
+                        visit_data = self.cargo_monitor.user_db.is_system_visited(system_a)
+                        visits_count = visit_data.get('visit_count', 0) if visit_data else 0
+                        self.distance_a_visits_label.config(text=f"➤ Visits: {visits_count}", fg="#ffffff")
+                    except:
+                        self.distance_a_visits_label.config(text="➤ Visits: ---", fg="#ffffff")
             
             # System B info
             if sys_b_info:
@@ -8767,6 +8940,14 @@ class App(tk.Tk):
                     text=f"➤ Coordinates: X: {sys_b_info['x']:.2f}, Y: {sys_b_info['y']:.2f}, Z: {sys_b_info['z']:.2f}",
                     fg="#ffffff"
                 )
+                # System B visits count
+                if hasattr(self, 'distance_b_visits_label') and hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                    try:
+                        visit_data = self.cargo_monitor.user_db.is_system_visited(system_b)
+                        visits_count = visit_data.get('visit_count', 0) if visit_data else 0
+                        self.distance_b_visits_label.config(text=f"➤ Visits: {visits_count}", fg="#ffffff")
+                    except:
+                        self.distance_b_visits_label.config(text="➤ Visits: ---", fg="#ffffff")
             
             # Update status based on results
             if sys_a_info and sys_b_info:
@@ -8802,9 +8983,23 @@ class App(tk.Tk):
                         self.current_sol_label.config(text=f"➤ {sol_distance:.2f} LY from Sol", fg="#ffcc00")
                     else:
                         self.current_sol_label.config(text="")
+                    
+                    # Update visit count for CURRENT system from database
+                    if hasattr(self, 'distance_visits_label'):
+                        visits_count = 0
+                        if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db') and self.cargo_monitor.user_db:
+                            try:
+                                visit_data = self.cargo_monitor.user_db.is_system_visited(current_system)
+                                if visit_data:
+                                    visits_count = visit_data.get('visit_count', 0)
+                            except:
+                                pass
+                        self.distance_visits_label.config(text=f"Visits: {visits_count}")
                 else:
                     self.distance_current_system.set("---")
                     self.current_sol_label.config(text="")
+                    if hasattr(self, 'distance_visits_label'):
+                        self.distance_visits_label.config(text="")
             
             if not current_system:
                 self.distance_to_home_label.config(text="")
@@ -8831,9 +9026,20 @@ class App(tk.Tk):
                     self.home_sol_label.config(text=f"(Sol: {sol_distance:.2f} LY)", fg="#888888")
                 else:
                     self.home_sol_label.config(text="")
+                
+                # Home visits count
+                if hasattr(self, 'home_visits_label') and hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                    try:
+                        visit_data = self.cargo_monitor.user_db.is_system_visited(home_system)
+                        visits_count = visit_data.get('visit_count', 0) if visit_data else 0
+                        self.home_visits_label.config(text=f"Visits: {visits_count}")
+                    except:
+                        self.home_visits_label.config(text="")
             else:
                 self.distance_to_home_label.config(text="")
                 self.home_sol_label.config(text="")
+                if hasattr(self, 'home_visits_label'):
+                    self.home_visits_label.config(text="")
             
             # Calculate distance to FC
             fc_system = self.distance_fc_system.get().strip()
@@ -8853,9 +9059,20 @@ class App(tk.Tk):
                     self.fc_sol_label.config(text=f"(Sol: {sol_distance:.2f} LY)", fg="#888888")
                 else:
                     self.fc_sol_label.config(text="")
+                
+                # FC visits count
+                if hasattr(self, 'fc_visits_label') and hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                    try:
+                        visit_data = self.cargo_monitor.user_db.is_system_visited(fc_system)
+                        visits_count = visit_data.get('visit_count', 0) if visit_data else 0
+                        self.fc_visits_label.config(text=f"Visits: {visits_count}")
+                    except:
+                        self.fc_visits_label.config(text="")
             else:
                 self.distance_to_fc_label.config(text="")
                 self.fc_sol_label.config(text="")
+                if hasattr(self, 'fc_visits_label'):
+                    self.fc_visits_label.config(text="")
             
             # Notify Mining Session and Ring Finder to update their distance displays
             if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, '_update_distance_display'):
@@ -10207,8 +10424,6 @@ class App(tk.Tk):
         geom = wcfg.get("geometry")
         zoomed = wcfg.get("zoomed", False)
         
-        print(f"[DEBUG] Restoring geometry: {geom}, zoomed: {zoomed}")
-        
         if geom:
             try:
                 # Parse geometry string: WIDTHxHEIGHT+X+Y
@@ -10245,9 +10460,7 @@ class App(tk.Tk):
                     
                 # Show window after geometry is set
                 self.deiconify()
-                print(f"[DEBUG] Window shown with geometry")
-            except Exception as e:
-                print(f"[DEBUG] Geometry restore error: {e}")
+            except Exception:
                 # If saved geometry fails, center on screen with default size
                 self.geometry("1220x700")
                 self.update_idletasks()

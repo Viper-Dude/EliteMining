@@ -67,6 +67,26 @@ class MaterialStatistics:
         """Get number of finds that meet or exceed the minimum percentage threshold"""
         return len([find for find in self.finds if find.percentage >= min_percentage])
     
+    def adjust_find_count(self, new_count: int) -> bool:
+        """
+        Adjust the number of finds (for correcting accidental double prospects).
+        Removes the most recent finds if reducing count.
+        Returns True if adjustment was made, False otherwise.
+        """
+        current_count = len(self.finds)
+        if new_count < 0 or new_count == current_count:
+            return False
+        
+        if new_count < current_count:
+            # Remove excess finds from the end (most recent)
+            self.finds = self.finds[:new_count]
+            log.info(f"Adjusted {self.material_name} finds from {current_count} to {new_count}")
+            return True
+        else:
+            # Cannot add finds - only reduce
+            log.warning(f"Cannot increase finds for {self.material_name} - only reduction allowed")
+            return False
+    
     def reset(self) -> None:
         """Reset all statistics for new session"""
         self.finds.clear()
@@ -104,6 +124,31 @@ class SessionAnalytics:
         self.core_asteroids_found = 0
         self.session_start_time = None
         log.debug("Session statistics reset")
+    
+    def adjust_material_hits(self, material_name: str, new_count: int) -> bool:
+        """
+        Adjust the hit count for a specific material (for correcting accidental double prospects).
+        
+        Args:
+            material_name: The material to adjust
+            new_count: The corrected number of hits
+            
+        Returns:
+            True if adjustment was made, False otherwise
+        """
+        adjusted = False
+        
+        # Adjust in quality stats (threshold-meeting hits)
+        if material_name in self.material_stats:
+            if self.material_stats[material_name].adjust_find_count(new_count):
+                adjusted = True
+        
+        # Also adjust in all stats to keep them in sync
+        if material_name in self.material_stats_all:
+            if self.material_stats_all[material_name].adjust_find_count(new_count):
+                adjusted = True
+        
+        return adjusted
     
     def add_prospector_result(self, materials_found: Dict[str, float], selected_materials: List[str], min_pct_map: Dict[str, float] = None) -> None:
         """

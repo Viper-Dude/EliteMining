@@ -643,4 +643,3 @@ def migrate_layout_settings() -> None:
         # Update layout version
         cfg["layout_version"] = LAYOUT_VERSION
         _save_cfg(cfg)
-        print(f"[CONFIG] Layout migrated to version {LAYOUT_VERSION} - sash positions reset to defaults")

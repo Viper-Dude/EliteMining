@@ -427,6 +427,233 @@ class ProspectorPanel(ttk.Frame):
             # Clicked on empty space - deselect all
             tree.selection_remove(*tree.selection())
 
+    def _on_stats_tree_double_click(self, event) -> None:
+        """Handle double-click on Mineral Analysis table to edit Hits column"""
+        # Identify which column was clicked
+        region = self.stats_tree.identify_region(event.x, event.y)
+        if region != "cell":
+            return
+        
+        column = self.stats_tree.identify_column(event.x)
+        item = self.stats_tree.identify_row(event.y)
+        
+        if not item:
+            return
+        
+        # Column #9 is the "count" (Hits) column
+        if column != "#9":
+            return
+        
+        # Get current values
+        values = self.stats_tree.item(item, "values")
+        if not values or len(values) < 9:
+            return
+        
+        material_display = values[0]  # e.g., "Bromellite (15.0%)" or "LTD (10.0%)"
+        current_hits = values[8]  # Hits column
+        
+        # Extract material name from display (remove threshold part)
+        material_name = material_display.split(" (")[0].strip() if " (" in material_display else material_display
+        
+        # Reverse the abbreviation to get original material name for lookup
+        material_name_full = self._reverse_abbreviate_material(material_name)
+        
+        # Create edit dialog
+        self._show_hits_edit_dialog(material_name_full, current_hits, item)
+    
+    def _show_hits_edit_dialog(self, material_name: str, current_hits: str, tree_item: str) -> None:
+        """Show a themed dialog to edit the hits count for a material"""
+        try:
+            current_value = int(current_hits) if current_hits and current_hits != "—" else 0
+        except ValueError:
+            current_value = 0
+        
+        # Get theme colors
+        from config import load_theme
+        theme = load_theme()
+        if theme == "elite_orange":
+            bg_color = "#000000"
+            fg_color = "#ff9900"
+            text_color = "#ffffff"
+            entry_bg = "#1a1a1a"
+            btn_bg = "#1a1a1a"
+            btn_fg = "#ff9900"
+            btn_active_bg = "#2a2a2a"
+            btn_border = "#ff6600"
+        else:
+            bg_color = "#1e1e1e"
+            fg_color = "#e0e0e0"
+            text_color = "#ffffff"
+            entry_bg = "#2d2d2d"
+            btn_bg = "#2a3a4a"
+            btn_fg = "#e0e0e0"
+            btn_active_bg = "#3a4a5a"
+            btn_border = "#555555"
+        
+        # Create dialog window
+        dialog = tk.Toplevel(self)
+        dialog.title("Edit Hits Count")
+        dialog.geometry("350x200")
+        dialog.configure(bg=bg_color)
+        dialog.resizable(False, False)
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        
+        # Set app icon
+        try:
+            from icon_utils import get_app_icon_path
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+            elif icon_path:
+                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+        except:
+            pass
+        
+        # Position dialog centered on main window
+        self.update_idletasks()
+        dialog.update_idletasks()
+        parent = self.winfo_toplevel()
+        x = parent.winfo_x() + (parent.winfo_width() - 350) // 2
+        y = parent.winfo_y() + (parent.winfo_height() - 200) // 2
+        dialog.geometry(f"350x200+{x}+{y}")
+        
+        # Main frame
+        main_frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
+        main_frame.pack(fill="both", expand=True)
+        
+        # Title
+        tk.Label(main_frame, text=f"Edit hits count for {material_name}:", 
+                bg=bg_color, fg=fg_color, font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 10))
+        
+        # Current value
+        tk.Label(main_frame, text=f"Current: {current_value}", 
+                bg=bg_color, fg=text_color, font=("Segoe UI", 10)).pack(anchor="w", pady=(0, 3))
+        
+        # Hint text
+        tk.Label(main_frame, text="(Reduce to fix accidental double prospects)", 
+                bg=bg_color, fg="#888888", font=("Segoe UI", 8, "italic")).pack(anchor="w", pady=(0, 10))
+        
+        # Entry frame
+        entry_frame = tk.Frame(main_frame, bg=bg_color)
+        entry_frame.pack(fill="x", pady=(5, 15))
+        
+        tk.Label(entry_frame, text="New value:", bg=bg_color, fg=text_color,
+                font=("Segoe UI", 10)).pack(side="left")
+        
+        value_var = tk.StringVar(value=str(current_value))
+        entry = tk.Entry(entry_frame, textvariable=value_var, width=8,
+                        bg=entry_bg, fg=text_color, 
+                        insertbackground=text_color,
+                        selectbackground="#404040",
+                        selectforeground=text_color,
+                        font=("Segoe UI", 11),
+                        relief="solid", bd=1,
+                        highlightbackground=btn_border,
+                        highlightthickness=1)
+        entry.pack(side="left", padx=(10, 10))
+        
+        entry.focus_set()
+        entry.select_range(0, tk.END)
+        
+        # Result variable
+        result = [None]
+        
+        def on_ok():
+            try:
+                new_val = int(value_var.get())
+                if new_val < 0:
+                    self.status_cb("Value cannot be negative")
+                    return
+                result[0] = new_val
+                dialog.destroy()
+            except ValueError:
+                self.status_cb("Please enter a valid number")
+        
+        def on_cancel():
+            dialog.destroy()
+        
+        # Buttons
+        btn_frame = tk.Frame(main_frame, bg=bg_color)
+        btn_frame.pack(pady=(5, 0))
+        
+        ok_btn = tk.Button(btn_frame, text="OK", command=on_ok, width=10,
+                          bg=btn_bg, fg=btn_fg, 
+                          activebackground=btn_active_bg, activeforeground=btn_fg,
+                          relief="solid", bd=1,
+                          highlightbackground=btn_border, highlightthickness=1,
+                          font=("Segoe UI", 9))
+        ok_btn.pack(side="left", padx=(0, 10))
+        
+        cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel, width=10,
+                              bg=btn_bg, fg=btn_fg,
+                              activebackground=btn_active_bg, activeforeground=btn_fg,
+                              relief="solid", bd=1,
+                              highlightbackground=btn_border, highlightthickness=1,
+                              font=("Segoe UI", 9))
+        cancel_btn.pack(side="left")
+        
+        # Bind Enter and Escape
+        entry.bind("<Return>", lambda e: on_ok())
+        dialog.bind("<Escape>", lambda e: on_cancel())
+        
+        # Wait for dialog
+        dialog.wait_window()
+        
+        # Process result
+        if result[0] is not None and result[0] != current_value:
+            if self._apply_hits_adjustment(material_name, current_value, result[0]):
+                self._refresh_statistics_display()
+                self.status_cb(f"✓ Adjusted {material_name} hits from {current_value} to {result[0]}")
+            else:
+                self.status_cb(f"Could not adjust hits for {material_name}")
+    
+    def _apply_hits_adjustment(self, material_name: str, old_count: int, new_count: int) -> bool:
+        """Apply hits adjustment - can reduce or increase within reason"""
+        if new_count < old_count:
+            # Reducing - use existing method
+            return self.session_analytics.adjust_material_hits(material_name, new_count)
+        elif new_count > old_count:
+            # Increasing - need to add fake finds
+            # This handles the case where user reduced too much and wants to restore
+            stats = self.session_analytics.material_stats.get(material_name)
+            stats_all = self.session_analytics.material_stats_all.get(material_name)
+            
+            if stats or stats_all:
+                # Add dummy finds to increase the count
+                from datetime import datetime
+                adds_needed = new_count - old_count
+                
+                # Get a reasonable percentage to use (from existing finds or default)
+                avg_pct = 15.0  # Default
+                if stats and stats.finds:
+                    avg_pct = sum(f.percentage for f in stats.finds) / len(stats.finds)
+                elif stats_all and stats_all.finds:
+                    avg_pct = sum(f.percentage for f in stats_all.finds) / len(stats_all.finds)
+                
+                for _ in range(adds_needed):
+                    if stats:
+                        stats.add_find(avg_pct, datetime.now())
+                    if stats_all:
+                        stats_all.add_find(avg_pct, datetime.now())
+                
+                return True
+            return False
+        return True  # No change needed
+    
+    def _reverse_abbreviate_material(self, display_name: str) -> str:
+        """Reverse the abbreviation used in _abbreviate_material_for_stats to get original name"""
+        # These are the abbreviations used in _abbreviate_material_for_stats
+        reverse_map = {
+            'Methanol Cryst': 'Methanol Monohydrate Crystals',
+            'LTD': 'Low Temperature Diamonds',
+            'Lithium Hydro': 'Lithium Hydroxide',
+            'H. Peroxide': 'Hydrogen Peroxide',
+            'Methane Clath': 'Methane Clathrate',
+            'Liq Oxygen': 'Liquid Oxygen',
+        }
+        return reverse_map.get(display_name, display_name)
+
     def __init__(self, master: tk.Widget, va_root: str, status_cb, toggle_vars, text_overlay=None, main_app=None, announcement_vars=None, main_announcement_enabled=None, tooltip_class=None) -> None:
         self.toggle_vars = toggle_vars
         self.announcement_vars = announcement_vars or {}  # Add announcement vars
@@ -1640,7 +1867,14 @@ class ProspectorPanel(ttk.Frame):
         self.tree.bind("<Leave>", hide_prospector_tooltip)
 
         # --- Live Mining Statistics Section ---
-        ttk.Label(rep, text="Mineral Analysis:", font=("Segoe UI", 10, "bold")).grid(row=5, column=0, sticky="w", pady=(10, 4))
+        mineral_header_frame = ttk.Frame(rep)
+        mineral_header_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(10, 4))
+        mineral_header_frame.columnconfigure(1, weight=1)
+        
+        ttk.Label(mineral_header_frame, text="Mineral Analysis:", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(mineral_header_frame, text="💡 Double-click Hits to correct accidental double prospects", 
+                  font=("Segoe UI", 8), foreground="#888888").grid(row=0, column=1, sticky="e")
+        
         stats_frame = ttk.Frame(rep)
         stats_frame.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(0, 0))
         stats_frame.columnconfigure(0, weight=1)
@@ -1734,6 +1968,9 @@ class ProspectorPanel(ttk.Frame):
         self.stats_tree.bind("<ButtonRelease-1>", save_mineral_analysis_widths)
         # Deselect when clicking empty space
         self.stats_tree.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.stats_tree))
+        
+        # Double-click on Hits column to edit (for correcting accidental double prospects)
+        self.stats_tree.bind("<Double-1>", self._on_stats_tree_double_click)
         
         self.stats_tree.grid(row=0, column=0, sticky="ew")
         
@@ -7954,7 +8191,6 @@ class ProspectorPanel(ttk.Frame):
             # Format: Session_YYYY-MM-DD_HH-MM-SS_System_Body.txt
             # NOTE: Spaces in system/body names are replaced with underscores in filenames
             if not timestamp_raw:
-                print(f"[DEBUG] Ship name parse - no timestamp_raw")
                 return ("", "")
             
             # Parse timestamp to get date/time parts for filename
@@ -7969,8 +8205,7 @@ class ProspectorPanel(ttk.Frame):
                 # Format timestamp for filename: YYYY-MM-DD_HH-MM-SS
                 date_str = session_time.strftime("%Y-%m-%d")
                 time_str = session_time.strftime("%H-%M-%S")
-            except Exception as e:
-                print(f"[DEBUG] Ship name parse - timestamp parse failed: {e}")
+            except Exception:
                 return ("", "")
             
             # Replace spaces with underscores in system and body names to match filename format
@@ -8013,20 +8248,16 @@ class ProspectorPanel(ttk.Frame):
                     ship_end = len(content)
                 
                 ship_name = content[ship_start:ship_end].strip()
-                print(f"[DEBUG] Ship name parse - extracted: '{ship_name}'")
                 
                 # Remove ship ID in parentheses (e.g., "(VIPD68)") from display
                 # Example: "Mega Bumper (VIPD68) - Type-11 Prospector" → "Mega Bumper - Type-11 Prospector"
                 import re
                 ship_name_cleaned = re.sub(r'\s*\([A-Z0-9-]+\)\s*', ' ', ship_name).strip()
-                print(f"[DEBUG] Ship name parse - after regex: '{ship_name_cleaned}'")
                 
                 return (ship_name_cleaned if ship_name_cleaned else "", txt_path)
             
-            print(f"[DEBUG] Ship name parse - 'Ship:' line not found in file")
             return ("", txt_path)
-        except Exception as e:
-            print(f"[DEBUG] Ship name parse - exception: {e}")
+        except Exception:
             return ("", "")
 
     def _refresh_reports_tab(self) -> None:
@@ -8419,7 +8650,6 @@ class ProspectorPanel(ttk.Frame):
                         eng_materials_display = eng_materials_raw  # Fallback to raw string
                 
                 # Get ship name and file path from miningSessionSummary.txt
-                print(f"[DEBUG] Parsing session - system: '{session['system']}', body: '{session['body']}', timestamp: '{session['timestamp_raw']}'")
                 ship_name, file_path = self._get_ship_name_from_session(
                     session['system'],
                     session['body'],
@@ -8529,20 +8759,6 @@ class ProspectorPanel(ttk.Frame):
                     else:
                         tons_per_session_display = session.get('tons_per', '—')
 
-                # Debugging output for problematic sessions (temporary)
-                try:
-                    if total_tons_val >= 200:
-                        print(f"[DEBUG-TONS] date={session.get('date','?')} file={file_path} total_tons={total_tons_val} csv_total_finds={session.get('total_finds')} parsed_total_finds={total_finds_val} asteroids_prospected={session.get('asteroids_prospected','?')} tons_per_display={tons_per_session_display}")
-                except Exception:
-                    pass
-                try:
-                    # Targeted debug for the example session you pasted
-                    if (str(session.get('system','')).startswith('Col 285 Sector YF-O d6-85') and
-                        str(session.get('body','')).startswith('4 A Ring')):
-                        print(f"[DEBUG-TONS-TARGET] system={session.get('system')} body={session.get('body')} date={session.get('date')} total_tons={total_tons_val} csv_total_finds={session.get('total_finds')} parsed_total_finds={total_finds_val} asteroids_prospected={session.get('asteroids_prospected')} tons_per_display={tons_per_session_display} file_path={file_path}")
-                except Exception:
-                    pass
-                
                 # Build values list dynamically from the tab tree's columns to avoid ordering mismatches
                 cols = list(self.reports_tree_tab["columns"])
                 vals = []
@@ -8796,9 +9012,6 @@ class ProspectorPanel(ttk.Frame):
 
             ev = evt.get("event")
             
-            # Debug: Show all events being processed (after startup)
-            # Real-time event processing
-            
             # Auto-start session on first prospector limpet launch
             if ev == "LaunchDrone" and evt.get("Type") == "Prospector":
                 if self.auto_start_on_prospector and not self.session_active:
@@ -8824,20 +9037,20 @@ class ProspectorPanel(ttk.Frame):
                     if self.main_app and hasattr(self.main_app, 'update_current_system'):
                         self.main_app.update_current_system(self.last_system, coords)
                         # Update distances in background (non-blocking)
-                        if hasattr(self.app, '_update_home_fc_distances'):
-                            self.app.after(100, self.app._update_home_fc_distances)
+                        if hasattr(self.main_app, '_update_home_fc_distances'):
+                            self.main_app.after(100, self.main_app._update_home_fc_distances)
                 
-                # Update location context
-                self.last_body_type = evt.get("BodyType", "")
+                    # Update location context
+                    self.last_body_type = evt.get("BodyType", "")
                 
-                # Auto-switch to Hotspots Finder on FSD jump (not during startup)
-                if ev == "FSDJump" and not self.startup_processing:
-                    # Check if there's a pending switch from session end
-                    if getattr(self, '_pending_ring_finder_switch', False):
-                        self._pending_ring_finder_switch = False
-                        self._auto_switch_to_ring_finder_delayed()
-                    else:
-                        self._auto_switch_to_ring_finder_tab()
+                    # Auto-switch to Hotspots Finder on FSD jump (not during startup)
+                    if ev == "FSDJump" and not self.startup_processing:
+                        # Check if there's a pending switch from session end
+                        if getattr(self, '_pending_ring_finder_switch', False):
+                            self._pending_ring_finder_switch = False
+                            self._auto_switch_to_ring_finder_delayed()
+                        else:
+                            self._auto_switch_to_ring_finder_tab()
             
             # Track Fleet Carrier location changes
             if ev == "CarrierLocation":
@@ -11204,7 +11417,7 @@ class ProspectorPanel(ttk.Frame):
         tree_frame_bookmarks.grid_rowconfigure(0, weight=1)
 
         # Create bookmarks treeview with multiple selection enabled
-        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
+        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
         self.bookmarks_tree.grid(row=0, column=0, sticky="nsew")
         
         # Configure row tags for alternating colors (theme-aware)
@@ -11226,6 +11439,7 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.heading("avg_yield", text="Avg Yield %", anchor="w")
         self.bookmarks_tree.heading("overlap", text="Overlap", anchor="w")
         self.bookmarks_tree.heading("res_site", text="RES Site", anchor="w")
+        self.bookmarks_tree.heading("rating", text="Rating", anchor="center")
         self.bookmarks_tree.heading("notes", text="Notes", anchor="w")
         
         # Configure column widths
@@ -11237,6 +11451,7 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.column("avg_yield", width=80, stretch=False, anchor="center")
         self.bookmarks_tree.column("overlap", width=80, stretch=False, anchor="w")
         self.bookmarks_tree.column("res_site", width=80, stretch=False, anchor="w")
+        self.bookmarks_tree.column("rating", width=70, stretch=False, anchor="center")
         self.bookmarks_tree.column("notes", width=50, stretch=False, anchor="center")  # Narrower for emoji
 
         # Load saved column widths from config
@@ -11257,7 +11472,7 @@ class ProspectorPanel(ttk.Frame):
             try:
                 from config import save_bookmarks_column_widths
                 widths = {}
-                for col in ["last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "notes"]:
+                for col in ["last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"]:
                     try:
                         widths[col] = self.bookmarks_tree.column(col, "width")
                     except:
@@ -11315,7 +11530,7 @@ class ProspectorPanel(ttk.Frame):
                 print(f"Bookmark sorting error for column {col}: {e}")
 
         # Bind column headers to sorting
-        for col in ("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "notes"):
+        for col in ("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"):
             self.bookmarks_tree.heading(col, command=lambda c=col: sort_bookmark_col(c))
 
         # Buttons frame
@@ -11491,6 +11706,14 @@ class ProspectorPanel(ttk.Frame):
             else:
                 res_display = ''
             
+            # Format rating as stars
+            rating = bookmark.get('rating', 0)
+            try:
+                rating = int(rating)
+            except:
+                rating = 0
+            rating_display = '★' * rating if rating > 0 else ''
+            
             tag = "evenrow" if row_index % 2 == 0 else "oddrow"
             self.bookmarks_tree.insert("", "end", values=(
                 bookmark.get('last_mined', ''),
@@ -11501,6 +11724,7 @@ class ProspectorPanel(ttk.Frame):
                 bookmark.get('avg_yield', ''),
                 overlap_display,
                 res_display,
+                rating_display,
                 notes_display
             ), tags=(tag,))
             row_index += 1
@@ -11646,10 +11870,20 @@ class ProspectorPanel(ttk.Frame):
         res_material_combo['values'] = tuple(res_materials)
         res_material_combo.grid(row=8, column=1, sticky="w", pady=(0, 5))
         
+        # Rating field (1-5 stars)
+        ttk.Label(frame, text="Rating:").grid(row=9, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        rating_var = tk.IntVar(value=bookmark_data.get('rating', 0) if bookmark_data else 0)
+        rating_frame = ttk.Frame(frame)
+        rating_frame.grid(row=9, column=1, sticky="w", pady=(0, 5))
+        rating_combo = ttk.Combobox(rating_frame, textvariable=rating_var, width=10, state="readonly")
+        rating_combo['values'] = (0, 1, 2, 3, 4, 5)
+        rating_combo.pack(side="left")
+        ttk.Label(rating_frame, text="  (0=None, 5=Best)").pack(side="left")
+        
         # Notes field
-        ttk.Label(frame, text="Notes:").grid(row=9, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text="Notes:").grid(row=10, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
         notes_text = tk.Text(frame, width=35, height=4, insertbackground="#ffffff")  # White cursor for visibility
-        notes_text.grid(row=9, column=1, sticky="w", pady=(0, 10))
+        notes_text.grid(row=10, column=1, sticky="w", pady=(0, 10))
         if bookmark_data:
             notes_text.insert("1.0", bookmark_data.get('notes', ''))
         
@@ -11698,7 +11932,7 @@ class ProspectorPanel(ttk.Frame):
         
         # Buttons
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=10, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=11, column=0, columnspan=2, pady=(10, 0))
         
         def save_bookmark():
             system = system_var.get().strip()
@@ -11718,6 +11952,7 @@ class ProspectorPanel(ttk.Frame):
                 'overlap_type': overlap_var.get(),
                 'res_site': res_var.get(),
                 'res_material': res_material_var.get(),
+                'rating': rating_var.get(),
                 'last_mined': bookmark_data.get('last_mined', '') if bookmark_data else '',
                 'notes': notes_text.get("1.0", "end-1c").strip(),
                 'date_added': bookmark_data.get('date_added', dt.datetime.now().strftime('%Y-%m-%d')) if bookmark_data else dt.datetime.now().strftime('%Y-%m-%d')
