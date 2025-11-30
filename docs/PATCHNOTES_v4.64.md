@@ -5,15 +5,10 @@
 
 ### Ship Presets Overhaul
 - **Grouped by Ship Type:** Presets are now organized in a collapsible tree view grouped by ship type
-- **New Preset Dialog:** Create new presets by selecting Ship Type from dropdown + optional Build Name
-- **Edit Function:** Right-click → Edit to change ship type or build name of existing presets
-- **Import Dialog:** When importing old presets, you can now properly categorize them with Ship Type + Build Name
-- **Import/Apply Buttons:** Moved inside the Ship Presets panel for better organization
 
 ![Ship Presets](https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png)
 
 > **Note:** Existing presets need to be edited/regrouped to fit the new format. Use right-click → Edit on each preset to assign the correct Ship Type.
-
 
 ### Security FIX
 - Discord webhooks security fix 

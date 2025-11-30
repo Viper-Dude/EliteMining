@@ -79,16 +79,43 @@ class MiningChartsPanel:
             self.chart_bg = '#2b2b2b'
             self.chart_face = '#1e1e1e'
         
-        # Chart colors for different materials
+        # Chart colors for different materials - distinct colors for each mineral
         self.material_colors = {
-            'Platinum': '#E5E4E2',  # Platinum color
-            'Painite': '#8B0000',   # Dark red
-            'Gold': '#FFD700',      # Gold
-            'Osmium': '#4169E1',    # Royal blue
-            'Rhodium': '#C0C0C0',   # Silver
-            'Palladium': '#CED0DD', # Light gray
-            'Silver': '#C0C0C0',    # Silver
-            'Default': '#00CED1'    # Dark turquoise
+            # High value minerals
+            'Platinum': '#E5E4E2',      # Platinum gray
+            'Painite': '#FF4500',       # Orange-red
+            'Low Temperature Diamonds': '#00BFFF',  # Deep sky blue
+            'Void Opals': '#9400D3',    # Dark violet
+            'Alexandrite': '#50C878',   # Emerald green
+            'Grandidierite': '#40E0D0', # Turquoise
+            'Musgravite': '#FF69B4',    # Hot pink
+            'Benitoite': '#1E90FF',     # Dodger blue
+            'Serendibite': '#32CD32',   # Lime green
+            'Monazite': '#FFD700',      # Gold
+            'Rhodplumsite': '#DC143C',  # Crimson
+            
+            # Common minerals
+            'Osmium': '#4169E1',        # Royal blue
+            'Gold': '#FFD700',          # Gold
+            'Silver': '#C0C0C0',        # Silver
+            'Palladium': '#CED0DD',     # Light gray
+            'Bromellite': '#00FF7F',    # Spring green
+            'Bertrandite': '#DEB887',   # Burlywood
+            'Indite': '#8A2BE2',        # Blue violet
+            'Gallite': '#20B2AA',       # Light sea green
+            'Coltan': '#D2691E',        # Chocolate brown
+            
+            # Fuel/Carrier minerals
+            'Tritium': '#FF6347',       # Tomato red
+            
+            # Other minerals
+            'Cobalt': '#0047AB',        # Cobalt blue
+            'Praseodymium': '#98FB98',  # Pale green
+            'Samarium': '#F0E68C',      # Khaki
+            'Uraninite': '#ADFF2F',     # Green yellow
+            
+            # Fallback
+            'Default': '#00CED1'        # Dark turquoise
         }
         
         self._create_charts()
@@ -304,9 +331,11 @@ class MiningChartsPanel:
         if materials:
             # Position legend outside the plot area (to the right)
             legend = self.timeline_ax.legend(bbox_to_anchor=(1.02, 1), loc='upper left', 
-                                           facecolor='#2b2b2b', edgecolor='white', fontsize=9)
+                                           facecolor='#2b2b2b', edgecolor='white', fontsize=10,
+                                           labelcolor='white')
             for text in legend.get_texts():
                 text.set_fontweight('normal')
+                text.set_color('white')
             self.timeline_ax.grid(True, alpha=0.3, color='gray')
         
         # Adjust layout to prevent label cutoff and accommodate external legend
@@ -384,9 +413,11 @@ class MiningChartsPanel:
         
         # Position legend outside the plot area (to the right)
         legend = self.bar_ax.legend(handles=legend_elements, bbox_to_anchor=(1.02, 1), loc='upper left', 
-                                  facecolor=self.chart_bg, edgecolor='white', fontsize=9)
+                                  facecolor=self.chart_bg, edgecolor='white', fontsize=10,
+                                  labelcolor='white')
         for text in legend.get_texts():
             text.set_fontweight('normal')
+            text.set_color('white')
         self.bar_ax.grid(True, alpha=0.3, color='gray', axis='y')
         
         # Adjust layout to prevent label cutoff and accommodate external legend

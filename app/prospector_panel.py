@@ -420,6 +420,13 @@ class ProspectorPanel(ttk.Frame):
             except Exception:
                 pass
 
+    def _deselect_on_empty_click(self, event, tree: ttk.Treeview) -> None:
+        """Deselect all items when clicking on empty space in a treeview"""
+        item = tree.identify_row(event.y)
+        if not item:
+            # Clicked on empty space - deselect all
+            tree.selection_remove(*tree.selection())
+
     def __init__(self, master: tk.Widget, va_root: str, status_cb, toggle_vars, text_overlay=None, main_app=None, announcement_vars=None, main_announcement_enabled=None, tooltip_class=None) -> None:
         self.toggle_vars = toggle_vars
         self.announcement_vars = announcement_vars or {}  # Add announcement vars
@@ -1495,11 +1502,17 @@ class ProspectorPanel(ttk.Frame):
         self.system_entry = ttk.Entry(sysbody_row, textvariable=self.session_system, width=40)
         self.system_entry.grid(row=0, column=1, sticky="w", padx=(0, 5))
         self.ToolTip(self.system_entry, "Current system name. (Can also be entered manually)")
+        # Prevent unwanted text selection when tab switching or focus changes
+        self.system_entry.bind('<FocusOut>', lambda e: self.system_entry.selection_clear())
+        self.system_entry.bind('<Map>', lambda e: self.after(10, self.system_entry.selection_clear))
 
         ttk.Label(sysbody_row, text="Planet/Ring:", font=("Segoe UI", 9)).grid(row=0, column=2, sticky="w", padx=(0, 2))
         self.body_entry = ttk.Entry(sysbody_row, textvariable=self.session_body, width=15)
         self.body_entry.grid(row=0, column=3, sticky="w")
         self.ToolTip(self.body_entry, "Current location: rings, planets, stations, or carriers. (Can also be entered manually)")
+        # Prevent unwanted text selection when tab switching or focus changes
+        self.body_entry.bind('<FocusOut>', lambda e: self.body_entry.selection_clear())
+        self.body_entry.bind('<Map>', lambda e: self.after(10, self.body_entry.selection_clear))
 
         # --- Remove VA Variables path row ---
         # vrow = ttk.Frame(rep)
@@ -1601,6 +1614,8 @@ class ProspectorPanel(ttk.Frame):
                 print(f"[DEBUG] Could not save Prospector Report column widths: {e}")
         
         self.tree.bind("<ButtonRelease-1>", save_prospector_report_widths)
+        # Deselect when clicking empty space
+        self.tree.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.tree))
         
         self.tree.grid(row=0, column=0, sticky="nsew")
         yscroll = ttk.Scrollbar(tree_frame_prospector, orient="vertical", command=self.tree.yview)
@@ -1717,6 +1732,8 @@ class ProspectorPanel(ttk.Frame):
                 print(f"[DEBUG] Could not save Mineral Analysis column widths: {e}")
         
         self.stats_tree.bind("<ButtonRelease-1>", save_mineral_analysis_widths)
+        # Deselect when clicking empty space
+        self.stats_tree.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.stats_tree))
         
         self.stats_tree.grid(row=0, column=0, sticky="ew")
         
@@ -6957,6 +6974,8 @@ class ProspectorPanel(ttk.Frame):
                 print(f"[DEBUG] Could not save Reports Tab column widths: {e}")
         
         self.reports_tree_tab.bind("<ButtonRelease-1>", save_column_widths_tab)
+        # Deselect when clicking empty space
+        self.reports_tree_tab.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.reports_tree_tab))
 
         # Add vertical scrollbar
         v_scrollbar = ttk.Scrollbar(tree_frame_reports, orient="vertical", command=self.reports_tree_tab.yview)
@@ -11248,6 +11267,8 @@ class ProspectorPanel(ttk.Frame):
                 print(f"[DEBUG] Could not save Bookmarks column widths: {e}")
         
         self.bookmarks_tree.bind("<ButtonRelease-1>", save_bookmarks_widths)
+        # Deselect when clicking empty space
+        self.bookmarks_tree.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.bookmarks_tree))
 
         # Add vertical scrollbar
         v_scrollbar = ttk.Scrollbar(tree_frame_bookmarks, orient="vertical", command=self.bookmarks_tree.yview)

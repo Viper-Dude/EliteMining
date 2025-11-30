@@ -455,6 +455,14 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     if distance_fields_added:
         log.info(f"Added Distance Calculator fields: {', '.join(distance_fields_added)}")
     
+    # Fix auto_switch_tabs - ensure it's a proper boolean (fixes issue after update)
+    if "auto_switch_tabs" in config:
+        # Re-save as proper boolean to fix any type issues
+        config["auto_switch_tabs"] = bool(config["auto_switch_tabs"])
+    else:
+        config["auto_switch_tabs"] = True  # Default to enabled
+        log.info("Added auto_switch_tabs setting (default: enabled)")
+    
     log.info(f"Config migration completed successfully from {original_version} to {target_version}")
     return config
 

@@ -99,6 +99,13 @@ class RingFinder:
     
     ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter
     
+    def _deselect_on_empty_click(self, event) -> None:
+        """Deselect all items when clicking on empty space in the results treeview"""
+        item = self.results_tree.identify_row(event.y)
+        if not item:
+            # Clicked on empty space - deselect all
+            self.results_tree.selection_remove(*self.results_tree.selection())
+    
     def __init__(self, parent_frame: ttk.Frame, prospector_panel=None, app_dir: Optional[str] = None, tooltip_class=None, distance_calculator=None, user_db=None):
         self.parent = parent_frame
         self.prospector_panel = prospector_panel  # Reference to get current system
@@ -654,6 +661,8 @@ class RingFinder:
                 print(f"[DEBUG] Could not save Ring Finder column widths: {e}")
         
         self.results_tree.bind("<ButtonRelease-1>", save_ring_finder_widths)
+        # Deselect when clicking empty space
+        self.results_tree.bind("<Button-1>", self._deselect_on_empty_click)
         
         # Configure row tags for alternating colors (theme-aware)
         if current_theme == "elite_orange":

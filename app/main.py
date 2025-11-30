@@ -6877,6 +6877,8 @@ class App(tk.Tk):
         # Save expand/collapse state when user clicks arrow icons (delay to ensure state is updated)
         self.preset_list.bind("<<TreeviewOpen>>", lambda e: self.after(10, self._save_preset_expanded_state))
         self.preset_list.bind("<<TreeviewClose>>", lambda e: self.after(10, self._save_preset_expanded_state))
+        # Deselect when clicking empty space
+        self.preset_list.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.preset_list))
 
         # Add scrollbar to preset list
         preset_scrollbar = ttk.Scrollbar(presets_pane, orient="vertical", command=self.preset_list.yview)
@@ -7659,6 +7661,13 @@ class App(tk.Tk):
                     return True
         return False
     
+    def _deselect_on_empty_click(self, event, tree: ttk.Treeview) -> None:
+        """Deselect all items when clicking on empty space in a treeview"""
+        item = tree.identify_row(event.y)
+        if not item:
+            # Clicked on empty space - deselect all
+            tree.selection_remove(*tree.selection())
+    
     def _on_preset_double_click(self, event) -> None:
         """Handle double-click on preset list - load preset or toggle group"""
         item = self.preset_list.identify_row(event.y)
@@ -8270,35 +8279,9 @@ class App(tk.Tk):
         return result
 
     def _rename_selected_preset(self) -> None:
-        old = self._get_selected_preset()
-        if not old:
-            from app_utils import centered_message
-            centered_message(self, "No preset selected", "Choose a preset to rename.")
-            return
-            
-        # Confirm rename action
-        from app_utils import centered_askyesno
-        if not centered_askyesno(self, "Confirm Rename", 
-                      f"Rename preset '{old}'?\n\n"
-                      f"You'll be asked for the new name next."):
-            return
-            
-        new = self._ask_preset_name(initial=old)
-        if not new or new == old:
-            return
-        old_path = self._settings_path(old)
-        new_path = self._settings_path(new)
-        if os.path.exists(new_path):
-            messagebox.showerror("Rename failed", f"A preset named '{new}' already exists.")
-            return
-        try:
-            os.rename(old_path, new_path)
-            self._refresh_preset_list()
-            # Find and select the renamed preset in the tree
-            self._select_preset_by_name(new)
-            self._set_status(f"Renamed preset to '{new}'.")
-        except Exception as e:
-            messagebox.showerror("Rename failed", str(e))
+        """Rename the selected preset - just call the Edit function"""
+        # Rename uses the same Edit dialog - Edit handles the full workflow
+        self._edit_selected_preset()
 
     # ==================== DISTANCE CALCULATOR TAB ====================
     
@@ -8946,20 +8929,18 @@ class App(tk.Tk):
                 messagebox.showerror("Delete failed", str(e))
 
     def _duplicate_selected_preset(self) -> None:
-        """Duplicate the selected preset with a new name"""
+        """Duplicate the selected preset with a new name, then open edit dialog"""
         sel = self._get_selected_preset()
         if not sel:
             return
         
-        # Ask for new name, suggesting a default
-        new_name = self._ask_preset_name(f"{sel} - Copy")
-        if not new_name:
-            return
-            
-        new_path = self._settings_path(new_name)
-        if os.path.exists(new_path):
-            messagebox.showerror("Name exists", f"A preset named '{new_name}' already exists.")
-            return
+        # Generate a unique copy name
+        base_name = f"{sel} - Copy"
+        new_name = base_name
+        counter = 2
+        while os.path.exists(self._settings_path(new_name)):
+            new_name = f"{base_name} {counter}"
+            counter += 1
             
         try:
             # Load the existing preset data
@@ -8967,11 +8948,16 @@ class App(tk.Tk):
                 data = json.load(f)
             
             # Save it with the new name
+            new_path = self._settings_path(new_name)
             with open(new_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
                 
             self._refresh_preset_list()
-            self._set_status(f"Duplicated preset '{sel}' as '{new_name}'.")
+            self._select_preset_by_name(new_name)
+            self._set_status(f"Duplicated preset '{sel}' - edit to rename.")
+            
+            # Immediately open edit dialog so user can set proper ship type and build name
+            self.after(100, self._edit_selected_preset)
         except Exception as e:
             messagebox.showerror("Duplicate failed", str(e))
 
@@ -11681,6 +11667,8 @@ class App(tk.Tk):
                 print(f"[DEBUG] Could not save Commodity Market column widths: {e}")
         
         self.marketplace_tree.bind("<ButtonRelease-1>", save_marketplace_widths)
+        # Deselect when clicking empty space
+        self.marketplace_tree.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.marketplace_tree))
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.marketplace_tree.yview)
