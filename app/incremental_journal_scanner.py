@@ -199,9 +199,13 @@ class IncrementalJournalScanner:
                         elif event_type == 'SAASignalsFound':
                             self.parser.process_saa_signals_found(event, current_system)
                             events_processed += 1
-                        elif event_type in ['FSDJump', 'Location', 'CarrierJump']:
+                        elif event_type in ['FSDJump', 'CarrierJump']:
+                            # Only count actual arrivals for visit tracking (not Location)
                             self.parser.process_fsd_jump(event)
                             events_processed += 1
+                        elif event_type == 'Location':
+                            # Update current system but don't count as a visit
+                            current_system = event.get('StarSystem', current_system)
                         
                     except json.JSONDecodeError:
                         continue

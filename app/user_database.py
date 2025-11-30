@@ -1126,21 +1126,27 @@ class UserDatabase:
                 # Check if system already exists
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT visit_count, first_visit_date FROM visited_systems 
+                    SELECT visit_count, first_visit_date, last_visit_date FROM visited_systems 
                     WHERE system_name = ?
                 ''', (system_name,))
                 
                 result = cursor.fetchone()
                 
                 if result:
-                    # Update existing record
-                    visit_count, first_visit = result
-                    conn.execute('''
-                        UPDATE visited_systems 
-                        SET last_visit_date = ?, visit_count = visit_count + 1
-                        WHERE system_name = ?
-                    ''', (visit_date, system_name))
-                    log.debug(f"Updated visit to system: {system_name} (visit #{visit_count + 1})")
+                    visit_count, first_visit, last_visit = result
+                    
+                    # Only increment visit count if this is a NEW visit (different timestamp)
+                    # This prevents duplicate counting from multiple sources processing same event
+                    if last_visit != visit_date:
+                        conn.execute('''
+                            UPDATE visited_systems 
+                            SET last_visit_date = ?, visit_count = visit_count + 1
+                            WHERE system_name = ?
+                        ''', (visit_date, system_name))
+                        log.debug(f"Updated visit to system: {system_name} (visit #{visit_count + 1})")
+                    else:
+                        # Same timestamp - already recorded this visit, skip increment
+                        log.debug(f"Skipping duplicate visit record for: {system_name}")
                 else:
                     # Insert new record
                     x_coord, y_coord, z_coord = coordinates or (None, None, None)

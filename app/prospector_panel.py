@@ -7234,11 +7234,23 @@ class ProspectorPanel(ttk.Frame):
         # CSV file path for button commands
         csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
         
+        # Theme-aware button colors
+        if _tab_theme == "elite_orange":
+            _btn_bg = "#1a1a1a"
+            _btn_fg = "#ff8c00"
+            _btn_active_bg = "#333333"
+            _btn_active_fg = "#ffa500"
+        else:
+            _btn_bg = "#444444"
+            _btn_fg = "#ffffff"
+            _btn_active_bg = "#555555"
+            _btn_active_fg = "#ffffff"
+        
         # Rebuild CSV button
         rebuild_btn = tk.Button(button_frame, text="Rebuild CSV", 
                                command=lambda: self._force_rebuild_and_refresh(), 
-                               bg="#444444", fg="#ffffff", 
-                               activebackground="#555555", activeforeground="#ffffff", 
+                               bg=_btn_bg, fg=_btn_fg, 
+                               activebackground=_btn_active_bg, activeforeground=_btn_active_fg, 
                                relief="solid", bd=1, 
                                highlightbackground="#666666", highlightcolor="#666666")
         rebuild_btn.pack(side="left", padx=(0, 5))
@@ -7247,8 +7259,8 @@ class ProspectorPanel(ttk.Frame):
         # Open Folder button
         folder_btn = tk.Button(button_frame, text="Open Folder", 
                               command=lambda: self._open_path(self.reports_dir), 
-                              bg="#444444", fg="#ffffff", 
-                              activebackground="#555555", activeforeground="#ffffff", 
+                              bg=_btn_bg, fg=_btn_fg, 
+                              activebackground=_btn_active_bg, activeforeground=_btn_active_fg, 
                               relief="solid", bd=1, 
                               highlightbackground="#666666", highlightcolor="#666666")
         folder_btn.pack(side="left", padx=(0, 5))
@@ -7257,14 +7269,14 @@ class ProspectorPanel(ttk.Frame):
         # Export CSV button  
         export_btn = tk.Button(button_frame, text="Export CSV", 
                               command=lambda: self._export_csv(csv_path), 
-                              bg="#444444", fg="#ffffff", 
-                              activebackground="#555555", activeforeground="#ffffff", 
+                              bg=_btn_bg, fg=_btn_fg, 
+                              activebackground=_btn_active_bg, activeforeground=_btn_active_fg, 
                               relief="solid", bd=1, 
                               highlightbackground="#666666", highlightcolor="#666666")
         export_btn.pack(side="left", padx=(0, 5))
         self.ToolTip(export_btn, "Export session data to a CSV file that can be opened in Excel or other spreadsheet programs.")
         
-        # Share to Discord button
+        # Share to Discord button (Discord brand color #5865F2)
         discord_btn = tk.Button(button_frame, text="Share to Discord", 
                                command=self._share_to_discord, 
                                bg="#5865F2", fg="#ffffff", 
@@ -7274,11 +7286,11 @@ class ProspectorPanel(ttk.Frame):
         discord_btn.pack(side="left", padx=(0, 5))
         self.ToolTip(discord_btn, "Share selected mining session report to Discord via webhook")
         
-        # Mining Card button
+        # Mining Card button (orange accent)
         card_btn = tk.Button(button_frame, text="Mining Card", 
                             command=self._create_mining_card_from_report, 
-                            bg="#FF8C00", fg="#ffffff", 
-                            activebackground="#CC7000", activeforeground="#ffffff", 
+                            bg="#ff6600", fg="#ffffff", 
+                            activebackground="#cc5500", activeforeground="#ffffff", 
                             relief="solid", bd=1, 
                             highlightbackground="#666666", highlightcolor="#666666")
         card_btn.pack(side="left", padx=(0, 5))

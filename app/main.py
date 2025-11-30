@@ -3542,30 +3542,36 @@ cargo panel forces Elite to write detailed inventory data.
                         except:
                             pass
                     
-                    # Also add to visited systems database
-                    timestamp = event.get("timestamp", "")
-                    system_address = event.get("SystemAddress")
-                    star_pos = event.get("StarPos", [])
+                    # Only count actual arrivals (FSDJump/CarrierJump) for visit tracking
+                    # Location events fire on game load - not a new visit
+                    if event_type in ["FSDJump", "CarrierJump"]:
+                        timestamp = event.get("timestamp", "")
+                        system_address = event.get("SystemAddress")
+                        star_pos = event.get("StarPos", [])
                     
-                    print(f"DEBUG: Event data - timestamp: {timestamp}, system_address: {system_address}, star_pos: {star_pos}")
-                    
-                    coordinates = None
-                    if len(star_pos) >= 3:
-                        coordinates = (star_pos[0], star_pos[1], star_pos[2])
-                        print(f"DEBUG: Parsed coordinates: {coordinates}")
-                    
-                    try:
-                        print(f"DEBUG: Attempting to add visited system: {system_name}")
-                        self.user_db.add_visited_system(
-                            system_name=system_name,
-                            visit_date=timestamp,
-                            system_address=system_address,
-                            coordinates=coordinates
-                        )
-                        print(f"DEBUG: Successfully added visited system: {system_name}")
-                    except Exception as e:
-                        print(f"Error adding visited system: {e}")
-                        print(f"DEBUG: Full error details - system: {system_name}, timestamp: {timestamp}, address: {system_address}, coords: {coordinates}")
+                        print(f"DEBUG: Event data - timestamp: {timestamp}, system_address: {system_address}, star_pos: {star_pos}")
+                        
+                        coordinates = None
+                        if len(star_pos) >= 3:
+                            coordinates = (star_pos[0], star_pos[1], star_pos[2])
+                            print(f"DEBUG: Parsed coordinates: {coordinates}")
+                        
+                        try:
+                            print(f"DEBUG: Attempting to add visited system: {system_name}")
+                            self.user_db.add_visited_system(
+                                system_name=system_name,
+                                visit_date=timestamp,
+                                system_address=system_address,
+                                coordinates=coordinates
+                            )
+                            print(f"DEBUG: Successfully added visited system: {system_name}")
+                            
+                            # Update CMDR info display (for visits count, current system, etc.)
+                            if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_cmdr_system_display'):
+                                self.main_app_ref.after(100, self.main_app_ref._update_cmdr_system_display)
+                        except Exception as e:
+                            print(f"Error adding visited system: {e}")
+                            print(f"DEBUG: Full error details - system: {system_name}, timestamp: {timestamp}, address: {system_address}, coords: {coordinates}")
                 else:
                     print(f"DEBUG: No system name found in {event_type} event")
                         
@@ -4296,6 +4302,11 @@ from prospector_panel import ProspectorPanel
 # -------------------- Main GUI --------------------
 
 class App(tk.Tk):
+    def _set_dark_title_bar(self):
+        """Placeholder - title bar uses default Windows styling (light/white)"""
+        # Dark title bar was too black - keeping default Windows title bar
+        pass
+    
     def __init__(self) -> None:
         try:
             super().__init__()
@@ -4407,16 +4418,7 @@ class App(tk.Tk):
         style.map("Horizontal.Scrollbar.thumb",
                   background=[("active", "#666666")])
 
-        style.configure("TNotebook", background="#1e1e1e", borderwidth=0)
-        style.configure("TNotebook.Tab",
-                        background="#444444",
-                        foreground="#ffffff",
-                        padding=[8, 4],
-                        relief="raised",
-                        borderwidth=1)
-        style.map("TNotebook.Tab",
-                   background=[("selected", "#555555")],
-                   foreground=[("selected", "#ffffff")])
+        # NOTE: TNotebook styling moved below after theme colors are loaded
 
 
         # --- Theme setup based on config ---
@@ -4440,18 +4442,24 @@ class App(tk.Tk):
         style.configure(".", background=dark_bg, foreground=dark_fg)
         style.configure("TLabel", background=dark_bg, foreground=dark_fg)
         style.configure("TFrame", background=dark_bg)
-        style.configure("TNotebook", background=accent)
-        style.configure("TNotebook.Tab", background=accent, foreground=dark_fg)
-        style.map("TNotebook.Tab", background=[("selected", dark_bg)])
+        
+        # Theme-aware Notebook tab styling
+        style.configure("TNotebook", background=accent, borderwidth=0)
+        style.configure("TNotebook.Tab",
+                        background=accent,
+                        foreground=dark_fg,
+                        padding=[8, 4],
+                        relief="raised",
+                        borderwidth=1)
+        style.map("TNotebook.Tab",
+                   background=[("selected", dark_bg)],
+                   foreground=[("selected", dark_fg)])
 
-        # Custom dark button style (uses centralized theme colors)
-        style.configure("Dark.TButton", 
-                        background=theme["btn_bg"], 
-                        foreground=theme["btn_fg"], 
-                        font=("Segoe UI", 9, "bold"))
+        # Custom dark button style
+        style.configure("Dark.TButton", background="#333333", foreground=btn_fg, font=("Segoe UI", 9, "bold"))
         style.map("Dark.TButton",
-                   background=[("active", theme["btn_bg_hover"]), ("disabled", theme["btn_bg_disabled"])],
-                   foreground=[("disabled", theme["btn_fg_disabled"])])
+                   background=[("active", "#444444"), ("disabled", "#1a1a1a")],
+                   foreground=[("disabled", "#666666")])
 
         style.configure("TCheckbutton", background=dark_bg, foreground=dark_fg)
         style.configure("TRadiobutton", background=dark_bg, foreground=dark_fg)
@@ -4469,7 +4477,7 @@ class App(tk.Tk):
         self.option_add("*TMenubutton.foreground", dark_fg)
         self.option_add("*Checkbutton.background", dark_bg)
         self.option_add("*Checkbutton.foreground", dark_fg)
-        self.option_add("*Checkbutton.selectColor", theme["btn_bg"])
+        self.option_add("*Checkbutton.selectColor", "#333333")
         self.option_add("*Checkbutton.activeBackground", dark_bg)
         self.option_add("*Checkbutton.activeForeground", dark_fg)
 
@@ -4915,6 +4923,11 @@ class App(tk.Tk):
         self.route_label_value.grid(row=0, column=8, sticky="w")
         self.total_systems_label_prefix.grid(row=0, column=9, sticky="e")
         self.total_systems_label_value.grid(row=0, column=10, sticky="w")
+        
+        # Help indicator for Tot Syst (updates on game restart)
+        self.total_systems_help = tk.Label(info_frame, text="(?)", fg="gray", bg=_info_bg, font=("Segoe UI", 9))
+        self.total_systems_help.grid(row=0, column=11, sticky="w")
+        ToolTip(self.total_systems_help, "Total systems visited (from game stats). Updates when Elite Dangerous is restarted.")
         
         # Load CMDR name in background
         self.after(500, self._update_cmdr_system_display)
@@ -7464,7 +7477,8 @@ class App(tk.Tk):
             self.route_label_prefix.config(text="| Syst In Route: ")
             self.route_label_value.config(text=str(jumps_remaining))
             
-            # Get total systems visited from journal Statistics event (accurate game data)
+            # Get total systems visited from journal Statistics event (game's official count)
+            # Note: This updates when docking, quitting, or periodically - not after every jump
             total_systems = 0
             if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
                 try:
@@ -10563,9 +10577,160 @@ class App(tk.Tk):
                 log.warning(f"Layout migration failed: {layout_error}")
                 
             log.info(f"=== CONFIG MIGRATION CHECK END === {datetime.now().isoformat()}")
+            
+            # Schedule database migrations to run after window is fully visible and positioned
+            # Using after(500) gives time for window manager to position the main window
+            self.after(500, self._run_database_migrations)
                 
         except Exception as e:
             log.error(f"Config migration check failed: {e}", exc_info=True)
+            # Continue startup even if migration fails
+
+    def _run_database_migrations(self):
+        """Run any pending database migrations with progress dialog"""
+        import logging
+        log = logging.getLogger("EliteMining.Migration")
+        
+        try:
+            from migrations.fix_visit_counts import is_migration_needed, get_database_path, run_migration
+            from app_utils import get_app_icon_path
+            
+            db_path = get_database_path()
+            
+            # Check if migration is needed before showing dialog
+            if not is_migration_needed(db_path):
+                log.info("No database migrations needed")
+                return
+            
+            log.info("Database migration needed, showing progress dialog...")
+            
+            # Ensure main window is updated before creating dialog
+            self.update_idletasks()
+            
+            # Create progress dialog - use center_window for proper positioning
+            progress_dialog = tk.Toplevel(self)
+            progress_dialog.withdraw()  # Hide until positioned
+            progress_dialog.title("EliteMining - Database Update")
+            progress_dialog.transient(self)
+            progress_dialog.resizable(False, False)
+            progress_dialog.configure(bg="#2c3e50")
+            
+            # Set app icon
+            try:
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    progress_dialog.iconbitmap(icon_path)
+            except Exception:
+                pass
+            
+            # Dialog content frame
+            frame = ttk.Frame(progress_dialog, padding=20)
+            frame.pack(fill="both", expand=True)
+            
+            # Title label
+            ttk.Label(
+                frame, 
+                text="Updating Database (one-time migration)",
+                font=("Segoe UI", 11, "bold")
+            ).pack(pady=(0, 15))
+            
+            # Status label
+            status_var = tk.StringVar(value="Initializing...")
+            ttk.Label(
+                frame,
+                textvariable=status_var,
+                font=("Segoe UI", 9)
+            ).pack(pady=(0, 10))
+            
+            # Progress bar
+            progress_bar = ttk.Progressbar(
+                frame, 
+                length=350, 
+                mode='determinate'
+            )
+            progress_bar.pack(pady=(0, 10))
+            
+            # Center dialog on parent window (main app)
+            # Force update to get accurate geometry
+            self.update()
+            progress_dialog.update_idletasks()
+            
+            # Get main window position and size
+            main_x = self.winfo_x()
+            main_y = self.winfo_y()
+            main_width = self.winfo_width()
+            main_height = self.winfo_height()
+            
+            # Get dialog size
+            dialog_width = progress_dialog.winfo_reqwidth()
+            dialog_height = progress_dialog.winfo_reqheight()
+            
+            # Calculate centered position
+            x = main_x + (main_width - dialog_width) // 2
+            y = main_y + (main_height - dialog_height) // 2
+            
+            # Apply position
+            progress_dialog.geometry(f"+{x}+{y}")
+            
+            # Show dialog
+            progress_dialog.deiconify()
+            progress_dialog.lift()
+            progress_dialog.focus_force()
+            progress_dialog.grab_set()
+            progress_dialog.update()
+            
+            # Progress callback
+            def update_progress(current, total, message):
+                progress_bar['value'] = current
+                status_var.set(message)
+                progress_dialog.update()
+            
+            # Run migration
+            success, message = run_migration(update_progress)
+            
+            if success:
+                log.info(f"Database migration completed: {message}")
+            else:
+                log.warning(f"Database migration issue: {message}")
+            
+            # Close dialog
+            progress_dialog.grab_release()
+            progress_dialog.destroy()
+            
+            # Notify user about changes
+            if success and "Fixed" in message:
+                # Check if running as frozen exe (installed version)
+                import sys
+                if getattr(sys, 'frozen', False):
+                    # Installed version - don't auto-restart (causes Tcl/Tk issues)
+                    centered_info_dialog(
+                        self,
+                        "Database Updated",
+                        "Visit counts have been corrected.\n\n"
+                        "Please restart EliteMining to apply changes."
+                    )
+                else:
+                    # Dev version - can restart safely
+                    restart = centered_yesno_dialog(
+                        self,
+                        "Database Updated",
+                        "Visit counts have been corrected.\n\n"
+                        "Restart EliteMining now to apply changes?"
+                    )
+                    if restart:
+                        self._restart_app()
+                
+        except ImportError:
+            # Migration module not found - skip silently
+            log.debug("Migration module not found, skipping")
+        except Exception as e:
+            log.error(f"Database migration failed: {e}")
+            # Try to close dialog if it exists
+            try:
+                progress_dialog.grab_release()
+                progress_dialog.destroy()
+            except:
+                pass
             # Continue startup even if migration fails
 
     def _toggle_theme(self) -> None:
@@ -13764,6 +13929,8 @@ if __name__ == "__main__":
         app = App()
         # Restore geometry after all widgets are created
         app.after(100, app._restore_window_geometry)
+        # Force dark title bar after window is fully created
+        app.after(200, app._set_dark_title_bar)
         app.mainloop()
     except Exception as e:
         # Show error dialog with full traceback

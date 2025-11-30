@@ -489,7 +489,7 @@ class RingFinder:
         
         # Search limitations info text (bottom of search controls)
         info_text = tk.Label(search_frame, 
-                            text="ℹ Search covers bubble systems. Data grows as you scan and import history  |  'No data' = Information not available",
+                            text="ℹ Search covers bubble systems. Data grows as you scan and import history  |  'No data' = Not visited or information not available",
                             fg="#cccccc", bg=_cb_bg, font=("Segoe UI", 8, "italic"), 
                             justify="left")
         info_text.grid(row=4, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
@@ -577,7 +577,7 @@ class RingFinder:
                      arrowcolor=[('readonly', '#ff8c00')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Visited", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Density")
+        columns = ("Distance", "LS", "System", "Visits", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Density")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
         
         # Set column widths - similar to EDTOOLS layout
@@ -590,7 +590,7 @@ class RingFinder:
             "Hotspots": 150,  # Reduced from 200 to 150
             "Overlap": 80,
             "RES Site": 80,
-            "Visited": 60,
+            "Visits": 60,
             "Density": 110
         }
         
@@ -621,7 +621,7 @@ class RingFinder:
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "RES Site":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
-            elif col == "Visited":
+            elif col == "Visits":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "LS":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
@@ -3210,8 +3210,10 @@ class RingFinder:
                 # Pure EDSM ring composition data - show "-"
                 hotspot_count_display = "-"
             
-            # Check if player has visited this system
-            visited_status = "Yes" if self.user_db.has_visited_system(system_name) else "No"
+            # Get visit count for this system
+            visit_data = self.user_db.is_system_visited(system_name)
+            visit_count = visit_data.get('visit_count', 0) if visit_data else 0
+            visited_status = str(visit_count)
             
             # Format density for display - use existing density column as fallback
             density_formatted = "No data"
