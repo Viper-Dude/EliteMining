@@ -6361,52 +6361,17 @@ class ProspectorPanel(ttk.Frame):
     def _enhance_materials_with_yields_and_tph(self, materials_breakdown_raw: str, avg_quality_percent: str, material_tph_breakdown: str) -> str:
         """Enhance materials display by adding yield percentages and TPH in brackets
         
-        Uses abbreviated mineral names for compact display in Reports column.
+        Uses centralized abbreviations from material_utils for consistency.
+        Supports multiple languages based on game settings.
         Note: Exports (CSV, TXT, HTML) keep full names - abbreviations are UI-only.
         """
         if not materials_breakdown_raw or materials_breakdown_raw == '—':
             return materials_breakdown_raw
             
         try:
-            # Material abbreviations for display (matches Ring Finder conventions)
-            display_abbreviations = {
-                'Alexandrite': 'Alex',
-                'Bauxite': 'Baux',
-                'Benitoite': 'Beni',
-                'Bertrandite': 'Bert',
-                'Bromellite': 'Brom',
-                'Cobalt': 'Coba',
-                'Coltan': 'Colt',
-                'Gallite': 'Gall',
-                'Gold': 'Gold',
-                'Goslarite': 'Gosl',
-                'Grandidierite': 'Gran',
-                'Haematite': 'Haem',
-                'Hydrogen Peroxide': 'H2O2',
-                'Indite': 'Indi',
-                'Lepidolite': 'Lepi',
-                'Liquid Oxygen': 'LOX',
-                'Lithium Hydroxide': 'LiOH',
-                'Low Temperature Diamonds': 'LTD',
-                'Methane Clathrate': 'MeCl',
-                'Methanol Monohydrate Crystals': 'MeOH',
-                'Monazite': 'Mona',
-                'Musgravite': 'Musg',
-                'Osmium': 'Osmi',
-                'Painite': 'Pain',
-                'Palladium': 'Pall',
-                'Platinum': 'Plat',
-                'Praseodymium': 'Pras',
-                'Rhodplumsite': 'Rhod',
-                'Rutile': 'Ruti',
-                'Samarium': 'Sama',
-                'Serendibite': 'Sere',
-                'Silver': 'Silv',
-                'Tritium': 'Trit',
-                'Uraninite': 'Uran',
-                'Void Opals': 'Opals',
-                'Water': 'H2O',
-            }
+            # Get language-aware abbreviations from centralized module
+            from material_utils import get_display_abbreviations
+            display_abbreviations = get_display_abbreviations()
             # Parse individual yields from avg_quality_percent field
             individual_yields = {}
             if avg_quality_percent and isinstance(avg_quality_percent, str) and ':' in avg_quality_percent:

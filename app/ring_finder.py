@@ -179,38 +179,11 @@ class RingFinder:
     def _abbreviate_material_for_display(self, hotspot_text: str) -> str:
         """Abbreviate material names in hotspot display text for Ring Finder column
         
-        Uses recognizable 3-4 character abbreviations for better readability
-        while saving space in the 'All Materials' view.
+        Uses centralized abbreviations from material_utils for consistency.
+        Supports multiple languages based on game settings.
         """
-        abbreviations = {
-            # Current materials in database (13 materials)
-            'Alexandrite': 'Alex',
-            'Benitoite': 'Beni',
-            'Bromellite': 'Brom',
-            'Grandidierite': 'Gran',
-            'Hydrogen Peroxide': 'H. Peroxide',
-            'Liquid Oxygen': 'Liq Oxygen',
-            'Lithium Hydroxide': 'Lithium Hydro',
-            'Low Temp Diamonds': 'LTD',
-            'Low Temperature Diamonds': 'LTD',  # Database version
-            'Methane Clathrate': 'Methane Clath',
-            'Methanol Monohydrate Crystals': 'Methanol Cryst',
-            'Monazite': 'Mona',
-            'Musgravite': 'Musg',
-            'Painite': 'Pain',
-            'Platinum': 'Plat',
-            'Rhodplumsite': 'Rhod',
-            'Serendibite': 'Sere',
-            'Tritium': 'Trit',
-            'Void Opals': 'Opals',
-        }
-        
-        # Replace full material names with abbreviations in the display text
-        result = hotspot_text
-        for full_name, abbr in abbreviations.items():
-            result = result.replace(full_name, abbr)
-        
-        return result
+        from material_utils import abbreviate_material_text
+        return abbreviate_material_text(hotspot_text)
         
     def setup_ui(self):
         """Create hotspot finder UI following EliteMining patterns"""
@@ -3107,22 +3080,50 @@ class RingFinder:
         
         # Identify entries to highlight - support multiple scanned rings
         pending_highlights = getattr(self, '_pending_highlights', set())
-        self._pending_highlights = set()  # Reset after reading
+        
+        # Only reset pending highlights if this is a manual search (no new highlights being added)
+        # This allows accumulating highlights when scanning multiple rings
+        is_auto_scan = len(pending_highlights) > 0
+        
+        # Get or create sets for tracking highlights
+        if not hasattr(self, '_active_highlights'):
+            self._active_highlights = set()  # Rings that stay at top (position only)
+        if not hasattr(self, '_green_highlights'):
+            self._green_highlights = set()  # Rings that are currently green
+        
+        # If this is an auto-scan (has pending highlights), add them to active and green
+        # If this is a manual search (no pending), clear everything
+        if is_auto_scan:
+            self._active_highlights.update(pending_highlights)
+            self._green_highlights.update(pending_highlights)  # New scans get green
+            self._pending_highlights = set()  # Clear pending after moving
+        else:
+            self._active_highlights = set()  # Manual search clears all
+            self._green_highlights = set()
+        
         self._is_auto_refresh = False  # Reset legacy flag
         
-        new_entries = set()
-        for highlight_system, highlight_body in pending_highlights:
+        # Build sets for position (top) and green highlighting
+        top_entries = set()  # Entries that go to top
+        green_entries = set()  # Entries that are green
+        
+        for highlight_system, highlight_body in self._active_highlights:
             # Normalize highlight_body to match database format (without system prefix)
-            # Database stores "7 A Ring" not "Bridge 7 A Ring"
             normalized_highlight = highlight_body
             if highlight_system and highlight_body.lower().startswith(highlight_system.lower()):
                 normalized_highlight = highlight_body[len(highlight_system):].strip()
-            normalized_highlight = ' '.join(normalized_highlight.split())  # Ensure proper spacing
+            normalized_highlight = ' '.join(normalized_highlight.split())
             
-            # Only highlight the exact system+body that was just scanned
             for system_name, body_name in current_results:
                 if body_name == normalized_highlight and system_name.lower() == highlight_system.lower():
-                    new_entries.add((system_name, body_name))
+                    top_entries.add((system_name, body_name))
+                    # Only add to green if still in green_highlights
+                    if (highlight_system, highlight_body) in self._green_highlights:
+                        green_entries.add((system_name, body_name))
+        
+        # Store for use in row insertion
+        self._current_top_entries = top_entries
+        self._current_green_entries = green_entries
         
         # Clear existing results completely
         for item in self.results_tree.get_children():
@@ -3131,12 +3132,15 @@ class RingFinder:
         # Force UI refresh
         self.results_tree.update()
         
-        # Sort by distance, then system name, then ring name for predictable ordering
+        # Sort: green entries first, then other top entries, then rest by distance
         try:
             hotspots.sort(key=lambda x: (
-                float(x.get('distance', 999)),           # Primary: Distance (closest first)
-                x.get('systemName', x.get('system', '')).lower(),  # Secondary: System name (alphabetical)
-                x.get('bodyName', x.get('ring', '')).lower()       # Tertiary: Ring name (alphabetical)
+                0 if (x.get('system', x.get('systemName', '')), x.get('ring', x.get('bodyName', ''))) in green_entries else (
+                    1 if (x.get('system', x.get('systemName', '')), x.get('ring', x.get('bodyName', ''))) in top_entries else 2
+                ),  # Green first, then top, then rest
+                float(x.get('distance', 999)),           # Then: Distance (closest first)
+                x.get('systemName', x.get('system', '')).lower(),  # Then: System name (alphabetical)
+                x.get('bodyName', x.get('ring', '')).lower()       # Then: Ring name (alphabetical)
             ))
         except:
             pass
@@ -3250,12 +3254,12 @@ class RingFinder:
             if ring_type_val is None or ring_type_val == "None":
                 ring_type_val = "No data"
             
-            # Check if this is a new entry and apply highlighting
-            is_new = (system_name, ring_name) in new_entries
+            # Check if this entry should be green (newly scanned, timer not expired)
+            is_green = (system_name, ring_name) in green_entries
             
-            # Apply alternating row colors + new entry highlighting
+            # Apply alternating row colors + green highlighting
             row_index = len(self.results_tree.get_children())
-            if is_new:
+            if is_green:
                 tags = ('new_entry',)
             else:
                 row_tag = 'evenrow' if row_index % 2 == 0 else 'oddrow'
@@ -3281,8 +3285,8 @@ class RingFinder:
                 density_formatted
             ), tags=tags)
             
-            # Store first new entry for scrolling
-            if is_new and not hasattr(self, '_first_new_item'):
+            # Store first green entry for scrolling
+            if is_green and not hasattr(self, '_first_new_item'):
                 self._first_new_item = item_id
             
         # Update status with source information 
@@ -3322,11 +3326,11 @@ class RingFinder:
             # Removed selection_set to prevent auto-selection of scanned rings
             delattr(self, '_first_new_item')
         
-        # Set timer to remove highlight after 10 seconds (reset if already running)
-        if new_entries:
+        # Set timer to remove green highlight after 20 seconds (reset if already running)
+        if green_entries:
             if self.highlight_timer:
                 self.parent.after_cancel(self.highlight_timer)
-            self.highlight_timer = self.parent.after(10000, self._clear_highlights)
+            self.highlight_timer = self.parent.after(20000, self._clear_highlights)
             
     def _show_error(self, error_msg: str):
         """Show error message and reset UI"""
@@ -3336,12 +3340,19 @@ class RingFinder:
         self.results_tree.delete(*self.results_tree.get_children())
     
     def _clear_highlights(self):
-        """Remove highlight tags from all items (called after 10 seconds)"""
+        """Remove green highlight from all items (rows stay at top until manual search)"""
+        # Clear the green highlights set so they don't come back
+        self._green_highlights = set()
+        
         for item in self.results_tree.get_children():
             # Remove the 'new_entry' tag from all items
             tags = list(self.results_tree.item(item, 'tags'))
             if 'new_entry' in tags:
                 tags.remove('new_entry')
+                # Apply alternating row color instead
+                row_index = self.results_tree.index(item)
+                row_tag = 'evenrow' if row_index % 2 == 0 else 'oddrow'
+                tags.append(row_tag)
                 self.results_tree.item(item, tags=tuple(tags))
         self.highlight_timer = None
         print("DEBUG: Highlights cleared")

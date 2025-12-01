@@ -52,8 +52,8 @@ class JournalParser:
         'Void Opal': 'Void Opals',
         'opal': 'Void Opals',
         'Opal': 'Void Opals',
-        'leerenopal': 'Void Opals',  # German
-        'Leerenopal': 'Void Opals',  # German
+        'leeren-opale': 'Void Opals',  # German
+        'Leeren-Opale': 'Void Opals',  # German
         'opales du vide': 'Void Opals',  # French
         'Opales Du Vide': 'Void Opals',  # French
         'ópalos del vacío': 'Void Opals',  # Spanish

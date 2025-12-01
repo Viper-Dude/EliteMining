@@ -718,7 +718,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.6.5"
+APP_VERSION = "v4.6.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -2850,6 +2850,28 @@ cargo panel forces Elite to write detailed inventory data.
         try:
             with open(journal_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
+            
+            # Detect game language from Fileheader (first few lines)
+            for line in lines[:10]:
+                try:
+                    event = json.loads(line.strip())
+                    if event.get("event") == "Fileheader":
+                        language = event.get("language", "English/UK")
+                        from material_utils import set_game_language
+                        if 'German' in language:
+                            set_game_language('de')
+                        elif 'French' in language:
+                            set_game_language('fr')
+                        elif 'Spanish' in language:
+                            set_game_language('es')
+                        elif 'Russian' in language:
+                            set_game_language('ru')
+                        else:
+                            set_game_language('en')
+                        print(f"[DEBUG] Game language detected: {language}")
+                        break
+                except:
+                    pass
             
             cargo_found = False
             location_found = False
