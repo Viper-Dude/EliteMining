@@ -4,32 +4,13 @@
 ## New Features & Improvements
 
 ### Full Localization System
-- **Complete German translation** – All UI elements, tooltips, dialogs, and status messages
-- **Language switcher** – Click the flag icon (bottom right) to change language
-- **Auto-detection** – Automatically detects language from Elite Dangerous settings
-- **120+ tooltips** localized across the entire application
-- All context menus, dialogs, and dynamic messages translated
-- Note: TXT/HTML session reports remain in English for data compatibility
-
-### Language Support
-| Language | Status |
-|----------|--------|
-| English | Complete |
-| German | Complete |
-| French | Community needed |
-| Spanish | Community needed |
-| Russian | Community needed |
-| Portuguese | Community needed |
-
-**Want to help translate?** See our [Translation Guide](https://github.com/Viper-Dude/EliteMining/blob/main/docs/TRANSLATION_GUIDE.md)!
+- Complete German translation for all UI elements, tooltips, and dialogs
+- Language switcher (flag icon, bottom right) - requires restart
+- Auto-detects language from Elite Dangerous settings
+- **Want to help translate?** See the [Translation Guide](https://github.com/Viper-Dude/EliteMining/blob/main/docs/TRANSLATION_GUIDE.md)
 
 ### VoiceAttack Profile
 - No changes - latest version is v4.6.0 (included in the installer and zip file)
-
-## Technical Notes
-- Localization files: `app/localization/strings_xx.json` and `materials_xx.json`
-- Language setting saved in `config.json`
-- Restart required after changing language
 
 ## Notes
 - If installer fails with errors, right-click the installer and select "Run as administrator"
