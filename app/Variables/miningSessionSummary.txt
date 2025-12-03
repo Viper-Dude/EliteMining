@@ -1,2 +1,2 @@
-Session: Col 173 Sector RR-O b37-3 — Unknown Body — 00:00:00 — Total 8t (Single Session)
-Ship: Mega Bumper - Type-11 Prospector | Bromellite 8t (69118.45 t/hr)
+Session: HIP 25759 — Unknown Body — 00:00:00 — Total 4t (Single Session)
+Ship: Lonely Ranger 2 - Caspian Explorer | Lepidolith 4t (30330.54 t/hr)

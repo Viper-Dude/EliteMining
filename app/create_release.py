@@ -182,6 +182,14 @@ class ReleaseBuilder:
                                     zipf.write(file_path, arc_name)
                             print(f"✅ Added: EliteMining/app/{item}/ (directory)")
                 
+                # Add localization folder (required for UI translations)
+                localization_dir = app_dir / "localization"
+                if localization_dir.exists():
+                    for file_path in localization_dir.glob('*.json'):
+                        arc_name = f"EliteMining/app/localization/{file_path.name}"
+                        zipf.write(file_path, arc_name)
+                    print(f"✅ Added: EliteMining/app/localization/ (JSON files)")
+                
                 # Skip adding protection scripts to ZIP - installer handles these separately
                 
                 # Add Variables folder if it exists under EliteMining/

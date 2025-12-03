@@ -104,9 +104,9 @@ def centered_yesno_dialog(parent, title, message):
         result['value'] = False
         dialog.destroy()
     
-    yes_btn = ttk.Button(btn_frame, text="Yes", width=10, command=on_yes)
+    yes_btn = ttk.Button(btn_frame, text=t('common.yes'), width=10, command=on_yes)
     yes_btn.pack(side=tk.LEFT, padx=(0, 10))
-    no_btn = ttk.Button(btn_frame, text="No", width=10, command=on_no)
+    no_btn = ttk.Button(btn_frame, text=t('common.no'), width=10, command=on_no)
     no_btn.pack(side=tk.LEFT)
     
     # Keyboard bindings
@@ -142,9 +142,10 @@ def centered_yesno_dialog(parent, title, message):
     return result['value']
 
 def centered_info_dialog(parent, title, message):
-    """Show an Info dialog centered over parent window. Returns when OK pressed."""
+    """Show an Info dialog centered over parent window with orange theme. Returns when OK pressed."""
     dialog = tk.Toplevel(parent)
     dialog.withdraw()  # Prevent flicker while laying out
+    dialog.configure(bg="#1e1e1e")
     try:
         from app_utils import get_app_icon_path
         icon_path = get_app_icon_path()
@@ -156,13 +157,18 @@ def centered_info_dialog(parent, title, message):
         pass
     dialog.title(title)
     dialog.resizable(False, False)
-    label = tk.Label(dialog, text=message, padx=20, pady=20)
+    label = tk.Label(dialog, text=message, padx=20, pady=20, 
+                    bg="#1e1e1e", fg="#ff9800", font=("Segoe UI", 10),
+                    justify="left", wraplength=500)
     label.pack()
-    btn_frame = tk.Frame(dialog)
+    btn_frame = tk.Frame(dialog, bg="#1e1e1e")
     btn_frame.pack(pady=(0, 15))
     def on_ok():
         dialog.destroy()
-    ok_btn = tk.Button(btn_frame, text="OK", width=10, command=on_ok)
+    ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=10, command=on_ok,
+                      bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                      activebackground="#4a4a4a", activeforeground="#ffffff",
+                      cursor="hand2")
     ok_btn.pack()
     top_parent = parent.winfo_toplevel() if parent else None
     if top_parent:
@@ -180,6 +186,29 @@ import threading
 import time
 import zipfile
 import announcer
+
+# Initialize localization system FIRST - before other imports that depend on it
+try:
+    from localization import init as init_localization, t as _t, get_language, get_station_types, get_sort_options, get_age_options, get_material, to_english
+    init_localization()
+    print(f"[MAIN] Localization initialized. Language: {get_language()}")
+    print(f"[MAIN] Test translation: tabs.mining_session = {_t('tabs.mining_session')}")
+    
+    def t(key, **kwargs):
+        """Safe translation function that won't crash if localization fails"""
+        try:
+            result = _t(key, **kwargs)
+            return result
+        except Exception as ex:
+            print(f"[MAIN] t() error for {key}: {ex}")
+            return key.split('.')[-1]  # Return last part of key as fallback
+except Exception as e:
+    print(f"[WARNING] Could not initialize localization: {e}")
+    def t(key, **kwargs):
+        """Fallback translation - returns last part of key"""
+        return key.split('.')[-1]
+
+# Now import modules that depend on localization
 from ring_finder import RingFinder
 # from marketplace_finder import MarketplaceFinder  # No longer used - using external sites
 from marketplace_api import MarketplaceAPI
@@ -414,7 +443,7 @@ class TextOverlay:
             return
             
         self.overlay_window = tk.Toplevel()
-        self.overlay_window.title("Mining Announcements")
+        self.overlay_window.title(t('dialogs.mining_announcements'))
         self.overlay_window.wm_overrideredirect(True)  # Remove window decorations
         self.overlay_window.wm_attributes("-topmost", True)  # Always on top
         
@@ -722,7 +751,18 @@ APP_VERSION = "v4.6.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
-_handler = RotatingFileHandler(LOG_FILE, maxBytes=512*1024, backupCount=3, encoding="utf-8")
+
+# Create a custom handler that silently handles rotation errors
+class SafeRotatingFileHandler(RotatingFileHandler):
+    """RotatingFileHandler that silently handles rotation errors (file locked by another process)"""
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except (PermissionError, OSError):
+            # File is locked by another process, just continue writing to current file
+            pass
+
+_handler = SafeRotatingFileHandler(LOG_FILE, maxBytes=512*1024, backupCount=3, encoding="utf-8")
 logging.basicConfig(level=logging.INFO, handlers=[_handler],
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("EliteMining")
@@ -810,7 +850,7 @@ class RefineryDialog:
         # Create dialog window (withdraw first to avoid flicker)
         self.dialog = tk.Toplevel(parent)
         self.dialog.withdraw()
-        self.dialog.title("Add Refinery Contents")
+        self.dialog.title(t('refinery_dialog.title'))
         self.dialog.geometry("600x650")
         self.dialog.configure(bg="#1e1e1e")
         self.dialog.resizable(True, True)  # Allow resizing so user can adjust if needed
@@ -898,13 +938,13 @@ class RefineryDialog:
         main_frame.pack(fill="both", expand=True)
         
         # Title
-        title_label = tk.Label(main_frame, text="⚗️ Add Refinery Contents", 
+        title_label = tk.Label(main_frame, text="⚗️ " + t('refinery_dialog.title'), 
                               bg="#1e1e1e", fg="#ffffff", 
                               font=("Segoe UI", 14, "bold"))
         title_label.pack(pady=(0, 15))
         
         # Manual add section (moved to top for dropdown space)
-        manual_frame = tk.LabelFrame(main_frame, text="🔍 Add Other Minerals", 
+        manual_frame = tk.LabelFrame(main_frame, text="🔍 " + t('refinery_dialog.add_other_minerals'), 
                                    bg="#1e1e1e", fg="#ffffff", 
                                    font=("Segoe UI", 10, "bold"))
         manual_frame.pack(fill="x", pady=(0, 15))
@@ -917,9 +957,9 @@ class RefineryDialog:
         manual_inner.columnconfigure(3, weight=0)  # Quantity entry column
         
         # Material selection
-        tk.Label(manual_inner, text="Material:", bg="#1e1e1e", fg="#ffffff").grid(row=0, column=0, sticky="w", padx=(0, 5))
+        tk.Label(manual_inner, text=t('refinery_dialog.material_label'), bg="#1e1e1e", fg="#ffffff").grid(row=0, column=0, sticky="w", padx=(0, 5))
         
-        self.material_var = tk.StringVar(value="Select Material...")
+        self.material_var = tk.StringVar(value=t('refinery_dialog.select_material'))
         
         # Material selection button using standard app styling
         material_btn = tk.Button(manual_inner, textvariable=self.material_var,
@@ -929,7 +969,7 @@ class RefineryDialog:
         material_btn.grid(row=0, column=1, padx=5, sticky="w")
         
         # Quantity entry
-        tk.Label(manual_inner, text="Quantity:", bg="#1e1e1e", fg="#ffffff").grid(row=0, column=2, sticky="w", padx=(10, 5))
+        tk.Label(manual_inner, text=t('refinery_dialog.quantity_label'), bg="#1e1e1e", fg="#ffffff").grid(row=0, column=2, sticky="w", padx=(10, 5))
         
         self.quantity_var = tk.StringVar()
         quantity_entry = tk.Entry(manual_inner, textvariable=self.quantity_var, width=8,
@@ -940,10 +980,10 @@ class RefineryDialog:
                                 relief="sunken", bd=1)
         quantity_entry.grid(row=0, column=3, padx=5)
         
-        tk.Label(manual_inner, text="tons", bg="#1e1e1e", fg="#ffffff").grid(row=0, column=4, sticky="w", padx=(5, 0))
+        tk.Label(manual_inner, text=t('refinery_dialog.tons'), bg="#1e1e1e", fg="#ffffff").grid(row=0, column=4, sticky="w", padx=(5, 0))
         
         # Add button
-        add_btn = tk.Button(manual_inner, text="+ Add", 
+        add_btn = tk.Button(manual_inner, text=t('refinery_dialog.add_button'), 
                           command=self._add_manual_material,
                           bg="#4a9eff", fg="#ffffff", 
                           font=("Segoe UI", 9, "bold"))
@@ -958,14 +998,14 @@ class RefineryDialog:
             capacity = getattr(self.cargo_monitor, 'max_cargo', 0)
             
             summary_label = tk.Label(summary_frame, 
-                                   text=f"📦 Cargo Hold Detected: {cargo_total} tons",
+                                   text="📦 " + t('refinery_dialog.cargo_hold_detected', total=cargo_total),
                                    bg="#2d2d2d", fg="#ffffff", 
                                    font=("Segoe UI", 10))
             summary_label.pack(pady=8)
         
         # Quick add from cargo section
         if self.current_cargo_items:
-            cargo_frame = tk.LabelFrame(main_frame, text="📦 Quick Add from Current Cargo", 
+            cargo_frame = tk.LabelFrame(main_frame, text="📦 " + t('refinery_dialog.quick_add_cargo'), 
                                       bg="#1e1e1e", fg="#ffffff", 
                                       font=("Segoe UI", 10, "bold"))
             cargo_frame.pack(fill="x", pady=(0, 15))
@@ -1001,7 +1041,7 @@ class RefineryDialog:
                         row += 1
         
         # Current refinery contents
-        contents_frame = tk.LabelFrame(main_frame, text="⚗️ Current Refinery Contents", 
+        contents_frame = tk.LabelFrame(main_frame, text="⚗️ " + t('refinery_dialog.current_refinery'), 
                                      bg="#1e1e1e", fg="#ffffff", 
                                      font=("Segoe UI", 10, "bold"))
         contents_frame.pack(fill="x", pady=(0, 15))
@@ -1023,12 +1063,12 @@ class RefineryDialog:
         button_container = tk.Frame(contents_frame, bg="#1e1e1e")
         button_container.pack(pady=(0, 10))
         
-        edit_btn = tk.Button(button_container, text="Edit Selected", 
+        edit_btn = tk.Button(button_container, text=t('refinery_dialog.edit_selected'), 
                            command=self._edit_selected,
                            bg="#4a9eff", fg="#ffffff")
         edit_btn.pack(side="left", padx=(0, 5))
         
-        remove_btn = tk.Button(button_container, text="Remove Selected", 
+        remove_btn = tk.Button(button_container, text=t('refinery_dialog.remove_selected'), 
                              command=self._remove_selected,
                              bg="#ff6b6b", fg="#ffffff")
         remove_btn.pack(side="left")
@@ -1038,7 +1078,7 @@ class RefineryDialog:
         self.summary_frame.pack(fill="x", pady=(0, 15))
         
         self.summary_label = tk.Label(self.summary_frame, 
-                                    text="Refinery Total: 0 tons",
+                                    text=t('dialogs.refinery_total', count=0),
                                     bg="#2d2d2d", fg="#ffffff", 
                                     font=("Segoe UI", 10, "bold"))
         self.summary_label.pack(pady=8)
@@ -1047,17 +1087,17 @@ class RefineryDialog:
         button_frame = tk.Frame(main_frame, bg="#1e1e1e")
         button_frame.pack(fill="x")
         
-        clear_btn = tk.Button(button_frame, text="Clear All", 
+        clear_btn = tk.Button(button_frame, text=t('refinery_dialog.clear_all'), 
                             command=self._clear_all,
                             bg="#666666", fg="#ffffff")
         clear_btn.pack(side="left")
         
-        cancel_btn = tk.Button(button_frame, text="Cancel", 
+        cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), 
                              command=self._cancel,
                              bg="#666666", fg="#ffffff")
         cancel_btn.pack(side="right", padx=(5, 0))
         
-        apply_btn = tk.Button(button_frame, text="Apply to Session", 
+        apply_btn = tk.Button(button_frame, text=t('refinery_dialog.apply_to_session'), 
                             command=self._apply,
                             bg="#4caf50", fg="#ffffff", 
                             font=("Segoe UI", 9, "bold"))
@@ -1073,11 +1113,9 @@ class RefineryDialog:
         current_total = sum(self.refinery_contents.values())
         if current_total + amount > 10.0:
             remaining_capacity = 10.0 - current_total
-            messagebox.showerror("Refinery Capacity Exceeded", 
-                               f"Refinery capacity is 10t maximum.\n"
-                               f"Current: {current_total}t\n"
-                               f"Available: {remaining_capacity}t\n"
-                               f"Cannot add {amount}t")
+            messagebox.showerror(t('refinery_dialog.capacity_exceeded_title'), 
+                               t('refinery_dialog.capacity_exceeded_msg', 
+                                 current=current_total, available=remaining_capacity, amount=amount))
             return
             
         if material in self.refinery_contents:
@@ -1094,14 +1132,14 @@ class RefineryDialog:
         material = self.material_var.get()
         
         # Check if material is selected
-        if not material or material == "Select Material...":
-            messagebox.showerror("No Material Selected", "Please select a material before adding.")
+        if not material or material == t('refinery_dialog.select_material'):
+            messagebox.showerror(t('dialogs.error'), t('refinery_dialog.select_material_error'))
             return
             
         try:
             quantity_str = self.quantity_var.get().strip()
             if not quantity_str:
-                messagebox.showerror("No Quantity Entered", "Please enter a quantity.")
+                messagebox.showerror(t('dialogs.error'), t('refinery_dialog.invalid_quantity'))
                 return
                 
             quantity = float(quantity_str)
@@ -1112,11 +1150,9 @@ class RefineryDialog:
             current_total = sum(self.refinery_contents.values())
             if current_total + quantity > 10.0:
                 remaining_capacity = 10.0 - current_total
-                messagebox.showerror("Refinery Capacity Exceeded", 
-                                   f"Refinery capacity is 10t maximum.\n"
-                                   f"Current: {current_total}t\n"
-                                   f"Available: {remaining_capacity}t\n"
-                                   f"Cannot add {quantity}t")
+                messagebox.showerror(t('refinery_dialog.capacity_exceeded_title'), 
+                                   t('refinery_dialog.capacity_exceeded_msg',
+                                     current=current_total, available=remaining_capacity, amount=quantity))
                 return
                 
             if material in self.refinery_contents:
@@ -1167,7 +1203,7 @@ class RefineryDialog:
         """Edit the quantity of selected material"""
         selection = self.contents_listbox.curselection()
         if not selection:
-            messagebox.showwarning("No Selection", "Please select a material to edit.")
+            messagebox.showwarning(t('dialogs.warning'), t('refinery_dialog.select_material_error'))
             return
             
         index = selection[0]
@@ -1192,7 +1228,7 @@ class RefineryDialog:
         """Show a custom dark-themed edit quantity dialog positioned near parent"""
         # Create dialog window
         edit_dialog = tk.Toplevel(self.dialog)
-        edit_dialog.title("Edit Material Quantity")
+        edit_dialog.title(t('refinery_dialog.edit_quantity_title'))
         edit_dialog.geometry("400x200")
         edit_dialog.configure(bg="#1e1e1e")
         edit_dialog.resizable(False, False)
@@ -1231,13 +1267,13 @@ class RefineryDialog:
         main_frame.pack(fill="both", expand=True)
         
         # Title
-        title_label = tk.Label(main_frame, text=f"Edit {material} Quantity", 
+        title_label = tk.Label(main_frame, text=t('refinery_dialog.edit_quantity_prompt', material=material), 
                               bg="#1e1e1e", fg="#ffffff", 
                               font=("Segoe UI", 12, "bold"))
         title_label.pack(pady=(0, 15))
         
         # Current quantity info
-        info_label = tk.Label(main_frame, text=f"Current quantity: {current_qty} tons", 
+        info_label = tk.Label(main_frame, text=t('refinery_dialog.current_quantity', qty=current_qty), 
                              bg="#1e1e1e", fg="#cccccc", 
                              font=("Segoe UI", 10))
         info_label.pack(pady=(0, 10))
@@ -1246,7 +1282,7 @@ class RefineryDialog:
         entry_frame = tk.Frame(main_frame, bg="#1e1e1e")
         entry_frame.pack(pady=(0, 20))
         
-        tk.Label(entry_frame, text="New quantity:", bg="#1e1e1e", fg="#ffffff",
+        tk.Label(entry_frame, text=t('refinery_dialog.new_quantity'), bg="#1e1e1e", fg="#ffffff",
                 font=("Segoe UI", 10)).pack(side="left")
         
         quantity_var = tk.StringVar(value=str(current_qty))
@@ -1259,7 +1295,7 @@ class RefineryDialog:
                                 relief="sunken", bd=1)
         quantity_entry.pack(side="left", padx=(10, 5))
         
-        tk.Label(entry_frame, text="tons", bg="#1e1e1e", fg="#ffffff",
+        tk.Label(entry_frame, text=t('refinery_dialog.tons'), bg="#1e1e1e", fg="#ffffff",
                 font=("Segoe UI", 10)).pack(side="left")
         
         # Focus and select all text
@@ -1288,13 +1324,13 @@ class RefineryDialog:
             edit_dialog.destroy()
         
         # OK button
-        ok_btn = tk.Button(button_frame, text="OK", command=ok_clicked,
+        ok_btn = tk.Button(button_frame, text=t('common.ok'), command=ok_clicked,
                           bg="#4caf50", fg="#ffffff", 
                           font=("Segoe UI", 9, "bold"), width=8)
         ok_btn.pack(side="left", padx=(0, 10))
         
         # Cancel button  
-        cancel_btn = tk.Button(button_frame, text="Cancel", command=cancel_clicked,
+        cancel_btn = tk.Button(button_frame, text=t('common.cancel'), command=cancel_clicked,
                               bg="#666666", fg="#ffffff", 
                               font=("Segoe UI", 9), width=8)
         cancel_btn.pack(side="left")
@@ -1324,15 +1360,15 @@ class RefineryDialog:
     def _update_summary(self):
         """Update the summary label"""
         total = sum(self.refinery_contents.values())
-        self.summary_label.configure(text=f"Refinery Total: {total} tons")
+        self.summary_label.configure(text=t('refinery_dialog.refinery_total', total=total))
         
         # Update final calculation if we have cargo data
         if self.cargo_monitor:
             cargo_total = getattr(self.cargo_monitor, 'current_cargo', 0)
             final_total = cargo_total + total
             
-            summary_text = f"Refinery Total: +{total} tons\n"
-            summary_text += f"Final Total: {cargo_total} + {total} = {final_total} tons"
+            summary_text = t('refinery_dialog.refinery_total', total=total) + "\n"
+            summary_text += t('refinery_dialog.final_total', cargo=cargo_total, refinery=total, total=final_total)
             self.summary_label.configure(text=summary_text)
     
     def _cancel(self):
@@ -1361,7 +1397,7 @@ class RefineryDialog:
         
         # Create selection window
         selector = tk.Toplevel(self.dialog)
-        selector.title("Select Material")
+        selector.title(t('refinery_dialog.select_material_title'))
         selector.geometry("400x500")
         selector.configure(bg="#1e1e1e")
         selector.resizable(False, False)
@@ -1385,7 +1421,7 @@ class RefineryDialog:
         selector.geometry(f"400x500+{x}+{y}")
         
         # Title
-        title_label = tk.Label(selector, text="Select Mining Material", 
+        title_label = tk.Label(selector, text=t('refinery_dialog.select_mining_material'), 
                               bg="#1e1e1e", fg="#ffffff", 
                               font=("Segoe UI", 12, "bold"))
         title_label.pack(pady=15)
@@ -1394,7 +1430,7 @@ class RefineryDialog:
         search_frame = tk.Frame(selector, bg="#1e1e1e")
         search_frame.pack(fill="x", padx=20, pady=(0, 10))
         
-        tk.Label(search_frame, text="Search:", bg="#1e1e1e", fg="#ffffff").pack(side="left")
+        tk.Label(search_frame, text=t('refinery_dialog.search'), bg="#1e1e1e", fg="#ffffff").pack(side="left")
         search_var = tk.StringVar()
         search_entry = tk.Entry(search_frame, textvariable=search_var, bg="#404040", fg="#ffffff")
         search_entry.pack(side="left", fill="x", expand=True, padx=(5, 0))
@@ -1413,18 +1449,19 @@ class RefineryDialog:
         materials_list.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=materials_list.yview)
         
-        # Populate list
+        # Populate list with localized material names
         materials = list(MINING_MATERIALS.keys())
         for material in sorted(materials):
-            materials_list.insert(tk.END, material)
+            materials_list.insert(tk.END, get_material(material))
         
         # Search function
         def filter_materials(*args):
             search_term = search_var.get().lower()
             materials_list.delete(0, tk.END)
             for material in sorted(materials):
-                if search_term in material.lower():
-                    materials_list.insert(tk.END, material)
+                localized = get_material(material)
+                if search_term in localized.lower():
+                    materials_list.insert(tk.END, localized)
         
         search_var.trace('w', filter_materials)
         
@@ -1442,11 +1479,11 @@ class RefineryDialog:
         def cancel_selection():
             selector.destroy()
         
-        select_btn = tk.Button(btn_frame, text="Select", command=select_material,
+        select_btn = tk.Button(btn_frame, text=t('common.select'), command=select_material,
                              bg="#4a9eff", fg="#ffffff", font=("Segoe UI", 9, "bold"))
         select_btn.pack(side="right", padx=(5, 0))
         
-        cancel_btn = tk.Button(btn_frame, text="Cancel", command=cancel_selection,
+        cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=cancel_selection,
                              bg="#666666", fg="#ffffff", font=("Segoe UI", 9))
         cancel_btn.pack(side="right")
         
@@ -1647,6 +1684,7 @@ class CargoMonitor:
             "type9_military": "Type-10 Defender",
             "lakonminer": "Type-11 Prospector",
             "corsair": "Corsair",
+            "explorer_nx": "Caspian Explorer",
         }
         
         # Initialize user database and journal parser for real-time hotspot tracking
@@ -1664,10 +1702,20 @@ class CargoMonitor:
             self.user_db = UserDatabase()
             print(f"DEBUG: CargoMonitor actual database path: {self.user_db.db_path}")
         self.current_system = None  # Track current system for hotspot detection
+        self.last_known_system = None  # Track last system for visit counting (to detect Location event arrivals)
+        self._last_visit_event = None  # Track last visit event to prevent FSDJump+CarrierJump double counting
         
         # Initialize JournalParser for proper Scan and SAASignalsFound processing
         # Add callback to notify Ring Finder when new hotspots are added
         self.journal_parser = JournalParser(self.journal_dir, self.user_db, self._on_hotspot_added)
+        
+        # Initialize last_known_system from database to handle offline carrier jumps
+        # This uses the most recently visited system that the app tracked before shutdown
+        # If player moved while app was offline, Location event will show different system -> count visit
+        try:
+            self.last_known_system = self.user_db.get_last_visited_system()
+        except Exception as e:
+            pass
         
         # Flag to track pending Ring Finder refreshes
         self._pending_ring_finder_refresh = False
@@ -1874,7 +1922,7 @@ class CargoMonitor:
             return
             
         self.cargo_window = tk.Toplevel()
-        self.cargo_window.title("Elite Mining - Cargo Monitor")
+        self.cargo_window.title(t('dialogs.cargo_monitor_title'))
         
         # Set app icon using centralized function
         try:
@@ -1911,7 +1959,7 @@ class CargoMonitor:
         main_frame.pack(fill="both", expand=True)
         
         # Title label
-        title_label = tk.Label(main_frame, text="🚛 Cargo Hold Monitor", 
+        title_label = tk.Label(main_frame, text="🚛 " + t('dialogs.cargo_hold_monitor'), 
                               bg="#1e1e1e", fg="#00FF00", 
                               font=("Segoe UI", 10, "bold"))
         title_label.pack(anchor="w")
@@ -1961,7 +2009,7 @@ class CargoMonitor:
         # Status label for journal monitoring
         self.status_label = tk.Label(
             main_frame,
-            text="🔍 Monitoring Elite Dangerous journal...",
+            text="🔍 " + t('dialogs.monitoring_journal'),
             bg="#1e1e1e",
             fg="#888888",
             font=("Segoe UI", 8, "italic")
@@ -1971,7 +2019,7 @@ class CargoMonitor:
         # Capacity status label
         self.capacity_label = tk.Label(
             main_frame,
-            text="⚙️ Waiting for ship loadout...",
+            text="⚙️ " + t('dialogs.waiting_loadout'),
             bg="#1e1e1e",
             fg="#666666",
             font=("Segoe UI", 8, "italic")
@@ -1981,7 +2029,7 @@ class CargoMonitor:
         # Refinery note - discrete version
         refinery_note = tk.Label(
             main_frame,
-            text="ℹ️ Note: Refinery hopper contents excluded",
+            text="ℹ️ " + t('dialogs.refinery_note'),
             bg="#1e1e1e",
             fg="#888888",
             font=("Segoe UI", 7, "italic"),
@@ -1994,7 +2042,7 @@ class CargoMonitor:
         close_frame = tk.Frame(main_frame, bg="#1e1e1e")
         close_frame.pack(anchor="w", pady=(10, 0))
         
-        close_btn = tk.Button(close_frame, text="✕ Close", 
+        close_btn = tk.Button(close_frame, text="✕ " + t('common.close'), 
                              command=self.close_window,
                              bg="#444444", fg="#ffffff",
                              activebackground="#555555", activeforeground="#ffffff",
@@ -2203,7 +2251,7 @@ class CargoMonitor:
     def force_cargo_update(self):
         """Force read the latest cargo data from Cargo.json and journal"""
         if hasattr(self, 'status_label'):
-            self.status_label.configure(text="🔄 Forcing cargo update...")
+            self.status_label.configure(text="🔄 " + t('dialogs.forcing_update'))
         
         # First, try to read from Cargo.json (most accurate)
         if self.read_cargo_json():
@@ -2274,11 +2322,11 @@ class CargoMonitor:
                             self.status_label.configure(text=f"⚠️ {count}t detected - need detailed data (open cargo in game)")
                 else:
                     if hasattr(self, 'status_label'):
-                        self.status_label.configure(text="❌ No cargo data - open cargo hold in Elite")
+                        self.status_label.configure(text="❌ " + t('dialogs.no_cargo_data'))
                         
         except Exception as e:
             if hasattr(self, 'status_label'):
-                self.status_label.configure(text="❌ Error reading journal file")
+                self.status_label.configure(text="❌ " + t('dialogs.journal_read_error'))
     
     def show_cargo_instructions(self):
         """Show instructions for getting detailed cargo data"""
@@ -2317,7 +2365,7 @@ cargo panel forces Elite to write detailed inventory data.
         # Create help window
         try:
             help_window = tk.Toplevel(self.cargo_window)
-            help_window.title("Cargo Monitor Help")
+            help_window.title(t('dialogs.cargo_monitor_help'))
             help_window.geometry("600x500")
             help_window.configure(bg="#2c3e50")
             
@@ -2341,7 +2389,7 @@ cargo panel forces Elite to write detailed inventory data.
             text_widget.config(state=tk.DISABLED)
             
             # Add close button
-            close_btn = tk.Button(help_window, text="✅ Got It!", 
+            close_btn = tk.Button(help_window, text="✅ " + t('dialogs.got_it'), 
                                  command=help_window.destroy,
                                  bg="#27ae60", fg="white", 
                                  font=("Arial", 12, "bold"))
@@ -2546,7 +2594,7 @@ cargo panel forces Elite to write detailed inventory data.
                 self.cargo_text.insert(tk.END, "💡 Alternative: Buy/sell anything at a station\n")
                 self.cargo_text.insert(tk.END, "   or jettison 1 unit of cargo (then scoop it back)")
             else:
-                self.cargo_text.insert(tk.END, "�🔸 Empty cargo hold\n\n")
+                self.cargo_text.insert(tk.END, f"🔸 {t('sidebar.empty_cargo')}\n\n")
                 self.cargo_text.insert(tk.END, "📋 To see your actual cargo:\n")
                 self.cargo_text.insert(tk.END, "1. Open Elite Dangerous\n")
                 self.cargo_text.insert(tk.END, "2. Open your cargo hold (4 key)\n") 
@@ -2819,13 +2867,13 @@ cargo panel forces Elite to write detailed inventory data.
         try:
             if not os.path.exists(self.journal_dir):
                 if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="❌ Elite Dangerous folder not found")
+                    self.status_label.configure(text="❌ " + t('dialogs.ed_folder_not_found'))
                 return
                 
             journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
             if not journal_files:
                 if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="❌ No journal files found")
+                    self.status_label.configure(text="❌ " + t('dialogs.no_journal_files'))
                 return
                 
             # Get the most recent journal file
@@ -2843,7 +2891,7 @@ cargo panel forces Elite to write detailed inventory data.
         except Exception as e:
             print(f"Error finding journal files: {e}")
             if hasattr(self, 'status_label'):
-                self.status_label.configure(text="❌ Journal monitoring error")
+                self.status_label.configure(text="❌ " + t('dialogs.journal_monitor_error'))
     
     def scan_journal_for_cargo_capacity(self, journal_file):
         """Scan existing journal file for the most recent CargoCapacity, current system location, and ring metadata"""
@@ -2930,9 +2978,15 @@ cargo panel forces Elite to write detailed inventory data.
                     # Look for current system location (existing logic)
                     elif not location_found and event_type in ["FSDJump", "Location", "CarrierJump"]:
                         system_name = event.get("StarSystem", "")
+                        print(f"DEBUG: Found {event_type} event with system: {system_name}")
                         if system_name:
                             self.current_system = system_name
                             location_found = True
+                            
+                            # Update last known system (but don't count visit here)
+                            # Visit counting is handled by _background_journal_catchup
+                            self.last_known_system = system_name
+                            
                             # Update distance calculator home/FC distances in main app
                             if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_home_fc_distances'):
                                 try:
@@ -3292,7 +3346,7 @@ cargo panel forces Elite to write detailed inventory data.
                                 "ShipyardTransfer", "SwitchToMainShip", "VehicleSwitch", "Commander", "Location"]:
                 # Handle ship changes - aggressive capacity refresh
                 if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="🚀 Ship changed - updating cargo capacity...")
+                    self.status_label.configure(text="🚀 " + t('dialogs.ship_changed'))
                 
                 # Multiple refresh attempts to ensure we get the right capacity
                 refresh_success = False
@@ -3308,7 +3362,7 @@ cargo panel forces Elite to write detailed inventory data.
                 # 3. If still no valid capacity, clear data and force a fresh read
                 if not refresh_success:
                     if hasattr(self, 'status_label'):
-                        self.status_label.configure(text="⚠️ Capacity detection failed - waiting for game data...")
+                        self.status_label.configure(text="⚠️ " + t('dialogs.capacity_failed'))
                     self.cargo_items.clear()
                     self.current_cargo = 0
                     self.max_cargo = 200  # Reset to default
@@ -3536,7 +3590,7 @@ cargo panel forces Elite to write detailed inventory data.
                 if is_cargo_related:
                     print(f"DEBUG: Cargo module change detected - Event: {event_type}, Slot: {slot}, Item: {item}")
                     if hasattr(self, 'status_label'):
-                        self.status_label.configure(text="⚙️ Cargo module changed - updating capacity...")
+                        self.status_label.configure(text="⚙️ " + t('dialogs.cargo_module_changed'))
                     
                     # Force immediate capacity refresh
                     refresh_success = self.refresh_ship_capacity()
@@ -3564,38 +3618,62 @@ cargo panel forces Elite to write detailed inventory data.
                         except:
                             pass
                     
-                    # Only count actual arrivals (FSDJump/CarrierJump) for visit tracking
-                    # Location events fire on game load - not a new visit
-                    if event_type in ["FSDJump", "CarrierJump"]:
-                        timestamp = event.get("timestamp", "")
-                        system_address = event.get("SystemAddress")
-                        star_pos = event.get("StarPos", [])
+                    # Visit tracking logic:
+                    # - FSDJump/CarrierJump: Player arrived at system - count once per timestamp
+                    #   (carrier owner gets both events with same timestamp - only count once)
+                    # - Location: Game load - count only if system is DIFFERENT from last known (player moved while offline)
                     
-                        print(f"DEBUG: Event data - timestamp: {timestamp}, system_address: {system_address}, star_pos: {star_pos}")
-                        
+                    timestamp = event.get("timestamp", "")
+                    system_address = event.get("SystemAddress")
+                    star_pos = event.get("StarPos", [])
+                    
+                    should_count_visit = False
+                    
+                    if event_type in ["FSDJump", "CarrierJump"]:
+                        # Player arrived at system via jump (ship or carrier)
+                        # Only count if we haven't already processed an event with same timestamp
+                        # (carrier owner gets both FSDJump and CarrierJump with same timestamp)
+                        if self._last_visit_event and self._last_visit_event[0] == timestamp:
+                            should_count_visit = False
+                        else:
+                            should_count_visit = True
+                            self._last_visit_event = (timestamp, event_type)
+                            
+                    elif event_type == "Location":
+                        # Game load - only count if player is in a DIFFERENT system than before
+                        # This handles: carrier jump while offline, respawn in new system, etc.
+                        if self.last_known_system is None:
+                            # First time tracking - don't count (initial game load)
+                            should_count_visit = False
+                        elif system_name != self.last_known_system:
+                            # Player moved to a different system (while offline or otherwise)
+                            should_count_visit = True
+                        else:
+                            # Same system - just a game restart, don't count
+                            should_count_visit = False
+                    
+                    # Update last known system
+                    self.last_known_system = system_name
+                    
+                    # Count the visit if applicable
+                    if should_count_visit:
                         coordinates = None
                         if len(star_pos) >= 3:
                             coordinates = (star_pos[0], star_pos[1], star_pos[2])
-                            print(f"DEBUG: Parsed coordinates: {coordinates}")
                         
                         try:
-                            print(f"DEBUG: Attempting to add visited system: {system_name}")
                             self.user_db.add_visited_system(
                                 system_name=system_name,
                                 visit_date=timestamp,
                                 system_address=system_address,
                                 coordinates=coordinates
                             )
-                            print(f"DEBUG: Successfully added visited system: {system_name}")
                             
                             # Update CMDR info display (for visits count, current system, etc.)
                             if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_cmdr_system_display'):
                                 self.main_app_ref.after(100, self.main_app_ref._update_cmdr_system_display)
                         except Exception as e:
-                            print(f"Error adding visited system: {e}")
-                            print(f"DEBUG: Full error details - system: {system_name}, timestamp: {timestamp}, address: {system_address}, coords: {coordinates}")
-                else:
-                    print(f"DEBUG: No system name found in {event_type} event")
+                            pass
                         
             elif event_type == "Scan":
                 # Process Scan events through JournalParser to store ring info
@@ -3780,7 +3858,7 @@ cargo panel forces Elite to write detailed inventory data.
         except Exception as e:
             # If Status.json fails, try to recover from journal
             if hasattr(self, 'status_label'):
-                self.status_label.configure(text="⚠️ Status.json error - checking journal...")
+                self.status_label.configure(text="⚠️ " + t('dialogs.status_json_error'))
             self._recover_capacity_from_journal()
         return False
     
@@ -3817,15 +3895,15 @@ cargo panel forces Elite to write detailed inventory data.
         """Delayed capacity refresh as last resort"""
         try:
             if hasattr(self, 'status_label'):
-                self.status_label.configure(text="🔄 Retrying capacity detection...")
+                self.status_label.configure(text="🔄 " + t('dialogs.retrying_capacity'))
             
             # Try all methods again
             if self.refresh_ship_capacity() or self._validate_cargo_capacity():
                 if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="✅ Capacity detected successfully")
+                    self.status_label.configure(text="✅ " + t('dialogs.capacity_detected'))
             else:
                 if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="⚠️ Using default capacity - open cargo in game to update")
+                    self.status_label.configure(text="⚠️ " + t('dialogs.default_capacity'))
         except Exception as e:
             pass
     
@@ -4728,13 +4806,13 @@ class App(tk.Tk):
             app_version=get_version()
         )
         self.eddn_sender.set_enabled(self.eddn_send_enabled.get() == 1)
-        print(f"✅ EDDN sender {'enabled' if self.eddn_send_enabled.get() == 1 else 'disabled'}")
+        print(f"[OK] EDDN sender {'enabled' if self.eddn_send_enabled.get() == 1 else 'disabled'}")
         
         # Initialize API uploader for session/hotspot sharing
         from api_uploader import APIUploader
         self.api_uploader = APIUploader()
         if self.api_uploader.enabled:
-            print(f"✅ API uploader enabled - endpoint: {self.api_uploader.api_url}")
+            print(f"[OK] API uploader enabled - endpoint: {self.api_uploader.api_url}")
             # Retry any queued uploads from previous sessions
             self.after(3000, lambda: self.api_uploader.retry_queued_uploads())
         else:
@@ -4754,7 +4832,7 @@ class App(tk.Tk):
         journal_dir = self.prospector_panel.journal_dir if hasattr(self, 'prospector_panel') else None
         if journal_dir and os.path.exists(journal_dir):
             file_watcher.add_watch(journal_dir, self._on_journal_file_change)
-            print(f"✅ Watching journal directory for Market.json updates")
+            print(f"[OK] Watching journal directory for Market.json updates")
 
         # Build UI - ProspectorPanel will scan latest journal and populate current_system
         self._build_ui()
@@ -4762,7 +4840,8 @@ class App(tk.Tk):
         # Set current system from ProspectorPanel's scan (already done during UI build)
         # ProspectorPanel._read_initial_location_from_journal() scans the latest file efficiently
         # Use that result instead of doing another expensive full-file scan
-        if self.prospector_panel and self.prospector_panel.last_system:
+        # Note: prospector_panel.last_system may not be populated yet - check is done in _check_offline_arrival()
+        if hasattr(self, 'prospector_panel') and self.prospector_panel and self.prospector_panel.last_system:
             self.current_system = self.prospector_panel.last_system
         
         # Initialize VoiceAttack variables after UI is built
@@ -4773,6 +4852,10 @@ class App(tk.Tk):
         
         # Auto-scan new journal entries after startup
         self.after(2000, self._auto_scan_journals_startup)  # Check after 2 seconds
+        
+        # Background 14-day journal catchup scan (silent, on thread)
+        # This handles visit tracking for when app wasn't running
+        self.after(5000, self._background_journal_catchup)  # Start after 5 seconds
 
     def _setup_keyboard_shortcuts(self):
         """Setup keyboard shortcuts for the application"""
@@ -4810,7 +4893,7 @@ class App(tk.Tk):
         from config import load_theme
         _current_theme = load_theme()
         # Button shows what you'll switch TO (opposite of current)
-        _theme_btn_text = "Dark Theme" if _current_theme == "elite_orange" else "Orange Theme"
+        _theme_btn_text = t('sidebar.dark_theme') if _current_theme == "elite_orange" else t('sidebar.orange_theme')
         # Style button to match current theme
         if _current_theme == "elite_orange":
             _btn_bg, _btn_fg = "#1a1a1a", "#ff8c00"
@@ -4840,7 +4923,7 @@ class App(tk.Tk):
         # Mining Session tab (moved from Dashboard, with all its sub-tabs)
         mining_session_tab = ttk.Frame(self.notebook, padding=8)
         self._build_mining_session_tab(mining_session_tab)
-        self.notebook.add(mining_session_tab, text="Mining Session")
+        self.notebook.add(mining_session_tab, text=t('tabs.mining_session'))
 
         # Distance Calculator tab (build FIRST so distance_calculator exists for other tabs)
         distance_tab = ttk.Frame(self.notebook, padding=8)
@@ -4849,25 +4932,25 @@ class App(tk.Tk):
         # Hotspots Finder tab (depends on distance_calculator)
         ring_finder_tab = ttk.Frame(self.notebook, padding=8)
         self._setup_ring_finder(ring_finder_tab)
-        self.notebook.add(ring_finder_tab, text="Hotspots Finder")
+        self.notebook.add(ring_finder_tab, text=t('tabs.hotspots_finder'))
 
         # Commodity Market tab
         marketplace_tab = ttk.Frame(self.notebook, padding=8)
         self._build_marketplace_tab(marketplace_tab)
-        self.notebook.add(marketplace_tab, text="Commodity Market")
+        self.notebook.add(marketplace_tab, text=t('tabs.commodity_market'))
         
         # Add Distance Calculator tab now (built earlier but added here for correct order)
-        self.notebook.add(distance_tab, text="Distance Calculator")
+        self.notebook.add(distance_tab, text=t('tabs.distance_calculator'))
 
         # VoiceAttack Controls tab (combined Firegroups + Mining Controls)
         voiceattack_tab = ttk.Frame(self.notebook, padding=8)
         self._build_voiceattack_controls_tab(voiceattack_tab)
-        self.notebook.add(voiceattack_tab, text="VoiceAttack Controls")
+        self.notebook.add(voiceattack_tab, text=t('tabs.voiceattack_controls'))
         
         # Bookmarks tab - Mining location bookmarks
         bookmarks_tab = ttk.Frame(self.notebook, padding=8)
         self._build_bookmarks_tab(bookmarks_tab)
-        self.notebook.add(bookmarks_tab, text="Bookmarks")
+        self.notebook.add(bookmarks_tab, text=t('tabs.bookmarks'))
         
         # Auto-populate marketplace system after UI is built
         self.after(3000, self._populate_marketplace_system)
@@ -4875,12 +4958,12 @@ class App(tk.Tk):
         # Settings tab (simplified with remaining sub-tabs)
         settings_tab = ttk.Frame(self.notebook, padding=8)
         self._build_settings_notebook(settings_tab)
-        self.notebook.add(settings_tab, text="Settings")
+        self.notebook.add(settings_tab, text=t('tabs.settings'))
 
         # About tab
         about_tab = ttk.Frame(self.notebook, padding=8)
         self._build_about_tab(about_tab)
-        self.notebook.add(about_tab, text="About")
+        self.notebook.add(about_tab, text=t('tabs.about'))
 
         # Actions row (global)
         actions = ttk.Frame(content_frame)
@@ -4923,7 +5006,7 @@ class App(tk.Tk):
             print(f"Could not load status bar logo: {e}")
         
         # Labels for mixed colors (white labels, yellow values)
-        self.cmdr_label_prefix = tk.Label(info_frame, text="CMDR:", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.cmdr_label_prefix = tk.Label(info_frame, text=t('status_bar.cmdr'), fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.system_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
@@ -4949,7 +5032,7 @@ class App(tk.Tk):
         # Help indicator for Tot Syst (updates on game restart)
         self.total_systems_help = tk.Label(info_frame, text="(?)", fg="gray", bg=_info_bg, font=("Segoe UI", 9))
         self.total_systems_help.grid(row=0, column=11, sticky="w")
-        ToolTip(self.total_systems_help, "Total systems visited (from game stats). Updates when Elite Dangerous is restarted.")
+        ToolTip(self.total_systems_help, t('status_bar.total_systems_tooltip'))
         
         # Load CMDR name in background
         self.after(500, self._update_cmdr_system_display)
@@ -5003,7 +5086,7 @@ class App(tk.Tk):
         parent_frame.rowconfigure(0, weight=1)
         
         # Create a LabelFrame to provide visual border around cargo monitor
-        cargo_frame = ttk.LabelFrame(parent_frame, text="🚛 Cargo Monitor", padding=6)
+        cargo_frame = ttk.LabelFrame(parent_frame, text="🚛 " + t('sidebar.cargo_monitor'), padding=6)
         cargo_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=(2, 0))  # sticky="nsew" - expand in all directions
         cargo_frame.columnconfigure(0, weight=1)
         cargo_frame.rowconfigure(1, weight=1)  # Content row expands
@@ -5014,7 +5097,7 @@ class App(tk.Tk):
         header_frame.columnconfigure(1, weight=1)
         
         # Title and summary in one line
-        title_label = ttk.Label(header_frame, text="Cargo Status:", font=("Segoe UI", 10, "bold"))
+        title_label = ttk.Label(header_frame, text=t('sidebar.cargo_status'), font=("Segoe UI", 10, "bold"))
         title_label.grid(row=0, column=0, sticky="w")
         
         self.integrated_cargo_summary = ttk.Label(header_frame, text="0/200t (0%) - Empty", 
@@ -5097,9 +5180,9 @@ class App(tk.Tk):
         
         if not cargo.cargo_items:
             if cargo.current_cargo > 0:
-                self.integrated_cargo_text.insert(tk.END, f"📊 {cargo.current_cargo}t total\n💡 No item details")
+                self.integrated_cargo_text.insert(tk.END, f"📊 {cargo.current_cargo}t {t('sidebar.total')}\n💡 {t('sidebar.no_item_details')}")
             else:
-                self.integrated_cargo_text.insert(tk.END, "📦 Empty cargo hold\n⛏️ Start mining!")
+                self.integrated_cargo_text.insert(tk.END, f"📦 {t('sidebar.empty_cargo')}\n⛏️ {t('sidebar.start_mining')}")
         else:
             # Vertical list with better alignment - show ALL items
             sorted_items = sorted(cargo.cargo_items.items(), key=lambda x: x[1], reverse=True)
@@ -5112,6 +5195,10 @@ class App(tk.Tk):
                 # Abbreviate only "Low Temperature Diamonds" to prevent truncation
                 if display_name in ['Low Temp. Diamonds', 'Low Temperature Diamonds']:
                     display_name = 'LTD'
+                
+                # Localize limpet to Drohne for German
+                if "limpet" in item_name.lower():
+                    display_name = t('sidebar.limpet')
                 
                 # Simple icons with better spacing
                 if "limpet" in item_name.lower():
@@ -5138,7 +5225,7 @@ class App(tk.Tk):
         # Display Engineering Materials section
         if cargo.materials_collected:
             self.integrated_cargo_text.insert(tk.END, "\n\n" + "─" * 25)
-            self.integrated_cargo_text.insert(tk.END, "\nEngineering Materials 🔩\n")
+            self.integrated_cargo_text.insert(tk.END, "\n" + t('mining_session.engineering_materials') + " 🔩\n")
             
             # Sort materials alphabetically
             sorted_materials = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
@@ -5166,7 +5253,7 @@ class App(tk.Tk):
         
         # Insert refinery note with formatting - get position before inserting
         note_start_index = self.integrated_cargo_text.index(tk.INSERT)
-        self.integrated_cargo_text.insert(tk.END, "\nNote: Contents in Refinery not included in totals")
+        self.integrated_cargo_text.insert(tk.END, "\n" + t('sidebar.refinery_note'))
         note_end_index = self.integrated_cargo_text.index(tk.INSERT)
         
         # Apply formatting to the note text only
@@ -5346,18 +5433,31 @@ class App(tk.Tk):
         frame.grid_columnconfigure(2, weight=0, minsize=150)
         frame.grid_columnconfigure(3, weight=1,  minsize=150)
 
-        header = ttk.Label(frame, text="Assign Firegroups (A–H) and Primary / Secondary Fire Buttons",
+        # Tool name translation mapping
+        tool_translations = {
+            "Mining lasers/MVR:": "voiceattack.tool_mining_lasers",
+            "Discovery scanner:": "voiceattack.tool_discovery_scanner",
+            "Prospector limpet:": "voiceattack.tool_prospector",
+            "Pulse wave analyser:": "voiceattack.tool_pulse_wave",
+            "Seismic charge launcher:": "voiceattack.tool_seismic",
+            "Weapons:": "voiceattack.tool_weapons",
+            "Sub-surface displacement missile:": "voiceattack.tool_ssm",
+        }
+
+        header = ttk.Label(frame, text=t('voiceattack.assign_firegroups'),
                            font=("Segoe UI", 11, "bold"))
         header.grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 8))
 
-        ttk.Label(frame, text="Firegroup").grid(row=1, column=1, sticky="w", padx=(0, 6))
-        ttk.Label(frame, text="Primary Fire Button").grid(row=1, column=2, sticky="w")
-        ttk.Label(frame, text="Secondary Fire Button").grid(row=1, column=3, sticky="w")
+        ttk.Label(frame, text=t('voiceattack.firegroup')).grid(row=1, column=1, sticky="w", padx=(0, 6))
+        ttk.Label(frame, text=t('voiceattack.primary_fire')).grid(row=1, column=2, sticky="w")
+        ttk.Label(frame, text=t('voiceattack.secondary_fire')).grid(row=1, column=3, sticky="w")
 
         row = 2
         for tool in TOOL_ORDER:
             cfg = VA_VARS[tool]
-            ttk.Label(frame, text=tool).grid(row=row, column=0, sticky="w", pady=3)
+            # Get localized tool name
+            display_tool = t(tool_translations.get(tool, tool)) if tool in tool_translations else tool
+            ttk.Label(frame, text=display_tool).grid(row=row, column=0, sticky="w", pady=3)
 
             if cfg["fg"] is not None:
                 cb = ttk.Combobox(frame, values=FIREGROUPS, width=6, textvariable=self.tool_fg[tool], state="readonly")
@@ -5366,8 +5466,8 @@ class App(tk.Tk):
                 ttk.Label(frame, text="—").grid(row=row, column=1, sticky="w")
 
             if cfg["btn"] is not None:
-                tk.Radiobutton(frame, text="Primary", value=1, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), padx=4, pady=2, anchor="w").grid(row=row, column=2, sticky="w")
-                tk.Radiobutton(frame, text="Secondary", value=2, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), padx=4, pady=2, anchor="w").grid(row=row, column=3, sticky="w")
+                tk.Radiobutton(frame, text=t('voiceattack.primary'), value=1, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), padx=4, pady=2, anchor="w").grid(row=row, column=2, sticky="w")
+                tk.Radiobutton(frame, text=t('voiceattack.secondary'), value=2, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), padx=4, pady=2, anchor="w").grid(row=row, column=3, sticky="w")
             else:
                 ttk.Label(frame, text="—").grid(row=row, column=2, sticky="w")
                 ttk.Label(frame, text="—").grid(row=row, column=3, sticky="w")
@@ -5384,7 +5484,7 @@ class App(tk.Tk):
         # Important notice (always yellow for visibility)
         important_label = tk.Label(
             card, 
-            text="⚠ Important: Mining automation requires all firegroups (A-H) in-game to be populated - empty groups prevent switching.",
+            text=t('voiceattack.important_firegroups'),
             font=("Segoe UI", 9, "bold"), 
             anchor="w", 
             bg=theme_bg, 
@@ -5394,14 +5494,14 @@ class App(tk.Tk):
         )
         important_label.grid(row=0, column=0, sticky="w", padx=8, pady=(60, 8))
 
-        tip_header = tk.Label(card, text="Tips/help:", font=("Segoe UI", 9, "bold"), anchor="w", bg=theme_bg, fg=theme_fg, borderwidth=0, relief="flat", highlightthickness=0)
+        tip_header = tk.Label(card, text=t('voiceattack.tips_help'), font=("Segoe UI", 9, "bold"), anchor="w", bg=theme_bg, fg=theme_fg, borderwidth=0, relief="flat", highlightthickness=0)
         tip_header.grid(row=1, column=0, sticky="w", padx=8, pady=(10, 2))
 
         tips = [
-            "For core mining, Set Pulse Wave Analyser and Prospector Limpet to the same firegroup with different Fire Buttons.",
-            "Set your collector limpets to the same firegroup as your mining lasers and MVR.",
-            '"Clear and Jump" clears mass lock then enters supercruise, jumps to selected system, or drop from supercruise.',
-            'Use "Stop all profile commands" in VoiceAttack to interrupt any active sequence.',
+            t('voiceattack.tip_core_mining'),
+            t('voiceattack.tip_collector'),
+            t('voiceattack.tip_clear_jump'),
+            t('voiceattack.tip_stop_all'),
         ]
         r = 2
         for tip in tips:
@@ -5434,12 +5534,12 @@ class App(tk.Tk):
         # === ANNOUNCEMENTS SUB-TAB ===
         announcements_tab = ttk.Frame(self.settings_notebook, padding=8)
         self._build_announcements_tab(announcements_tab)
-        self.settings_notebook.add(announcements_tab, text="Announcements")
+        self.settings_notebook.add(announcements_tab, text=t('settings.announcements'))
 
         # === GENERAL SETTINGS SUB-TAB ===
         general_tab = ttk.Frame(self.settings_notebook, padding=8)
         self._build_interface_options_tab(general_tab)
-        self.settings_notebook.add(general_tab, text="General Settings")
+        self.settings_notebook.add(general_tab, text=t('settings.general_settings'))
 
     # ---------- About tab ----------
     def _build_about_tab(self, frame: ttk.Frame) -> None:
@@ -5498,16 +5598,16 @@ class App(tk.Tk):
                  fg="#888888", bg=_about_bg).pack()
         
         # Description
-        tk.Label(center_frame, text="Mining companion for Elite Dangerous", 
+        tk.Label(center_frame, text=t('about.description'), 
                  font=("Segoe UI", 11), fg="#e0e0e0", bg=_about_bg).pack(pady=(10, 20))
         
         # Separator
         tk.Frame(center_frame, height=1, bg="#444444", width=400).pack(pady=10)
         
         # Copyright and license
-        tk.Label(center_frame, text="© 2024-2025 CMDR ViperDude", 
+        tk.Label(center_frame, text=t('about.copyright'), 
                  font=("Segoe UI", 10), fg="#e0e0e0", bg=_about_bg).pack()
-        tk.Label(center_frame, text="Licensed under GNU General Public License v3.0", 
+        tk.Label(center_frame, text=t('about.license'), 
                  font=("Segoe UI", 9), fg="#888888", bg=_about_bg).pack()
         
         # Separator
@@ -5519,11 +5619,11 @@ class App(tk.Tk):
         
         # Define links
         links = [
-            ("Discord", "https://discord.gg/5dsF3UshRR"),
-            ("Reddit", "https://www.reddit.com/r/EliteDangerous/comments/1oflji3/elitemining_free_mining_hotspot_finder_app/"),
-            ("GitHub", "https://github.com/Viper-Dude/EliteMining"),
-            ("Documentation", "https://github.com/Viper-Dude/EliteMining#readme"),
-            ("Report Bug", "https://github.com/Viper-Dude/EliteMining/issues/new"),
+            (t('about.discord'), "https://discord.gg/5dsF3UshRR"),
+            (t('about.reddit'), "https://www.reddit.com/r/EliteDangerous/comments/1oflji3/elitemining_free_mining_hotspot_finder_app/"),
+            (t('about.github'), "https://github.com/Viper-Dude/EliteMining"),
+            (t('about.documentation'), "https://github.com/Viper-Dude/EliteMining#readme"),
+            (t('about.report_bug'), "https://github.com/Viper-Dude/EliteMining/issues/new"),
         ]
         
         def open_link(url):
@@ -5573,7 +5673,7 @@ class App(tk.Tk):
         # Support text on the left
         support_text = tk.Label(
             support_frame,
-            text="This app is free. Support future updates with a donation.",
+            text=t('about.donation_text'),
             wraplength=350,
             justify="left",
             fg="#cccccc",
@@ -5607,12 +5707,12 @@ class App(tk.Tk):
         # === MINING CONTROLS SUB-TAB ===
         mining_controls_tab = ttk.Frame(self.voiceattack_notebook, padding=8)
         self._build_timers_tab(mining_controls_tab)
-        self.voiceattack_notebook.add(mining_controls_tab, text="Mining Controls")
+        self.voiceattack_notebook.add(mining_controls_tab, text=t('voiceattack.mining_controls'))
 
         # === FIREGROUPS & FIRE BUTTONS SUB-TAB ===
         firegroups_tab = ttk.Frame(self.voiceattack_notebook, padding=8)
         self._build_fg_tab(firegroups_tab)
-        self.voiceattack_notebook.add(firegroups_tab, text="Firegroups & Fire Buttons")
+        self.voiceattack_notebook.add(firegroups_tab, text=t('voiceattack.firegroups'))
 
     def _build_bookmarks_tab(self, frame: ttk.Frame) -> None:
         """Build the Bookmarks tab - Mining location bookmarks"""
@@ -5629,7 +5729,7 @@ class App(tk.Tk):
         frame.rowconfigure(2, weight=1)
 
         # Basic announcement controls
-        ttk.Label(frame, text="Announcement Settings", font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
+        ttk.Label(frame, text=t('settings.announcement_settings'), font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
         
         # Check if prospector panel is available for advanced controls
         if hasattr(self, 'prospector_panel') and self.prospector_panel:
@@ -5658,39 +5758,48 @@ class App(tk.Tk):
                 
                 # Add announcement toggles if available
                 if hasattr(self, 'announcement_vars') and self.announcement_vars:
-                    ttk.Label(toggles_frame, text="Announcement Types:", font=("Segoe UI", 9, "bold")).pack(anchor="w")
+                    ttk.Label(toggles_frame, text=t('settings.announcement_types'), font=("Segoe UI", 9, "bold")).pack(anchor="w")
+                    
+                    # Localized display names and help texts for announcement toggles
+                    toggle_display = {
+                        "Core Asteroids": (t('settings.core_asteroids'), t('settings.core_asteroids_help')),
+                        "Non-Core Asteroids": (t('settings.non_core_asteroids'), t('settings.non_core_asteroids_help'))
+                    }
+                    
                     for name, (_fname, helptext) in ANNOUNCEMENT_TOGGLES.items():
                         # Check if the variable exists before trying to use it
                         if name in self.announcement_vars:
-                            checkbox = tk.Checkbutton(toggles_frame, text=name, 
+                            # Get localized display name and help text
+                            display_name, localized_help = toggle_display.get(name, (name, helptext))
+                            checkbox = tk.Checkbutton(toggles_frame, text=display_name, 
                                                     variable=self.announcement_vars[name], 
                                                     bg=_ann_cb_bg, fg="#ffffff", selectcolor=_ann_cb_select, 
                                                     activebackground=_ann_cb_bg, activeforeground="#ffffff", 
                                                     highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                                                     padx=4, pady=1, anchor="w")
                             checkbox.pack(anchor="w", padx=(10, 0))
-                            ToolTip(checkbox, helptext)
+                            ToolTip(checkbox, localized_help)
                 
                 # Right side: Threshold controls
                 thr = ttk.Frame(main_controls)
                 thr.pack(side="left")
-                ttk.Label(thr, text="Announce at ≥").pack(side="left")
+                ttk.Label(thr, text=t('settings.announce_at')).pack(side="left")
                 sp = ttk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
                                  textvariable=self.prospector_panel.threshold, 
                                  command=self.prospector_panel._save_threshold_value)
                 sp.pack(side="left", padx=(6, 4))
-                ToolTip(sp, "Set the minimum percentage threshold for announcements")
+                ToolTip(sp, t('tooltips.announcement_threshold'))
                 
-                set_all_btn = tk.Button(thr, text="Set all", command=self._ann_set_all_threshold,
+                set_all_btn = tk.Button(thr, text=t('settings.set_all'), command=self._ann_set_all_threshold,
                                        bg="#2a4a5a", fg="#ffffff", 
                                        activebackground="#3a5a6a", activeforeground="#ffffff",
                                        relief="solid", bd=1, cursor="hand2", pady=2, padx=8)
                 set_all_btn.pack(side="left", padx=(10, 0))
-                ToolTip(set_all_btn, "Set all materials to the minimum threshold percentage")
+                ToolTip(set_all_btn, t('tooltips.set_all_threshold'))
                 ttk.Label(thr, text="%").pack(side="left")
 
                 # Materials section label
-                ttk.Label(frame, text="Select minerals and set minimum percentages:",
+                ttk.Label(frame, text=t('settings.select_minerals'),
                           font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(8, 4))
 
                 # Create the full material tree with functionality
@@ -5702,9 +5811,9 @@ class App(tk.Tk):
 
                 # Material tree
                 self.ann_mat_tree = ttk.Treeview(materials_frame, columns=("announce", "material", "minpct"), show="headings", height=14)
-                self.ann_mat_tree.heading("announce", text="Announce")
-                self.ann_mat_tree.heading("material", text="Mineral")
-                self.ann_mat_tree.heading("minpct", text="Minimal %")
+                self.ann_mat_tree.heading("announce", text=t('settings.announce'))
+                self.ann_mat_tree.heading("material", text=t('settings.mineral'))
+                self.ann_mat_tree.heading("minpct", text=t('settings.minimal_pct'))
                 self.ann_mat_tree.column("announce", width=90, anchor="center", stretch=False)
                 self.ann_mat_tree.column("material", width=300, anchor="center", stretch=True)
                 self.ann_mat_tree.column("minpct", width=100, anchor="center", stretch=False)
@@ -5738,10 +5847,13 @@ class App(tk.Tk):
                 for mat in KNOWN_MATERIALS:
                     flag = "✓" if self.prospector_panel.announce_map.get(mat, True) else "—"
                     row_tag = 'evenrow' if row_idx % 2 == 0 else 'oddrow'
+                    # Get localized material name for display
+                    from localization import get_material
+                    display_mat = get_material(mat)
                     if mat in CORE_ONLY:
-                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""), tags=(row_tag,))
+                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, display_mat, ""), tags=(row_tag,))
                     else:
-                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""), tags=(row_tag,))
+                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, display_mat, ""), tags=(row_tag,))
                         
                         # Create spinbox for non-core materials
                         v = self.prospector_panel.min_pct_map.get(mat, 0.0)
@@ -5815,23 +5927,23 @@ class App(tk.Tk):
                 btns = ttk.Frame(frame)
                 btns.grid(row=4, column=0, sticky="w", pady=(8, 0))
                 
-                select_all_btn = tk.Button(btns, text="Select all", command=self._ann_select_all,
+                select_all_btn = tk.Button(btns, text=t('settings.select_all'), command=self._ann_select_all,
                                           bg="#2a5a2a", fg="#ffffff", 
                                           activebackground="#3a6a3a", activeforeground="#ffffff",
                                           relief="solid", bd=1, cursor="hand2", pady=3)
                 select_all_btn.pack(side="left")
-                ToolTip(select_all_btn, "Enable announcements for all materials")
+                ToolTip(select_all_btn, t('tooltips.select_all_materials'))
                 
-                unselect_all_btn = tk.Button(btns, text="Unselect all", command=self._ann_unselect_all,
+                unselect_all_btn = tk.Button(btns, text=t('settings.unselect_all'), command=self._ann_unselect_all,
                                            bg="#5a2a2a", fg="#ffffff", 
                                            activebackground="#6a3a3a", activeforeground="#ffffff",
                                            relief="solid", bd=1, cursor="hand2", pady=3)
                 unselect_all_btn.pack(side="left", padx=(6, 0))
-                ToolTip(unselect_all_btn, "Disable announcements for all materials")
+                ToolTip(unselect_all_btn, t('tooltips.unselect_all_materials'))
                 
                 # Add preset buttons
                 for i in range(1, 6):  # Preset 1 to 5
-                    preset_btn = tk.Button(btns, text=f"Preset {i}",
+                    preset_btn = tk.Button(btns, text=t('settings.preset_button').format(num=i),
                                          bg="#4a4a2a", fg="#ffffff",
                                          activebackground="#5a5a3a", activeforeground="#ffffff",
                                          relief="solid", bd=1,
@@ -5851,11 +5963,7 @@ class App(tk.Tk):
                     preset_btn.bind("<ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
                     
                     # Add tooltip
-                    tooltip_text = ("Left-click = Load saved preset\n"
-                                  "Right-click = Save current settings into that preset slot\n"
-                                  f"Use Preset {i} to store different announcement profiles\n"
-                                  "(e.g. Core-only, High-value, All materials)")
-                    ToolTip(preset_btn, tooltip_text)
+                    ToolTip(preset_btn, t('tooltips.preset_load_save').format(num=i))
                 
             except ImportError:
                 # Fallback if imports fail
@@ -6078,11 +6186,11 @@ class App(tk.Tk):
 
         # Now build content in scrollable_frame instead of frame
         scrollable_frame.columnconfigure(0, weight=1)
-        ttk.Label(scrollable_frame, text="Interface Options", font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
+        ttk.Label(scrollable_frame, text=t('settings.interface_options'), font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
         r = 1
         
         # ========== GENERAL INTERFACE SECTION ==========
-        ttk.Label(scrollable_frame, text="General Interface", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.general_interface'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -6091,24 +6199,24 @@ class App(tk.Tk):
         r += 1
         
         # Tooltips option
-        tk.Checkbutton(scrollable_frame, text="Enable Tooltips", variable=self.tooltips_enabled, 
+        tk.Checkbutton(scrollable_frame, text=t('settings.enable_tooltips'), variable=self.tooltips_enabled, 
                       bg=_gs_bg, fg="#ffffff", selectcolor=_gs_bg, activebackground=_gs_bg, 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground=_gs_bg, 
                       highlightcolor=_gs_bg, takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Show helpful tooltips when hovering over buttons and controls", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.tooltips_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # Stay on top option
-        tk.Checkbutton(scrollable_frame, text="Stay on Top", variable=self.stay_on_top, 
+        tk.Checkbutton(scrollable_frame, text=t('settings.stay_on_top'), variable=self.stay_on_top, 
                       bg=_gs_bg, fg="#ffffff", selectcolor=_gs_bg, activebackground=_gs_bg, 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground=_gs_bg, 
                       highlightcolor=_gs_bg, takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Keep application window always on top of other windows", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.stay_on_top_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
@@ -6116,14 +6224,14 @@ class App(tk.Tk):
         theme_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         theme_frame.grid(row=r, column=0, sticky="w")
         
-        tk.Label(theme_frame, text="Theme:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left", padx=(4, 10))
+        tk.Label(theme_frame, text=t('settings.theme') + ":", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left", padx=(4, 10))
         
         current_theme_text = "Elite Orange" if self.current_theme == "elite_orange" else "Dark Gray"
         self.theme_label = tk.Label(theme_frame, text=current_theme_text, bg=_gs_bg, fg="#ffcc00", font=("Segoe UI", 9, "bold"))
         self.theme_label.pack(side="left", padx=(0, 15))
         
         # Button shows what you'll switch TO (opposite of current)
-        _settings_theme_btn_text = "Dark Theme" if _gs_theme == "elite_orange" else "Orange Theme"
+        _settings_theme_btn_text = t('settings.dark_theme') if _gs_theme == "elite_orange" else t('settings.orange_theme')
         # Style to match current theme
         if _gs_theme == "elite_orange":
             _sbtn_bg, _sbtn_fg = "#1a1a1a", "#ff8c00"
@@ -6153,8 +6261,98 @@ class App(tk.Tk):
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
+        # Language selector option
+        lang_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
+        lang_frame.grid(row=r, column=0, sticky="w")
+        
+        tk.Label(lang_frame, text=t('settings.language') + ":", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left", padx=(4, 10))
+        
+        # Import config functions once at the start
+        from config import _load_cfg as load_config_func, _save_cfg as save_config_func
+        
+        # Get current language and available languages
+        try:
+            from localization import get_language, get_available_languages
+            current_lang = get_language()
+            available_langs = get_available_languages()
+        except ImportError:
+            current_lang = 'en'
+            available_langs = ['en']
+        
+        # Language display names (no auto-detect - user chooses explicitly)
+        lang_names = {
+            'en': 'English',
+            'de': 'Deutsch (German)',
+            'fr': 'Français (French)',
+            'es': 'Español (Spanish)',
+            'ru': 'Русский (Russian)',
+            'pt': 'Português (Portuguese)'
+        }
+        
+        # Show current language as highlighted label (like Theme display)
+        current_lang_display = lang_names.get(current_lang, 'English')
+        # Try to load saved preference to show correct display
+        try:
+            cfg = load_config_func()
+            saved_lang = cfg.get('language', 'en')  # Default to English
+            # Convert 'auto' to 'en' for backwards compatibility
+            if saved_lang == 'auto':
+                saved_lang = 'en'
+            if saved_lang in lang_names:
+                current_lang_display = lang_names.get(saved_lang, 'English')
+        except:
+            current_lang_display = 'English'
+        
+        self.lang_display_label = tk.Label(lang_frame, text=current_lang_display, bg=_gs_bg, fg="#ffcc00", font=("Segoe UI", 9, "bold"))
+        self.lang_display_label.pack(side="left", padx=(0, 15))
+        
+        # Create language variable and combobox
+        self.language_var = tk.StringVar(value=current_lang_display)
+        lang_combo = ttk.Combobox(lang_frame, textvariable=self.language_var, width=20, state="readonly")
+        
+        # Build values list - available languages only (no auto-detect)
+        lang_values = []
+        for code in available_langs:
+            if code in lang_names:
+                lang_values.append(lang_names[code])
+        lang_combo['values'] = tuple(lang_values)
+        lang_combo.pack(side="left", padx=(0, 15))
+        
+        # Reverse mapping for saving
+        self._lang_name_to_code = {v: k for k, v in lang_names.items()}
+        
+        def _on_language_change(event=None):
+            selected_name = self.language_var.get()
+            selected_code = self._lang_name_to_code.get(selected_name, 'en')
+            
+            # Update display label
+            self.lang_display_label.config(text=selected_name)
+            
+            # Save to config
+            try:
+                cfg = load_config_func()
+                cfg['language'] = selected_code
+                save_config_func(cfg)
+            except Exception as e:
+                print(f"Error saving language setting: {e}")
+            
+            # Show restart prompt with option to restart now
+            from app_utils import centered_askyesno
+            if centered_askyesno(scrollable_frame.winfo_toplevel(), 
+                t('settings.restart_required'), 
+                t('settings.restart_required_msg') + "\n\n" + t('settings.restart_now_prompt')):
+                # User chose to restart now
+                self._restart_app()
+        
+        lang_combo.bind('<<ComboboxSelected>>', _on_language_change)
+        r += 1
+        
+        tk.Label(scrollable_frame, text=t('settings.choose_language_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+        
         # ========== EDDN SECTION ==========
-        ttk.Label(scrollable_frame, text="EDDN", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.eddn'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add separator
@@ -6163,20 +6361,20 @@ class App(tk.Tk):
         r += 1
         
         # EDDN send enable/disable
-        tk.Checkbutton(scrollable_frame, text="✓ Send Event Information to EDDN", variable=self.eddn_send_enabled, 
+        tk.Checkbutton(scrollable_frame, text="✓ " + t('settings.send_eddn'), variable=self.eddn_send_enabled, 
                       command=self._on_eddn_send_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Share market data with the Elite Dangerous community via EDDN (Elite Dangerous Data Network)", 
+        tk.Label(scrollable_frame, text=t('settings.send_eddn_desc'), 
                  wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # ========== TEXT OVERLAY DISPLAY SECTION ==========
-        ttk.Label(scrollable_frame, text="Text Overlay Display", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.text_overlay'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -6185,20 +6383,20 @@ class App(tk.Tk):
         r += 1
         
         # Text overlay enable/disable
-        tk.Checkbutton(scrollable_frame, text="Enable Text Overlay", variable=self.text_overlay_enabled, 
+        tk.Checkbutton(scrollable_frame, text=t('settings.enable_text_overlay'), variable=self.text_overlay_enabled, 
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Announcements text overlay (same text that goes to TTS)", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.text_overlay_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 8))
         r += 1
         
         # Text brightness slider
         transparency_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         transparency_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(transparency_frame, text="Text Brightness:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(transparency_frame, text=t('settings.text_brightness'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         _slider_trough = "#1a1a1a" if _gs_theme == "elite_orange" else "#444444"
         _slider_active = "#ff6600" if _gs_theme == "elite_orange" else "#444444"
         _slider_fg = "#ff8c00" if _gs_theme == "elite_orange" else "#ffffff"
@@ -6210,17 +6408,34 @@ class App(tk.Tk):
         self.transparency_scale.pack(side="left", padx=(8, 0))
         tk.Label(transparency_frame, text="%", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         r += 1
-        tk.Label(scrollable_frame, text="Adjust text brightness/opacity", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.text_brightness_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Text color selection with actual colors shown
         color_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         color_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(color_frame, text="Text Color:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(color_frame, text=t('settings.text_color'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        
+        # Localized color names mapping
+        color_display_names = {
+            "White": t('settings.color_white'),
+            "Yellow": t('settings.color_yellow'),
+            "Orange": t('settings.color_orange'),
+            "Light Blue": t('settings.color_light_blue'),
+            "Light Green": t('settings.color_light_green'),
+            "Light Gray": t('settings.color_light_gray'),
+            "Cyan": t('settings.color_cyan'),
+            "Magenta": t('settings.color_magenta')
+        }
+        self._color_display_to_internal = {v: k for k, v in color_display_names.items()}
+        
+        # Create display variable with localized name
+        current_color_display = color_display_names.get(self.text_overlay_color.get(), t('settings.color_white'))
+        self._color_display_var = tk.StringVar(value=current_color_display)
         
         # Create custom OptionMenu with colored options
-        self.color_menu = tk.OptionMenu(color_frame, self.text_overlay_color, *self.color_options.keys())
+        self.color_menu = tk.OptionMenu(color_frame, self._color_display_var, *color_display_names.values())
         self.color_menu.configure(
             bg=_gs_bg, 
             fg="#ffffff", 
@@ -6238,14 +6453,20 @@ class App(tk.Tk):
         menu.configure(bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"], 
                       activebackground=MENU_COLORS["activebackground"])
         
-        # Clear existing items and add colored ones
+        # Clear existing items and add colored ones with localized labels
         menu.delete(0, 'end')
-        for color_name, color_hex in self.color_options.items():
+        for internal_name, color_hex in self.color_options.items():
+            display_name = color_display_names.get(internal_name, internal_name)
             # For very light colors, use black text for readability
-            text_color = "#000000" if color_name in ["White", "Yellow", "Light Gray", "Light Green", "Light Blue", "Cyan"] else "#000000"
+            text_color = "#000000" if internal_name in ["White", "Yellow", "Light Gray", "Light Green", "Light Blue", "Cyan"] else "#000000"
+            
+            def set_color(disp=display_name, internal=internal_name):
+                self._color_display_var.set(disp)
+                self.text_overlay_color.set(internal)
+            
             menu.add_command(
-                label=color_name,
-                command=lambda value=color_name: self.text_overlay_color.set(value),
+                label=display_name,
+                command=set_color,
                 background=color_hex,
                 foreground=text_color,
                 activebackground=color_hex,
@@ -6253,55 +6474,77 @@ class App(tk.Tk):
                 font=("Segoe UI", 9, "bold")
             )
         r += 1
-        tk.Label(scrollable_frame, text="Choose text color ", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.text_color_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
-        # Text size selection
+        # Text size selection with localized options
         size_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         size_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(size_frame, text="Text Size:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
-        self.size_combo = ttk.Combobox(size_frame, textvariable=self.text_overlay_size, 
-                                      values=list(self.size_options.keys()), 
+        tk.Label(size_frame, text=t('settings.text_size'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        
+        # Localized size options
+        size_display_names = [t('settings.text_size_small'), t('settings.text_size_normal'), t('settings.text_size_large')]
+        self._size_display_to_internal = {
+            t('settings.text_size_small'): "Small",
+            t('settings.text_size_normal'): "Normal",
+            t('settings.text_size_large'): "Large"
+        }
+        self._size_internal_to_display = {v: k for k, v in self._size_display_to_internal.items()}
+        
+        # Convert current value to display name
+        current_size_display = self._size_internal_to_display.get(self.text_overlay_size.get(), t('settings.text_size_normal'))
+        self._size_display_var = tk.StringVar(value=current_size_display)
+        
+        self.size_combo = ttk.Combobox(size_frame, textvariable=self._size_display_var, 
+                                      values=size_display_names, 
                                       state="readonly", width=12, font=("Segoe UI", 8))
         self.size_combo.pack(side="left", padx=(8, 0))
+        
+        # Sync display var to internal var
+        def _on_size_change(event=None):
+            display_val = self._size_display_var.get()
+            internal_val = self._size_display_to_internal.get(display_val, "Normal")
+            self.text_overlay_size.set(internal_val)
+        self.size_combo.bind('<<ComboboxSelected>>', _on_size_change)
+        
         r += 1
-        tk.Label(scrollable_frame, text="Choose text size for better readability", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.text_size_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Display duration slider
         duration_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         duration_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(duration_frame, text="Display Duration:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(duration_frame, text=t('settings.display_duration'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         self.duration_scale = tk.Scale(duration_frame, from_=5, to=30, orient="horizontal", 
                                      variable=self.text_overlay_duration, bg=_gs_bg, fg=_slider_fg, 
                                      activebackground=_slider_active, highlightthickness=0, length=140,
                                      troughcolor=_slider_trough, font=("Segoe UI", 8),
                                      sliderrelief="flat", sliderlength=20)
         self.duration_scale.pack(side="left", padx=(8, 0))
-        tk.Label(duration_frame, text="seconds", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(duration_frame, text=t('settings.seconds'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         r += 1
-        tk.Label(scrollable_frame, text="How long text stays visible on screen (5-30 seconds)", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.duration_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Overlay mode selection (Standard vs Enhanced Prospector)
         mode_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         mode_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(mode_frame, text="Overlay Mode:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(mode_frame, text=t('settings.overlay_mode'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Radio buttons for mode selection
-        tk.Radiobutton(mode_frame, text="Standard Text", value="standard", variable=self.overlay_mode,
+        tk.Radiobutton(mode_frame, text=t('settings.overlay_standard'), value="standard", variable=self.overlay_mode,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
                       padx=4, pady=2, anchor="w").pack(side="left", padx=(8, 0))
-        tk.Radiobutton(mode_frame, text="Enhanced Prospector", value="enhanced", variable=self.overlay_mode,
+        tk.Radiobutton(mode_frame, text=t('settings.overlay_enhanced'), value="enhanced", variable=self.overlay_mode,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
                       padx=4, pady=2, anchor="w").pack(side="left", padx=(8, 0))
         r += 1
-        tk.Label(scrollable_frame, text="Standard: Simple text (only when announced) | Enhanced: Game-style display (every prospector fire)",
+        tk.Label(scrollable_frame, text=t('settings.overlay_mode_desc'),
                  wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
@@ -6320,7 +6563,7 @@ class App(tk.Tk):
         # r += 1
         
         # ========== TEXT-TO-SPEECH AUDIO SECTION ==========
-        ttk.Label(scrollable_frame, text="Text-to-Speech Audio", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.tts_settings'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -6329,7 +6572,7 @@ class App(tk.Tk):
         r += 1
         
         # TTS Voice selection (moved from announcements panel)
-        tk.Label(scrollable_frame, text="TTS Voice:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).grid(row=r, column=0, sticky="w", pady=(4, 4))
+        tk.Label(scrollable_frame, text=t('settings.tts_voice'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).grid(row=r, column=0, sticky="w", pady=(4, 4))
         r += 1
         
         voice_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
@@ -6358,7 +6601,7 @@ class App(tk.Tk):
             except Exception as e:
                 print(f"Error testing voice: {e}")
         
-        test_btn = tk.Button(voice_frame, text="▶ Test Voice", command=_test_voice_interface,
+        test_btn = tk.Button(voice_frame, text=t('settings.test_voice'), command=_test_voice_interface,
                             bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                             activeforeground="#ffffff", relief="ridge", bd=1, 
                             font=("Segoe UI", 8, "normal"), cursor="hand2")
@@ -6369,7 +6612,7 @@ class App(tk.Tk):
         vol_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         vol_frame.grid(row=r, column=0, sticky="w", pady=(6, 4))
         
-        tk.Label(vol_frame, text="Volume:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(vol_frame, text=t('settings.tts_volume'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Initialize voice volume variable if not exists
         if not hasattr(self, 'voice_volume'):
@@ -6417,7 +6660,7 @@ class App(tk.Tk):
                                activeforeground="#ffffff", relief="ridge", bd=1, 
                                font=("Segoe UI", 8, "normal"), cursor="hand2")
         fix_tts_btn.pack(side="left", padx=(8, 0), pady=(15, 0))
-        ToolTip(fix_tts_btn, "Reinitialize Text-to-Speech engine.\nUse this if TTS stops working or after recycling Windows voices.")
+        ToolTip(fix_tts_btn, t('tooltips.fix_tts'))
         r += 1
         
         # Load saved voice preference
@@ -6457,12 +6700,12 @@ class App(tk.Tk):
         self.after(100, self._refresh_voice_list)
         
         r += 1
-        tk.Label(scrollable_frame, text="Configure Text-to-Speech voice and volume for announcements", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.tts_config_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # ========== JOURNAL FILES SECTION ==========
-        ttk.Label(scrollable_frame, text="Journal Files", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.journal_files'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -6473,28 +6716,28 @@ class App(tk.Tk):
         # Journal folder path setting
         journal_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         journal_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(journal_frame, text="Journal folder:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(journal_frame, text=t('settings.journal_location'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Initialize journal label (will be updated after prospector panel creation)
         self.journal_lbl = tk.Label(journal_frame, text="(not set)", fg="gray", bg=_gs_bg, font=("Segoe UI", 9))
         self.journal_lbl.pack(side="left", padx=(6, 0))
         
-        journal_btn = tk.Button(journal_frame, text="Change…", command=self._change_journal_dir,
+        journal_btn = tk.Button(journal_frame, text=t('settings.change'), command=self._change_journal_dir,
                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                activeforeground="#ffffff", relief="ridge", bd=1, 
                                font=("Segoe UI", 8, "normal"), cursor="hand2")
         journal_btn.pack(side="left", padx=(8, 0))
-        ToolTip(journal_btn, "Select the Elite Dangerous Journal folder\nUsually located in: Documents\\Frontier Developments\\Elite Dangerous")
+        ToolTip(journal_btn, t('tooltips.journal_folder'))
         
-        import_btn = tk.Button(journal_frame, text="Import History", command=self._import_journal_history,
+        import_btn = tk.Button(journal_frame, text=t('settings.import_history'), command=self._import_journal_history,
                               bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                               activeforeground="#ffffff", relief="ridge", bd=1,
                               font=("Segoe UI", 8, "normal"), cursor="hand2")
         import_btn.pack(side="left", padx=(8, 0))
-        ToolTip(import_btn, "Import visited systems and hotspots from existing journal files")
+        ToolTip(import_btn, t('tooltips.import_history'))
         
         r += 1
-        tk.Label(scrollable_frame, text="Path to Elite Dangerous journal files for prospector monitoring", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.journal_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
@@ -6502,7 +6745,7 @@ class App(tk.Tk):
         self.ask_import_on_path_change = tk.IntVar()
         import_prompt_check = tk.Checkbutton(
             scrollable_frame,
-            text="Ask to import history when changing journal folder",
+            text=t('settings.ask_import_prompt'),
             variable=self.ask_import_on_path_change,
             command=self._save_import_prompt_preference,
             bg=_gs_bg,
@@ -6520,13 +6763,13 @@ class App(tk.Tk):
         r += 1
         
         # Auto-scan journals on startup checkbox
-        tk.Checkbutton(scrollable_frame, text="Auto-scan Journals on Startup", variable=self.auto_scan_journals, 
+        tk.Checkbutton(scrollable_frame, text=t('settings.auto_scan_journals'), variable=self.auto_scan_journals, 
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Automatically check for new mining data in Elite Dangerous journals when the app starts. Disable if you prefer manual imports via Settings → Import History", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.auto_scan_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
@@ -6542,7 +6785,7 @@ class App(tk.Tk):
         r += 1
 
         # ========== SCREENSHOTS FOLDER SECTION ==========
-        ttk.Label(scrollable_frame, text="Screenshots Folder", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.screenshots_folder_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add separator line
@@ -6553,7 +6796,7 @@ class App(tk.Tk):
         # Screenshots folder path setting
         screenshots_folder_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         screenshots_folder_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(screenshots_folder_frame, text="Screenshots folder:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(screenshots_folder_frame, text=t('settings.screenshots_folder_label'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         
         # Create StringVar for screenshots folder path
         self.screenshots_folder_path = tk.StringVar()
@@ -6563,15 +6806,15 @@ class App(tk.Tk):
         self.screenshots_folder_lbl = tk.Label(screenshots_folder_frame, text=self.screenshots_folder_path.get(), fg="gray", bg=_gs_bg, font=("Segoe UI", 9))
         self.screenshots_folder_lbl.pack(side="left", padx=(6, 0))
         
-        screenshots_btn = tk.Button(screenshots_folder_frame, text="Change…", command=self._change_screenshots_folder,
+        screenshots_btn = tk.Button(screenshots_folder_frame, text=t('settings.change'), command=self._change_screenshots_folder,
                                   bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                   activeforeground="#ffffff", relief="ridge", bd=1, 
                                   font=("Segoe UI", 8, "normal"), cursor="hand2")
         screenshots_btn.pack(side="left", padx=(8, 0))
-        ToolTip(screenshots_btn, "Select the default folder for importing screenshots\nUsually located in: Documents\\Pictures")
+        ToolTip(screenshots_btn, t('tooltips.screenshots_folder'))
         
         r += 1
-        tk.Label(scrollable_frame, text="Default folder for selecting screenshots when adding them to reports", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.screenshots_folder_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -6635,7 +6878,7 @@ class App(tk.Tk):
 
         # ========== API UPLOAD SECTION ==========
         r += 1
-        ttk.Label(scrollable_frame, text="API Upload", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.api_upload_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add separator line
@@ -6646,13 +6889,13 @@ class App(tk.Tk):
         # COMING SOON notice
         coming_soon_frame = tk.Frame(scrollable_frame, bg="#3a3a00", relief="solid", bd=1)
         coming_soon_frame.grid(row=r, column=0, sticky="ew", pady=(0, 10))
-        tk.Label(coming_soon_frame, text="🚧 COMING SOON - Server Infrastructure In Development", 
+        tk.Label(coming_soon_frame, text="🚧 " + t('settings.api_coming_soon'), 
                 bg="#3a3a00", fg="#ffff00", font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=10, pady=(8, 4))
-        tk.Label(coming_soon_frame, text="The API upload feature is currently under development. Server-side infrastructure", 
+        tk.Label(coming_soon_frame, text=t('settings.api_coming_soon_desc1'), 
                 bg="#3a3a00", fg="#ffffff", font=("Segoe UI", 8)).pack(anchor="w", padx=10)
-        tk.Label(coming_soon_frame, text="is being built to receive and process mining data. This feature will be enabled", 
+        tk.Label(coming_soon_frame, text=t('settings.api_coming_soon_desc2'), 
                 bg="#3a3a00", fg="#ffffff", font=("Segoe UI", 8)).pack(anchor="w", padx=10)
-        tk.Label(coming_soon_frame, text="in a future release. Stay tuned!", 
+        tk.Label(coming_soon_frame, text=t('settings.api_coming_soon_desc3'), 
                 bg="#3a3a00", fg="#ffffff", font=("Segoe UI", 8)).pack(anchor="w", padx=10, pady=(0, 8))
         r += 1
         
@@ -6670,7 +6913,7 @@ class App(tk.Tk):
             self.api_key = tk.StringVar(value=api_settings["api_key"])
             self.api_cmdr_name = tk.StringVar(value=api_settings["cmdr_name"])
         
-        api_check = tk.Checkbutton(api_frame, text="Enable API Upload (Not Yet Available)", 
+        api_check = tk.Checkbutton(api_frame, text=t('settings.api_enable_upload'), 
                                    variable=self.api_upload_enabled,
                                    command=self._on_api_upload_toggle,
                                    bg=_gs_bg, fg="#888888", selectcolor="#1e1e1e", 
@@ -6683,20 +6926,20 @@ class App(tk.Tk):
         # Consent message
         consent_frame = tk.Frame(scrollable_frame, bg="#2a2a2a", relief="solid", bd=1)
         consent_frame.grid(row=r, column=0, sticky="ew", pady=(4, 8), padx=(20, 0))
-        tk.Label(consent_frame, text="ℹ️ By enabling, you agree to share:", 
+        tk.Label(consent_frame, text="ℹ️ " + t('settings.api_consent_title'), 
                 bg="#2a2a2a", fg="#ffcc00", font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=8, pady=(6, 2))
-        tk.Label(consent_frame, text="  • Mining session statistics", 
+        tk.Label(consent_frame, text="  • " + t('settings.api_consent_sessions'), 
                 bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8)
-        tk.Label(consent_frame, text="  • Discovered hotspot locations", 
+        tk.Label(consent_frame, text="  • " + t('settings.api_consent_hotspots'), 
                 bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8)
-        tk.Label(consent_frame, text="  • Materials and performance data", 
+        tk.Label(consent_frame, text="  • " + t('settings.api_consent_materials'), 
                 bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8, pady=(0, 6))
         r += 1
         
         # CMDR Name (DISABLED)
         cmdr_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         cmdr_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        tk.Label(cmdr_frame, text="CMDR Name:", bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(cmdr_frame, text=t('settings.api_cmdr_name'), bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         cmdr_entry = tk.Entry(cmdr_frame, textvariable=self.api_cmdr_name, 
                              bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=30, state="disabled")
         cmdr_entry.pack(side="left", padx=(8, 0))
@@ -6705,7 +6948,7 @@ class App(tk.Tk):
         # API Endpoint URL (DISABLED)
         endpoint_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         endpoint_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        tk.Label(endpoint_frame, text="API Endpoint:", bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(endpoint_frame, text=t('settings.api_endpoint'), bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         endpoint_entry = tk.Entry(endpoint_frame, textvariable=self.api_endpoint_url, 
                                  bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=50, state="disabled")
         endpoint_entry.pack(side="left", padx=(8, 0))
@@ -6714,7 +6957,7 @@ class App(tk.Tk):
         # API Key (DISABLED)
         apikey_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         apikey_frame.grid(row=r, column=0, sticky="w", pady=(4, 8))
-        tk.Label(apikey_frame, text="API Key:", bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(apikey_frame, text=t('settings.api_key'), bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         apikey_entry = tk.Entry(apikey_frame, textvariable=self.api_key, 
                                bg="#2d2d2d", fg="#888888", font=("Consolas", 9), width=50, show="*", state="disabled")
         apikey_entry.pack(side="left", padx=(8, 0))
@@ -6735,27 +6978,27 @@ class App(tk.Tk):
         api_buttons_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
         
         # Test Connection button (DISABLED)
-        test_btn = tk.Button(api_buttons_frame, text="Test Connection", command=self._test_api_connection,
+        test_btn = tk.Button(api_buttons_frame, text=t('settings.api_test_connection'), command=self._test_api_connection,
                             bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
                             activeforeground="#888888", relief="ridge", bd=1, padx=10, pady=3,
                             font=("Segoe UI", 8, "normal"), cursor="hand2", state="disabled")
         test_btn.pack(side="left", padx=(0, 8))
-        ToolTip(test_btn, "Not available - server infrastructure in development")
+        ToolTip(test_btn, t('tooltips.test_upload'))
         
         # Save Settings button (DISABLED)
-        save_api_btn = tk.Button(api_buttons_frame, text="Save Settings", command=self._save_api_settings,
+        save_api_btn = tk.Button(api_buttons_frame, text=t('settings.api_save_settings'), command=self._save_api_settings,
                                 bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
                                 activeforeground="#888888", relief="ridge", bd=1, padx=10, pady=3,
                                 font=("Segoe UI", 8, "normal"), cursor="hand2", state="disabled")
         save_api_btn.pack(side="left", padx=(0, 8))
         
         # Bulk Upload button (DISABLED)
-        bulk_upload_btn = tk.Button(api_buttons_frame, text="Bulk Upload All Data", command=self._bulk_upload_api_data,
+        bulk_upload_btn = tk.Button(api_buttons_frame, text=t('settings.api_bulk_upload'), command=self._bulk_upload_api_data,
                                     bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
                                     activeforeground="#888888", relief="ridge", bd=1, padx=10, pady=3,
                                     font=("Segoe UI", 8, "normal"), cursor="hand2", state="disabled")
         bulk_upload_btn.pack(side="left")
-        ToolTip(bulk_upload_btn, "Not available - server infrastructure in development")
+        ToolTip(bulk_upload_btn, t('tooltips.bulk_upload'))
         r += 1
         
         # Status label
@@ -6765,13 +7008,13 @@ class App(tk.Tk):
         self._update_api_status()
         r += 1
         
-        tk.Label(scrollable_frame, text="Share mining data with the community for aggregation and analytics", 
+        tk.Label(scrollable_frame, text=t('settings.api_desc'), 
                 wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
         # ========== BACKUP & RESTORE SECTION ==========
-        ttk.Label(scrollable_frame, text="Backup & Restore", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.backup_restore_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -6783,29 +7026,31 @@ class App(tk.Tk):
         backup_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         backup_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
         
-        backup_btn = tk.Button(backup_frame, text="📦 Backup", command=self._show_backup_dialog,
+        backup_btn = tk.Button(backup_frame, text="📦 " + t('settings.backup_button'), command=self._show_backup_dialog,
                               bg="#2a3a4a", fg="#e0e0e0", 
                               activebackground="#3a4a5a", activeforeground="#ffffff",
                               relief="ridge", bd=1, padx=12, pady=4,
                               font=("Segoe UI", 9, "normal"), cursor="hand2")
         backup_btn.pack(side="left", padx=(0, 8))
-        ToolTip(backup_btn, "Create backup of Ship Presets, Reports, Bookmarks, and VoiceAttack Profile\nBackup is saved as a timestamped zip file")
+        _backup_tooltip = t('tooltips.backup')
+        print(f"[DEBUG TOOLTIP] tooltips.backup = {repr(_backup_tooltip)}")
+        ToolTip(backup_btn, _backup_tooltip)
         
-        restore_btn = tk.Button(backup_frame, text="📂 Restore", command=self._show_restore_dialog,
+        restore_btn = tk.Button(backup_frame, text="📂 " + t('settings.restore_button'), command=self._show_restore_dialog,
                                bg="#4a3a2a", fg="#e0e0e0", 
                                activebackground="#5a4a3a", activeforeground="#ffffff",
                                relief="ridge", bd=1, padx=12, pady=4,
                                font=("Segoe UI", 9, "normal"), cursor="hand2")
         restore_btn.pack(side="left")
-        ToolTip(restore_btn, "Restore from backup zip file\nSelect which data to restore and handle conflicts")
+        ToolTip(restore_btn, t('tooltips.restore'))
         
         r += 1
-        tk.Label(scrollable_frame, text="Backup and restore ship presets, reports, and bookmarks", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.backup_restore_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
         # ========== UPDATES SECTION ==========
-        ttk.Label(scrollable_frame, text="Updates", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.updates_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -6814,14 +7059,14 @@ class App(tk.Tk):
         r += 1
         
         # Check for updates button
-        update_btn = tk.Button(scrollable_frame, text="Check for Updates", command=self._manual_update_check,
+        update_btn = tk.Button(scrollable_frame, text=t('settings.check_for_updates'), command=self._manual_update_check,
                               bg="#2a4a2a", fg="#e0e0e0", 
                               activebackground="#3a5a3a", activeforeground="#ffffff",
                               relief="ridge", bd=1, padx=12, pady=4,
                               font=("Segoe UI", 9, "normal"), cursor="hand2")
         update_btn.grid(row=r, column=0, sticky="w", pady=(4, 0))
         r += 1
-        tk.Label(scrollable_frame, text="Check GitHub for newer versions of EliteMining", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.updates_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -6961,7 +7206,7 @@ class App(tk.Tk):
         presets_pane.rowconfigure(3, weight=0)  # Row 3 (buttons) stays at bottom
 
         # Ship Presets title
-        presets_title = ttk.Label(presets_pane, text="⚙️ Ship Presets (VoiceAttack)", font=("Segoe UI", 10, "bold"))
+        presets_title = ttk.Label(presets_pane, text="⚙️ " + t('sidebar.ship_presets'), font=("Segoe UI", 10, "bold"))
         presets_title.grid(row=0, column=0, sticky="w", pady=(0, 2))
         
         # Set minimum height for presets pane to prevent collapse
@@ -6969,7 +7214,7 @@ class App(tk.Tk):
         presets_pane.grid_propagate(True)
         
         # Help text for preset operations
-        help_text = ttk.Label(presets_pane, text="Right click for options", 
+        help_text = ttk.Label(presets_pane, text=t('sidebar.right_click_options'), 
                              font=("Segoe UI", 8), foreground="#666666")
         help_text.grid(row=1, column=0, sticky="w", pady=(0, 6))
         
@@ -7012,7 +7257,7 @@ class App(tk.Tk):
         
         import_btn = tk.Button(
             preset_buttons_frame, 
-            text="⬇ Import", 
+            text="⬇ " + t('common.import'), 
             command=self._import_all_from_txt,
             bg="#3a3a3a",
             fg="#e0e0e0", 
@@ -7027,11 +7272,11 @@ class App(tk.Tk):
         )
         import_btn.grid(row=0, column=0, padx=(0, 4))
         self.import_btn = import_btn
-        ToolTip(import_btn, "Read VoiceAttack settings from game files\n(Firegroups, Mining Controls, Announcements)")
+        ToolTip(import_btn, t('tooltips.import_va'))
         
         apply_btn = tk.Button(
             preset_buttons_frame, 
-            text="⬆ Apply", 
+            text="⬆ " + t('common.apply'), 
             command=self._save_all_to_txt,
             bg="#2a4a2a",
             fg="#e0e0e0", 
@@ -7045,7 +7290,7 @@ class App(tk.Tk):
             cursor="hand2"
         )
         apply_btn.grid(row=0, column=1, padx=(4, 0))
-        ToolTip(apply_btn, "Save settings to VoiceAttack variable files\nPress after:\n• Selecting a Ship Preset\n• Changing any settings in Mining Controls or Firegroups tab")
+        ToolTip(apply_btn, t('tooltips.apply_va'))
 
         # Get theme-aware menu colors
         from core.constants import get_menu_colors
@@ -7057,20 +7302,20 @@ class App(tk.Tk):
                                   activebackground=menu_colors["activebackground"], 
                                   activeforeground=menu_colors["activeforeground"],
                                   selectcolor=menu_colors["selectcolor"])
-        self._preset_menu.add_command(label="Save as New", command=self._save_as_new)
-        self._preset_menu.add_command(label="Overwrite", command=self._overwrite_selected)
+        self._preset_menu.add_command(label=t('context_menu.save_as_new'), command=self._save_as_new)
+        self._preset_menu.add_command(label=t('context_menu.overwrite'), command=self._overwrite_selected)
         self._preset_menu.add_separator()
-        self._preset_menu.add_command(label="Edit", command=self._edit_selected_preset)
-        self._preset_menu.add_command(label="Duplicate", command=self._duplicate_selected_preset)
-        self._preset_menu.add_command(label="Rename", command=self._rename_selected_preset)
+        self._preset_menu.add_command(label=t('context_menu.edit'), command=self._edit_selected_preset)
+        self._preset_menu.add_command(label=t('context_menu.duplicate'), command=self._duplicate_selected_preset)
+        self._preset_menu.add_command(label=t('context_menu.rename'), command=self._rename_selected_preset)
         self._preset_menu.add_separator()
-        self._preset_menu.add_command(label="Export…", command=self._export_selected_preset)
-        self._preset_menu.add_command(label="Import…", command=self._import_preset_file)
+        self._preset_menu.add_command(label=t('context_menu.export'), command=self._export_selected_preset)
+        self._preset_menu.add_command(label=t('context_menu.import'), command=self._import_preset_file)
         self._preset_menu.add_separator()
-        self._preset_menu.add_command(label="Expand All", command=self._expand_all_preset_groups)
-        self._preset_menu.add_command(label="Collapse All", command=self._collapse_all_preset_groups)
+        self._preset_menu.add_command(label=t('context_menu.expand_all'), command=self._expand_all_preset_groups)
+        self._preset_menu.add_command(label=t('context_menu.collapse_all'), command=self._collapse_all_preset_groups)
         self._preset_menu.add_separator()
-        self._preset_menu.add_command(label="Delete", command=self._delete_selected)
+        self._preset_menu.add_command(label=t('context_menu.delete'), command=self._delete_selected)
         
         # Context menu for empty space (limited options)
         self._preset_empty_menu = tk.Menu(self, tearoff=0, 
@@ -7078,11 +7323,11 @@ class App(tk.Tk):
                                   activebackground=menu_colors["activebackground"], 
                                   activeforeground=menu_colors["activeforeground"],
                                   selectcolor=menu_colors["selectcolor"])
-        self._preset_empty_menu.add_command(label="Save as New", command=self._save_as_new)
-        self._preset_empty_menu.add_command(label="Import…", command=self._import_preset_file)
+        self._preset_empty_menu.add_command(label=t('context_menu.save_as_new'), command=self._save_as_new)
+        self._preset_empty_menu.add_command(label=t('context_menu.import'), command=self._import_preset_file)
         self._preset_empty_menu.add_separator()
-        self._preset_empty_menu.add_command(label="Expand All", command=self._expand_all_preset_groups)
-        self._preset_empty_menu.add_command(label="Collapse All", command=self._collapse_all_preset_groups)
+        self._preset_empty_menu.add_command(label=t('context_menu.expand_all'), command=self._expand_all_preset_groups)
+        self._preset_empty_menu.add_command(label=t('context_menu.collapse_all'), command=self._collapse_all_preset_groups)
         
         self.preset_list.bind("<Button-3>", self._show_preset_menu)
 
@@ -7118,12 +7363,15 @@ class App(tk.Tk):
             activeforeground=_tbtn_active_fg,
             relief="solid",
             bd=1,
-            padx=10,
-            pady=2,
+            padx=6,
+            pady=1,
             font=("Segoe UI", 8),
             cursor="hand2"
         )
-        self.theme_toggle_btn.pack()
+        self.theme_toggle_btn.pack(side="left")
+        
+        # Language flag buttons (next to theme button)
+        self._create_language_flags(theme_btn_frame)
 
         # Refresh the preset list
         self._refresh_preset_list()
@@ -7168,8 +7416,28 @@ class App(tk.Tk):
     def _build_timers_tab(self, frame: ttk.Frame) -> None:
         frame.columnconfigure(0, weight=1)
         
+        # Timer name translation mapping (English key -> translation key)
+        timer_translations = {
+            "Duration for firing mining lasers (first period)": "voiceattack.timer_laser_first",
+            "Pause between laser periods for weapon recharge/cooldown": "voiceattack.timer_pause",
+            "Duration for second laser period (If Laser Mining Extra is enabled)": "voiceattack.timer_laser_extra",
+            "Delay before selecting prospector target after laser mining": "voiceattack.timer_target",
+            "Delay before retracting cargo scoop after mining sequence": "voiceattack.timer_cargoscoop",
+            "Boost Interval (For Core Mining Boost sequense )": "voiceattack.timer_boost",
+        }
+        
+        # Timer help text translation mapping
+        timer_help_translations = {
+            "Duration for firing mining lasers (first period)": "voiceattack.help_timer_laser_first",
+            "Pause between laser periods for weapon recharge/cooldown": "voiceattack.help_timer_pause",
+            "Duration for second laser period (If Laser Mining Extra is enabled)": "voiceattack.help_timer_laser_extra",
+            "Delay before selecting prospector target after laser mining": "voiceattack.help_timer_target",
+            "Delay before retracting cargo scoop after mining sequence": "voiceattack.help_timer_cargoscoop",
+            "Boost Interval (For Core Mining Boost sequense )": "voiceattack.help_timer_boost",
+        }
+        
         # Timers section
-        ttk.Label(frame, text="Timers", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(frame, text=t('voiceattack.timers'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
         r = 1
         for name, spec in TIMERS.items():
             _fname, lo, hi, helptext = spec
@@ -7180,12 +7448,16 @@ class App(tk.Tk):
             sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[name])
             sp.pack(side="left")
             
+            # Get localized timer name
+            display_name = t(timer_translations.get(name, name)) if name in timer_translations else name
+            
             # Label second with tooltip
-            label = ttk.Label(rowf, text=f"{name} [{lo}..{hi}] seconds")
+            label = ttk.Label(rowf, text=f"{display_name} [{lo}..{hi}] {t('voiceattack.seconds')}")
             label.pack(side="left", padx=(6, 0))
             
-            # Add tooltip with the help text
-            ToolTip(label, helptext)
+            # Add tooltip with localized help text
+            localized_help = t(timer_help_translations.get(name, name)) if name in timer_help_translations else helptext
+            ToolTip(label, localized_help)
             
             r += 1
         
@@ -7203,8 +7475,22 @@ class App(tk.Tk):
         _toggle_fg = "#ff8c00" if self.current_theme == "elite_orange" else "#ffffff"
         _toggle_tip_fg = "#ffa500"
         
-        ttk.Label(toggles_header, text="Toggles", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
-        tk.Label(toggles_header, text="💡 Tip: Use 'Stop all profile commands' in VoiceAttack to interrupt any active sequence", 
+        # Toggle help text translation mapping
+        toggle_help_translations = {
+            "Auto Honk": "voiceattack.help_auto_honk",
+            "Cargo Scoop": "voiceattack.help_cargo_scoop",
+            "Headtracker Docking Control": "voiceattack.help_headtracker",
+            "Laser Mining Extra": "voiceattack.help_laser_extra",
+            "Night Vision": "voiceattack.help_night_vision",
+            "FSD Jump Sequence": "voiceattack.help_fsd_jump",
+            "Power Settings": "voiceattack.help_power",
+            "Prospector Sequence": "voiceattack.help_prospector",
+            "Pulse Wave Analyser": "voiceattack.help_pulse_wave",
+            "Target": "voiceattack.help_target",
+        }
+        
+        ttk.Label(toggles_header, text=t('voiceattack.toggles'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
+        tk.Label(toggles_header, text=t('voiceattack.tip_stop_commands'), 
                  fg=_toggle_tip_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).grid(row=0, column=1, sticky="")
         r += 1
         
@@ -7212,15 +7498,21 @@ class App(tk.Tk):
             rowf = ttk.Frame(frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            checkbox = tk.Checkbutton(rowf, text=f"Enable {name}", variable=self.toggle_vars[name], 
+            checkbox = tk.Checkbutton(rowf, text=f"{t('voiceattack.enable')} {name}", variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             
+            # Get localized help text
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            
+            # Add tooltip to checkbox
+            ToolTip(checkbox, display_help)
+            
             _help_fg = "#888888" if self.current_theme == "elite_orange" else "gray"
-            tk.Label(rowf, text=helptext, fg=_help_fg, bg=_toggle_bg,
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
 
@@ -7487,16 +7779,16 @@ class App(tk.Tk):
             self.cmdr_label_value.config(text=cmdr_name)
             
             if current_system:
-                self.system_label_prefix.config(text="| Current Syst: ")
+                self.system_label_prefix.config(text=t('status_bar.current_system') + " ")
                 self.system_label_value.config(text=current_system)
             else:
                 self.system_label_prefix.config(text="")
                 self.system_label_value.config(text="")
             
-            self.visits_label_prefix.config(text="| Visits: ")
+            self.visits_label_prefix.config(text=t('status_bar.visits') + " ")
             self.visits_label_value.config(text=str(visits_count))
             
-            self.route_label_prefix.config(text="| Syst In Route: ")
+            self.route_label_prefix.config(text=t('status_bar.systems_in_route') + " ")
             self.route_label_value.config(text=str(jumps_remaining))
             
             # Get total systems visited from journal Statistics event (game's official count)
@@ -7510,7 +7802,7 @@ class App(tk.Tk):
                 except:
                     pass
             
-            self.total_systems_label_prefix.config(text="| Tot Syst: ")
+            self.total_systems_label_prefix.config(text=t('status_bar.total_systems') + " ")
             self.total_systems_label_value.config(text=str(total_systems))
             
         except Exception as e:
@@ -7914,7 +8206,7 @@ class App(tk.Tk):
     def _ask_preset_name(self, initial: Optional[str] = None) -> Optional[str]:
         """Custom dark dialog for preset names"""
         dialog = tk.Toplevel(self)
-        dialog.title("Preset Name")
+        dialog.title(t('dialogs.preset_name'))
         dialog.configure(bg="#2c3e50")
         dialog.geometry("400x150")
         dialog.resizable(False, False)
@@ -7963,12 +8255,12 @@ class App(tk.Tk):
         def on_cancel():
             dialog.destroy()
             
-        ok_btn = tk.Button(btn_frame, text="OK", command=on_ok,
+        ok_btn = tk.Button(btn_frame, text=t('common.ok'), command=on_ok,
                           bg="#27ae60", fg="white", font=("Arial", 10),
                           width=10)
         ok_btn.pack(side=tk.LEFT, padx=5)
         
-        cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel,
+        cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
                               bg="#e74c3c", fg="white", font=("Arial", 10),
                               width=10)
         cancel_btn.pack(side=tk.LEFT, padx=5)
@@ -8037,7 +8329,7 @@ class App(tk.Tk):
         
         dialog = tk.Toplevel(self)
         dialog.withdraw()  # Hide while setting up
-        dialog.title("New Ship Preset")
+        dialog.title(t('dialogs.new_ship_preset'))
         dialog.configure(bg="#1e1e1e")
         dialog.geometry("450x240")
         dialog.resizable(False, False)
@@ -8161,7 +8453,7 @@ class App(tk.Tk):
                           width=10, cursor="hand2")
         ok_btn.pack(side=tk.LEFT, padx=5)
         
-        cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel,
+        cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
                               bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
                               activebackground="#4a4a4a", activeforeground="#ffffff",
                               width=10, cursor="hand2")
@@ -8297,7 +8589,7 @@ class App(tk.Tk):
         
         dialog = tk.Toplevel(self)
         dialog.withdraw()
-        dialog.title("Edit Ship Preset")
+        dialog.title(t('dialogs.edit_ship_preset'))
         dialog.configure(bg="#1e1e1e")
         dialog.geometry("480x280")
         dialog.resizable(False, False)
@@ -8439,7 +8731,7 @@ class App(tk.Tk):
                           width=10, cursor="hand2")
         ok_btn.pack(side=tk.LEFT, padx=5)
         
-        cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel,
+        cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
                               bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
                               activebackground="#4a4a4a", activeforeground="#ffffff",
                               width=10, cursor="hand2")
@@ -8481,7 +8773,7 @@ class App(tk.Tk):
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Configuration section (moved to top)
-        config_frame = ttk.LabelFrame(main_container, text="Configuration", padding=10)
+        config_frame = ttk.LabelFrame(main_container, text=t('distance_calculator.configuration'), padding=10)
         config_frame.pack(fill="x", pady=(0, 10))
         
         # Configure column weights: label, input (limited expand), button, distance info, visits
@@ -8493,7 +8785,7 @@ class App(tk.Tk):
         
         # Current System Display (always updated, read-only)
         row = 0
-        ttk.Label(config_frame, text="Current System:", font=("Segoe UI", 9, "bold")).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(config_frame, text=t('distance_calculator.current_system'), font=("Segoe UI", 9, "bold")).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_current_system = tk.StringVar(value="---")
         # Clear selection when current system updates (prevents auto-selection of readonly entry)
         try:
@@ -8507,7 +8799,7 @@ class App(tk.Tk):
                                    bg="#2d2d2d", fg="#00ff00", font=("Segoe UI", 9, "bold"),
                        state="readonly", readonlybackground="#2d2d2d", takefocus=False)
         current_display.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        ToolTip(current_display, "Your current system (updates automatically on FSD jump)")
+        ToolTip(current_display, t('tooltips.current_system'))
         # Make the display available for selection-clear later
         self.distance_current_display = current_display
         # Avoid the Current System entry being selected when displayed
@@ -8532,14 +8824,14 @@ class App(tk.Tk):
         
         # Home System
         row += 1
-        ttk.Label(config_frame, text="Home System:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(config_frame, text=t('distance_calculator.home_system'), font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_home_system = tk.StringVar(value=load_home_system())
         home_entry = tk.Entry(config_frame, textvariable=self.distance_home_system, 
                              bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
                              insertbackground="#ffffff")
         home_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         home_entry.bind("<Return>", self._distance_set_home)  # Bind Enter key
-        ToolTip(home_entry, "Type system name and press Enter to save")
+        ToolTip(home_entry, t('tooltips.home_system'))
         
         # Distance to Home (from current) and to Sol
         home_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
@@ -8560,13 +8852,13 @@ class App(tk.Tk):
         
         # Fleet Carrier System (auto-detected, read-only)
         row += 1
-        ttk.Label(config_frame, text="Fleet Carrier:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(config_frame, text=t('distance_calculator.fleet_carrier'), font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_fc_system = tk.StringVar(value="")  # Will be auto-detected
         fc_entry = tk.Entry(config_frame, textvariable=self.distance_fc_system, 
                            bg="#2d2d2d", fg="#ffaa00", font=("Segoe UI", 9),
                            state="readonly", readonlybackground="#2d2d2d")
         fc_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        ToolTip(fc_entry, "Auto-detected from journals on app start and after FC jumps")
+        ToolTip(fc_entry, t('tooltips.fleet_carrier'))
         
         # Distance to FC (from current) and to Sol
         fc_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
@@ -8587,16 +8879,16 @@ class App(tk.Tk):
         
         # Refresh locations button (current system + FC)
         row += 1
-        auto_fc_btn = tk.Button(config_frame, text="Refresh Locations", 
+        auto_fc_btn = tk.Button(config_frame, text=t('distance_calculator.refresh_locations'), 
                                command=self._distance_refresh_locations,
                                bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
                                activeforeground="#ffffff", relief="ridge", bd=1, padx=8, pady=3,
                                font=("Segoe UI", 8, "normal"), cursor="hand2")
         auto_fc_btn.grid(row=row, column=0, columnspan=4, pady=(8, 0))
-        ToolTip(auto_fc_btn, "Scan journal files to update current system and fleet carrier location")
+        ToolTip(auto_fc_btn, t('tooltips.refresh_locations'))
         
         # Calculator section
-        calc_frame = ttk.LabelFrame(main_container, text="System Distance Calculator", padding=10)
+        calc_frame = ttk.LabelFrame(main_container, text=t('distance_calculator.system_calculator'), padding=10)
         calc_frame.pack(fill="x", pady=(0, 10))
         
         # Configure column weights: label, input (fixed), buttons
@@ -8609,7 +8901,7 @@ class App(tk.Tk):
         
         # System A input
         row = 0
-        ttk.Label(calc_frame, text="System A:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(calc_frame, text=t('distance_calculator.system_a'), font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_system_a = tk.StringVar(value=saved_system_a)
         system_a_entry = tk.Entry(calc_frame, textvariable=self.distance_system_a, 
                                   bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
@@ -8618,16 +8910,16 @@ class App(tk.Tk):
         system_a_entry.bind("<Return>", lambda e: self._calculate_distances())
         system_a_entry.bind("<FocusOut>", lambda e: self._save_distance_systems())
         
-        use_current_btn = tk.Button(calc_frame, text="Use Current", command=self._distance_use_current_system,
+        use_current_btn = tk.Button(calc_frame, text=t('distance_calculator.use_current'), command=self._distance_use_current_system,
                                    bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                    activeforeground="#ffffff", relief="ridge", bd=1, 
-                                   font=("Segoe UI", 8, "normal"), cursor="hand2", width=12)
+                                   font=("Segoe UI", 8, "normal"), cursor="hand2", width=14)
         use_current_btn.grid(row=row, column=2, pady=3, padx=(5, 0), sticky="w")
-        ToolTip(use_current_btn, "Fill with your current system from journals")
+        ToolTip(use_current_btn, t('tooltips.use_current'))
         
         # System B input
         row += 1
-        ttk.Label(calc_frame, text="System B:", font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(calc_frame, text=t('distance_calculator.system_b'), font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_system_b = tk.StringVar(value=saved_system_b)
         system_b_entry = tk.Entry(calc_frame, textvariable=self.distance_system_b, 
                                   bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
@@ -8640,28 +8932,28 @@ class App(tk.Tk):
         buttons_frame = tk.Frame(calc_frame, bg="#1e1e1e")
         buttons_frame.grid(row=row, column=2, pady=3, padx=(5, 0), sticky="w")
         
-        use_home_btn = tk.Button(buttons_frame, text="Home", command=self._distance_use_home,
+        use_home_btn = tk.Button(buttons_frame, text=t('distance_calculator.home'), command=self._distance_use_home,
                                 bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                 activeforeground="#ffffff", relief="ridge", bd=1, 
-                                font=("Segoe UI", 8, "normal"), cursor="hand2", width=5)
+                                font=("Segoe UI", 8, "normal"), cursor="hand2", width=6)
         use_home_btn.pack(side="left", padx=(0, 2))
-        ToolTip(use_home_btn, "Fill with your Home System")
+        ToolTip(use_home_btn, t('tooltips.use_home'))
         
-        use_fc_btn = tk.Button(buttons_frame, text="FC", command=self._distance_use_fc,
+        use_fc_btn = tk.Button(buttons_frame, text=t('distance_calculator.fc'), command=self._distance_use_fc,
                               bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                               activeforeground="#ffffff", relief="ridge", bd=1, 
-                              font=("Segoe UI", 8, "normal"), cursor="hand2", width=5)
+                              font=("Segoe UI", 8, "normal"), cursor="hand2", width=4)
         use_fc_btn.pack(side="left")
-        ToolTip(use_fc_btn, "Fill with your Fleet Carrier location")
+        ToolTip(use_fc_btn, t('tooltips.use_fc'))
         
         # Calculate button (or auto-calculate on change)
         row += 1
-        calc_btn = tk.Button(calc_frame, text="Calculate Distance", command=self._calculate_distances,
+        calc_btn = tk.Button(calc_frame, text=t('distance_calculator.calculate_distance'), command=self._calculate_distances,
                    bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                    activeforeground="#ffffff", relief="ridge", bd=1, padx=12, pady=4,
                    font=("Segoe UI", 9, "bold"), cursor="hand2")
         calc_btn.grid(row=row, column=0, columnspan=3, pady=(8, 3))
-        ToolTip(calc_btn, "Calculate distances between systems (or press Enter)")
+        ToolTip(calc_btn, t('tooltips.calculate_distance'))
 
         # Set focus to the Calculate Distance button after UI is built
         calc_frame.after(100, calc_btn.focus_set)
@@ -8673,12 +8965,12 @@ class App(tk.Tk):
         self.distance_status_label.grid(row=row, column=0, columnspan=3, pady=(0, 5))
         
         # Results section
-        results_frame = ttk.LabelFrame(main_container, text="Results", padding=10)
+        results_frame = ttk.LabelFrame(main_container, text=t('distance_calculator.results'), padding=10)
         results_frame.pack(fill="both", expand=True, pady=(0, 10))
         
         # Distance A ↔ B
         row = 0
-        self.distance_ab_label = tk.Label(results_frame, text="➤ Distance A ↔ B: ---", 
+        self.distance_ab_label = tk.Label(results_frame, text=f"➤ {t('distance_calculator.distance')} A ↔ B: ---", 
                                          font=("Segoe UI", 11, "bold"), fg="#ffcc00", bg=_dc_bg, anchor="w")
         self.distance_ab_label.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         
@@ -8689,42 +8981,42 @@ class App(tk.Tk):
         
         # System A Info with system name on same line (left column)
         row += 1
-        self.distance_system_a_name = tk.Label(results_frame, text="System A Info: ---", 
+        self.distance_system_a_name = tk.Label(results_frame, text=t('distance_calculator.system_a_info') + " ---", 
                                                font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
         self.distance_system_a_name.grid(row=row, column=0, sticky="w", padx=(0, 20), pady=(5, 0))
         
         # System B Info with system name on same line (right column)
-        self.distance_system_b_name = tk.Label(results_frame, text="System B Info: ---", 
+        self.distance_system_b_name = tk.Label(results_frame, text=t('distance_calculator.system_b_info') + " ---", 
                                                font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
         self.distance_system_b_name.grid(row=row, column=1, sticky="w", pady=(5, 0))
         
         # Distance to Sol - side by side
         row += 1
-        self.distance_a_sol_label = tk.Label(results_frame, text="➤ Distance to Sol: ---", 
+        self.distance_a_sol_label = tk.Label(results_frame, text=t('distance_calculator.distance_to_sol') + " ---", 
                                              font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_a_sol_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
         
-        self.distance_b_sol_label = tk.Label(results_frame, text="➤ Distance to Sol: ---", 
+        self.distance_b_sol_label = tk.Label(results_frame, text=t('distance_calculator.distance_to_sol') + " ---", 
                                              font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_b_sol_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
         
         # Visits count - side by side
         row += 1
-        self.distance_a_visits_label = tk.Label(results_frame, text="➤ Visits: ---", 
+        self.distance_a_visits_label = tk.Label(results_frame, text=t('distance_calculator.visits') + " ---", 
                                                 font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_a_visits_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
         
-        self.distance_b_visits_label = tk.Label(results_frame, text="➤ Visits: ---", 
+        self.distance_b_visits_label = tk.Label(results_frame, text=t('distance_calculator.visits') + " ---", 
                                                 font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_b_visits_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
         
         # Coordinates - side by side
         row += 1
-        self.distance_a_coords_label = tk.Label(results_frame, text="➤ Coordinates: ---", 
+        self.distance_a_coords_label = tk.Label(results_frame, text=t('distance_calculator.coordinates') + " ---", 
                                                 font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_a_coords_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
         
-        self.distance_b_coords_label = tk.Label(results_frame, text="➤ Coordinates: ---", 
+        self.distance_b_coords_label = tk.Label(results_frame, text=t('distance_calculator.coordinates') + " ---", 
                                                 font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_b_coords_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
         
@@ -8895,8 +9187,8 @@ class App(tk.Tk):
         system_b = self.distance_system_b.get().strip()
         
         # Update system info labels with system names on same line
-        self.distance_system_a_name.config(text=f"System A Info: {system_a if system_a else '---'}")
-        self.distance_system_b_name.config(text=f"System B Info: {system_b if system_b else '---'}")
+        self.distance_system_a_name.config(text=f"{t('distance_calculator.system_a_info')} {system_a if system_a else '---'}")
+        self.distance_system_b_name.config(text=f"{t('distance_calculator.system_b_info')} {system_b if system_b else '---'}")
         
         if not system_a and not system_b:
             self.distance_status_label.config(text="⚠ Please enter at least one system name", fg="#ffaa00")
@@ -8912,11 +9204,11 @@ class App(tk.Tk):
             self.update()
             
             # Reset labels
-            self.distance_ab_label.config(text=f"➤ Distance {system_a or 'A'} ↔ {system_b or 'B'}: Calculating...", fg="#cccccc")
-            self.distance_a_sol_label.config(text="➤ Distance to Sol: ---", fg="#ffffff")
-            self.distance_a_coords_label.config(text="➤ Coordinates: ---", fg="#ffffff")
-            self.distance_b_sol_label.config(text="➤ Distance to Sol: ---", fg="#ffffff")
-            self.distance_b_coords_label.config(text="➤ Coordinates: ---", fg="#ffffff")
+            self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}: ...", fg="#cccccc")
+            self.distance_a_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
+            self.distance_a_coords_label.config(text=t('distance_calculator.coordinates') + " ---", fg="#ffffff")
+            self.distance_b_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
+            self.distance_b_coords_label.config(text=t('distance_calculator.coordinates') + " ---", fg="#ffffff")
             self.update()
             
             # Get system info from EDSM
@@ -8939,21 +9231,21 @@ class App(tk.Tk):
             if sys_a_info and sys_b_info:
                 distance_ab = self.distance_calculator.calculate_distance(sys_a_info, sys_b_info)
                 if distance_ab is not None:
-                    self.distance_ab_label.config(text=f"➤ Distance {system_a} ↔ {system_b}: {distance_ab:.2f} LY", fg="#ffcc00")
+                    self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a} ↔ {system_b}: {distance_ab:.2f} LY", fg="#ffcc00")
                 else:
-                    self.distance_ab_label.config(text=f"➤ Distance {system_a} ↔ {system_b}: Calculation failed", fg="#ff6666")
+                    self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a} ↔ {system_b}: ---", fg="#ff6666")
             else:
-                self.distance_ab_label.config(text=f"➤ Distance {system_a or 'A'} ↔ {system_b or 'B'}: Need both systems", fg="#cccccc")
+                self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}: ---", fg="#cccccc")
             
             # System A info
             if sys_a_info:
                 sol_dist_a, _ = self.distance_calculator.get_distance_to_sol(system_a)
                 self.distance_a_sol_label.config(
-                    text=f"➤ Distance to Sol: {sol_dist_a:.2f} LY" if sol_dist_a is not None else "➤ Distance to Sol: ---",
+                    text=f"{t('distance_calculator.distance_to_sol')} {sol_dist_a:.2f} LY" if sol_dist_a is not None else t('distance_calculator.distance_to_sol') + " ---",
                     fg="#ffffff"
                 )
                 self.distance_a_coords_label.config(
-                    text=f"➤ Coordinates: X: {sys_a_info['x']:.2f}, Y: {sys_a_info['y']:.2f}, Z: {sys_a_info['z']:.2f}",
+                    text=f"{t('distance_calculator.coordinates')} X: {sys_a_info['x']:.2f}, Y: {sys_a_info['y']:.2f}, Z: {sys_a_info['z']:.2f}",
                     fg="#ffffff"
                 )
                 # System A visits count
@@ -8961,19 +9253,19 @@ class App(tk.Tk):
                     try:
                         visit_data = self.cargo_monitor.user_db.is_system_visited(system_a)
                         visits_count = visit_data.get('visit_count', 0) if visit_data else 0
-                        self.distance_a_visits_label.config(text=f"➤ Visits: {visits_count}", fg="#ffffff")
+                        self.distance_a_visits_label.config(text=f"{t('distance_calculator.visits')} {visits_count}", fg="#ffffff")
                     except:
-                        self.distance_a_visits_label.config(text="➤ Visits: ---", fg="#ffffff")
+                        self.distance_a_visits_label.config(text=t('distance_calculator.visits') + " ---", fg="#ffffff")
             
             # System B info
             if sys_b_info:
                 sol_dist_b, _ = self.distance_calculator.get_distance_to_sol(system_b)
                 self.distance_b_sol_label.config(
-                    text=f"➤ Distance to Sol: {sol_dist_b:.2f} LY" if sol_dist_b is not None else "➤ Distance to Sol: ---",
+                    text=f"{t('distance_calculator.distance_to_sol')} {sol_dist_b:.2f} LY" if sol_dist_b is not None else t('distance_calculator.distance_to_sol') + " ---",
                     fg="#ffffff"
                 )
                 self.distance_b_coords_label.config(
-                    text=f"➤ Coordinates: X: {sys_b_info['x']:.2f}, Y: {sys_b_info['y']:.2f}, Z: {sys_b_info['z']:.2f}",
+                    text=f"{t('distance_calculator.coordinates')} X: {sys_b_info['x']:.2f}, Y: {sys_b_info['y']:.2f}, Z: {sys_b_info['z']:.2f}",
                     fg="#ffffff"
                 )
                 # System B visits count
@@ -8981,13 +9273,13 @@ class App(tk.Tk):
                     try:
                         visit_data = self.cargo_monitor.user_db.is_system_visited(system_b)
                         visits_count = visit_data.get('visit_count', 0) if visit_data else 0
-                        self.distance_b_visits_label.config(text=f"➤ Visits: {visits_count}", fg="#ffffff")
+                        self.distance_b_visits_label.config(text=f"{t('distance_calculator.visits')} {visits_count}", fg="#ffffff")
                     except:
-                        self.distance_b_visits_label.config(text="➤ Visits: ---", fg="#ffffff")
+                        self.distance_b_visits_label.config(text=t('distance_calculator.visits') + " ---", fg="#ffffff")
             
             # Update status based on results
             if sys_a_info and sys_b_info:
-                self.distance_status_label.config(text="✓ Calculation complete", fg="#00ff00")
+                self.distance_status_label.config(text=t('distance_calculator.calculation_complete'), fg="#00ff00")
             elif sys_a_info or sys_b_info:
                 self.distance_status_label.config(text="⚠ One system not found", fg="#ffaa00")
             else:
@@ -9016,7 +9308,7 @@ class App(tk.Tk):
                     # Calculate distance from current system to Sol
                     sol_distance, _ = self.distance_calculator.get_distance_to_sol(current_system)
                     if sol_distance is not None:
-                        self.current_sol_label.config(text=f"➤ {sol_distance:.2f} LY from Sol", fg="#ffcc00")
+                        self.current_sol_label.config(text=f"➤ {sol_distance:.2f} {t('distance_calculator.from_sol')}", fg="#ffcc00")
                     else:
                         self.current_sol_label.config(text="")
                     
@@ -9030,7 +9322,7 @@ class App(tk.Tk):
                                     visits_count = visit_data.get('visit_count', 0)
                             except:
                                 pass
-                        self.distance_visits_label.config(text=f"Visits: {visits_count}")
+                        self.distance_visits_label.config(text=f"{t('distance_calculator.visits_label')} {visits_count}")
                 else:
                     self.distance_current_system.set("---")
                     self.current_sol_label.config(text="")
@@ -9052,14 +9344,14 @@ class App(tk.Tk):
                     current_system, home_system
                 )
                 if distance is not None:
-                    self.distance_to_home_label.config(text=f"➤ {distance:.2f} LY from current", fg="#ffcc00")
+                    self.distance_to_home_label.config(text=f"➤ {distance:.2f} {t('distance_calculator.from_current')}", fg="#ffcc00")
                 else:
                     self.distance_to_home_label.config(text="", fg="#888888")
                 
                 # Distance from home to Sol
                 sol_distance, _ = self.distance_calculator.get_distance_to_sol(home_system)
                 if sol_distance is not None:
-                    self.home_sol_label.config(text=f"(Sol: {sol_distance:.2f} LY)", fg="#888888")
+                    self.home_sol_label.config(text=f"({t('distance_calculator.sol_distance')} {sol_distance:.2f} LY)", fg="#888888")
                 else:
                     self.home_sol_label.config(text="")
                 
@@ -9068,7 +9360,7 @@ class App(tk.Tk):
                     try:
                         visit_data = self.cargo_monitor.user_db.is_system_visited(home_system)
                         visits_count = visit_data.get('visit_count', 0) if visit_data else 0
-                        self.home_visits_label.config(text=f"Visits: {visits_count}")
+                        self.home_visits_label.config(text=f"{t('distance_calculator.visits_label')} {visits_count}")
                     except:
                         self.home_visits_label.config(text="")
             else:
@@ -9085,14 +9377,14 @@ class App(tk.Tk):
                     current_system, fc_system
                 )
                 if distance is not None:
-                    self.distance_to_fc_label.config(text=f"➤ {distance:.2f} LY from current", fg="#ffcc00")
+                    self.distance_to_fc_label.config(text=f"➤ {distance:.2f} {t('distance_calculator.from_current')}", fg="#ffcc00")
                 else:
                     self.distance_to_fc_label.config(text="", fg="#888888")
                 
                 # Distance from FC to Sol
                 sol_distance, _ = self.distance_calculator.get_distance_to_sol(fc_system)
                 if sol_distance is not None:
-                    self.fc_sol_label.config(text=f"(Sol: {sol_distance:.2f} LY)", fg="#888888")
+                    self.fc_sol_label.config(text=f"({t('distance_calculator.sol_distance')} {sol_distance:.2f} LY)", fg="#888888")
                 else:
                     self.fc_sol_label.config(text="")
                 
@@ -9101,7 +9393,7 @@ class App(tk.Tk):
                     try:
                         visit_data = self.cargo_monitor.user_db.is_system_visited(fc_system)
                         visits_count = visit_data.get('visit_count', 0) if visit_data else 0
-                        self.fc_visits_label.config(text=f"Visits: {visits_count}")
+                        self.fc_visits_label.config(text=f"{t('distance_calculator.visits_label')} {visits_count}")
                     except:
                         self.fc_visits_label.config(text="")
             else:
@@ -9150,10 +9442,10 @@ class App(tk.Tk):
                 # Extract number from "➤ XX.XX LY from current"
                 fc_ly = fc_text.split("LY")[0].replace("➤", "").strip()
             
-            return f"➤ Sol: {sol_ly} LY | Home: {home_ly} LY | Fleet Carrier: {fc_ly} LY"
+            return f"➤ {t('mining_session.sol')} {sol_ly} LY | {t('mining_session.home')} {home_ly} LY | {t('mining_session.fleet_carrier')} {fc_ly} LY"
             
         except Exception as e:
-            return "➤ Sol: --- | Home: --- | Fleet Carrier: ---"
+            return f"➤ {t('mining_session.sol')} --- | {t('mining_session.home')} --- | {t('mining_session.fleet_carrier')} ---"
     
     # ==================== END DISTANCE CALCULATOR ====================
 
@@ -9328,7 +9620,7 @@ class App(tk.Tk):
         
         dialog = tk.Toplevel(self)
         dialog.withdraw()
-        dialog.title("Import Ship Preset")
+        dialog.title(t('dialogs.import_ship_preset'))
         dialog.configure(bg="#1e1e1e")
         dialog.geometry("480x280")
         dialog.resizable(False, False)
@@ -9470,7 +9762,7 @@ class App(tk.Tk):
                           width=10, cursor="hand2")
         ok_btn.pack(side=tk.LEFT, padx=5)
         
-        cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel,
+        cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
                               bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
                               activebackground="#4a4a4a", activeforeground="#ffffff",
                               width=10, cursor="hand2")
@@ -9750,7 +10042,7 @@ class App(tk.Tk):
             self.eddn_sender.set_enabled(enabled)
             status_msg = "EDDN sharing enabled - Contributing to community" if enabled else "EDDN sharing disabled"
             self._set_status(status_msg)
-            print(f"✅ {status_msg}")
+            print(f"[OK] {status_msg}")
     
     def _on_api_upload_toggle(self) -> None:
         """Called when API upload checkbox is toggled"""
@@ -9933,7 +10225,7 @@ class App(tk.Tk):
                 
             # Create progress window
             progress = tk.Toplevel(self)
-            progress.title("Importing Journal History")
+            progress.title(t('dialogs.importing_journal'))
             progress.geometry("400x200")
             progress.resizable(False, False)
             progress.configure(bg="#1e1e1e")
@@ -10040,7 +10332,7 @@ class App(tk.Tk):
         
         # Create modal dialog
         dialog = tk.Toplevel(self)
-        dialog.title("Import Journal History?")
+        dialog.title(t('dialogs.import_journal_question'))
         dialog.configure(bg="#2c3e50")
         dialog.geometry("550x350")  # Increased size to accommodate long paths
         dialog.resizable(False, False)
@@ -10632,7 +10924,7 @@ class App(tk.Tk):
             # Create progress dialog - use center_window for proper positioning
             progress_dialog = tk.Toplevel(self)
             progress_dialog.withdraw()  # Hide until positioned
-            progress_dialog.title("EliteMining - Database Update")
+            progress_dialog.title(t('dialogs.database_update'))
             progress_dialog.transient(self)
             progress_dialog.resizable(False, False)
             progress_dialog.configure(bg="#2c3e50")
@@ -10775,7 +11067,7 @@ class App(tk.Tk):
         
         # Create custom centered dialog
         dialog = tk.Toplevel(self)
-        dialog.title("Theme Changed")
+        dialog.title(t('dialogs.theme_changed'))
         dialog.transient(self)
         dialog.grab_set()
         dialog.resizable(False, False)
@@ -10794,26 +11086,21 @@ class App(tk.Tk):
         frame = ttk.Frame(dialog, padding=20)
         frame.pack(fill="both", expand=True)
         
+        # Show theme change message with OK button
         ttk.Label(frame, text=f"Theme changed to {theme_name}.", 
                   font=("Segoe UI", 10, "bold")).pack(pady=(0, 5))
-        ttk.Label(frame, text="Restart EliteMining now to apply the new theme?",
+        ttk.Label(frame, text="Please restart EliteMining to apply changes.",
                   font=("Segoe UI", 9)).pack(pady=(0, 15))
         
-        # Buttons
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack()
-        
-        def on_yes():
-            dialog.destroy()
-            self._restart_app()
-        
-        def on_no():
+        # Single OK button - user will close app manually
+        def on_ok():
             dialog.destroy()
         
-        yes_btn = ttk.Button(btn_frame, text="Yes", command=on_yes, width=10)
-        yes_btn.pack(side="left", padx=(0, 10))
-        no_btn = ttk.Button(btn_frame, text="No", command=on_no, width=10)
-        no_btn.pack(side="left")
+        ok_btn = ttk.Button(frame, text="OK", command=on_ok, width=10)
+        ok_btn.pack()
+        ok_btn.focus_set()
+        dialog.bind("<Return>", lambda e: on_ok())
+        dialog.bind("<Escape>", lambda e: on_ok())
         
         # Center dialog on main window
         dialog.update_idletasks()
@@ -10827,17 +11114,156 @@ class App(tk.Tk):
         x = main_x + (main_width - dialog_width) // 2
         y = main_y + (main_height - dialog_height) // 2
         dialog.geometry(f"+{x}+{y}")
-        
-        # Focus on Yes button
-        yes_btn.focus_set()
-        dialog.bind("<Return>", lambda e: on_yes())
-        dialog.bind("<Escape>", lambda e: on_no())
     
+    def _create_language_flags(self, parent_frame) -> None:
+        """Create a single language flag button that shows dropdown on click"""
+        from localization import get_language
+        from path_utils import get_app_data_dir
+        
+        # Get current language
+        current_lang = get_language()
+        
+        # Flag image files
+        self._lang_flag_files = {
+            'en': 'united-kingdom.png',
+            'de': 'german-flag.png'
+        }
+        
+        # Language names for menu
+        self._lang_names = {
+            'en': 'English',
+            'de': 'Deutsch'
+        }
+        
+        # Load flag images
+        self._flag_images = {}
+        images_dir = os.path.join(get_app_data_dir(), "Images")
+        
+        for lang_code, filename in self._lang_flag_files.items():
+            flag_path = os.path.join(images_dir, filename)
+            if os.path.exists(flag_path):
+                try:
+                    img = tk.PhotoImage(file=flag_path)
+                    # Subsample to reduce size (divide by factor)
+                    # 512px -> ~21px = subsample by 24
+                    if img.width() > 100:
+                        scale = img.width() // 21
+                        img = img.subsample(scale, scale)
+                    self._flag_images[lang_code] = img
+                except Exception as e:
+                    print(f"Error loading flag image {filename}: {e}")
+        
+        # Determine current flag
+        current_image = self._flag_images.get(current_lang, self._flag_images.get('en'))
+        
+        # Create flag button with image
+        if current_image:
+            self._current_lang_label = tk.Label(
+                parent_frame,
+                image=current_image,
+                bg="#1e1e1e",
+                cursor="hand2",
+                bd=0,
+                highlightthickness=0
+            )
+            self._current_lang_label.image = current_image  # Keep reference
+        else:
+            # Fallback to text if no image
+            self._current_lang_label = tk.Label(
+                parent_frame,
+                text=current_lang.upper(),
+                font=("Segoe UI", 9, "bold"),
+                bg="#2a4a6a",
+                fg="#ffffff",
+                padx=8,
+                pady=3,
+                cursor="hand2",
+                relief="raised",
+                bd=1
+            )
+        
+        self._current_lang_label.pack(side="left", padx=(8, 0))
+        
+        # Bind click to show language menu
+        self._current_lang_label.bind("<Button-1>", self._show_language_menu)
+        
+        # Hover effect (subtle) - use add='+' to not override ToolTip bindings
+        def on_enter_flag(e):
+            self._current_lang_label.config(bg="#2a2a2a")
+        def on_leave_flag(e):
+            self._current_lang_label.config(bg="#1e1e1e")
+        self._current_lang_label.bind("<Enter>", on_enter_flag, add='+')
+        self._current_lang_label.bind("<Leave>", on_leave_flag, add='+')
+        
+        # Add tooltip AFTER bindings
+        ToolTip(self._current_lang_label, t('tooltips.change_language'))
+    
+    def _show_language_menu(self, event):
+        """Show popup menu with language options"""
+        menu = tk.Menu(self, tearoff=0, bg="#2a2a2a", fg="#ffffff", 
+                      activebackground="#4a4a4a", activeforeground="#ffffff",
+                      font=("Segoe UI", 10))
+        
+        from localization import get_language
+        current_lang = get_language()
+        
+        for lang_code, lang_name in self._lang_names.items():
+            # Add checkmark for current language
+            label = f"{lang_name}" + ("  ✓" if lang_code == current_lang else "")
+            
+            # Try to add image to menu item
+            img = self._flag_images.get(lang_code)
+            if img:
+                menu.add_command(label=label, image=img, compound="left",
+                               command=lambda lc=lang_code: self._change_language(lc))
+            else:
+                menu.add_command(label=label, 
+                               command=lambda lc=lang_code: self._change_language(lc))
+        
+        # Show menu at button position (above the button)
+        try:
+            menu.tk_popup(event.widget.winfo_rootx(), 
+                         event.widget.winfo_rooty() - len(self._lang_names) * 28)
+        finally:
+            menu.grab_release()
+    
+    def _change_language(self, lang_code: str):
+        """Change language and prompt for restart"""
+        from localization import get_language
+        from app_utils import centered_message
+        
+        # Don't do anything if same language
+        if lang_code == get_language():
+            return
+        
+        # Save to config
+        try:
+            cfg = _load_cfg()
+            cfg['language'] = lang_code
+            _save_cfg(cfg)
+        except Exception as e:
+            print(f"Error saving language setting: {e}")
+            return
+        
+        # Update the flag display with new image
+        new_image = self._flag_images.get(lang_code)
+        if new_image:
+            self._current_lang_label.config(image=new_image)
+            self._current_lang_label.image = new_image
+        else:
+            self._current_lang_label.config(text=lang_code.upper())
+        
+        # Show restart message with OK button
+        from app_utils import centered_message
+        centered_message(self, t('settings.restart_required'),
+            "Language changed.\n\nPlease restart EliteMining to apply changes.")
+
     def _restart_app(self) -> None:
-        """Restart the application"""
+        """Restart the application - shows message for frozen executables"""
         import sys
         import os
         import subprocess
+        from tkinter import messagebox
         
         # Save window geometry before restart
         try:
@@ -10848,7 +11274,6 @@ class App(tk.Tk):
                 self.update_idletasks()
             geometry = self.geometry()
             save_window_geometry({"geometry": geometry, "zoomed": is_zoomed})
-            print(f"Saved window geometry before restart: {geometry}, zoomed: {is_zoomed}")
         except Exception as e:
             print(f"Error saving window geometry before restart: {e}")
         
@@ -10859,14 +11284,22 @@ class App(tk.Tk):
         except Exception as e:
             print(f"Error saving session before restart: {e}")
         
-        # Get the current script and Python executable
-        python = sys.executable
-        script = os.path.abspath(sys.argv[0])
+        # Get the executable path
+        executable = sys.executable
         
-        # Use subprocess with proper argument handling for paths with spaces
-        subprocess.Popen([python, script])
+        if getattr(sys, 'frozen', False):
+            # For frozen executables, show restart message
+            messagebox.showinfo(
+                "Restart Required",
+                "Please restart EliteMining to apply changes.\n\n"
+                "The application will now close."
+            )
+        else:
+            # Running from Python script - direct restart works fine
+            script = os.path.abspath(sys.argv[0])
+            subprocess.Popen([executable, script])
         
-        # Close the current window
+        # Close the current window and exit cleanly
         self.destroy()
         sys.exit(0)
 
@@ -10939,9 +11372,63 @@ class App(tk.Tk):
         except:
             pass
         
+        # Save last app close timestamp for smart journal catchup
+        self._save_last_app_close_time()
+        
         # EDDN listener removed - no longer needed
             
         self.destroy()
+    
+    def _save_last_app_close_time(self):
+        """Save the current timestamp so next startup knows when app was last running"""
+        import json
+        from datetime import datetime
+        from path_utils import get_app_data_dir
+        
+        try:
+            timestamp_file = os.path.join(get_app_data_dir(), "last_app_close.json")
+            data = {
+                "timestamp": datetime.now().isoformat(),
+                "sync_version": "4.6.6"  # Track which version did the full sync
+            }
+            with open(timestamp_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f)
+            log.info(f"[CATCHUP] Saved app close time: {data['timestamp']}")
+        except Exception as e:
+            log.error(f"[CATCHUP] Failed to save app close time: {e}")
+    
+    def _get_last_app_close_time(self):
+        """Get the timestamp of when app was last closed and sync version"""
+        import json
+        from datetime import datetime
+        from path_utils import get_app_data_dir
+        
+        try:
+            timestamp_file = os.path.join(get_app_data_dir(), "last_app_close.json")
+            if os.path.exists(timestamp_file):
+                with open(timestamp_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                timestamp_str = data.get("timestamp")
+                sync_version = data.get("sync_version")
+                if timestamp_str:
+                    return datetime.fromisoformat(timestamp_str), sync_version
+        except Exception as e:
+            log.error(f"[CATCHUP] Failed to read app close time: {e}")
+        return None, None
+    
+    def _needs_full_sync(self):
+        """Check if a full journal sync is needed (first run of this version)"""
+        _, sync_version = self._get_last_app_close_time()
+        # If no sync version or older than 4.6.6, need full sync
+        if not sync_version:
+            return True
+        # Compare versions - 4.6.6 introduced full sync
+        try:
+            current_parts = [int(x) for x in "4.6.6".split('.')]
+            saved_parts = [int(x) for x in sync_version.split('.')]
+            return saved_parts < current_parts
+        except:
+            return True
 
     def _setup_announcement_tracing(self):
         """Set up tracing for announcement variables after loading is complete"""
@@ -10972,10 +11459,10 @@ class App(tk.Tk):
         """Show backup dialog with options to select what to backup"""
         try:
             dialog = tk.Toplevel(self)
-            dialog.title("Create Backup")
+            dialog.title(t('dialogs.backup_title'))
             dialog.geometry("450x480")
             dialog.resizable(False, False)
-            dialog.configure(bg="#2c3e50")
+            dialog.configure(bg="#1e1e1e")
             dialog.transient(self)
             dialog.grab_set()
             
@@ -10997,126 +11484,112 @@ class App(tk.Tk):
             dialog.geometry(f"+{x}+{y}")
             
             # Title
-            title_label = tk.Label(dialog, text="📦 Create Backup", 
+            title_label = tk.Label(dialog, text="📦 " + t('dialogs.backup_title'), 
                                  font=("Segoe UI", 14, "bold"),
-                                 bg="#2c3e50", fg="#ecf0f1")
+                                 bg="#1e1e1e", fg="#ff9800")
             title_label.pack(pady=15)
             
             # Instructions
-            inst_label = tk.Label(dialog, text="Select what to include in the backup:",
+            inst_label = tk.Label(dialog, text=t('dialogs.backup_instructions'),
                                 font=("Segoe UI", 10),
-                                bg="#2c3e50", fg="#bdc3c7")
+                                bg="#1e1e1e", fg="#aaaaaa")
             inst_label.pack(pady=(0, 20))
             
             # Backup options frame
-            options_frame = tk.Frame(dialog, bg="#2c3e50")
+            options_frame = tk.Frame(dialog, bg="#1e1e1e")
             options_frame.pack(pady=10)
             
-            # Backup option variables
-            backup_presets = tk.IntVar(value=1)
-            backup_reports = tk.IntVar(value=1)
-            backup_bookmarks = tk.IntVar(value=1)
-            backup_va_profile = tk.IntVar(value=1)
+            # Backup option variables - all default to unticked
+            backup_presets = tk.IntVar(value=0)
+            backup_reports = tk.IntVar(value=0)
+            backup_bookmarks = tk.IntVar(value=0)
+            backup_va_profile = tk.IntVar(value=0)
             backup_userdb = tk.IntVar(value=0)
             backup_journals = tk.IntVar(value=0)
             backup_all = tk.IntVar(value=0)
             
             def on_all_change():
-                if backup_all.get():
-                    backup_presets.set(1)
-                    backup_reports.set(1)
-                    backup_bookmarks.set(1)
-                    backup_va_profile.set(1)
-                    backup_userdb.set(1)
-                    backup_journals.set(1)
-                    # Disable individual checkboxes
-                    presets_cb.config(state="disabled")
-                    reports_cb.config(state="disabled")
-                    bookmarks_cb.config(state="disabled")
-                    va_profile_cb.config(state="disabled")
-                    userdb_cb.config(state="disabled")
-                    journals_cb.config(state="disabled")
-                else:
-                    # Enable individual checkboxes
-                    presets_cb.config(state="normal")
-                    reports_cb.config(state="normal")
-                    bookmarks_cb.config(state="normal")
-                    va_profile_cb.config(state="normal")
-                    userdb_cb.config(state="normal")
-                    journals_cb.config(state="normal")
+                """Toggle all checkboxes on/off based on Backup Everything state"""
+                new_value = backup_all.get()
+                backup_presets.set(new_value)
+                backup_reports.set(new_value)
+                backup_bookmarks.set(new_value)
+                backup_va_profile.set(new_value)
+                backup_userdb.set(new_value)
+                backup_journals.set(new_value)
             
             # All checkbox
-            all_cb = tk.Checkbutton(options_frame, text="📂 Backup Everything",
+            all_cb = tk.Checkbutton(options_frame, text="📂 " + t('dialogs.backup_everything'),
                                   variable=backup_all,
                                   command=on_all_change,
-                                  bg="#2c3e50", fg="#ecf0f1",
-                                  selectcolor="#34495e",
-                                  activebackground="#34495e",
-                                  activeforeground="#ecf0f1",
+                                  bg="#1e1e1e", fg="#ffffff",
+                                  selectcolor="#2a2a2a",
+                                  activebackground="#2a2a2a",
+                                  activeforeground="#ffffff",
                                   font=("Segoe UI", 10, "bold"))
             all_cb.pack(anchor="w", pady=5)
             
             # Separator
-            sep = tk.Frame(options_frame, height=1, bg="#7f8c8d")
+            sep = tk.Frame(options_frame, height=1, bg="#ff9800")
             sep.pack(fill="x", pady=10)
             
             # Individual checkboxes
-            presets_cb = tk.Checkbutton(options_frame, text="⚙️ Ship Presets",
+            presets_cb = tk.Checkbutton(options_frame, text="⚙️ " + t('dialogs.ship_presets'),
                                       variable=backup_presets,
-                                      bg="#2c3e50", fg="#ecf0f1",
-                                      selectcolor="#34495e",
-                                      activebackground="#34495e",
-                                      activeforeground="#ecf0f1",
+                                      bg="#1e1e1e", fg="#ffffff",
+                                      selectcolor="#2a2a2a",
+                                      activebackground="#2a2a2a",
+                                      activeforeground="#ffffff",
                                       font=("Segoe UI", 10))
             presets_cb.pack(anchor="w", pady=2)
             
-            reports_cb = tk.Checkbutton(options_frame, text="📊 Mining Reports",
+            reports_cb = tk.Checkbutton(options_frame, text="📊 " + t('dialogs.mining_reports'),
                                       variable=backup_reports,
-                                      bg="#2c3e50", fg="#ecf0f1",
-                                      selectcolor="#34495e",
-                                      activebackground="#34495e",
-                                      activeforeground="#ecf0f1",
+                                      bg="#1e1e1e", fg="#ffffff",
+                                      selectcolor="#2a2a2a",
+                                      activebackground="#2a2a2a",
+                                      activeforeground="#ffffff",
                                       font=("Segoe UI", 10))
             reports_cb.pack(anchor="w", pady=2)
             
-            bookmarks_cb = tk.Checkbutton(options_frame, text="🔖 Mining Bookmarks",
+            bookmarks_cb = tk.Checkbutton(options_frame, text="🔖 " + t('dialogs.mining_bookmarks'),
                                         variable=backup_bookmarks,
-                                        bg="#2c3e50", fg="#ecf0f1",
-                                        selectcolor="#34495e",
-                                        activebackground="#34495e",
-                                        activeforeground="#ecf0f1",
+                                        bg="#1e1e1e", fg="#ffffff",
+                                        selectcolor="#2a2a2a",
+                                        activebackground="#2a2a2a",
+                                        activeforeground="#ffffff",
                                         font=("Segoe UI", 10))
             bookmarks_cb.pack(anchor="w", pady=2)
             
-            va_profile_cb = tk.Checkbutton(options_frame, text="🎤 VoiceAttack Profile",
+            va_profile_cb = tk.Checkbutton(options_frame, text="🎤 " + t('dialogs.voiceattack_profile'),
                                          variable=backup_va_profile,
-                                         bg="#2c3e50", fg="#ecf0f1",
-                                         selectcolor="#34495e",
-                                         activebackground="#34495e",
-                                         activeforeground="#ecf0f1",
+                                         bg="#1e1e1e", fg="#ffffff",
+                                         selectcolor="#2a2a2a",
+                                         activebackground="#2a2a2a",
+                                         activeforeground="#ffffff",
                                          font=("Segoe UI", 10))
             va_profile_cb.pack(anchor="w", pady=2)
             
-            userdb_cb = tk.Checkbutton(options_frame, text="💾 User Database (Hotspots)",
+            userdb_cb = tk.Checkbutton(options_frame, text="💾 " + t('dialogs.user_database'),
                                        variable=backup_userdb,
-                                       bg="#2c3e50", fg="#ecf0f1",
-                                       selectcolor="#34495e",
-                                       activebackground="#34495e",
-                                       activeforeground="#ecf0f1",
+                                       bg="#1e1e1e", fg="#ffffff",
+                                       selectcolor="#2a2a2a",
+                                       activebackground="#2a2a2a",
+                                       activeforeground="#ffffff",
                                        font=("Segoe UI", 10))
             userdb_cb.pack(anchor="w", pady=2)
             
-            journals_cb = tk.Checkbutton(options_frame, text="📝 Journal Files",
+            journals_cb = tk.Checkbutton(options_frame, text="📝 " + t('dialogs.journal_files'),
                                         variable=backup_journals,
-                                        bg="#2c3e50", fg="#ecf0f1",
-                                        selectcolor="#34495e",
-                                        activebackground="#34495e",
-                                        activeforeground="#ecf0f1",
+                                        bg="#1e1e1e", fg="#ffffff",
+                                        selectcolor="#2a2a2a",
+                                        activebackground="#2a2a2a",
+                                        activeforeground="#ffffff",
                                         font=("Segoe UI", 10))
             journals_cb.pack(anchor="w", pady=2)
             
             # Buttons frame
-            btn_frame = tk.Frame(dialog, bg="#2c3e50")
+            btn_frame = tk.Frame(dialog, bg="#1e1e1e")
             btn_frame.pack(pady=20)
             
             def on_create_backup():
@@ -11129,7 +11602,7 @@ class App(tk.Tk):
                 include_journals = backup_journals.get() or backup_all.get()
                 
                 if not (include_presets or include_reports or include_bookmarks or include_va_profile or include_userdb or include_journals):
-                    messagebox.showwarning("No Selection", "Please select at least one item to backup.")
+                    messagebox.showwarning(t('dialogs.no_selection'), t('dialogs.no_selection_msg'))
                     return
                 
                 dialog.destroy()
@@ -11138,12 +11611,12 @@ class App(tk.Tk):
             def on_cancel():
                 dialog.destroy()
             
-            create_btn = tk.Button(btn_frame, text="✅ Create Backup", command=on_create_backup,
+            create_btn = tk.Button(btn_frame, text=t('dialogs.create_backup'), command=on_create_backup,
                                  bg="#27ae60", fg="white", font=("Segoe UI", 10, "bold"),
                                  width=15, cursor="hand2")
             create_btn.pack(side=tk.LEFT, padx=5)
             
-            cancel_btn = tk.Button(btn_frame, text="❌ Cancel", command=on_cancel,
+            cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=on_cancel,
                                  bg="#e74c3c", fg="white", font=("Segoe UI", 10, "bold"),
                                  width=15, cursor="hand2")
             cancel_btn.pack(side=tk.LEFT, padx=5)
@@ -11185,7 +11658,7 @@ class App(tk.Tk):
             default_name = f"EliteMining_Backup_{content_desc}_{timestamp}.zip"
             
             backup_path = filedialog.asksaveasfilename(
-                title="Save Backup As",
+                title=t('dialogs.save_backup_as'),
                 defaultextension=".zip",
                 filetypes=[("ZIP files", "*.zip"), ("All files", "*.*")],
                 initialfile=default_name
@@ -11365,7 +11838,7 @@ class App(tk.Tk):
         try:
             # Ask for backup file
             backup_path = filedialog.askopenfilename(
-                title="Select Backup File",
+                title=t('dialogs.select_backup_file'),
                 filetypes=[("ZIP files", "*.zip"), ("All files", "*.*")]
             )
             
@@ -11392,13 +11865,13 @@ class App(tk.Tk):
                     has_journals = any(f.startswith("Journals/") and f.endswith(".log") for f in file_list)
                     
                     if not (has_presets or has_reports or has_bookmarks or has_va_profile or has_userdb or has_journals):
-                        messagebox.showerror("Invalid Backup", "This doesn't appear to be a valid EliteMining backup file.")
+                        messagebox.showerror(t('dialogs.invalid_backup'), t('dialogs.invalid_backup_msg'))
                         return
                     
                     self._show_restore_options_dialog(backup_path, has_presets, has_reports, has_bookmarks, has_va_profile, has_userdb, has_journals, manifest)
                     
             except zipfile.BadZipFile:
-                messagebox.showerror("Invalid File", "Selected file is not a valid ZIP archive.")
+                messagebox.showerror(t('dialogs.invalid_file'), t('dialogs.invalid_zip_msg'))
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to read backup file: {str(e)}")
                 
@@ -11410,10 +11883,10 @@ class App(tk.Tk):
         """Show dialog to select what to restore from backup"""
         try:
             dialog = tk.Toplevel(self)
-            dialog.title("Restore from Backup")
-            dialog.geometry("450x550")
+            dialog.title(t('dialogs.restore_title'))
+            dialog.geometry("450x620")
             dialog.resizable(False, False)
-            dialog.configure(bg="#2c3e50")
+            dialog.configure(bg="#1e1e1e")
             dialog.transient(self)
             dialog.grab_set()
             
@@ -11435,119 +11908,151 @@ class App(tk.Tk):
             dialog.geometry(f"+{x}+{y}")
             
             # Title
-            title_label = tk.Label(dialog, text="📂 Restore from Backup", 
+            title_label = tk.Label(dialog, text=t('dialogs.restore_title'), 
                                  font=("Segoe UI", 14, "bold"),
-                                 bg="#2c3e50", fg="#ecf0f1")
+                                 bg="#1e1e1e", fg="#ff9800")
             title_label.pack(pady=15)
             
             # Backup info
             if manifest:
                 backup_date = manifest.get("backup_date", "Unknown")
                 app_version = manifest.get("app_version", "Unknown")
-                info_text = f"Backup Date: {backup_date[:19].replace('T', ' ')}\nApp Version: {app_version}"
+                info_text = f"{t('dialogs.backup_date')}: {backup_date[:19].replace('T', ' ')}\n{t('dialogs.app_version')}: {app_version}"
             else:
-                info_text = f"Backup File: {os.path.basename(backup_path)}"
+                info_text = f"{t('dialogs.backup_file')}: {os.path.basename(backup_path)}"
                 
             info_label = tk.Label(dialog, text=info_text,
                                 font=("Segoe UI", 9),
-                                bg="#2c3e50", fg="#bdc3c7")
+                                bg="#1e1e1e", fg="#aaaaaa")
             info_label.pack(pady=(0, 10))
             
             # Instructions
-            inst_label = tk.Label(dialog, text="Select what to restore:",
+            inst_label = tk.Label(dialog, text=t('dialogs.restore_instructions'),
                                 font=("Segoe UI", 10),
-                                bg="#2c3e50", fg="#bdc3c7")
+                                bg="#1e1e1e", fg="#aaaaaa")
             inst_label.pack(pady=(0, 20))
             
             # Restore options frame
-            options_frame = tk.Frame(dialog, bg="#2c3e50")
+            options_frame = tk.Frame(dialog, bg="#1e1e1e")
             options_frame.pack(pady=10)
             
-            # Restore option variables
-            restore_presets = tk.IntVar(value=1 if has_presets else 0)
-            restore_reports = tk.IntVar(value=1 if has_reports else 0)
-            restore_bookmarks = tk.IntVar(value=1 if has_bookmarks else 0)
-            restore_va_profile = tk.IntVar(value=1 if has_va_profile else 0)
-            restore_userdb = tk.IntVar(value=0)  # Default to unchecked for safety
-            restore_journals = tk.IntVar(value=0)  # Default to unchecked for safety
+            # Restore option variables - all default to unticked
+            restore_presets = tk.IntVar(value=0)
+            restore_reports = tk.IntVar(value=0)
+            restore_bookmarks = tk.IntVar(value=0)
+            restore_va_profile = tk.IntVar(value=0)
+            restore_userdb = tk.IntVar(value=0)
+            restore_journals = tk.IntVar(value=0)
+            restore_all = tk.IntVar(value=0)
+            
+            def on_restore_all_change():
+                """Toggle all available checkboxes on/off based on Restore Everything state"""
+                new_value = restore_all.get()
+                if has_presets:
+                    restore_presets.set(new_value)
+                if has_reports:
+                    restore_reports.set(new_value)
+                if has_bookmarks:
+                    restore_bookmarks.set(new_value)
+                if has_va_profile:
+                    restore_va_profile.set(new_value)
+                if has_userdb:
+                    restore_userdb.set(new_value)
+                if has_journals:
+                    restore_journals.set(new_value)
+            
+            # Restore Everything checkbox
+            all_cb = tk.Checkbutton(options_frame, text=t('dialogs.restore_everything'),
+                                  variable=restore_all,
+                                  command=on_restore_all_change,
+                                  bg="#1e1e1e", fg="#ffffff",
+                                  selectcolor="#2a2a2a",
+                                  activebackground="#2a2a2a",
+                                  activeforeground="#ffffff",
+                                  font=("Segoe UI", 10, "bold"))
+            all_cb.pack(anchor="w", pady=5)
+            
+            # Separator
+            sep = tk.Frame(options_frame, height=1, bg="#ff9800")
+            sep.pack(fill="x", pady=10)
             
             # Checkboxes for available items
             if has_presets:
-                presets_cb = tk.Checkbutton(options_frame, text="⚙️ Ship Presets",
+                presets_cb = tk.Checkbutton(options_frame, text=t('dialogs.ship_presets'),
                                           variable=restore_presets,
-                                          bg="#2c3e50", fg="#ecf0f1",
-                                          selectcolor="#34495e",
-                                          activebackground="#34495e",
-                                          activeforeground="#ecf0f1",
+                                          bg="#1e1e1e", fg="#ffffff",
+                                          selectcolor="#2a2a2a",
+                                          activebackground="#2a2a2a",
+                                          activeforeground="#ffffff",
                                           font=("Segoe UI", 10))
                 presets_cb.pack(anchor="w", pady=2)
             
             if has_reports:
-                reports_cb = tk.Checkbutton(options_frame, text="📊 Mining Reports",
+                reports_cb = tk.Checkbutton(options_frame, text=t('dialogs.mining_reports'),
                                           variable=restore_reports,
-                                          bg="#2c3e50", fg="#ecf0f1",
-                                          selectcolor="#34495e",
-                                          activebackground="#34495e",
-                                          activeforeground="#ecf0f1",
+                                          bg="#1e1e1e", fg="#ffffff",
+                                          selectcolor="#2a2a2a",
+                                          activebackground="#2a2a2a",
+                                          activeforeground="#ffffff",
                                           font=("Segoe UI", 10))
                 reports_cb.pack(anchor="w", pady=2)
             
             if has_bookmarks:
-                bookmarks_cb = tk.Checkbutton(options_frame, text="🔖 Mining Bookmarks",
+                bookmarks_cb = tk.Checkbutton(options_frame, text=t('dialogs.mining_bookmarks'),
                                             variable=restore_bookmarks,
-                                            bg="#2c3e50", fg="#ecf0f1",
-                                            selectcolor="#34495e",
-                                            activebackground="#34495e",
-                                            activeforeground="#ecf0f1",
+                                            bg="#1e1e1e", fg="#ffffff",
+                                            selectcolor="#2a2a2a",
+                                            activebackground="#2a2a2a",
+                                            activeforeground="#ffffff",
                                             font=("Segoe UI", 10))
                 bookmarks_cb.pack(anchor="w", pady=2)
             
             if has_va_profile:
-                va_profile_cb = tk.Checkbutton(options_frame, text="🎤 VoiceAttack Profile",
+                va_profile_cb = tk.Checkbutton(options_frame, text=t('dialogs.voiceattack_profile'),
                                              variable=restore_va_profile,
-                                             bg="#2c3e50", fg="#ecf0f1",
-                                             selectcolor="#34495e",
-                                             activebackground="#34495e",
-                                             activeforeground="#ecf0f1",
+                                             bg="#1e1e1e", fg="#ffffff",
+                                             selectcolor="#2a2a2a",
+                                             activebackground="#2a2a2a",
+                                             activeforeground="#ffffff",
                                              font=("Segoe UI", 10))
                 va_profile_cb.pack(anchor="w", pady=2)
             
             if has_userdb:
-                userdb_cb = tk.Checkbutton(options_frame, text="💾 User Database (Hotspots)",
+                userdb_cb = tk.Checkbutton(options_frame, text=t('dialogs.user_database'),
                                           variable=restore_userdb,
-                                          bg="#2c3e50", fg="#ecf0f1",
-                                          selectcolor="#34495e",
-                                          activebackground="#34495e",
-                                          activeforeground="#ecf0f1",
+                                          bg="#1e1e1e", fg="#ffffff",
+                                          selectcolor="#2a2a2a",
+                                          activebackground="#2a2a2a",
+                                          activeforeground="#ffffff",
                                           font=("Segoe UI", 10))
                 userdb_cb.pack(anchor="w", pady=2)
             
             if has_journals:
-                journals_cb = tk.Checkbutton(options_frame, text="📝 Journal Files",
+                journals_cb = tk.Checkbutton(options_frame, text=t('dialogs.journal_files'),
                                            variable=restore_journals,
-                                           bg="#2c3e50", fg="#ecf0f1",
-                                           selectcolor="#34495e",
-                                           activebackground="#34495e",
-                                           activeforeground="#ecf0f1",
+                                           bg="#1e1e1e", fg="#ffffff",
+                                           selectcolor="#2a2a2a",
+                                           activebackground="#2a2a2a",
+                                           activeforeground="#ffffff",
                                            font=("Segoe UI", 10))
                 journals_cb.pack(anchor="w", pady=2)
             
             # Warning label
             warning_label = tk.Label(dialog, 
-                                   text="⚠️ Warning: This will overwrite existing files!",
+                                   text=t('dialogs.restore_warning'),
                                    font=("Segoe UI", 9, "bold"),
-                                   bg="#2c3e50", fg="#e74c3c")
+                                   bg="#1e1e1e", fg="#e74c3c")
             warning_label.pack(pady=(20, 5))
             
             # Restart info label
             restart_label = tk.Label(dialog, 
-                                   text="ℹ️ Restart the app after restoring backups",
+                                   text=t('dialogs.restart_info'),
                                    font=("Segoe UI", 9),
-                                   bg="#2c3e50", fg="#95a5a6")
+                                   bg="#1e1e1e", fg="#888888")
             restart_label.pack(pady=(0, 10))
             
             # Buttons frame
-            btn_frame = tk.Frame(dialog, bg="#2c3e50")
+            btn_frame = tk.Frame(dialog, bg="#1e1e1e")
             btn_frame.pack(pady=20)
             
             def on_restore():
@@ -11567,14 +12072,13 @@ class App(tk.Tk):
                     restore_any = True
                 
                 if not restore_any:
-                    messagebox.showwarning("No Selection", "Please select at least one item to restore.")
+                    messagebox.showwarning(t('dialogs.no_selection'), t('dialogs.no_selection_msg'))
                     return
                 
                 # Confirm action
                 from app_utils import centered_askyesno
-                result = centered_askyesno(self, "Confirm Restore", 
-                                           "Are you sure you want to restore the selected items?\n\n"
-                                           "This will overwrite existing files!")
+                result = centered_askyesno(self, t('dialogs.confirm_restore'), 
+                                           t('dialogs.confirm_restore_msg'))
                 if not result:
                     return
                 
@@ -11590,15 +12094,15 @@ class App(tk.Tk):
             def on_cancel():
                 dialog.destroy()
             
-            restore_btn = tk.Button(btn_frame, text="✅ Restore", command=on_restore,
+            restore_btn = tk.Button(btn_frame, text=t('dialogs.restore_button'), command=on_restore,
                                   bg="#27ae60", fg="white", font=("Segoe UI", 10, "bold"),
-                                  width=15, cursor="hand2")
-            restore_btn.pack(side=tk.LEFT, padx=5)
+                                  width=18, cursor="hand2")
+            restore_btn.pack(side=tk.LEFT, padx=10)
             
-            cancel_btn = tk.Button(btn_frame, text="❌ Cancel", command=on_cancel,
+            cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=on_cancel,
                                  bg="#e74c3c", fg="white", font=("Segoe UI", 10, "bold"),
-                                 width=15, cursor="hand2")
-            cancel_btn.pack(side=tk.LEFT, padx=5)
+                                 width=18, cursor="hand2")
+            cancel_btn.pack(side=tk.LEFT, padx=10)
             
             # Bind escape key
             dialog.bind('<Escape>', lambda e: on_cancel())
@@ -11757,7 +12261,7 @@ class App(tk.Tk):
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Search section
-        search_frame = ttk.LabelFrame(main_container, text="Search For Commodity Prices", padding=10)
+        search_frame = ttk.LabelFrame(main_container, text=t('marketplace.search_title'), padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
         
         # Configure grid weights
@@ -11783,64 +12287,73 @@ class App(tk.Tk):
         row0_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
         row0_frame.grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
-        rb1 = tk.Radiobutton(row0_frame, text="Near System (500 LY)", variable=self.marketplace_search_mode,
+        rb1 = tk.Radiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.marketplace_search_mode,
                       value="near_system", bg=_mkt_cb_bg, fg="#ffffff", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         rb1.pack(side="left", padx=(0, 15))
         rb1.config(takefocus=0)
-        ToolTip(rb1, "Search within 500 LY of reference system - returns all matching stations in range")
+        ToolTip(rb1, t('tooltips.near_system_search'))
         
-        rb2 = tk.Radiobutton(row0_frame, text="Galaxy-Wide (Top 30)", variable=self.marketplace_search_mode,
+        rb2 = tk.Radiobutton(row0_frame, text=t('marketplace.galaxy_wide'), variable=self.marketplace_search_mode,
                       value="galaxy_wide", bg=_mkt_cb_bg, fg="#ffffff", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         rb2.pack(side="left", padx=(0, 20))
         rb2.config(takefocus=0)
-        ToolTip(rb2, "Show top 30 from best 100 prices galaxy-wide - station filters apply after fetching top 100")
+        ToolTip(rb2, t('tooltips.galaxy_wide_search'))
         
         ttk.Separator(row0_frame, orient="vertical").pack(side="left", fill="y", padx=(0, 15))
         
-        sell_cb = tk.Checkbutton(row0_frame, text="Sell", variable=self.marketplace_sell_mode,
+        sell_cb = tk.Checkbutton(row0_frame, text=t('marketplace.sell'), variable=self.marketplace_sell_mode,
                       command=self._on_sell_mode_toggle, bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         sell_cb.pack(side="left", padx=(0, 10))
-        ToolTip(sell_cb, "Search for stations buying this commodity (where you can sell)")
+        ToolTip(sell_cb, t('tooltips.sell_mode'))
         
-        buy_cb = tk.Checkbutton(row0_frame, text="Buy", variable=self.marketplace_buy_mode,
+        buy_cb = tk.Checkbutton(row0_frame, text=t('marketplace.buy'), variable=self.marketplace_buy_mode,
                       command=self._on_buy_mode_toggle, bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         buy_cb.pack(side="left")
-        ToolTip(buy_cb, "Search for stations selling this commodity (where you can buy)")
+        ToolTip(buy_cb, t('tooltips.buy_mode'))
         
         # Row 1: Reference System + Commodity
         row1_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
         row1_frame.grid(row=1, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
         # Fixed-width label for perfect alignment with Station: below
-        ttk.Label(row1_frame, text="Ref. System:", width=12).pack(side="left", padx=(0, 5))
+        ttk.Label(row1_frame, text=t('marketplace.ref_system'), width=12).pack(side="left", padx=(0, 5))
         self.marketplace_reference_system = tk.StringVar(value=cfg.get('marketplace_reference_system', ''))
         self.marketplace_ref_entry = ttk.Entry(row1_frame, textvariable=self.marketplace_reference_system, width=30)
         self.marketplace_ref_entry.pack(side="left", padx=(0, 5))
         self.marketplace_ref_entry.bind("<Return>", lambda e: self._search_marketplace())
         
-        self.marketplace_use_current_btn = tk.Button(row1_frame, text="Use Current", 
+        self.marketplace_use_current_btn = tk.Button(row1_frame, text=t('marketplace.use_current'), 
                                     command=self._use_current_system_marketplace,
                                     bg="#4a3a2a", fg="#e0e0e0", activebackground="#5a4a3a", activeforeground="#ffffff",
                                     relief="ridge", bd=1, padx=6, pady=2, font=("Segoe UI", 8), cursor="hand2",
                                     highlightbackground=_mkt_cb_bg, highlightcolor=_mkt_cb_bg)
         self.marketplace_use_current_btn.pack(side="left", padx=(0, 20))
         
-        ttk.Label(row1_frame, text="Commodity:").pack(side="left", padx=(0, 5))
-        self.marketplace_commodity = tk.StringVar(value=cfg.get('marketplace_commodity', 'Alexandrite'))
-        sorted_commodities = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
+        # Commodity label - language-specific padding
+        _commodity_padx = (59, 34) if get_language() == "de" else (59, 17)  # Adjust English values as needed
+        ttk.Label(row1_frame, text=t('marketplace.commodity')).pack(side="left", padx=_commodity_padx)
+        
+        # Commodity list with localization
+        self._commodity_order = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
                              "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Indite", 
-                             "Lepidolite", "LTD", "Monazite", "Musgravite", 
+                             "Lepidolite", "Low Temperature Diamonds", "Monazite", "Musgravite", 
                              "Osmium", "Painite", "Palladium", "Platinum", "Praseodymium", 
                              "Rhodplumsite", "Rutile", "Samarium", "Serendibite", "Silver", 
                              "Tritium", "Uraninite", "Void Opals"]
+        self._commodity_map = {k: get_material(k) for k in self._commodity_order}
+        self._commodity_rev_map = {v: k for k, v in self._commodity_map.items()}
+        
+        saved_commodity = cfg.get('marketplace_commodity', 'Alexandrite')
+        self.marketplace_commodity = tk.StringVar(value=self._commodity_map.get(saved_commodity, saved_commodity))
+        sorted_commodities = [self._commodity_map[k] for k in self._commodity_order]
         commodity_combo = ttk.Combobox(row1_frame, textvariable=self.marketplace_commodity,
                                      values=sorted_commodities, state="readonly", width=18)
         commodity_combo.pack(side="left")
@@ -11851,69 +12364,99 @@ class App(tk.Tk):
         row2_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
         row2_frame.grid(row=2, column=0, columnspan=5, sticky="w", pady=(0, 10))
         
+        # Station type localization maps
+        station_type_map = get_station_types()
+        self._station_type_order = ['All', 'Orbital', 'Surface', 'Fleet Carrier', 'Megaship', 'Stronghold']
+        self._station_type_map = {k: station_type_map.get(k, k) for k in self._station_type_order}
+        self._station_type_rev_map = {v: k for k, v in self._station_type_map.items()}
+        
+        # Sort options localization maps (full map for all modes)
+        self._sort_options_map = get_sort_options()
+        self._sort_rev_map = {v: k for k, v in self._sort_options_map.items()}
+        
+        # Age options localization maps
+        age_options_map = get_age_options()
+        self._age_order = ['Any', '1 hour', '8 hours', '16 hours', '1 day', '2 days']
+        self._age_map = {k: age_options_map.get(k, k) for k in self._age_order}
+        self._age_rev_map = {v: k for k, v in self._age_map.items()}
+        
         # Station label with same width as "Ref. System:" for perfect alignment
-        station_label = ttk.Label(row2_frame, text="Station:", width=12)
+        station_label = ttk.Label(row2_frame, text=t('marketplace.station'), width=12)
         station_label.pack(side="left", padx=(0, 5))
-        self.marketplace_station_type = tk.StringVar(value=cfg.get('marketplace_station_type', 'All'))
+        saved_station = cfg.get('marketplace_station_type', 'All')
+        self.marketplace_station_type = tk.StringVar(value=self._station_type_map.get(saved_station, saved_station))
         station_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_station_type,
-                                values=["All", "Orbital", "Surface", "Fleet Carrier", "Megaship", "Stronghold"],
+                                values=[self._station_type_map[k] for k in self._station_type_order],
                                 state="readonly", width=12)
         station_combo.pack(side="left", padx=(0, 15))
-        ToolTip(station_combo, "Filter by station type: Orbital, Surface, Fleet Carrier, Megaship, or Stronghold")
+        ToolTip(station_combo, t('tooltips.station_type_filter'))
         
         def on_station_type_change(*args):
-            if self.marketplace_station_type.get() == "Fleet Carrier":
+            selected = self.marketplace_station_type.get()
+            english_val = self._station_type_rev_map.get(selected, selected)
+            if english_val == "Fleet Carrier":
                 self.marketplace_exclude_carriers.set(False)
             self._save_marketplace_preferences()
         self.marketplace_station_type.trace_add("write", on_station_type_change)
         
         self.marketplace_exclude_carriers = tk.BooleanVar(value=cfg.get('marketplace_exclude_carriers', True))
-        exclude_cb = tk.Checkbutton(row2_frame, text="Exclude Carriers", variable=self.marketplace_exclude_carriers,
+        exclude_cb = tk.Checkbutton(row2_frame, text=t('marketplace.exclude_carriers'), variable=self.marketplace_exclude_carriers,
                       command=self._save_marketplace_preferences,
                       bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
         exclude_cb.pack(side="left", padx=(0, 10))
-        ToolTip(exclude_cb, "Exclude Fleet Carriers from search results")
+        ToolTip(exclude_cb, t('tooltips.exclude_carriers'))
         
         self.marketplace_large_pad_only = tk.BooleanVar(value=cfg.get('marketplace_large_pad_only', False))
-        large_pad_cb = tk.Checkbutton(row2_frame, text="Large Pads", variable=self.marketplace_large_pad_only,
+        large_pad_cb = tk.Checkbutton(row2_frame, text=t('marketplace.large_pads'), variable=self.marketplace_large_pad_only,
                       command=self._save_marketplace_preferences,
                       bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
-        large_pad_cb.pack(side="left", padx=(0, 15))
-        ToolTip(large_pad_cb, "Show only stations with Large landing pads")
+        large_pad_cb.pack(side="left", padx=(0, 8))
+        ToolTip(large_pad_cb, t('tooltips.large_pads'))
         
-        ttk.Label(row2_frame, text="Sort by:").pack(side="left", padx=(0, 5))
-        self.marketplace_order_by = tk.StringVar(value=cfg.get('marketplace_order_by', 'Distance'))
+        # Sort by label - language-specific padding
+        _sort_padx = (0, 3) if get_language() == "de" else (55, 43)
+        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=_sort_padx)
+        saved_sort = cfg.get('marketplace_order_by', 'Distance')
+        # Determine initial sort options based on sell mode (default)
+        initial_sort_order = ['Best price (highest)', 'Distance', 'Best demand', 'Last update']
+        self.marketplace_order_by = tk.StringVar(value=self._sort_options_map.get(saved_sort, saved_sort))
         self.marketplace_order_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_order_by,
-                                     values=["Best price", "Distance", "Best supply/demand", "Last update"],
-                                     state="readonly", width=18)
-        self.marketplace_order_combo.pack(side="left", padx=(0, 10))
+                                     values=[self._sort_options_map.get(k, k) for k in initial_sort_order],
+                                     state="readonly", width=20)
+        self.marketplace_order_combo.pack(side="left")
         self.marketplace_order_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
-        ToolTip(self.marketplace_order_combo, "Sort results by price, distance, supply/demand, or data freshness")
+        ToolTip(self.marketplace_order_combo, t('tooltips.sort_by'))
         
-        ttk.Label(row2_frame, text="Max age:").pack(side="left", padx=(0, 5))
-        self.marketplace_max_age = tk.StringVar(value=cfg.get('marketplace_max_age', '8 hours'))
-        age_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_max_age,
-                                values=["Any", "1 hour", "8 hours", "16 hours", "1 day", "2 days"],
-                                state="readonly", width=10)
-        age_combo.pack(side="left", padx=(0, 15))
-        age_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
-        ToolTip(age_combo, "Filter by how recent the market data is")
-        
-        # Row 3: Search button
-        row3_frame = tk.Frame(search_frame, bg="#1e1e1e")
+        # Row 3: Search button and Max Age
+        row3_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
         row3_frame.grid(row=3, column=0, columnspan=5, sticky="w")
         
-        search_btn = tk.Button(row3_frame, text="🔍 Search", 
+        search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'), 
                               command=self._search_marketplace,
                               bg="#2a4a2a", fg="#e0e0e0", 
                               activebackground="#3a5a3a", activeforeground="#ffffff",
                               relief="ridge", bd=1, padx=10, pady=4,
                               font=("Segoe UI", 9, "bold"), cursor="hand2")
         search_btn.pack(side="left")
+        
+        # Max Age moved to row 3 - aligned below "Sort by:" / "Sortieren nach:"
+        # Language-specific padding and theme-appropriate text color
+        _max_age_fg = "#ff8c00" if _mkt_cb_theme == "elite_orange" else "#e0e0e0"
+        _max_age_padx = (369, 26) if get_language() == "de" else (365, 33)  # (left, gap) - language specific
+        max_age_label = tk.Label(row3_frame, text=t('marketplace.max_age'), bg=_mkt_cb_bg, fg=_max_age_fg)
+        max_age_label.pack(side="left", padx=_max_age_padx)
+        saved_age = cfg.get('marketplace_max_age', '8 hours')
+        self.marketplace_max_age = tk.StringVar(value=self._age_map.get(saved_age, saved_age))
+        age_combo = ttk.Combobox(row3_frame, textvariable=self.marketplace_max_age,
+                                values=[self._age_map[k] for k in self._age_order],
+                                state="readonly", width=10)
+        age_combo.pack(side="left")
+        age_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
+        ToolTip(age_combo, t('tooltips.max_age'))
         
         # EDTools button hidden (keep for future reference)
         # edtools_btn = tk.Button(search_frame, text="🔍 Search EDTools.cc", 
@@ -11925,16 +12468,16 @@ class App(tk.Tk):
         results_header = tk.Frame(main_container, bg=_mkt_cb_bg)
         results_header.pack(fill="x", pady=(10, 0))
         
-        tk.Label(results_header, text="Search Results", 
+        tk.Label(results_header, text=t('marketplace.search_results'), 
                 bg=_mkt_cb_bg, fg="#ffffff", 
                 font=("Segoe UI", 10, "bold")).pack(side="left")
         
-        tk.Label(results_header, text="  •  Right-click rows for options",
+        tk.Label(results_header, text="  •  " + t('marketplace.right_click_options'),
                 bg=_mkt_cb_bg, fg="#888888",
                 font=("Segoe UI", 8)).pack(side="left")
         
         # Status label (moved to header, right side)
-        self.marketplace_total_label = tk.Label(results_header, text="Enter system and commodity, then click Search",
+        self.marketplace_total_label = tk.Label(results_header, text=t('marketplace.enter_system_commodity'),
                                                bg=_mkt_cb_bg, fg="gray", font=("TkDefaultFont", 8))
         self.marketplace_total_label.pack(side="right")
         
@@ -11945,10 +12488,10 @@ class App(tk.Tk):
         self._create_marketplace_results_table(results_frame)
         
         # Add tooltips
-        ToolTip(self.marketplace_ref_entry, "Enter reference system for distance-based search")
-        ToolTip(self.marketplace_use_current_btn, "Use current system from journal")
-        ToolTip(search_btn, "Search for commodity prices")
-        ToolTip(commodity_combo, "Select commodity to search")
+        ToolTip(self.marketplace_ref_entry, t('tooltips.reference_system'))
+        ToolTip(self.marketplace_use_current_btn, t('tooltips.use_current_market'))
+        ToolTip(search_btn, t('tooltips.search_market'))
+        ToolTip(commodity_combo, t('tooltips.select_commodity'))
         
         # Initialize dropdown options based on current buy/sell mode
         self._update_marketplace_order_options()
@@ -12101,13 +12644,13 @@ class App(tk.Tk):
         is_buy_mode = self.marketplace_buy_mode.get() if hasattr(self, 'marketplace_buy_mode') else False
         
         titles = {
-            "location": "Location",
-            "type": "Type",
-            "pad": "Pad",
-            "distance": "Distance",
-            "demand": "Stock" if is_buy_mode else "Demand",  # Dynamic based on mode
-            "price": "Price",
-            "updated": "Updated"
+            "location": t('marketplace.location'),
+            "type": t('marketplace.type'),
+            "pad": t('marketplace.pad'),
+            "distance": t('marketplace.distance'),
+            "demand": t('marketplace.supply') if is_buy_mode else t('marketplace.demand'),  # Dynamic based on mode
+            "price": t('marketplace.price'),
+            "updated": t('marketplace.updated')
         }
         return titles.get(col, col)
     
@@ -12142,10 +12685,10 @@ class App(tk.Tk):
                                                activebackground=menu_active_bg,
                                                activeforeground=menu_active_fg,
                                                selectcolor=menu_active_bg)
-        self.marketplace_context_menu.add_command(label="Open in Inara", command=self._open_inara_from_menu)
-        self.marketplace_context_menu.add_command(label="Open in EDSM", command=self._open_edsm_from_menu)
+        self.marketplace_context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara_from_menu)
+        self.marketplace_context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm_from_menu)
         self.marketplace_context_menu.add_separator()
-        self.marketplace_context_menu.add_command(label="Copy System Name", command=self._copy_marketplace_system)
+        self.marketplace_context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_marketplace_system)
     
     def _open_inara_from_menu(self):
         """Open Inara station search from context menu"""
@@ -12214,7 +12757,7 @@ class App(tk.Tk):
                     system_name = location.split(" / ")[0]
                     self.clipboard_clear()
                     self.clipboard_append(system_name)
-                    self.marketplace_total_label.config(text=f"✓ Copied '{system_name}' to clipboard")
+                    self.marketplace_total_label.config(text=t('marketplace.copied_to_clipboard').format(system=system_name))
     
     def _populate_marketplace_system(self):
         """Auto-populate marketplace system on startup (same as ring finder)"""
@@ -12268,20 +12811,24 @@ class App(tk.Tk):
         if hasattr(self, 'marketplace_order_combo'):
             is_buy_mode = self.marketplace_buy_mode.get()
             current_value = self.marketplace_order_by.get()
+            # Get English value for comparison
+            current_english = self._sort_rev_map.get(current_value, current_value)
             
             if is_buy_mode:
-                # Buy mode options
-                options = ["Best price (lowest)", "Distance", "Best supply", "Last update"]
+                # Buy mode options (English keys)
+                options_keys = ["Best price (lowest)", "Distance", "Best supply", "Last update"]
             else:
-                # Sell mode options
-                options = ["Best price (highest)", "Distance", "Best demand", "Last update"]
+                # Sell mode options (English keys)
+                options_keys = ["Best price (highest)", "Distance", "Best demand", "Last update"]
             
+            # Convert to localized values
+            options = [self._sort_options_map.get(k, k) for k in options_keys]
             self.marketplace_order_combo['values'] = options
             
             # Update current selection if it was one of the changing options
-            if "Best price" in current_value:
+            if "Best price" in current_english or "price" in current_english.lower():
                 self.marketplace_order_by.set(options[0])
-            elif "supply" in current_value or "demand" in current_value:
+            elif "supply" in current_english.lower() or "demand" in current_english.lower():
                 self.marketplace_order_by.set(options[2])
             # Distance and Last update remain the same
     
@@ -12397,7 +12944,7 @@ class App(tk.Tk):
                 items.append(values)
             
             if not items:
-                self.marketplace_total_label.config(text="No results to export")
+                self.marketplace_total_label.config(text=t('marketplace.no_results_to_export'))
                 return
             
             # Ask for save location
@@ -12418,29 +12965,34 @@ class App(tk.Tk):
                     # Write data
                     writer.writerows(items)
                 
-                self.marketplace_total_label.config(text=f"✅ Exported {len(items)} results to {file_path}")
+                self.marketplace_total_label.config(text=t('marketplace.export_success').format(count=len(items), path=file_path))
             
         except Exception as e:
-            self.marketplace_total_label.config(text=f"❌ Export failed: {str(e)}")
+            self.marketplace_total_label.config(text=t('marketplace.export_failed').format(error=str(e)))
     
     def _clear_marketplace_cache(self):
         """Clear marketplace cache - no longer needed (using external sites)"""
-        self.marketplace_total_label.config(text="ℹ️ Cache not needed (using external sites)")
+        self.marketplace_total_label.config(text=t('marketplace.cache_not_needed'))
     
     def _save_marketplace_preferences(self):
         """Save all marketplace preferences to config"""
         from config import update_config_values
+        # Convert localized values back to English for saving
+        station_type_english = self._station_type_rev_map.get(self.marketplace_station_type.get(), self.marketplace_station_type.get())
+        order_by_english = self._sort_rev_map.get(self.marketplace_order_by.get(), self.marketplace_order_by.get())
+        max_age_english = self._age_rev_map.get(self.marketplace_max_age.get(), self.marketplace_max_age.get())
+        commodity_english = self._commodity_rev_map.get(self.marketplace_commodity.get(), self.marketplace_commodity.get())
         updates = {
             "marketplace_search_mode": str(self.marketplace_search_mode.get()),
             "marketplace_sell_mode": bool(self.marketplace_sell_mode.get()),
             "marketplace_buy_mode": bool(self.marketplace_buy_mode.get()),
             "marketplace_reference_system": str(self.marketplace_reference_system.get()),
-            "marketplace_commodity": str(self.marketplace_commodity.get()),
-            "marketplace_station_type": str(self.marketplace_station_type.get()),
+            "marketplace_commodity": commodity_english,
+            "marketplace_station_type": station_type_english,
             "marketplace_exclude_carriers": bool(self.marketplace_exclude_carriers.get()),
             "marketplace_large_pad_only": bool(self.marketplace_large_pad_only.get()),
-            "marketplace_order_by": str(self.marketplace_order_by.get()),
-            "marketplace_max_age": str(self.marketplace_max_age.get())
+            "marketplace_order_by": order_by_english,
+            "marketplace_max_age": max_age_english
         }
         update_config_values(updates)
     
@@ -12454,23 +13006,25 @@ class App(tk.Tk):
             # Save current search parameters
             self._save_marketplace_preferences()
             
-            commodity = self.marketplace_commodity.get()
+            # Convert localized commodity name to English for API
+            commodity_display = self.marketplace_commodity.get()
+            commodity = self._commodity_rev_map.get(commodity_display, commodity_display)
             search_mode = self.marketplace_search_mode.get()
             
             # Validation
             if not commodity:
-                self.marketplace_total_label.config(text="❌ Please select a commodity")
+                self.marketplace_total_label.config(text=t('marketplace.select_commodity'))
                 return
             
             # Mode-specific validation
             if search_mode == "near_system":
                 reference_system = self.marketplace_reference_system.get().strip()
                 if not reference_system:
-                    self.marketplace_total_label.config(text="❌ Please enter a reference system")
+                    self.marketplace_total_label.config(text=t('marketplace.enter_reference_system'))
                     return
             
             # Convert max age to days
-            max_age_str = self.marketplace_max_age.get()
+            max_age_str = self._age_rev_map.get(self.marketplace_max_age.get(), self.marketplace_max_age.get())
             max_days_ago = self._convert_age_to_days(max_age_str)
             
             # Determine buy/sell mode
@@ -12481,8 +13035,10 @@ class App(tk.Tk):
             exclude_carriers = self.marketplace_exclude_carriers.get()
             
             # Show searching status
-            mode_text = "buying from" if is_buy_mode else "selling to"
-            self.marketplace_total_label.config(text=f"🔍 Searching for stations {mode_text}...")
+            if is_buy_mode:
+                self.marketplace_total_label.config(text=t('marketplace.searching_buying'))
+            else:
+                self.marketplace_total_label.config(text=t('marketplace.searching_selling'))
             self.update()
             
             # Call appropriate API based on search mode and buy/sell mode
@@ -12502,7 +13058,7 @@ class App(tk.Tk):
             
             # Apply filters
             exclude_carriers = self.marketplace_exclude_carriers.get()
-            station_type_filter = self.marketplace_station_type.get()
+            station_type_filter = self._station_type_rev_map.get(self.marketplace_station_type.get(), self.marketplace_station_type.get())
             
             # Track original count before filtering for better error messages
             original_count = len(results)
@@ -12549,7 +13105,7 @@ class App(tk.Tk):
             
             if results:
                 # Sort results based on "Order by" selection
-                order_by = self.marketplace_order_by.get()
+                order_by = self._sort_rev_map.get(self.marketplace_order_by.get(), self.marketplace_order_by.get())
                 
                 if "Distance" in order_by:
                     # Sort by distance (nearest first)
@@ -12578,7 +13134,7 @@ class App(tk.Tk):
                     if reference_system:
                         # Show results immediately without distances
                         self._display_marketplace_results(results_sorted[:30])
-                        self.marketplace_total_label.config(text="⏳ Calculating distances...")
+                        self.marketplace_total_label.config(text=t('marketplace.calculating_distances'))
                         self.config(cursor="watch")
                         self.update_idletasks()
                         
@@ -12600,11 +13156,11 @@ class App(tk.Tk):
                     else:
                         # No reference system - show without distances
                         self._display_marketplace_results(results_sorted[:30])
-                        self.marketplace_total_label.config(text=f"✓ Found {len(results)} stations (showing top 30 by price)")
+                        self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
                 elif search_mode == "near_system":
                     # Near system: show top 30 by price (already sorted by distance in API)
                     self._display_marketplace_results(results_sorted[:30])
-                    self.marketplace_total_label.config(text=f"✓ Found {len(results)} stations (showing top 30 by price)")
+                    self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
             else:
                 # No results after filtering - clear the table and show message
                 self._clear_marketplace_results()
@@ -12614,18 +13170,18 @@ class App(tk.Tk):
                     # We had results but filtered them all out
                     if exclude_carriers:
                         self.marketplace_total_label.config(
-                            text=f"⚠️ Found {original_count} stations but all are Fleet Carriers. Uncheck 'Exclude Fleet Carriers' to see them."
+                            text=t('marketplace.all_fleet_carriers').format(count=original_count)
                         )
                     else:
                         self.marketplace_total_label.config(
-                            text=f"⚠️ Found {original_count} stations but none match your filters (station type/pad size)."
+                            text=t('marketplace.no_match_filters').format(count=original_count)
                         )
                 else:
                     # No results from API at all
-                    self.marketplace_total_label.config(text="❌ No results found")
+                    self.marketplace_total_label.config(text=t('marketplace.no_results'))
                 
         except Exception as e:
-            self.marketplace_total_label.config(text=f"❌ Search failed: {str(e)}")
+            self.marketplace_total_label.config(text=t('marketplace.search_failed').format(error=str(e)))
     
     def _marketplace_search_worker(self, commodity, reference_system, max_dist, station_type, max_results, price_age):
         """Background worker for marketplace search to prevent UI hanging"""
@@ -13402,7 +13958,7 @@ class App(tk.Tk):
             
             # Re-display results with distances
             self._display_marketplace_results(results_sorted)
-            self.marketplace_total_label.config(text=f"✓ Found {total_results} stations (showing top 30 with distances)")
+            self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_distance').format(count=total_results))
             self.config(cursor="")
         except Exception as e:
             print(f"[MARKETPLACE] Error updating with distances: {e}")
@@ -13410,7 +13966,7 @@ class App(tk.Tk):
     
     def _restore_marketplace_cursor(self, total_results):
         """Restore cursor if distance calculation fails"""
-        self.marketplace_total_label.config(text=f"✓ Found {total_results} stations (showing top 30)")
+        self.marketplace_total_label.config(text=t('marketplace.found_stations_top30').format(count=total_results))
         self.config(cursor="")
     
     def _has_large_pads(self, station_type):
@@ -13537,10 +14093,10 @@ class App(tk.Tk):
         
         # Estimate time (rough: ~18 journals/second based on test)
         estimated_minutes = max(1, journal_count // (18 * 60))
-        time_text = f"{estimated_minutes} minute{'s' if estimated_minutes != 1 else ''}"
+        time_text = f"{estimated_minutes} {t('dialogs.minute') if estimated_minutes == 1 else t('dialogs.minutes')}"
         
         dialog = tk.Toplevel(self)
-        dialog.title("Welcome to EliteMining!")
+        dialog.title(t('dialogs.welcome_title'))
         dialog.transient(self)
         dialog.grab_set()
         dialog.resizable(False, False)
@@ -13559,15 +14115,15 @@ class App(tk.Tk):
         content.pack(fill=tk.BOTH, expand=True)
         
         # Title
-        title = tk.Label(content, text="Welcome to EliteMining!", 
+        title = tk.Label(content, text=t('dialogs.welcome_title'), 
                         font=("Segoe UI", 14, "bold"), 
                         bg="#2b2b2b", fg="#ffffff")
         title.pack(pady=(0, 10))
         
         # Message
-        message_text = f"""This appears to be your first time running EliteMining.
+        message_text = f"""{t('dialogs.welcome_first_run')}
 
-Would you like to scan your Elite Dangerous journal files to import your mining history?"""
+{t('dialogs.welcome_scan_prompt')}"""
         
         message = tk.Label(content, text=message_text,
                           font=("Segoe UI", 10),
@@ -13576,10 +14132,10 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         message.pack(pady=(0, 15))
         
         # Bullet points
-        bullets_text = f"""• This will import all discovered rings, hotspots, and visited systems
-• Found {journal_count:,} journal files dating back to {oldest_date}
-• Scanning will take approximately {time_text}
-• You can skip this and manually import your history later from Settings → Import History"""
+        bullets_text = f"""• {t('dialogs.welcome_bullets_1')}
+• {t('dialogs.welcome_bullets_2').format(count=f'{journal_count:,}', date=oldest_date)}
+• {t('dialogs.welcome_bullets_3').format(time=time_text)}
+• {t('dialogs.welcome_bullets_4')}"""
         
         bullets = tk.Label(content, text=bullets_text,
                           font=("Segoe UI", 9),
@@ -13588,7 +14144,7 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         bullets.pack(pady=(0, 20))
         
         # Question
-        question = tk.Label(content, text="Scan now?",
+        question = tk.Label(content, text=t('dialogs.welcome_scan_now'),
                            font=("Segoe UI", 10, "bold"),
                            bg="#2b2b2b", fg="#ffffff")
         question.pack(pady=(0, 15))
@@ -13618,18 +14174,18 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
             print("Initial import skipped by user")
         
         # Scan Now button (green, recommended)
-        scan_btn = tk.Button(button_frame, text="Scan Now", command=on_scan,
+        scan_btn = tk.Button(button_frame, text=t('dialogs.welcome_yes_scan'), command=on_scan,
                             bg="#27ae60", fg="white", 
                             font=("Segoe UI", 10, "bold"),
-                            width=12, cursor="hand2", relief=tk.FLAT,
+                            width=14, cursor="hand2", relief=tk.FLAT,
                             activebackground="#229954")
         scan_btn.pack(side=tk.LEFT, padx=5)
         
         # Skip button
-        skip_btn = tk.Button(button_frame, text="Skip", command=on_skip,
+        skip_btn = tk.Button(button_frame, text=t('dialogs.welcome_skip'), command=on_skip,
                             bg="#5a5a5a", fg="white",
                             font=("Segoe UI", 10),
-                            width=12, cursor="hand2", relief=tk.FLAT,
+                            width=14, cursor="hand2", relief=tk.FLAT,
                             activebackground="#4a4a4a")
         skip_btn.pack(side=tk.LEFT, padx=5)
         
@@ -13647,7 +14203,7 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         
         # Create progress dialog
         progress_dialog = tk.Toplevel(self)
-        progress_dialog.title("Importing Journal History")
+        progress_dialog.title(t('dialogs.importing_journal'))
         progress_dialog.transient(self)
         progress_dialog.grab_set()
         progress_dialog.resizable(False, False)
@@ -13693,9 +14249,9 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         
         def on_cancel():
             cancel_requested['value'] = True
-            cancel_btn.config(state=tk.DISABLED, text="Cancelling...")
+            cancel_btn.config(state=tk.DISABLED, text=t('common.cancel') + "...")
         
-        cancel_btn = tk.Button(content, text="Cancel", command=on_cancel,
+        cancel_btn = tk.Button(content, text=t('common.cancel'), command=on_cancel,
                               bg="#5a5a5a", fg="white",
                               font=("Segoe UI", 9),
                               width=15, cursor="hand2", relief=tk.FLAT,
@@ -13791,7 +14347,7 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
                         print("[JOURNAL] WARNING: ring_finder not found, cannot update counter")
                 else:
                     print("[JOURNAL] ✓ Auto-scan complete: No new entries")
-                    self.after(0, lambda: self._set_status("No new journal entries found"))
+                    # Don't show message - catchup scan will follow with more useful info
                     
             except Exception as e:
                 print(f"[JOURNAL] ERROR during auto-scan: {e}")
@@ -13803,6 +14359,201 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         thread = threading.Thread(target=scan_in_background, daemon=True)
         thread.start()
     
+    def _background_journal_catchup(self):
+        """Background scan of journals modified since app was last closed.
+        
+        This runs on a background thread so it doesn't block the UI.
+        Shows progress in status bar. Falls back to 14 days if no previous close time.
+        """
+        import threading
+        import glob
+        from datetime import datetime, timedelta
+        
+        def catchup_scan():
+            try:
+                # Check if full sync is needed (first run of v4.6.6+)
+                needs_full_sync = self._needs_full_sync()
+                
+                if needs_full_sync:
+                    # Do a full sync of ALL journals (one-time for this version)
+                    print("[CATCHUP] First run of v4.6.6+ - performing full journal sync...")
+                    self.after(0, lambda: self._set_status("Syncing all journal history (one-time)...", 0))
+                    
+                    # Get journal directory
+                    journal_dir = self.cargo_monitor.journal_dir
+                    if not journal_dir or not os.path.isdir(journal_dir):
+                        print("[CATCHUP] No journal directory found")
+                        return
+                    
+                    # Get ALL journals
+                    pattern = os.path.join(journal_dir, "Journal.*.log")
+                    all_journals = sorted(glob.glob(pattern))
+                    
+                    if not all_journals:
+                        print("[CATCHUP] No journal files found")
+                        return
+                    
+                    print(f"[CATCHUP] Full sync: processing {len(all_journals)} journals...")
+                    self._process_journals_for_catchup(all_journals, is_full_sync=True)
+                    return
+                
+                # Normal smart scanning based on last app close time
+                last_close, _ = self._get_last_app_close_time()
+                
+                if last_close:
+                    # Calculate how long ago
+                    time_diff = datetime.now() - last_close
+                    hours_ago = time_diff.total_seconds() / 3600
+                    print(f"[CATCHUP] App was last closed {hours_ago:.1f} hours ago")
+                    cutoff_date = last_close
+                    scan_description = f"{hours_ago:.1f}h"
+                else:
+                    # No previous close time - fall back to 14 days
+                    print("[CATCHUP] No previous app close time found, using 14-day fallback")
+                    cutoff_date = datetime.now() - timedelta(days=14)
+                    scan_description = "14 days"
+                
+                self.after(0, lambda: self._set_status("Scanning recent journals...", 0))
+                
+                # Get journal directory
+                journal_dir = self.cargo_monitor.journal_dir
+                if not journal_dir or not os.path.isdir(journal_dir):
+                    print("[CATCHUP] No journal directory found")
+                    return
+                
+                # Get journals modified since cutoff
+                pattern = os.path.join(journal_dir, "Journal.*.log")
+                all_journals = sorted(glob.glob(pattern))
+                
+                if not all_journals:
+                    print("[CATCHUP] No journal files found")
+                    return
+                
+                recent_journals = []
+                
+                for journal in all_journals:
+                    try:
+                        mtime = os.path.getmtime(journal)
+                        file_date = datetime.fromtimestamp(mtime)
+                        if file_date >= cutoff_date:
+                            recent_journals.append(journal)
+                    except:
+                        pass
+                
+                if not recent_journals:
+                    print(f"[CATCHUP] No journals modified since {scan_description} ago")
+                    self.after(0, lambda: self._set_status("No new journal data", 3000))
+                    return
+                
+                print(f"[CATCHUP] Found {len(recent_journals)} journals modified in last {scan_description}")
+                self._process_journals_for_catchup(recent_journals, is_full_sync=False)
+                
+            except Exception as e:
+                print(f"[CATCHUP] ERROR: {e}")
+                self.after(0, lambda: self._set_status("Journal scan failed", 5000))
+                import traceback
+                traceback.print_exc()
+        
+        # Run on background thread
+        thread = threading.Thread(target=catchup_scan, daemon=True)
+        thread.start()
+    
+    def _process_journals_for_catchup(self, journals, is_full_sync=False):
+        """Process journal files for catchup scan
+        
+        Args:
+            journals: List of journal file paths to process
+            is_full_sync: If True, this is a full sync (all journals)
+        """
+        import json
+        
+        visits_added = 0
+        hotspots_added = 0
+        
+        for idx, journal_path in enumerate(journals):
+            # Update progress for full sync
+            if is_full_sync and idx % 50 == 0:
+                progress = f"Syncing journals... {idx}/{len(journals)}"
+                self.after(0, lambda p=progress: self._set_status(p, 0))
+            
+            try:
+                with open(journal_path, 'r', encoding='utf-8') as f:
+                    current_system = None
+                    
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        try:
+                            event = json.loads(line)
+                            event_type = event.get('event', '')
+                            
+                            # Track current system
+                            if event_type in ['FSDJump', 'Location', 'CarrierJump']:
+                                current_system = event.get('StarSystem')
+                            
+                            # Process visits (FSDJump/CarrierJump only, not Location)
+                            if event_type in ['FSDJump', 'CarrierJump']:
+                                system_name = event.get('StarSystem', '')
+                                if system_name:
+                                    timestamp = event.get('timestamp', '')
+                                    system_address = event.get('SystemAddress')
+                                    star_pos = event.get('StarPos', [])
+                                    coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
+                                    
+                                    try:
+                                        self.cargo_monitor.user_db.add_visited_system(
+                                            system_name=system_name,
+                                            visit_date=timestamp,
+                                            system_address=system_address,
+                                            coordinates=coordinates
+                                        )
+                                        visits_added += 1
+                                    except:
+                                        pass
+                            
+                            # Process Scan events for ring/hotspot data
+                            elif event_type == 'Scan':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_scan(event)
+                                    hotspots_added += 1
+                                except:
+                                    pass
+                            
+                            # Process SAASignalsFound for hotspots
+                            elif event_type == 'SAASignalsFound':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_saa_signals_found(event, current_system)
+                                    hotspots_added += 1
+                                except:
+                                    pass
+                                    
+                        except json.JSONDecodeError:
+                            continue
+                        except:
+                            continue
+            except Exception as e:
+                print(f"[CATCHUP] Error reading {os.path.basename(journal_path)}: {e}")
+                continue
+        
+        sync_type = "Full sync" if is_full_sync else "Catchup"
+        print(f"[CATCHUP] ✓ {sync_type} complete: processed {len(journals)} files, {visits_added} visits, {hotspots_added} scan events")
+        
+        # Show completion in status bar
+        if is_full_sync:
+            self.after(0, lambda: self._set_status(f"Full sync complete: {len(journals)} files processed"))
+        else:
+            self.after(0, lambda: self._set_status(f"Journal scan complete: {len(journals)} files processed"))
+        
+        # Update database info display
+        if visits_added > 0 or hotspots_added > 0:
+            if hasattr(self, 'ring_finder'):
+                self.after(0, self.ring_finder._update_database_info)
+            # Update CMDR display for visit counts
+            if hasattr(self, '_update_cmdr_system_display'):
+                self.after(0, self._update_cmdr_system_display)
+
     def get_current_system(self) -> Optional[str]:
         """Centralized method to get current system - single source of truth"""
         # Return cached value if available
@@ -13880,72 +14631,16 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         print(f"[SYSTEM] Updated current system: {system_name}")
 
 
-def check_single_instance():
-    """
-    Check if another instance of EliteMining is already running.
-    Uses a lock file to prevent multiple instances.
-    Returns True if this is the only instance, False if another is running.
-    """
-    import tempfile
-    import atexit
-    
-    lock_file_path = os.path.join(tempfile.gettempdir(), "EliteMining.lock")
-    
-    try:
-        # Try to create/open the lock file exclusively
-        if os.path.exists(lock_file_path):
-            # Check if the process that created the lock is still running
-            try:
-                with open(lock_file_path, 'r') as f:
-                    pid = int(f.read().strip())
-                
-                # Check if process is still running (Windows-specific)
-                import ctypes
-                kernel32 = ctypes.windll.kernel32
-                PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-                handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-                if handle:
-                    kernel32.CloseHandle(handle)
-                    # Process is still running
-                    return False
-                # Process not running, we can take over
-            except (ValueError, OSError, FileNotFoundError):
-                # Lock file is invalid or process check failed, take over
-                pass
-        
-        # Create new lock file with our PID
-        with open(lock_file_path, 'w') as f:
-            f.write(str(os.getpid()))
-        
-        # Register cleanup on exit
-        def cleanup_lock():
-            try:
-                if os.path.exists(lock_file_path):
-                    with open(lock_file_path, 'r') as f:
-                        if f.read().strip() == str(os.getpid()):
-                            os.remove(lock_file_path)
-            except:
-                pass
-        
-        atexit.register(cleanup_lock)
-        return True
-        
-    except Exception as e:
-        print(f"[SINGLE-INSTANCE] Error checking instance: {e}")
-        return True  # Allow running on error
-
-
 if __name__ == "__main__":
-    # Check for existing instance
-    if not check_single_instance():
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showwarning(
-            "EliteMining Already Running",
-            "Another instance of EliteMining is already running.\n\n"
-            "Please close the existing instance first, or check your taskbar/system tray."
-        )
-        sys.exit(0)
+    # Clean up any restart flag from previous run
+    try:
+        import sys
+        if getattr(sys, 'frozen', False):
+            flag_file = os.path.join(os.path.dirname(sys.executable), ".restart_pending")
+            if os.path.exists(flag_file):
+                os.remove(flag_file)
+    except:
+        pass
     
     try:
         app = App()

@@ -20,6 +20,21 @@ from core.constants import MENU_COLORS
 from local_database import LocalSystemsDatabase
 from user_database import UserDatabase
 from edsm_integration import EDSMIntegration
+# Localization
+try:
+    from localization import t, get_ring_types, get_abbr, get_material, to_english
+except Exception:
+    # Fallback stubs if localization not initialized
+    def t(key, **kwargs):
+        return key
+    def get_ring_types():
+        return {'All':'All','Metallic':'Metallic','Rocky':'Rocky','Icy':'Icy','Metal Rich':'Metal Rich'}
+    def get_abbr(name):
+        return name
+    def get_material(name):
+        return name
+    def to_english(name):
+        return name
 
 # ToolTip class for showing helpful information
 class ToolTip:
@@ -97,7 +112,12 @@ class ToolTip:
 class RingFinder:
     """Mining hotspot finder with EDDB API integration"""
     
-    ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter
+    ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter (internal key)
+    
+    def _is_all_minerals(self, value: str) -> bool:
+        """Check if the given value represents 'All Minerals' (handles localized values)"""
+        from localization import t
+        return value == RingFinder.ALL_MINERALS or value == t('ring_finder.all_minerals')
     
     def _deselect_on_empty_click(self, event) -> None:
         """Deselect all items when clicking on empty space in the results treeview"""
@@ -119,6 +139,20 @@ class RingFinder:
         global ToolTip
         if tooltip_class:
             ToolTip = tooltip_class
+        
+        # Prepare ring type localization maps (English <-> Localized)
+        try:
+            ring_map = get_ring_types()
+        except Exception:
+            ring_map = {'All':'All','Metallic':'Metallic','Rocky':'Rocky','Icy':'Icy','Metal Rich':'Metal Rich'}
+        # Ensure deterministic order
+        self._ring_type_order = ['All','Metallic','Rocky','Icy','Metal Rich']
+        self._ring_type_map = {k: ring_map.get(k, k) for k in self._ring_type_order}
+        # Reverse mapping localized->english
+        self._ring_type_rev_map = {v:k for k,v in self._ring_type_map.items()}
+
+        # Helper to map localized material display back to English
+        self._to_english = to_english
         
         # Initialize local database manager
         self.local_db = LocalSystemsDatabase()
@@ -184,6 +218,32 @@ class RingFinder:
         """
         from material_utils import abbreviate_material_text
         return abbreviate_material_text(hotspot_text)
+    
+    def _localize_hotspot_display(self, text: str) -> str:
+        """Localize material names in hotspot display text.
+        
+        Converts English material names to localized versions.
+        Handles formats like 'Void Opals (1)' or 'Platinum (2), Painite (1)'
+        """
+        if not text or text == "-":
+            return text
+        import re
+        # Pattern to match material name with optional count: "Material Name (X)" or just "Material Name"
+        pattern = r'([A-Za-z][A-Za-z\s]+?)(\s*\(\d+\))?(?:,\s*|$)'
+        
+        def replace_material(match):
+            material = match.group(1).strip()
+            count = match.group(2) or ""
+            localized = get_material(material)
+            if localized == material:
+                # Try abbreviation lookup for short forms
+                localized = get_abbr(material)
+                if localized == material:
+                    return match.group(0)  # No translation found
+            return f"{localized}{count}, " if match.group(0).endswith(", ") else f"{localized}{count}"
+        
+        result = re.sub(pattern, replace_material, text)
+        return result.rstrip(", ")
         
     def setup_ui(self):
         """Create hotspot finder UI following EliteMining patterns"""
@@ -221,7 +281,7 @@ class RingFinder:
         search_header.pack(fill="x", padx=10, pady=5)
         
         # Search frame title and help text
-        search_title = ttk.Label(search_header, text="Search For Hotspots", font=("Segoe UI", 9, "bold"))
+        search_title = ttk.Label(search_header, text=t('ring_finder.title'), font=("Segoe UI", 9, "bold"))
         search_title.pack(side="left")
         
         # Database status on the right
@@ -240,7 +300,7 @@ class RingFinder:
         rf_bg = "#0a0a0a" if rf_theme == "elite_orange" else "#1e1e1e"
         rf_value_fg = "#ffcc00"  # Yellow for values in both themes
         
-        ttk.Label(distance_header, text="Distances:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
+        ttk.Label(distance_header, text=t('ring_finder.distances'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
         
         self.distance_info_var = tk.StringVar(value="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
         distance_info_label = tk.Label(distance_header, textvariable=self.distance_info_var,
@@ -248,7 +308,7 @@ class RingFinder:
         distance_info_label.pack(side="left")
         
         # Database info on same line, right-aligned
-        self.db_info_var = tk.StringVar(value="Total: ... hotspots in ... systems")
+        self.db_info_var = tk.StringVar(value=t('ring_finder.total_hotspots_in_systems').format(hotspots="...", systems="..."))
         db_info_label = tk.Label(distance_header, textvariable=self.db_info_var,
                                 font=("Segoe UI", 8, "italic"), foreground="#888888", bg=rf_bg)
         db_info_label.pack(side="right")
@@ -266,7 +326,7 @@ class RingFinder:
         search_frame.grid_columnconfigure(6, weight=1)  # Let column 6 take remaining space
         
         # Single smart search input
-        ttk.Label(search_frame, text="Reference System:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        ttk.Label(search_frame, text=t('ring_finder.reference_system')).grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.system_var = tk.StringVar()
         self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=35)
         self.system_entry.bind('<Return>', lambda e: self.search_hotspots())
@@ -282,7 +342,7 @@ class RingFinder:
         buttons_frame.grid(row=0, column=2, sticky="w", padx=(5, 0))
         
         # Auto-detect button (fills current system automatically) - with app color scheme
-        auto_btn = tk.Button(buttons_frame, text="Use Current System", command=self._auto_detect_system,
+        auto_btn = tk.Button(buttons_frame, text=t('ring_finder.use_current_system'), command=self._auto_detect_system,
                             bg="#4a3a2a", fg="#e0e0e0", 
                             activebackground="#5a4a3a", activeforeground="#ffffff",
                             relief="ridge", bd=1, padx=8, pady=4,
@@ -290,7 +350,7 @@ class RingFinder:
         auto_btn.pack(side="left", padx=(0, 5))
         
         # Search button - with app color scheme
-        self.search_btn = tk.Button(buttons_frame, text="Search", command=self.search_hotspots,
+        self.search_btn = tk.Button(buttons_frame, text=t('ring_finder.search'), command=self.search_hotspots,
                                    bg="#2a4a2a", fg="#e0e0e0", 
                                    activebackground="#3a5a3a", activeforeground="#ffffff",
                                    relief="ridge", bd=1, padx=15, pady=4,
@@ -314,7 +374,7 @@ class RingFinder:
             _cb_bg = "#1e1e1e"
             _cb_select = "#1e1e1e"
         
-        self.auto_search_cb = tk.Checkbutton(buttons_frame, text="Auto-Search", 
+        self.auto_search_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.auto_search'), 
                                            variable=self.auto_search_var,
                                            command=self._save_auto_search_state,
                                            bg=_cb_bg, fg="#e0e0e0", 
@@ -335,7 +395,7 @@ class RingFinder:
         # Load auto-switch tabs state from main app
         self._load_auto_switch_tabs_state()
         
-        self.auto_switch_tabs_cb = tk.Checkbutton(buttons_frame, text="Auto-Switch Tabs", 
+        self.auto_switch_tabs_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.auto_switch_tabs'), 
                                            variable=self.auto_switch_tabs_var,
                                            command=self._on_auto_switch_tabs_toggle,
                                            bg=_cb_bg, fg="#e0e0e0", 
@@ -345,31 +405,29 @@ class RingFinder:
         self.auto_switch_tabs_cb.pack(side="left", padx=(18, 0))
         
         # Tooltip for auto-switch tabs
-        ToolTip(self.auto_switch_tabs_cb, 
-               "Automatically switch tabs based on game state:\n"
-               "- Switch to Mining Session when dropping into a ring\n"
-               "- Switch to Hotspots Finder when entering supercruise or jumping")
+        ToolTip(self.auto_switch_tabs_cb, t('ring_finder.auto_switch_tooltip'))
 
         # Ring Type filter
-        ttk.Label(search_frame, text="Ring Type:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        self.material_var = tk.StringVar(value="All")
+        ttk.Label(search_frame, text=t('ring_finder.ring_type')).grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        # Default to localized 'All'
+        self.material_var = tk.StringVar(value=self._ring_type_map.get('All', 'All'))
         material_combo = ttk.Combobox(search_frame, textvariable=self.material_var, width=22, state="readonly")
-        material_combo['values'] = ("All", "Metallic", "Rocky", "Icy", "Metal Rich")
+        material_combo['values'] = tuple(self._ring_type_map[k] for k in self._ring_type_order)
         material_combo.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         
         # Material filter (new - specific materials) - dynamically populated from database
-        ttk.Label(search_frame, text="Mineral:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.specific_material_var = tk.StringVar(value=RingFinder.ALL_MINERALS)
+        ttk.Label(search_frame, text=t('ring_finder.mineral')).grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        self.specific_material_var = tk.StringVar(value=t('ring_finder.all_minerals'))
         specific_material_combo = ttk.Combobox(search_frame, textvariable=self.specific_material_var, width=22, state="readonly")
         
-        # Get materials from database and sort alphabetically
+        # Get materials from database and sort alphabetically (localized display)
         available_materials = self._get_available_materials()
         specific_material_combo['values'] = available_materials
         specific_material_combo.grid(row=2, column=1, sticky="w", padx=5, pady=5)
         
         # Add tooltips for the filters
-        ToolTip(material_combo, "Filter by ring type:\n- Metallic: Platinum, Gold, Silver\n- Icy: LTDs, Tritium, Bromellite\n- Rocky: Alexandrite, Benitoite, Opals\n- Metal Rich: Painite, Osmium")
-        ToolTip(specific_material_combo, "Filter by specific material:\nAutomatically shows only confirmed hotspots\n(no theoretical ring data)")
+        ToolTip(material_combo, t('ring_finder.tooltip_ring_type'))
+        ToolTip(specific_material_combo, t('ring_finder.tooltip_mineral'))
         
         # Create a sub-frame for right-side filters (row 1-2) that will pack tightly
         right_filters_frame_row1 = ttk.Frame(search_frame)
@@ -379,7 +437,7 @@ class RingFinder:
         right_filters_frame_row2.grid(row=2, column=2, columnspan=2, sticky="w", padx=(10, 0))
         
         # Distance filter (now a dropdown) - in sub-frame with fixed label width
-        ttk.Label(right_filters_frame_row1, text="Max Distance (LY):", width=15, anchor="e").pack(side="left", padx=(0, 5))
+        ttk.Label(right_filters_frame_row1, text=t('ring_finder.max_distance') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
         self.distance_var = tk.StringVar(value="50")
         distance_combo = ttk.Combobox(right_filters_frame_row1, textvariable=self.distance_var, width=8, state="readonly")
         distance_combo['values'] = ("10", "50", "100", "150", "200", "300")
@@ -387,37 +445,41 @@ class RingFinder:
         
         # Overlaps Only checkbox - filters to show only overlap entries
         self.overlaps_only_var = tk.BooleanVar(value=False)
-        self.overlaps_only_cb = tk.Checkbutton(right_filters_frame_row1, text="Overlaps Only",
+        self.overlaps_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.overlaps_only'),
                                                variable=self.overlaps_only_var,
                                                command=self._on_overlaps_only_changed,
                                                bg=_cb_bg, fg="#e0e0e0",
                                                activebackground="#2e2e2e", activeforeground="#ffffff",
                                                selectcolor=_cb_select, relief="flat",
                                                font=("Segoe UI", 8, "normal"))
-        self.overlaps_only_cb.pack(side="left", padx=(26, 0))
-        ToolTip(self.overlaps_only_cb, "When checked, only shows rings with known overlaps\n(ignores distance limit)")
+        # Dynamic padding based on language (German text is shorter after abbreviation)
+        from localization import get_language
+        _overlaps_padx = (16, 0) if get_language() == 'de' else (26, 0)
+        self.overlaps_only_cb.pack(side="left", padx=_overlaps_padx)
+        ToolTip(self.overlaps_only_cb, t('ring_finder.tooltip_overlaps'))
         
         # RES Only checkbox - filters to show only RES site entries
         self.res_only_var = tk.BooleanVar(value=False)
-        self.res_only_cb = tk.Checkbutton(right_filters_frame_row1, text="RES Only",
+        self.res_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.res_only'),
                                           variable=self.res_only_var,
                                           command=self._on_res_only_changed,
                                           bg=_cb_bg, fg="#e0e0e0",
                                           activebackground="#2e2e2e", activeforeground="#ffffff",
                                           selectcolor=_cb_select, relief="flat",
                                           font=("Segoe UI", 8, "normal"))
-        self.res_only_cb.pack(side="left", padx=(10, 0))
-        ToolTip(self.res_only_cb, "When checked, only shows rings with RES sites\n(Hazardous, High, Low - ignores distance limit)")
+        _res_padx = (25, 0) if get_language() == 'de' else (10, 0)
+        self.res_only_cb.pack(side="left", padx=_res_padx)
+        ToolTip(self.res_only_cb, t('ring_finder.tooltip_res'))
         
         # Max Results filter - in sub-frame with fixed label width to align dropdowns
-        ttk.Label(right_filters_frame_row2, text="Max Results:", width=15, anchor="e").pack(side="left", padx=(0, 5))
+        ttk.Label(right_filters_frame_row2, text=t('ring_finder.max_results') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
         self.max_results_var = tk.StringVar(value="30")
         max_results_combo = ttk.Combobox(right_filters_frame_row2, textvariable=self.max_results_var, width=8, state="readonly")
-        max_results_combo['values'] = ("10", "20", "30", "50", "100", "All")
+        max_results_combo['values'] = ("10", "20", "30", "50", "100", t('common.all'))
         max_results_combo.pack(side="left", padx=(0, 10))
         
         # Min Hotspots filter (only active for specific materials) - in sub-frame
-        ttk.Label(right_filters_frame_row2, text="Min Hotspots:", width=12, anchor="e").pack(side="left", padx=(0, 5))
+        ttk.Label(right_filters_frame_row2, text=t('ring_finder.min_hotspots') + ":", width=12, anchor="e").pack(side="left", padx=(0, 5))
         self.min_hotspots_var = tk.IntVar(value=1)  # Changed to IntVar for spinbox
         self.min_hotspots_spinbox = ttk.Spinbox(right_filters_frame_row2, 
                                                  textvariable=self.min_hotspots_var, 
@@ -428,7 +490,7 @@ class RingFinder:
                                                  wrap=False,
                                                  command=lambda: None)  # Enable arrow clicks
         self.min_hotspots_spinbox.pack(side="left")
-        ToolTip(self.min_hotspots_spinbox, "Minimum hotspot count filter\nOnly shows rings with X or more hotspots\n(Only active when specific mineral is selected)")
+        ToolTip(self.min_hotspots_spinbox, t('tooltips.min_hotspots'))
         
         # NOW bind material selection to enable/disable min hotspots filter (after spinbox exists!)
         specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_changed)
@@ -458,11 +520,11 @@ class RingFinder:
             print(f"Warning: Failed to initialize material change handler: {e}")
         
         # Add tooltip for distance limitation
-        ToolTip(distance_combo, "Maximum search radius in light years\nRecommended: 10-50 LY for better performance\nLarger distances may take longer to search")
+        ToolTip(distance_combo, t('tooltips.max_distance'))
         
         # Search limitations info text (bottom of search controls)
         info_text = tk.Label(search_frame, 
-                            text="ℹ Search covers bubble systems. Data grows as you scan and import history  |  'No data' = Not visited or information not available",
+                            text=f"ℹ {t('ring_finder.search_help')}  |  {t('ring_finder.no_data_help')}",
                             fg="#cccccc", bg=_cb_bg, font=("Segoe UI", 8, "italic"), 
                             justify="left")
         info_text.grid(row=4, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
@@ -471,8 +533,8 @@ class RingFinder:
         results_header = ttk.Frame(self.scrollable_frame)
         results_header.pack(fill="x", padx=10, pady=(2, 0))
         
-        ttk.Label(results_header, text="Search Results", font=("Segoe UI", 9, "bold")).pack(side="left")
-        ttk.Label(results_header, text="Right-click rows for options", 
+        ttk.Label(results_header, text=t('ring_finder.search_results'), font=("Segoe UI", 9, "bold")).pack(side="left")
+        ttk.Label(results_header, text=t('ring_finder.right_click_help'), 
                  font=("Segoe UI", 8), foreground="#666666").pack(side="right", padx=(0, 5))
         
         results_frame = ttk.Frame(self.scrollable_frame)
@@ -567,11 +629,18 @@ class RingFinder:
             "Density": 110
         }
         
-        # Map internal column names to display names
+        # Map internal column names to localized display names
         column_display_names = {
-            "Distance": "Dist (LY)",
-            "Planet/Ring": "Location",
-            "Ring Type": "Type"
+            "Distance": t('ring_finder.col_dist'),
+            "LS": t('ring_finder.col_ls'),
+            "System": t('ring_finder.col_system'),
+            "Visits": t('ring_finder.col_visits'),
+            "Planet/Ring": t('ring_finder.col_location'),
+            "Ring Type": t('ring_finder.col_type'),
+            "Hotspots": t('ring_finder.col_hotspots'),
+            "Overlap": t('ring_finder.col_overlap'),
+            "RES Site": t('ring_finder.col_res'),
+            "Density": t('ring_finder.col_density')
         }
         
         for col in columns:
@@ -734,14 +803,14 @@ class RingFinder:
                 hotspots_str = f"{total_hotspots:,}"
                 systems_str = f"{total_systems:,}"
                 
-                info_text = f"Total: {hotspots_str} hotspots in {systems_str} systems"
+                info_text = t('ring_finder.total_hotspots_in_systems').format(hotspots=hotspots_str, systems=systems_str)
                 print(f"[DB INFO] Setting text: {info_text}")
                 self.db_info_var.set(info_text)
         except Exception as e:
             print(f"[DB INFO] Error updating database info: {e}")
             import traceback
             traceback.print_exc()
-            self.db_info_var.set("Total: ... hotspots in ... systems")
+            self.db_info_var.set(t('ring_finder.total_hotspots_in_systems').format(hotspots="...", systems="..."))
     
     def _on_canvas_configure(self, event):
         """Handle canvas resize to make scrollable frame fill canvas dimensions"""
@@ -752,9 +821,10 @@ class RingFinder:
     
     def _get_available_materials(self):
         """Get alphabetically sorted list of available materials from database"""
+        from localization import t
         try:
             import sqlite3
-            materials = [RingFinder.ALL_MINERALS]  # Always start with RingFinder.ALL_MINERALS
+            materials = [t('ring_finder.all_minerals')]  # Always start with localized "All Minerals"
             
             with sqlite3.connect(self.user_db.db_path) as conn:
                 cursor = conn.cursor()
@@ -778,7 +848,8 @@ class RingFinder:
         except Exception as e:
             print(f"Warning: Could not load materials from database: {e}")
             # Fallback to hardcoded sorted list
-            return (RingFinder.ALL_MINERALS, "Alexandrite", "Benitoite", "Bromellite", "Grandidierite", 
+            from localization import t
+            return (t('ring_finder.all_minerals'), "Alexandrite", "Benitoite", "Bromellite", "Grandidierite", 
                    "Low Temp Diamonds", "Monazite", "Musgravite", "Painite", 
                    "Platinum", "Rhodplumsite", "Serendibite", "Tritium", "Void Opals")
     
@@ -788,7 +859,7 @@ class RingFinder:
         
         print(f"[DEBUG] Material changed to: '{selected_material}'")
         
-        if selected_material == RingFinder.ALL_MINERALS:
+        if self._is_all_minerals(selected_material):
             # Disable min hotspots filter for "All Minerals" - disabled state prevents interaction
             self.min_hotspots_spinbox.configure(state="disabled")
             self.min_hotspots_var.set(1)  # Reset to default (IntVar)
@@ -808,14 +879,21 @@ class RingFinder:
     
     def _format_material_for_display(self, material_name: str) -> str:
         """Format material name for display in dropdown"""
-        # Convert database names to user-friendly display names
-        display_mapping = {
-            'Low Temperature Diamonds': 'Low Temp Diamonds',  # Shorten for dropdown
-            'LowTemperatureDiamond': 'Low Temp Diamonds',     # Handle old format
-            'Opal': 'Void Opals'  # Since these are void opal hotspots
+        # Normalize database names to canonical English names first
+        normalize_map = {
+            'LowTemperatureDiamond': 'Low Temperature Diamonds',
+            'Low Temp Diamonds': 'Low Temperature Diamonds',
+            'Opal': 'Void Opals',
         }
+        canonical_name = normalize_map.get(material_name, material_name)
         
-        return display_mapping.get(material_name, material_name)
+        # Get localized display name
+        try:
+            display_name = get_material(canonical_name)
+        except Exception:
+            display_name = canonical_name
+        
+        return display_name
     
     def _on_overlaps_only_changed(self):
         """Handle Overlaps Only checkbox change - disable RES Only if enabled"""
@@ -830,11 +908,19 @@ class RingFinder:
     def _preload_data(self):
         """Preload systems data in background"""
         try:
-            self.status_var.set("Loading systems database...")
+            # Check if parent window still exists
+            if not self.parent.winfo_exists():
+                return
+            self.status_var.set(t('ring_finder.loading_database'))
             self._load_systems_cache()
-            self.parent.after(0, lambda: self.status_var.set("Ready - Community database loaded"))
+            if self.parent.winfo_exists():
+                self.parent.after(0, lambda: self.status_var.set(t('ring_finder.database_ready')) if self.parent.winfo_exists() else None)
         except Exception as e:
-            self.parent.after(0, lambda: self.status_var.set(f"Error loading database: {e}"))
+            try:
+                if self.parent.winfo_exists():
+                    self.parent.after(0, lambda: self.status_var.set(f"Error loading database: {e}") if self.parent.winfo_exists() else None)
+            except:
+                pass  # Window already destroyed
     
             
     def _update_sol_distance(self, system_name: str):
@@ -871,13 +957,13 @@ class RingFinder:
             if current_system:
                 self.current_system_var.set(current_system)
                 self._update_sol_distance(current_system)
-                self.status_var.set(f"Current system: {current_system}")
+                self.status_var.set(t('ring_finder.current_system').format(system=current_system))
                 # Check if coordinates exist in cache
                 coords = self.systems_data.get(current_system.lower())
                 if not coords:
-                    self.status_var.set(f"Current system: {current_system} (coordinates not available)")
+                    self.status_var.set(t('ring_finder.coords_not_available').format(system=current_system))
                 else:
-                    self.status_var.set(f"Current system: {current_system}")
+                    self.status_var.set(t('ring_finder.current_system').format(system=current_system))
                 return
             
             # Fallback: read directly from Status.json
@@ -896,11 +982,11 @@ class RingFinder:
                             # coords = self._get_system_coords_from_edsm(system_name)
                             if coords:
                                 self.systems_data[system_name.lower()] = coords
-                                self.status_var.set(f"Current system: {system_name}")
+                                self.status_var.set(t('ring_finder.current_system').format(system=system_name))
                             else:
-                                self.status_var.set(f"Current system: {system_name} (coordinates not available)")
+                                self.status_var.set(t('ring_finder.coords_not_available').format(system=system_name))
                         else:
-                            self.status_var.set(f"Current system: {system_name}")
+                            self.status_var.set(t('ring_finder.current_system').format(system=system_name))
                         return
             
             # Last resort: check latest journal file
@@ -910,10 +996,10 @@ class RingFinder:
                 system_name = self._get_system_from_journal(latest_journal)
                 if system_name:
                     self.current_system_var.set(system_name)
-                    self.status_var.set(f"Current system: {system_name}")
+                    self.status_var.set(t('ring_finder.current_system').format(system=system_name))
                     return
             
-            self.status_var.set("Could not detect current system - Elite Dangerous not running?")
+            self.status_var.set(t('ring_finder.could_not_detect_system'))
             
         except Exception as e:
             self.status_var.set(f"Auto-detect failed: {e}")
@@ -953,20 +1039,20 @@ class RingFinder:
                     cursor.execute("SELECT COUNT(*) FROM hotspot_data LIMIT 1")
                     cursor.fetchone()
                 
-                print(f"✓ Database verification successful on attempt {attempt + 1}")
+                print(f"[OK] Database verification successful on attempt {attempt + 1}")
                 self.db_ready = True
                 return True
                 
             except sqlite3.OperationalError as e:
-                print(f"⚠ Database not ready (attempt {attempt + 1}/{max_retries}): {e}")
+                print(f"[WARN] Database not ready (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     time.sleep(0.5)  # Wait before retry
                 else:
-                    print(f"❌ Database verification failed after {max_retries} attempts")
+                    print(f"[ERROR] Database verification failed after {max_retries} attempts")
                     self.db_ready = False
                     return False
             except Exception as e:
-                print(f"❌ Unexpected database error: {e}")
+                print(f"[ERROR] Unexpected database error: {e}")
                 self.db_ready = False
                 return False
     
@@ -989,7 +1075,7 @@ class RingFinder:
         """Update confirmed hotspots checkbox when material filter changes"""
         try:
             specific_material = self.specific_material_var.get()
-            if specific_material != RingFinder.ALL_MINERALS:
+            if not self._is_all_minerals(specific_material):
                 # Material selected - force confirmed hotspots and disable checkbox
                 self.confirmed_only_var.set(True)
                 if self.confirmed_checkbox:
@@ -1054,11 +1140,17 @@ class RingFinder:
         try:
             from config import save_ring_finder_filters
             
+            # Save canonical English identifiers to settings
+            max_results_value = self.max_results_var.get()
+            # Convert localized "Alle" back to English "All" for storage
+            if max_results_value == t('common.all'):
+                max_results_value = "All"
+            
             settings = {
-                "ring_type": self.material_var.get(),
-                "specific_material": self.specific_material_var.get(),
+                "ring_type": self._ring_type_rev_map.get(self.material_var.get(), self.material_var.get()),
+                "specific_material": self._to_english(self.specific_material_var.get()),
                 "distance": self.distance_var.get(),
-                "max_results": self.max_results_var.get(),
+                "max_results": max_results_value,
                 "min_hotspots": self.min_hotspots_var.get()
             }
             
@@ -1076,15 +1168,23 @@ class RingFinder:
             if not settings:
                 return
             
-            # Restore settings
+            # Restore settings (convert stored English identifiers to localized display)
             if "ring_type" in settings:
-                self.material_var.set(settings["ring_type"])
+                self.material_var.set(self._ring_type_map.get(settings["ring_type"], settings["ring_type"]))
             if "specific_material" in settings:
-                self.specific_material_var.set(settings["specific_material"])
+                try:
+                    self.specific_material_var.set(get_material(settings["specific_material"]))
+                except Exception:
+                    self.specific_material_var.set(settings["specific_material"])
             if "distance" in settings:
                 self.distance_var.set(settings["distance"])
             if "max_results" in settings:
-                self.max_results_var.set(settings["max_results"])
+                # Convert English "All" to localized version
+                saved_max = settings["max_results"]
+                if saved_max == "All":
+                    self.max_results_var.set(t('common.all'))
+                else:
+                    self.max_results_var.set(saved_max)
             if "min_hotspots" in settings:
                 self.min_hotspots_var.set(settings["min_hotspots"])
             
@@ -1114,7 +1214,7 @@ class RingFinder:
                 cursor = conn.cursor()
                 
                 # Query overlap entries
-                if specific_material == RingFinder.ALL_MINERALS:
+                if self._is_all_minerals(specific_material):
                     cursor.execute('''
                         SELECT system_name, body_name, material_name, overlap_tag,
                                ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
@@ -1284,7 +1384,7 @@ class RingFinder:
                 cursor = conn.cursor()
                 
                 # Query RES entries
-                if specific_material == RingFinder.ALL_MINERALS:
+                if self._is_all_minerals(specific_material):
                     cursor.execute('''
                         SELECT system_name, body_name, material_name, res_tag, overlap_tag,
                                ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
@@ -1436,8 +1536,11 @@ class RingFinder:
         # Update Sol distance for reference system
         self._update_sol_distance(reference_system)
         
-        material_filter = self.material_var.get()
-        specific_material = self.specific_material_var.get()
+        # Map localized UI selections back to English identifiers for queries
+        material_filter_local = self.material_var.get()
+        material_filter = self._ring_type_rev_map.get(material_filter_local, material_filter_local)
+        specific_material_local = self.specific_material_var.get()
+        specific_material = self._to_english(specific_material_local)
         
         # Convert dropdown display names to database names for SQL query
         if specific_material == "Low Temp Diamonds":
@@ -1452,14 +1555,15 @@ class RingFinder:
             
         max_distance = float(self.distance_var.get() or "100")
         max_results_str = self.max_results_var.get()
-        max_results = None if max_results_str == "All" else int(max_results_str)
+        # Handle both English "All" and localized versions (e.g., "Alle" in German)
+        max_results = None if max_results_str in ('All', t('common.all')) else int(max_results_str)
         
         # Auto-enable confirmed hotspots when filtering by specific material
-        if specific_material != RingFinder.ALL_MINERALS:
+        if not self._is_all_minerals(specific_material):
             confirmed_only = True
 
         if not reference_system:
-            self.status_var.set("Please enter a reference system or use 'Use Current System'")
+            self.status_var.set(t('ring_finder.enter_reference_system'))
             return
 
         # Check if search criteria changed from last search and clear relevant cache
@@ -1509,11 +1613,11 @@ class RingFinder:
                         self.current_system_coords = edsm_coords
 
             if not self.current_system_coords:
-                self.status_var.set(f"Warning: '{reference_system}' coordinates not found - distances may be inaccurate")
+                self.status_var.set(t('ring_finder.coords_not_found_warning').format(system=reference_system))
 
         # Get min hotspots filter (only valid for specific materials)
         min_hotspots = 1  # Default
-        if specific_material != RingFinder.ALL_MINERALS:
+        if not self._is_all_minerals(specific_material):
             try:
                 min_hotspots = int(self.min_hotspots_var.get())
                 if min_hotspots < 1:
@@ -1522,8 +1626,8 @@ class RingFinder:
                 min_hotspots = 1
         
         # Disable search button
-        self.search_btn.configure(state="disabled", text="Searching...")
-        self.status_var.set("⏳ Searching for rings...")
+        self.search_btn.configure(state="disabled", text=t('ring_finder.searching'))
+        self.status_var.set(t('ring_finder.searching'))
 
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
@@ -1542,6 +1646,10 @@ class RingFinder:
             if not self.db_ready:
                 print("⚠ Database not ready, search may return incomplete results")
             
+            # Check if window still exists before accessing tkinter vars
+            if not self.parent.winfo_exists():
+                return
+            
             # Set the reference system coords for this worker thread
             self.current_system_coords = reference_coords
             
@@ -1557,7 +1665,7 @@ class RingFinder:
                 hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results)
             
             # Apply min hotspots filter if needed (skip for overlaps/RES only mode)
-            if min_hotspots > 1 and specific_material != RingFinder.ALL_MINERALS and not self.overlaps_only_var.get() and not self.res_only_var.get():
+            if min_hotspots > 1 and not self._is_all_minerals(specific_material) and not self.overlaps_only_var.get() and not self.res_only_var.get():
                 original_count = len(hotspots)
                 hotspots = [h for h in hotspots if h.get('count', 1) >= min_hotspots]
                 filtered_count = len(hotspots)
@@ -1581,10 +1689,18 @@ class RingFinder:
             
         except Exception as e:
             error_msg = f"Search failed: {str(e)}"
-            self.parent.after(0, self._show_error, error_msg)
+            try:
+                if self.parent.winfo_exists():
+                    self.parent.after(0, self._show_error, error_msg)
+            except:
+                pass  # Window already destroyed
         finally:
             # Re-enable search button
-            self.parent.after(0, lambda: self.search_btn.configure(state="normal", text="Search"))
+            try:
+                if self.parent.winfo_exists():
+                    self.parent.after(0, lambda: self.search_btn.configure(state="normal", text=t('ring_finder.search')) if self.parent.winfo_exists() else None)
+            except:
+                pass  # Window already destroyed
     
     def _fill_missing_metadata_edsm(self, hotspots: List[Dict], max_systems: int = None):
         """
@@ -1741,7 +1857,7 @@ class RingFinder:
                 hotspot_count = hotspot.get('count', 1)
                 
                 # Skip if specific material filter doesn't match
-                if specific_material != RingFinder.ALL_MINERALS and not self._material_matches(specific_material, material_name):
+                if not self._is_all_minerals(specific_material) and not self._material_matches(specific_material, material_name):
                     continue
                 
                 # Get distance (already calculated in user_hotspots)
@@ -2001,7 +2117,7 @@ class RingFinder:
                                     continue
                                     
                             # If specific material is selected, check if this ring type can produce it
-                            if specific_material != RingFinder.ALL_MINERALS:
+                            if not self._is_all_minerals(specific_material):
                                 if specific_material not in all_materials:
                                     continue
                             
@@ -2452,7 +2568,7 @@ class RingFinder:
                 
                 # Search for hotspots matching the material filter
                 # Use subquery to get ring metadata from ANY material in same ring, then join with specific materials
-                if material_filter == RingFinder.ALL_MINERALS:
+                if self._is_all_minerals(material_filter):
                     cursor.execute('''
                         SELECT h.system_name, h.body_name, h.material_name, h.hotspot_count,
                                COALESCE(h.ring_type, m.ring_type) as ring_type,
@@ -2657,7 +2773,7 @@ class RingFinder:
                         placeholders = ','.join(['?'] * len(batch))
                         
                         # Different query for ALL_MINERALS vs specific material
-                        if specific_material == RingFinder.ALL_MINERALS:
+                        if self._is_all_minerals(specific_material):
                             # Show ALL rings of this type (one row per ring, combining hotspot info)
                             query = f'''
                                 SELECT system_name, body_name, 
@@ -2692,7 +2808,7 @@ class RingFinder:
                     search_pattern = f"%{reference_system}%"
                     
                     # Different query for ALL_MINERALS vs specific material
-                    if specific_material == RingFinder.ALL_MINERALS:
+                    if self._is_all_minerals(specific_material):
                         # Show ALL rings of this type (one row per ring)
                         direct_search_query = '''
                             SELECT system_name, body_name, 
@@ -2746,7 +2862,7 @@ class RingFinder:
                             print(f" DEBUG: Hit processing limit ({max_process_limit}) - stopping to prevent hang")
                             break
                         # Filter by specific material using our smart material matching
-                        if specific_material != RingFinder.ALL_MINERALS and not self._material_matches(specific_material, material_name):
+                        if not self._is_all_minerals(specific_material) and not self._material_matches(specific_material, material_name):
                             continue
                         
                         # Use ring type from database - no fallback needed
@@ -2826,7 +2942,7 @@ class RingFinder:
                         source_label = f"EDTools.cc ({coord_source})" if coord_source else "EDTools.cc Community Data"
                         
                         # Abbreviate material names ONLY for "All Minerals" view
-                        if specific_material == RingFinder.ALL_MINERALS:
+                        if self._is_all_minerals(specific_material):
                             display_material_name = self._abbreviate_material_for_display(material_name)
                         else:
                             display_material_name = material_name
@@ -2872,7 +2988,7 @@ class RingFinder:
                     pass
                 
                 # Sort by distance first, then LS distance for practical mining workflow
-                if material_filter != RingFinder.ALL_MINERALS:
+                if not self._is_all_minerals(material_filter):
                     # For specific materials, prioritize by hotspot count, then distance, then LS
                     user_hotspots.sort(key=lambda x: (-x.get('count', 0), x.get('distance') or 999.9, x.get('ls_distance') or 999999))
                 else:
@@ -3266,11 +3382,15 @@ class RingFinder:
                 tags = (row_tag,)
             
             # Get overlap display for this ring (filtered by current material selection)
-            current_material_filter = self.specific_material_var.get()
+            current_material_filter = self._to_english(self.specific_material_var.get())
             overlap_display = self._get_overlap_display(system_name, ring_name, current_material_filter)
             
             # Get RES display for this ring (filtered by current material selection)
             res_display = self._get_res_display(system_name, ring_name, current_material_filter)
+            
+            # Localize material names in hotspot display
+            hotspot_count_display = self._localize_hotspot_display(hotspot_count_display)
+            overlap_display = self._localize_hotspot_display(overlap_display)
             
             item_id = self.results_tree.insert("", "end", values=(
                 hotspot.get('distance', 'No data'),
@@ -3297,25 +3417,25 @@ class RingFinder:
         if search_term:
             if material_filter != 'All':
                 if count > 0:
-                    status_msg = f"Found {count} {material_filter} location{'s' if count != 1 else ''} near '{search_term}'"
+                    status_msg = t('ring_finder.found_material_locations_near').format(count=count, material=material_filter, system=search_term)
                 else:
-                    status_msg = f"No {material_filter} rings found within search criteria for '{search_term}'"
+                    status_msg = t('ring_finder.no_material_rings_found_near').format(material=material_filter, system=search_term)
             else:
                 if count > 0:
-                    status_msg = f"Found {count} location{'s' if count != 1 else ''} near '{search_term}'"
+                    status_msg = t('ring_finder.found_locations_near').format(count=count, system=search_term)
                 else:
-                    status_msg = f"No rings found within search criteria for '{search_term}'"
+                    status_msg = t('ring_finder.no_rings_found_near').format(system=search_term)
         else:
             if material_filter != 'All':
                 if count > 0:
-                    status_msg = f"Found {count} {material_filter} ring{'s' if count != 1 else ''}"
+                    status_msg = t('ring_finder.found_material_rings').format(count=count, material=material_filter)
                 else:
-                    status_msg = f"No {material_filter} rings found within current search parameters"
+                    status_msg = t('ring_finder.no_material_rings_found').format(material=material_filter)
             else:
                 if count > 0:
-                    status_msg = f"Found {count} ring{'s' if count != 1 else ''}"
+                    status_msg = t('ring_finder.found_rings').format(count=count)
                 else:
-                    status_msg = f"No rings found within current search parameters"
+                    status_msg = t('ring_finder.no_rings_found')
             
         # Set status message
         self.status_var.set(status_msg)
@@ -3334,7 +3454,7 @@ class RingFinder:
             
     def _show_error(self, error_msg: str):
         """Show error message and reset UI"""
-        self.status_var.set("Search failed - check your search criteria")
+        self.status_var.set(t('ring_finder.search_failed'))
         print(f"Hotspot search error: {error_msg}")
         # Clear results on error
         self.results_tree.delete(*self.results_tree.get_children())
@@ -3378,12 +3498,12 @@ class RingFinder:
                                    activebackground=menu_active_bg, 
                                    activeforeground=menu_active_fg,
                                    selectcolor=menu_active_bg)
-        self.context_menu.add_command(label="Copy System Name", command=self._copy_system_name)
+        self.context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_name)
         self.context_menu.add_separator()
-        self.context_menu.add_command(label="Set Overlap...", command=self._show_overlap_dialog)
-        self.context_menu.add_command(label="Set RES...", command=self._show_res_dialog)
+        self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
+        self.context_menu.add_command(label=t('context_menu.set_res'), command=self._show_res_dialog)
         self.context_menu.add_separator()
-        self.context_menu.add_command(label="Bookmark This Location", command=self._bookmark_selected)
+        self.context_menu.add_command(label=t('context_menu.bookmark_location'), command=self._bookmark_selected)
     
     def _show_context_menu(self, event):
         """Show the context menu when right-clicking on results"""
@@ -3737,7 +3857,7 @@ class RingFinder:
                 return ""
             
             # If filtering by specific material, only show that material's overlap
-            if material_filter and material_filter != RingFinder.ALL_MINERALS:
+            if material_filter and not self._is_all_minerals(material_filter):
                 # Filter overlaps to only the selected material
                 filtered_overlaps = []
                 for overlap in overlaps:
@@ -3786,7 +3906,7 @@ class RingFinder:
                 return ""
             
             # If filtering by specific material, only show that material's RES
-            if material_filter and material_filter != RingFinder.ALL_MINERALS:
+            if material_filter and not self._is_all_minerals(material_filter):
                 # Filter RES to only the selected material
                 filtered_res = []
                 for res in res_sites:
@@ -3854,7 +3974,7 @@ class RingFinder:
             
             # Create dialog
             dialog = tk.Toplevel(self.parent)
-            dialog.title("Set Overlap")
+            dialog.title(t('context_menu.set_overlap_title'))
             dialog.resizable(False, False)
             dialog.transient(self.parent.winfo_toplevel())
             
@@ -3871,19 +3991,19 @@ class RingFinder:
             frame.pack(fill="both", expand=True)
             
             # Header
-            ttk.Label(frame, text=f"Set Overlap for:", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=t('context_menu.set_overlap_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
             ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
             
             # Material dropdown - use full names
-            ttk.Label(frame, text="Mineral:").grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
+            ttk.Label(frame, text=t('context_menu.mineral')).grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
             material_var = tk.StringVar()
             material_combo = ttk.Combobox(frame, textvariable=material_var, width=25, state="readonly")
             material_combo['values'] = full_materials
             material_combo.grid(row=2, column=1, sticky="w", pady=5)
             
             # Pre-select material based on current filter
-            current_filter = self.specific_material_var.get()
-            if current_filter != RingFinder.ALL_MINERALS:
+            current_filter = self._to_english(self.specific_material_var.get())
+            if not self._is_all_minerals(current_filter):
                 # Try to find matching material in dropdown
                 for mat in full_materials:
                     if current_filter.lower() in mat.lower() or mat.lower() in current_filter.lower():
@@ -3893,7 +4013,7 @@ class RingFinder:
                 material_var.set(full_materials[0])
             
             # Overlap selection
-            ttk.Label(frame, text="Overlap:").grid(row=3, column=0, sticky="w", pady=5, padx=(0, 10))
+            ttk.Label(frame, text=t('context_menu.overlap_label')).grid(row=3, column=0, sticky="w", pady=5, padx=(0, 10))
             overlap_var = tk.StringVar(value="None")
             
             overlap_frame = tk.Frame(frame, bg="#1e1e1e")
@@ -3902,7 +4022,7 @@ class RingFinder:
             # Dark themed radio buttons
             rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
                         "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
-            tk.Radiobutton(overlap_frame, text="None", variable=overlap_var, value="None", **rb_style).pack(side="left", padx=(0, 10))
+            tk.Radiobutton(overlap_frame, text=t('context_menu.none'), variable=overlap_var, value="None", **rb_style).pack(side="left", padx=(0, 10))
             tk.Radiobutton(overlap_frame, text="2x", variable=overlap_var, value="2x", **rb_style).pack(side="left", padx=(0, 10))
             tk.Radiobutton(overlap_frame, text="3x", variable=overlap_var, value="3x", **rb_style).pack(side="left")
             
@@ -3941,14 +4061,14 @@ class RingFinder:
             def cancel():
                 dialog.destroy()
             
-            save_btn = tk.Button(button_frame, text="Save", command=save,
+            save_btn = tk.Button(button_frame, text=t('dialogs.save'), command=save,
                                 bg="#2a5a2a", fg="#ffffff", 
                                 activebackground="#3a6a3a", activeforeground="#ffffff",
                                 relief="solid", bd=1, cursor="hand2", 
                                 pady=6, padx=15, font=("Segoe UI", 9))
             save_btn.pack(side="left", padx=(0, 8))
             
-            cancel_btn = tk.Button(button_frame, text="Cancel", command=cancel,
+            cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
                                   bg="#5a2a2a", fg="#ffffff", 
                                   activebackground="#6a3a3a", activeforeground="#ffffff",
                                   relief="solid", bd=1, cursor="hand2", 
@@ -4052,7 +4172,7 @@ class RingFinder:
             
             # Create dialog
             dialog = tk.Toplevel(self.parent)
-            dialog.title("Set RES Site")
+            dialog.title(t('context_menu.set_res_title'))
             dialog.resizable(False, False)
             dialog.transient(self.parent.winfo_toplevel())
             
@@ -4069,19 +4189,19 @@ class RingFinder:
             frame.pack(fill="both", expand=True)
             
             # Header
-            ttk.Label(frame, text=f"Set RES Site for:", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=t('context_menu.set_res_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
             ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
             
             # Material dropdown - use full names
-            ttk.Label(frame, text="Mineral:").grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
+            ttk.Label(frame, text=t('context_menu.mineral')).grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
             material_var = tk.StringVar()
             material_combo = ttk.Combobox(frame, textvariable=material_var, width=25, state="readonly")
             material_combo['values'] = full_materials
             material_combo.grid(row=2, column=1, sticky="w", pady=5)
             
-            # Pre-select material based on current filter
-            current_filter = self.specific_material_var.get()
-            if current_filter != RingFinder.ALL_MINERALS:
+            # Pre-select material based on current filter (map localized display to English)
+            current_filter = self._to_english(self.specific_material_var.get())
+            if not self._is_all_minerals(current_filter):
                 # Try to find matching material in dropdown
                 for mat in full_materials:
                     if current_filter.lower() in mat.lower() or mat.lower() in current_filter.lower():
@@ -4091,7 +4211,7 @@ class RingFinder:
                 material_var.set(full_materials[0])
             
             # RES type selection
-            ttk.Label(frame, text="RES Type:").grid(row=3, column=0, sticky="w", pady=5, padx=(0, 10))
+            ttk.Label(frame, text=t('context_menu.res_type')).grid(row=3, column=0, sticky="w", pady=5, padx=(0, 10))
             res_var = tk.StringVar(value="None")
             
             res_frame = tk.Frame(frame, bg="#1e1e1e")
@@ -4100,7 +4220,7 @@ class RingFinder:
             # Dark themed radio buttons
             rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
                         "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
-            tk.Radiobutton(res_frame, text="None", variable=res_var, value="None", **rb_style).pack(side="left", padx=(0, 8))
+            tk.Radiobutton(res_frame, text=t('context_menu.none'), variable=res_var, value="None", **rb_style).pack(side="left", padx=(0, 8))
             tk.Radiobutton(res_frame, text="Haz", variable=res_var, value="Hazardous", **rb_style).pack(side="left", padx=(0, 8))
             tk.Radiobutton(res_frame, text="High", variable=res_var, value="High", **rb_style).pack(side="left", padx=(0, 8))
             tk.Radiobutton(res_frame, text="Low", variable=res_var, value="Low", **rb_style).pack(side="left")
@@ -4138,14 +4258,14 @@ class RingFinder:
             def cancel():
                 dialog.destroy()
             
-            save_btn = tk.Button(button_frame, text="Save", command=save,
+            save_btn = tk.Button(button_frame, text=t('dialogs.save'), command=save,
                                 bg="#2a5a2a", fg="#ffffff", 
                                 activebackground="#3a6a3a", activeforeground="#ffffff",
                                 relief="solid", bd=1, cursor="hand2", 
                                 pady=6, padx=15, font=("Segoe UI", 9))
             save_btn.pack(side="left", padx=(0, 8))
             
-            cancel_btn = tk.Button(button_frame, text="Cancel", command=cancel,
+            cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
                                   bg="#5a2a2a", fg="#ffffff", 
                                   activebackground="#6a3a3a", activeforeground="#ffffff",
                                   relief="solid", bd=1, cursor="hand2", 

@@ -3,12 +3,26 @@
 # PyInstaller imports for VS Code linting
 from PyInstaller.building.build_main import Analysis
 from PyInstaller.building.api import PYZ, EXE
+import sys
+import os
+
+# Get Tcl/Tk library paths
+tcl_path = os.path.join(sys.base_prefix, 'tcl')
+tcl_library = os.path.join(tcl_path, 'tcl8.6')
+tk_library = os.path.join(tcl_path, 'tk8.6')
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('app/Images', 'Images'), ('app/Settings', 'Settings'), ('app/Reports', 'Reports')],
+    datas=[
+        ('app/Images', 'Images'), 
+        ('app/Settings', 'Settings'), 
+        ('app/Reports', 'Reports'),
+        ('app/localization', 'localization'),
+        (tcl_library, 'tcl8.6'),
+        (tk_library, 'tk8.6'),
+    ],
     hiddenimports=[
         'matplotlib',
         'matplotlib.pyplot',

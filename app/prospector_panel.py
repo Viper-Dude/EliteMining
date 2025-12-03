@@ -80,6 +80,17 @@ import announcer
 # Import normalization from journal_parser for consistent material name handling
 from journal_parser import JournalParser
 
+# Localization
+try:
+    from localization import t, get_material, get_abbr, to_english
+except Exception:
+    def t(key, **kwargs):
+        return key
+    def get_material(name):
+        return name
+    def get_abbr(name):
+        return name
+
 # Import graphs module for graphical analytics
 try:
     from mining_charts import MiningChartsPanel
@@ -1050,9 +1061,9 @@ class ProspectorPanel(ttk.Frame):
                 distance_text = self.main_app.get_distance_info_text()
                 self.distance_info_label.config(text=distance_text)
             else:
-                self.distance_info_label.config(text="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
+                self.distance_info_label.config(text=f"➤ {t('mining_session.sol')} --- | {t('mining_session.home')} --- | {t('mining_session.fleet_carrier')} ---")
         except Exception as e:
-            self.distance_info_label.config(text="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
+            self.distance_info_label.config(text=f"➤ {t('mining_session.sol')} --- | {t('mining_session.home')} --- | {t('mining_session.fleet_carrier')} ---")
     
     def _update_ship_info_display(self) -> None:
         """Update the ship info display with current ship data from cargo monitor"""
@@ -1693,7 +1704,7 @@ class ProspectorPanel(ttk.Frame):
         rep.columnconfigure(0, weight=1)
         rep.columnconfigure(1, weight=0)
         rep.rowconfigure(4, weight=1)  # Updated for new ship info row
-        nb.add(rep, text="Mining Analytics")
+        nb.add(rep, text=t('mining_session.mining_analytics'))
 
         # --- Distance and Ship Info Row ---
         distance_ship_row = ttk.Frame(rep)
@@ -1705,15 +1716,15 @@ class ProspectorPanel(ttk.Frame):
         _pp_theme = load_theme()
         _pp_bg = "#0a0a0a" if _pp_theme == "elite_orange" else "#1e1e1e"
         
-        ttk.Label(distance_ship_row, text="Distances:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
-        self.distance_info_label = tk.Label(distance_ship_row, text="➤ Sol: --- | Home: --- | Fleet Carrier: ---",
+        ttk.Label(distance_ship_row, text=t('mining_session.distances'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
+        self.distance_info_label = tk.Label(distance_ship_row, text=f"➤ {t('mining_session.sol')} --- | {t('mining_session.home')} --- | {t('mining_session.fleet_carrier')} ---",
                                 font=("Segoe UI", 9), foreground="#ffcc00", bg=_pp_bg)
         self.distance_info_label.pack(side="left")
         
         # Ship info on the right side of the same row
         ship_info_frame = ttk.Frame(distance_ship_row)
         ship_info_frame.pack(side="right", padx=(20, 0))
-        ttk.Label(ship_info_frame, text="Ship:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
+        ttk.Label(ship_info_frame, text=t('mining_session.ship'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
         self.ship_info_label = ttk.Label(ship_info_frame, text="", font=("Segoe UI", 9, "bold"), foreground="#ffcc00")
         self.ship_info_label.pack(side="left")
 
@@ -1725,18 +1736,18 @@ class ProspectorPanel(ttk.Frame):
         sysbody_row.columnconfigure(2, weight=0, minsize=80)
         sysbody_row.columnconfigure(3, weight=1)
 
-        ttk.Label(sysbody_row, text="System:", font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", padx=(0, 2))
+        ttk.Label(sysbody_row, text=t('mining_session.system'), font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", padx=(0, 2))
         self.system_entry = ttk.Entry(sysbody_row, textvariable=self.session_system, width=40)
         self.system_entry.grid(row=0, column=1, sticky="w", padx=(0, 5))
-        self.ToolTip(self.system_entry, "Current system name. (Can also be entered manually)")
+        self.ToolTip(self.system_entry, t('tooltips.system_entry'))
         # Prevent unwanted text selection when tab switching or focus changes
         self.system_entry.bind('<FocusOut>', lambda e: self.system_entry.selection_clear())
         self.system_entry.bind('<Map>', lambda e: self.after(10, self.system_entry.selection_clear))
 
-        ttk.Label(sysbody_row, text="Planet/Ring:", font=("Segoe UI", 9)).grid(row=0, column=2, sticky="w", padx=(0, 2))
+        ttk.Label(sysbody_row, text=t('mining_session.planet_ring'), font=("Segoe UI", 9)).grid(row=0, column=2, sticky="w", padx=(0, 2))
         self.body_entry = ttk.Entry(sysbody_row, textvariable=self.session_body, width=15)
         self.body_entry.grid(row=0, column=3, sticky="w")
-        self.ToolTip(self.body_entry, "Current location: rings, planets, stations, or carriers. (Can also be entered manually)")
+        self.ToolTip(self.body_entry, t('tooltips.body_entry'))
         # Prevent unwanted text selection when tab switching or focus changes
         self.body_entry.bind('<FocusOut>', lambda e: self.body_entry.selection_clear())
         self.body_entry.bind('<Map>', lambda e: self.after(10, self.body_entry.selection_clear))
@@ -1748,7 +1759,7 @@ class ProspectorPanel(ttk.Frame):
         # self.va_lbl = tk.Label(vrow, text=self.vars_dir, fg="gray", font=("Segoe UI", 9))
         # self.va_lbl.pack(side="left", padx=(6, 0))
 
-        ttk.Label(rep, text="Prospector Reports:", font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 4))
+        ttk.Label(rep, text=t('mining_session.prospector_reports'), font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 4))
 
         # Configure Prospector Reports Treeview style based on theme
         from config import load_theme
@@ -1806,9 +1817,9 @@ class ProspectorPanel(ttk.Frame):
         self.tree = ttk.Treeview(tree_frame_prospector, columns=("materials", "content", "time"), show="headings", height=5, style="ProspectorReports.Treeview")
         self.tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
-        self.tree.heading("materials", text="Minerals", anchor="w")
-        self.tree.heading("content", text="Asteroid Content", anchor="w")
-        self.tree.heading("time", text="Time", anchor="w")
+        self.tree.heading("materials", text=t('mining_session.minerals'), anchor="w")
+        self.tree.heading("content", text=t('mining_session.asteroid_content'), anchor="w")
+        self.tree.heading("time", text=t('mining_session.time'), anchor="w")
         self.tree.column("materials", width=400, minwidth=150, anchor="w", stretch=False)
         self.tree.column("content", width=180, minwidth=100, anchor="w", stretch=False)
         self.tree.column("time", width=80, minwidth=60, anchor="w", stretch=True)
@@ -1871,8 +1882,8 @@ class ProspectorPanel(ttk.Frame):
         mineral_header_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(10, 4))
         mineral_header_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(mineral_header_frame, text="Mineral Analysis:", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
-        ttk.Label(mineral_header_frame, text="💡 Double-click Hits to correct accidental double prospects", 
+        ttk.Label(mineral_header_frame, text=t('mining_session.material_analysis'), font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(mineral_header_frame, text=t('mining_session.double_click_hint'), 
                   font=("Segoe UI", 8), foreground="#888888").grid(row=0, column=1, sticky="e")
         
         stats_frame = ttk.Frame(rep)
@@ -1918,15 +1929,15 @@ class ProspectorPanel(ttk.Frame):
                            show="headings", height=5, style="MineralAnalysis.Treeview")
         self.stats_tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.stats_tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
-        self.stats_tree.heading("material", text="Mineral (Thr%)", anchor="w")
-        self.stats_tree.heading("tons", text="Tons", anchor="w")
-        self.stats_tree.heading("tph", text="T/hr", anchor="w")
-        self.stats_tree.heading("tons_per", text="T/Ast", anchor="w")
-        self.stats_tree.heading("avg_all", text="Avg % (All)", anchor="w")
-        self.stats_tree.heading("avg_pct", text="Avg % (≥Thr)", anchor="w")
-        self.stats_tree.heading("best_pct", text="Best %", anchor="w")
-        self.stats_tree.heading("latest_pct", text="Latest %", anchor="w")
-        self.stats_tree.heading("count", text="Hits", anchor="w")
+        self.stats_tree.heading("material", text=t('mining_session.mineral_thr'), anchor="w")
+        self.stats_tree.heading("tons", text=t('mining_session.tons'), anchor="w")
+        self.stats_tree.heading("tph", text=t('mining_session.tph'), anchor="w")
+        self.stats_tree.heading("tons_per", text=t('mining_session.t_ast'), anchor="w")
+        self.stats_tree.heading("avg_all", text=t('mining_session.avg_all'), anchor="w")
+        self.stats_tree.heading("avg_pct", text=t('mining_session.avg_thr'), anchor="w")
+        self.stats_tree.heading("best_pct", text=t('mining_session.best_pct'), anchor="w")
+        self.stats_tree.heading("latest_pct", text=t('mining_session.latest_pct'), anchor="w")
+        self.stats_tree.heading("count", text=t('mining_session.hits'), anchor="w")
         
         self.stats_tree.column("material", width=135, minwidth=110, anchor="w", stretch=False)
         self.stats_tree.column("tons", width=65, minwidth=50, anchor="w", stretch=False)
@@ -2006,8 +2017,8 @@ class ProspectorPanel(ttk.Frame):
         summary_frame.grid(row=2, column=0, sticky="ew", pady=(8, 0))
         summary_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(summary_frame, text="Session Summary:", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w")
-        self.stats_summary_label = ttk.Label(summary_frame, text="No data yet", foreground="#888888")
+        ttk.Label(summary_frame, text=t('mining_session.session_summary'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w")
+        self.stats_summary_label = ttk.Label(summary_frame, text=t('mining_session.no_data_yet'), foreground="#888888")
         self.stats_summary_label.grid(row=0, column=1, sticky="w", padx=(10, 0))
         
         # Session controls (moved from Session tab)
@@ -2021,37 +2032,37 @@ class ProspectorPanel(ttk.Frame):
         session_controls = ttk.Frame(controls_frame)
         session_controls.grid(row=0, column=0, sticky="w")
         
-        self.start_btn = tk.Button(session_controls, text="Start", command=self._session_start, 
+        self.start_btn = tk.Button(session_controls, text=t('mining_session.start'), command=self._session_start, 
                                  bg="#2a5a2a", fg="#ffffff", 
                                  activebackground="#3a6a3a", activeforeground="#ffffff",
                                  relief="solid", bd=1, cursor="hand2", width=10,
                                  highlightbackground="#1a3a1a", highlightcolor="#1a3a1a")
         self.start_btn.pack(side="left")
-        self.ToolTip(self.start_btn, "Start a new mining session to track materials and performance")
+        self.ToolTip(self.start_btn, t('tooltips.start_session'))
         
-        self.pause_resume_btn = tk.Button(session_controls, text="Pause", command=self._toggle_pause_resume, state="disabled", 
+        self.pause_resume_btn = tk.Button(session_controls, text=t('mining_session.pause'), command=self._toggle_pause_resume, state="disabled", 
                                         bg="#5a4a2a", fg="#ffffff", 
                                         activebackground="#6a5a3a", activeforeground="#ffffff",
                                         relief="solid", bd=1, cursor="hand2", width=10,
                                         highlightbackground="#3a2a1a", highlightcolor="#3a2a1a")
         self.pause_resume_btn.pack(side="left", padx=(4, 0))
-        self.ToolTip(self.pause_resume_btn, "Pause or resume the current mining session")
+        self.ToolTip(self.pause_resume_btn, t('tooltips.pause_session'))
         
-        self.stop_btn = tk.Button(session_controls, text="End", command=self._session_stop, state="disabled", 
+        self.stop_btn = tk.Button(session_controls, text=t('mining_session.end'), command=self._session_stop, state="disabled", 
                                 bg="#5a2a2a", fg="#ffffff", 
                                 activebackground="#6a3a3a", activeforeground="#ffffff",
                                 relief="solid", bd=1, cursor="hand2", width=10,
                                 highlightbackground="#3a1a1a", highlightcolor="#3a1a1a")
         self.stop_btn.pack(side="left", padx=(4, 0))
-        self.ToolTip(self.stop_btn, "End the session and generate a final report")
+        self.ToolTip(self.stop_btn, t('tooltips.stop_session'))
         
-        self.cancel_btn = tk.Button(session_controls, text="Cancel", command=self._session_cancel, state="disabled", 
+        self.cancel_btn = tk.Button(session_controls, text=t('mining_session.cancel'), command=self._session_cancel, state="disabled", 
                                   bg="#4a4a4a", fg="#ffffff", 
                                   activebackground="#5a5a5a", activeforeground="#ffffff",
                                   relief="solid", bd=1, cursor="hand2", width=10,
                                   highlightbackground="#2a2a2a", highlightcolor="#2a2a2a")
         self.cancel_btn.pack(side="left", padx=(4, 0))
-        self.ToolTip(self.cancel_btn, "Cancel the current session without saving")
+        self.ToolTip(self.cancel_btn, t('tooltips.cancel_session'))
         
         # Session options frame (below buttons for checkboxes)
         options_frame = ttk.Frame(controls_frame)
@@ -2073,7 +2084,7 @@ class ProspectorPanel(ttk.Frame):
         self.auto_start_var = tk.IntVar()  # Initialize without value first
         auto_start_cb = tk.Checkbutton(
             options_frame, 
-            text="Auto-start", 
+            text=t('mining_session.auto_start'), 
             variable=self.auto_start_var,
             # Don't set command yet - will add after setting value
             bg=_opt_bg, 
@@ -2093,7 +2104,7 @@ class ProspectorPanel(ttk.Frame):
         self.auto_start_var.set(auto_start_ui_value)  # Set value without callback
         auto_start_cb.config(command=self._on_auto_start_checkbox_toggle)  # Now add callback
         print(f"[DEBUG] Auto-start checkbox created and value set to: {auto_start_ui_value}")
-        self.ToolTip(auto_start_cb, "Automatically start session when first prospector limpet is fired\n(Only works when no session is active)")
+        self.ToolTip(auto_start_cb, t('tooltips.auto_start'))
         
         # Prompt when cargo full checkbox - preserve user's saved setting
         # If both multi-session and prompt-when-full are enabled, we'll disable prompt UI but keep the setting
@@ -2102,7 +2113,7 @@ class ProspectorPanel(ttk.Frame):
         self.prompt_on_full_var = tk.IntVar()  # Initialize without value first
         self.prompt_on_full_cb = tk.Checkbutton(
             options_frame, 
-            text="Prompt when full", 
+            text=t('mining_session.prompt_when_full'), 
             variable=self.prompt_on_full_var,
             # Don't set command yet - will add after setting value
             bg=_opt_bg, 
@@ -2132,7 +2143,7 @@ class ProspectorPanel(ttk.Frame):
             self.prompt_on_full_cb.config(state="normal", fg="#ffffff")
             print(f"[DEBUG] Prompt-when-full checkbox enabled (single session mode)")
         
-        self.ToolTip(self.prompt_on_full_cb, "Show prompt to end session when cargo is 100% full\nand has been idle (no changes) for 1 minute\nRemember to end session BEFORE unloading cargo!")
+        self.ToolTip(self.prompt_on_full_cb, t('tooltips.prompt_full'))
         
         # Multi-session mode checkbox
         multi_session_ui_value = 1 if self.multi_session_mode else 0
@@ -2140,7 +2151,7 @@ class ProspectorPanel(ttk.Frame):
         self.multi_session_var = tk.IntVar()  # Initialize without value first
         multi_session_cb = tk.Checkbutton(
             options_frame, 
-            text="Multi-Session", 
+            text=t('mining_session.multi_session'), 
             variable=self.multi_session_var,
             # Don't set command yet - will add after setting value
             bg=_opt_bg, 
@@ -2160,7 +2171,7 @@ class ProspectorPanel(ttk.Frame):
         self.multi_session_var.set(multi_session_ui_value)  # Set value without callback
         multi_session_cb.config(command=self._on_multi_session_checkbox_toggle)  # Now add callback
         print(f"[DEBUG] Multi-session checkbox created and value set to: {multi_session_ui_value}")
-        self.ToolTip(multi_session_cb, "Accumulate statistics across multiple cargo loads\nStats won't reset until you manually end the session")
+        self.ToolTip(multi_session_cb, t('tooltips.multi_session'))
         
         # Apply initial state: If multi-session is already enabled (loaded from file), disable "Prompt when full"
         if self.multi_session_mode:
@@ -2172,7 +2183,7 @@ class ProspectorPanel(ttk.Frame):
         elapsed_frame = ttk.Frame(controls_frame)
         elapsed_frame.grid(row=0, column=1, sticky="ew", padx=(10, 10))
         
-        ttk.Label(elapsed_frame, text="Elapsed:").pack(side="left")
+        ttk.Label(elapsed_frame, text=t('mining_session.elapsed') + ":").pack(side="left")
         self.elapsed_lbl = ttk.Label(elapsed_frame, textvariable=self.session_elapsed, font=("Segoe UI", 9, "bold"))
         self.elapsed_lbl.pack(side="left", padx=(6, 0))
         
@@ -2213,7 +2224,7 @@ class ProspectorPanel(ttk.Frame):
         sp = ttk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
                          textvariable=self.threshold, command=self._save_threshold_value)
         sp.pack(side="left", padx=(6, 4))
-        self.ToolTip(sp, "Set the minimum percentage threshold for announcements")
+        self.ToolTip(sp, t('tooltips.announcement_threshold'))
         
         set_all_btn = tk.Button(thr, text="Set all", command=self._set_all_min_pct,
                                bg="#2a4a5a", fg="#ffffff", 
@@ -2222,7 +2233,7 @@ class ProspectorPanel(ttk.Frame):
                                highlightbackground="#1a2a3a", highlightcolor="#1a2a3a",
                                width=8)
         set_all_btn.pack(side="left", padx=(10, 0))
-        self.ToolTip(set_all_btn, "Set all materials to the minimum threshold percentage")
+        self.ToolTip(set_all_btn, t('tooltips.set_all_threshold'))
         ttk.Label(thr, text="%").pack(side="left")
 
         ttk.Label(ann, text="Select minerals and set minimum percentages:",
@@ -2353,7 +2364,7 @@ class ProspectorPanel(ttk.Frame):
                                   relief="solid", bd=1, cursor="hand2", pady=3,
                                   highlightbackground="#1a3a1a", highlightcolor="#1a3a1a")
         select_all_btn.pack(side="left")
-        self.ToolTip(select_all_btn, "Enable announcements for all materials")
+        self.ToolTip(select_all_btn, t('tooltips.select_all_materials'))
         
         unselect_all_btn = tk.Button(btns, text="Unselect all", command=self._mute_all,
                                    bg="#5a2a2a", fg="#ffffff", 
@@ -2361,12 +2372,12 @@ class ProspectorPanel(ttk.Frame):
                                    relief="solid", bd=1, cursor="hand2", pady=3,
                                    highlightbackground="#3a1a1a", highlightcolor="#3a1a1a")
         unselect_all_btn.pack(side="left", padx=(6, 0))
-        self.ToolTip(unselect_all_btn, "Disable announcements for all materials")
+        self.ToolTip(unselect_all_btn, t('tooltips.unselect_all_materials'))
 
         # --- Preset buttons row ---
         self.preset_buttons = []
         for i in range(1, 6):
-            btn = tk.Button(btns, text=f"Preset {i}",
+            btn = tk.Button(btns, text=t('settings.preset_button').format(num=i),
                           bg="#4a4a2a", fg="#ffffff",
                           activebackground="#5a5a3a", activeforeground="#ffffff",
                           relief="solid", bd=1,
@@ -2375,7 +2386,7 @@ class ProspectorPanel(ttk.Frame):
             btn.pack(side="left", padx=(8, 0))
             self.preset_buttons.append(btn)
             # Add tooltip for preset buttons
-            self.ToolTip(btn, f"Left-click to load preset {i} announcement settings\nRight-click to save current settings as preset {i}")
+            self.ToolTip(btn, t('tooltips.preset_load_save').format(num=i))
 
             if i == 1:
                 btn.bind("<Button-1>", lambda e: self._load_preset1())
@@ -2399,7 +2410,7 @@ class ProspectorPanel(ttk.Frame):
         # Graphs tab - Analytics visualization (Session tab removed and merged into Prospector)
         if CHARTS_AVAILABLE:
             charts = ttk.Frame(nb, padding=8)
-            nb.add(charts, text="📊 Graphs")
+            nb.add(charts, text="📊 " + t('mining_session.graphs'))
             charts.columnconfigure(0, weight=1)
             charts.rowconfigure(0, weight=1)
             
@@ -2413,7 +2424,7 @@ class ProspectorPanel(ttk.Frame):
 
         # Reports tab - Session reports and management
         reports = ttk.Frame(nb, padding=8)
-        nb.add(reports, text="📋 Reports")
+        nb.add(reports, text="📋 " + t('mining_session.reports'))
         reports.columnconfigure(0, weight=1)
         reports.rowconfigure(0, weight=1)
         
@@ -2422,7 +2433,7 @@ class ProspectorPanel(ttk.Frame):
 
         # Statistics tab - Session statistics and analytics
         statistics = ttk.Frame(nb, padding=8)
-        nb.add(statistics, text="📊 Statistics")
+        nb.add(statistics, text="📊 " + t('mining_session.statistics'))
         statistics.columnconfigure(0, weight=1)
         statistics.rowconfigure(0, weight=1)
         
@@ -3288,20 +3299,20 @@ class ProspectorPanel(ttk.Frame):
                                          activebackground=MENU_COLORS["activebackground"], 
                                          activeforeground=MENU_COLORS["activeforeground"],
                                          selectcolor=MENU_COLORS["selectcolor"])
-                    context_menu.add_command(label="📂 Open Report (TXT)", command=open_selected)
-                    context_menu.add_command(label="📊 Open Detailed Report (HTML)", command=lambda: self._open_enhanced_report_from_menu(tree))
+                    context_menu.add_command(label=t('context_menu.open_report_txt'), command=open_selected)
+                    context_menu.add_command(label=t('context_menu.open_report_html'), command=lambda: self._open_enhanced_report_from_menu(tree))
                     context_menu.add_separator()
-                    context_menu.add_command(label="📊 Generate Detailed Report (HTML)", command=lambda: self._generate_enhanced_report_from_menu(tree))
+                    context_menu.add_command(label=t('context_menu.generate_report_html'), command=lambda: self._generate_enhanced_report_from_menu(tree))
                     context_menu.add_separator()
-                    context_menu.add_command(label="Share to Discord", command=lambda: self._share_selected_to_discord_popup(tree))
-                    context_menu.add_command(label="Create Mining Card", command=lambda: self._create_mining_card_from_report_popup(tree))
+                    context_menu.add_command(label=t('context_menu.share_discord'), command=lambda: self._share_selected_to_discord_popup(tree))
+                    context_menu.add_command(label=t('context_menu.create_mining_card'), command=lambda: self._create_mining_card_from_report_popup(tree))
                     context_menu.add_separator()
-                    context_menu.add_command(label="📋 Copy System Name", command=lambda: copy_system_to_clipboard_reports(tree))
+                    context_menu.add_command(label=t('context_menu.copy_system'), command=lambda: copy_system_to_clipboard_reports(tree))
                     context_menu.add_separator()
                     context_menu.add_separator()
                     
                     # Word wrap toggle
-                    wrap_text = "Disable Word Wrap" if word_wrap_enabled.get() else "Enable Word Wrap" 
+                    wrap_text = t('context_menu.word_wrap_off') if word_wrap_enabled.get() else t('context_menu.word_wrap_on')
                     def toggle_word_wrap():
                         word_wrap_enabled.set(not word_wrap_enabled.get())
                         # Don't change global row height - handle per-row instead
@@ -3346,19 +3357,19 @@ class ProspectorPanel(ttk.Frame):
                     
                     # Add Refinery Contents option (only for single selection)
                     if len(selected_items) == 1:
-                        context_menu.add_command(label="⚗️ Add Refinery Contents", 
+                        context_menu.add_command(label=t('context_menu.add_refinery'), 
                                                command=lambda: self._add_refinery_to_session_from_menu(tree, selected_items[0]))
                         context_menu.add_separator()
                     
                     # Update label based on selection count
                     if len(selected_items) == 1:
-                        context_menu.add_command(label="🗑️Delete Detailed Report + Screenshots", 
+                        context_menu.add_command(label=t('context_menu.delete_report_screenshots'), 
                                                command=lambda: self._delete_enhanced_report_from_menu(tree))
                         context_menu.add_separator()  # Add separator for safety
-                        context_menu.add_command(label="🗑️Delete Complete Session", 
+                        context_menu.add_command(label=t('context_menu.delete_complete_session'), 
                                                command=lambda items=selected_items: delete_selected(items))
                     else:
-                        context_menu.add_command(label=f"🗑️Delete {len(selected_items)} CSV Entries + Text Reports", 
+                        context_menu.add_command(label=t('context_menu.delete_csv_entries').format(count=len(selected_items)), 
                                                command=lambda items=selected_items: delete_selected(items))
                     
                     try:
@@ -3414,35 +3425,32 @@ class ProspectorPanel(ttk.Frame):
             # Create confirmation message
             if len(sessions_to_delete) == 1:
                 item_id, session = sessions_to_delete[0]
-                confirm_msg = (f"Are you sure you want to permanently delete this mining session report?\n\n"
-                              f"Session Details:\n"
-                              f"• Date: {session['date']}\n"
-                              f"• System: {session['system']}\n"
-                              f"• Body: {session['body']}\n"
-                              f"• Duration: {session['duration']}\n"
-                              f"• Tons Mined: {session['tons']}\n\n"
-                              f"This will permanently delete:\n"
-                              f"• The CSV report entry\n"
-                              f"• The individual report file\n"
-                              f"• Graph files (if any)\n"
-                              f"• Detailed HTML report (if any)\n"
-                              f"• Mining card PNG (if any)\n"
-                              f"• Screenshots (if any)\n\n"
-                              f"This action cannot be undone.")
-                title = "Delete Mining Session Report"
+                confirm_msg = (t('context_menu.delete_session_confirm') + "\n\n"
+                              f"{t('context_menu.session_details')}\n"
+                              f"• {t('context_menu.date_label')} {session['date']}\n"
+                              f"• {t('context_menu.system_label')} {session['system']}\n"
+                              f"• {t('context_menu.body_label')} {session['body']}\n"
+                              f"• {t('context_menu.duration_label')} {session['duration']}\n"
+                              f"• {t('context_menu.tons_mined_label')} {session['tons']}\n\n"
+                              f"{t('context_menu.will_delete')}\n"
+                              f"• {t('context_menu.all_csv_entries')}\n"
+                              f"• {t('context_menu.all_report_files')}\n"
+                              f"• {t('context_menu.all_associated_files')}\n\n"
+                              f"{t('context_menu.cannot_undone')}")
+                title = t('context_menu.delete_session_title')
             else:
-                confirm_msg = f"Are you sure you want to permanently delete {len(sessions_to_delete)} mining session reports?\n\n"
-                confirm_msg += "Sessions to be deleted:\n"
+                confirm_msg = t('context_menu.delete_sessions_confirm', count=len(sessions_to_delete)) + "\n\n"
+                confirm_msg += t('context_menu.sessions_to_delete') + "\n"
                 for i, (_, session) in enumerate(sessions_to_delete[:5], 1):  # Show max 5 items
                     confirm_msg += f"  {i}. {session['date']} - {session['system']}/{session['body']}\n"
                 if len(sessions_to_delete) > 5:
-                    confirm_msg += f"  ... and {len(sessions_to_delete) - 5} more\n"
-                confirm_msg += f"\nThis will permanently delete:\n"
-                confirm_msg += f"• All CSV report entries\n"
-                confirm_msg += f"• All individual report files\n"
-                confirm_msg += f"• All associated graphs, HTML reports, mining cards, and screenshots\n\n"
-                confirm_msg += f"This action cannot be undone."
-                title = "Delete Multiple Mining Session Reports"
+                    confirm_msg += t('context_menu.and_more', count=len(sessions_to_delete) - 5) + "\n"
+                confirm_msg += f"\n{t('context_menu.will_delete')}\n"
+                confirm_msg += f"• {t('context_menu.all_csv_entries')}\n"
+                confirm_msg += f"• {t('context_menu.all_report_files')}\n"
+                confirm_msg += f"• {t('context_menu.all_associated_files')}\n\n"
+                confirm_msg += t('context_menu.cannot_undone')
+                title = t('context_menu.delete_sessions_title')
             
             # Confirm deletion
             from main import centered_yesno_dialog
@@ -3689,24 +3697,24 @@ class ProspectorPanel(ttk.Frame):
         # Center the action buttons
         rebuild_btn = tk.Button(btns, text="Rebuild CSV", command=lambda: self._rebuild_csv_from_files(csv_path, win), bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
         rebuild_btn.grid(row=0, column=1, padx=(4, 0))
-        self.ToolTip(rebuild_btn, "Rebuild the CSV index from all text files in the reports folder. Use this if data doesn't match between the table and files.")
+        self.ToolTip(rebuild_btn, t('tooltips.rebuild_csv'))
         
         folder_btn = tk.Button(btns, text="Open Folder", command=lambda: self._open_path(self.reports_dir), bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
         folder_btn.grid(row=0, column=2, padx=(4, 0))
-        self.ToolTip(folder_btn, "Open the reports folder in Windows Explorer to browse all session files.")
+        self.ToolTip(folder_btn, t('tooltips.open_folder'))
         
         export_btn = tk.Button(btns, text="Export CSV", command=lambda: self._export_csv(csv_path), bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
         export_btn.grid(row=0, column=3, padx=(4, 0))
-        self.ToolTip(export_btn, "Export session data to a CSV file that can be opened in Excel or other spreadsheet programs.")
+        self.ToolTip(export_btn, t('tooltips.export_csv'))
         
         batch_btn = tk.Button(btns, text="Batch Reports", command=lambda: self._open_batch_reports_dialog(win), bg="#2a4a5a", fg="#ffffff", activebackground="#3a5a6a", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
         batch_btn.grid(row=0, column=4, padx=(4, 0))
-        self.ToolTip(batch_btn, "Generate enhanced HTML reports for multiple sessions at once.")
+        self.ToolTip(batch_btn, t('tooltips.batch_reports'))
 
         # Close button on the far right with more space
         close_btn = tk.Button(btns, text="Close", command=win.destroy, bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666", width=8)
         close_btn.grid(row=0, column=6, sticky="e", padx=(20, 0))
-        self.ToolTip(close_btn, "Close the reports window.")
+        self.ToolTip(close_btn, t('tooltips.close_reports'))
 
     def _is_summary_entry(self, material_name: str) -> bool:
         """Check if material name is a summary entry that should be filtered out"""
@@ -6428,8 +6436,10 @@ class ProspectorPanel(ttk.Frame):
                         material_name = parts[0].strip()
                         tonnage_text = parts[1].strip()
                         
+                        # Get localized material name, then abbreviate for display
+                        localized_name = get_material(material_name)
                         # Use abbreviated name for display (compact UI)
-                        display_name = display_abbreviations.get(material_name, material_name)
+                        display_name = display_abbreviations.get(material_name, localized_name)
                         
                         # Build enhanced display with abbreviated name
                         display_parts = [f"{display_name}: {tonnage_text}"]
@@ -6940,23 +6950,41 @@ class ProspectorPanel(ttk.Frame):
         filter_frame = ttk.Frame(main_frame)
         filter_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
         
-        ttk.Label(filter_frame, text="Filter:").pack(side="left", padx=(0, 5))
+        ttk.Label(filter_frame, text=t('reports.filter')).pack(side="left", padx=(0, 5))
         
-        self.date_filter_var = tk.StringVar(value="All sessions")
+        # Build localized filter options with internal keys for filter logic
+        self._filter_options = [
+            ("all_sessions", t('reports.all_sessions')),
+            ("last_1_day", t('reports.last_1_day')),
+            ("last_2_days", t('reports.last_2_days')),
+            ("last_3_days", t('reports.last_3_days')),
+            ("last_7_days", t('reports.last_7_days')),
+            ("last_30_days", t('reports.last_30_days')),
+            ("last_90_days", t('reports.last_90_days')),
+            ("high_yield", t('reports.high_yield')),
+            ("medium_yield", t('reports.medium_yield')),
+            ("low_yield", t('reports.low_yield')),
+            ("high_hit_rate", t('reports.high_hit_rate')),
+            ("medium_hit_rate", t('reports.medium_hit_rate')),
+            ("low_hit_rate", t('reports.low_hit_rate')),
+            ("platinum_sessions", t('reports.platinum_sessions')),
+            ("high_value_materials", t('reports.high_value_materials')),
+            ("common_materials", t('reports.common_materials')),
+        ]
+        self._filter_display_to_key = {display: key for key, display in self._filter_options}
+        filter_display_values = [display for key, display in self._filter_options]
+        
+        self.date_filter_var = tk.StringVar(value=t('reports.all_sessions'))
         date_filter_combo = ttk.Combobox(filter_frame, textvariable=self.date_filter_var, 
-                                        values=["All sessions", 
-                                               "Last 1 day", "Last 2 days", "Last 3 days", "Last 7 days", "Last 30 days", "Last 90 days",
-                                               "High Yield (>350 T/hr)", "Medium Yield (250-350 T/hr)", "Low Yield (100-250 T/hr)",
-                                               "High Hit Rate (>40%)", "Medium Hit Rate (20-40%)", "Low Hit Rate (<20%)",
-                                               "Platinum Sessions", "High-Value Materials", "Common Materials"], 
-                                        state="readonly", width=28)
+                                        values=filter_display_values, 
+                                        state="readonly", width=32)
         date_filter_combo.pack(side="left", padx=(0, 5))
         
         # Add hint text for right-click options
-        ttk.Label(filter_frame, text="Right-click rows for options", foreground="gray").pack(side="right", padx=(10, 0))
+        ttk.Label(filter_frame, text=t('reports.right_click_options'), foreground="gray").pack(side="right", padx=(10, 0))
         date_filter_combo.bind("<<ComboboxSelected>>", self._on_date_filter_changed)
         
-        self.ToolTip(date_filter_combo, "Filter sessions by date, yield performance, hit rate, or materials")
+        self.ToolTip(date_filter_combo, t('tooltips.date_filter'))
 
         # Configure Reports tab Treeview style (theme-aware)
         from config import load_theme
@@ -7022,26 +7050,26 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.tag_configure('evenrow', background=_tab_alt, foreground=_tab_fg)
         
         # Configure column headings
-        self.reports_tree_tab.heading("date", text="Date/Time", anchor="w")
-        self.reports_tree_tab.heading("duration", text="Duration", anchor="w")
-        self.reports_tree_tab.heading("session_type", text="Type", anchor="w")
-        self.reports_tree_tab.heading("ship", text="Ship", anchor="w")
-        self.reports_tree_tab.heading("system", text="System", anchor="w")
-        self.reports_tree_tab.heading("body", text="Planet/Ring", anchor="w")
-        self.reports_tree_tab.heading("tons", text="Total Tons", anchor="w")
-        self.reports_tree_tab.heading("tph", text="T/hr", anchor="w")
-        self.reports_tree_tab.heading("tons_per", text="Tons/Asteroid", anchor="w")
-        self.reports_tree_tab.heading("asteroids", text="Prospected", anchor="w")
-        self.reports_tree_tab.heading("materials", text="Mat Types", anchor="w")
+        self.reports_tree_tab.heading("date", text=t('reports.date_time'), anchor="w")
+        self.reports_tree_tab.heading("duration", text=t('reports.duration'), anchor="w")
+        self.reports_tree_tab.heading("session_type", text=t('reports.type'), anchor="w")
+        self.reports_tree_tab.heading("ship", text=t('reports.ship'), anchor="w")
+        self.reports_tree_tab.heading("system", text=t('reports.system'), anchor="w")
+        self.reports_tree_tab.heading("body", text=t('reports.planet_ring'), anchor="w")
+        self.reports_tree_tab.heading("tons", text=t('reports.total_tons'), anchor="w")
+        self.reports_tree_tab.heading("tph", text=t('reports.tph'), anchor="w")
+        self.reports_tree_tab.heading("tons_per", text=t('reports.tons_per_asteroid'), anchor="w")
+        self.reports_tree_tab.heading("asteroids", text=t('reports.prospected'), anchor="w")
+        self.reports_tree_tab.heading("materials", text=t('reports.mat_types'), anchor="w")
         # New column: Total Hits (number of asteroids that contained tracked materials)
-        self.reports_tree_tab.heading("total_hits", text="Total Hits", anchor="w")
-        self.reports_tree_tab.heading("hit_rate", text="Hit Rate %", anchor="w")
-        self.reports_tree_tab.heading("quality", text="Average Yield %", anchor="w")
-        self.reports_tree_tab.heading("cargo", text="Minerals (Tonnage, Yields & T/hr)", anchor="w")
-        self.reports_tree_tab.heading("prospects", text="Limpets", anchor="w")
-        self.reports_tree_tab.heading("eng_materials", text="Engineering Materials", anchor="w")
-        self.reports_tree_tab.heading("comment", text="Comment", anchor="w")
-        self.reports_tree_tab.heading("enhanced", text="Detail Report", anchor="w")
+        self.reports_tree_tab.heading("total_hits", text=t('reports.total_hits'), anchor="w")
+        self.reports_tree_tab.heading("hit_rate", text=t('reports.hit_rate'), anchor="w")
+        self.reports_tree_tab.heading("quality", text=t('reports.avg_yield'), anchor="w")
+        self.reports_tree_tab.heading("cargo", text=t('reports.minerals_column'), anchor="w")
+        self.reports_tree_tab.heading("prospects", text=t('reports.limpets'), anchor="w")
+        self.reports_tree_tab.heading("eng_materials", text=t('reports.engineering_materials'), anchor="w")
+        self.reports_tree_tab.heading("comment", text=t('reports.comment'), anchor="w")
+        self.reports_tree_tab.heading("enhanced", text=t('reports.detail_report'), anchor="w")
         
         # Add sorting to tab treeview
         tab_sort_dirs = {}
@@ -7212,54 +7240,54 @@ class ProspectorPanel(ttk.Frame):
             _btn_active_fg = "#ffffff"
         
         # Rebuild CSV button
-        rebuild_btn = tk.Button(button_frame, text="Rebuild CSV", 
+        rebuild_btn = tk.Button(button_frame, text=t('reports.rebuild_csv'), 
                                command=lambda: self._force_rebuild_and_refresh(), 
                                bg=_btn_bg, fg=_btn_fg, 
                                activebackground=_btn_active_bg, activeforeground=_btn_active_fg, 
                                relief="solid", bd=1, 
                                highlightbackground="#666666", highlightcolor="#666666")
         rebuild_btn.pack(side="left", padx=(0, 5))
-        self.ToolTip(rebuild_btn, "Rebuild the CSV index from all text files in the reports folder. Use this if data doesn't match between the table and files.")
+        self.ToolTip(rebuild_btn, t('tooltips.rebuild_csv'))
         
         # Open Folder button
-        folder_btn = tk.Button(button_frame, text="Open Folder", 
+        folder_btn = tk.Button(button_frame, text=t('reports.open_folder'), 
                               command=lambda: self._open_path(self.reports_dir), 
                               bg=_btn_bg, fg=_btn_fg, 
                               activebackground=_btn_active_bg, activeforeground=_btn_active_fg, 
                               relief="solid", bd=1, 
                               highlightbackground="#666666", highlightcolor="#666666")
         folder_btn.pack(side="left", padx=(0, 5))
-        self.ToolTip(folder_btn, "Open the reports folder in Windows Explorer to browse all session files.")
+        self.ToolTip(folder_btn, t('tooltips.open_folder'))
         
         # Export CSV button  
-        export_btn = tk.Button(button_frame, text="Export CSV", 
+        export_btn = tk.Button(button_frame, text=t('reports.export_csv'), 
                               command=lambda: self._export_csv(csv_path), 
                               bg=_btn_bg, fg=_btn_fg, 
                               activebackground=_btn_active_bg, activeforeground=_btn_active_fg, 
                               relief="solid", bd=1, 
                               highlightbackground="#666666", highlightcolor="#666666")
         export_btn.pack(side="left", padx=(0, 5))
-        self.ToolTip(export_btn, "Export session data to a CSV file that can be opened in Excel or other spreadsheet programs.")
+        self.ToolTip(export_btn, t('tooltips.export_csv'))
         
         # Share to Discord button (Discord brand color #5865F2)
-        discord_btn = tk.Button(button_frame, text="Share to Discord", 
+        discord_btn = tk.Button(button_frame, text=t('reports.share_discord'), 
                                command=self._share_to_discord, 
                                bg="#5865F2", fg="#ffffff", 
                                activebackground="#4752C4", activeforeground="#ffffff", 
                                relief="solid", bd=1, 
                                highlightbackground="#666666", highlightcolor="#666666")
         discord_btn.pack(side="left", padx=(0, 5))
-        self.ToolTip(discord_btn, "Share selected mining session report to Discord via webhook")
+        self.ToolTip(discord_btn, t('tooltips.discord_share'))
         
         # Mining Card button (orange accent)
-        card_btn = tk.Button(button_frame, text="Mining Card", 
+        card_btn = tk.Button(button_frame, text=t('reports.mining_card'), 
                             command=self._create_mining_card_from_report, 
                             bg="#ff6600", fg="#ffffff", 
                             activebackground="#cc5500", activeforeground="#ffffff", 
                             relief="solid", bd=1, 
                             highlightbackground="#666666", highlightcolor="#666666")
         card_btn.pack(side="left", padx=(0, 5))
-        self.ToolTip(card_btn, "Generate visual mining card (PNG) from selected session report")
+        self.ToolTip(card_btn, t('tooltips.mining_card'))
         
         # Add double-click functionality for opening report files
         def open_selected():
@@ -7560,20 +7588,20 @@ class ProspectorPanel(ttk.Frame):
                                           bg=_menu_bg, fg=_menu_fg,
                                           activebackground=_menu_active_bg,
                                           activeforeground=_menu_active_fg)
-                    context_menu.add_command(label="Open Report (TXT)", command=lambda: open_selected())
-                    context_menu.add_command(label="Open Detailed Report (HTML)", command=lambda: self._open_enhanced_report_from_menu(self.reports_tree_tab))
+                    context_menu.add_command(label=t('context_menu.open_report_txt'), command=lambda: open_selected())
+                    context_menu.add_command(label=t('context_menu.open_report_html'), command=lambda: self._open_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()
-                    context_menu.add_command(label="Bookmark This Location", command=lambda: bookmark_selected())
-                    context_menu.add_command(label="Generate Detailed Report (HTML)", command=lambda: self._generate_enhanced_report_from_menu(self.reports_tree_tab))
+                    context_menu.add_command(label=t('context_menu.bookmark_location'), command=lambda: bookmark_selected())
+                    context_menu.add_command(label=t('context_menu.generate_report_html'), command=lambda: self._generate_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()
-                    context_menu.add_command(label="Copy System Name", command=lambda: copy_system_name_tab())
+                    context_menu.add_command(label=t('context_menu.copy_system'), command=lambda: copy_system_name_tab())
                     context_menu.add_separator()
-                    context_menu.add_command(label="Share to Discord", command=lambda: self._share_selected_to_discord())
-                    context_menu.add_command(label="Create Mining Card", command=lambda: self._create_mining_card_from_report())
+                    context_menu.add_command(label=t('context_menu.share_discord'), command=lambda: self._share_selected_to_discord())
+                    context_menu.add_command(label=t('context_menu.create_mining_card'), command=lambda: self._create_mining_card_from_report())
                     context_menu.add_separator()
-                    context_menu.add_command(label="Delete Detailed Report + Screenshots", command=lambda: self._delete_enhanced_report_from_menu(self.reports_tree_tab))
+                    context_menu.add_command(label=t('context_menu.delete_report_screenshots'), command=lambda: self._delete_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()  # Add separator for safety
-                    context_menu.add_command(label="Delete Complete Session", command=lambda: delete_selected())
+                    context_menu.add_command(label=t('context_menu.delete_complete_session'), command=lambda: delete_selected())
                     
                     # Show the menu at cursor position
                     context_menu.tk_popup(event.x_root, event.y_root)
@@ -7599,22 +7627,22 @@ class ProspectorPanel(ttk.Frame):
                         date_str = session['date']
                         duration = session.get('elapsed', 'Unknown')
                         tons = session.get('tons', 'Unknown')
-                        msg = (f"Are you sure you want to permanently delete this mining session report?\n\n"
-                              f"Session Details:\n"
-                              f"• Date: {date_str}\n"
-                              f"• System: {system}\n"
-                              f"• Body: {body}\n"
-                              f"• Duration: {duration}\n"
-                              f"• Tons Mined: {tons}\n\n"
-                              f"This will permanently delete:\n"
-                              f"• The CSV report entry\n"
-                              f"• The individual report file\n"
-                              f"• Graph files (if any)\n"
-                              f"• Detailed HTML report (if any)\n"
-                              f"• Mining card PNG (if any)\n"
-                              f"• Screenshots (if any)\n\n"
-                              f"This action cannot be undone.")
-                        title = "Delete Mining Session Report"
+                        msg = (t('context_menu.delete_session_confirm') + "\n\n"
+                              f"{t('context_menu.session_details')}\n"
+                              f"• {t('context_menu.date_label')} {date_str}\n"
+                              f"• {t('context_menu.system_label')} {system}\n"
+                              f"• {t('context_menu.body_label')} {body}\n"
+                              f"• {t('context_menu.duration_label')} {duration}\n"
+                              f"• {t('context_menu.tons_mined_label')} {tons}\n\n"
+                              f"{t('context_menu.will_delete')}\n"
+                              f"• {t('context_menu.csv_entry')}\n"
+                              f"• {t('context_menu.report_file')}\n"
+                              f"• {t('context_menu.graph_files')}\n"
+                              f"• {t('context_menu.html_report')}\n"
+                              f"• {t('context_menu.mining_card')}\n"
+                              f"• {t('context_menu.screenshots')}\n\n"
+                              f"{t('context_menu.cannot_undone')}")
+                        title = t('context_menu.delete_session_title')
                     else:
                         self._set_status("Session data not found for selected item")
                         return
@@ -7626,17 +7654,17 @@ class ProspectorPanel(ttk.Frame):
                             session = self.reports_tab_session_lookup[item_id]
                             sessions_to_delete.append(session)
                     
-                    msg = f"Are you sure you want to permanently delete {item_count} mining session reports?\n\n"
-                    msg += "Sessions to be deleted:\n"
+                    msg = t('context_menu.delete_sessions_confirm', count=item_count) + "\n\n"
+                    msg += t('context_menu.sessions_to_delete') + "\n"
                     for i, session in enumerate(sessions_to_delete[:5], 1):  # Show max 5 items
                         msg += f"  {i}. {session['date']} - {session['system']}/{session['body']}\n"
                     if len(sessions_to_delete) > 5:
-                        msg += f"  ... and {len(sessions_to_delete) - 5} more\n"
-                    msg += f"\nThis will permanently delete:\n"
-                    msg += f"• All CSV report entries\n"
-                    msg += f"• All individual report files\n\n"
-                    msg += f"This action cannot be undone."
-                    title = "Delete Multiple Mining Session Reports"
+                        msg += t('context_menu.and_more', count=len(sessions_to_delete) - 5) + "\n"
+                    msg += f"\n{t('context_menu.will_delete')}\n"
+                    msg += f"• {t('context_menu.all_csv_entries')}\n"
+                    msg += f"• {t('context_menu.all_report_files')}\n\n"
+                    msg += t('context_menu.cannot_undone')
+                    title = t('context_menu.delete_sessions_title')
                 
                 # Confirm deletion
                 from main import centered_yesno_dialog
@@ -7909,25 +7937,25 @@ class ProspectorPanel(ttk.Frame):
             
             if region == "heading" and column:
                 column_tooltips = {
-                    "#1": "Date and time when the mining session ended",
-                    "#2": "Total duration of the mining session", 
-                    "#3": "Session type (Single or Multi-session)",
-                    "#4": "Ship name, type, and identifier used for mining",
-                    "#5": "Star system where mining took place",
-                    "#6": "Planet, ring, or celestial body that was mined",
-                    "#7": "Total tons of materials mined",
-                    "#8": "Tons per hour mining rate",
-                    "#9": "Average tons collected per asteroid",
-                    "#10": "Total asteroids scanned during the session",
-                    "#11": "Number of different mineral types found within the threshold set in announcement panel",
-                    "#12": "Total Material Hits — number of asteroids that contained the tracked materials",
-                    "#13": "Percentage of asteroids that had valuable minerals (Hit Rate %)",
-                    "#14": "Average quality/yield percentage of minerals found",
-                    "#15": "Minerals mined with quantities and individual yields",
-                    "#16": "Number of prospector limpets used during mining session",
-                    "#17": "Engineering materials collected during the session",
-                    "#18": "Session comments and notes",
-                    "#19": "Detailed report for this session"
+                    "#1": t('tooltips.reports_datetime'),
+                    "#2": t('tooltips.reports_duration'),
+                    "#3": t('tooltips.reports_type'),
+                    "#4": t('tooltips.reports_ship'),
+                    "#5": t('tooltips.reports_system'),
+                    "#6": t('tooltips.reports_body'),
+                    "#7": t('tooltips.reports_tons'),
+                    "#8": t('tooltips.reports_tph'),
+                    "#9": t('tooltips.reports_tpa'),
+                    "#10": t('tooltips.reports_asteroids'),
+                    "#11": t('tooltips.reports_minerals'),
+                    "#12": t('tooltips.reports_hits'),
+                    "#13": t('tooltips.reports_hitrate'),
+                    "#14": t('tooltips.reports_yield'),
+                    "#15": t('tooltips.reports_minerals_detail'),
+                    "#16": t('tooltips.reports_limpets'),
+                    "#17": t('tooltips.reports_engineering'),
+                    "#18": t('tooltips.reports_notes'),
+                    "#19": t('tooltips.reports_report')
                 }
                 
                 tooltip_text = column_tooltips.get(column)
@@ -7975,9 +8003,9 @@ class ProspectorPanel(ttk.Frame):
             
             if region == "heading" and column:
                 column_tooltips = {
-                    "#1": "Minerals found in this asteroid with their percentages",
-                    "#2": "Material content quality and remaining percentage",
-                    "#3": "Time when this asteroid was scanned"
+                    "#1": t('tooltips.prospector_minerals'),
+                    "#2": t('tooltips.prospector_content'),
+                    "#3": t('tooltips.prospector_time')
                 }
                 
                 tooltip_text = column_tooltips.get(column)
@@ -8022,15 +8050,15 @@ class ProspectorPanel(ttk.Frame):
             
             if region == "heading" and column:
                 column_tooltips = {
-                    "#1": "Material name with your announcement threshold\nExample: Platinum (27%) means you're only alerted when\nasteroids have 27% or higher Platinum content",
-                    "#2": "Total tons of this material collected this session",
-                    "#3": "Mining rate: Tons per hour for this material",
-                    "#4": "Average tons collected per asteroid for this material",
-                    "#5": "Average % across ALL asteroids you prospected\n(includes low-quality asteroids below threshold)",
-                    "#6": "Average % only for asteroids AT OR ABOVE threshold\n(your quality finds that triggered announcements)",
-                    "#7": "Highest % found this session for this material",
-                    "#8": "Most recent prospector scan result for this material",
-                    "#9": "Number of hits that met your threshold\n(quality finds that triggered announcements)"
+                    "#1": t('tooltips.mineral_name'),
+                    "#2": t('tooltips.mineral_tons'),
+                    "#3": t('tooltips.mineral_tph'),
+                    "#4": t('tooltips.mineral_tpa'),
+                    "#5": t('tooltips.mineral_avg_all'),
+                    "#6": t('tooltips.mineral_avg_thr'),
+                    "#7": t('tooltips.mineral_best'),
+                    "#8": t('tooltips.mineral_current'),
+                    "#9": t('tooltips.mineral_hits')
                 }
                 
                 tooltip_text = column_tooltips.get(column)
@@ -8457,22 +8485,25 @@ class ProspectorPanel(ttk.Frame):
             sessions_data.sort(key=lambda x: x['timestamp_raw'], reverse=True)
             
             # Apply date filter if set
-            if hasattr(self, 'date_filter_var') and self.date_filter_var.get() != "All sessions":
+            # Convert display value to internal key for filter logic
+            filter_display = self.date_filter_var.get() if hasattr(self, 'date_filter_var') else ""
+            filter_key = self._filter_display_to_key.get(filter_display, "all_sessions") if hasattr(self, '_filter_display_to_key') else "all_sessions"
+            
+            if filter_key != "all_sessions":
                 from datetime import datetime, timedelta
                 now = datetime.now()
-                filter_value = self.date_filter_var.get()
                 
-                if filter_value == "Last 1 day":
+                if filter_key == "last_1_day":
                     cutoff = now - timedelta(days=1)
-                elif filter_value == "Last 2 days":
+                elif filter_key == "last_2_days":
                     cutoff = now - timedelta(days=2)
-                elif filter_value == "Last 3 days":
+                elif filter_key == "last_3_days":
                     cutoff = now - timedelta(days=3)
-                elif filter_value == "Last 7 days":
+                elif filter_key == "last_7_days":
                     cutoff = now - timedelta(days=7)
-                elif filter_value == "Last 30 days":
+                elif filter_key == "last_30_days":
                     cutoff = now - timedelta(days=30)
-                elif filter_value == "Last 90 days":
+                elif filter_key == "last_90_days":
                     cutoff = now - timedelta(days=90)
                 else:
                     cutoff = None
@@ -8497,11 +8528,9 @@ class ProspectorPanel(ttk.Frame):
                     sessions_data = filtered_sessions
             
             # Apply additional filters (yield, hit rate, materials)
-            if hasattr(self, 'date_filter_var'):
-                filter_value = self.date_filter_var.get()
-                
+            if filter_key:
                 # Yield-based filters
-                if filter_value == "High Yield (>350 T/hr)":
+                if filter_key == "high_yield":
                     filtered_sessions = []
                     for session in sessions_data:
                         try:
@@ -8512,7 +8541,7 @@ class ProspectorPanel(ttk.Frame):
                             continue
                     sessions_data = filtered_sessions
                     
-                elif filter_value == "Medium Yield (250-350 T/hr)":
+                elif filter_key == "medium_yield":
                     filtered_sessions = []
                     for session in sessions_data:
                         try:
@@ -8523,7 +8552,7 @@ class ProspectorPanel(ttk.Frame):
                             continue
                     sessions_data = filtered_sessions
                     
-                elif filter_value == "Low Yield (100-250 T/hr)":
+                elif filter_key == "low_yield":
                     filtered_sessions = []
                     for session in sessions_data:
                         try:
@@ -8535,7 +8564,7 @@ class ProspectorPanel(ttk.Frame):
                     sessions_data = filtered_sessions
                 
                 # Hit rate filters
-                elif filter_value == "High Hit Rate (>40%)":
+                elif filter_key == "high_hit_rate":
                     filtered_sessions = []
                     for session in sessions_data:
                         try:
@@ -8546,7 +8575,7 @@ class ProspectorPanel(ttk.Frame):
                             continue
                     sessions_data = filtered_sessions
                     
-                elif filter_value == "Medium Hit Rate (20-40%)":
+                elif filter_key == "medium_hit_rate":
                     filtered_sessions = []
                     for session in sessions_data:
                         try:
@@ -8557,7 +8586,7 @@ class ProspectorPanel(ttk.Frame):
                             continue
                     sessions_data = filtered_sessions
                     
-                elif filter_value == "Low Hit Rate (<20%)":
+                elif filter_key == "low_hit_rate":
                     filtered_sessions = []
                     for session in sessions_data:
                         try:
@@ -8569,7 +8598,7 @@ class ProspectorPanel(ttk.Frame):
                     sessions_data = filtered_sessions
                 
                 # Material-based filters
-                elif filter_value == "Platinum Sessions":
+                elif filter_key == "platinum_sessions":
                     filtered_sessions = []
                     for session in sessions_data:
                         cargo_data = session.get('cargo', '').lower()
@@ -8577,7 +8606,7 @@ class ProspectorPanel(ttk.Frame):
                             filtered_sessions.append(session)
                     sessions_data = filtered_sessions
                     
-                elif filter_value == "High-Value Materials":
+                elif filter_key == "high_value_materials":
                     high_value_materials = ['platinum', 'osmium', 'painite', 'rhodplumsite', 'benitoite', 'monazite', 'musgravite']
                     filtered_sessions = []
                     for session in sessions_data:
@@ -8586,7 +8615,7 @@ class ProspectorPanel(ttk.Frame):
                             filtered_sessions.append(session)
                     sessions_data = filtered_sessions
                     
-                elif filter_value == "Common Materials":
+                elif filter_key == "common_materials":
                     common_materials = ['bertrandite', 'indite', 'gallite', 'lepidolite', 'lithium', 'bauxite', 'cobalt', 'samarium']
                     filtered_sessions = []
                     for session in sessions_data:
@@ -9579,7 +9608,11 @@ class ProspectorPanel(ttk.Frame):
             traceback.print_exc()
 
     def _abbreviate_material_for_stats(self, material_name: str) -> str:
-        """Abbreviate long material names for Mineral Analysis table display"""
+        """Abbreviate long material names for Mineral Analysis table display, with localization"""
+        # First get localized name
+        localized_name = get_material(material_name)
+        
+        # Then abbreviate for display
         abbreviations = {
             'Methanol Monohydrate Crystals': 'Methanol Cryst',
             'Low Temperature Diamonds': 'LTD',
@@ -9589,7 +9622,10 @@ class ProspectorPanel(ttk.Frame):
             'Methane Clathrate': 'Methane Clath',
             'Liquid Oxygen': 'Liq Oxygen',
         }
-        return abbreviations.get(material_name, material_name)
+        # Try English abbreviation first, fall back to localized name
+        if material_name in abbreviations:
+            return abbreviations[material_name]
+        return localized_name
 
     def _refresh_statistics_display(self) -> None:
         """Refresh the live statistics display"""
@@ -9953,7 +9989,7 @@ class ProspectorPanel(ttk.Frame):
         self.session_ejected = 0
 
         self.start_btn.config(state="disabled")
-        self.pause_resume_btn.config(state="normal", text="Pause")
+        self.pause_resume_btn.config(state="normal", text=t('mining_session.pause'))
         self.stop_btn.config(state="normal")
         self.cancel_btn.config(state="normal")
         self._set_status("Mining session started.")
@@ -10316,8 +10352,8 @@ class ProspectorPanel(ttk.Frame):
         
         # Show custom edit dialog with app logo
         new_comment = self._show_custom_comment_dialog(
-            "Edit Comment", 
-            "Edit session comment:",
+            t('dialogs.session_comment_title'), 
+            t('dialogs.edit_session_comment'),
             current_comment
         )
         
@@ -10850,8 +10886,8 @@ class ProspectorPanel(ttk.Frame):
     def _show_comment_dialog(self) -> str:
         """Show dialog to get session comment from user"""
         comment = self._show_custom_comment_dialog(
-            "Session Comment", 
-            "Add a comment to this mining session (optional):",
+            t('dialogs.session_comment_title'), 
+            t('dialogs.session_comment_add'),
             ""
         )
         return comment or ""
@@ -11021,8 +11057,8 @@ class ProspectorPanel(ttk.Frame):
                 from main import centered_yesno_dialog
                 add_refinery = centered_yesno_dialog(
                     self.winfo_toplevel(),
-                    "Refinery Materials",
-                    "Do you have any additional materials in your refinery that you want to add to this session?"
+                    t('dialogs.refinery_materials_title'),
+                    t('dialogs.refinery_materials_question')
                 )
                 
                 if add_refinery:
@@ -11069,8 +11105,8 @@ class ProspectorPanel(ttk.Frame):
             main_parent = self.winfo_toplevel()
             add_comment = centered_yesno_dialog(
                 main_parent,
-                "Session Comment",
-                "Would you like to add a comment to this mining session?"
+                t('dialogs.session_comment_title'),
+                t('dialogs.session_comment_question')
             )
             
             if add_comment:
@@ -11093,7 +11129,7 @@ class ProspectorPanel(ttk.Frame):
         self._set_status("Session ended.")
         
         self.start_btn.config(state="normal")
-        self.pause_resume_btn.config(state="disabled", text="Pause")
+        self.pause_resume_btn.config(state="disabled", text=t('mining_session.pause'))
         self.stop_btn.config(state="disabled")
         self.cancel_btn.config(state="disabled")
 
@@ -11239,13 +11275,13 @@ class ProspectorPanel(ttk.Frame):
                 self.session_paused_seconds += (dt.datetime.utcnow() - self.session_pause_started).total_seconds()
             self.session_paused = False
             self.session_pause_started = None
-            self.pause_resume_btn.config(text="Pause")
+            self.pause_resume_btn.config(text=t('mining_session.pause'))
             self._set_status("Session resumed.")
         else:
             # Currently running, so pause
             self.session_paused = True
             self.session_pause_started = dt.datetime.utcnow()
-            self.pause_resume_btn.config(text="Resume")
+            self.pause_resume_btn.config(text=t('mining_session.resume'))
             self._set_status("Session paused.")
 
     def _session_cancel(self) -> None:
@@ -11264,7 +11300,7 @@ class ProspectorPanel(ttk.Frame):
 
         # Reset button states
         self.start_btn.config(state="normal")
-        self.pause_resume_btn.config(state="disabled", text="Pause")
+        self.pause_resume_btn.config(state="disabled", text=t('mining_session.pause'))
         self.stop_btn.config(state="disabled")
         self.cancel_btn.config(state="disabled")
 
@@ -11319,24 +11355,39 @@ class ProspectorPanel(ttk.Frame):
         filter_frame = ttk.Frame(main_frame)
         filter_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
         
-        ttk.Label(filter_frame, text="Filter:").pack(side="left", padx=(0, 5))
+        ttk.Label(filter_frame, text=t('bookmarks.filter')).pack(side="left", padx=(0, 5))
         
-        self.bookmark_filter_var = tk.StringVar(value="All Locations")
+        # Build localized filter options with internal keys
+        self._bookmark_filter_options = [
+            ("all_locations", t('bookmarks.all_locations')),
+            ("high_yield", t('bookmarks.high_yield')),
+            ("medium_yield", t('bookmarks.medium_yield')),
+            ("low_yield", t('bookmarks.low_yield')),
+            ("recent", t('bookmarks.recent')),
+            ("hotspot_locations", t('bookmarks.hotspot_locations')),
+            ("no_overlap", t('bookmarks.no_overlap')),
+            ("overlap_2x", t('bookmarks.overlap_2x')),
+            ("overlap_3x", t('bookmarks.overlap_3x')),
+        ]
+        self._bookmark_filter_display_to_key = {display: key for key, display in self._bookmark_filter_options}
+        bookmark_filter_display_values = [display for key, display in self._bookmark_filter_options]
+        
+        self.bookmark_filter_var = tk.StringVar(value=t('bookmarks.all_locations'))
         filter_combo = ttk.Combobox(filter_frame, textvariable=self.bookmark_filter_var, 
-                                   values=["All Locations", "High Yield (>350 T/hr)", "Medium Yield (250-350 T/hr)", "Low Yield (100-250 T/hr)", "Recent (Last 30 Days)", "Hotspot Locations", "No Overlap", "2x Overlap", "3x Overlap"], 
+                                   values=bookmark_filter_display_values, 
                                    state="readonly", width=28)
         filter_combo.pack(side="left", padx=(0, 10))
         filter_combo.bind("<<ComboboxSelected>>", self._on_bookmark_filter_changed)
         
         # Search box
-        ttk.Label(filter_frame, text="Search:").pack(side="left", padx=(10, 5))
+        ttk.Label(filter_frame, text=t('bookmarks.search')).pack(side="left", padx=(10, 5))
         self.bookmark_search_var = tk.StringVar()
         search_entry = ttk.Entry(filter_frame, textvariable=self.bookmark_search_var, width=20)
         search_entry.pack(side="left", padx=(0, 5))
         search_entry.bind("<KeyRelease>", self._on_bookmark_search_changed)
         
-        self.ToolTip(filter_combo, "Filter bookmarks by material type")
-        self.ToolTip(search_entry, "Search bookmarks by system, body, or materials")
+        self.ToolTip(filter_combo, t('tooltips.bookmark_filter'))
+        self.ToolTip(search_entry, t('tooltips.bookmark_search'))
 
         # Configure Bookmarks Treeview style (theme-aware)
         from config import load_theme
@@ -11408,16 +11459,16 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.focus_set()
         
         # Configure column headings
-        self.bookmarks_tree.heading("last_mined", text="Last Mined", anchor="w")
-        self.bookmarks_tree.heading("system", text="System", anchor="w")
-        self.bookmarks_tree.heading("body", text="Location", anchor="w")
-        self.bookmarks_tree.heading("hotspot", text="Type", anchor="w")
-        self.bookmarks_tree.heading("materials", text="Minerals Found", anchor="w")
-        self.bookmarks_tree.heading("avg_yield", text="Avg Yield %", anchor="w")
-        self.bookmarks_tree.heading("overlap", text="Overlap", anchor="w")
-        self.bookmarks_tree.heading("res_site", text="RES Site", anchor="w")
-        self.bookmarks_tree.heading("rating", text="Rating", anchor="center")
-        self.bookmarks_tree.heading("notes", text="Notes", anchor="w")
+        self.bookmarks_tree.heading("last_mined", text=t('bookmarks.last_mined'), anchor="w")
+        self.bookmarks_tree.heading("system", text=t('bookmarks.system'), anchor="w")
+        self.bookmarks_tree.heading("body", text=t('bookmarks.location'), anchor="w")
+        self.bookmarks_tree.heading("hotspot", text=t('bookmarks.type'), anchor="w")
+        self.bookmarks_tree.heading("materials", text=t('bookmarks.minerals_found'), anchor="w")
+        self.bookmarks_tree.heading("avg_yield", text=t('bookmarks.avg_yield'), anchor="w")
+        self.bookmarks_tree.heading("overlap", text=t('bookmarks.overlap'), anchor="w")
+        self.bookmarks_tree.heading("res_site", text=t('bookmarks.res_site'), anchor="w")
+        self.bookmarks_tree.heading("rating", text=t('bookmarks.rating'), anchor="center")
+        self.bookmarks_tree.heading("notes", text=t('bookmarks.notes'), anchor="w")
         
         # Configure column widths
         self.bookmarks_tree.column("last_mined", width=100, stretch=False, anchor="center")
@@ -11515,34 +11566,34 @@ class ProspectorPanel(ttk.Frame):
         button_frame.grid(row=3, column=0, columnspan=2, pady=(8, 0), sticky="ew")
         
         # Add Bookmark button
-        add_btn = tk.Button(button_frame, text="Add Bookmark", 
+        add_btn = tk.Button(button_frame, text=t('bookmarks.add_bookmark'), 
                            command=self._add_bookmark_dialog, 
                            bg="#2a5a2a", fg="#ffffff", 
                            activebackground="#3a6a3a", activeforeground="#ffffff",
                            relief="solid", bd=1, cursor="hand2", pady=3,
                            highlightbackground="#1a3a1a", highlightcolor="#1a3a1a")
         add_btn.pack(side="left", padx=(0, 6))
-        self.ToolTip(add_btn, "Add a new mining location bookmark")
+        self.ToolTip(add_btn, t('tooltips.add_bookmark'))
         
         # Edit Bookmark button
-        edit_btn = tk.Button(button_frame, text="Edit Bookmark", 
+        edit_btn = tk.Button(button_frame, text=t('bookmarks.edit_bookmark'), 
                             command=self._edit_bookmark_dialog, 
                             bg="#4a4a2a", fg="#ffffff",
                             activebackground="#5a5a3a", activeforeground="#ffffff",
                             relief="solid", bd=1, cursor="hand2", pady=3,
                             highlightbackground="#2a2a1a", highlightcolor="#2a2a1a")
         edit_btn.pack(side="left", padx=(0, 6))
-        self.ToolTip(edit_btn, "Edit the selected bookmark")
+        self.ToolTip(edit_btn, t('tooltips.edit_bookmark'))
         
         # Delete Bookmark button
-        delete_btn = tk.Button(button_frame, text="Delete Bookmark", 
+        delete_btn = tk.Button(button_frame, text=t('bookmarks.delete_bookmark'), 
                               command=self._delete_bookmark, 
                               bg="#5a2a2a", fg="#ffffff", 
                               activebackground="#6a3a3a", activeforeground="#ffffff",
                               relief="solid", bd=1, cursor="hand2", pady=3,
                               highlightbackground="#3a1a1a", highlightcolor="#3a1a1a")
         delete_btn.pack(side="left", padx=(0, 6))
-        self.ToolTip(delete_btn, "Delete the selected bookmark(s) - use Ctrl+click or Shift+click to select multiple")
+        self.ToolTip(delete_btn, t('tooltips.delete_bookmark'))
 
         # Double-click to edit
         self.bookmarks_tree.bind("<Double-1>", self._on_bookmark_double_click)
@@ -11591,14 +11642,16 @@ class ProspectorPanel(ttk.Frame):
             self.bookmarks_tree.delete(item)
         
         # Get filter and search values
-        filter_value = self.bookmark_filter_var.get() if hasattr(self, 'bookmark_filter_var') else "All Locations"
+        filter_display = self.bookmark_filter_var.get() if hasattr(self, 'bookmark_filter_var') else t('bookmarks.all_locations')
+        # Convert display value to internal key for filter logic
+        filter_value = self._bookmark_filter_display_to_key.get(filter_display, "all_locations") if hasattr(self, '_bookmark_filter_display_to_key') else "all_locations"
         search_text = self.bookmark_search_var.get().lower() if hasattr(self, 'bookmark_search_var') else ""
         
         # Filter and display bookmarks
         row_index = 0
         for bookmark in self.bookmarks_data:
-            # Apply filter
-            if filter_value == "High Yield (>350 T/hr)":
+            # Apply filter using internal keys
+            if filter_value == "high_yield":
                 yield_str = bookmark.get('avg_yield', '')
                 try:
                     yield_val = float(yield_str.replace(' T/hr', '')) if yield_str else 0
@@ -11606,7 +11659,7 @@ class ProspectorPanel(ttk.Frame):
                         continue
                 except:
                     continue
-            elif filter_value == "Medium Yield (250-350 T/hr)":
+            elif filter_value == "medium_yield":
                 yield_str = bookmark.get('avg_yield', '')
                 try:
                     yield_val = float(yield_str.replace(' T/hr', '')) if yield_str else 0
@@ -11614,7 +11667,7 @@ class ProspectorPanel(ttk.Frame):
                         continue
                 except:
                     continue
-            elif filter_value == "Low Yield (100-250 T/hr)":
+            elif filter_value == "low_yield":
                 yield_str = bookmark.get('avg_yield', '')
                 try:
                     yield_val = float(yield_str.replace(' T/hr', '')) if yield_str else 0
@@ -11622,7 +11675,7 @@ class ProspectorPanel(ttk.Frame):
                         continue
                 except:
                     continue
-            elif filter_value == "Recent (Last 30 Days)":
+            elif filter_value == "recent":
                 last_mined = bookmark.get('last_mined', '')
                 if last_mined:
                     try:
@@ -11634,19 +11687,19 @@ class ProspectorPanel(ttk.Frame):
                         continue
                 else:
                     continue
-            elif filter_value == "Hotspot Locations":
+            elif filter_value == "hotspot_locations":
                 hotspot = bookmark.get('hotspot', '').lower()
                 if not hotspot or hotspot == '':
                     continue
-            elif filter_value == "No Overlap":
+            elif filter_value == "no_overlap":
                 overlap_type = bookmark.get('overlap_type', '')
                 if overlap_type != '':
                     continue
-            elif filter_value == "2x Overlap":
+            elif filter_value == "overlap_2x":
                 overlap_type = bookmark.get('overlap_type', '')
                 if overlap_type != '2x':
                     continue
-            elif filter_value == "3x Overlap":
+            elif filter_value == "overlap_3x":
                 overlap_type = bookmark.get('overlap_type', '')
                 if overlap_type != '3x':
                     continue
@@ -11759,7 +11812,7 @@ class ProspectorPanel(ttk.Frame):
         """Show add/edit bookmark dialog"""
         dialog = tk.Toplevel(self)
         dialog.withdraw()
-        dialog.title("Add Bookmark" if bookmark_data is None else "Edit Bookmark")
+        dialog.title(t('bookmarks.add_bookmark') if bookmark_data is None else t('bookmarks.edit_bookmark'))
 
         # Set app icon while withdrawn (avoid visual flicker)
         try:
@@ -11779,86 +11832,104 @@ class ProspectorPanel(ttk.Frame):
         dialog.rowconfigure(0, weight=1)
         
         # System field
-        ttk.Label(frame, text="System:").grid(row=0, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.system') + ":").grid(row=0, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         system_var = tk.StringVar(value=bookmark_data.get('system', '') if bookmark_data else '')
         system_entry = ttk.Entry(frame, textvariable=system_var, width=35)
         system_entry.grid(row=0, column=1, sticky="w", pady=(0, 5))
         
         # Body field
-        ttk.Label(frame, text="Body/Ring:").grid(row=1, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.body_ring')).grid(row=1, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         body_var = tk.StringVar(value=bookmark_data.get('body', '') if bookmark_data else '')
         body_entry = ttk.Entry(frame, textvariable=body_var, width=35)
         body_entry.grid(row=1, column=1, sticky="w", pady=(0, 5))
         
         # Hotspot field - Ring Type dropdown
-        ttk.Label(frame, text="Ring Type:").grid(row=2, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.ring_type')).grid(row=2, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         hotspot_var = tk.StringVar(value=bookmark_data.get('hotspot', '') if bookmark_data else '')
         hotspot_combo = ttk.Combobox(frame, textvariable=hotspot_var, width=32, state="readonly")
-        hotspot_combo['values'] = ("", "Metallic", "Rocky", "Icy", "Metal Rich")  # Blank option instead of "All"
+        hotspot_combo['values'] = ("", t('ring_finder.metallic'), t('ring_finder.rocky'), t('ring_finder.icy'), t('ring_finder.metal_rich'))
         hotspot_combo.grid(row=2, column=1, sticky="w", pady=(0, 5))
         
-        # Materials field
-        ttk.Label(frame, text="Minerals Found:").grid(row=3, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
-        materials_var = tk.StringVar(value=bookmark_data.get('materials', '') if bookmark_data else '')
+        # Materials field - convert stored English names to localized display names
+        ttk.Label(frame, text=t('bookmarks.minerals_found_label')).grid(row=3, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        stored_materials = bookmark_data.get('materials', '') if bookmark_data else ''
+        # Convert each mineral name to localized version
+        if stored_materials:
+            materials_list = [m.strip() for m in stored_materials.split(',')]
+            localized_materials = [get_material(m) for m in materials_list]
+            display_materials = ', '.join(localized_materials)
+        else:
+            display_materials = ''
+        materials_var = tk.StringVar(value=display_materials)
         materials_entry = ttk.Entry(frame, textvariable=materials_var, width=35)
         materials_entry.grid(row=3, column=1, sticky="w", pady=(0, 5))
         
         # Average Yield field
-        ttk.Label(frame, text="Average Yield %:").grid(row=4, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.average_yield')).grid(row=4, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         yield_var = tk.StringVar(value=bookmark_data.get('avg_yield', '') if bookmark_data else '')
         yield_entry = ttk.Entry(frame, textvariable=yield_var, width=35)
         yield_entry.grid(row=4, column=1, sticky="w", pady=(0, 5))
         
         # Target Material dropdown field
-        ttk.Label(frame, text="Overlap Minerals:").grid(row=5, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
-        target_material_var = tk.StringVar(value=bookmark_data.get('target_material', '') if bookmark_data else '')
+        ttk.Label(frame, text=t('bookmarks.overlap_minerals')).grid(row=5, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         
-        # Specific materials list as requested
-        target_materials = ['', 'Alexandrite', 'Benitoite', 'Bromellite', 'Grandidierite', 'Low-Temperature Diamonds', 
-                           'Monazite', 'Musgravite', 'Painite', 'Platinum', 'Void Opals', 'Tritium']
+        # English names for internal storage
+        target_materials_en = ['', 'Alexandrite', 'Benitoite', 'Bromellite', 'Grandidierite', 'Low-Temperature Diamonds', 
+                              'Monazite', 'Musgravite', 'Painite', 'Platinum', 'Void Opals', 'Tritium']
+        # Localized names for display
+        target_materials_display = [get_material(m) if m else '' for m in target_materials_en]
+        
+        # Create mapping between display and English names
+        display_to_en = {get_material(m): m for m in target_materials_en if m}
+        display_to_en[''] = ''
+        
+        # Get current value and convert to display name
+        current_value = bookmark_data.get('target_material', '') if bookmark_data else ''
+        current_display = get_material(current_value) if current_value else ''
+        target_material_var = tk.StringVar(value=current_display)
         
         target_material_combo = ttk.Combobox(frame, textvariable=target_material_var, width=32, state="readonly")
-        target_material_combo['values'] = tuple(target_materials)
+        target_material_combo['values'] = tuple(target_materials_display)
         target_material_combo.grid(row=5, column=1, sticky="w", pady=(0, 5))
         
         # Overlap field
-        ttk.Label(frame, text="Overlap Type:").grid(row=6, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.overlap_type_label')).grid(row=6, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         overlap_var = tk.StringVar(value=bookmark_data.get('overlap_type', '') if bookmark_data else '')
         overlap_combo = ttk.Combobox(frame, textvariable=overlap_var, width=32, state="readonly")
         overlap_combo['values'] = ('', '2x', '3x')
         overlap_combo.grid(row=6, column=1, sticky="w", pady=(0, 5))
         
         # RES Site field
-        ttk.Label(frame, text="RES Site:").grid(row=7, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.res_site_label')).grid(row=7, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         res_var = tk.StringVar(value=bookmark_data.get('res_site', '') if bookmark_data else '')
         res_combo = ttk.Combobox(frame, textvariable=res_var, width=32, state="readonly")
         res_combo['values'] = ('', 'Hazardous', 'High', 'Low')
         res_combo.grid(row=7, column=1, sticky="w", pady=(0, 5))
         
         # RES Minerals dropdown field (separate from Overlap Minerals)
-        ttk.Label(frame, text="RES Minerals:").grid(row=8, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
-        res_material_var = tk.StringVar(value=bookmark_data.get('res_material', '') if bookmark_data else '')
+        ttk.Label(frame, text=t('bookmarks.res_minerals')).grid(row=8, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         
-        # Same materials list for RES
-        res_materials = ['', 'Alexandrite', 'Benitoite', 'Bromellite', 'Grandidierite', 'Low-Temperature Diamonds', 
-                        'Monazite', 'Musgravite', 'Painite', 'Platinum', 'Void Opals', 'Tritium']
+        # Get current RES material value and convert to display name
+        current_res_value = bookmark_data.get('res_material', '') if bookmark_data else ''
+        current_res_display = get_material(current_res_value) if current_res_value else ''
+        res_material_var = tk.StringVar(value=current_res_display)
         
         res_material_combo = ttk.Combobox(frame, textvariable=res_material_var, width=32, state="readonly")
-        res_material_combo['values'] = tuple(res_materials)
+        res_material_combo['values'] = tuple(target_materials_display)  # Same materials list
         res_material_combo.grid(row=8, column=1, sticky="w", pady=(0, 5))
         
         # Rating field (1-5 stars)
-        ttk.Label(frame, text="Rating:").grid(row=9, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.rating_label')).grid(row=9, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         rating_var = tk.IntVar(value=bookmark_data.get('rating', 0) if bookmark_data else 0)
         rating_frame = ttk.Frame(frame)
         rating_frame.grid(row=9, column=1, sticky="w", pady=(0, 5))
         rating_combo = ttk.Combobox(rating_frame, textvariable=rating_var, width=10, state="readonly")
         rating_combo['values'] = (0, 1, 2, 3, 4, 5)
         rating_combo.pack(side="left")
-        ttk.Label(rating_frame, text="  (0=None, 5=Best)").pack(side="left")
+        ttk.Label(rating_frame, text="  " + t('bookmarks.rating_hint')).pack(side="left")
         
         # Notes field
-        ttk.Label(frame, text="Notes:").grid(row=10, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.notes_label')).grid(row=10, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
         notes_text = tk.Text(frame, width=35, height=4, insertbackground="#ffffff")  # White cursor for visibility
         notes_text.grid(row=10, column=1, sticky="w", pady=(0, 10))
         if bookmark_data:
@@ -11870,7 +11941,9 @@ class ProspectorPanel(ttk.Frame):
             try:
                 system = system_var.get().strip()
                 body = body_var.get().strip()
-                material = target_material_var.get()
+                material_display = target_material_var.get()
+                # Convert display name back to English for database lookup
+                material = to_english(material_display) if material_display else ''
                 
                 if not system or not body or not material:
                     return
@@ -11916,19 +11989,34 @@ class ProspectorPanel(ttk.Frame):
             body = body_var.get().strip()
             
             if not system or not body:
-                tk.messagebox.showerror("Error", "System and Body/Ring are required fields")
+                tk.messagebox.showerror(t('dialogs.error'), t('bookmarks.error_required_fields'))
                 return
+            
+            # Convert display names back to English for storage
+            target_mat_display = target_material_var.get()
+            target_mat_en = to_english(target_mat_display) if target_mat_display else ''
+            res_mat_display = res_material_var.get()
+            res_mat_en = to_english(res_mat_display) if res_mat_display else ''
+            
+            # Convert localized materials back to English for storage
+            materials_display = materials_var.get().strip()
+            if materials_display:
+                materials_list = [m.strip() for m in materials_display.split(',')]
+                materials_en_list = [to_english(m) for m in materials_list]
+                materials_en = ', '.join(materials_en_list)
+            else:
+                materials_en = ''
             
             bookmark = {
                 'system': system,
                 'body': body,
                 'hotspot': hotspot_var.get().strip(),
-                'materials': materials_var.get().strip(),
+                'materials': materials_en,
                 'avg_yield': yield_var.get().strip(),
-                'target_material': target_material_var.get(),
+                'target_material': target_mat_en,
                 'overlap_type': overlap_var.get(),
                 'res_site': res_var.get(),
-                'res_material': res_material_var.get(),
+                'res_material': res_mat_en,
                 'rating': rating_var.get(),
                 'last_mined': bookmark_data.get('last_mined', '') if bookmark_data else '',
                 'notes': notes_text.get("1.0", "end-1c").strip(),
@@ -11939,10 +12027,10 @@ class ProspectorPanel(ttk.Frame):
             try:
                 if self.main_app and hasattr(self.main_app, 'cargo_monitor') and hasattr(self.main_app.cargo_monitor, 'user_db'):
                     user_db = self.main_app.cargo_monitor.user_db
-                    target_mat = target_material_var.get()
+                    target_mat = target_mat_en
                     overlap_type = overlap_var.get()
                     res_site = res_var.get()
-                    res_mat = res_material_var.get()
+                    res_mat = res_mat_en
                     
                     # Get previous values to clear if changed
                     prev_target_mat = bookmark_data.get('target_material', '') if bookmark_data else ''
@@ -11985,7 +12073,7 @@ class ProspectorPanel(ttk.Frame):
             dialog.destroy()
         
         # Save button with proper styling - bigger size
-        save_btn = tk.Button(button_frame, text="Save", command=save_bookmark,
+        save_btn = tk.Button(button_frame, text=t('dialogs.save'), command=save_bookmark,
                             bg="#2a5a2a", fg="#ffffff", 
                             activebackground="#3a6a3a", activeforeground="#ffffff",
                             relief="solid", bd=1, cursor="hand2", 
@@ -11994,7 +12082,7 @@ class ProspectorPanel(ttk.Frame):
         save_btn.pack(side="left", padx=(0, 8))
         
         # Cancel button with proper styling - bigger size
-        cancel_btn = tk.Button(button_frame, text="Cancel", command=cancel,
+        cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
                               bg="#5a2a2a", fg="#ffffff", 
                               activebackground="#6a3a3a", activeforeground="#ffffff",
                               relief="solid", bd=1, cursor="hand2", 
@@ -12039,15 +12127,15 @@ class ProspectorPanel(ttk.Frame):
         # Get count of selected bookmarks for confirmation message
         bookmark_count = len(selection)
         if bookmark_count == 1:
-            confirm_message = "Are you sure you want to delete this bookmark?"
+            confirm_message = t('dialogs.delete_bookmark_single')
         else:
-            confirm_message = f"Are you sure you want to delete {bookmark_count} bookmarks?"
+            confirm_message = t('dialogs.delete_bookmark_multi').format(count=bookmark_count)
         
         # Confirm deletion using centered dialog
         from main import centered_yesno_dialog
         main_parent = self.winfo_toplevel()
         
-        if not centered_yesno_dialog(main_parent, "Confirm Delete", confirm_message):
+        if not centered_yesno_dialog(main_parent, t('dialogs.confirm_delete'), confirm_message):
             return
         
         # Collect all bookmarks to delete
@@ -12123,10 +12211,10 @@ class ProspectorPanel(ttk.Frame):
                                             bg=_menu_bg, fg=_menu_fg,
                                             activebackground=_menu_active_bg,
                                             activeforeground=_menu_active_fg)
-        self.bookmark_context_menu.add_command(label="Copy System Name", command=self._copy_system_to_clipboard)
+        self.bookmark_context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_to_clipboard)
         self.bookmark_context_menu.add_separator()
-        self.bookmark_context_menu.add_command(label="Edit Bookmark", command=self._edit_bookmark_dialog)
-        self.bookmark_context_menu.add_command(label="Delete Bookmark(s)", command=self._delete_bookmark)
+        self.bookmark_context_menu.add_command(label=t('context_menu.edit_bookmark'), command=self._edit_bookmark_dialog)
+        self.bookmark_context_menu.add_command(label=t('context_menu.delete_selected'), command=self._delete_bookmark)
         
         # Bind right-click event
         self.bookmarks_tree.bind("<Button-3>", self._show_bookmark_context_menu)
@@ -12193,12 +12281,12 @@ class ProspectorPanel(ttk.Frame):
         main_frame.pack(fill="both", expand=True, padx=8, pady=8)
         
         # Title
-        title_label = tk.Label(main_frame, text="📊 Mining Session Statistics", 
+        title_label = tk.Label(main_frame, text=t('statistics.title'), 
                               font=("Consolas", 14, "bold"), fg="#ffffff", bg=_stats_bg)
         title_label.pack(pady=(0, 5))
         
         # Info text
-        info_label = tk.Label(main_frame, text="Statistics calculated from saved mining session reports", 
+        info_label = tk.Label(main_frame, text=t('statistics.info'), 
                              font=("Segoe UI", 9, "italic"), fg="#888888", bg=_stats_bg)
         info_label.pack(pady=(0, 10))
         
@@ -12207,10 +12295,10 @@ class ProspectorPanel(ttk.Frame):
         stats_container.pack(fill="both", expand=True)
         
         # Two-column layout
-        left_column = ttk.LabelFrame(stats_container, text="Overall Statistics", padding=10, style="Stats.TLabelframe")
+        left_column = ttk.LabelFrame(stats_container, text=t('statistics.overall_statistics'), padding=10, style="Stats.TLabelframe")
         left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
-        right_column = ttk.LabelFrame(stats_container, text="Best (Records)", padding=10, style="Stats.TLabelframe")
+        right_column = ttk.LabelFrame(stats_container, text=t('statistics.best_records'), padding=10, style="Stats.TLabelframe")
         right_column.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         
         stats_container.grid_columnconfigure(0, weight=1)
@@ -12222,18 +12310,18 @@ class ProspectorPanel(ttk.Frame):
         
         # Overall Statistics (Left Column)
         # Add "Session Overview" header
-        session_header = tk.Label(left_column, text="Session Overview", font=("Consolas", 10, "bold"), 
+        session_header = tk.Label(left_column, text=t('statistics.session_overview'), font=("Consolas", 10, "bold"), 
                                  fg="#ffaa00", bg=_stats_bg, anchor="w")
         session_header.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5), padx=(0, 10))
         
         stats_data = [
-            ("Total Sessions:", "total_sessions"),
-            ("Total Mining Time:", "total_time"),
-            ("Total Tonnage Collected:", "total_tonnage"),
-            ("Average Tons/Hour:", "avg_tph"),
-            ("Systems Mined:", "unique_systems"),
-            ("Total Asteroids Prospected:", "total_asteroids"),
-            ("Average Hit Rate:", "avg_hit_rate")
+            (t('statistics.total_sessions'), "total_sessions"),
+            (t('statistics.total_time'), "total_time"),
+            (t('statistics.total_tonnage'), "total_tonnage"),
+            (t('statistics.avg_tph'), "avg_tph"),
+            (t('statistics.systems_mined'), "unique_systems"),
+            (t('statistics.total_asteroids'), "total_asteroids"),
+            (t('statistics.avg_hit_rate'), "avg_hit_rate")
         ]
         
         for i, (label_text, key) in enumerate(stats_data):
@@ -12253,17 +12341,17 @@ class ProspectorPanel(ttk.Frame):
         separator.grid(row=8, column=0, columnspan=2, sticky="ew", pady=8, padx=(0, 10))
         
         # Add "Best Records" header
-        best_header = tk.Label(left_column, text="Best Records", font=("Consolas", 10, "bold"), 
+        best_header = tk.Label(left_column, text=t('statistics.best_records'), font=("Consolas", 10, "bold"), 
                               fg="#ffaa00", bg=_stats_bg, anchor="w")
         best_header.grid(row=9, column=0, columnspan=2, sticky="w", pady=(5, 2), padx=(0, 10))
         
         # Best records data
         best_records_data = [
-            ("Best T/hr:", "best_session_tph"),
-            ("Best System:", "best_session_system"),
-            ("Most Mined Ton Session:", "best_tonnage"),
-            ("Most Mined System:", "most_mined_system"),
-            ("Most Mined Minerals:", "most_collected_material")
+            (t('statistics.best_tph'), "best_session_tph"),
+            (t('statistics.best_system'), "best_session_system"),
+            (t('statistics.most_mined_ton_session'), "best_tonnage"),
+            (t('statistics.most_mined_system'), "most_mined_system"),
+            (t('statistics.most_mined_minerals'), "most_collected_material")
         ]
         
         for i, (label_text, key) in enumerate(best_records_data):
@@ -12279,7 +12367,7 @@ class ProspectorPanel(ttk.Frame):
             self.stats_labels[key] = value_label
         
         # Records (Right Column) - Top 5 Best Systems only
-        top_systems_title = tk.Label(right_column, text="Top 5 Best Systems (T/hr)", font=("Consolas", 10, "bold"), 
+        top_systems_title = tk.Label(right_column, text=t('statistics.top_5_systems'), font=("Consolas", 10, "bold"), 
                                     fg="#cccccc", bg=_stats_bg, anchor="w")
         top_systems_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 2), padx=(0, 10))
         
@@ -12681,9 +12769,11 @@ class ProspectorPanel(ttk.Frame):
             self.stats_labels['most_mined_system'].config(text=most_system)
             
             most_material = stats.get('most_collected_material', 'None')
-            if most_material and len(most_material) > 30:
-                most_material = most_material[:30] + "..."
-            self.stats_labels['most_collected_material'].config(text=most_material)
+            # Localize the material name
+            most_material_localized = get_material(most_material) if most_material and most_material != 'None' else most_material
+            if most_material_localized and len(most_material_localized) > 30:
+                most_material_localized = most_material_localized[:30] + "..."
+            self.stats_labels['most_collected_material'].config(text=most_material_localized)
             
             self.stats_labels['best_tonnage'].config(text=f"{stats['best_session']['tonnage']:.1f}")
             self.stats_labels['avg_hit_rate'].config(text=f"{stats['avg_hit_rate']:.1f}%")
@@ -12696,10 +12786,11 @@ class ProspectorPanel(ttk.Frame):
                     sys_data = top_systems[rank - 1]
                     # Line 1: Rank. System | Body
                     line1_text = f"{rank}. {sys_data['system']} | {sys_data['body']}"
-                    # Line 2: Material with label
-                    line2_text = f"Minerals: {sys_data['material']}"
-                    # Line 3: Metrics (T/Asteroid and TPH only)
-                    line3_text = f"{sys_data['tons_per']:.1f} T/Asteroid  |  {sys_data['tph']:.1f} T/hr"
+                    # Line 2: Material with label (localized)
+                    material_localized = get_material(sys_data['material']) if sys_data['material'] else sys_data['material']
+                    line2_text = f"{t('statistics.minerals_label')} {material_localized}"
+                    # Line 3: Metrics (T/Asteroid and TPH only) - localized
+                    line3_text = f"{sys_data['tons_per']:.1f} {t('statistics.t_per_asteroid')}  |  {sys_data['tph']:.1f} {t('statistics.t_per_hr')}"
                 else:
                     line1_text = f"{rank}. — | —"
                     line2_text = "—"
@@ -13643,7 +13734,9 @@ class ProspectorPanel(ttk.Frame):
                     import webbrowser
                     webbrowser.open(f"file:///{html_path.replace(os.sep, '/')}")
                 else:
-                    messagebox.showwarning("File Not Found", f"Detailed report file not found:\n{html_path}")
+                    from app_utils import centered_message
+                    centered_message(self.winfo_toplevel(), t('context_menu.file_not_found'), 
+                                   f"{t('context_menu.file_not_found_msg')}\n{html_path}")
             else:
                 # Extract session info from report_id for better user feedback
                 parts = report_id.split('_', 2)  # Split into max 3 parts: date, system, body
@@ -13652,21 +13745,23 @@ class ProspectorPanel(ttk.Frame):
                 body = parts[2] if len(parts) > 2 else "Unknown"
                 
                 from app_utils import centered_message
-                centered_message(self.winfo_toplevel(), "No Detailed Report",
-                                 f"No detailed report found for this mining session.\n\n"
-                                 f"Session: {display_date} - {system} {body}\n\n"
-                                 f"To create a detailed report, right-click on this session and select 'Generate Detailed Report (HTML)'.")
+                centered_message(self.winfo_toplevel(), t('context_menu.no_detailed_report_title'),
+                                 f"{t('context_menu.no_detailed_report_msg')}\n\n"
+                                 f"{t('context_menu.session_info', date=display_date, system=system, body=body)}\n\n"
+                                 f"{t('context_menu.create_report_hint')}")
                 
         except Exception as e:
             print(f"Error opening detailed report: {e}")
-            messagebox.showerror("Error", f"Failed to open detailed report: {e}")
+            from app_utils import centered_message
+            centered_message(self.winfo_toplevel(), t('common.error'), f"Failed to open detailed report: {e}")
     
     def _open_enhanced_report_from_menu(self, tree):
         """Open detailed report from context menu for selected item"""
         try:
             selected_items = tree.selection()
             if not selected_items:
-                messagebox.showwarning("No Selection", "Please select a report first.")
+                from app_utils import centered_message
+                centered_message(self.winfo_toplevel(), t('context_menu.no_selection'), t('context_menu.no_selection_msg'))
                 return
                 
             # Get the first selected item
@@ -13674,7 +13769,8 @@ class ProspectorPanel(ttk.Frame):
             values = tree.item(item, 'values')
             
             if not values:
-                messagebox.showwarning("Invalid Selection", "Could not get report data.")
+                from app_utils import centered_message
+                centered_message(self.winfo_toplevel(), t('context_menu.invalid_selection'), t('context_menu.invalid_selection_msg'))
                 return
                 
             # Extract timestamp to use as report_id (should be in the first column)
@@ -13807,19 +13903,19 @@ class ProspectorPanel(ttk.Frame):
                     from main import centered_info_dialog
                     centered_info_dialog(
                         self.winfo_toplevel(),
-                        "No Detailed Report",
-                        f"No detailed report found for this mining session.\n\n"
-                        f"Session: {display_date} - {system} {body}\n\n"
-                        f"To create a detailed report, right-click on this session and select 'Generate Detailed Report (HTML)'."
+                        t('context_menu.no_detailed_report_title'),
+                        f"{t('context_menu.no_detailed_report_msg')}\n\n"
+                        f"{t('context_menu.session_info', date=display_date, system=system, body=body)}\n\n"
+                        f"{t('context_menu.create_report_hint')}"
                     )
                 else:
                     # Multiple selections with no detailed reports
                     from main import centered_info_dialog
                     centered_info_dialog(
                         self.winfo_toplevel(),
-                        "No Detailed Reports",
-                        f"None of the {len(selected_items)} selected sessions have detailed reports.\n\n"
-                        f"To create detailed reports, right-click on individual sessions and select 'Generate Detailed Report (HTML)'."
+                        t('context_menu.no_detailed_reports_title'),
+                        t('context_menu.no_detailed_reports_msg', count=len(selected_items)) + "\n\n" +
+                        t('context_menu.create_report_hint')
                     )
                 return
             
@@ -14796,8 +14892,8 @@ class ProspectorPanel(ttk.Frame):
             from main import centered_yesno_dialog
             add_screenshots = centered_yesno_dialog(
                 tree.winfo_toplevel(),
-                "Detailed Report",
-                "Would you like to add screenshots to this detailed report?"
+                t('context_menu.detailed_report_title'),
+                t('context_menu.add_screenshots_question')
             )
             
             if add_screenshots:
@@ -14845,8 +14941,8 @@ class ProspectorPanel(ttk.Frame):
                     from main import centered_yesno_dialog
                     preview_report = centered_yesno_dialog(
                         tree.winfo_toplevel(),
-                        "Enhanced Report Generated",
-                        f"Enhanced HTML report created successfully!\n\nWould you like to preview it now?"
+                        t('context_menu.report_generated_title'),
+                        f"{t('context_menu.report_created_success')}\n\n{t('context_menu.preview_question')}"
                     )
                     
                     if preview_report:
@@ -14854,15 +14950,18 @@ class ProspectorPanel(ttk.Frame):
                         
                     self._set_status(f"Enhanced report generated: {os.path.basename(html_report_path)}")
                 else:
-                    messagebox.showerror("Save Failed", "Could not save enhanced report.", parent=tree.winfo_toplevel())
+                    from app_utils import centered_message
+                    centered_message(tree.winfo_toplevel(), t('context_menu.save_failed'), t('context_menu.save_failed_msg'))
             else:
-                messagebox.showerror("Generation Failed", "Could not generate enhanced report content.", parent=tree.winfo_toplevel())
+                from app_utils import centered_message
+                centered_message(tree.winfo_toplevel(), t('context_menu.generation_failed'), t('context_menu.generation_failed_msg'))
                 
         except ImportError:
-            messagebox.showerror(
-                "Enhanced Report Error",
-                "Enhanced report functionality not available - missing dependencies",
-                parent=tree.winfo_toplevel()
+            from app_utils import centered_message
+            centered_message(
+                tree.winfo_toplevel(),
+                t('context_menu.report_error_title'),
+                t('context_menu.report_error_msg')
             )
         except Exception as e:
             print(f"Error generating enhanced report from menu: {e}")
@@ -14979,11 +15078,11 @@ class ProspectorPanel(ttk.Frame):
                     self._update_enhanced_report_mapping(enhanced_session_data, os.path.basename(html_report_path))
                     
                     # Ask user if they want to preview the report
-                    from app_utils import centered_askyesno
-                    preview_report = centered_askyesno(
+                    from main import centered_yesno_dialog
+                    preview_report = centered_yesno_dialog(
                         self.winfo_toplevel(),
-                        "Enhanced Report Generated",
-                        f"Enhanced HTML report saved successfully!\n\nWould you like to preview it now?"
+                        t('context_menu.report_generated_title'),
+                        f"{t('context_menu.report_created_success')}\n\n{t('context_menu.preview_question')}"
                     )
                     
                     if preview_report:

@@ -9,6 +9,13 @@ import os
 import sys
 from datetime import datetime
 
+# Import localization
+try:
+    from localization import t
+except ImportError:
+    def t(key, **kwargs):
+        return key  # Fallback to key if localization not available
+
 # Import matplotlib with error handling for PyInstaller compatibility
 try:
     import matplotlib
@@ -52,6 +59,13 @@ import csv
 import os
 from typing import Dict, List, Any, Optional
 from mining_statistics import SessionAnalytics
+
+# Localization
+try:
+    from localization import t
+except Exception:
+    def t(key, **kwargs):
+        return key
 
 class MiningChartsPanel:
     """Panel containing live mining analytics charts"""
@@ -129,7 +143,7 @@ class MiningChartsPanel:
             placeholder_frame.pack(fill='both', expand=True, padx=10, pady=10)
             
             label = ttk.Label(placeholder_frame, 
-                            text="Charts are not available - matplotlib module not found\n"
+                            text=t('graphs.charts_not_available') + "\n"
                                  "Charts functionality is disabled in this build",
                             justify='center',
                             font=('TkDefaultFont', 10))
@@ -179,32 +193,17 @@ class MiningChartsPanel:
         chart_controls = ttk.Frame(controls_frame)
         chart_controls.pack(side="left", fill="x", expand=True)
         
-        # Refresh button with custom styling - NO MORE WHITE HOVER!
-        refresh_btn = ttk.Button(chart_controls, text="🔄 Refresh", command=self.refresh_charts, 
-                               style="Charts.TButton")
-        refresh_btn.pack(side="left", padx=(0, 10))
-        
-        # Auto-refresh checkbox with custom styling - NO MORE WHITE HOVER!
-        self.auto_refresh_var = tk.BooleanVar(value=True)
-        auto_refresh_cb = ttk.Checkbutton(chart_controls, text="Auto-refresh", variable=self.auto_refresh_var,
-                                        style="Charts.TCheckbutton")
-        auto_refresh_cb.pack(side="left")
-        
-        # Store buttons for tooltip setup later
-        self.refresh_btn = refresh_btn
-        self.auto_refresh_cb = auto_refresh_cb
-        
         # Right side: Export controls (always visible) - BALANCED SIZE
         export_controls = ttk.Frame(controls_frame)
         export_controls.pack(side="right")
         
         # Better sized export buttons with custom styling - NO MORE WHITE HOVER!
-        export_charts_btn = ttk.Button(export_controls, text="📸 PNG", command=self.export_charts_png, 
+        export_charts_btn = ttk.Button(export_controls, text="📸 " + t('graphs.export_png'), command=self.export_charts_png, 
                                      width=7, style="Charts.TButton")
         export_charts_btn.pack(side="left", padx=(0, 3))
         
         # Note: CSV/data export removed for Mining Analytics (not needed)
-        export_all_btn = ttk.Button(export_controls, text="💾 All", command=self.export_charts_png, 
+        export_all_btn = ttk.Button(export_controls, text="💾 " + t('graphs.export_all'), command=self.export_charts_png, 
                       width=6, style="Charts.TButton")
         export_all_btn.pack(side="left")
 
@@ -217,21 +216,23 @@ class MiningChartsPanel:
         charts_notebook.pack(fill="both", expand=True)
         
         # Timeline Chart Tab - SMALLER size for better visibility
-        timeline_frame = ttk.Frame(charts_notebook, padding=5)
-        charts_notebook.add(timeline_frame, text="Yield Timeline")
+        timeline_frame = tk.Frame(charts_notebook, bg=self.chart_bg, padx=5, pady=5)
+        charts_notebook.add(timeline_frame, text=t('graphs.yield_timeline'))
         
         self.timeline_fig = Figure(figsize=(7, 3), dpi=100, facecolor=self.chart_bg)
         self.timeline_ax = self.timeline_fig.add_subplot(111, facecolor=self.chart_face)
         self.timeline_canvas = FigureCanvasTkAgg(self.timeline_fig, timeline_frame)
+        self.timeline_canvas.get_tk_widget().configure(bg=self.chart_bg, highlightthickness=0)
         self.timeline_canvas.get_tk_widget().pack(fill="both", expand=True)
         
         # Bar Chart Tab - SMALLER size for better visibility
-        bar_frame = ttk.Frame(charts_notebook, padding=5)
-        charts_notebook.add(bar_frame, text="Minerals Comparison")
+        bar_frame = tk.Frame(charts_notebook, bg=self.chart_bg, padx=5, pady=5)
+        charts_notebook.add(bar_frame, text=t('graphs.minerals_comparison'))
         
         self.bar_fig = Figure(figsize=(5, 3), dpi=100, facecolor=self.chart_bg)
         self.bar_ax = self.bar_fig.add_subplot(111, facecolor=self.chart_face)
         self.bar_canvas = FigureCanvasTkAgg(self.bar_fig, bar_frame)
+        self.bar_canvas.get_tk_widget().configure(bg=self.chart_bg, highlightthickness=0)
         self.bar_canvas.get_tk_widget().pack(fill="both", expand=True)
         
         # Initialize charts
@@ -275,11 +276,10 @@ class MiningChartsPanel:
         return self.material_colors.get(material_name, self.material_colors['Default'])
     
     def update_charts(self):
-        """Update charts with current session data"""
+        """Update charts with current session data - always refreshes"""
         if not MATPLOTLIB_AVAILABLE:
             return
-        if self.auto_refresh_var.get():
-            self.refresh_charts()
+        self.refresh_charts()
     
     def refresh_charts(self):
         """Refresh both charts with latest data"""
@@ -300,7 +300,7 @@ class MiningChartsPanel:
         materials = self.session_analytics.get_tracked_materials()
         
         if not materials:
-            self.timeline_ax.text(0.5, 0.5, 'No data available\nStart mining to see yield trends!', 
+            self.timeline_ax.text(0.5, 0.5, t('graphs.no_data_yield'), 
                                  transform=self.timeline_ax.transAxes, ha='center', va='center',
                                  fontsize=12, color='gray', style='italic')
             self.timeline_canvas.draw()
@@ -351,7 +351,7 @@ class MiningChartsPanel:
         summary_data = self.session_analytics.get_live_summary()
         
         if not summary_data:
-            self.bar_ax.text(0.5, 0.5, 'No data available\nStart mining to see material comparison!', 
+            self.bar_ax.text(0.5, 0.5, t('graphs.no_data_comparison'), 
                            transform=self.bar_ax.transAxes, ha='center', va='center',
                            fontsize=12, color='gray', style='italic')
             self.bar_canvas.draw()
@@ -436,7 +436,7 @@ class MiningChartsPanel:
     
     def _setup_bar_style(self):
         """Setup bar chart styling"""
-        self.bar_ax.set_facecolor('#1e1e1e')
+        self.bar_ax.set_facecolor(self.chart_face)
         self.bar_ax.tick_params(colors='white', which='both')
         for spine in self.bar_ax.spines.values():
             spine.set_color('white')
@@ -711,17 +711,11 @@ class MiningChartsPanel:
             return
             
         try:
-            # Control button tooltips
-            if hasattr(self, 'refresh_btn') and self.refresh_btn:
-                self.ToolTip(self.refresh_btn, "Manually refresh charts with latest mining data")
-            if hasattr(self, 'auto_refresh_cb') and self.auto_refresh_cb:
-                self.ToolTip(self.auto_refresh_cb, "Automatically update charts as new data arrives")
-                
             # Export button tooltips
             if hasattr(self, 'export_charts_btn') and self.export_charts_btn:
-                self.ToolTip(self.export_charts_btn, "Export charts as PNG images")
+                self.ToolTip(self.export_charts_btn, t('tooltips.chart_export_png'))
             if hasattr(self, 'export_all_btn') and self.export_all_btn:
-                self.ToolTip(self.export_all_btn, "Export charts (data CSV export disabled)")
+                self.ToolTip(self.export_all_btn, t('tooltips.chart_export_all'))
         except Exception as e:
             print(f"Warning: Could not setup tooltips for charts: {e}")
 

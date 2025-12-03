@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.6.5
+AppVersion=v4.6.6
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -28,6 +28,8 @@ Type: files; Name: "{app}\LICENSE.txt"
 [Files]
 ; Only include specific file types from needed subfolders (exclude .py files)
 Source: "app\Images\*";    DestDir: "{app}\app\Images";    Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.py,*.pyc,__pycache__"
+; Localization files (v4.6.7+) - required for UI translations
+Source: "app\localization\*.json";  DestDir: "{app}\app\localization";  Flags: ignoreversion
 ; VoiceAttack-specific files (only installed if VA detected)
 Source: "app\Ship Presets\*";  DestDir: "{app}\app\Ship Presets";  Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "*.py,*.pyc,__pycache__"; Check: IsVADetected
 ; Reports folder intentionally excluded - users must earn their reports by mining! 😉

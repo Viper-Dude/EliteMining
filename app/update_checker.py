@@ -3,6 +3,7 @@ Update checker module for EliteMining
 Checks GitHub releases for new versions
 """
 
+import logging
 import requests
 import threading
 import time
@@ -15,6 +16,8 @@ from packaging import version
 import tkinter as tk
 from tkinter import messagebox
 import webbrowser
+
+log = logging.getLogger("EliteMining.UpdateChecker")
 
 class UpdateChecker:
     """Handles checking for application updates"""
@@ -71,7 +74,7 @@ class UpdateChecker:
             try:
                 self._check_for_updates(parent_window, show_no_updates)
             except Exception as e:
-                print(f"Update check failed: {e}")
+                log.error(f"Update check failed: {e}")
         
         thread = threading.Thread(target=worker, daemon=True)
         thread.start()
@@ -79,11 +82,11 @@ class UpdateChecker:
     def _check_for_updates(self, parent_window=None, show_no_updates=False):
         """Check GitHub API for latest release"""
         try:
-            print(f"Checking for updates... Current version: {self.current_version}")
+            log.info(f"Checking for updates... Current version: {self.current_version}")
             
             response = requests.get(self.check_url, timeout=10)
             if response.status_code != 200:
-                print(f"Update check failed: HTTP {response.status_code}")
+                log.warning(f"Update check failed: HTTP {response.status_code}")
                 return
             
             release_data = response.json()
@@ -109,15 +112,15 @@ class UpdateChecker:
                     parent_window.after(0, self._show_update_dialog, 
                                       latest_version, download_url, parent_window)
                 else:
-                    print(f"Update available: {latest_version}")
+                    log.info(f"Update available: {latest_version}")
             elif show_no_updates:
                 if parent_window:
                     parent_window.after(0, self._show_no_updates_dialog, parent_window)
                 else:
-                    print("No updates available")
+                    log.info("No updates available")
             
         except Exception as e:
-            print(f"Update check error: {e}")
+            log.error(f"Update check error: {e}")
     
     def _is_newer_version(self, latest: str, current: str) -> bool:
         """Compare version strings"""
@@ -131,13 +134,11 @@ class UpdateChecker:
         """Show update available dialog"""
         try:
             from app_utils import centered_askyesno
+            from localization import t
             result = centered_askyesno(
                 parent_window,
-                "Update Available",
-                f"A new version of EliteMining is available!\n\n"
-                f"Current version: {self.current_version}\n"
-                f"Latest version: {latest_version}\n\n"
-                f"Would you like to download the update?"
+                t('dialogs.update_available'),
+                t('dialogs.update_available_msg').format(current=self.current_version, latest=latest_version)
             )
             
             if result and download_url:
@@ -149,7 +150,8 @@ class UpdateChecker:
         """Show no updates available dialog"""
         try:
             from app_utils import centered_message
-            centered_message(parent_window, "No Updates", f"You are running the latest version ({self.current_version})")
+            from localization import t
+            centered_message(parent_window, t('dialogs.no_updates'), t('dialogs.latest_version').format(version=self.current_version))
         except:
             pass
     

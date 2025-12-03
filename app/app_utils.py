@@ -243,28 +243,37 @@ def _center_child_over_parent(child: tk.Toplevel, parent: Optional[tk.Widget]) -
 
 
 def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon: str = 'info') -> None:
-    """Show a centered info/warning/error dialog. Icon can be 'info', 'warning', or 'error'."""
-    from tkinter import ttk
+    """Show a centered info/warning/error dialog with orange theme. Icon can be 'info', 'warning', or 'error'."""
+    try:
+        from localization import t
+    except ImportError:
+        t = lambda key, **kw: key
     
     dialog = tk.Toplevel(parent)
     dialog.withdraw()
     dialog.title(title)
     dialog.resizable(False, False)
+    dialog.configure(bg="#1e1e1e")
     set_window_icon(dialog)
     
-    # Use ttk frame for themed look
-    frame = ttk.Frame(dialog, padding=20)
+    # Main frame with dark background
+    frame = tk.Frame(dialog, bg="#1e1e1e", padx=20, pady=20)
     frame.pack(fill="both", expand=True)
     
-    ttk.Label(frame, text=message, font=("Segoe UI", 10), wraplength=420, justify="left").pack(pady=(0, 15))
+    # Message label with orange text
+    tk.Label(frame, text=message, font=("Segoe UI", 10), wraplength=420, justify="left",
+            bg="#1e1e1e", fg="#ff9800").pack(pady=(0, 15))
     
-    btn_frame = ttk.Frame(frame)
+    btn_frame = tk.Frame(frame, bg="#1e1e1e")
     btn_frame.pack()
     
     def on_ok():
         dialog.destroy()
     
-    ok_btn = ttk.Button(btn_frame, text="OK", width=12, command=on_ok)
+    ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=12, command=on_ok,
+                      bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                      activebackground="#4a4a4a", activeforeground="#ffffff",
+                      cursor="hand2")
     ok_btn.pack()
     
     # Keyboard binding

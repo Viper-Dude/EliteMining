@@ -807,8 +807,8 @@ class UserDatabase:
                     existing_id, existing_coord_source, existing_ls, existing_ring_type, existing_date, existing_count = existing
                     
                     # Log existing data for debugging
-                    log.info(f"Found existing hotspot: {system_name} - {body_name} - {material_name} | coord_source={existing_coord_source} | ls={existing_ls} | type={existing_ring_type}")
-                    log.info(f"New data: coord_source={coord_source} | ls={ls_distance} | type={ring_type}")
+                    log.debug(f"Found existing hotspot: {system_name} - {body_name} - {material_name} | coord_source={existing_coord_source} | ls={existing_ls} | type={existing_ring_type}")
+                    log.debug(f"New data: coord_source={coord_source} | ls={ls_distance} | type={ring_type}")
                     
                     # Determine if we should update
                     should_update = False
@@ -859,7 +859,7 @@ class UserDatabase:
                             update_reason = f"newer scan date with equal/better data ({new_data_count}/{len(new_data_fields)} fields vs {existing_data_count}/{len(existing_data_fields)} fields)"
                         elif scan_date > existing_date and new_data_count < existing_data_count:
                             # Newer but less complete - don't overwrite good data
-                            log.info(f"Skipping update for {system_name} - {body_name} - {material_name}: newer scan but less complete ({new_data_count} vs {existing_data_count} fields)")
+                            log.debug(f"Skipping update for {system_name} - {body_name} - {material_name}: newer scan but less complete ({new_data_count} vs {existing_data_count} fields)")
                             return
                         elif hotspot_count > existing_count:
                             should_update = True
@@ -869,10 +869,10 @@ class UserDatabase:
                             should_update = True
                             update_reason = "updating unknown-source data with journal data"
                         else:
-                            log.info(f"No update needed for {system_name} - {body_name} - {material_name}: existing_coord_source={existing_coord_source}, new_data_count={new_data_count}")
+                            log.debug(f"No update needed for {system_name} - {body_name} - {material_name}: existing_coord_source={existing_coord_source}, new_data_count={new_data_count}")
                     
                     if should_update:
-                        log.info(f"Updating hotspot ({update_reason}): {system_name} - {body_name} - {material_name}")
+                        log.debug(f"Updating hotspot ({update_reason}): {system_name} - {body_name} - {material_name}")
                         cursor.execute('''
                             UPDATE hotspot_data 
                             SET hotspot_count = ?, scan_date = ?, system_address = ?, body_id = ?,
@@ -1135,9 +1135,11 @@ class UserDatabase:
                 if result:
                     visit_count, first_visit, last_visit = result
                     
-                    # Only increment visit count if this is a NEW visit (different timestamp)
-                    # This prevents duplicate counting from multiple sources processing same event
-                    if last_visit != visit_date:
+                    # Only increment visit count if this visit is NEWER than the last recorded visit
+                    # This prevents:
+                    # 1. Duplicate counting from multiple sources processing same event (same timestamp)
+                    # 2. Re-counting old visits when catchup scan re-processes old journals
+                    if visit_date > last_visit:
                         conn.execute('''
                             UPDATE visited_systems 
                             SET last_visit_date = ?, visit_count = visit_count + 1
@@ -1145,8 +1147,8 @@ class UserDatabase:
                         ''', (visit_date, system_name))
                         log.debug(f"Updated visit to system: {system_name} (visit #{visit_count + 1})")
                     else:
-                        # Same timestamp - already recorded this visit, skip increment
-                        log.debug(f"Skipping duplicate visit record for: {system_name}")
+                        # Same or older timestamp - already recorded, skip increment
+                        log.debug(f"Skipping duplicate/old visit record for: {system_name}")
                 else:
                     # Insert new record
                     x_coord, y_coord, z_coord = coordinates or (None, None, None)
@@ -1223,6 +1225,29 @@ class UserDatabase:
                 return "Yes"
             else:
                 return f"{visit_count} visits"
+    
+    def get_last_visited_system(self) -> Optional[str]:
+        """Get the most recently visited system from the database.
+        
+        This is used to initialize the visit tracking on app startup,
+        allowing detection of carrier jumps that occurred while the app was offline.
+        
+        Returns:
+            Name of the most recently visited system, or None if no visits recorded
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT system_name FROM visited_systems 
+                    ORDER BY last_visit_date DESC
+                    LIMIT 1
+                ''')
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            log.error(f"Error getting last visited system: {e}")
+            return None
     
     def has_visited_system(self, system_name: str) -> bool:
         """Check if the player has ever visited a system
