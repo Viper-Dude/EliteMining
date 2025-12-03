@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 
 # === CHANGE VERSION AND DATE HERE ===
-NEW_VERSION = "4.6.7"
+NEW_VERSION = "4.6.6"
 NEW_BUILD_DATE = "2025-12-03"  # Format: YYYY-MM-DD (leave empty for today's date)
 # ====================================
 
