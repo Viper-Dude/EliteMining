@@ -516,6 +516,12 @@ Join our Discord server for real-time help, mining tips, and community discussio
 - **GitHub Discussions:** [EliteMining Forum](https://github.com/Viper-Dude/EliteMining/discussions/4)
 - **Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
 
+### Help Translate EliteMining
+Want to help translate EliteMining into your language? See our [Translation Guide](docs/TRANSLATION_GUIDE.md) for instructions.
+
+**Currently supported:** English, German  
+**Needed:** French, Spanish, Russian, Portuguese
+
 [Back to Top](#top)
 
 ---
