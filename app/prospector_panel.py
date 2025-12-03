@@ -6078,7 +6078,7 @@ class ProspectorPanel(ttk.Frame):
         
         log.debug(f"[Enhanced Overlay] Input: {panel_summary}")
         
-        lines = ["LIMPET (PROSPECTOR)"]
+        lines = [t('settings.overlay_limpet_prospector')]
         
         # Parse panel_summary by splitting on " — "
         parts = [p.strip() for p in panel_summary.split(" — ")]
@@ -6103,9 +6103,9 @@ class ProspectorPanel(ttk.Frame):
         
         # Add remaining first
         if "Depleted" in remaining:
-            lines.append("MINERALS REMAINING: DEPLETED")
+            lines.append(f"{t('settings.overlay_minerals_remaining')} {t('settings.overlay_depleted')}")
         else:
-            lines.append(f"MINERALS REMAINING: {remaining}")
+            lines.append(f"{t('settings.overlay_minerals_remaining')} {remaining}")
         
         # Parse materials: "Bertrandite 16.2%, Indite 13.7%"
         # Materials are separated by ", " (comma space)
@@ -6122,16 +6122,19 @@ class ProspectorPanel(ttk.Frame):
                 if match:
                     material_name = match.group(1)
                     percentage = match.group(2)
-                    lines.append(f"{material_name.upper()} {percentage}%")
-                    log.debug(f"[Enhanced Overlay] Added: {material_name.upper()} {percentage}%")
+                    # Translate material name to current language
+                    localized_name = get_material(material_name)
+                    lines.append(f"{localized_name.upper()} {percentage}%")
+                    log.debug(f"[Enhanced Overlay] Added: {localized_name.upper()} {percentage}%")
         
         # Add content at the end
         if content:
-            lines.append(f"MATERIAL CONTENT: {content.upper()}")
+            lines.append(f"{t('settings.overlay_material_content')} {content.upper()}")
         
         # Add core detected line if motherlode present (matching game format)
         if core_material:
-            lines.append(f"CORE DETECTED: {core_material.upper()}")
+            localized_core = get_material(core_material)
+            lines.append(f"{t('settings.overlay_core_detected')} {localized_core.upper()}")
         
         result = "\n".join(lines)
         print(f"[Enhanced Overlay] Output lines count: {len(lines)}")
@@ -6152,7 +6155,7 @@ class ProspectorPanel(ttk.Frame):
         log.debug(f"[Enhanced Overlay EX] Materials: {materials_txt}")
         log.debug(f"[Enhanced Overlay EX] Content: {content_txt}")
         
-        lines = ["LIMPET (PROSPECTOR)"]
+        lines = [t('settings.overlay_limpet_prospector')]
         
         # Parse content_txt to extract content and remaining
         content = ""
@@ -6168,9 +6171,9 @@ class ProspectorPanel(ttk.Frame):
         
         # Add remaining first
         if "Depleted" in remaining:
-            lines.append("MINERALS REMAINING: DEPLETED")
+            lines.append(f"{t('settings.overlay_minerals_remaining')} {t('settings.overlay_depleted')}")
         else:
-            lines.append(f"MINERALS REMAINING: {remaining}")
+            lines.append(f"{t('settings.overlay_minerals_remaining')} {remaining}")
         
         # Parse materials
         if materials_txt and "No materials" not in materials_txt:
@@ -6181,15 +6184,18 @@ class ProspectorPanel(ttk.Frame):
                 if match:
                     material_name = match.group(1)
                     percentage = match.group(2)
-                    lines.append(f"{material_name.upper()} {percentage}%")
+                    # Translate material name to current language
+                    localized_name = get_material(material_name)
+                    lines.append(f"{localized_name.upper()} {percentage}%")
         
         # Add content at the end
         if content:
-            lines.append(f"MATERIAL CONTENT: {content.upper()}")
+            lines.append(f"{t('settings.overlay_material_content')} {content.upper()}")
         
         # Add core detected line if motherlode present (matching game format)
         if core_material:
-            lines.append(f"CORE DETECTED: {core_material.upper()}")
+            localized_core = get_material(core_material)
+            lines.append(f"{t('settings.overlay_core_detected')} {localized_core.upper()}")
         
         result = "\n".join(lines)
         log.debug(f"[Enhanced Overlay EX] Output:\n{result}")

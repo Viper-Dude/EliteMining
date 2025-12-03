@@ -9,7 +9,7 @@
 
 
 ### Bug Fixes
-- [ ] **Fix system visit counts on Fleet Carriers** - Visit counts should update when arriving at or sitting on a Fleet Carrier (currently not tracking FC location changes properly)
+- [ ] **
 
 
 
@@ -18,7 +18,7 @@
 ## 🟡 Medium Priority
 
 ### Features
-- [ ] Bookmarks tab - finish internal localization
+- [ ] 
 
 ### Code Quality
 - [ ] **Auto populate cmdrs name*** In the paost to discord
