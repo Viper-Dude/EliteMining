@@ -429,7 +429,7 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 ### Backup & Restore 
 - Easily save and restore your complete EliteMining setup including settings, bookmarks, and reports. Create timestamped backups before updates or quickly restore previous configurations with one click.  
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/backup.png" width="350"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/backup.png" width="600"><br>  
 
 [Back to Top](#top)
 
