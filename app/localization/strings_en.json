@@ -525,6 +525,8 @@
     "share_discord": "Share to Discord",
     "create_mining_card": "Create Mining Card",
     "copy_system": "Copy System Name",
+    "copy_station": "Copy Station Name",
+    "copy_both": "Copy Station @ System",
     "copy_body": "Copy Body Name",
     "word_wrap_on": "Enable Word Wrap",
     "word_wrap_off": "Disable Word Wrap",

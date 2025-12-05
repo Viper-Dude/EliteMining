@@ -525,6 +525,8 @@
     "share_discord": "Auf Discord teilen",
     "create_mining_card": "Bergbau-Karte erstellen",
     "copy_system": "Systemname kopieren",
+    "copy_station": "Stationsname kopieren",
+    "copy_both": "Station @ System kopieren",
     "copy_body": "Körpername kopieren",
     "word_wrap_on": "Zeilenumbruch aktivieren",
     "word_wrap_off": "Zeilenumbruch deaktivieren",

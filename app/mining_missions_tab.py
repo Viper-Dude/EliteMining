@@ -408,13 +408,13 @@ class MiningMissionsTab(ttk.Frame):
         delivered_bar_fill = tk.Frame(delivered_bar_frame, bg=self.delivered_fg)
         delivered_bar_fill.place(relwidth=delivered_bar_pct/100, relheight=1.0)
         
-        # Row 2: Destination, Time, Reward - all on one line
+        # Row 2: Destination (Station @ System) with right-click copy
         row2 = tk.Frame(inner, bg=self.accent_bg)
         row2.pack(fill="x")
         
-        # Destination (compact)
+        # Build destination text showing both station and system
         if destination_station and destination_system:
-            dest_text = f"📍 {destination_station}"
+            dest_text = f"📍 {destination_station} @ {destination_system}"
         elif destination_station:
             dest_text = f"📍 {destination_station}"
         elif destination_system:
@@ -423,15 +423,20 @@ class MiningMissionsTab(ttk.Frame):
             dest_text = ""
         
         if dest_text:
-            tk.Label(
+            dest_label = tk.Label(
                 row2,
                 text=dest_text,
                 bg=self.accent_bg,
                 fg="#4a9eff",
-                font=("Segoe UI", 8)
-            ).pack(side="left")
+                font=("Segoe UI", 8),
+                cursor="hand2"
+            )
+            dest_label.pack(side="left")
+            
+            # Add right-click context menu for copying
+            self._create_dest_context_menu(dest_label, destination_system, destination_station)
         
-        # Time remaining
+        # Time remaining (right side of row2)
         time_text = self._format_time_remaining(expiry)
         tk.Label(
             row2,
@@ -439,18 +444,26 @@ class MiningMissionsTab(ttk.Frame):
             bg=self.accent_bg,
             fg="#ff6666" if "Expired" in time_text else self.fg_dim,
             font=("Segoe UI", 8)
-        ).pack(side="left", padx=(10, 0))
+        ).pack(side="right")
         
-        # Reward (right side)
+        # Row 3: Reward info on separate line
         if reward:
-            reward_text = f"{reward:,.0f} CR"
+            row3 = tk.Frame(inner, bg=self.accent_bg)
+            row3.pack(fill="x")
+            
+            if count > 0:
+                cr_per_ton = reward / count
+                reward_text = f"💰 {reward:,.0f} CR  •  {cr_per_ton:,.0f} CR/t"
+            else:
+                reward_text = f"💰 {reward:,.0f} CR"
+            
             tk.Label(
-                row2,
+                row3,
                 text=reward_text,
                 bg=self.accent_bg,
                 fg="#ffcc00",
                 font=("Segoe UI", 8, "bold")
-            ).pack(side="right")
+            ).pack(side="left")
         
         # Store widget references for in-place updates
         if mission_id:
@@ -544,6 +557,42 @@ class MiningMissionsTab(ttk.Frame):
     def set_main_app(self, main_app):
         """Set the main app reference for tab switching"""
         self.main_app = main_app
+    
+    def _create_dest_context_menu(self, label: tk.Label, system: str, station: str):
+        """Create right-click context menu for destination label"""
+        try:
+            from localization import t
+        except:
+            def t(key, **kwargs):
+                return key.split('.')[-1]
+        
+        if not system:
+            return  # No menu if no system name
+        
+        menu = tk.Menu(label, tearoff=0, bg=self.accent_bg, fg=self.fg_bright,
+                       activebackground=self.progress_fg, activeforeground="#ffffff")
+        
+        menu.add_command(
+            label=t('context_menu.copy_system'),
+            command=lambda: self._copy_to_clipboard(system, "system")
+        )
+        
+        def show_menu(event):
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+        
+        label.bind("<Button-3>", show_menu)
+    
+    def _copy_to_clipboard(self, text: str, item_type: str):
+        """Copy text to clipboard"""
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            print(f"[MISSIONS] Copied {item_type}: {text}")
+        except Exception as e:
+            print(f"[MISSIONS] Error copying to clipboard: {e}")
     
     def destroy(self):
         """Clean up callbacks on destroy"""
