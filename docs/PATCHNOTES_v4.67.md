@@ -1,21 +1,26 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2025-12-03
+**Release Date:** 2025-12-05
 
 ## New Features & Improvements
 
-### [Feature Category 1]
-- [Feature description 1]
-- [Feature description 2]
-- [Feature description 3]
+### Mining Missions Tab
+- New dedicated tab for tracking mining missions
+- Find hotspots directly from mission commodity requirements
 
-### [Feature Category 2]
-- [Feature description 1]
-- [Feature description 2]
+### Hotspots Finder
+- Right-click menu to search for selling stations near any hotspot
+- Find hotspots from Commodity Market tab search
+
+### Commodity Market Tab
+- Search for hotspots directly from market search results
+
+### Database Migration
+- Automatic fix for incorrect visit counts on first startup after update
 
 ## Hotfix
 
-### [System/Component Name]
-- Fixed [issue description]
+### Visit Counter
+- Fixed inflated visit counts from previous versions
 
 
 ### Voiceattack Profile
@@ -28,8 +33,6 @@
 - Configure your mining hotkeys in the "Custom Key-binds for Mining Control" category
 
 ## Notes!
-- [Important note 1]
-- [Important note 2]
 - If installer fails with errors, right-click the installer and select "Run as administrator"
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

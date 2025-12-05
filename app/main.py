@@ -1696,21 +1696,11 @@ class CargoMonitor:
             self.user_db = UserDatabase()
             print(f"DEBUG: CargoMonitor actual database path: {self.user_db.db_path}")
         self.current_system = None  # Track current system for hotspot detection
-        self.last_known_system = None  # Track last system for visit counting (to detect Location event arrivals)
-        self._last_visit_event = None  # Track last visit event to prevent FSDJump+CarrierJump double counting
         self._update_in_progress = False  # Flag to skip background tasks when update is starting
         
         # Initialize JournalParser for proper Scan and SAASignalsFound processing
         # Add callback to notify Ring Finder when new hotspots are added
         self.journal_parser = JournalParser(self.journal_dir, self.user_db, self._on_hotspot_added)
-        
-        # Initialize last_known_system from database to handle offline carrier jumps
-        # This uses the most recently visited system that the app tracked before shutdown
-        # If player moved while app was offline, Location event will show different system -> count visit
-        try:
-            self.last_known_system = self.user_db.get_last_visited_system()
-        except Exception as e:
-            pass
         
         # Flag to track pending Ring Finder refreshes
         self._pending_ring_finder_refresh = False
@@ -3620,77 +3610,42 @@ cargo panel forces Elite to write detailed inventory data.
                     if hasattr(self, 'cargo_window') and self.cargo_window:
                         self.cargo_window.after(1000, self._delayed_capacity_refresh)
 
-            elif event_type in ["FSDJump", "Location", "CarrierJump"]:
-                # Track current system for hotspot detection
+            elif event_type in ["FSDJump", "CarrierJump"]:
+                # Player jumped to a new system - update current system via centralized method
+                # This will also record the visit (handled by update_current_system)
                 system_name = event.get("StarSystem", "")
-                print(f"DEBUG: Processing {event_type} event for system: {system_name}")
+                star_pos = event.get("StarPos", [])
+                
+                if system_name:
+                    coords = None
+                    if len(star_pos) >= 3:
+                        coords = (star_pos[0], star_pos[1], star_pos[2])
+                    
+                    # Use centralized method - this handles visit counting
+                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'update_current_system'):
+                        self.main_app_ref.update_current_system(system_name, coords)
+                    else:
+                        self.current_system = system_name
+                    
+                    print(f"[JUMP] {event_type}: Arrived at {system_name}")
+            
+            elif event_type == "Location":
+                # Game loaded - just update current system display, don't count as visit
+                # (Player was already here, they didn't "arrive")
+                system_name = event.get("StarSystem", "")
+                star_pos = event.get("StarPos", [])
                 
                 if system_name:
                     self.current_system = system_name
                     
-                    # Update distance calculator home/FC distances in main app
-                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_home_fc_distances'):
-                        try:
-                            self.main_app_ref._update_home_fc_distances()
-                        except:
-                            pass
-                    
-                    # Visit tracking logic:
-                    # - FSDJump/CarrierJump: Player arrived at system - count once per timestamp
-                    #   (carrier owner gets both events with same timestamp - only count once)
-                    # - Location: Game load - count only if system is DIFFERENT from last known (player moved while offline)
-                    
-                    timestamp = event.get("timestamp", "")
-                    system_address = event.get("SystemAddress")
-                    star_pos = event.get("StarPos", [])
-                    
-                    should_count_visit = False
-                    
-                    if event_type in ["FSDJump", "CarrierJump"]:
-                        # Player arrived at system via jump (ship or carrier)
-                        # Only count if we haven't already processed an event with same timestamp
-                        # (carrier owner gets both FSDJump and CarrierJump with same timestamp)
-                        if self._last_visit_event and self._last_visit_event[0] == timestamp:
-                            should_count_visit = False
-                        else:
-                            should_count_visit = True
-                            self._last_visit_event = (timestamp, event_type)
-                            
-                    elif event_type == "Location":
-                        # Game load - only count if player is in a DIFFERENT system than before
-                        # This handles: carrier jump while offline, respawn in new system, etc.
-                        if self.last_known_system is None:
-                            # First time tracking - don't count (initial game load)
-                            should_count_visit = False
-                        elif system_name != self.last_known_system:
-                            # Player moved to a different system (while offline or otherwise)
-                            should_count_visit = True
-                        else:
-                            # Same system - just a game restart, don't count
-                            should_count_visit = False
-                    
-                    # Update last known system
-                    self.last_known_system = system_name
-                    
-                    # Count the visit if applicable
-                    if should_count_visit:
-                        coordinates = None
-                        if len(star_pos) >= 3:
-                            coordinates = (star_pos[0], star_pos[1], star_pos[2])
-                        
-                        try:
-                            self.user_db.add_visited_system(
-                                system_name=system_name,
-                                visit_date=timestamp,
-                                system_address=system_address,
-                                coordinates=coordinates
-                            )
-                            
-                            # Update CMDR info display (for visits count, current system, etc.)
-                            if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_cmdr_system_display'):
-                                self.main_app_ref.after(100, self.main_app_ref._update_cmdr_system_display)
-                        except Exception as e:
-                            pass
+                    # Update display only (no visit counting)
+                    if hasattr(self, 'main_app_ref'):
+                        if hasattr(self.main_app_ref, 'distance_current_system'):
+                            self.main_app_ref.distance_current_system.set(system_name)
+                        if hasattr(self.main_app_ref, '_update_cmdr_system_display'):
+                            self.main_app_ref.after(100, self.main_app_ref._update_cmdr_system_display)
+                        if hasattr(self.main_app_ref, '_update_home_fc_distances'):
+                            self.main_app_ref.after(100, self.main_app_ref._update_home_fc_distances)
                         
             elif event_type == "Scan":
                 # Process Scan events through JournalParser to store ring info
@@ -4979,7 +4934,7 @@ class App(tk.Tk):
         # Mining Session tab (moved from Dashboard, with all its sub-tabs)
         mining_session_tab = ttk.Frame(self.notebook, padding=8)
         self._build_mining_session_tab(mining_session_tab)
-        self.notebook.add(mining_session_tab, text=t('tabs.mining_session'))
+        self.notebook.add(mining_session_tab, text=t('tabs.mining'))
 
         # Distance Calculator tab (build FIRST so distance_calculator exists for other tabs)
         distance_tab = ttk.Frame(self.notebook, padding=8)
@@ -10958,9 +10913,9 @@ class App(tk.Tk):
                 
             log.info(f"=== CONFIG MIGRATION CHECK END === {datetime.now().isoformat()}")
             
-            # Schedule database migrations to run after window is fully visible and positioned
-            # Using after(500) gives time for window manager to position the main window
-            self.after(500, self._run_database_migrations)
+            # NOTE: Database migrations disabled - visit counting is handled by
+            # the background journal scan (_background_journal_catchup) which runs silently
+            # self.after(500, self._run_database_migrations)
                 
         except Exception as e:
             log.error(f"Config migration check failed: {e}", exc_info=True)
@@ -11070,6 +11025,8 @@ class App(tk.Tk):
             
             if success:
                 log.info(f"Database migration completed: {message}")
+                # Mark that migration completed - background scan can skip redundant work
+                self._migration_completed = True
             else:
                 log.warning(f"Database migration issue: {message}")
             
@@ -12861,6 +12818,8 @@ class App(tk.Tk):
         self.marketplace_context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara_from_menu)
         self.marketplace_context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm_from_menu)
         self.marketplace_context_menu.add_separator()
+        self.marketplace_context_menu.add_command(label=t('context_menu.find_hotspots'), command=self._find_hotspots_from_marketplace)
+        self.marketplace_context_menu.add_separator()
         self.marketplace_context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_marketplace_system)
     
     def _open_inara_from_menu(self):
@@ -12931,6 +12890,71 @@ class App(tk.Tk):
                     self.clipboard_clear()
                     self.clipboard_append(system_name)
                     self.marketplace_total_label.config(text=t('marketplace.copied_to_clipboard').format(system=system_name))
+    
+    def _find_hotspots_from_marketplace(self):
+        """Open Hotspots Finder with the selected commodity to find mining locations"""
+        # Get the currently selected commodity from the dropdown
+        commodity_display = self.marketplace_commodity.get()
+        
+        # Convert localized name to English for ring finder
+        commodity_english = self._commodity_rev_map.get(commodity_display, commodity_display)
+        
+        if not commodity_english:
+            self.marketplace_total_label.config(text=t('marketplace.select_commodity'))
+            return
+        
+        # Get the system from the selected row
+        selection = self.marketplace_tree.selection()
+        system_name = None
+        if selection:
+            item = selection[0]
+            values = self.marketplace_tree.item(item, 'values')
+            if values and len(values) > 0:
+                location = values[0]  # Location is first column "System / Station"
+                if " / " in location:
+                    system_name = location.split(" / ")[0].strip()
+        
+        # Switch to Hotspots Finder tab
+        try:
+            self.notebook.select(1)  # Hotspots Finder is typically tab index 1
+            
+            # Set the mineral in ring finder
+            if hasattr(self, 'ring_finder'):
+                # Get localized mineral name for the dropdown
+                from localization import get_material
+                try:
+                    localized_mineral = get_material(commodity_english)
+                except:
+                    localized_mineral = commodity_english
+                
+                # Set the mineral dropdown
+                self.ring_finder.specific_material_var.set(localized_mineral)
+                
+                # Set reference system from selected row
+                if system_name and hasattr(self.ring_finder, 'system_var'):
+                    self.ring_finder.system_var.set(system_name)
+                
+                # Set Min Hotspots = 1
+                if hasattr(self.ring_finder, 'min_hotspots_var'):
+                    self.ring_finder.min_hotspots_var.set("1")
+                
+                # Set Max Distance = 100 LY
+                if hasattr(self.ring_finder, 'distance_var'):
+                    self.ring_finder.distance_var.set("100")
+                
+                # Set Max Results = All
+                if hasattr(self.ring_finder, 'max_results_var'):
+                    self.ring_finder.max_results_var.set("All")
+                
+                # Trigger search after a short delay to let UI update
+                self.after(100, self.ring_finder.search_hotspots)
+                
+                print(f"[MARKETPLACE] Searching hotspots for {commodity_english} near {system_name or 'current system'}")
+                
+        except Exception as e:
+            print(f"[MARKETPLACE] Error opening hotspots finder: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _populate_marketplace_system(self):
         """Auto-populate marketplace system on startup (same as ring finder)"""
@@ -14215,6 +14239,9 @@ class App(tk.Tk):
         Subsequent runs: Scan only last 6 months of journals
         
         This runs on a background thread so it doesn't block the UI.
+        
+        NOTE: If the visit counts migration ran, it already scanned all journals
+        for visits, so we only need to scan for hotspots/ring data here.
         """
         import threading
         import glob
@@ -14225,11 +14252,21 @@ class App(tk.Tk):
             print("[JOURNAL] Skipping scan - update in progress")
             return
         
+        # Check if migration already ran this session (it scans all journals)
+        migration_ran = getattr(self, '_migration_completed', False)
+        
         def catchup_scan():
             try:
                 # Check again in case update started while we were waiting
                 if getattr(self, '_update_in_progress', False):
                     print("[JOURNAL] Scan cancelled - update in progress")
+                    return
+                
+                # If migration already ran, skip the visit counting parts
+                # Migration already fixed visit counts from ALL journals
+                if migration_ran:
+                    print("[JOURNAL] Migration already ran - skipping redundant visit scan")
+                    self.after(0, lambda: self._set_status("Ready", 3000))
                     return
                     
                 self.after(0, lambda: self._set_status("Scanning journal history...", 0))
@@ -14251,28 +14288,27 @@ class App(tk.Tk):
                     self.after(0, lambda: self._set_status("No journal files found", 5000))
                     return
                 
-                # Determine if this is first install (no existing data)
-                is_first_install = self._is_first_install()
+                # Determine if this is first install or migration needed
+                scan_type = self._is_first_install()  # Returns 'first_install', 'migration', or 'none'
                 
-                # Check if we need a full scan for this version (major update)
-                force_full_scan = self._needs_full_scan_for_version()
-                
-                if is_first_install or force_full_scan:
-                    # First install OR major version update: scan ALL journals
+                if scan_type in ('first_install', 'migration'):
+                    # First install or migration: scan ALL journals - show progress dialog
                     journals_to_scan = all_journals
-                    reason = "First install" if is_first_install else "Version update"
-                    print(f"[STARTUP] {reason} - full scan of {len(journals_to_scan)} journals...")
-                    log.info(f"Startup: {reason} - full scan of {len(journals_to_scan)} journals")
-                    self.after(0, lambda r=reason, n=len(journals_to_scan): self._set_status(f"{r}: scanning {n} journals...", 0))
+                    print(f"[STARTUP] {scan_type} - full scan of {len(journals_to_scan)} journals...")
+                    log.info(f"Startup: {scan_type} - full scan of {len(journals_to_scan)} journals")
+                    
+                    # Show progress dialog (runs on main thread)
+                    self.after(0, lambda j=journals_to_scan, st=scan_type: self._run_full_scan_with_dialog(j, st))
+                    return  # Don't continue - dialog handles the scan
                 else:
-                    # Subsequent runs: scan last 6 months for visits/hotspots
+                    # Subsequent runs: scan last 6 months silently
                     cutoff_date = datetime.now() - timedelta(days=180)
                     journals_to_scan = self._filter_journals_by_date(all_journals, cutoff_date)
                     print(f"[STARTUP] Regular scan: {len(journals_to_scan)} of {len(all_journals)} journals (last 6 months)")
                     log.info(f"Startup: Regular scan - {len(journals_to_scan)} of {len(all_journals)} journals (last 6 months)")
                     self.after(0, lambda n=len(journals_to_scan): self._set_status(f"Scanning {n} journals...", 0))
                 
-                self._process_journals_for_catchup(journals_to_scan, is_full_sync=(is_first_install or force_full_scan))
+                self._process_journals_for_catchup(journals_to_scan, is_full_sync=False)
                 
             except Exception as e:
                 print(f"[JOURNAL] ERROR: {e}")
@@ -14284,58 +14320,402 @@ class App(tk.Tk):
         thread = threading.Thread(target=catchup_scan, daemon=True)
         thread.start()
     
-    def _is_first_install(self) -> bool:
-        """Check if this is a first install (no existing user data)"""
+    def _is_first_install(self) -> str:
+        """Check if this is a first install or if migration is needed
+        
+        Returns:
+            'first_install' - No visits recorded (new user)
+            'migration' - Has visits but needs full rescan (update)
+            'none' - No scan needed
+        """
         try:
             if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
                 user_db = self.cargo_monitor.user_db
                 if user_db:
                     # Check if database has any visits recorded
                     count = user_db.get_total_visits_count()
-                    return count == 0
+                    print(f"[STARTUP] Visit count in database: {count}")
+                    if count == 0:
+                        print("[STARTUP] No visits in database - first install")
+                        return 'first_install'
+                    
+                    # Check if full scan was done for this version using JSON file
+                    try:
+                        from path_utils import get_app_data_dir
+                        from version import get_version
+                        import json
+                        
+                        scan_status_file = os.path.join(get_app_data_dir(), "last_full_scan.json")
+                        current_version = get_version()
+                        print(f"[STARTUP] Checking scan status file: {scan_status_file}")
+                        
+                        if os.path.exists(scan_status_file):
+                            with open(scan_status_file, 'r') as f:
+                                scan_data = json.load(f)
+                                last_scan_version = scan_data.get('version', '')
+                                
+                                # If already scanned for this version, no need to rescan
+                                if last_scan_version == current_version:
+                                    print(f"[STARTUP] Full scan already done for v{current_version}")
+                                    return 'none'
+                                else:
+                                    print(f"[STARTUP] Version changed: {last_scan_version} → {current_version}, needs migration")
+                                    return 'migration'
+                        else:
+                            # No scan status file = needs full scan (update from old version)
+                            print(f"[STARTUP] No scan status file found, needs migration for v{current_version}")
+                            return 'migration'
+                            
+                    except Exception as e:
+                        print(f"[STARTUP] Scan status check error: {e}")
+                        # If we can't check, assume needs migration
+                        return 'migration'
+                    
+                    return 'none'  # Has visits and scan already done
+        except Exception as e:
+            print(f"[STARTUP] _is_first_install exception: {e}")
+        return 'first_install'  # Assume first install if we can't determine
+    
+    def _run_full_scan_with_dialog(self, journals, scan_type='first_install'):
+        """Run full journal scan with a progress dialog
+        
+        Args:
+            journals: List of journal files to scan
+            scan_type: 'first_install' or 'migration'
+        """
+        import threading
+        from localization import t
+        from app_utils import get_app_icon_path
+        
+        # Get theme colors
+        if self.current_theme == "elite_orange":
+            bg_color = "#000000"
+            fg_color = "#ff8c00"
+            text_color = "#ffffff"
+            dim_color = "#888888"
+        else:
+            bg_color = "#1e1e1e"
+            fg_color = "#569cd6"
+            text_color = "#ffffff"
+            dim_color = "#888888"
+        
+        # Choose text based on scan type
+        if scan_type == 'migration':
+            title_key = 'dialogs.migration_title'
+            scanning_key = 'dialogs.migration_scanning'
+            patience_key = 'dialogs.migration_patience'
+        else:
+            title_key = 'dialogs.first_install_title'
+            scanning_key = 'dialogs.first_install_scanning'
+            patience_key = 'dialogs.first_install_patience'
+        
+        # Create progress dialog
+        progress_dialog = tk.Toplevel(self)
+        progress_dialog.withdraw()  # Hide while setting up
+        progress_dialog.title(t(title_key))
+        progress_dialog.resizable(False, False)
+        progress_dialog.transient(self)
+        progress_dialog.configure(bg=bg_color)
+        
+        # Set app icon (same method as other dialogs)
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                progress_dialog.iconbitmap(icon_path)
         except Exception:
             pass
-        return True  # Assume first install if we can't determine
-    
-    def _needs_full_scan_for_version(self) -> bool:
-        """Check if current version requires a full journal scan.
         
-        Add version numbers here when major updates require re-scanning all journals.
-        After a user runs once on that version, it saves the version and won't re-scan.
+        # Prevent closing
+        progress_dialog.protocol("WM_DELETE_WINDOW", lambda: None)
+        
+        # Title label
+        title_label = tk.Label(
+            progress_dialog,
+            text="⏳ " + t(scanning_key),
+            font=("Segoe UI", 11, "bold"),
+            bg=bg_color,
+            fg=fg_color
+        )
+        title_label.pack(pady=(20, 5))
+        
+        # Subtitle / patience message
+        subtitle_label = tk.Label(
+            progress_dialog,
+            text=t(patience_key),
+            font=("Segoe UI", 9, "italic"),
+            bg=bg_color,
+            fg=dim_color
+        )
+        subtitle_label.pack(pady=(0, 10))
+        
+        # Progress bar
+        progress_var = tk.DoubleVar(value=0)
+        progress_bar = ttk.Progressbar(
+            progress_dialog, 
+            variable=progress_var, 
+            maximum=100,
+            length=350,
+            mode='determinate'
+        )
+        progress_bar.pack(pady=10)
+        
+        # Status label
+        status_var = tk.StringVar(value=t('dialogs.please_wait'))
+        status_label = tk.Label(
+            progress_dialog,
+            textvariable=status_var,
+            font=("Segoe UI", 9),
+            bg=bg_color,
+            fg=dim_color
+        )
+        status_label.pack(pady=(5, 15))
+        
+        # Center dialog on parent window AFTER widgets are added
+        # Force update to get accurate geometry (same as database update dialog)
+        self.update()
+        progress_dialog.update_idletasks()
+        
+        # Get main window position and size
+        main_x = self.winfo_x()
+        main_y = self.winfo_y()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+        
+        # Get dialog size
+        dialog_width = progress_dialog.winfo_reqwidth()
+        dialog_height = progress_dialog.winfo_reqheight()
+        
+        # Calculate centered position
+        x = main_x + (main_width - dialog_width) // 2
+        y = main_y + (main_height - dialog_height) // 2
+        
+        # Apply position
+        progress_dialog.geometry(f"+{x}+{y}")
+        
+        # Show dialog
+        progress_dialog.deiconify()
+        progress_dialog.lift()
+        progress_dialog.focus_force()
+        progress_dialog.grab_set()
+        progress_dialog.update()
+        
+        def update_progress(current, total, message):
+            """Update progress from background thread"""
+            pct = (current / total) * 100 if total > 0 else 0
+            progress_var.set(pct)
+            status_var.set(message)
+            progress_dialog.update()
+        
+        def run_scan():
+            """Run the scan in background thread"""
+            try:
+                total = len(journals)
+                # For migration, reset visit counts first then rebuild
+                is_migration = (scan_type == 'migration')
+                self._process_journals_for_catchup_with_progress(
+                    journals, 
+                    is_full_sync=True,
+                    is_migration=is_migration,
+                    progress_callback=lambda c, m: self.after(0, lambda: update_progress(c, total, m))
+                )
+            except Exception as e:
+                print(f"[FULL SCAN] Error: {e}")
+            finally:
+                # Close dialog when done
+                self.after(0, lambda: self._close_full_scan_dialog(progress_dialog))
+        
+        # Run scan in background thread
+        thread = threading.Thread(target=run_scan, daemon=True)
+        thread.start()
+    
+    def _close_full_scan_dialog(self, dialog):
+        """Close the full scan progress dialog"""
+        try:
+            dialog.grab_release()
+            dialog.destroy()
+        except:
+            pass
+        self._set_status("Journal scan complete", 5000)
+    
+    def _process_journals_for_catchup_with_progress(self, journals, is_full_sync=False, is_migration=False, progress_callback=None):
+        """Process journals with progress callback for first install/migration dialog
+        
+        Args:
+            journals: List of journal files to process
+            is_full_sync: If True, this is a full sync of all journals
+            is_migration: If True, RESET visit counts before scanning (fixes wrong counts)
+            progress_callback: Optional callback(current, message) for progress
         """
         import json
-        from path_utils import get_app_data_dir
+        from localization import t
+        import sqlite3
         
-        # Versions that require full scan (add new versions here as needed)
-        FULL_SCAN_VERSIONS = ["4.6.7"]
+        visits_added = 0
+        hotspots_added = 0
+        missions_found = 0
         
-        current_version = APP_VERSION.lstrip('v')
+        # For MIGRATION: Reset all visit counts AND dates first, then rebuild
+        # This is essential to fix inflated counts from previous buggy versions
+        # We must reset last_visit_date too, otherwise add_visited_system will skip old entries
+        if is_migration:
+            try:
+                user_db = self.cargo_monitor.user_db
+                if user_db:
+                    with sqlite3.connect(user_db.db_path) as conn:
+                        conn.execute('''
+                            UPDATE visited_systems 
+                            SET visit_count = 0, 
+                                first_visit_date = '', 
+                                last_visit_date = ''
+                        ''')
+                        conn.commit()
+                    print("[MIGRATION] Reset all visit counts and dates before rescan")
+            except Exception as e:
+                print(f"[MIGRATION] Failed to reset visit data: {e}")
         
-        # Check if current version requires full scan
-        if current_version not in FULL_SCAN_VERSIONS:
-            return False
-        
-        # Check if we already did a full scan for this version
-        version_file = os.path.join(get_app_data_dir(), "last_full_scan_version.json")
+        # Start batch mode for mission tracker
+        mission_tracker = None
         try:
-            if os.path.exists(version_file):
-                with open(version_file, 'r') as f:
-                    data = json.load(f)
-                    last_scanned = data.get('version', '')
-                    if last_scanned == current_version:
-                        return False  # Already scanned for this version
-        except Exception:
+            from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+            if MISSIONS_AVAILABLE:
+                mission_tracker = get_mission_tracker()
+                if mission_tracker:
+                    mission_tracker.start_batch()
+        except:
             pass
         
-        # Need full scan - save that we're doing it
-        try:
-            os.makedirs(os.path.dirname(version_file), exist_ok=True)
-            with open(version_file, 'w') as f:
-                json.dump({'version': current_version}, f)
-        except Exception:
-            pass
+        total = len(journals)
+        for idx, journal_path in enumerate(journals):
+            # Update progress with localized message
+            if progress_callback and idx % 10 == 0:
+                msg = t('dialogs.processing_journal', current=idx + 1, total=total)
+                progress_callback(idx, msg)
+            
+            try:
+                with open(journal_path, 'r', encoding='utf-8') as f:
+                    current_system = None
+                    
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        try:
+                            event = json.loads(line)
+                            event_type = event.get('event', '')
+                            
+                            # Process visits - ONLY FSDJump and CarrierJump
+                            if event_type in ['FSDJump', 'CarrierJump']:
+                                system_name = event.get('StarSystem', '')
+                                if system_name:
+                                    timestamp = event.get('timestamp', '')
+                                    system_address = event.get('SystemAddress')
+                                    star_pos = event.get('StarPos', [])
+                                    coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
+                                    
+                                    try:
+                                        self.cargo_monitor.user_db.add_visited_system(
+                                            system_name=system_name,
+                                            visit_date=timestamp,
+                                            system_address=system_address,
+                                            coordinates=coordinates
+                                        )
+                                        visits_added += 1
+                                    except:
+                                        pass
+                                    current_system = system_name
+                                    
+                            elif event_type == 'Location':
+                                system_name = event.get('StarSystem', '')
+                                if system_name:
+                                    current_system = system_name
+                            
+                            elif event_type == 'Scan':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_scan(event)
+                                    hotspots_added += 1
+                                except:
+                                    pass
+                            
+                            elif event_type == 'SAASignalsFound':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_saa_signals_found(event, current_system)
+                                    hotspots_added += 1
+                                except:
+                                    pass
+                            
+                            elif event_type == 'MissionAccepted':
+                                try:
+                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                    if MISSIONS_AVAILABLE:
+                                        tracker = get_mission_tracker()
+                                        if tracker and tracker.process_event(event):
+                                            missions_found += 1
+                                except:
+                                    pass
+                            
+                            elif event_type in ['MissionCompleted', 'MissionAbandoned', 'CargoDepot']:
+                                try:
+                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                    if MISSIONS_AVAILABLE:
+                                        tracker = get_mission_tracker()
+                                        if tracker:
+                                            tracker.process_event(event)
+                                except:
+                                    pass
+                                    
+                        except json.JSONDecodeError:
+                            continue
+            except Exception:
+                continue
         
-        return True
+        # End batch mode
+        if mission_tracker:
+            try:
+                mission_tracker.end_batch()
+            except:
+                pass
+        
+        # Final progress update
+        if progress_callback:
+            msg = t('dialogs.scan_complete', visits=visits_added, hotspots=hotspots_added)
+            progress_callback(total, msg)
+        
+        print(f"[FIRST INSTALL] ✓ Scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
+        log.info(f"First install scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
+        
+        # Mark full scan as complete using JSON file
+        try:
+            from path_utils import get_app_data_dir
+            from version import get_version
+            from datetime import datetime
+            import json
+            
+            app_dir = get_app_data_dir()
+            scan_status_file = os.path.join(app_dir, "last_full_scan.json")
+            
+            scan_data = {
+                "version": get_version(),
+                "scan_date": datetime.now().isoformat(),
+                "journals_scanned": total,
+                "visits_added": visits_added,
+                "hotspots_added": hotspots_added
+            }
+            
+            with open(scan_status_file, 'w') as f:
+                json.dump(scan_data, f, indent=2)
+            
+            print(f"[FIRST INSTALL] Full scan status saved: {scan_status_file}")
+        except Exception as e:
+            print(f"[FIRST INSTALL] Failed to save scan status: {e}")
+        
+        # Update UI components
+        if hasattr(self, 'ring_finder') and self.ring_finder:
+            self.after(0, self.ring_finder._update_database_info)
+        if hasattr(self, '_update_cmdr_system_display'):
+            self.after(0, self._update_cmdr_system_display)
+        if hasattr(self, '_update_home_fc_distances'):
+            self.after(100, self._update_home_fc_distances)
     
     def _filter_journals_by_date(self, journals: list, cutoff_date) -> list:
         """Filter journals to only include those after cutoff date.
@@ -14389,6 +14769,8 @@ class App(tk.Tk):
     def _process_journals_for_catchup(self, journals, is_full_sync=False):
         """Process journal files for catchup scan
         
+        Processes hotspots/ring data, visits, and missions from journal files.
+        
         Args:
             journals: List of journal file paths to process
             is_full_sync: If True, this is a full sync (all journals)
@@ -14429,9 +14811,8 @@ class App(tk.Tk):
                             event = json.loads(line)
                             event_type = event.get('event', '')
                             
-                            # Process visits (FSDJump, CarrierJump always count; Location only if system changed)
-                            # Location events detect carrier jumps while logged out, but should NOT
-                            # count multiple times for game restarts in the same system
+                            # Process visits - ONLY FSDJump and CarrierJump count as real arrivals
+                            # Location events are just game loads, not actual travel
                             if event_type in ['FSDJump', 'CarrierJump']:
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
@@ -14453,28 +14834,10 @@ class App(tk.Tk):
                                     current_system = system_name
                                     
                             elif event_type == 'Location':
-                                # Location event = game loaded in this system
-                                # Only count as visit if system is DIFFERENT from last known
-                                # This detects carrier jumps while offline without double-counting restarts
+                                # Location = game loaded, just track current system for context
                                 system_name = event.get('StarSystem', '')
-                                if system_name and system_name != current_system:
-                                    timestamp = event.get('timestamp', '')
-                                    system_address = event.get('SystemAddress')
-                                    star_pos = event.get('StarPos', [])
-                                    coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
-                                    
-                                    try:
-                                        self.cargo_monitor.user_db.add_visited_system(
-                                            system_name=system_name,
-                                            visit_date=timestamp,
-                                            system_address=system_address,
-                                            coordinates=coordinates
-                                        )
-                                        visits_added += 1
-                                    except:
-                                        pass
-                                # Always update current_system for tracking
-                                current_system = system_name
+                                if system_name:
+                                    current_system = system_name
                             
                             # Process Scan events for ring/hotspot data
                             elif event_type == 'Scan':
@@ -14623,13 +14986,35 @@ class App(tk.Tk):
             pass
     
     def update_current_system(self, system_name: str, coords: Optional[tuple] = None) -> None:
-        """Centralized method to update current system - notifies all interested components"""
+        """Centralized method to update current system - notifies all interested components
+        
+        This is the ONLY place where visit counting should happen.
+        Called when: FSD jump, carrier jump, or any real system change.
+        NOT called for: Location events at startup (those just read current position).
+        """
         if not system_name:
             return
+        
+        # Check if this is actually a NEW system (not same as before)
+        previous_system = getattr(self, 'current_system', None)
+        is_new_system = previous_system and previous_system != system_name
             
         # Update central cache
         self.current_system = system_name
         self.current_system_coords = coords
+        
+        # Count visit ONLY if we moved to a different system
+        if is_new_system:
+            try:
+                if hasattr(self, 'user_db'):
+                    import datetime
+                    self.user_db.add_visited_system(
+                        system_name=system_name,
+                        visit_date=datetime.datetime.utcnow().isoformat() + "Z",
+                        coordinates=coords
+                    )
+            except Exception as e:
+                print(f"[VISIT] Error recording visit: {e}")
         
         # Notify all components that use current system
         # 1. Update ring finder reference system

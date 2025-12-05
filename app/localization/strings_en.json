@@ -34,6 +34,7 @@
     "no_data": "No data"
   },
   "tabs": {
+    "mining": "Mining",
     "mining_session": "Mining Session",
     "mining_missions": "Mining Missions",
     "hotspots_finder": "Hotspots Finder",
@@ -43,6 +44,15 @@
     "bookmarks": "Bookmarks",
     "settings": "Settings",
     "about": "About"
+  },
+  "ring_guide": {
+    "title": "Ring Mining Reference",
+    "subtitle": "Click to expand/collapse",
+    "laser_high": "Laser (High)",
+    "laser_low": "Laser (Low)",
+    "core_high": "Core (High)",
+    "core_low": "Core (Low)",
+    "tab_title": "Reference"
   },
   "ring_finder": {
     "title": "Search For Hotspots",
@@ -110,7 +120,9 @@
     "tooltip_mineral": "Filter by specific material:\nAutomatically shows only confirmed hotspots\n(no theoretical ring data)",
     "tooltip_overlaps": "When checked, only shows rings with known overlaps\n(ignores distance limit)",
     "tooltip_res": "When checked, only shows rings with RES sites\n(Hazardous, High, Low - ignores distance limit)",
-    "auto_switch_tooltip": "Automatically switch tabs based on game state:\n- Switch to Mining Session when dropping into a ring\n- Switch to Hotspots Finder when entering supercruise or jumping"
+    "auto_switch_tooltip": "Automatically switch tabs based on game state:\n- Switch to Mining Session when dropping into a ring\n- Switch to Hotspots Finder when entering supercruise or jumping",
+    "no_selection": "No row selected",
+    "select_mineral_first": "Select a specific mineral first (not 'All Minerals')"
   },
   "sidebar": {
     "ship_presets": "Ship Presets (VoiceAttack)",
@@ -182,7 +194,7 @@
     "asteroids_prospected": "Asteroids Prospected",
     "quality_hits": "Quality Hits",
     "hit_rate": "Hit Rate",
-    "mining_analytics": "Mining Analytics",
+    "mining_analytics": "Session",
     "analytics": "Analytics",
     "graphs": "Graphs",
     "reports": "Reports",
@@ -528,6 +540,8 @@
     "copy_station": "Copy Station Name",
     "copy_both": "Copy Station @ System",
     "copy_body": "Copy Body Name",
+    "find_sell_station": "Find Sell Station",
+    "find_hotspots": "Find Hotspots",
     "word_wrap_on": "Enable Word Wrap",
     "word_wrap_off": "Disable Word Wrap",
     "add_refinery": "Add Refinery Contents",
@@ -808,6 +822,15 @@
     "delete_bookmark_multi": "Are you sure you want to delete {count} bookmarks?",
     "save": "Save",
     "theme_changed": "Theme Changed",
+    "first_install_title": "First Install Setup",
+    "first_install_scanning": "Scanning your journal history...",
+    "first_install_patience": "This may take a moment on first run",
+    "migration_title": "Database Migration",
+    "migration_scanning": "Fixing visit counts...",
+    "migration_patience": "One-time fix after update",
+    "please_wait": "Please wait...",
+    "processing_journal": "Processing journal {current} of {total}...",
+    "scan_complete": "Complete! {visits} visits, {hotspots} hotspots",
     "session_active_title": "Mining Session Active",
     "session_active_message": "A mining session is currently running.",
     "session_active_yes": "Stop session and save data",

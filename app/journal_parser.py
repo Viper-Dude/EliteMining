@@ -381,9 +381,9 @@ class JournalParser:
         """
         try:
             body_name = event.get('BodyName', '')
-            log.info(f"[JOURNAL PARSER] Processing SAASignalsFound: {current_system} - {body_name}")
+            log.debug(f"[JOURNAL PARSER] Processing SAASignalsFound: {current_system} - {body_name}")
             if not self.is_ring_body(body_name):
-                log.info(f"[JOURNAL PARSER] Skipping non-ring body: {body_name}")
+                log.debug(f"[JOURNAL PARSER] Skipping non-ring body: {body_name}")
                 return
             
             # Filter out phantom rings that were removed by Frontier
@@ -442,7 +442,13 @@ class JournalParser:
                         ring_mass = db_metadata.get('ring_mass')
                         log.info(f"Retrieved ring metadata from database: {body_name} = Type:{ring_class}, LS:{ls_distance}, Density:{density}")
                     else:
-                        log.warning(f"Ring metadata not available for {system_name} - {body_name}")
+                        # Only warn once per ring to reduce log spam
+                        warn_key = f"{system_name}_{body_name}"
+                        if not hasattr(self, '_warned_rings'):
+                            self._warned_rings = set()
+                        if warn_key not in self._warned_rings:
+                            log.debug(f"Ring metadata not available for {system_name} - {body_name}")
+                            self._warned_rings.add(warn_key)
             
             # Track if we're adding truly NEW hotspots (not previously scanned)
             hotspots_are_new = False
@@ -548,14 +554,19 @@ class JournalParser:
     def process_location(self, event: Dict[str, Any]) -> Optional[str]:
         """Process Location event (current system on game start)
         
+        Note: Location events do NOT count as visits - they just indicate
+        where the player was when loading the game. Only FSDJump and CarrierJump
+        events represent actual arrivals at a system.
+        
         Args:
             event: Journal event data
             
         Returns:
             System name of current location
         """
-        # Location events have the same structure as FSDJump for our purposes
-        return self.process_fsd_jump(event)
+        # Only return system name - do NOT add as visit
+        # Location is just "where am I now", not "I arrived here"
+        return event.get('StarSystem', '')
     
     def process_fsd_target(self, event: Dict[str, Any]) -> Optional[int]:
         """Process FSDTarget event to track jumps remaining in route
@@ -615,15 +626,15 @@ class JournalParser:
                         stats['systems_visited'] += 1
                         file_stats['visits'] += 1
                 elif event_type == 'Location':
+                    # Location just tracks current system, doesn't count as a visit
                     current_system = self.process_location(event)
+                    # Don't increment visit counters for Location events
+                elif event_type == 'CarrierJump':
+                    # Fleet carrier jumps are real arrivals - count as visits
+                    current_system = self.process_fsd_jump(event)  # Same structure as FSDJump
                     if current_system:
                         stats['systems_visited'] += 1
                         file_stats['visits'] += 1
-                elif event_type == 'CarrierJump':
-                    # Fleet carrier jumps also change current system
-                    carrier_system = event.get('StarSystem', '')
-                    if carrier_system:
-                        current_system = carrier_system
                 
                 elif event_type == 'Scan':
                     # Process Scan events to extract ring class information

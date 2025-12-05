@@ -94,6 +94,20 @@ class MiningMissionsTab(ttk.Frame):
         content_frame.columnconfigure(0, weight=1)
         content_frame.rowconfigure(0, weight=1)
         
+        # Status bar at bottom
+        self.status_frame = tk.Frame(self, bg=self.bg_color)
+        self.status_frame.grid(row=2, column=0, sticky="ew", pady=(5, 0))
+        
+        self.status_label = tk.Label(
+            self.status_frame,
+            text="",
+            bg=self.bg_color,
+            fg=self.fg_color,
+            font=("Segoe UI", 9),
+            pady=4
+        )
+        self.status_label.pack(side="left", padx=10)
+        
         # Create canvas with scrollbar
         self.canvas = tk.Canvas(content_frame, bg=self.bg_color, highlightthickness=0)
         scrollbar = ttk.Scrollbar(content_frame, orient="vertical", command=self.canvas.yview)
@@ -104,8 +118,11 @@ class MiningMissionsTab(ttk.Frame):
             lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         )
         
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Make scrollable_frame expand to fill canvas width
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
         
         self.canvas.grid(row=0, column=0, sticky="nsew")
         scrollbar.grid(row=0, column=1, sticky="ns")
@@ -115,6 +132,10 @@ class MiningMissionsTab(ttk.Frame):
         
         # Initial refresh
         self._refresh_missions()
+    
+    def _on_canvas_configure(self, event):
+        """Resize scrollable frame to match canvas width"""
+        self.canvas.itemconfig(self.canvas_window, width=event.width)
     
     def _on_mousewheel(self, event):
         """Handle mousewheel scrolling"""
@@ -170,10 +191,56 @@ class MiningMissionsTab(ttk.Frame):
             else:
                 # Just update values in-place
                 self._update_mission_values(missions, cargo_items)
+            
+            # Update status bar
+            self._update_status_bar(missions, cargo_items)
                 
         except Exception as e:
             log.warning(f"Error refreshing missions: {e}")
             self._clear_and_show_no_missions()
+    
+    def _update_status_bar(self, missions: list, cargo_items: Dict[str, int]):
+        """Update the status bar with mission summary"""
+        if not missions:
+            self.status_label.configure(text="")
+            return
+        
+        total_missions = len(missions)
+        total_to_mine = 0
+        total_to_deliver = 0
+        total_rewards = 0
+        
+        for mission in missions:
+            commodity = mission.get('commodity', '')
+            count = mission.get('count', 0)
+            delivered = mission.get('delivered', 0)
+            reward = mission.get('reward', 0)
+            
+            # Calculate cargo in hold for this commodity
+            cargo_in_hold = 0
+            commodity_lower = commodity.lower()
+            for cargo_name, qty in cargo_items.items():
+                if commodity_lower in cargo_name.lower() or cargo_name.lower() in commodity_lower:
+                    cargo_in_hold = qty
+                    break
+            
+            # To mine = what we still need to collect (count - cargo in hold), minimum 0
+            still_need = max(0, count - cargo_in_hold)
+            total_to_mine += still_need
+            
+            # To deliver = total required - already delivered
+            total_to_deliver += max(0, count - delivered)
+            
+            total_rewards += reward
+        
+        # Format the status text
+        status_text = (
+            f"Missions: {total_missions}  |  "
+            f"To Mine: {total_to_mine:,}t  |  "
+            f"To Deliver: {total_to_deliver:,}t  |  "
+            f"Rewards: {total_rewards:,} CR"
+        )
+        self.status_label.configure(text=status_text)
     
     def _clear_and_show_no_missions(self):
         """Clear cards and show no missions message"""
@@ -182,6 +249,8 @@ class MiningMissionsTab(ttk.Frame):
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
         self._show_no_missions_message()
+        # Clear status bar
+        self.status_label.configure(text="")
     
     def _full_rebuild_missions(self, missions: list, cargo_items: Dict[str, int]):
         """Full rebuild of mission cards when missions list changes"""
@@ -190,9 +259,15 @@ class MiningMissionsTab(ttk.Frame):
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
         
-        # Create mission cards
+        # Configure 2-column grid layout
+        self.scrollable_frame.columnconfigure(0, weight=1)
+        self.scrollable_frame.columnconfigure(1, weight=1)
+        
+        # Create mission cards in 2-column layout
         for i, mission in enumerate(missions):
-            self._create_mission_card(mission, cargo_items, i)
+            row = i // 2  # 0, 0, 1, 1, 2, 2, ...
+            col = i % 2   # 0, 1, 0, 1, 0, 1, ...
+            self._create_mission_card(mission, cargo_items, i, row, col)
     
     def _update_mission_values(self, missions: list, cargo_items: Dict[str, int]):
         """Update existing mission cards in-place without rebuilding"""
@@ -296,7 +371,7 @@ class MiningMissionsTab(ttk.Frame):
                 cargo[name] = qty if isinstance(qty, int) else 0
         return cargo
     
-    def _create_mission_card(self, mission: dict, cargo_items: Dict[str, int], index: int):
+    def _create_mission_card(self, mission: dict, cargo_items: Dict[str, int], index: int, row: int = 0, col: int = 0):
         """Create a compact card for a single mission"""
         try:
             from localization import t
@@ -324,18 +399,18 @@ class MiningMissionsTab(ttk.Frame):
                 actual_cargo = qty
                 break
         
-        # Card frame with border - more compact
+        # Card frame with border - more compact, using grid layout
         card = tk.Frame(
             self.scrollable_frame,
             bg=self.accent_bg,
             highlightbackground=self.fg_dim,
             highlightthickness=1
         )
-        card.pack(fill="x", padx=5, pady=2)
+        card.grid(row=row, column=col, sticky="nsew", padx=3, pady=2)
         
         # Inner padding - reduced
         inner = tk.Frame(card, bg=self.accent_bg)
-        inner.pack(fill="x", padx=8, pady=6)
+        inner.pack(fill="both", expand=True, padx=8, pady=6)
         
         # Row 1: Commodity, Progress, Find Hotspot button
         row1 = tk.Frame(inner, bg=self.accent_bg)
@@ -365,7 +440,7 @@ class MiningMissionsTab(ttk.Frame):
         find_btn = tk.Button(
             row1,
             text="🔍 Find",
-            command=lambda c=commodity: self._find_hotspot(c),
+            command=lambda c=commodity, ds=destination_system: self._find_hotspot(c, ds),
             bg=self.btn_bg,
             fg=self.btn_fg,
             font=("Segoe UI", 8),
@@ -506,45 +581,81 @@ class MiningMissionsTab(ttk.Frame):
         except Exception:
             return t('mining_missions.unknown_time')
     
-    def _find_hotspot(self, commodity: str):
-        """Open Ring Finder with the commodity pre-selected and trigger search"""
-        if self.ring_finder:
-            try:
-                # Set commodity in Ring Finder dropdown
-                if hasattr(self.ring_finder, 'mineral_var'):
-                    # Try to find matching material in the dropdown
-                    if hasattr(self.ring_finder, 'mineral_dropdown'):
-                        values = self.ring_finder.mineral_dropdown.cget('values')
-                        commodity_lower = commodity.lower()
-                        matched = False
-                        for val in values:
-                            if commodity_lower in val.lower() or val.lower() in commodity_lower:
-                                self.ring_finder.mineral_var.set(val)
-                                matched = True
-                                break
-                        if not matched:
-                            self.ring_finder.mineral_var.set(commodity)
-                    else:
-                        self.ring_finder.mineral_var.set(commodity)
-                
-                # Switch to Ring Finder tab in the MAIN notebook
-                if self.main_app and hasattr(self.main_app, 'notebook'):
-                    nb = self.main_app.notebook
-                    for i, tab_id in enumerate(nb.tabs()):
-                        tab_text = nb.tab(tab_id, "text")
-                        if "Hotspot" in tab_text or "Ring" in tab_text:
-                            nb.select(i)
+    def _find_hotspot(self, commodity: str, destination_system: str = ""):
+        """Open Ring Finder with the commodity pre-selected and trigger search,
+        or open Reference tab for materials not in Ring Finder dropdown"""
+        if not self.ring_finder:
+            return
+        
+        try:
+            # Check if commodity exists in Ring Finder mineral dropdown
+            material_in_dropdown = False
+            matched_value = None
+            
+            if hasattr(self.ring_finder, 'specific_material_var'):
+                # Get the dropdown values
+                dropdown = getattr(self.ring_finder, 'specific_material_combo', None)
+                if dropdown:
+                    values = dropdown.cget('values')
+                    commodity_lower = commodity.lower()
+                    for val in values:
+                        val_lower = val.lower()
+                        # Skip "All Minerals" type entries
+                        if 'all' in val_lower:
+                            continue
+                        if commodity_lower in val_lower or val_lower in commodity_lower:
+                            matched_value = val
+                            material_in_dropdown = True
                             break
+            
+            if material_in_dropdown and matched_value:
+                # Material found in dropdown - do Ring Finder search
+                # Set the mineral
+                self.ring_finder.specific_material_var.set(matched_value)
+                
+                # Set reference system to destination system
+                if destination_system and hasattr(self.ring_finder, 'system_var'):
+                    self.ring_finder.system_var.set(destination_system)
+                
+                # Set max distance = 100
+                if hasattr(self.ring_finder, 'distance_var'):
+                    self.ring_finder.distance_var.set("100")
+                
+                # Set max results = All
+                if hasattr(self.ring_finder, 'max_results_var'):
+                    self.ring_finder.max_results_var.set("All")
+                
+                # Switch to Hotspots Finder tab
+                if self.main_app and hasattr(self.main_app, 'notebook'):
+                    self.main_app.notebook.select(1)  # Hotspots Finder tab
                 
                 # Trigger search after a short delay
-                if hasattr(self.ring_finder, '_on_search'):
-                    self.ring_finder.after(300, self.ring_finder._on_search)
+                if hasattr(self.ring_finder, 'search_hotspots'):
+                    self.main_app.after(200, self.ring_finder.search_hotspots)
+                
+                print(f"[MISSIONS] Searching Ring Finder for: {commodity} near {destination_system}")
+            else:
+                # Material NOT in dropdown - open Reference tab
+                if self.main_app and hasattr(self.main_app, 'notebook'):
+                    # Switch to Mining tab first (index 0)
+                    self.main_app.notebook.select(0)
                     
-                print(f"[MISSIONS] Searching Ring Finder for: {commodity}")
-            except Exception as e:
-                print(f"[MISSIONS] Error opening Ring Finder: {e}")
-                import traceback
-                traceback.print_exc()
+                    # Then switch to Reference sub-tab (via prospector_panel's notebook)
+                    if hasattr(self.main_app, 'prospector_panel') and hasattr(self.main_app.prospector_panel, 'nb'):
+                        sub_nb = self.main_app.prospector_panel.nb
+                        # Find the Reference tab
+                        for i, tab_id in enumerate(sub_nb.tabs()):
+                            tab_text = sub_nb.tab(tab_id, "text")
+                            if "Reference" in tab_text:
+                                sub_nb.select(i)
+                                break
+                
+                print(f"[MISSIONS] Opening Reference tab for: {commodity} (not in Ring Finder)")
+                
+        except Exception as e:
+            print(f"[MISSIONS] Error in _find_hotspot: {e}")
+            import traceback
+            traceback.print_exc()
     
     def set_ring_finder(self, ring_finder):
         """Set the ring finder reference"""

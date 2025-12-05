@@ -417,16 +417,16 @@ class RingFinder:
         # Material filter (new - specific materials) - dynamically populated from database
         ttk.Label(search_frame, text=t('ring_finder.mineral')).grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.specific_material_var = tk.StringVar(value=t('ring_finder.all_minerals'))
-        specific_material_combo = ttk.Combobox(search_frame, textvariable=self.specific_material_var, width=22, state="readonly")
+        self.specific_material_combo = ttk.Combobox(search_frame, textvariable=self.specific_material_var, width=22, state="readonly")
         
         # Get materials from database and sort alphabetically (localized display)
         available_materials = self._get_available_materials()
-        specific_material_combo['values'] = available_materials
-        specific_material_combo.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.specific_material_combo['values'] = available_materials
+        self.specific_material_combo.grid(row=2, column=1, sticky="w", padx=5, pady=5)
         
         # Add tooltips for the filters
         ToolTip(material_combo, t('ring_finder.tooltip_ring_type'))
-        ToolTip(specific_material_combo, t('ring_finder.tooltip_mineral'))
+        ToolTip(self.specific_material_combo, t('ring_finder.tooltip_mineral'))
         
         # Create a sub-frame for right-side filters (row 1-2) that will pack tightly
         right_filters_frame_row1 = ttk.Frame(search_frame)
@@ -492,7 +492,7 @@ class RingFinder:
         ToolTip(self.min_hotspots_spinbox, t('tooltips.min_hotspots'))
         
         # NOW bind material selection to enable/disable min hotspots filter (after spinbox exists!)
-        specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_changed)
+        self.specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_changed)
         
         # Confirmed hotspots only checkbox - DISABLED FOR TESTING
         # try:
@@ -849,7 +849,7 @@ class RingFinder:
             # Fallback to hardcoded sorted list
             from localization import t
             return (t('ring_finder.all_minerals'), "Alexandrite", "Benitoite", "Bromellite", "Grandidierite", 
-                   "Low Temp Diamonds", "Monazite", "Musgravite", "Painite", 
+                   "Low Temp.Diamonds", "Monazite", "Musgravite", "Painite", 
                    "Platinum", "Rhodplumsite", "Serendibite", "Tritium", "Void Opals")
     
     def _on_material_changed(self, event=None):
@@ -886,6 +886,10 @@ class RingFinder:
         }
         canonical_name = normalize_map.get(material_name, material_name)
         
+        # Abbreviate long names for dropdown display
+        if canonical_name == 'Low Temperature Diamonds':
+            return 'Low Temp.Diamonds'
+        
         # Get localized display name
         try:
             display_name = get_material(canonical_name)
@@ -914,10 +918,11 @@ class RingFinder:
             self._load_systems_cache()
             if self.parent.winfo_exists():
                 self.parent.after(0, lambda: self.status_var.set(t('ring_finder.database_ready')) if self.parent.winfo_exists() else None)
-        except Exception as e:
+        except Exception as ex:
             try:
+                error_msg = str(ex)
                 if self.parent.winfo_exists():
-                    self.parent.after(0, lambda: self.status_var.set(f"Error loading database: {e}") if self.parent.winfo_exists() else None)
+                    self.parent.after(0, lambda msg=error_msg: self.status_var.set(f"Error loading database: {msg}") if self.parent.winfo_exists() else None)
             except:
                 pass  # Window already destroyed
     
@@ -3499,6 +3504,8 @@ class RingFinder:
                                    selectcolor=menu_active_bg)
         self.context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_name)
         self.context_menu.add_separator()
+        self.context_menu.add_command(label=t('context_menu.find_sell_station'), command=self._find_sell_station)
+        self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
         self.context_menu.add_command(label=t('context_menu.set_res'), command=self._show_res_dialog)
         self.context_menu.add_separator()
@@ -3512,6 +3519,18 @@ class RingFinder:
             if item:
                 self.results_tree.selection_set(item)
                 self.results_tree.focus(item)
+                
+                # Enable/disable "Find Sell Station" based on mineral selection
+                mineral_display = self.specific_material_var.get()
+                mineral = self._to_english(mineral_display)
+                is_specific_mineral = not self._is_all_minerals(mineral)
+                
+                # Menu item index for "Find Sell Station" is 2 (after copy_system and separator)
+                if is_specific_mineral:
+                    self.context_menu.entryconfig(2, state="normal")
+                else:
+                    self.context_menu.entryconfig(2, state="disabled")
+                
                 self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.context_menu.grab_release()
@@ -3527,6 +3546,75 @@ class RingFinder:
                 self.parent.clipboard_clear()
                 self.parent.clipboard_append(system_name)
                 self.status_var.set(f"Copied '{system_name}' to clipboard")
+    
+    def _find_sell_station(self):
+        """Open Commodity Market with selected system and mineral to find sell stations"""
+        selection = self.results_tree.selection()
+        if not selection:
+            self.status_var.set(t('ring_finder.no_selection'))
+            return
+        
+        item = selection[0]
+        values = self.results_tree.item(item, 'values')
+        if not values or len(values) < 3:
+            return
+        
+        # Get system name from the selected row
+        system_name = values[2]  # System is column index 2
+        
+        # Get the currently selected mineral from the dropdown (already validated in context menu)
+        mineral_display = self.specific_material_var.get()
+        mineral = self._to_english(mineral_display)
+        
+        # Get main_app through prospector_panel
+        main_app = getattr(self.prospector_panel, 'main_app', None) if hasattr(self, 'prospector_panel') else None
+        
+        # Switch to Commodity Market tab and set up search
+        if main_app:
+            try:
+                # Switch to Commodity Market tab
+                main_app.notebook.select(2)  # Commodity Market is typically tab index 2
+                
+                # Set the reference system (StringVar)
+                if hasattr(main_app, 'marketplace_reference_system'):
+                    main_app.marketplace_reference_system.set(system_name)
+                
+                # Set the commodity (use localized name for dropdown)
+                if hasattr(main_app, 'marketplace_commodity'):
+                    from localization import get_material
+                    try:
+                        localized_mineral = get_material(mineral)
+                    except:
+                        localized_mineral = mineral
+                    main_app.marketplace_commodity.set(localized_mineral)
+                
+                # Set sell mode (not buy mode)
+                if hasattr(main_app, 'marketplace_sell_mode'):
+                    main_app.marketplace_sell_mode.set(True)
+                if hasattr(main_app, 'marketplace_buy_mode'):
+                    main_app.marketplace_buy_mode.set(False)
+                
+                # Set search mode to "near system"
+                if hasattr(main_app, 'marketplace_search_mode'):
+                    main_app.marketplace_search_mode.set("near_system")
+                
+                # Set max age to 8 hours (use localized value)
+                if hasattr(main_app, 'marketplace_max_age') and hasattr(main_app, '_age_map'):
+                    localized_8h = main_app._age_map.get('8 hours', '8 hours')
+                    main_app.marketplace_max_age.set(localized_8h)
+                
+                # Trigger search after a short delay to let UI update
+                main_app.after(100, main_app._search_marketplace)
+                
+                self.status_var.set(f"Searching sell stations for {mineral} near {system_name}...")
+                
+            except Exception as e:
+                print(f"[RING FINDER] Error opening commodity market: {e}")
+                import traceback
+                traceback.print_exc()
+                self.status_var.set(f"Error: {e}")
+        else:
+            self.status_var.set("Error: Could not access main application")
     
     def _copy_system_ring(self):
         """Copy the selected system + ring to clipboard"""

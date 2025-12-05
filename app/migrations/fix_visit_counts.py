@@ -1,10 +1,14 @@
 """
-Migration: Fix Visit Counts (v4.6.5)
+Migration: Fix Visit Counts (v4.6.7)
 
 Recalculates visit_count for all systems in visited_systems table
 by scanning journal files and counting unique timestamps.
 
-This fixes inflated visit counts caused by duplicate event processing.
+This fixes inflated visit counts caused by:
+- Location events being counted as visits (game load ≠ arrival)
+- Duplicate event processing
+
+Only FSDJump and CarrierJump events are counted as real arrivals.
 """
 
 import os
@@ -17,7 +21,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-MIGRATION_VERSION = "4.6.5_fix_visit_counts_v2"
+MIGRATION_VERSION = "4.6.7_fix_visit_counts_v4"
 
 
 def get_database_path():
@@ -165,7 +169,14 @@ def scan_journals_for_visits(journal_dir, progress_callback=None):
 
 
 def apply_migration(db_path, visit_data):
-    """Update database with corrected visit counts"""
+    """Update database with corrected visit counts
+    
+    This does a FULL REBUILD of visit counts - clears all existing counts
+    and replaces them with freshly calculated values from journal scan.
+    
+    Also handles first install by creating new entries for systems that
+    were visited but aren't in the database yet.
+    """
     
     updated = 0
     
@@ -179,34 +190,73 @@ def apply_migration(db_path, visit_data):
                 WHERE type='table' AND name='visited_systems'
             """)
             if not cursor.fetchone():
-                log.info("No visited_systems table found, skipping migration")
-                return 0
+                # Create the table for first install
+                log.info("Creating visited_systems table for first install")
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS visited_systems (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        system_name TEXT NOT NULL,
+                        system_address INTEGER,
+                        x_coord REAL,
+                        y_coord REAL,
+                        z_coord REAL,
+                        first_visit_date TEXT,
+                        last_visit_date TEXT,
+                        visit_count INTEGER DEFAULT 1
+                    )
+                ''')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_visited_system_name ON visited_systems(system_name)')
+                conn.commit()
             
+            # FULL REBUILD: First, reset ALL visit counts to 0
+            # This ensures we start fresh and don't keep any incorrect counts
+            cursor.execute('UPDATE visited_systems SET visit_count = 0')
+            log.info(f"Reset all visit counts to 0")
+            
+            # Now apply the correct counts from journal scan
             for system_name, data in visit_data.items():
+                new_count = data['visit_count']
+                
                 cursor.execute(
-                    'SELECT visit_count FROM visited_systems WHERE system_name = ?', 
+                    'SELECT id FROM visited_systems WHERE system_name = ?', 
                     (system_name,)
                 )
                 result = cursor.fetchone()
                 
                 if result:
-                    old_count = result[0]
-                    new_count = data['visit_count']
+                    # Update existing record
+                    cursor.execute('''
+                        UPDATE visited_systems 
+                        SET visit_count = ?,
+                            first_visit_date = ?,
+                            last_visit_date = ?
+                        WHERE system_name = ?
+                    ''', (new_count, data['first_visit'], data['last_visit'], system_name))
+                    updated += 1
+                else:
+                    # Insert new record (system was visited but not in database yet)
+                    coords = data.get('coords', [])
+                    x_coord = coords[0] if len(coords) > 0 else None
+                    y_coord = coords[1] if len(coords) > 1 else None
+                    z_coord = coords[2] if len(coords) > 2 else None
                     
-                    if old_count != new_count:
-                        cursor.execute('''
-                            UPDATE visited_systems 
-                            SET visit_count = ?,
-                                first_visit_date = ?,
-                                last_visit_date = ?
-                            WHERE system_name = ?
-                        ''', (new_count, data['first_visit'], data['last_visit'], system_name))
-                        updated += 1
+                    cursor.execute('''
+                        INSERT INTO visited_systems 
+                        (system_name, system_address, x_coord, y_coord, z_coord, 
+                         first_visit_date, last_visit_date, visit_count)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (system_name, data.get('system_address'), 
+                          x_coord, y_coord, z_coord,
+                          data['first_visit'], data['last_visit'], new_count))
+                    updated += 1
             
             conn.commit()
+            log.info(f"Updated {updated} systems with correct visit counts")
             
     except Exception as e:
         log.error(f"Error applying migration: {e}")
+        import traceback
+        traceback.print_exc()
         return 0
     
     return updated

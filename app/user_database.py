@@ -703,7 +703,10 @@ class UserDatabase:
                 ''')
                 
                 conn.commit()
-                log.info(f"User database initialized: {self.db_path}")
+                # Only log init message once per session to reduce log spam
+                if not getattr(self.__class__, '_init_logged', False):
+                    log.info(f"User database initialized: {self.db_path}")
+                    self.__class__._init_logged = True
                 
         except Exception as e:
             log.error(f"Error creating user database tables: {e}")

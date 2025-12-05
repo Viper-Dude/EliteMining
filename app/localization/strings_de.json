@@ -34,6 +34,7 @@
     "no_data": "Keine Daten"
   },
   "tabs": {
+    "mining": "Bergbau",
     "mining_session": "Bergbau-Sitzung",
     "mining_missions": "Bergbau-Missionen",
     "hotspots_finder": "Hotspot-Finder",
@@ -43,6 +44,15 @@
     "bookmarks": "Lesezeichen",
     "settings": "Einstellungen",
     "about": "Über"
+  },
+  "ring_guide": {
+    "title": "Ring-Bergbau Referenz",
+    "subtitle": "Klicken zum Auf-/Zuklappen",
+    "laser_high": "Laser (Hoch)",
+    "laser_low": "Laser (Niedrig)",
+    "core_high": "Kern (Hoch)",
+    "core_low": "Kern (Niedrig)",
+    "tab_title": "Referenz"
   },
   "ring_finder": {
     "title": "Hotspot-Suche",
@@ -110,7 +120,9 @@
     "tooltip_mineral": "Nach bestimmtem Material filtern:\nZeigt automatisch nur bestätigte Hotspots\n(keine theoretischen Ringdaten)",
     "tooltip_overlaps": "Wenn aktiviert, werden nur Ringe mit bekannten Überlappungen angezeigt\n(ignoriert Entfernungslimit)",
     "tooltip_res": "Wenn aktiviert, werden nur Ringe mit RES-Gebieten angezeigt\n(Hazardous, High, Low - ignoriert Entfernungslimit)",
-    "auto_switch_tooltip": "Automatisch Tabs wechseln basierend auf Spielstatus:\n- Zu Bergbau-Sitzung wechseln beim Eintritt in einen Ring\n- Zu Hotspot-Finder wechseln bei Supercruise oder Sprung"
+    "auto_switch_tooltip": "Automatisch Tabs wechseln basierend auf Spielstatus:\n- Zu Bergbau-Sitzung wechseln beim Eintritt in einen Ring\n- Zu Hotspot-Finder wechseln bei Supercruise oder Sprung",
+    "no_selection": "Keine Zeile ausgewählt",
+    "select_mineral_first": "Wähle zuerst ein spezifisches Mineral (nicht 'Alle Mineralien')"
   },
   "sidebar": {
     "ship_presets": "Schiff-Presets (VoiceAttack)",
@@ -182,7 +194,7 @@
     "asteroids_prospected": "Prospektierte Asteroiden",
     "quality_hits": "Qualitätstreffer",
     "hit_rate": "Trefferquote",
-    "mining_analytics": "Bergbau-Analytik",
+    "mining_analytics": "Sitzung",
     "analytics": "Analytik",
     "graphs": "Grafiken",
     "reports": "Berichte",
@@ -528,6 +540,8 @@
     "copy_station": "Stationsname kopieren",
     "copy_both": "Station @ System kopieren",
     "copy_body": "Körpername kopieren",
+    "find_sell_station": "Verkaufsstation finden",
+    "find_hotspots": "Hotspots finden",
     "word_wrap_on": "Zeilenumbruch aktivieren",
     "word_wrap_off": "Zeilenumbruch deaktivieren",
     "add_refinery": "Raffinerieinhalt hinzufügen",
@@ -808,6 +822,15 @@
     "delete_bookmark_multi": "Möchten Sie wirklich {count} Lesezeichen löschen?",
     "save": "Speichern",
     "theme_changed": "Design geändert",
+    "first_install_title": "Erstinstallation",
+    "first_install_scanning": "Durchsuche deine Journal-Historie...",
+    "first_install_patience": "Dies kann beim ersten Start einen Moment dauern",
+    "migration_title": "Datenbank-Migration",
+    "migration_scanning": "Korrigiere Besuchszähler...",
+    "migration_patience": "Einmalige Korrektur nach Update",
+    "please_wait": "Bitte warten...",
+    "processing_journal": "Verarbeite Journal {current} von {total}...",
+    "scan_complete": "Fertig! {visits} Besuche, {hotspots} Hotspots",
     "session_active_title": "Bergbau-Sitzung Aktiv",
     "session_active_message": "Eine Bergbau-Sitzung läuft gerade.",
     "session_active_yes": "Sitzung beenden und speichern",

@@ -2420,7 +2420,7 @@ class ProspectorPanel(ttk.Frame):
         # Graphs tab - Analytics visualization (Session tab removed and merged into Prospector)
         # COMBINED: Analytics tab with Graphs and Statistics sub-sections
         analytics = ttk.Frame(nb, padding=8)
-        nb.add(analytics, text="📊 " + t('mining_session.analytics'))
+        nb.add(analytics, text=t('mining_session.analytics'))
         analytics.columnconfigure(0, weight=1)
         analytics.rowconfigure(0, weight=1)
         
@@ -2431,7 +2431,7 @@ class ProspectorPanel(ttk.Frame):
         # Graphs sub-tab
         if CHARTS_AVAILABLE:
             charts = ttk.Frame(analytics_nb, padding=8)
-            analytics_nb.add(charts, text="📈 " + t('mining_session.graphs'))
+            analytics_nb.add(charts, text=t('mining_session.graphs'))
             charts.columnconfigure(0, weight=1)
             charts.rowconfigure(0, weight=1)
             
@@ -2445,7 +2445,7 @@ class ProspectorPanel(ttk.Frame):
         
         # Statistics sub-tab
         statistics = ttk.Frame(analytics_nb, padding=8)
-        analytics_nb.add(statistics, text="📊 " + t('mining_session.statistics'))
+        analytics_nb.add(statistics, text=t('mining_session.statistics'))
         statistics.columnconfigure(0, weight=1)
         statistics.rowconfigure(0, weight=1)
         
@@ -2454,7 +2454,7 @@ class ProspectorPanel(ttk.Frame):
 
         # Reports tab - Session reports and management
         reports = ttk.Frame(nb, padding=8)
-        nb.add(reports, text="📋 " + t('mining_session.reports'))
+        nb.add(reports, text=t('mining_session.reports'))
         reports.columnconfigure(0, weight=1)
         reports.rowconfigure(0, weight=1)
         
@@ -2483,6 +2483,21 @@ class ProspectorPanel(ttk.Frame):
         except Exception as e:
             print(f"[DEBUG] Could not create Mining Missions sub-tab: {e}")
             self.missions_tab = None
+        
+        # Ring Guide/Reference tab - Show minerals by ring type
+        try:
+            from ring_guide_tab import RingGuideTab
+            reference_frame = ttk.Frame(nb, padding=8)
+            nb.add(reference_frame, text=t('ring_guide.tab_title'))
+            reference_frame.columnconfigure(0, weight=1)
+            reference_frame.rowconfigure(0, weight=1)
+            
+            # Create reference tab content
+            self.ring_guide_tab = RingGuideTab(reference_frame)
+            self.ring_guide_tab.pack(fill="both", expand=True)
+        except Exception as e:
+            print(f"[DEBUG] Could not create Ring Guide sub-tab: {e}")
+            self.ring_guide_tab = None
 
     # --- Cargo Monitor ---
     def _open_cargo_monitor(self) -> None:
