@@ -206,9 +206,8 @@ class RingFinder:
         # Load initial data in background
         threading.Thread(target=self._preload_data, daemon=True).start()
         
-        # Schedule startup auto-search if enabled (after database loads)
-        if self.auto_search_var.get():
-            self.parent.after(3000, self._startup_auto_search)  # 3 second delay
+        # Note: Auto-search is triggered from main.py at startup
+        # Journal scan will refresh results when it completes
         
     def _abbreviate_material_for_display(self, hotspot_text: str) -> str:
         """Abbreviate material names in hotspot display text for Ring Finder column
@@ -3820,9 +3819,21 @@ class RingFinder:
         except Exception as e:
             print(f"[AUTO-TAB] Error syncing auto-switch tabs: {e}")
 
-    def _startup_auto_search(self):
-        """Perform auto-search on startup if enabled"""
+    def _startup_auto_search(self, force: bool = False):
+        """Perform auto-search on startup if enabled
+        
+        Args:
+            force: If True, skip the full sync check (used when called after sync completes)
+        """
         try:
+            # Check if full sync is pending - if so, wait for sync to trigger us
+            # This avoids running search with stale visit counts
+            if not force:
+                main_app = self.parent
+                if hasattr(main_app, '_needs_full_sync') and main_app._needs_full_sync():
+                    print("[RING FINDER] Full sync pending - deferring auto-search")
+                    return
+            
             # Get current system from prospector panel (most reliable)
             current_system = getattr(self.prospector_panel, 'last_system', None) if self.prospector_panel else None
             
@@ -3921,6 +3932,7 @@ class RingFinder:
                 return ""
             
             # Format RES tags with material abbreviation (RES type first, then material)
+            # Handles comma-separated tags for multiple RES per material
             display_parts = []
             for res in res_sites:
                 material = res['material_name']
@@ -3931,9 +3943,19 @@ class RingFinder:
                 if abbr == material:
                     # Use first 4 chars as fallback abbreviation
                     abbr = material[:4] if len(material) > 4 else material
-                res_abbr = self._abbreviate_res_tag(tag)
-                if res_abbr:
-                    display_parts.append(f"{res_abbr} {abbr}")
+                
+                # Handle comma-separated tags (e.g., "Hazardous, High")
+                if tag and ',' in tag:
+                    # Multiple RES types for this material
+                    for single_tag in tag.split(','):
+                        single_tag = single_tag.strip()
+                        res_abbr = self._abbreviate_res_tag(single_tag)
+                        if res_abbr:
+                            display_parts.append(f"{res_abbr} {abbr}")
+                else:
+                    res_abbr = self._abbreviate_res_tag(tag)
+                    if res_abbr:
+                        display_parts.append(f"{res_abbr} {abbr}")
             
             return ", ".join(display_parts)
         except Exception as e:
@@ -4139,7 +4161,7 @@ class RingFinder:
             print(f"Error refreshing row overlap: {e}")
 
     def _show_res_dialog(self):
-        """Show dialog to add RES site for selected hotspot"""
+        """Show dialog to add RES site(s) for selected hotspot - supports multiple RES per material"""
         try:
             selection = self.results_tree.selection()
             if not selection:
@@ -4210,45 +4232,77 @@ class RingFinder:
             if not material_var.get() and full_materials:
                 material_var.set(full_materials[0])
             
-            # RES type selection
-            ttk.Label(frame, text=t('context_menu.res_type')).grid(row=3, column=0, sticky="w", pady=5, padx=(0, 10))
-            res_var = tk.StringVar(value="None")
+            # RES type selection - CHECKBOXES for multiple selection
+            ttk.Label(frame, text=t('context_menu.res_type')).grid(row=3, column=0, sticky="nw", pady=5, padx=(0, 10))
             
             res_frame = tk.Frame(frame, bg="#1e1e1e")
             res_frame.grid(row=3, column=1, sticky="w", pady=5)
             
-            # Dark themed radio buttons
-            rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
-                        "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
-            tk.Radiobutton(res_frame, text=t('context_menu.none'), variable=res_var, value="None", **rb_style).pack(side="left", padx=(0, 8))
-            tk.Radiobutton(res_frame, text="Haz", variable=res_var, value="Hazardous", **rb_style).pack(side="left", padx=(0, 8))
-            tk.Radiobutton(res_frame, text="High", variable=res_var, value="High", **rb_style).pack(side="left", padx=(0, 8))
-            tk.Radiobutton(res_frame, text="Low", variable=res_var, value="Low", **rb_style).pack(side="left")
+            # Checkbox variables for each RES type
+            haz_var = tk.BooleanVar(value=False)
+            high_var = tk.BooleanVar(value=False)
+            low_var = tk.BooleanVar(value=False)
             
-            # Load current RES value when material changes
+            # Dark themed checkboxes
+            cb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
+                        "activeforeground": "#ffffff", "selectcolor": "#333333", "relief": "flat"}
+            
+            tk.Checkbutton(res_frame, text="Haz", variable=haz_var, **cb_style).pack(side="left", padx=(0, 12))
+            tk.Checkbutton(res_frame, text="High", variable=high_var, **cb_style).pack(side="left", padx=(0, 12))
+            tk.Checkbutton(res_frame, text="Low", variable=low_var, **cb_style).pack(side="left")
+            
+            # Helper label
+            ttk.Label(frame, text=t('context_menu.res_multi_hint'), font=("Segoe UI", 8, "italic"), 
+                     foreground="#888888").grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 10))
+            
+            # Load current RES values when material changes
             def on_material_change(*args):
                 mat = material_var.get()
                 if mat:
                     current_tag = self.user_db.get_res_tag(system_name, ring_name, mat)
-                    res_var.set(current_tag if current_tag else "None")
+                    # Parse comma-separated tags
+                    haz_var.set(False)
+                    high_var.set(False)
+                    low_var.set(False)
+                    if current_tag:
+                        tags = [t.strip() for t in current_tag.split(',')]
+                        for tag in tags:
+                            if tag.lower() in ['hazardous', 'haz']:
+                                haz_var.set(True)
+                            elif tag.lower() == 'high':
+                                high_var.set(True)
+                            elif tag.lower() == 'low':
+                                low_var.set(True)
             
             material_var.trace_add('write', on_material_change)
             on_material_change()  # Initialize
             
             # Buttons
             button_frame = ttk.Frame(frame)
-            button_frame.grid(row=4, column=0, columnspan=2, pady=(15, 0))
+            button_frame.grid(row=5, column=0, columnspan=2, pady=(15, 0))
             
             def save():
                 mat = material_var.get()
                 if not mat:
                     return
-                tag = res_var.get()
-                tag_value = tag if tag != "None" else None
+                
+                # Build comma-separated tag from checkboxes
+                selected_tags = []
+                if haz_var.get():
+                    selected_tags.append("Hazardous")
+                if high_var.get():
+                    selected_tags.append("High")
+                if low_var.get():
+                    selected_tags.append("Low")
+                
+                tag_value = ", ".join(selected_tags) if selected_tags else None
                 
                 success = self.user_db.set_res_tag(system_name, ring_name, mat, tag_value)
                 if success:
-                    self.status_var.set(f"RES tagged: {mat} = {tag}")
+                    if tag_value:
+                        self.status_var.set(f"RES tagged: {mat} = {tag_value}")
+                    else:
+                        self.status_var.set(f"RES cleared for {mat}")
                     # Refresh the current row's RES display
                     self._refresh_row_res(item, system_name, ring_name)
                 else:

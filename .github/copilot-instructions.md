@@ -103,6 +103,29 @@ python app/create_release.py
 
 ## Critical Architecture Decisions & Common Gotchas
 
+### ⚠️ CARGO MONITOR HAS TWO DISPLAYS! ⚠️
+**See `docs/CARGO_MONITOR_REFERENCE.md` for full documentation**
+
+1. **INTEGRATED DISPLAY (PRIMARY)** - What users see!
+   - Method: `_update_integrated_cargo_display()` (~line 3570 in main.py)
+   - Located in bottom pane of main app, always visible
+
+2. **POPUP WINDOW (SECONDARY)** - Rarely used
+   - Method: `update_display()` (~line 1850 in main.py)
+   - Separate floating window, must be manually opened
+
+**ALWAYS UPDATE BOTH when changing cargo display!**
+
+Shared data source: `cargo_items = {display_name: quantity}` (e.g., `{"Bromellite": 25}`)
+
+### Path Management (CRITICAL)
+- **Use `path_utils.py`** for all file path operations
+- `get_app_data_dir()` - User data (config, database)
+- `get_ship_presets_dir()` - Ship preset JSON files  
+- `get_reports_dir()` - Mining session reports
+- PyInstaller extracts to read-only `_MEI*` temp dirs - **never write there!**
+- VoiceAttack: `VA_ROOT` environment variable for installer paths
+
 ### Performance & Reliability Fixes
 - **Config Loading Spam**: Rate limiting in `_load_cfg()` prevents 20+ loads per operation (2-second cache). **Never bypass this system**.
 - **Path Inconsistencies**: `_get_config_path()` handles dev vs. compiled context automatically. Development uses `app/config.json`, production uses `../config.json`.
@@ -230,10 +253,14 @@ python app/create_release.py
 - TTS announcements can be tested via Interface Options tab test buttons
 - Validate both VS Code development and compiled executable versions for path consistency
 
-### Recent Architecture Updates (v4.0.5)
-- **Config System**: Added rate limiting to prevent spam (2-second cache in `_load_cfg()`), fixed path detection for dev/compiled consistency via `_get_config_path()`
-- **Cargo Monitor**: Enhanced with ship change detection, Status.json integration, background monitoring threads that work without UI windows
-- **Build Process**: EliteVA integration with proper MIT licensing, streamlined release automation via `create_release.py` ReleaseBuilder class
-- **Version Management**: Separated application version from config schema version in `version.py` for backward compatibility
-- **Background Processing**: CargoMonitor now runs continuous monitoring threads (`_start_background_monitoring()`) independent of cargo window state
-- **Update System**: Added update checking infrastructure with configurable intervals and GitHub API integration for release detection
+### Recent Architecture Updates (v4.6.7)
+- **Mining Missions Tab**: Tracks active mining missions from journal, shows progress from cargo
+  - `mining_missions.py` - Mission tracker singleton
+  - `mining_missions_tab.py` - Full tab UI with Find Hotspot integration
+  - `mining_missions_panel.py` - Collapsible widget for sidebar
+- **Journal Scanning**: Time-based scan (6 months) after first install, version-triggered full scans
+- **Config System**: Rate limiting to prevent spam (2-second cache in `_load_cfg()`)
+- **Cargo Monitor**: Enhanced with ship change detection, Status.json integration
+- **Path Utils**: Centralized path management for dev/installer compatibility
+- **Localization**: Always update `strings_en.json` AND `strings_de.json` for UI changes
+- **Theme Colors**: Check `config.load_theme()` - elite_orange vs dark_gray

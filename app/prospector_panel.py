@@ -80,6 +80,15 @@ import announcer
 # Import normalization from journal_parser for consistent material name handling
 from journal_parser import JournalParser
 
+# Import mining missions tracker
+try:
+    from mining_missions import get_mission_tracker
+    MISSIONS_AVAILABLE = True
+except ImportError:
+    MISSIONS_AVAILABLE = False
+    def get_mission_tracker():
+        return None
+
 # Localization
 try:
     from localization import t, get_material, get_abbr, to_english
@@ -1695,6 +1704,7 @@ class ProspectorPanel(ttk.Frame):
     # --- UI ---
     def _build_ui(self) -> None:
         nb = ttk.Notebook(self)
+        self.nb = nb  # Store reference for tab switching
         nb.grid(row=0, column=0, sticky="nsew")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
@@ -2408,9 +2418,20 @@ class ProspectorPanel(ttk.Frame):
         """
 
         # Graphs tab - Analytics visualization (Session tab removed and merged into Prospector)
+        # COMBINED: Analytics tab with Graphs and Statistics sub-sections
+        analytics = ttk.Frame(nb, padding=8)
+        nb.add(analytics, text="📊 " + t('mining_session.analytics'))
+        analytics.columnconfigure(0, weight=1)
+        analytics.rowconfigure(0, weight=1)
+        
+        # Create internal notebook for Graphs and Statistics
+        analytics_nb = ttk.Notebook(analytics)
+        analytics_nb.pack(fill="both", expand=True)
+        
+        # Graphs sub-tab
         if CHARTS_AVAILABLE:
-            charts = ttk.Frame(nb, padding=8)
-            nb.add(charts, text="📊 " + t('mining_session.graphs'))
+            charts = ttk.Frame(analytics_nb, padding=8)
+            analytics_nb.add(charts, text="📈 " + t('mining_session.graphs'))
             charts.columnconfigure(0, weight=1)
             charts.rowconfigure(0, weight=1)
             
@@ -2421,6 +2442,15 @@ class ProspectorPanel(ttk.Frame):
             self.charts_panel.grid(row=0, column=0, sticky="nsew")
         else:
             self.charts_panel = None
+        
+        # Statistics sub-tab
+        statistics = ttk.Frame(analytics_nb, padding=8)
+        analytics_nb.add(statistics, text="📊 " + t('mining_session.statistics'))
+        statistics.columnconfigure(0, weight=1)
+        statistics.rowconfigure(0, weight=1)
+        
+        # Create the statistics panel content
+        self._create_statistics_panel(statistics)
 
         # Reports tab - Session reports and management
         reports = ttk.Frame(nb, padding=8)
@@ -2431,14 +2461,28 @@ class ProspectorPanel(ttk.Frame):
         # Create the reports panel content
         self._create_reports_panel(reports)
 
-        # Statistics tab - Session statistics and analytics
-        statistics = ttk.Frame(nb, padding=8)
-        nb.add(statistics, text="📊 " + t('mining_session.statistics'))
-        statistics.columnconfigure(0, weight=1)
-        statistics.rowconfigure(0, weight=1)
-        
-        # Create the statistics panel content
-        self._create_statistics_panel(statistics)
+        # Mining Missions tab - Track active mining missions
+        try:
+            from mining_missions_tab import MiningMissionsTab
+            missions_frame = ttk.Frame(nb, padding=8)
+            nb.add(missions_frame, text=t('mining_missions.title'))
+            missions_frame.columnconfigure(0, weight=1)
+            missions_frame.rowconfigure(0, weight=1)
+            
+            # Create missions tab content
+            self.missions_tab = MiningMissionsTab(missions_frame)
+            self.missions_tab.pack(fill="both", expand=True)
+            
+            # Pass references after main app is set
+            if self.main_app:
+                self.missions_tab.set_main_app(self.main_app)
+                if hasattr(self.main_app, 'ring_finder'):
+                    self.missions_tab.set_ring_finder(self.main_app.ring_finder)
+                if hasattr(self.main_app, 'cargo_monitor'):
+                    self.missions_tab.set_cargo_monitor(self.main_app.cargo_monitor)
+        except Exception as e:
+            print(f"[DEBUG] Could not create Mining Missions sub-tab: {e}")
+            self.missions_tab = None
 
     # --- Cargo Monitor ---
     def _open_cargo_monitor(self) -> None:
@@ -9481,6 +9525,21 @@ class ProspectorPanel(ttk.Frame):
                             print(f"[Session Location] PRESERVED mining body: {self.session_mining_body}")
                         self.session_location_captured_from_mining = True
 
+            # Mining mission tracking
+            if MISSIONS_AVAILABLE:
+                mission_tracker = get_mission_tracker()
+                if mission_tracker:
+                    if ev == "MissionAccepted":
+                        mission_tracker.handle_mission_accepted(evt)
+                    elif ev == "MissionCompleted":
+                        mission_tracker.handle_mission_completed(evt)
+                    elif ev == "MissionAbandoned":
+                        mission_tracker.handle_mission_abandoned(evt)
+                    elif ev == "MissionFailed":
+                        mission_tracker.handle_mission_failed(evt)
+                    elif ev == "CargoDepot":
+                        mission_tracker.handle_cargo_depot(evt)
+
     def _summaries_from_event(self, evt: Dict[str, Any]) -> Tuple[str, str, str, str, str, bool]:
         t = evt.get("timestamp")
         try:
@@ -9874,6 +9933,9 @@ class ProspectorPanel(ttk.Frame):
                 if self.main_app.auto_switch_tabs.get():
                     if hasattr(self.main_app, 'switch_to_tab'):
                         self.main_app.switch_to_tab('mining_session')
+                    # Also select the Mining Analytics sub-tab (index 0)
+                    if hasattr(self, 'nb') and self.nb:
+                        self.nb.select(0)
         except Exception as e:
             print(f"[AUTO-TAB] Error switching to mining tab: {e}")
     
@@ -9935,6 +9997,31 @@ class ProspectorPanel(ttk.Frame):
                         print("[AUTO-TAB] Session ended - will switch to ring finder on next supercruise/FSD jump")
         except Exception as e:
             print(f"[AUTO-TAB] Error setting pending switch: {e}")
+
+    def _find_hotspot_for_commodity(self, commodity: str) -> None:
+        """Open Ring Finder with pre-selected commodity from mining mission"""
+        try:
+            # Switch to Hotspots Finder tab in main app
+            if self.main_app and hasattr(self.main_app, 'nb') and hasattr(self.main_app, 'ring_finder'):
+                # Find the Ring Finder tab index
+                for i, tab_id in enumerate(self.main_app.nb.tabs()):
+                    tab_text = self.main_app.nb.tab(tab_id, "text")
+                    if "Hotspot" in tab_text or "Ring" in tab_text:
+                        self.main_app.nb.select(i)
+                        break
+                
+                # Set the commodity in Ring Finder if possible
+                ring_finder = self.main_app.ring_finder
+                if hasattr(ring_finder, 'mineral_var'):
+                    # Map commodity to Ring Finder mineral name
+                    ring_finder.mineral_var.set(commodity)
+                    print(f"[MISSIONS] Opened Ring Finder for: {commodity}")
+                    
+                    # Trigger search if possible
+                    if hasattr(ring_finder, '_on_search'):
+                        self.main_app.after(100, ring_finder._on_search)
+        except Exception as e:
+            print(f"[MISSIONS] Error opening Ring Finder: {e}")
 
     def _session_start(self) -> None:
         if self.session_active:

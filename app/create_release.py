@@ -144,7 +144,6 @@ class ReleaseBuilder:
                 # Add configuration files in EliteMining root
                 config_files = [
                     ("app/config.json.template", "config.json"),  # Use template for clean config
-                    ("app/last_journal_scan.json.template", "last_journal_scan.json"),  # Use template for clean scan state
                     ("EliteMining-Profile.vap", "EliteMining-Profile.vap"),
                     ("LICENSE.txt", "LICENSE.txt")
                 ]

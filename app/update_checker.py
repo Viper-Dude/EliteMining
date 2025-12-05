@@ -142,6 +142,9 @@ class UpdateChecker:
             )
             
             if result and download_url:
+                # Set flag to stop any pending background tasks (journal scan, etc.)
+                if hasattr(parent_window, '_update_in_progress'):
+                    parent_window._update_in_progress = True
                 webbrowser.open(download_url)
         except:
             pass

@@ -1166,6 +1166,22 @@ class UserDatabase:
         except Exception as e:
             log.error(f"Error adding visited system: {e}")
     
+    def get_total_visits_count(self) -> int:
+        """Get total count of visited systems (used to detect first install)
+        
+        Returns:
+            Number of unique systems visited
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT COUNT(*) FROM visited_systems')
+                result = cursor.fetchone()
+                return result[0] if result else 0
+        except Exception as e:
+            log.error(f"Error getting visits count: {e}")
+            return 0
+    
     def is_system_visited(self, system_name: str) -> Optional[Dict[str, Any]]:
         """Check if a system has been visited
         

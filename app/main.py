@@ -1,23 +1,3 @@
-def center_window(child, parent):
-    """Center `child` (Toplevel) on `parent` (Tk or Toplevel)."""
-    print(f"[DEBUG] Parent object: {parent}")
-    print(f"[DEBUG] Parent type: {type(parent)}")
-    parent.update_idletasks()
-    child.update_idletasks()
-    pw = parent.winfo_width()
-    ph = parent.winfo_height()
-    px = parent.winfo_rootx()
-    py = parent.winfo_rooty()
-    cw = child.winfo_width()
-    ch = child.winfo_height()
-    print(f"[DEBUG] Parent geometry: x={px}, y={py}, w={pw}, h={ph}")
-    print(f"[DEBUG] Dialog geometry: w={cw}, h={ch}")
-    # For diagnosis, optionally force centering on root window
-    # import tkinter as tk; root = tk._default_root; if root: parent = root
-    x = px + (pw - cw) // 2
-    y = py + (ph - ch) // 2
-    print(f"[DEBUG] Centered dialog position: x={x}, y={y}")
-    child.geometry(f"+{x}+{y}")
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -140,6 +120,20 @@ def centered_yesno_dialog(parent, title, message):
     yes_btn.focus_set()
     dialog.wait_window()
     return result['value']
+
+def center_window(child, parent):
+    """Center `child` (Toplevel) on `parent` (Tk or Toplevel)."""
+    parent.update_idletasks()
+    child.update_idletasks()
+    pw = parent.winfo_width()
+    ph = parent.winfo_height()
+    px = parent.winfo_rootx()
+    py = parent.winfo_rooty()
+    cw = child.winfo_width()
+    ch = child.winfo_height()
+    x = px + (pw - cw) // 2
+    y = py + (ph - ch) // 2
+    child.geometry(f"+{x}+{y}")
 
 def centered_info_dialog(parent, title, message):
     """Show an Info dialog centered over parent window with orange theme. Returns when OK pressed."""
@@ -747,7 +741,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.6.6"
+APP_VERSION = "v4.6.7"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1704,6 +1698,7 @@ class CargoMonitor:
         self.current_system = None  # Track current system for hotspot detection
         self.last_known_system = None  # Track last system for visit counting (to detect Location event arrivals)
         self._last_visit_event = None  # Track last visit event to prevent FSDJump+CarrierJump double counting
+        self._update_in_progress = False  # Flag to skip background tasks when update is starting
         
         # Initialize JournalParser for proper Scan and SAASignalsFound processing
         # Add callback to notify Ring Finder when new hotspots are added
@@ -2236,6 +2231,9 @@ class CargoMonitor:
             self.current_cargo = count
             self.update_display()
             
+            # Update mining mission progress from cargo
+            self._update_mission_progress_from_cargo()
+            
             # Notify main app of changes
             if self.update_callback:
                 self.update_callback()
@@ -2247,6 +2245,24 @@ class CargoMonitor:
             
         except Exception as e:
             return False
+    
+    def _update_mission_progress_from_cargo(self):
+        """Update mining mission progress based on current cargo contents"""
+        try:
+            from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+            if MISSIONS_AVAILABLE and self.cargo_items:
+                tracker = get_mission_tracker()
+                if tracker:
+                    # Build cargo dict with just names and quantities
+                    cargo_dict = {}
+                    for name, data in self.cargo_items.items():
+                        if isinstance(data, dict):
+                            cargo_dict[name] = data.get('Count', 0)
+                        else:
+                            cargo_dict[name] = data
+                    tracker.update_progress_from_cargo(cargo_dict)
+        except Exception as e:
+            print(f"[MISSIONS] Error updating progress: {e}")
     
     def force_cargo_update(self):
         """Force read the latest cargo data from Cargo.json and journal"""
@@ -2983,9 +2999,10 @@ cargo panel forces Elite to write detailed inventory data.
                             self.current_system = system_name
                             location_found = True
                             
-                            # Update last known system (but don't count visit here)
-                            # Visit counting is handled by _background_journal_catchup
-                            self.last_known_system = system_name
+                            # NOTE: Do NOT update last_known_system here!
+                            # Visit counting logic depends on comparing current system to last_known_system
+                            # which is initialized from the database. Updating it here would prevent
+                            # detection of offline carrier jumps (Location event after FC jump while logged out)
                             
                             # Update distance calculator home/FC distances in main app
                             if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_home_fc_distances'):
@@ -4837,6 +4854,9 @@ class App(tk.Tk):
         # Build UI - ProspectorPanel will scan latest journal and populate current_system
         self._build_ui()
         
+        # Clean up legacy files from older versions
+        self._cleanup_legacy_files()
+        
         # Set current system from ProspectorPanel's scan (already done during UI build)
         # ProspectorPanel._read_initial_location_from_journal() scans the latest file efficiently
         # Use that result instead of doing another expensive full-file scan
@@ -4850,12 +4870,48 @@ class App(tk.Tk):
         # Check for updates after UI is ready (automatic check once per day)
         self.after(1000, self._check_for_updates_startup)  # Check after 1 second
         
-        # Auto-scan new journal entries after startup
-        self.after(2000, self._auto_scan_journals_startup)  # Check after 2 seconds
+        # Early distance calculation using cached data (before journal scan)
+        self.after(1500, self._update_home_fc_distances)
         
-        # Background 14-day journal catchup scan (silent, on thread)
-        # This handles visit tracking for when app wasn't running
-        self.after(5000, self._background_journal_catchup)  # Start after 5 seconds
+        # Ring finder auto-search runs first so user sees results quickly
+        # (uses existing database data before journal scan updates it)
+        self.after(2000, self._trigger_ring_auto_search)
+        
+        # Full journal scan runs silently in background after ring search starts
+        # When complete, triggers distance calculation again with updated data
+        self.after(3000, self._background_journal_catchup)
+
+    def _cleanup_legacy_files(self):
+        """Remove legacy files from older versions that are no longer used"""
+        from path_utils import get_app_data_dir
+        
+        # Legacy files to clean up (removed in v4.6.7+)
+        legacy_files = [
+            # Old incremental journal scan state files (now using full scan)
+            os.path.join(get_app_data_dir(), "last_app_close.json"),
+            os.path.join(get_app_data_dir(), "last_journal_scan.json"),
+            # Also check app directory for dev installs
+            os.path.join(os.path.dirname(__file__), "last_app_close.json"),
+            os.path.join(os.path.dirname(__file__), "last_journal_scan.json"),
+            os.path.join(os.path.dirname(__file__), "journal_scan_state.py"),
+            os.path.join(os.path.dirname(__file__), "incremental_journal_scanner.py"),
+        ]
+        
+        for filepath in legacy_files:
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                    print(f"[CLEANUP] Removed legacy file: {os.path.basename(filepath)}")
+            except Exception as e:
+                # Silently ignore errors (file in use, permissions, etc.)
+                pass
+
+    def _trigger_ring_auto_search(self):
+        """Trigger ring finder auto-search at startup if enabled"""
+        if hasattr(self, 'ring_finder') and self.ring_finder:
+            if hasattr(self.ring_finder, 'auto_search_var') and self.ring_finder.auto_search_var.get():
+                print("[STARTUP] Triggering ring finder auto-search...")
+                self.ring_finder._startup_auto_search(force=True)
 
     def _setup_keyboard_shortcuts(self):
         """Setup keyboard shortcuts for the application"""
@@ -5224,7 +5280,14 @@ class App(tk.Tk):
         
         # Display Engineering Materials section
         if cargo.materials_collected:
-            self.integrated_cargo_text.insert(tk.END, "\n\n" + "─" * 25)
+            # Calculate separator width based on widget width (in characters)
+            try:
+                widget_width = self.integrated_cargo_text.winfo_width()
+                font_width = 7  # Approximate width of Consolas 9pt character
+                sep_chars = max(10, min(25, (widget_width // font_width) - 2))
+            except:
+                sep_chars = 18  # Fallback
+            self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
             self.integrated_cargo_text.insert(tk.END, "\n" + t('mining_session.engineering_materials') + " 🔩\n")
             
             # Sort materials alphabetically
@@ -5246,7 +5309,14 @@ class App(tk.Tk):
         
         
         # Add refinery note at the very bottom with proper spacing
-        self.integrated_cargo_text.insert(tk.END, "\n\n" + "─" * 25)
+        # Calculate separator width based on widget width (in characters)
+        try:
+            widget_width = self.integrated_cargo_text.winfo_width()
+            font_width = 7  # Approximate width of Consolas 9pt character
+            sep_chars = max(10, min(25, (widget_width // font_width) - 2))
+        except:
+            sep_chars = 18  # Fallback
+        self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
         
         # Configure tag for small italic text - left aligned
         self.integrated_cargo_text.tag_configure("small_italic", font=("Consolas", 8, "italic"), foreground="#888888", justify="left")
@@ -9027,12 +9097,15 @@ class App(tk.Tk):
         self.after(1000, self._distance_auto_calculate_on_startup)
     
     def _distance_auto_calculate_on_startup(self):
-        """Auto-calculate distances and Home/FC on startup (runs in background thread)"""
+        """Auto-detect Fleet Carrier on startup (runs in background thread)
+        
+        Note: Distance calculations and UI updates happen after journal scan completes.
+        """
         import threading
         
         def startup_thread():
             try:
-                # Auto-detect Fleet Carrier location from journals (always fresh scan)
+                # Auto-detect Fleet Carrier location from journals
                 if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
                     try:
                         self.fc_tracker.set_journal_directory(self.prospector_panel.journal_dir)
@@ -9043,18 +9116,11 @@ class App(tk.Tk):
                     except Exception as e:
                         print(f"Error auto-detecting FC on startup: {e}")
                 
-                # Defer distance updates to prevent startup freeze (wait for prospector panel to scan journals)
-                self.after(500, self._update_home_fc_distances)
+                # Distance updates are triggered after journal scan completes
+                # See _process_journals_for_catchup() which calls _update_home_fc_distances
                 
-                # If both System A and B are populated, auto-calculate
-                system_a = self.distance_system_a.get().strip()
-                system_b = self.distance_system_b.get().strip()
-                
-                if system_a or system_b:
-                    # Defer calculation to prevent blocking startup
-                    self.after(500, self._calculate_distances)
             except Exception as e:
-                print(f"Error in auto-calculate on startup: {e}")
+                print(f"Error in FC detection on startup: {e}")
         
         # Start background thread
         threading.Thread(target=startup_thread, daemon=True).start()
@@ -11303,22 +11369,176 @@ class App(tk.Tk):
         self.destroy()
         sys.exit(0)
 
+    def _show_session_active_dialog(self) -> str:
+        """Show a themed dialog when closing with an active mining session.
+        
+        Returns:
+            'yes' - Stop session and save
+            'no' - Cancel session (lose data)
+            'cancel' - Keep session running (don't close)
+        """
+        from localization import t
+        from config import load_theme
+        from icon_utils import get_app_icon_path
+        
+        result = [None]  # Use list to allow modification in nested function
+        
+        # Create themed dialog
+        dialog = tk.Toplevel(self)
+        dialog.title(t('dialogs.session_active_title'))
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        
+        # Set app icon
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+            elif icon_path:
+                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+        except Exception:
+            pass
+        
+        # Get theme colors
+        theme = load_theme()
+        if theme == "elite_orange":
+            bg_color = "#0a0a0a"
+            fg_color = "#ff8c00"
+            fg_bright = "#ffa500"
+            btn_bg = "#1a1a1a"
+            btn_fg = "#ff8c00"
+            warning_color = "#ffcc00"
+        else:
+            bg_color = "#1e1e1e"
+            fg_color = "#e6e6e6"
+            fg_bright = "#ffffff"
+            btn_bg = "#333333"
+            btn_fg = "#ffffff"
+            warning_color = "#ffcc00"
+        
+        dialog.configure(bg=bg_color)
+        
+        # Main frame
+        main_frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
+        main_frame.pack(fill="both", expand=True)
+        
+        # Warning icon and message row
+        msg_frame = tk.Frame(main_frame, bg=bg_color)
+        msg_frame.pack(fill="x", pady=(0, 15))
+        
+        # Warning icon (using text emoji)
+        tk.Label(
+            msg_frame,
+            text="⚠️",
+            font=("Segoe UI", 24),
+            bg=bg_color,
+            fg=warning_color
+        ).pack(side="left", padx=(0, 15))
+        
+        # Message text
+        msg_text_frame = tk.Frame(msg_frame, bg=bg_color)
+        msg_text_frame.pack(side="left", fill="x", expand=True)
+        
+        tk.Label(
+            msg_text_frame,
+            text=t('dialogs.session_active_message'),
+            font=("Segoe UI", 11, "bold"),
+            bg=bg_color,
+            fg=fg_bright
+        ).pack(anchor="w")
+        
+        # Options list
+        options_frame = tk.Frame(main_frame, bg=bg_color)
+        options_frame.pack(fill="x", pady=(0, 15))
+        
+        options = [
+            (f"• {t('dialogs.yes')} = {t('dialogs.session_active_yes')}", fg_color),
+            (f"• {t('dialogs.no')} = {t('dialogs.session_active_no')}", fg_color),
+            (f"• {t('dialogs.cancel')} = {t('dialogs.session_active_cancel')}", fg_color),
+        ]
+        
+        for opt_text, opt_color in options:
+            tk.Label(
+                options_frame,
+                text=opt_text,
+                font=("Segoe UI", 9),
+                bg=bg_color,
+                fg=opt_color
+            ).pack(anchor="w", pady=1)
+        
+        # Button frame
+        btn_frame = tk.Frame(main_frame, bg=bg_color)
+        btn_frame.pack(fill="x")
+        
+        def on_yes():
+            result[0] = "yes"
+            dialog.destroy()
+        
+        def on_no():
+            result[0] = "no"
+            dialog.destroy()
+        
+        def on_cancel():
+            result[0] = "cancel"
+            dialog.destroy()
+        
+        # Buttons with consistent styling
+        btn_style = {
+            "font": ("Segoe UI", 9),
+            "width": 10,
+            "relief": "flat",
+            "cursor": "hand2",
+            "bg": btn_bg,
+            "fg": btn_fg,
+            "activebackground": fg_color,
+            "activeforeground": bg_color,
+        }
+        
+        yes_btn = tk.Button(btn_frame, text=t('dialogs.yes'), command=on_yes, **btn_style)
+        yes_btn.pack(side="left", padx=(0, 10))
+        
+        no_btn = tk.Button(btn_frame, text=t('dialogs.no'), command=on_no, **btn_style)
+        no_btn.pack(side="left", padx=(0, 10))
+        
+        cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=on_cancel, **btn_style)
+        cancel_btn.pack(side="left")
+        
+        # Handle window close button (X)
+        dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+        
+        # Bind keyboard
+        dialog.bind("<Escape>", lambda e: on_cancel())
+        
+        # Center dialog on main window
+        dialog.update_idletasks()
+        dialog_width = dialog.winfo_width()
+        dialog_height = dialog.winfo_height()
+        main_x = self.winfo_x()
+        main_y = self.winfo_y()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+        
+        x = main_x + (main_width - dialog_width) // 2
+        y = main_y + (main_height - dialog_height) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Focus yes button
+        yes_btn.focus_set()
+        
+        # Wait for dialog to close
+        dialog.wait_window()
+        
+        return result[0] if result[0] else "cancel"
+
     def _on_close(self) -> None:
         # Check if mining session is active
         if hasattr(self, 'prospector_panel') and self.prospector_panel.session_active:
-            from tkinter import messagebox
-            result = messagebox.askyesnocancel(
-                "Mining Session Active",
-                "A mining session is currently running.\n\n"
-                "• Yes = Stop session and save data\n"
-                "• No = Cancel session (lose data)\n" 
-                "• Cancel = Keep session running",
-                icon="warning"
-            )
+            result = self._show_session_active_dialog()
             
-            if result is True:  # Yes - Stop and save
+            if result == "yes":  # Stop and save
                 self.prospector_panel._session_stop()
-            elif result is False:  # No - Cancel session
+            elif result == "no":  # Cancel session
                 self.prospector_panel._session_cancel()
             else:  # Cancel - Don't close
                 return
@@ -11372,63 +11592,9 @@ class App(tk.Tk):
         except:
             pass
         
-        # Save last app close timestamp for smart journal catchup
-        self._save_last_app_close_time()
-        
         # EDDN listener removed - no longer needed
             
         self.destroy()
-    
-    def _save_last_app_close_time(self):
-        """Save the current timestamp so next startup knows when app was last running"""
-        import json
-        from datetime import datetime
-        from path_utils import get_app_data_dir
-        
-        try:
-            timestamp_file = os.path.join(get_app_data_dir(), "last_app_close.json")
-            data = {
-                "timestamp": datetime.now().isoformat(),
-                "sync_version": "4.6.6"  # Track which version did the full sync
-            }
-            with open(timestamp_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f)
-            log.info(f"[CATCHUP] Saved app close time: {data['timestamp']}")
-        except Exception as e:
-            log.error(f"[CATCHUP] Failed to save app close time: {e}")
-    
-    def _get_last_app_close_time(self):
-        """Get the timestamp of when app was last closed and sync version"""
-        import json
-        from datetime import datetime
-        from path_utils import get_app_data_dir
-        
-        try:
-            timestamp_file = os.path.join(get_app_data_dir(), "last_app_close.json")
-            if os.path.exists(timestamp_file):
-                with open(timestamp_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                timestamp_str = data.get("timestamp")
-                sync_version = data.get("sync_version")
-                if timestamp_str:
-                    return datetime.fromisoformat(timestamp_str), sync_version
-        except Exception as e:
-            log.error(f"[CATCHUP] Failed to read app close time: {e}")
-        return None, None
-    
-    def _needs_full_sync(self):
-        """Check if a full journal sync is needed (first run of this version)"""
-        _, sync_version = self._get_last_app_close_time()
-        # If no sync version or older than 4.6.6, need full sync
-        if not sync_version:
-            return True
-        # Compare versions - 4.6.6 introduced full sync
-        try:
-            current_parts = [int(x) for x in "4.6.6".split('.')]
-            saved_parts = [int(x) for x in sync_version.split('.')]
-            return saved_parts < current_parts
-        except:
-            return True
 
     def _setup_announcement_tracing(self):
         """Set up tracing for announcement variables after loading is complete"""
@@ -12248,6 +12414,13 @@ class App(tk.Tk):
             # Check if there were any pending hotspot additions while Ring Finder was being created
             if getattr(self, '_pending_ring_finder_refresh', False):
                 self._refresh_ring_finder()
+            
+            # Update mining missions tab with references (it's created before ring_finder)
+            if hasattr(self, 'prospector_panel') and self.prospector_panel:
+                if hasattr(self.prospector_panel, 'missions_tab') and self.prospector_panel.missions_tab:
+                    self.prospector_panel.missions_tab.set_ring_finder(self.ring_finder)
+                    self.prospector_panel.missions_tab.set_main_app(self)
+                    self.prospector_panel.missions_tab.set_cargo_monitor(self.cargo_monitor)
                 
         except Exception as e:
             import traceback
@@ -14035,421 +14208,74 @@ class App(tk.Tk):
         """Manually check for updates (from menu)"""
         self.update_checker.manual_check(self)
     
-    def _auto_scan_journals_startup(self):
-        """Auto-scan new journal entries on startup, with welcome dialog for first-time users"""
-        import threading
-        import glob
-        from incremental_journal_scanner import IncrementalJournalScanner
-        from journal_scan_state import JournalScanState
-        
-        # Check if auto-scan is enabled in settings
-        cfg = _load_cfg()
-        auto_scan_enabled = cfg.get("auto_scan_journals", True)
-        
-        if not auto_scan_enabled:
-            print("[JOURNAL] Auto-scan disabled by user preference")
-            self._set_status("Auto-scan disabled - enable in Settings if desired", 10000)
-            return
-        
-        print("[JOURNAL] Starting auto-scan on startup...")
-        self._set_status("Checking journals for new mining data...", 3000)
-        
-        # Check if this is first run (no state file)
-        state = JournalScanState()
-        last_journal = state.get_last_journal_file()
-        is_first_run = not last_journal
-        
-        print(f"DEBUG: First run check - last_journal={last_journal}, is_first_run={is_first_run}")
-        
-        if is_first_run:
-            # Count journal files for the welcome message
-            journal_dir = self.cargo_monitor.journal_dir
-            pattern = os.path.join(journal_dir, "Journal.*.log")
-            all_journals = sorted(glob.glob(pattern))
-            journal_count = len(all_journals)
-            
-            if journal_count > 0:
-                # Show welcome dialog
-                self._show_first_run_welcome_dialog(journal_count, all_journals)
-            else:
-                print("No journal files found, skipping initial import")
-                self._set_status("No journal files found - check journal folder in Settings", 8000)
-        else:
-            # Not first run - do incremental auto-scan, passing state to avoid duplicate load
-            self._run_auto_scan_background(state)
-    
-    def _show_first_run_welcome_dialog(self, journal_count, all_journals):
-        """Show welcome dialog for first-time users"""
-        # Get oldest journal date for display
-        oldest_date = "unknown"
-        if all_journals:
-            oldest_file = os.path.basename(all_journals[0])
-            try:
-                # Parse date from filename: Journal.2023-09-01T120000.01.log
-                date_part = oldest_file.split('.')[1].split('T')[0]
-                oldest_date = date_part
-            except:
-                pass
-        
-        # Estimate time (rough: ~18 journals/second based on test)
-        estimated_minutes = max(1, journal_count // (18 * 60))
-        time_text = f"{estimated_minutes} {t('dialogs.minute') if estimated_minutes == 1 else t('dialogs.minutes')}"
-        
-        dialog = tk.Toplevel(self)
-        dialog.title(t('dialogs.welcome_title'))
-        dialog.transient(self)
-        dialog.grab_set()
-        dialog.resizable(False, False)
-        
-        # Set icon
-        set_window_icon(dialog)
-        
-        # Position centered on parent
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - 200
-        y = self.winfo_y() + (self.winfo_height() // 2) - 175
-        dialog.geometry(f"400x350+{x}+{y}")
-        
-        # Main content frame
-        content = tk.Frame(dialog, bg="#2b2b2b", padx=20, pady=20)
-        content.pack(fill=tk.BOTH, expand=True)
-        
-        # Title
-        title = tk.Label(content, text=t('dialogs.welcome_title'), 
-                        font=("Segoe UI", 14, "bold"), 
-                        bg="#2b2b2b", fg="#ffffff")
-        title.pack(pady=(0, 10))
-        
-        # Message
-        message_text = f"""{t('dialogs.welcome_first_run')}
-
-{t('dialogs.welcome_scan_prompt')}"""
-        
-        message = tk.Label(content, text=message_text,
-                          font=("Segoe UI", 10),
-                          bg="#2b2b2b", fg="#e6e6e6",
-                          justify=tk.LEFT, wraplength=360)
-        message.pack(pady=(0, 15))
-        
-        # Bullet points
-        bullets_text = f"""• {t('dialogs.welcome_bullets_1')}
-• {t('dialogs.welcome_bullets_2').format(count=f'{journal_count:,}', date=oldest_date)}
-• {t('dialogs.welcome_bullets_3').format(time=time_text)}
-• {t('dialogs.welcome_bullets_4')}"""
-        
-        bullets = tk.Label(content, text=bullets_text,
-                          font=("Segoe UI", 9),
-                          bg="#2b2b2b", fg="#cccccc",
-                          justify=tk.LEFT, wraplength=360)
-        bullets.pack(pady=(0, 20))
-        
-        # Question
-        question = tk.Label(content, text=t('dialogs.welcome_scan_now'),
-                           font=("Segoe UI", 10, "bold"),
-                           bg="#2b2b2b", fg="#ffffff")
-        question.pack(pady=(0, 15))
-        
-        # Button frame
-        button_frame = tk.Frame(content, bg="#2b2b2b")
-        button_frame.pack()
-        
-        def on_scan():
-            dialog.destroy()
-            self._run_initial_import_with_progress()
-        
-        def on_skip():
-            dialog.destroy()
-            # Create empty state file so we don't ask again
-            # but still allow auto-scan for new journals
-            from journal_scan_state import JournalScanState
-            state = JournalScanState()
-            # Set state to latest journal with current position
-            journal_dir = self.cargo_monitor.journal_dir
-            pattern = os.path.join(journal_dir, "Journal.*.log")
-            all_journals = sorted(glob.glob(pattern))
-            if all_journals:
-                latest = all_journals[-1]
-                file_size = os.path.getsize(latest)
-                state.save_state(latest, file_size)
-            print("Initial import skipped by user")
-        
-        # Scan Now button (green, recommended)
-        scan_btn = tk.Button(button_frame, text=t('dialogs.welcome_yes_scan'), command=on_scan,
-                            bg="#27ae60", fg="white", 
-                            font=("Segoe UI", 10, "bold"),
-                            width=14, cursor="hand2", relief=tk.FLAT,
-                            activebackground="#229954")
-        scan_btn.pack(side=tk.LEFT, padx=5)
-        
-        # Skip button
-        skip_btn = tk.Button(button_frame, text=t('dialogs.welcome_skip'), command=on_skip,
-                            bg="#5a5a5a", fg="white",
-                            font=("Segoe UI", 10),
-                            width=14, cursor="hand2", relief=tk.FLAT,
-                            activebackground="#4a4a4a")
-        skip_btn.pack(side=tk.LEFT, padx=5)
-        
-        # Bind Escape to skip
-        dialog.bind('<Escape>', lambda e: on_skip())
-        
-        # Make Scan Now the default (Enter key)
-        scan_btn.focus_set()
-        dialog.bind('<Return>', lambda e: on_scan())
-    
-    def _run_initial_import_with_progress(self):
-        """Run initial import with progress dialog"""
-        import threading
-        from incremental_journal_scanner import IncrementalJournalScanner
-        
-        # Create progress dialog
-        progress_dialog = tk.Toplevel(self)
-        progress_dialog.title(t('dialogs.importing_journal'))
-        progress_dialog.transient(self)
-        progress_dialog.grab_set()
-        progress_dialog.resizable(False, False)
-        progress_dialog.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable X button
-        
-        # Set icon
-        set_window_icon(progress_dialog)
-        
-        # Position centered on parent
-        progress_dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - 200
-        y = self.winfo_y() + (self.winfo_height() // 2) - 100
-        progress_dialog.geometry(f"400x200+{x}+{y}")
-        
-        # Content frame
-        content = tk.Frame(progress_dialog, bg="#2b2b2b", padx=20, pady=20)
-        content.pack(fill=tk.BOTH, expand=True)
-        
-        # Title
-        title = tk.Label(content, text="Importing Mining History", 
-                        font=("Segoe UI", 12, "bold"), 
-                        bg="#2b2b2b", fg="#ffffff")
-        title.pack(pady=(0, 15))
-        
-        # Progress label
-        progress_label = tk.Label(content, text="Preparing scan...",
-                                 font=("Segoe UI", 9),
-                                 bg="#2b2b2b", fg="#e6e6e6")
-        progress_label.pack(pady=(0, 5))
-        
-        # Progress bar
-        progress_bar = ttk.Progressbar(content, length=360, mode='determinate')
-        progress_bar.pack(pady=(0, 10))
-        
-        # Stats label
-        stats_label = tk.Label(content, text="Files: 0 | Events: 0",
-                              font=("Segoe UI", 9),
-                              bg="#2b2b2b", fg="#cccccc")
-        stats_label.pack(pady=(0, 15))
-        
-        # Cancel button
-        cancel_requested = {'value': False}
-        
-        def on_cancel():
-            cancel_requested['value'] = True
-            cancel_btn.config(state=tk.DISABLED, text=t('common.cancel') + "...")
-        
-        cancel_btn = tk.Button(content, text=t('common.cancel'), command=on_cancel,
-                              bg="#5a5a5a", fg="white",
-                              font=("Segoe UI", 9),
-                              width=15, cursor="hand2", relief=tk.FLAT,
-                              activebackground="#4a4a4a")
-        cancel_btn.pack()
-        
-        # Scan in background
-        def scan_with_progress():
-            try:
-                journal_dir = self.cargo_monitor.journal_dir
-                user_db = self.cargo_monitor.user_db
-                scanner = IncrementalJournalScanner(journal_dir, user_db)
-                
-                total_events = 0
-                
-                def progress_callback(files_done, total_files, current_file):
-                    if cancel_requested['value']:
-                        return  # Stop processing
-                    
-                    # Update UI in main thread
-                    percent = int((files_done / total_files) * 100) if total_files > 0 else 0
-                    self.after(0, lambda: progress_bar.config(value=percent))
-                    self.after(0, lambda: progress_label.config(text=f"Scanning: {current_file}"))
-                    self.after(0, lambda f=files_done, t=total_files, e=total_events: 
-                              stats_label.config(text=f"Files: {f}/{t} | Events: {e:,}"))
-                
-                # Modified scan that checks for cancel
-                files, events = scanner.scan_new_entries(progress_callback=progress_callback)
-                total_events = events
-                
-                # Close dialog and show result
-                self.after(0, lambda: progress_dialog.destroy())
-                
-                if cancel_requested['value']:
-                    print(f"Import cancelled by user. Processed {files} files, {events} events (partial data kept)")
-                    self.after(0, lambda e=events: self._set_status(f"Import cancelled - {e:,} events imported"))
-                    # Update counter even for partial import
-                    if hasattr(self, 'ring_finder'):
-                        self.after(0, self.ring_finder._update_database_info)
-                else:
-                    print(f"✓ Import complete: {files} files, {events} events processed")
-                    self.after(0, lambda e=events: self._set_status(f"Imported {e:,} journal entries"))
-                    # Update database counter after full import
-                    if hasattr(self, 'ring_finder'):
-                        print("[JOURNAL] Updating database counter after full import...")
-                        self.after(0, self.ring_finder._update_database_info)
-                    
-            except Exception as e:
-                print(f"Error during import: {e}")
-                import traceback
-                traceback.print_exc()
-                self.after(0, lambda: progress_dialog.destroy())
-                self.after(0, lambda: self._set_status("Import failed"))
-        
-        thread = threading.Thread(target=scan_with_progress, daemon=True)
-        thread.start()
-    
-    def _run_auto_scan_background(self, state=None):
-        """Run auto-scan in background thread
-        
-        Args:
-            state: Optional pre-loaded JournalScanState to avoid duplicate load
-        """
-        import threading
-        from incremental_journal_scanner import IncrementalJournalScanner
-        
-        def scan_in_background():
-            try:
-                print("[JOURNAL] Auto-scanning journals for new entries...")
-                
-                # Get journal directory and user database
-                journal_dir = self.cargo_monitor.journal_dir
-                user_db = self.cargo_monitor.user_db
-                
-                # Create scanner with pre-loaded state (callback per-hotspot would be too frequent from background thread)
-                scanner = IncrementalJournalScanner(journal_dir, user_db, state=state)
-                
-                # Scan new entries
-                files, events = scanner.scan_new_entries(
-                    progress_callback=lambda f, t, name: print(f"[JOURNAL] Scanning: {name} ({f}/{t})")
-                )
-                
-                if files > 0 or events > 0:
-                    print(f"[JOURNAL] ✓ Auto-scan complete: {files} file(s), {events} event(s) processed")
-                    # Update status in UI thread using _set_status for auto-clear
-                    event_count = events
-                    self.after(0, lambda e=event_count: self._set_status(f"Scanned {e} new journal entries"))
-                    # Update database counter in Hotspots Finder tab
-                    if hasattr(self, 'ring_finder'):
-                        print("[JOURNAL] Scheduling database counter update...")
-                        self.after(0, self.ring_finder._update_database_info)
-                    else:
-                        print("[JOURNAL] WARNING: ring_finder not found, cannot update counter")
-                else:
-                    print("[JOURNAL] ✓ Auto-scan complete: No new entries")
-                    # Don't show message - catchup scan will follow with more useful info
-                    
-            except Exception as e:
-                print(f"[JOURNAL] ERROR during auto-scan: {e}")
-                import traceback
-                traceback.print_exc()
-                self.after(0, lambda: self._set_status("Journal scan failed - check journal folder in Settings", 8000))
-        
-        # Run in background thread to not block UI
-        thread = threading.Thread(target=scan_in_background, daemon=True)
-        thread.start()
-    
     def _background_journal_catchup(self):
-        """Background scan of journals modified since app was last closed.
+        """Background scan of journals at startup.
+        
+        First install: Full scan of all journals
+        Subsequent runs: Scan only last 6 months of journals
         
         This runs on a background thread so it doesn't block the UI.
-        Shows progress in status bar. Falls back to 14 days if no previous close time.
         """
         import threading
         import glob
         from datetime import datetime, timedelta
         
+        # Skip if update is in progress (app will restart anyway)
+        if getattr(self, '_update_in_progress', False):
+            print("[JOURNAL] Skipping scan - update in progress")
+            return
+        
         def catchup_scan():
             try:
-                # Check if full sync is needed (first run of v4.6.6+)
-                needs_full_sync = self._needs_full_sync()
-                
-                if needs_full_sync:
-                    # Do a full sync of ALL journals (one-time for this version)
-                    print("[CATCHUP] First run of v4.6.6+ - performing full journal sync...")
-                    self.after(0, lambda: self._set_status("Syncing all journal history (one-time)...", 0))
-                    
-                    # Get journal directory
-                    journal_dir = self.cargo_monitor.journal_dir
-                    if not journal_dir or not os.path.isdir(journal_dir):
-                        print("[CATCHUP] No journal directory found")
-                        return
-                    
-                    # Get ALL journals
-                    pattern = os.path.join(journal_dir, "Journal.*.log")
-                    all_journals = sorted(glob.glob(pattern))
-                    
-                    if not all_journals:
-                        print("[CATCHUP] No journal files found")
-                        return
-                    
-                    print(f"[CATCHUP] Full sync: processing {len(all_journals)} journals...")
-                    self._process_journals_for_catchup(all_journals, is_full_sync=True)
+                # Check again in case update started while we were waiting
+                if getattr(self, '_update_in_progress', False):
+                    print("[JOURNAL] Scan cancelled - update in progress")
                     return
-                
-                # Normal smart scanning based on last app close time
-                last_close, _ = self._get_last_app_close_time()
-                
-                if last_close:
-                    # Calculate how long ago
-                    time_diff = datetime.now() - last_close
-                    hours_ago = time_diff.total_seconds() / 3600
-                    print(f"[CATCHUP] App was last closed {hours_ago:.1f} hours ago")
-                    cutoff_date = last_close
-                    scan_description = f"{hours_ago:.1f}h"
-                else:
-                    # No previous close time - fall back to 14 days
-                    print("[CATCHUP] No previous app close time found, using 14-day fallback")
-                    cutoff_date = datetime.now() - timedelta(days=14)
-                    scan_description = "14 days"
-                
-                self.after(0, lambda: self._set_status("Scanning recent journals...", 0))
+                    
+                self.after(0, lambda: self._set_status("Scanning journal history...", 0))
                 
                 # Get journal directory
                 journal_dir = self.cargo_monitor.journal_dir
                 if not journal_dir or not os.path.isdir(journal_dir):
-                    print("[CATCHUP] No journal directory found")
+                    print("[JOURNAL] No journal directory found")
+                    self.after(0, lambda: self._set_status("No journal folder found", 5000))
                     return
                 
-                # Get journals modified since cutoff
+                # Get ALL journals
                 pattern = os.path.join(journal_dir, "Journal.*.log")
                 all_journals = sorted(glob.glob(pattern))
                 
                 if not all_journals:
-                    print("[CATCHUP] No journal files found")
+                    print("[JOURNAL] No journal files found")
+                    log.info("No journal files found")
+                    self.after(0, lambda: self._set_status("No journal files found", 5000))
                     return
                 
-                recent_journals = []
+                # Determine if this is first install (no existing data)
+                is_first_install = self._is_first_install()
                 
-                for journal in all_journals:
-                    try:
-                        mtime = os.path.getmtime(journal)
-                        file_date = datetime.fromtimestamp(mtime)
-                        if file_date >= cutoff_date:
-                            recent_journals.append(journal)
-                    except:
-                        pass
+                # Check if we need a full scan for this version (major update)
+                force_full_scan = self._needs_full_scan_for_version()
                 
-                if not recent_journals:
-                    print(f"[CATCHUP] No journals modified since {scan_description} ago")
-                    self.after(0, lambda: self._set_status("No new journal data", 3000))
-                    return
+                if is_first_install or force_full_scan:
+                    # First install OR major version update: scan ALL journals
+                    journals_to_scan = all_journals
+                    reason = "First install" if is_first_install else "Version update"
+                    print(f"[STARTUP] {reason} - full scan of {len(journals_to_scan)} journals...")
+                    log.info(f"Startup: {reason} - full scan of {len(journals_to_scan)} journals")
+                    self.after(0, lambda r=reason, n=len(journals_to_scan): self._set_status(f"{r}: scanning {n} journals...", 0))
+                else:
+                    # Subsequent runs: scan last 6 months for visits/hotspots
+                    cutoff_date = datetime.now() - timedelta(days=180)
+                    journals_to_scan = self._filter_journals_by_date(all_journals, cutoff_date)
+                    print(f"[STARTUP] Regular scan: {len(journals_to_scan)} of {len(all_journals)} journals (last 6 months)")
+                    log.info(f"Startup: Regular scan - {len(journals_to_scan)} of {len(all_journals)} journals (last 6 months)")
+                    self.after(0, lambda n=len(journals_to_scan): self._set_status(f"Scanning {n} journals...", 0))
                 
-                print(f"[CATCHUP] Found {len(recent_journals)} journals modified in last {scan_description}")
-                self._process_journals_for_catchup(recent_journals, is_full_sync=False)
+                self._process_journals_for_catchup(journals_to_scan, is_full_sync=(is_first_install or force_full_scan))
                 
             except Exception as e:
-                print(f"[CATCHUP] ERROR: {e}")
+                print(f"[JOURNAL] ERROR: {e}")
                 self.after(0, lambda: self._set_status("Journal scan failed", 5000))
                 import traceback
                 traceback.print_exc()
@@ -14457,6 +14283,108 @@ class App(tk.Tk):
         # Run on background thread
         thread = threading.Thread(target=catchup_scan, daemon=True)
         thread.start()
+    
+    def _is_first_install(self) -> bool:
+        """Check if this is a first install (no existing user data)"""
+        try:
+            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                user_db = self.cargo_monitor.user_db
+                if user_db:
+                    # Check if database has any visits recorded
+                    count = user_db.get_total_visits_count()
+                    return count == 0
+        except Exception:
+            pass
+        return True  # Assume first install if we can't determine
+    
+    def _needs_full_scan_for_version(self) -> bool:
+        """Check if current version requires a full journal scan.
+        
+        Add version numbers here when major updates require re-scanning all journals.
+        After a user runs once on that version, it saves the version and won't re-scan.
+        """
+        import json
+        from path_utils import get_app_data_dir
+        
+        # Versions that require full scan (add new versions here as needed)
+        FULL_SCAN_VERSIONS = ["4.6.7"]
+        
+        current_version = APP_VERSION.lstrip('v')
+        
+        # Check if current version requires full scan
+        if current_version not in FULL_SCAN_VERSIONS:
+            return False
+        
+        # Check if we already did a full scan for this version
+        version_file = os.path.join(get_app_data_dir(), "last_full_scan_version.json")
+        try:
+            if os.path.exists(version_file):
+                with open(version_file, 'r') as f:
+                    data = json.load(f)
+                    last_scanned = data.get('version', '')
+                    if last_scanned == current_version:
+                        return False  # Already scanned for this version
+        except Exception:
+            pass
+        
+        # Need full scan - save that we're doing it
+        try:
+            os.makedirs(os.path.dirname(version_file), exist_ok=True)
+            with open(version_file, 'w') as f:
+                json.dump({'version': current_version}, f)
+        except Exception:
+            pass
+        
+        return True
+    
+    def _filter_journals_by_date(self, journals: list, cutoff_date) -> list:
+        """Filter journals to only include those after cutoff date.
+        
+        Uses the date embedded in the journal filename (Journal.YYYY-MM-DDTHHMMSS.01.log)
+        rather than file modification time, which can be unreliable.
+        """
+        from datetime import datetime
+        import re
+        
+        filtered = []
+        # Pattern to extract date from filename: Journal.YYYY-MM-DD or Journal.YYMMDD
+        # Format 1: Journal.2023-08-18T161752.01.log (current format)
+        # Format 2: Journal.230818123456.01.log (old format, if any)
+        date_pattern_iso = re.compile(r'Journal\.(\d{4}-\d{2}-\d{2})T')
+        date_pattern_old = re.compile(r'Journal\.(\d{6,8})')
+        
+        for journal_path in journals:
+            try:
+                filename = os.path.basename(journal_path)
+                
+                # Try ISO format first (YYYY-MM-DD)
+                match = date_pattern_iso.search(filename)
+                if match:
+                    date_str = match.group(1)
+                    file_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    if file_date >= cutoff_date:
+                        filtered.append(journal_path)
+                    continue
+                
+                # Try old format (YYMMDD or YYYYMMDD)
+                match = date_pattern_old.search(filename)
+                if match:
+                    date_str = match.group(1)
+                    if len(date_str) == 6:
+                        file_date = datetime.strptime(date_str, "%y%m%d")
+                    else:
+                        file_date = datetime.strptime(date_str, "%Y%m%d")
+                    if file_date >= cutoff_date:
+                        filtered.append(journal_path)
+                    continue
+                
+                # Can't parse date, include it to be safe
+                filtered.append(journal_path)
+            except Exception:
+                # Include if we can't determine date
+                filtered.append(journal_path)
+        
+        return filtered
     
     def _process_journals_for_catchup(self, journals, is_full_sync=False):
         """Process journal files for catchup scan
@@ -14469,11 +14397,23 @@ class App(tk.Tk):
         
         visits_added = 0
         hotspots_added = 0
+        missions_found = 0
+        
+        # Start batch mode for mission tracker to avoid UI spam during scan
+        mission_tracker = None
+        try:
+            from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+            if MISSIONS_AVAILABLE:
+                mission_tracker = get_mission_tracker()
+                if mission_tracker:
+                    mission_tracker.start_batch()
+        except:
+            pass
         
         for idx, journal_path in enumerate(journals):
-            # Update progress for full sync
-            if is_full_sync and idx % 50 == 0:
-                progress = f"Syncing journals... {idx}/{len(journals)}"
+            # Update progress in status bar
+            if idx % 25 == 0:  # Update every 25 files
+                progress = f"Scanning journals... {idx}/{len(journals)}"
                 self.after(0, lambda p=progress: self._set_status(p, 0))
             
             try:
@@ -14489,11 +14429,9 @@ class App(tk.Tk):
                             event = json.loads(line)
                             event_type = event.get('event', '')
                             
-                            # Track current system
-                            if event_type in ['FSDJump', 'Location', 'CarrierJump']:
-                                current_system = event.get('StarSystem')
-                            
-                            # Process visits (FSDJump/CarrierJump only, not Location)
+                            # Process visits (FSDJump, CarrierJump always count; Location only if system changed)
+                            # Location events detect carrier jumps while logged out, but should NOT
+                            # count multiple times for game restarts in the same system
                             if event_type in ['FSDJump', 'CarrierJump']:
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
@@ -14512,6 +14450,31 @@ class App(tk.Tk):
                                         visits_added += 1
                                     except:
                                         pass
+                                    current_system = system_name
+                                    
+                            elif event_type == 'Location':
+                                # Location event = game loaded in this system
+                                # Only count as visit if system is DIFFERENT from last known
+                                # This detects carrier jumps while offline without double-counting restarts
+                                system_name = event.get('StarSystem', '')
+                                if system_name and system_name != current_system:
+                                    timestamp = event.get('timestamp', '')
+                                    system_address = event.get('SystemAddress')
+                                    star_pos = event.get('StarPos', [])
+                                    coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
+                                    
+                                    try:
+                                        self.cargo_monitor.user_db.add_visited_system(
+                                            system_name=system_name,
+                                            visit_date=timestamp,
+                                            system_address=system_address,
+                                            coordinates=coordinates
+                                        )
+                                        visits_added += 1
+                                    except:
+                                        pass
+                                # Always update current_system for tracking
+                                current_system = system_name
                             
                             # Process Scan events for ring/hotspot data
                             elif event_type == 'Scan':
@@ -14528,31 +14491,100 @@ class App(tk.Tk):
                                     hotspots_added += 1
                                 except:
                                     pass
+                            
+                            # Process mining missions
+                            elif event_type == 'MissionAccepted':
+                                try:
+                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                    if MISSIONS_AVAILABLE:
+                                        tracker = get_mission_tracker()
+                                        if tracker:
+                                            if tracker.process_event(event):
+                                                missions_found += 1
+                                except:
+                                    pass
+                            
+                            elif event_type == 'MissionCompleted':
+                                try:
+                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                    if MISSIONS_AVAILABLE:
+                                        tracker = get_mission_tracker()
+                                        if tracker:
+                                            tracker.process_event(event)
+                                except:
+                                    pass
+                            
+                            elif event_type == 'MissionAbandoned':
+                                try:
+                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                    if MISSIONS_AVAILABLE:
+                                        tracker = get_mission_tracker()
+                                        if tracker:
+                                            tracker.process_event(event)
+                                except:
+                                    pass
+                            
+                            elif event_type == 'CargoDepot':
+                                try:
+                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                    if MISSIONS_AVAILABLE:
+                                        tracker = get_mission_tracker()
+                                        if tracker:
+                                            tracker.process_event(event)
+                                except:
+                                    pass
                                     
                         except json.JSONDecodeError:
                             continue
                         except:
                             continue
             except Exception as e:
-                print(f"[CATCHUP] Error reading {os.path.basename(journal_path)}: {e}")
+                print(f"[JOURNAL] Error reading {os.path.basename(journal_path)}: {e}")
                 continue
         
-        sync_type = "Full sync" if is_full_sync else "Catchup"
-        print(f"[CATCHUP] ✓ {sync_type} complete: processed {len(journals)} files, {visits_added} visits, {hotspots_added} scan events")
+        # End batch mode for mission tracker
+        if mission_tracker:
+            try:
+                mission_tracker.end_batch()
+            except:
+                pass
+        
+        print(f"[JOURNAL] ✓ Scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
+        log.info(f"Journal scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
         
         # Show completion in status bar
-        if is_full_sync:
-            self.after(0, lambda: self._set_status(f"Full sync complete: {len(journals)} files processed"))
-        else:
-            self.after(0, lambda: self._set_status(f"Journal scan complete: {len(journals)} files processed"))
+        self.after(0, lambda: self._set_status(f"Journal scan complete: {len(journals)} files processed"))
         
-        # Update database info display
-        if visits_added > 0 or hotspots_added > 0:
-            if hasattr(self, 'ring_finder'):
-                self.after(0, self.ring_finder._update_database_info)
-            # Update CMDR display for visit counts
-            if hasattr(self, '_update_cmdr_system_display'):
-                self.after(0, self._update_cmdr_system_display)
+        # Refresh mining missions tab after scan (batch mode already notified callbacks)
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            if hasattr(self.prospector_panel, 'missions_tab') and self.prospector_panel.missions_tab:
+                self.after(100, self.prospector_panel.missions_tab._refresh_missions)
+        
+        # Update UI components after scan (ring search already ran, just update database info)
+        if hasattr(self, 'ring_finder') and self.ring_finder:
+            self.after(0, self.ring_finder._update_database_info)
+        if hasattr(self, '_update_cmdr_system_display'):
+            self.after(0, self._update_cmdr_system_display)
+        
+        # Distance calculation runs AFTER journal scan is complete (now has accurate visit data)
+        if hasattr(self, '_update_home_fc_distances'):
+            print("[JOURNAL] Triggering distance calculation...")
+            self.after(100, self._update_home_fc_distances)
+        
+        # Also trigger System A ↔ B calculation if both fields are populated
+        if hasattr(self, '_calculate_distances'):
+            self.after(200, self._auto_calculate_if_populated)
+
+    def _auto_calculate_if_populated(self):
+        """Auto-calculate System A ↔ B distance if both fields have values"""
+        try:
+            system_a = self.distance_system_a.get().strip()
+            system_b = self.distance_system_b.get().strip()
+            
+            if system_a and system_b:
+                self._calculate_distances()
+        except Exception:
+            pass
 
     def get_current_system(self) -> Optional[str]:
         """Centralized method to get current system - single source of truth"""
