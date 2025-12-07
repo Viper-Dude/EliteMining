@@ -66,7 +66,7 @@ class SystemFinderAPI:
         
         try:
             if progress_callback:
-                progress_callback(20, 100, "Querying Spansh API...")
+                progress_callback(20, 100, "Searching galaxy database...")
             
             response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
             response.raise_for_status()
