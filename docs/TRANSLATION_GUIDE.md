@@ -130,38 +130,38 @@ Contains Elite Dangerous material names and abbreviations:
 
 Material names must match the in-game names exactly. Here are the English names to translate:
 
-| English | Notes |
-|---------|-------|
-| Platinum | |
-| Painite | |
-| Low Temperature Diamonds | Often abbreviated as "LTD" |
-| Void Opals | |
-| Alexandrite | |
-| Grandidierite | |
-| Musgravite | |
-| Rhodplumsite | |
-| Serendibite | |
-| Monazite | |
-| Benitoite | |
-| Bromellite | |
-| Tritium | |
-| Gold | |
-| Silver | |
-| Osmium | |
-| Palladium | |
-| Praseodymium | |
-| Samarium | |
-| Bertrandite | |
-| Coltan | |
-| Gallite | |
-| Indite | |
-| Uraninite | |
-| Methane Clathrate | |
-| Methanol Monohydrate Crystals | |
-| Lithium Hydroxide | |
-| Hydrogen Peroxide | |
-| Liquid Oxygen | |
-| Water | |
+| English | Abbreviation | Notes |
+|---------|--------------|-------|
+| Platinum | Plat | |
+| Painite | Pain | |
+| Low Temperature Diamonds | LTD, Low Temp.Diamonds | Often abbreviated in UI for space |
+| Void Opals | Opals | |
+| Alexandrite | Alex | |
+| Grandidierite | Gran | |
+| Musgravite | Musg | |
+| Rhodplumsite | Rhod | |
+| Serendibite | Sere | |
+| Monazite | Mona | |
+| Benitoite | Beni | |
+| Bromellite | Brom | |
+| Tritium | Trit | |
+| Gold | Gold | |
+| Silver | Silv | |
+| Osmium | Osmi | |
+| Palladium | Pall | |
+| Praseodymium | Pras | |
+| Samarium | Sama | |
+| Bertrandite | Bert | |
+| Coltan | Colt | |
+| Gallite | Gall | |
+| Indite | Indi | |
+| Uraninite | Uran | |
+| Methane Clathrate | MeCl | |
+| Methanol Monohydrate Crystals | MeOH | |
+| Lithium Hydroxide | LiOH | |
+| Hydrogen Peroxide | H2O2 | |
+| Liquid Oxygen | LOX | |
+| Water | H2O | |
 
 ---
 

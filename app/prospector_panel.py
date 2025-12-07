@@ -12011,7 +12011,7 @@ class ProspectorPanel(ttk.Frame):
         ttk.Label(frame, text=t('bookmarks.res_site_label')).grid(row=7, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         res_var = tk.StringVar(value=bookmark_data.get('res_site', '') if bookmark_data else '')
         res_combo = ttk.Combobox(frame, textvariable=res_var, width=32, state="readonly")
-        res_combo['values'] = ('', 'Hazardous', 'High', 'Low')
+        res_combo['values'] = ('', 'Hazardous', 'High', 'Normal', 'Low')
         res_combo.grid(row=7, column=1, sticky="w", pady=(0, 5))
         
         # RES Minerals dropdown field (separate from Overlap Minerals)
@@ -12370,7 +12370,7 @@ class ProspectorPanel(ttk.Frame):
             self._set_status("No system name to copy")
 
     def _create_statistics_panel(self, parent: ttk.Widget) -> None:
-        """Create the statistics panel for comprehensive mining analytics"""
+        """Create the statistics panel for comprehensive mining analytics with scrolling support"""
         # Get theme for styling
         from config import load_theme
         _stats_theme = load_theme()
@@ -12384,30 +12384,34 @@ class ProspectorPanel(ttk.Frame):
         style.configure("Stats.TLabelframe", background=_stats_bg)
         style.configure("Stats.TLabelframe.Label", background=_stats_bg, foreground=_stats_fg, font=("Consolas", 10, "bold"))
         
-        # Main scrollable frame
+        # Main frame (no scrollbar needed - layout is compact)
         main_frame = ttk.Frame(parent, style="Stats.TFrame")
-        main_frame.pack(fill="both", expand=True, padx=8, pady=8)
+        main_frame.pack(fill="both", expand=True, padx=5, pady=5)
         
-        # Title
-        title_label = tk.Label(main_frame, text=t('statistics.title'), 
-                              font=("Consolas", 14, "bold"), fg="#ffffff", bg=_stats_bg)
-        title_label.pack(pady=(0, 5))
+        # Title row - combines title and info text on same line to save space
+        title_row = ttk.Frame(main_frame, style="Stats.TFrame")
+        title_row.pack(fill="x", pady=(0, 5))
         
-        # Info text
-        info_label = tk.Label(main_frame, text=t('statistics.info'), 
-                             font=("Segoe UI", 9, "italic"), fg="#888888", bg=_stats_bg)
-        info_label.pack(pady=(0, 10))
+        # Title text (emoji already in localization)
+        title_label = tk.Label(title_row, text=t('statistics.title'), 
+                              font=("Consolas", 12, "bold"), fg="#ffffff", bg=_stats_bg)
+        title_label.pack(side="left")
+        
+        # Info text - smaller, next to title
+        info_label = tk.Label(title_row, text="  —  " + t('statistics.info'), 
+                             font=("Segoe UI", 8, "italic"), fg="#666666", bg=_stats_bg)
+        info_label.pack(side="left", padx=(5, 0))
         
         # Statistics container
         stats_container = ttk.Frame(main_frame, style="Stats.TFrame")
         stats_container.pack(fill="both", expand=True)
         
         # Two-column layout
-        left_column = ttk.LabelFrame(stats_container, text=t('statistics.overall_statistics'), padding=10, style="Stats.TLabelframe")
-        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        left_column = ttk.LabelFrame(stats_container, text=t('statistics.overall_statistics'), padding=5, style="Stats.TLabelframe")
+        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 3))
         
-        right_column = ttk.LabelFrame(stats_container, text=t('statistics.best_records'), padding=10, style="Stats.TLabelframe")
-        right_column.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        right_column = ttk.LabelFrame(stats_container, text=t('statistics.best_records'), padding=5, style="Stats.TLabelframe")
+        right_column.grid(row=0, column=1, sticky="nsew", padx=(3, 0))
         
         stats_container.grid_columnconfigure(0, weight=1)
         stats_container.grid_columnconfigure(1, weight=1)
@@ -12477,27 +12481,27 @@ class ProspectorPanel(ttk.Frame):
         # Records (Right Column) - Top 5 Best Systems only
         top_systems_title = tk.Label(right_column, text=t('statistics.top_5_systems'), font=("Consolas", 10, "bold"), 
                                     fg="#cccccc", bg=_stats_bg, anchor="w")
-        top_systems_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 2), padx=(0, 10))
+        top_systems_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 1), padx=(0, 10))
         
         # Create labels for top 5 systems (3 lines per system: System|Body, Material, then metrics)
         row_offset = 0
         for rank in range(1, 6):
             # Line 1: Rank. System | Body
-            system_label = tk.Label(right_column, text=f"{rank}. — | —", font=("Consolas", 10), 
+            system_label = tk.Label(right_column, text=f"{rank}. — | —", font=("Consolas", 9), 
                                    fg="#ffffff", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
-            system_label.grid(row=1+row_offset, column=0, columnspan=2, sticky="w", pady=(2, 0), padx=(0, 10))
+            system_label.grid(row=1+row_offset, column=0, columnspan=2, sticky="w", pady=(1, 0), padx=(0, 10))
             self.stats_labels[f'top_system_{rank}_line1'] = system_label
             
             # Line 2: Material (indented to align below system name, after "1. ")
-            material_label = tk.Label(right_column, text="—", font=("Consolas", 10), 
+            material_label = tk.Label(right_column, text="—", font=("Consolas", 9), 
                                      fg="#ffaa00", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
-            material_label.grid(row=1+row_offset+1, column=0, columnspan=2, sticky="w", pady=(0, 0), padx=(15, 0))
+            material_label.grid(row=1+row_offset+1, column=0, columnspan=2, sticky="w", pady=0, padx=(15, 0))
             self.stats_labels[f'top_system_{rank}_line2'] = material_label
             
             # Line 3: Metrics indented (T/Asteroid, TPH)
-            metrics_label = tk.Label(right_column, text="—", font=("Consolas", 10), 
+            metrics_label = tk.Label(right_column, text="—", font=("Consolas", 9), 
                                     fg="#00ff00", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
-            metrics_label.grid(row=1+row_offset+2, column=0, columnspan=2, sticky="w", pady=(0, 2), padx=(15, 0))
+            metrics_label.grid(row=1+row_offset+2, column=0, columnspan=2, sticky="w", pady=(0, 1), padx=(15, 0))
             self.stats_labels[f'top_system_{rank}_line3'] = metrics_label
             
             row_offset += 3
@@ -12766,7 +12770,10 @@ class ProspectorPanel(ttk.Frame):
             return ("No data", "#2b2b2b", "#888888")
     
     def _get_top_systems_from_csv(self, limit=5):
-        """Get top N unique systems by tons_per_asteroid from CSV (no duplicate system/body combos).
+        """Get top N unique systems by TPH from CSV, keeping the BEST session for each system/body.
+        
+        T/Asteroid is calculated using HITS (asteroids with materials), not asteroids_prospected.
+        Uses hit_rate_percent to derive hits: hits = asteroids_prospected * (hit_rate / 100)
         
         Returns list of dicts with system, body, tons_per, tph, material
         """
@@ -12777,8 +12784,8 @@ class ProspectorPanel(ttk.Frame):
             if not os.path.exists(csv_path):
                 return []
             
-            sessions = []
-            seen_systems = set()  # Track unique system|body combinations
+            # Track best session for each system|body (by TPH)
+            best_sessions = {}  # key: system|body, value: session dict
             
             with open(csv_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
@@ -12788,29 +12795,46 @@ class ProspectorPanel(ttk.Frame):
                         body = row.get('body', '')
                         system_key = f"{system}|{body}"
                         
-                        # Skip if we've already seen this system|body combination
-                        if system_key in seen_systems:
+                        total_tons = float(row.get('total_tons', 0) or 0)
+                        asteroids = int(row.get('asteroids_prospected', 0) or 0)
+                        tph = float(row.get('overall_tph', 0) or 0)
+                        hit_rate = float(row.get('hit_rate_percent', 0) or 0)
+                        
+                        if total_tons <= 0:
                             continue
                         
-                        total_tons = float(row.get('total_tons', 0) or 0)
-                        asteroids = int(row.get('asteroids_prospected', 0) or 1)
-                        tons_per = total_tons / asteroids if asteroids > 0 else 0
+                        # Calculate T/Asteroid using HITS (not asteroids_prospected)
+                        # hits = asteroids that contained tracked materials
+                        if asteroids > 0 and hit_rate > 0:
+                            hits = int(round(asteroids * (hit_rate / 100.0)))
+                            hits = max(hits, 1)  # At least 1 hit if we have tons
+                            tons_per = total_tons / hits
+                        elif asteroids > 0:
+                            # Fallback: if no hit_rate, use asteroids_prospected
+                            tons_per = total_tons / asteroids
+                        else:
+                            tons_per = 0
                         
                         if tons_per > 0:
                             best_material = row.get('best_material', 'Unknown')
                             
-                            sessions.append({
+                            session_data = {
                                 'system': system,
                                 'body': body,
                                 'tons_per': tons_per,
-                                'tph': float(row.get('overall_tph', 0) or 0),
+                                'tph': tph,
                                 'material': best_material
-                            })
-                            seen_systems.add(system_key)
+                            }
+                            
+                            # Keep the BEST session for each system/body (by TPH)
+                            if system_key not in best_sessions or tph > best_sessions[system_key]['tph']:
+                                best_sessions[system_key] = session_data
+                                
                     except (ValueError, TypeError):
                         continue
             
-            # Sort by T/hr (TPH) descending
+            # Convert to list and sort by TPH descending
+            sessions = list(best_sessions.values())
             sessions.sort(key=lambda x: x['tph'], reverse=True)
             
             return sessions[:limit]

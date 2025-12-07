@@ -259,9 +259,9 @@ class MiningMissionsTab(ttk.Frame):
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
         
-        # Configure 2-column grid layout
-        self.scrollable_frame.columnconfigure(0, weight=1)
-        self.scrollable_frame.columnconfigure(1, weight=1)
+        # Configure 2-column grid layout with equal widths
+        self.scrollable_frame.columnconfigure(0, weight=1, uniform="cards")
+        self.scrollable_frame.columnconfigure(1, weight=1, uniform="cards")
         
         # Create mission cards in 2-column layout
         for i, mission in enumerate(missions):
@@ -399,18 +399,18 @@ class MiningMissionsTab(ttk.Frame):
                 actual_cargo = qty
                 break
         
-        # Card frame with border - more compact, using grid layout
+        # Card frame with border
         card = tk.Frame(
             self.scrollable_frame,
             bg=self.accent_bg,
             highlightbackground=self.fg_dim,
             highlightthickness=1
         )
-        card.grid(row=row, column=col, sticky="nsew", padx=3, pady=2)
+        card.grid(row=row, column=col, sticky="ew", padx=3, pady=2)
         
-        # Inner padding - reduced
+        # Inner padding
         inner = tk.Frame(card, bg=self.accent_bg)
-        inner.pack(fill="both", expand=True, padx=8, pady=6)
+        inner.pack(fill="x", padx=8, pady=6)
         
         # Row 1: Commodity, Progress, Find Hotspot button
         row1 = tk.Frame(inner, bg=self.accent_bg)

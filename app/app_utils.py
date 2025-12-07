@@ -243,35 +243,52 @@ def _center_child_over_parent(child: tk.Toplevel, parent: Optional[tk.Widget]) -
 
 
 def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon: str = 'info') -> None:
-    """Show a centered info/warning/error dialog with orange theme. Icon can be 'info', 'warning', or 'error'."""
+    """Show a centered info/warning/error dialog with proper theme colors. Icon can be 'info', 'warning', or 'error'."""
     try:
         from localization import t
     except ImportError:
         t = lambda key, **kw: key
     
+    # Get theme from config
+    try:
+        from config import load_theme
+        theme = load_theme()
+    except:
+        theme = "elite_orange"
+    
+    # Set colors based on theme
+    if theme == "elite_orange":
+        bg_color = "#1e1e1e"
+        fg_color = "#ff9800"
+        btn_bg = "#3a3a3a"
+    else:  # dark_gray
+        bg_color = "#1e1e1e"
+        fg_color = "#e6e6e6"
+        btn_bg = "#3a3a3a"
+    
     dialog = tk.Toplevel(parent)
     dialog.withdraw()
     dialog.title(title)
     dialog.resizable(False, False)
-    dialog.configure(bg="#1e1e1e")
+    dialog.configure(bg=bg_color)
     set_window_icon(dialog)
     
     # Main frame with dark background
-    frame = tk.Frame(dialog, bg="#1e1e1e", padx=20, pady=20)
+    frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=20)
     frame.pack(fill="both", expand=True)
     
-    # Message label with orange text
+    # Message label with themed text
     tk.Label(frame, text=message, font=("Segoe UI", 10), wraplength=420, justify="left",
-            bg="#1e1e1e", fg="#ff9800").pack(pady=(0, 15))
+            bg=bg_color, fg=fg_color).pack(pady=(0, 15))
     
-    btn_frame = tk.Frame(frame, bg="#1e1e1e")
+    btn_frame = tk.Frame(frame, bg=bg_color)
     btn_frame.pack()
     
     def on_ok():
         dialog.destroy()
     
     ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=12, command=on_ok,
-                      bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                      bg=btn_bg, fg="#ffffff", font=("Segoe UI", 10),
                       activebackground="#4a4a4a", activeforeground="#ffffff",
                       cursor="hand2")
     ok_btn.pack()

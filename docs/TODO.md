@@ -18,7 +18,25 @@
 ## 🟡 Medium Priority
 
 ### Features
-- [ ] 
+- [ ] **System Finder Tab** - New tab to search nearby systems by criteria (like Inara)
+  - Reference System + "Current System" button
+  - Max Distance dropdown (50ly, 100ly, 150ly, 200ly, etc.)
+  - Filter dropdowns:
+    - Allegiance: Any / Federation / Empire / Alliance / Independent
+    - Government: Any / Democracy / Corporate / Patronage / Feudal / Dictatorship / etc.
+    - Security: Any / High / Medium / Low / Anarchy
+    - Economy: Any / Industrial / Agriculture / Extraction / Refinery / etc.
+    - Population: Any / Low (<1M) / Medium (1M-100M) / High (100M-1B) / Very High (>1B)
+    - State: Any / Expansion / War / Civil War / Boom / Famine / etc.
+  - Results table: System | Distance | Security | Allegiance | State | Population | Faction
+  - Uses EDData API `/v2/system/name/{system}/nearby` + `/v2/system/name/{system}/status`
+  - Context menu: Copy system, Open in Inara, Open in EDSM
+
+- [ ] **Tools Tab** - Create new "Tools" main tab with sub-tabs:
+  - Distance Calculator (move from main tabs)
+  - Bookmarks (move from main tabs)
+  - Future: Material Finder, Route Planner, etc.
+  - Reduces main tab bar clutter, groups utility features together
 
 ### Code Quality
 - [ ] **Auto populate cmdrs name*** In the paost to discord

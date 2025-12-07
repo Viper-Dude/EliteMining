@@ -741,7 +741,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.6.7"
+APP_VERSION = "v4.68"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4927,6 +4927,9 @@ class App(tk.Tk):
             try:
                 # Focus the notebook itself to remove selection from entry widgets
                 self.notebook.focus_set()
+                # Clear selection from System Finder entry if it exists
+                if hasattr(self, 'sysfinder_ref_entry'):
+                    self.sysfinder_ref_entry.selection_clear()
             except Exception:
                 pass
         self.notebook.bind('<<NotebookTabChanged>>', _clear_entry_focus)
@@ -4950,6 +4953,11 @@ class App(tk.Tk):
         self._build_marketplace_tab(marketplace_tab)
         self.notebook.add(marketplace_tab, text=t('tabs.commodity_market'))
         
+        # System Finder tab
+        system_finder_tab = ttk.Frame(self.notebook, padding=8)
+        self._build_system_finder_tab(system_finder_tab)
+        self.notebook.add(system_finder_tab, text=t('tabs.system_finder'))
+        
         # Add Distance Calculator tab now (built earlier but added here for correct order)
         self.notebook.add(distance_tab, text=t('tabs.distance_calculator'))
 
@@ -4971,10 +4979,7 @@ class App(tk.Tk):
         self._build_settings_notebook(settings_tab)
         self.notebook.add(settings_tab, text=t('tabs.settings'))
 
-        # About tab
-        about_tab = ttk.Frame(self.notebook, padding=8)
-        self._build_about_tab(about_tab)
-        self.notebook.add(about_tab, text=t('tabs.about'))
+        # About tab removed - now accessible via version button in sidebar
 
         # Actions row (global)
         actions = ttk.Frame(content_frame)
@@ -5068,6 +5073,13 @@ class App(tk.Tk):
         try:
             if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_entry'):
                 self.after(300, lambda: self.ring_finder.system_entry.selection_clear())
+        except Exception:
+            pass
+        
+        # Clear selection on system finder entry after UI stabilized
+        try:
+            if hasattr(self, 'sysfinder_ref_entry'):
+                self.after(300, lambda: self.sysfinder_ref_entry.selection_clear())
         except Exception:
             pass
         
@@ -7397,6 +7409,9 @@ class App(tk.Tk):
         
         # Language flag buttons (next to theme button)
         self._create_language_flags(theme_btn_frame)
+        
+        # Version button (opens About dialog)
+        self._create_version_button(theme_btn_frame)
 
         # Refresh the preset list
         self._refresh_preset_list()
@@ -10837,6 +10852,7 @@ class App(tk.Tk):
         try:
             self.after(150, lambda: self.import_btn.focus_set() if hasattr(self, 'import_btn') else None)
             self.after(150, lambda: (self.ring_finder.system_entry.selection_clear() if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_entry') else None))
+            self.after(150, lambda: (self.sysfinder_ref_entry.selection_clear() if hasattr(self, 'sysfinder_ref_entry') else None))
             self.after(150, lambda: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None))
         except Exception:
             pass
@@ -11077,13 +11093,16 @@ class App(tk.Tk):
         import tkinter as tk
         from tkinter import ttk
         
+        # Remember old theme for cancel
+        old_theme = self.current_theme
+        
         # Toggle theme
         if self.current_theme == "elite_orange":
             new_theme = "dark_gray"
-            theme_name = "Dark Gray"
+            theme_name = t('settings.dark_gray') if 'settings.dark_gray' in t('settings.dark_gray') else "Dark Gray"
         else:
             new_theme = "elite_orange"
-            theme_name = "Elite Orange"
+            theme_name = t('settings.elite_orange') if 'settings.elite_orange' in t('settings.elite_orange') else "Elite Orange"
         
         # Save new theme
         save_theme(new_theme)
@@ -11110,20 +11129,30 @@ class App(tk.Tk):
         frame.pack(fill="both", expand=True)
         
         # Show theme change message with OK button
-        ttk.Label(frame, text=f"Theme changed to {theme_name}.", 
+        ttk.Label(frame, text=f"{t('dialogs.theme_changed_to')} {theme_name}.", 
                   font=("Segoe UI", 10, "bold")).pack(pady=(0, 5))
-        ttk.Label(frame, text="Please restart EliteMining to apply changes.",
+        ttk.Label(frame, text=t('settings.restart_message'),
                   font=("Segoe UI", 9)).pack(pady=(0, 15))
         
-        # Single OK button - user will close app manually
+        # Button frame
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack()
+        
         def on_ok():
             dialog.destroy()
         
-        ok_btn = ttk.Button(frame, text="OK", command=on_ok, width=10)
-        ok_btn.pack()
+        def on_cancel():
+            # Revert theme change
+            save_theme(old_theme)
+            dialog.destroy()
+        
+        ok_btn = ttk.Button(btn_frame, text=t('common.ok'), command=on_ok, width=10)
+        ok_btn.pack(side="left", padx=(0, 10))
+        cancel_btn = ttk.Button(btn_frame, text=t('common.cancel'), command=on_cancel, width=10)
+        cancel_btn.pack(side="left")
         ok_btn.focus_set()
         dialog.bind("<Return>", lambda e: on_ok())
-        dialog.bind("<Escape>", lambda e: on_ok())
+        dialog.bind("<Escape>", lambda e: on_cancel())
         
         # Center dialog on main window
         dialog.update_idletasks()
@@ -11221,6 +11250,263 @@ class App(tk.Tk):
         # Add tooltip AFTER bindings
         ToolTip(self._current_lang_label, t('tooltips.change_language'))
     
+    def _create_version_button(self, parent_frame) -> None:
+        """Create a clickable version button that opens the About dialog"""
+        from version import get_version
+        
+        version = get_version()
+        
+        # Get theme-appropriate colors
+        if self.current_theme == "elite_orange":
+            _vbtn_bg = "#1a1a1a"
+            _vbtn_fg = "#888888"
+            _vbtn_hover_fg = "#ffcc00"
+        else:
+            _vbtn_bg = "#1e1e1e"
+            _vbtn_fg = "#777777"
+            _vbtn_hover_fg = "#ffffff"
+        
+        self._version_label = tk.Label(
+            parent_frame,
+            text=f"v{version}",
+            font=("Segoe UI", 8),
+            bg=_vbtn_bg,
+            fg=_vbtn_fg,
+            cursor="hand2",
+            padx=4
+        )
+        self._version_label.pack(side="left", padx=(8, 0))
+        
+        # Bind click to show About dialog
+        self._version_label.bind("<Button-1>", lambda e: self._show_about_dialog())
+        
+        # Hover effect
+        def on_enter_version(e):
+            self._version_label.config(fg=_vbtn_hover_fg)
+        def on_leave_version(e):
+            self._version_label.config(fg=_vbtn_fg)
+        self._version_label.bind("<Enter>", on_enter_version, add='+')
+        self._version_label.bind("<Leave>", on_leave_version, add='+')
+        
+        # Add tooltip
+        ToolTip(self._version_label, t('tooltips.about'))
+    
+    def _show_about_dialog(self) -> None:
+        """Show the About dialog as a popup window"""
+        import webbrowser
+        from version import __version__, __build_date__
+        from config import load_theme
+        from app_utils import get_app_icon_path
+        
+        # Theme-aware colors
+        _about_theme = load_theme()
+        _about_bg = "#000000" if _about_theme == "elite_orange" else "#1e1e1e"
+        _btn_bg = "#1a1a1a" if _about_theme == "elite_orange" else "#2a3a4a"
+        _btn_fg = "#ff9900" if _about_theme == "elite_orange" else "#e0e0e0"
+        _btn_active_bg = "#2a2a2a" if _about_theme == "elite_orange" else "#3a4a5a"
+        _btn_active_fg = "#ffcc00" if _about_theme == "elite_orange" else "#ffffff"
+        
+        # Create dialog
+        dialog = tk.Toplevel(self)
+        dialog.title(t('tabs.about'))
+        dialog.configure(bg=_about_bg)
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        # Set icon
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+        except:
+            pass
+        
+        # Main container
+        main_frame = tk.Frame(dialog, bg=_about_bg, padx=30, pady=20)
+        main_frame.pack(fill="both", expand=True)
+        
+        # Try to load text logo image
+        try:
+            from path_utils import get_images_dir
+            from PIL import Image, ImageTk
+            import os
+            logo_path = os.path.join(get_images_dir(), "EliteMining_txt_logo_transp_resize.png")
+            if os.path.exists(logo_path):
+                img = Image.open(logo_path)
+                # Resize to reasonable width
+                orig_width, orig_height = img.size
+                new_width = 220
+                new_height = int(orig_height * (new_width / orig_width))
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                self._about_dialog_logo = ImageTk.PhotoImage(img)
+                logo_label = tk.Label(main_frame, image=self._about_dialog_logo, bg=_about_bg)
+                logo_label.pack(pady=(0, 5))
+            else:
+                tk.Label(main_frame, text="EliteMining", font=("Segoe UI", 16, "bold"), 
+                         fg="#ffcc00", bg=_about_bg).pack()
+        except Exception:
+            tk.Label(main_frame, text="EliteMining", font=("Segoe UI", 16, "bold"), 
+                     fg="#ffcc00", bg=_about_bg).pack()
+        
+        # Version
+        tk.Label(main_frame, text=f"Version {__version__}", font=("Segoe UI", 10), 
+                 fg="#888888", bg=_about_bg).pack(pady=(0, 10))
+        
+        # Description
+        tk.Label(main_frame, text=t('about.description'), 
+                 font=("Segoe UI", 10), fg="#e0e0e0", bg=_about_bg).pack(pady=(0, 10))
+        
+        # Separator
+        tk.Frame(main_frame, height=1, bg="#444444", width=350).pack(pady=8)
+        
+        # Copyright and license
+        tk.Label(main_frame, text=t('about.copyright'), 
+                 font=("Segoe UI", 9), fg="#e0e0e0", bg=_about_bg).pack()
+        tk.Label(main_frame, text=t('about.license'), 
+                 font=("Segoe UI", 8), fg="#888888", bg=_about_bg).pack()
+        
+        # Separator
+        tk.Frame(main_frame, height=1, bg="#444444", width=350).pack(pady=8)
+        
+        # Links section (horizontal row)
+        links_frame = tk.Frame(main_frame, bg=_about_bg)
+        links_frame.pack(pady=8)
+        
+        # Row 1: Discord, Reddit, GitHub
+        links_row1 = [
+            (t('about.discord'), "https://discord.gg/5dsF3UshRR"),
+            (t('about.reddit'), "https://www.reddit.com/r/EliteDangerous/comments/1oflji3/elitemining_free_mining_hotspot_finder_app/"),
+            (t('about.github'), "https://github.com/Viper-Dude/EliteMining"),
+        ]
+        
+        def open_link(url):
+            webbrowser.open(url)
+        
+        for label, url in links_row1:
+            btn = tk.Button(links_frame, text=label, 
+                           command=lambda u=url: open_link(u),
+                           bg=_btn_bg, fg=_btn_fg, activebackground=_btn_active_bg,
+                           activeforeground=_btn_active_fg, relief="ridge", bd=1, 
+                           padx=8, pady=2, font=("Segoe UI", 8), cursor="hand2")
+            btn.pack(side="left", padx=3)
+        
+        # Row 2: Docs, Report Bug
+        links_frame2 = tk.Frame(main_frame, bg=_about_bg)
+        links_frame2.pack(pady=(4, 8))
+        
+        links_row2 = [
+            (t('about.documentation'), "https://github.com/Viper-Dude/EliteMining#readme"),
+            (t('about.report_bug'), "https://github.com/Viper-Dude/EliteMining/issues/new"),
+        ]
+        
+        for label, url in links_row2:
+            btn = tk.Button(links_frame2, text=label, 
+                           command=lambda u=url: open_link(u),
+                           bg=_btn_bg, fg=_btn_fg, activebackground=_btn_active_bg,
+                           activeforeground=_btn_active_fg, relief="ridge", bd=1, 
+                           padx=8, pady=2, font=("Segoe UI", 8), cursor="hand2")
+            btn.pack(side="left", padx=3)
+        
+        # Separator
+        tk.Frame(main_frame, height=1, bg="#444444", width=350).pack(pady=8)
+        
+        # Credits (compact)
+        credits_text = "Credits: EliteVA (Somfic) • Ardent API (Iain Collins) • EDData API (gOOvER | CMDR Shyvin) • EDCD/EDDN"
+        tk.Label(main_frame, text=credits_text, font=("Segoe UI", 8), 
+                 fg="#888888", bg=_about_bg, wraplength=380).pack(pady=(0, 10))
+        
+        # Support/Donate row
+        support_frame = tk.Frame(main_frame, bg=_about_bg)
+        support_frame.pack(pady=(5, 0))
+        
+        tk.Label(support_frame, text="☕ " + t('about.donation_text')[:50] + "...", 
+                 font=("Segoe UI", 8, "italic"), fg="#aaaaaa", bg=_about_bg).pack(side="left")
+        
+        # PayPal button with logo image
+        try:
+            from path_utils import get_app_data_dir
+            paypal_img_path = os.path.join(get_app_data_dir(), "Images", "paypal.png")
+            if os.path.exists(paypal_img_path):
+                paypal_img = tk.PhotoImage(file=paypal_img_path)
+                # Scale to ~45px width
+                if paypal_img.width() > 45:
+                    scale = max(1, paypal_img.width() // 45)
+                    paypal_img = paypal_img.subsample(scale, scale)
+                self._about_dialog_paypal_img = paypal_img  # Keep reference
+                paypal_btn = tk.Label(support_frame, image=paypal_img, cursor="hand2", bg=_about_bg)
+                paypal_btn.pack(side="left", padx=(10, 0))
+                paypal_btn.bind("<Button-1>", lambda e: webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=NZQTA4TGPDSC6"))
+            else:
+                raise FileNotFoundError("PayPal image not found")
+        except Exception:
+            # Fallback to text button
+            paypal_btn = tk.Button(support_frame, text="PayPal", 
+                                  command=lambda: webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=NZQTA4TGPDSC6"),
+                                  bg="#0070ba", fg="#ffffff", activebackground="#0060aa",
+                                  relief="flat", bd=0, padx=8, pady=1, font=("Segoe UI", 8), cursor="hand2")
+            paypal_btn.pack(side="left", padx=(10, 0))
+        
+        # Close button
+        close_btn = tk.Button(main_frame, text=t('common.close'), 
+                             command=dialog.destroy,
+                             bg=_btn_bg, fg=_btn_fg, activebackground=_btn_active_bg,
+                             activeforeground=_btn_active_fg, relief="ridge", bd=1, 
+                             padx=20, pady=3, font=("Segoe UI", 9), cursor="hand2")
+        close_btn.pack(pady=(15, 0))
+        
+        # Center on parent - IMPORTANT: Always center dialogs on parent window!
+        dialog.update_idletasks()
+        self._center_dialog_on_parent(dialog)
+        
+        # Focus dialog
+        dialog.focus_set()
+
+    def _center_dialog_on_parent(self, dialog) -> None:
+        """Center a dialog window on the main application window.
+        
+        IMPORTANT: Always use this method when creating popup dialogs to ensure
+        consistent positioning across all dialogs in the application.
+        
+        Usage:
+            dialog = tk.Toplevel(self)
+            # ... add widgets to dialog ...
+            dialog.update_idletasks()  # Required to get accurate dimensions
+            self._center_dialog_on_parent(dialog)
+        """
+        # Force geometry update to get accurate dimensions
+        dialog.update()
+        
+        # Get main window position and size
+        main_x = self.winfo_x()
+        main_y = self.winfo_y()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+        
+        # Get dialog size - try reqwidth first, fall back to actual width
+        dialog_width = dialog.winfo_reqwidth()
+        dialog_height = dialog.winfo_reqheight()
+        
+        # If reqwidth returned too small, use actual dimensions
+        if dialog_width < 50:
+            dialog_width = dialog.winfo_width()
+        if dialog_height < 50:
+            dialog_height = dialog.winfo_height()
+        
+        # If still too small, use reasonable defaults
+        if dialog_width < 50:
+            dialog_width = 400
+        if dialog_height < 50:
+            dialog_height = 300
+        
+        # Calculate centered position relative to main window
+        # DO NOT apply screen bounds - we want it on the same monitor as main window
+        x = main_x + (main_width - dialog_width) // 2
+        y = main_y + (main_height - dialog_height) // 2
+        
+        # Apply position with explicit size
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+
     def _show_language_menu(self, event):
         """Show popup menu with language options"""
         menu = tk.Menu(self, tearoff=0, bg="#2a2a2a", fg="#ffffff", 
@@ -11251,13 +11537,18 @@ class App(tk.Tk):
             menu.grab_release()
     
     def _change_language(self, lang_code: str):
-        """Change language and prompt for restart"""
+        """Change language and prompt for restart with Cancel option"""
         from localization import get_language
-        from app_utils import centered_message
+        from app_utils import get_app_icon_path
+        from config import load_theme
         
         # Don't do anything if same language
-        if lang_code == get_language():
+        old_lang = get_language()
+        if lang_code == old_lang:
             return
+        
+        # Save old flag image reference
+        old_image = self._flag_images.get(old_lang)
         
         # Save to config
         try:
@@ -11276,10 +11567,88 @@ class App(tk.Tk):
         else:
             self._current_lang_label.config(text=lang_code.upper())
         
-        # Show restart message with OK button
-        from app_utils import centered_message
-        centered_message(self, t('settings.restart_required'),
-            "Language changed.\n\nPlease restart EliteMining to apply changes.")
+        # Get theme colors
+        theme = load_theme()
+        if theme == "elite_orange":
+            bg_color = "#1e1e1e"
+            fg_color = "#ff9800"
+        else:
+            bg_color = "#1e1e1e"
+            fg_color = "#e6e6e6"
+        
+        # Create dialog with OK and Cancel
+        dialog = tk.Toplevel(self)
+        dialog.withdraw()
+        dialog.title(t('settings.restart_required'))
+        dialog.resizable(False, False)
+        dialog.configure(bg=bg_color)
+        dialog.transient(self)
+        
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+        except:
+            pass
+        
+        frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=20)
+        frame.pack(fill="both", expand=True)
+        
+        tk.Label(frame, text=t('dialogs.language_changed'), 
+                font=("Segoe UI", 10, "bold"), bg=bg_color, fg=fg_color).pack(pady=(0, 5))
+        tk.Label(frame, text=t('settings.restart_message'),
+                font=("Segoe UI", 9), bg=bg_color, fg=fg_color).pack(pady=(0, 15))
+        
+        btn_frame = tk.Frame(frame, bg=bg_color)
+        btn_frame.pack()
+        
+        def on_ok():
+            dialog.destroy()
+        
+        def on_cancel():
+            # Revert language change
+            try:
+                cfg = _load_cfg()
+                cfg['language'] = old_lang
+                _save_cfg(cfg)
+            except:
+                pass
+            # Revert flag display
+            if old_image:
+                self._current_lang_label.config(image=old_image)
+                self._current_lang_label.image = old_image
+            else:
+                self._current_lang_label.config(text=old_lang.upper())
+            dialog.destroy()
+        
+        ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=10, command=on_ok,
+                          bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                          activebackground="#4a4a4a", activeforeground="#ffffff", cursor="hand2")
+        ok_btn.pack(side="left", padx=(0, 10))
+        cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), width=10, command=on_cancel,
+                              bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                              activebackground="#4a4a4a", activeforeground="#ffffff", cursor="hand2")
+        cancel_btn.pack(side="left")
+        
+        dialog.bind("<Return>", lambda e: on_ok())
+        dialog.bind("<Escape>", lambda e: on_cancel())
+        
+        # Center on parent
+        dialog.update_idletasks()
+        dialog_width = dialog.winfo_reqwidth()
+        dialog_height = dialog.winfo_reqheight()
+        main_x = self.winfo_x()
+        main_y = self.winfo_y()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+        x = main_x + (main_width - dialog_width) // 2
+        y = main_y + (main_height - dialog_height) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        dialog.deiconify()
+        dialog.grab_set()
+        ok_btn.focus_set()
+        dialog.wait_window()
 
     def _restart_app(self) -> None:
         """Restart the application - shows message for frozen executables"""
@@ -12626,6 +12995,687 @@ class App(tk.Tk):
         # Initialize dropdown options based on current buy/sell mode
         self._update_marketplace_order_options()
     
+    # ==================== SYSTEM FINDER TAB ====================
+    def _build_system_finder_tab(self, frame: ttk.Frame) -> None:
+        """Build the System Finder tab - search nearby systems by criteria"""
+        from system_finder_api import (
+            SECURITY_OPTIONS, ALLEGIANCE_OPTIONS, GOVERNMENT_OPTIONS,
+            STATE_OPTIONS, ECONOMY_OPTIONS, POPULATION_OPTIONS
+        )
+        from config import load_theme
+        
+        # Get theme colors
+        sf_theme = load_theme()
+        if sf_theme == "elite_orange":
+            sf_bg = "#0a0a0a"
+            sf_menu_bg = "#1e1e1e"
+            sf_menu_fg = "#ff8c00"
+            sf_menu_active_bg = "#ff6600"
+            sf_menu_active_fg = "#000000"
+        else:
+            sf_bg = "#1e1e1e"
+            sf_menu_bg = "#2d2d2d"
+            sf_menu_fg = "#e0e0e0"
+            sf_menu_active_bg = "#3a3a3a"
+            sf_menu_active_fg = "#ffffff"
+        
+        # Main container
+        main_container = ttk.Frame(frame)
+        main_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Search section
+        search_frame = ttk.LabelFrame(main_container, text=t('system_finder.title'), padding=10)
+        search_frame.pack(fill="x", pady=(0, 10))
+        
+        # Configure grid weights
+        for i in range(4):
+            search_frame.columnconfigure(i, weight=1)
+        
+        # Row 0: Reference system, Use Current System button, and Search button
+        row = 0
+        ttk.Label(search_frame, text=t('system_finder.reference_system') + ":").grid(
+            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+        
+        # Frame to hold entry, buttons side by side
+        ref_frame = ttk.Frame(search_frame)
+        ref_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5, pady=3)
+        
+        self.sysfinder_reference_system = tk.StringVar()
+        self.sysfinder_ref_entry = ttk.Entry(
+            ref_frame, textvariable=self.sysfinder_reference_system, width=30
+        )
+        self.sysfinder_ref_entry.pack(side="left")
+        
+        # Use Current System button - right next to entry (like ring finder)
+        self.sysfinder_use_current_btn = tk.Button(
+            ref_frame, text=t('ring_finder.use_current_system'),
+            command=self._use_current_system_sysfinder,
+            bg="#4a3a2a", fg="#e0e0e0",
+            activebackground="#5a4a3a", activeforeground="#ffffff",
+            relief="ridge", bd=1, padx=8, pady=4,
+            font=("Segoe UI", 8, "normal"), cursor="hand2"
+        )
+        self.sysfinder_use_current_btn.pack(side="left", padx=(5, 0))
+        
+        # Search button - moved to Row 0 for faster access
+        self.sysfinder_search_btn = tk.Button(
+            ref_frame, text=t('system_finder.search'),
+            command=self._search_systems,
+            bg="#2a4a2a", fg="#e0e0e0",
+            activebackground="#3a5a3a", activeforeground="#ffffff",
+            relief="ridge", bd=1, padx=15, pady=4,
+            font=("Segoe UI", 8, "normal"), cursor="hand2"
+        )
+        self.sysfinder_search_btn.pack(side="left", padx=(10, 0))
+        
+        # Row 1: Allegiance and Population
+        row = 1
+        ttk.Label(search_frame, text=t('system_finder.allegiance') + ":").grid(
+            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+        
+        self.sysfinder_allegiance = tk.StringVar(value="Any")
+        allegiance_combo = ttk.Combobox(
+            search_frame, textvariable=self.sysfinder_allegiance,
+            values=ALLEGIANCE_OPTIONS, width=15, state="readonly"
+        )
+        allegiance_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
+        
+        ttk.Label(search_frame, text=t('system_finder.population') + ":").grid(
+            row=row, column=2, sticky="e", padx=(15, 5), pady=3)
+        
+        # Population options (Inara-style thresholds - no localization needed)
+        self.sysfinder_population = tk.StringVar(value="Any")
+        pop_combo = ttk.Combobox(
+            search_frame, textvariable=self.sysfinder_population,
+            values=POPULATION_OPTIONS, width=22, state="readonly"
+        )
+        pop_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
+        
+        # Row 2: Government and Security
+        row = 2
+        ttk.Label(search_frame, text=t('system_finder.government') + ":").grid(
+            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+        
+        self.sysfinder_government = tk.StringVar(value="Any")
+        gov_combo = ttk.Combobox(
+            search_frame, textvariable=self.sysfinder_government,
+            values=GOVERNMENT_OPTIONS, width=15, state="readonly"
+        )
+        gov_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
+        
+        ttk.Label(search_frame, text=t('system_finder.security') + ":").grid(
+            row=row, column=2, sticky="e", padx=(15, 5), pady=3)
+        
+        self.sysfinder_security = tk.StringVar(value="Any")
+        security_combo = ttk.Combobox(
+            search_frame, textvariable=self.sysfinder_security,
+            values=SECURITY_OPTIONS, width=22, state="readonly"
+        )
+        security_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
+        
+        # Row 3: Economy and State
+        row = 3
+        ttk.Label(search_frame, text=t('system_finder.economy') + ":").grid(
+            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+        
+        self.sysfinder_economy = tk.StringVar(value="Any")
+        economy_combo = ttk.Combobox(
+            search_frame, textvariable=self.sysfinder_economy,
+            values=ECONOMY_OPTIONS, width=15, state="readonly"
+        )
+        economy_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
+        
+        ttk.Label(search_frame, text=t('system_finder.state') + ":").grid(
+            row=row, column=2, sticky="e", padx=(15, 5), pady=3)
+        
+        self.sysfinder_state = tk.StringVar(value="Any")
+        state_combo = ttk.Combobox(
+            search_frame, textvariable=self.sysfinder_state,
+            values=STATE_OPTIONS, width=18, state="readonly"
+        )
+        state_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
+        
+        # Row 4: Reference system info display (shows info about the "Reference System")
+        # Split into 2 rows: Row 1 = System name, Row 2 = Properties
+        row = 4
+        ref_info_frame = tk.Frame(search_frame, bg=sf_bg)
+        ref_info_frame.grid(row=row, column=0, columnspan=4, pady=(8, 3), sticky="ew")
+        
+        # Store background color for later updates
+        self._sysfinder_ref_bg = sf_bg
+        
+        # Reference system info - using multiple labels for white/yellow styling
+        # Labels in white, values in yellow (like CMDR status line)
+        font_label = ("Segoe UI", 8)
+        font_value = ("Segoe UI", 8, "bold")
+        
+        # Row 1: System name (centered)
+        row1_container = tk.Frame(ref_info_frame, bg=sf_bg)
+        row1_container.pack(anchor="center")
+        
+        tk.Label(row1_container, text="Current System:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        self.sysfinder_ref_val_system = tk.Label(row1_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_system.pack(side="left")
+        
+        # Row 2: Properties (centered)
+        row2_container = tk.Frame(ref_info_frame, bg=sf_bg)
+        row2_container.pack(anchor="center")
+        
+        tk.Label(row2_container, text="Security:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        self.sysfinder_ref_val_sec = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_sec.pack(side="left")
+        
+        tk.Label(row2_container, text=" | Allegiance:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        self.sysfinder_ref_val_alleg = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_alleg.pack(side="left")
+        
+        tk.Label(row2_container, text=" | Government:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        self.sysfinder_ref_val_gov = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_gov.pack(side="left")
+        
+        tk.Label(row2_container, text=" | Economy:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        self.sysfinder_ref_val_eco = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_eco.pack(side="left")
+        
+        tk.Label(row2_container, text=" | Population:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        self.sysfinder_ref_val_pop = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_pop.pack(side="left")
+        
+        tk.Label(row2_container, text=" | State:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        self.sysfinder_ref_val_state = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_state.pack(side="left")
+        
+        # Add trace to update info when reference system changes (with debounce)
+        self._sysfinder_ref_update_pending = None
+        def on_ref_system_change(*args):
+            # Cancel any pending update
+            if self._sysfinder_ref_update_pending:
+                self.after_cancel(self._sysfinder_ref_update_pending)
+            # Schedule new update after 500ms debounce
+            system = self.sysfinder_reference_system.get().strip()
+            if system:
+                self._sysfinder_ref_update_pending = self.after(500, lambda: self._update_sysfinder_ref_info(system))
+            else:
+                # Reset all values to "-"
+                self.sysfinder_ref_val_system.config(text=" Enter system")
+                self.sysfinder_ref_val_sec.config(text=" -")
+                self.sysfinder_ref_val_alleg.config(text=" -")
+                self.sysfinder_ref_val_gov.config(text=" -")
+                self.sysfinder_ref_val_eco.config(text=" -")
+                self.sysfinder_ref_val_pop.config(text=" -")
+                self.sysfinder_ref_val_state.config(text=" -")
+        self.sysfinder_reference_system.trace_add('write', on_ref_system_change)
+        
+        # Results section
+        results_frame = ttk.LabelFrame(main_container, text="", padding=5)
+        results_frame.pack(fill="both", expand=True, pady=(5, 0))
+        
+        # Status/count label
+        self.sysfinder_status_label = ttk.Label(results_frame, text="")
+        self.sysfinder_status_label.pack(anchor="w", pady=(0, 5))
+        
+        # Store theme colors for context menu (before creating it)
+        self._sysfinder_menu_bg = sf_menu_bg
+        self._sysfinder_menu_fg = sf_menu_fg
+        self._sysfinder_menu_active_bg = sf_menu_active_bg
+        self._sysfinder_menu_active_fg = sf_menu_active_fg
+        
+        # Create results table
+        self._create_sysfinder_results_table(results_frame)
+        
+        # Create context menu
+        self._create_sysfinder_context_menu()
+        
+        # Auto-populate current system after a delay
+        self.after(2000, self._populate_sysfinder_system)
+        
+        # Remove focus from entry field (prevent highlight on tab switch)
+        # Focus the frame instead of the entry
+        frame.focus_set()
+    
+    def _create_sysfinder_results_table(self, parent_frame):
+        """Create results table for system finder"""
+        table_frame = ttk.Frame(parent_frame, relief="solid", borderwidth=1)
+        table_frame.pack(fill="both", expand=True, padx=2, pady=2)
+        
+        # Define columns (faction removed - users can right-click → Inara for details)
+        columns = ("system", "distance", "security", "allegiance", "state", "population", "economy")
+        
+        self.sysfinder_tree = ttk.Treeview(
+            table_frame, columns=columns, show="headings", height=15
+        )
+        
+        # Column headings
+        self.sysfinder_tree.heading("system", text=t('system_finder.col_system'), 
+                                    command=lambda: self._sort_sysfinder_column("system", False))
+        self.sysfinder_tree.heading("distance", text=t('system_finder.col_distance'), 
+                                    command=lambda: self._sort_sysfinder_column("distance", True))
+        self.sysfinder_tree.heading("security", text=t('system_finder.col_security'), 
+                                    command=lambda: self._sort_sysfinder_column("security", False))
+        self.sysfinder_tree.heading("allegiance", text=t('system_finder.col_allegiance'), 
+                                    command=lambda: self._sort_sysfinder_column("allegiance", False))
+        self.sysfinder_tree.heading("state", text=t('system_finder.col_state'), 
+                                    command=lambda: self._sort_sysfinder_column("state", False))
+        self.sysfinder_tree.heading("population", text=t('system_finder.col_population'), 
+                                    command=lambda: self._sort_sysfinder_column("population", True))
+        self.sysfinder_tree.heading("economy", text=t('system_finder.col_economy'), 
+                                    command=lambda: self._sort_sysfinder_column("economy", False))
+        
+        # Column widths
+        self.sysfinder_tree.column("system", width=150, minwidth=100)
+        self.sysfinder_tree.column("distance", width=70, minwidth=50, anchor="center")
+        self.sysfinder_tree.column("security", width=80, minwidth=60, anchor="center")
+        self.sysfinder_tree.column("allegiance", width=90, minwidth=70, anchor="center")
+        self.sysfinder_tree.column("state", width=90, minwidth=70, anchor="center")
+        self.sysfinder_tree.column("population", width=100, minwidth=70, anchor="center")
+        self.sysfinder_tree.column("economy", width=120, minwidth=80, anchor="center")
+        
+        # Vertical scrollbar
+        v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.sysfinder_tree.yview)
+        self.sysfinder_tree.configure(yscrollcommand=v_scrollbar.set)
+        
+        # Horizontal scrollbar (like Ring Finder)
+        h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.sysfinder_tree.xview)
+        self.sysfinder_tree.configure(xscrollcommand=h_scrollbar.set)
+        
+        # Configure row tags for alternating colors (like Ring Finder)
+        self.sysfinder_tree.tag_configure('oddrow', background='#1e1e1e')
+        self.sysfinder_tree.tag_configure('evenrow', background='#252525')
+        
+        # Grid layout for treeview and scrollbars (like Ring Finder)
+        self.sysfinder_tree.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        
+        # Configure grid weights
+        table_frame.grid_columnconfigure(0, weight=1)
+        table_frame.grid_rowconfigure(0, weight=1)
+        
+        # Bind right-click for context menu
+        self.sysfinder_tree.bind("<Button-3>", self._show_sysfinder_context_menu)
+        
+        # Store sort direction
+        self._sysfinder_sort_reverse = {}
+    
+    def _create_sysfinder_context_menu(self):
+        """Create context menu for system finder results with theme colors"""
+        menu_bg = getattr(self, '_sysfinder_menu_bg', '#1e1e1e')
+        menu_fg = getattr(self, '_sysfinder_menu_fg', '#ff8c00')
+        menu_active_bg = getattr(self, '_sysfinder_menu_active_bg', '#ff6600')
+        menu_active_fg = getattr(self, '_sysfinder_menu_active_fg', '#000000')
+        
+        self.sysfinder_context_menu = tk.Menu(self, tearoff=0, 
+            bg=menu_bg, fg=menu_fg, 
+            activebackground=menu_active_bg, activeforeground=menu_active_fg,
+            selectcolor=menu_active_bg)
+        self.sysfinder_context_menu.add_command(
+            label=t('system_finder.copy_system'),
+            command=self._copy_sysfinder_system
+        )
+        self.sysfinder_context_menu.add_separator()
+        self.sysfinder_context_menu.add_command(
+            label=t('system_finder.open_inara'),
+            command=self._open_sysfinder_inara
+        )
+        self.sysfinder_context_menu.add_command(
+            label=t('system_finder.open_edsm'),
+            command=self._open_sysfinder_edsm
+        )
+        self.sysfinder_context_menu.add_command(
+            label=t('system_finder.open_spansh'),
+            command=self._open_sysfinder_spansh
+        )
+    
+    def _show_sysfinder_context_menu(self, event):
+        """Show context menu on right-click"""
+        try:
+            item = self.sysfinder_tree.identify_row(event.y)
+            if item:
+                self.sysfinder_tree.selection_set(item)
+                self.sysfinder_context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.sysfinder_context_menu.grab_release()
+    
+    def _copy_sysfinder_system(self):
+        """Copy selected system name to clipboard"""
+        selection = self.sysfinder_tree.selection()
+        if selection:
+            item = self.sysfinder_tree.item(selection[0])
+            system_name = item['values'][0]
+            self.clipboard_clear()
+            self.clipboard_append(system_name)
+            self._set_status(f"Copied: {system_name}", 3000)
+    
+    def _open_sysfinder_inara(self):
+        """Open selected system in Inara"""
+        selection = self.sysfinder_tree.selection()
+        if selection:
+            item = self.sysfinder_tree.item(selection[0])
+            system_name = item['values'][0]
+            import urllib.parse
+            import webbrowser
+            url = f"https://inara.cz/elite/starsystem/?search={urllib.parse.quote(system_name)}"
+            webbrowser.open(url)
+    
+    def _open_sysfinder_edsm(self):
+        """Open selected system in EDSM"""
+        selection = self.sysfinder_tree.selection()
+        if selection:
+            item = self.sysfinder_tree.item(selection[0])
+            system_name = item['values'][0]
+            import urllib.parse
+            import webbrowser
+            url = f"https://www.edsm.net/en/system/id/0/name/{urllib.parse.quote(system_name)}"
+            webbrowser.open(url)
+    
+    def _open_sysfinder_spansh(self):
+        """Open selected system in Spansh"""
+        selection = self.sysfinder_tree.selection()
+        if selection:
+            item = self.sysfinder_tree.item(selection[0])
+            system_name = item['values'][0]
+            import urllib.parse
+            import webbrowser
+            # Spansh uses /search/ endpoint for system lookup
+            url = f"https://spansh.co.uk/search/{urllib.parse.quote(system_name)}"
+            webbrowser.open(url)
+
+    def _use_current_system_sysfinder(self):
+        """Use current system from journal for system finder"""
+        try:
+            current = self.get_current_system()
+            if current:
+                self.sysfinder_reference_system.set(current)
+                self._set_status(f"Using current system: {current}", 3000)
+                # Update reference system info display
+                self._update_sysfinder_ref_info(current)
+            else:
+                self._set_status("Could not determine current system", 3000)
+        except Exception as e:
+            logging.error(f"[SYSTEM_FINDER] Error getting current system: {e}")
+    
+    def _populate_sysfinder_system(self):
+        """Auto-populate system finder with current system"""
+        try:
+            current = self.get_current_system()
+            if current and hasattr(self, 'sysfinder_reference_system'):
+                if not self.sysfinder_reference_system.get():
+                    self.sysfinder_reference_system.set(current)
+                    # Update reference system info display
+                    self._update_sysfinder_ref_info(current)
+                    # Remove selection/focus from entry field
+                    if hasattr(self, 'sysfinder_ref_entry'):
+                        self.sysfinder_ref_entry.selection_clear()
+                        self.focus_set()  # Move focus to main window
+        except Exception:
+            pass
+    
+    def _update_sysfinder_ref_info(self, system_name: str):
+        """Update the reference system info display with system status"""
+        if not system_name or not hasattr(self, 'sysfinder_ref_val_system'):
+            return
+        
+        # Show loading state
+        self.sysfinder_ref_val_system.config(text=f" {system_name}")
+        self.sysfinder_ref_val_sec.config(text=" ...")
+        self.sysfinder_ref_val_alleg.config(text=" ...")
+        self.sysfinder_ref_val_gov.config(text=" ...")
+        self.sysfinder_ref_val_eco.config(text=" ...")
+        self.sysfinder_ref_val_pop.config(text=" ...")
+        self.sysfinder_ref_val_state.config(text=" ...")
+        
+        def fetch_info():
+            try:
+                from system_finder_api import SystemFinderAPI
+                print(f"[REF_INFO DEBUG] Fetching info for: {system_name}")
+                status = SystemFinderAPI.get_system_status(system_name)
+                print(f"[REF_INFO DEBUG] API returned: {status}")
+                
+                if status:
+                    # Extract values
+                    security = status.get('security') or '-'
+                    allegiance = status.get('allegiance') or '-'
+                    government = status.get('government') or '-'
+                    population = status.get('population', 0)
+                    state = status.get('state') or 'Normal'
+                    if state == 'None':
+                        state = 'Normal'
+                    economy = status.get('economy', {})
+                    if isinstance(economy, dict):
+                        economy_str = economy.get('primary') or '-'
+                    else:
+                        economy_str = economy or '-'
+                    
+                    # Format population with suffix
+                    if population >= 1_000_000_000:
+                        pop_str = f"{population / 1_000_000_000:.1f}B"
+                    elif population >= 1_000_000:
+                        pop_str = f"{population / 1_000_000:.1f}M"
+                    elif population >= 1_000:
+                        pop_str = f"{population / 1_000:.1f}K"
+                    elif population > 0:
+                        pop_str = str(population)
+                    else:
+                        pop_str = "-"
+                    
+                    # Update each value label on main thread
+                    def update_labels():
+                        self.sysfinder_ref_val_system.config(text=f" {system_name}")
+                        self.sysfinder_ref_val_sec.config(text=f" {security}")
+                        self.sysfinder_ref_val_alleg.config(text=f" {allegiance}")
+                        self.sysfinder_ref_val_gov.config(text=f" {government}")
+                        self.sysfinder_ref_val_eco.config(text=f" {economy_str}")
+                        self.sysfinder_ref_val_pop.config(text=f" {pop_str}")
+                        self.sysfinder_ref_val_state.config(text=f" {state}")
+                    self.after(0, update_labels)
+                else:
+                    # No data available
+                    def update_no_data():
+                        self.sysfinder_ref_val_system.config(text=f" {system_name}")
+                        self.sysfinder_ref_val_sec.config(text=" -")
+                        self.sysfinder_ref_val_alleg.config(text=" -")
+                        self.sysfinder_ref_val_gov.config(text=" -")
+                        self.sysfinder_ref_val_eco.config(text=" -")
+                        self.sysfinder_ref_val_pop.config(text=" -")
+                        self.sysfinder_ref_val_state.config(text=" -")
+                    self.after(0, update_no_data)
+                
+            except Exception as e:
+                logging.error(f"[SYSTEM_FINDER] Error fetching ref system info: {e}")
+                def update_error():
+                    self.sysfinder_ref_val_system.config(text=f" {system_name}")
+                    self.sysfinder_ref_val_sec.config(text=" Error")
+                    self.sysfinder_ref_val_alleg.config(text=" -")
+                    self.sysfinder_ref_val_gov.config(text=" -")
+                    self.sysfinder_ref_val_eco.config(text=" -")
+                    self.sysfinder_ref_val_pop.config(text=" -")
+                    self.sysfinder_ref_val_state.config(text=" -")
+                self.after(0, update_error)
+        
+        # Run in background thread to avoid blocking UI
+        import threading
+        thread = threading.Thread(target=fetch_info, daemon=True)
+        thread.start()
+    
+    def _search_systems(self):
+        """Search for systems matching criteria"""
+        reference = self.sysfinder_reference_system.get().strip()
+        if not reference:
+            self.sysfinder_status_label.config(text=t('system_finder.no_system_entered'))
+            return
+        
+        # Disable search button during search
+        self.sysfinder_search_btn.config(state="disabled")
+        self.sysfinder_status_label.config(text=t('system_finder.searching'))
+        self.config(cursor="wait")
+        self.update()
+        
+        # Run search in background thread
+        thread = threading.Thread(target=self._search_systems_worker, daemon=True)
+        thread.start()
+    
+    def _search_systems_worker(self):
+        """Background worker for system search - uses Spansh API with server-side filtering"""
+        try:
+            from system_finder_api import SystemFinderAPI
+            
+            reference = self.sysfinder_reference_system.get().strip()
+            
+            print(f"[SYSTEM_FINDER DEBUG] Starting Spansh search near: {reference}")
+            
+            def progress_callback(current, total, message):
+                self.after(0, lambda: self.sysfinder_status_label.config(text=message))
+            
+            # Build filters (all values are direct English, no mapping needed)
+            filters = {
+                'allegiance': self.sysfinder_allegiance.get(),
+                'government': self.sysfinder_government.get(),
+                'security': self.sysfinder_security.get(),
+                'economy': self.sysfinder_economy.get(),
+                'state': self.sysfinder_state.get(),
+                'population': self.sysfinder_population.get(),
+            }
+            
+            print(f"[SYSTEM_FINDER DEBUG] Filters: {filters}")
+            
+            # Check if any filters are active
+            has_filters = any(v != 'Any' for v in filters.values())
+            
+            # Use new Spansh-based search with server-side filtering
+            systems = SystemFinderAPI.search_systems(
+                reference_system=reference,
+                filters=filters,
+                max_results=100,
+                progress_callback=progress_callback
+            )
+            
+            print(f"[SYSTEM_FINDER DEBUG] Spansh returned {len(systems) if systems else 0} systems")
+            if systems and len(systems) > 0:
+                print(f"[SYSTEM_FINDER DEBUG] First system sample: {systems[0]}")
+            
+            if not systems:
+                self.after(0, self._sysfinder_search_complete, [], None, has_filters)
+                return
+            
+            self.after(0, self._sysfinder_search_complete, systems, None, has_filters)
+            
+        except Exception as e:
+            logging.error(f"[SYSTEM_FINDER] Search error: {e}")
+            import traceback
+            traceback.print_exc()
+            self.after(0, self._sysfinder_search_complete, [], str(e), False)
+    
+    def _sysfinder_search_complete(self, results: list, error: str = None, had_filters: bool = False):
+        """Handle search completion - update UI"""
+        self.sysfinder_search_btn.config(state="normal")
+        self.config(cursor="")
+        
+        # Clear existing results
+        for item in self.sysfinder_tree.get_children():
+            self.sysfinder_tree.delete(item)
+        
+        if error:
+            self.sysfinder_status_label.config(text=f"Error: {error}")
+            return
+        
+        if not results:
+            if had_filters:
+                # Filters were applied but no matches found
+                self.sysfinder_status_label.config(text=t('system_finder.no_filter_results'))
+            else:
+                self.sysfinder_status_label.config(text=t('system_finder.no_results'))
+            return
+        
+        # Update status
+        self.sysfinder_status_label.config(
+            text=t('system_finder.results_count').format(count=len(results))
+        )
+        
+        # Populate results with alternating row colors
+        for idx, system in enumerate(results):
+            # Determine row tag for alternating colors
+            row_tag = 'oddrow' if idx % 2 == 0 else 'evenrow'
+            
+            # Format population
+            pop = system.get('population', 0)
+            if pop >= 1_000_000_000:
+                pop_str = f"{pop / 1_000_000_000:.1f}B"
+            elif pop >= 1_000_000:
+                pop_str = f"{pop / 1_000_000:.1f}M"
+            elif pop >= 1000:
+                pop_str = f"{pop / 1000:.1f}K"
+            elif pop > 0:
+                pop_str = str(pop)
+            else:
+                pop_str = "0"
+            
+            # Format economy - use "-" for missing data
+            economy = system.get('economy', {})
+            if isinstance(economy, dict):
+                eco_str = economy.get('primary') or '-'
+            else:
+                eco_str = str(economy) if economy else '-'
+            
+            # Format distance
+            distance = system.get('distance', 0)
+            dist_str = f"{distance:.1f} ly" if distance else "0 ly"
+            
+            # Normalize state - show 'Normal' for systems without active state
+            state_val = system.get('state', 'Normal')
+            if not state_val or state_val == '-' or state_val == 'None':
+                state_val = 'Normal'
+            
+            self.sysfinder_tree.insert("", "end", values=(
+                system.get('systemName', '-'),
+                dist_str,
+                system.get('security', '-'),
+                system.get('allegiance', '-'),
+                state_val,
+                pop_str,
+                eco_str
+            ), tags=(row_tag,))
+    
+    def _sort_sysfinder_column(self, column: str, numeric: bool):
+        """Sort system finder results by column"""
+        try:
+            items = [(self.sysfinder_tree.set(item, column), item) 
+                     for item in self.sysfinder_tree.get_children('')]
+            
+            # Toggle sort direction
+            reverse = self._sysfinder_sort_reverse.get(column, False)
+            self._sysfinder_sort_reverse[column] = not reverse
+            
+            if numeric:
+                # Parse numeric values (handle "123.4 ly", "1.5B", "2.3M", etc.)
+                def parse_value(val):
+                    val = val.strip()
+                    if not val:
+                        return 0
+                    # Remove ' ly' suffix for distance
+                    val = val.replace(' ly', '').strip()
+                    # Handle B/M/K suffixes
+                    if val.endswith('B'):
+                        return float(val[:-1]) * 1_000_000_000
+                    elif val.endswith('M'):
+                        return float(val[:-1]) * 1_000_000
+                    elif val.endswith('K'):
+                        return float(val[:-1]) * 1000
+                    try:
+                        return float(val)
+                    except:
+                        return 0
+                
+                items.sort(key=lambda x: parse_value(x[0]), reverse=reverse)
+            else:
+                items.sort(key=lambda x: x[0].lower(), reverse=reverse)
+            
+            # Rearrange items
+            for index, (val, item) in enumerate(items):
+                self.sysfinder_tree.move(item, '', index)
+                
+        except Exception as e:
+            logging.error(f"[SYSTEM_FINDER] Sort error: {e}")
+
     def _create_marketplace_results_table(self, parent_frame):
         """Create results table for marketplace search"""
         table_frame = ttk.Frame(parent_frame, relief="solid", borderwidth=1)
@@ -12817,6 +13867,7 @@ class App(tk.Tk):
                                                selectcolor=menu_active_bg)
         self.marketplace_context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara_from_menu)
         self.marketplace_context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm_from_menu)
+        self.marketplace_context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh_from_menu)
         self.marketplace_context_menu.add_separator()
         self.marketplace_context_menu.add_command(label=t('context_menu.find_hotspots'), command=self._find_hotspots_from_marketplace)
         self.marketplace_context_menu.add_separator()
@@ -12864,6 +13915,25 @@ class App(tk.Tk):
             except Exception as e:
                 print(f"[MARKETPLACE] Error opening EDSM: {e}")
     
+    def _open_spansh_from_menu(self):
+        """Open Spansh system search from context menu"""
+        selection = self.marketplace_tree.selection()
+        if selection:
+            try:
+                item = selection[0]
+                values = self.marketplace_tree.item(item, 'values')
+                if values and len(values) > 0:
+                    location = values[0]  # "System / Station"
+                    if ' / ' in location:
+                        system_name, station_name = location.split(' / ', 1)
+                        import urllib.parse
+                        import webbrowser
+                        url = f"https://spansh.co.uk/search/{urllib.parse.quote(system_name.strip())}"
+                        webbrowser.open(url)
+                        print(f"[MARKETPLACE] Opening Spansh for system: {system_name}")
+            except Exception as e:
+                print(f"[MARKETPLACE] Error opening Spansh: {e}")
+
     def _show_marketplace_context_menu(self, event):
         """Show context menu on right-click"""
         try:
@@ -15006,13 +16076,21 @@ class App(tk.Tk):
         # Count visit ONLY if we moved to a different system
         if is_new_system:
             try:
-                if hasattr(self, 'user_db'):
+                # Use cargo_monitor.user_db which is the same db used for display
+                user_db = None
+                if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                    user_db = self.cargo_monitor.user_db
+                elif hasattr(self, 'user_db'):
+                    user_db = self.user_db
+                    
+                if user_db:
                     import datetime
-                    self.user_db.add_visited_system(
+                    user_db.add_visited_system(
                         system_name=system_name,
                         visit_date=datetime.datetime.utcnow().isoformat() + "Z",
                         coordinates=coords
                     )
+                    print(f"[VISIT] Recorded visit to {system_name}")
             except Exception as e:
                 print(f"[VISIT] Error recording visit: {e}")
         
@@ -15033,13 +16111,20 @@ class App(tk.Tk):
         if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, 'session_system'):
             self.prospector_panel.session_system.set(system_name)
         
-        # 4. Update CMDR/System display in actions bar
+        # 4. Update CMDR/System display in actions bar (including visit count)
+        # Use a small delay to ensure database write is committed
         if hasattr(self, 'system_label_value'):
-            self.after(0, self._update_cmdr_system_display)
+            self.after(100, self._update_cmdr_system_display)
+        
+        # 5. Update System Finder current system display and reference field
+        if hasattr(self, 'sysfinder_reference_system'):
+            self.sysfinder_reference_system.set(system_name)
+            self._update_sysfinder_ref_info(system_name)
         
         # Clear any selection that might have been applied and set neutral focus
         try:
             self.after(50, lambda: (self.ring_finder.system_entry.selection_clear() if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_entry') else None))
+            self.after(50, lambda: (self.sysfinder_ref_entry.selection_clear() if hasattr(self, 'sysfinder_ref_entry') else None))
             self.after(50, lambda: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None))
             self.after(50, lambda: (self.import_btn.focus_set() if hasattr(self, 'import_btn') else None))
         except Exception:

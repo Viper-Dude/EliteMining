@@ -410,9 +410,21 @@ class RingFinder:
         ttk.Label(search_frame, text=t('ring_finder.ring_type')).grid(row=1, column=0, sticky="w", padx=5, pady=5)
         # Default to localized 'All'
         self.material_var = tk.StringVar(value=self._ring_type_map.get('All', 'All'))
-        material_combo = ttk.Combobox(search_frame, textvariable=self.material_var, width=22, state="readonly")
+        material_combo = ttk.Combobox(search_frame, textvariable=self.material_var, width=15, state="readonly")
         material_combo['values'] = tuple(self._ring_type_map[k] for k in self._ring_type_order)
         material_combo.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        
+        # "Any Ring" checkbox - DISABLED (hidden) - searches Spansh for rings without requiring hotspot data
+        self.any_ring_var = tk.BooleanVar(value=False)
+        self.any_ring_cb = tk.Checkbutton(search_frame, text=t('ring_finder.any_ring'),
+                                          variable=self.any_ring_var,
+                                          command=self._on_any_ring_changed,
+                                          bg=_cb_bg, fg="#e0e0e0",
+                                          activebackground="#2e2e2e", activeforeground="#ffffff",
+                                          selectcolor=_cb_select, relief="flat",
+                                          font=("Segoe UI", 8, "normal"))
+        # self.any_ring_cb.grid(row=1, column=1, sticky="e", padx=(130, 0), pady=5)  # Hidden - feature disabled
+        # ToolTip(self.any_ring_cb, t('ring_finder.any_ring_tooltip'))
         
         # Material filter (new - specific materials) - dynamically populated from database
         ttk.Label(search_frame, text=t('ring_finder.mineral')).grid(row=2, column=0, sticky="w", padx=5, pady=5)
@@ -438,9 +450,9 @@ class RingFinder:
         # Distance filter (now a dropdown) - in sub-frame with fixed label width
         ttk.Label(right_filters_frame_row1, text=t('ring_finder.max_distance') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
         self.distance_var = tk.StringVar(value="50")
-        distance_combo = ttk.Combobox(right_filters_frame_row1, textvariable=self.distance_var, width=8, state="readonly")
-        distance_combo['values'] = ("10", "50", "100", "150", "200", "300")
-        distance_combo.pack(side="left")
+        self.distance_combo = ttk.Combobox(right_filters_frame_row1, textvariable=self.distance_var, width=8, state="readonly")
+        self.distance_combo['values'] = ("10", "50", "100", "150", "200", "300")
+        self.distance_combo.pack(side="left")
         
         # Overlaps Only checkbox - filters to show only overlap entries
         self.overlaps_only_var = tk.BooleanVar(value=False)
@@ -519,7 +531,7 @@ class RingFinder:
             print(f"Warning: Failed to initialize material change handler: {e}")
         
         # Add tooltip for distance limitation
-        ToolTip(distance_combo, t('tooltips.max_distance'))
+        ToolTip(self.distance_combo, t('tooltips.max_distance'))
         
         # Search limitations info text (bottom of search controls)
         info_text = tk.Label(search_frame, 
@@ -875,6 +887,34 @@ class RingFinder:
                 self.confirmed_only_var.set(True)
             if hasattr(self, 'confirmed_checkbox') and self.confirmed_checkbox:
                 self.confirmed_checkbox.configure(state="disabled", fg="#888888")
+    
+    def _on_any_ring_changed(self):
+        """Handle Any Ring checkbox change - enables Spansh search mode"""
+        if self.any_ring_var.get():
+            # Any Ring mode - disable controls that don't apply to Spansh search
+            self.specific_material_combo.configure(state="disabled")
+            self.min_hotspots_spinbox.configure(state="disabled")
+            self.distance_combo.configure(state="disabled")
+            self.overlaps_only_cb.configure(state="disabled")
+            self.res_only_cb.configure(state="disabled")
+            # Uncheck overlaps/res checkboxes since they don't apply
+            self.overlaps_only_var.set(False)
+            self.res_only_var.set(False)
+            # Make sure a specific ring type is selected (not "All")
+            ring_type = self.material_var.get()
+            ring_type_english = self._ring_type_rev_map.get(ring_type, ring_type)
+            if ring_type_english == 'All':
+                # Default to Icy if "All" is selected
+                self.material_var.set(self._ring_type_map.get('Icy', 'Icy'))
+            self.status_var.set(t('ring_finder.any_ring_mode'))
+        else:
+            # Normal mode - restore controls
+            self.specific_material_combo.configure(state="readonly")
+            self.distance_combo.configure(state="readonly")
+            self.overlaps_only_cb.configure(state="normal")
+            self.res_only_cb.configure(state="normal")
+            self._on_material_changed()  # Restore min hotspots state
+            self.status_var.set("")
     
     def _format_material_for_display(self, material_name: str) -> str:
         """Format material name for display in dropdown"""
@@ -1632,13 +1672,21 @@ class RingFinder:
         # Disable search button
         self.search_btn.configure(state="disabled", text=t('ring_finder.searching'))
         self.status_var.set(t('ring_finder.searching'))
+        
+        # Check if Any Ring mode is enabled
+        any_ring_mode = self.any_ring_var.get()
+        
+        # For Any Ring mode, use a large fixed distance (dropdown is disabled)
+        # Some regions of space have limited ring data, so use large radius
+        if any_ring_mode:
+            max_distance = 1000.0  # Fixed 1000 LY for Any Ring mode (covers sparse regions)
 
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
-                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots),
+                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, any_ring_mode),
                         daemon=True).start()
         
-    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1):
+    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, any_ring_mode: bool = False):
         """Background worker for hotspot search"""
         try:
             # Wait for database to be ready (with timeout)
@@ -1657,8 +1705,17 @@ class RingFinder:
             # Set the reference system coords for this worker thread
             self.current_system_coords = reference_coords
             
+            # Any Ring mode: Search Spansh for rings of specific type (ignoring hotspot data)
+            if any_ring_mode:
+                # Use max_results if set, otherwise default to 150 for more results
+                spansh_max = max_results if max_results else 150
+                spansh_rings = self._search_spansh_rings(reference_system, material_filter, max_distance, spansh_max, reference_coords)
+                print(f" DEBUG: Any Ring mode - found {len(spansh_rings)} rings from Spansh")
+                # Convert Spansh rings to hotspot format using local database lookup
+                hotspots = self._convert_spansh_to_hotspots(spansh_rings, reference_coords)
+                print(f" DEBUG: Any Ring mode - converted to {len(hotspots)} hotspot entries")
             # Overlaps Only mode: Show only overlap entries (ignore distance)
-            if self.overlaps_only_var.get():
+            elif self.overlaps_only_var.get():
                 hotspots = self._get_all_overlaps_for_search(reference_system, reference_coords, specific_material)
                 print(f" DEBUG: Overlaps Only mode - found {len(hotspots)} overlap locations")
             # RES Only mode: Show only RES site entries (ignore distance)
@@ -1833,6 +1890,261 @@ class RingFinder:
             print(f"[EDSM] ⚠ Error refreshing metadata: {e}")
             print(f"[EDSM DEBUG] Refresh exception: {type(e).__name__}: {str(e)}")
     
+    def _search_spansh_rings(self, reference_system: str, ring_type: str, max_distance: float, max_results: int, reference_coords) -> List[Dict]:
+        """Search Spansh API for rings of a specific type (Any Ring mode)
+        
+        Args:
+            reference_system: Name of reference system
+            ring_type: Ring type filter (Icy, Rocky, Metallic, Metal Rich)
+            max_distance: Maximum distance in light years
+            max_results: Maximum number of results
+            reference_coords: Reference system coordinates dict
+            
+        Returns:
+            List of hotspot-format dicts for display in results table
+        """
+        import requests
+        
+        print(f"[SPANSH] Searching for {ring_type} rings within {max_distance}ly of {reference_system}")
+        
+        if not reference_coords:
+            print("[SPANSH] No reference coordinates available")
+            return []
+        
+        try:
+            # Build Spansh API request
+            # IMPORTANT: Do NOT use any filters - they all break the API
+            # - 'rings' filter limits to ~25 bodies
+            # - 'ring_type' filter doesn't actually filter
+            # - 'distance' filter also limits to ~25 bodies
+            # Instead: Get ALL bodies sorted by distance, filter client-side
+            request_size = 5000  # Request max for best coverage
+            payload = {
+                'reference_system': reference_system,
+                'size': request_size,
+                'sort': [{'distance': {'direction': 'asc'}}],
+                'filters': {}  # NO FILTERS - all done client-side
+            }
+            
+            # Add full browser-like headers to avoid rate limiting
+            # The sec-* headers are required for Spansh API to return full results
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Content-Type': 'application/json',
+                'Origin': 'https://spansh.co.uk',
+                'Referer': 'https://spansh.co.uk/bodies',
+                'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': '"Windows"',
+                'sec-fetch-dest': 'empty',
+                'sec-fetch-mode': 'cors',
+                'sec-fetch-site': 'same-origin'
+            }
+            
+            print(f"[SPANSH] Searching for {ring_type} rings within {max_distance}ly of {reference_system}")
+            
+            response = requests.post(
+                'https://spansh.co.uk/api/bodies/search',
+                json=payload,
+                headers=headers,
+                timeout=60
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            bodies = data.get('results', [])
+            total_count = data.get('count', 0)
+            print(f"[SPANSH] API returned {len(bodies)} bodies (total available: {total_count})")
+            
+            # Convert to hotspot format, filtering by ring type CLIENT-SIDE
+            # Many bodies won't have rings or won't have the ring type we want
+            results = []
+            seen_rings = set()  # Avoid duplicate rings
+            skipped_type = 0
+            skipped_dup = 0
+            skipped_no_rings = 0
+            
+            for body in bodies:
+                system_name = body.get('system_name', '')
+                body_name = body.get('name', '')
+                distance = body.get('distance', 0)
+                ls_distance = body.get('distance_to_arrival', 0)
+                rings = body.get('rings', [])
+                
+                # Skip bodies beyond max distance (client-side filter)
+                if distance > max_distance:
+                    continue
+                
+                # Skip bodies without rings
+                if not rings:
+                    skipped_no_rings += 1
+                    continue
+                
+                for ring in rings:
+                    ring_type_actual = ring.get('type', '')
+                    ring_name = ring.get('name', '')
+                    
+                    # Filter by ring type (skip if not matching, or if "All" is selected)
+                    if ring_type != 'All' and ring_type_actual != ring_type:
+                        skipped_type += 1
+                        continue
+                    
+                    # Create unique key to avoid duplicates
+                    ring_key = f"{system_name}|{ring_name}"
+                    if ring_key in seen_rings:
+                        skipped_dup += 1
+                        continue
+                    seen_rings.add(ring_key)
+                    
+                    # Get hotspot signals if available
+                    signals = ring.get('signals', [])
+                    hotspot_info = ""
+                    hotspot_count = 0
+                    if signals:
+                        # Format as "Material (count), Material (count)" like normal search
+                        signal_parts = []
+                        for s in signals:
+                            name = s.get('name', '')
+                            count = s.get('count', 1)
+                            hotspot_count += count
+                            if name:
+                                signal_parts.append(f"{name} ({count})")
+                        # Show first 3 materials
+                        hotspot_info = ", ".join(signal_parts[:3])
+                        if len(signal_parts) > 3:
+                            hotspot_info += f" +{len(signal_parts)-3}"
+                    
+                    # Format as hotspot result
+                    result = {
+                        'system': system_name,
+                        'body': body_name,
+                        'ring': ring_name,
+                        'ring_type': ring_type_actual,
+                        'distance': round(distance, 2),
+                        'ls_distance': round(ls_distance, 2) if ls_distance else None,
+                        'material': hotspot_info if hotspot_info else t('ring_finder.no_hotspot_data'),
+                        'count': hotspot_count if hotspot_count else 0,
+                        'overlap': '',
+                        'res_site': '',
+                        'density': '',
+                        'source': 'spansh',
+                        'data_source': 'spansh'
+                    }
+                    results.append(result)
+                    
+                    # Don't break early - collect all results, limit at the end
+            
+            # Sort by distance
+            results.sort(key=lambda x: x.get('distance', 9999))
+            
+            bodies_with_rings = len(bodies) - skipped_no_rings
+            print(f"[SPANSH] {len(bodies)} bodies checked, {bodies_with_rings} have rings, {skipped_no_rings} without rings")
+            print(f"[SPANSH] Found {len(results)} {ring_type} rings (skipped {skipped_type} wrong type, {skipped_dup} duplicates)")
+            print(f"[SPANSH] Returning first {max_results} results")
+            return results[:max_results]
+            
+        except requests.exceptions.Timeout:
+            print("[SPANSH] Request timed out")
+            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_timeout')))
+            return []
+        except requests.exceptions.RequestException as e:
+            print(f"[SPANSH] API error: {e}")
+            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_error')))
+            return []
+        except Exception as e:
+            print(f"[SPANSH] Unexpected error: {e}")
+            return []
+
+    def _convert_spansh_to_hotspots(self, spansh_rings: List[Dict], reference_coords) -> List[Dict]:
+        """Convert Spansh ring results to the standard hotspot format used by user database searches
+        
+        This makes Spansh results go through the same display logic as normal searches,
+        so Hotspots, Overlaps, RES, etc. columns are populated from the local database.
+        
+        Args:
+            spansh_rings: List of ring results from Spansh API
+            reference_coords: Reference system coordinates for distance calculation
+            
+        Returns:
+            List of hotspot-format dicts compatible with _update_results
+        """
+        from material_utils import abbreviate_material
+        
+        results = []
+        
+        for ring in spansh_rings:
+            system_name = ring.get('system', '')
+            body_name = ring.get('body', '')
+            ring_name = ring.get('ring', '')
+            ring_type = ring.get('ring_type', 'No data')
+            distance = ring.get('distance', 0)
+            ls_distance = ring.get('ls_distance')
+            
+            if not system_name or not ring_name:
+                continue
+            
+            # Format LS distance for display
+            ls_display = "No data"
+            if ls_distance is not None and ls_distance != "No data":
+                try:
+                    ls_display = f"{int(float(ls_distance)):,}"
+                except (ValueError, TypeError):
+                    ls_display = "No data"
+            
+            # Look up hotspots from local database for this ring
+            hotspot_display = "-"
+            hotspot_count = 0
+            try:
+                # Strip the system name prefix from ring_name to match database format
+                # Spansh returns: "Antliae Sector IR-W c1-4 A 5 A Ring"
+                # Database stores: "A 5 A Ring"
+                db_ring_name = ring_name
+                if ring_name.lower().startswith(system_name.lower()):
+                    db_ring_name = ring_name[len(system_name):].strip()
+                
+                db_hotspots = self.user_db.get_body_hotspots(system_name, db_ring_name)
+                if db_hotspots:
+                    formatted_parts = []
+                    for h in db_hotspots:
+                        material = h.get('material_name', '')
+                        count = h.get('hotspot_count', 1)
+                        hotspot_count += count
+                        if material:
+                            abbrev = abbreviate_material(material)
+                            formatted_parts.append(f"{abbrev} ({count})")
+                    
+                    if formatted_parts:
+                        hotspot_display = ", ".join(formatted_parts[:4])
+                        if len(formatted_parts) > 4:
+                            hotspot_display += f" +{len(formatted_parts)-4}"
+                        print(f"[SPANSH DB LOOKUP] Formatted: {hotspot_display}")
+            except Exception as e:
+                print(f"[SPANSH] Error looking up hotspots for {system_name} {ring_name}: {e}")
+            
+            # Create result in standard format (same as _search_user_database_first)
+            result = {
+                'system': system_name,
+                'systemName': system_name,
+                'body': body_name,
+                'bodyName': ring_name,  # Use ring_name as bodyName for display
+                'ring': ring_name,
+                'ring_type': ring_type,
+                'type': hotspot_display,  # This populates Hotspots column
+                'ls': ls_display,
+                'ls_distance': ls_distance,
+                'distance': f"{distance:.1f}" if distance > 0 else "0.0",
+                'density': "No data",
+                'has_hotspots': hotspot_count > 0,
+                'count': hotspot_count,
+                'data_source': 'Spansh',
+                'source': 'Spansh'
+            }
+            results.append(result)
+        
+        return results
+
     def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None) -> List[Dict]:
         """Get hotspot data using user database only - no EDSM dependencies"""
         # Use user database-only approach for all searches
@@ -3327,6 +3639,12 @@ class RingFinder:
             elif "Overlap" in data_source or "RES" in data_source:
                 # Overlap/RES data - use the pre-formatted type field which has all materials
                 hotspot_count_display = hotspot.get("type", "-")
+            elif "Spansh" in data_source or "spansh" in data_source:
+                # Spansh data - use the pre-formatted type field which has hotspot info
+                # This contains abbreviated material names with counts: "Brom (3), Gran (2)"
+                hotspot_count_display = hotspot.get("type", "-")
+                if hotspot_count_display == t('ring_finder.no_hotspot_data') or hotspot_count_display == "":
+                    hotspot_count_display = "-"
             elif "count" in hotspot:
                 # User database hotspots - show the count  
                 hotspot_count_display = str(hotspot.get("count", "-"))
@@ -3504,6 +3822,10 @@ class RingFinder:
                                    selectcolor=menu_active_bg)
         self.context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_name)
         self.context_menu.add_separator()
+        self.context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara)
+        self.context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm)
+        self.context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh)
+        self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.find_sell_station'), command=self._find_sell_station)
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
@@ -3525,11 +3847,11 @@ class RingFinder:
                 mineral = self._to_english(mineral_display)
                 is_specific_mineral = not self._is_all_minerals(mineral)
                 
-                # Menu item index for "Find Sell Station" is 2 (after copy_system and separator)
+                # Menu item index for "Find Sell Station" is 6 (after copy_system, separator, inara, edsm, spansh, separator)
                 if is_specific_mineral:
-                    self.context_menu.entryconfig(2, state="normal")
+                    self.context_menu.entryconfig(6, state="normal")
                 else:
-                    self.context_menu.entryconfig(2, state="disabled")
+                    self.context_menu.entryconfig(6, state="disabled")
                 
                 self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -3547,6 +3869,45 @@ class RingFinder:
                 self.parent.clipboard_append(system_name)
                 self.status_var.set(f"Copied '{system_name}' to clipboard")
     
+    def _open_inara(self):
+        """Open selected system in Inara"""
+        selection = self.results_tree.selection()
+        if selection:
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if values and len(values) > 2:
+                system_name = values[2]  # System is column index 2
+                import urllib.parse
+                import webbrowser
+                url = f"https://inara.cz/elite/starsystem/?search={urllib.parse.quote(system_name)}"
+                webbrowser.open(url)
+    
+    def _open_edsm(self):
+        """Open selected system in EDSM"""
+        selection = self.results_tree.selection()
+        if selection:
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if values and len(values) > 2:
+                system_name = values[2]  # System is column index 2
+                import urllib.parse
+                import webbrowser
+                url = f"https://www.edsm.net/en/system/id/0/name/{urllib.parse.quote(system_name)}"
+                webbrowser.open(url)
+    
+    def _open_spansh(self):
+        """Open selected system in Spansh"""
+        selection = self.results_tree.selection()
+        if selection:
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if values and len(values) > 2:
+                system_name = values[2]  # System is column index 2
+                import urllib.parse
+                import webbrowser
+                url = f"https://spansh.co.uk/search/{urllib.parse.quote(system_name)}"
+                webbrowser.open(url)
+
     def _find_sell_station(self):
         """Open Commodity Market with selected system and mineral to find sell stations"""
         selection = self.results_tree.selection()
@@ -4329,6 +4690,7 @@ class RingFinder:
             # Checkbox variables for each RES type
             haz_var = tk.BooleanVar(value=False)
             high_var = tk.BooleanVar(value=False)
+            normal_var = tk.BooleanVar(value=False)
             low_var = tk.BooleanVar(value=False)
             
             # Dark themed checkboxes
@@ -4337,6 +4699,7 @@ class RingFinder:
             
             tk.Checkbutton(res_frame, text="Haz", variable=haz_var, **cb_style).pack(side="left", padx=(0, 12))
             tk.Checkbutton(res_frame, text="High", variable=high_var, **cb_style).pack(side="left", padx=(0, 12))
+            tk.Checkbutton(res_frame, text="Normal", variable=normal_var, **cb_style).pack(side="left", padx=(0, 12))
             tk.Checkbutton(res_frame, text="Low", variable=low_var, **cb_style).pack(side="left")
             
             # Helper label
@@ -4351,6 +4714,7 @@ class RingFinder:
                     # Parse comma-separated tags
                     haz_var.set(False)
                     high_var.set(False)
+                    normal_var.set(False)
                     low_var.set(False)
                     if current_tag:
                         tags = [t.strip() for t in current_tag.split(',')]
@@ -4359,6 +4723,8 @@ class RingFinder:
                                 haz_var.set(True)
                             elif tag.lower() == 'high':
                                 high_var.set(True)
+                            elif tag.lower() == 'normal':
+                                normal_var.set(True)
                             elif tag.lower() == 'low':
                                 low_var.set(True)
             
@@ -4380,6 +4746,8 @@ class RingFinder:
                     selected_tags.append("Hazardous")
                 if high_var.get():
                     selected_tags.append("High")
+                if normal_var.get():
+                    selected_tags.append("Normal")
                 if low_var.get():
                     selected_tags.append("Low")
                 

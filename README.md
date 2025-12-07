@@ -17,6 +17,7 @@
 - [Hotspot Finder](#hotspot-finder)
 - [Commodity Market](#commodity-market)
 - [Mining Missions](#mining-missions)
+- [Star Systems](#star-systems)
 - [Distance Calculator](#distance-calculator)
 - [Getting Started](#getting-started)
 - [Commands](#commands)
@@ -257,6 +258,26 @@ Track your active mining missions and quickly find hotspots or selling stations 
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_missions.png" width="600"><br>  
 *Mining Missions tab showing active missions with quick search options.*
+
+[Back to Top](#top)
+
+---
+
+## Star Systems
+
+Search for nearby star systems with detailed status information. Perfect for finding systems with specific conditions for missions, bounty hunting, or exploration.
+
+### Key Features
+- **Current System Info** – View detailed status of your current system (security, allegiance, government, state, economy, population)
+- **Nearby System Search** – Find systems within range of your reference system
+- **Server-Side Filtering** – Filter by Security, Allegiance, Government, State, Economy, Population
+- **Distance Sorting** – Results sorted by distance from reference system
+- **Quick Actions:**
+  - Right-click to copy system name or open in Inara/EDSM/Spansh
+  - "Use Current" button fills reference system instantly
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/star_system.png" width="600"><br>  
+*Star Systems tab showing current system info and nearby system search with filters.*
 
 [Back to Top](#top)
 
