@@ -17,6 +17,7 @@
 - [Hotspot Finder](#hotspot-finder)
 - [Commodity Market](#commodity-market)
 - [Mining Missions](#mining-missions)
+- [Ring Mining Reference](#ring-mining-reference)
 - [Star Systems](#star-systems)
 - [Distance Calculator](#distance-calculator)
 - [Getting Started](#getting-started)
@@ -258,6 +259,22 @@ Track your active mining missions and quickly find hotspots or selling stations 
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_missions.png" width="600"><br>  
 *Mining Missions tab showing active missions with quick search options.*
+
+[Back to Top](#top)
+
+---
+
+## Ring Mining Reference
+
+Quick reference guide for ring types and mining minerals, accessible from the Mining tab.
+
+### Key Features
+- **Ring Type Guides** – Expandable sections for Icy, Metallic, Metal-Rich, and Rocky rings
+- **Mineral Categories** – Laser (High/Low) and Core (High/Low) minerals for each ring type
+- **RES Sites Reference** – Resource Extraction Site types with pirate levels and mining bonus percentages
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_reference.png" width="600"><br>  
+*Ring Mining Reference showing ring types and RES site bonuses.*
 
 [Back to Top](#top)
 

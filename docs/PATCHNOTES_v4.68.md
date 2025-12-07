@@ -8,6 +8,12 @@
 - Displays current system info (security, allegiance, government, state, economy, population)
 - Right-click context menu to copy system name or open in Inara/EDSM/Spansh
 
+### Ring Mining Reference Tab
+- Added new "Reference" sub-tab under Mining with ring type guides
+- Expandable sections for Icy, Metallic, Metal-Rich, and Rocky rings
+- Shows Laser (High/Low) and Core (High/Low) minerals for each ring type
+- RES Sites reference with pirate levels and mining bonus percentages
+
 ## Hotfix
 
 
