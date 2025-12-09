@@ -259,6 +259,10 @@ class SessionAnalytics:
         mother_raw = event.get('MotherlodeMaterial', '').strip()
         motherlode_material = mother_localized if mother_localized else mother_raw
         
+        # Normalize motherlode material name to match KNOWN_MATERIALS (handles all languages)
+        if motherlode_material:
+            motherlode_material = JournalParser.normalize_material_name(motherlode_material)
+        
         # Track core asteroid count
         if motherlode_material:
             self.core_asteroids_found += 1
