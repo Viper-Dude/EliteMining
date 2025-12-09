@@ -843,8 +843,17 @@ class UserDatabase:
                     new_data_count = sum(new_data_fields)
                     existing_data_count = sum(existing_data_fields)
                     
+                    # Journal scans with actual hotspot counts always override database entries with count=0
+                    # This handles cases where old imports have count=0 but journal has real scan data
+                    if hotspot_count > 0 and existing_count == 0:
+                        should_update = True
+                        update_reason = "journal scan data overrides empty count"
+                    # Always update if hotspot count is higher (regardless of coord_source)
+                    elif hotspot_count > existing_count:
+                        should_update = True
+                        update_reason = "higher hotspot count"
                     # Update if journal has more complete information
-                    if coord_source == "visited_systems":
+                    elif coord_source == "visited_systems":
                         # Check for ring mass/density updates
                         if (ring_mass and not existing_mass) or (density and not existing_density):
                             should_update = True
@@ -864,9 +873,6 @@ class UserDatabase:
                             # Newer but less complete - don't overwrite good data
                             log.debug(f"Skipping update for {system_name} - {body_name} - {material_name}: newer scan but less complete ({new_data_count} vs {existing_data_count} fields)")
                             return
-                        elif hotspot_count > existing_count:
-                            should_update = True
-                            update_reason = "higher hotspot count"
                         # Allow journal data to update entries with no coord_source (unknown origin)
                         elif existing_coord_source in (None, "", "unknown") and new_data_count > 0:
                             should_update = True

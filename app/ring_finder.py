@@ -768,13 +768,30 @@ class RingFinder:
         data = [(self.results_tree.set(child, col), child) for child in self.results_tree.get_children('')]
         
         # Sort data - handle numeric columns specially
-        if col in ["Distance", "Hotspots", "LS", "Density"]:
+        if col in ["Distance", "LS", "Density"]:
             # Numeric sort - handle N/A values
             def sort_key(item):
                 val = item[0]
                 if val == "No data" or val == "":
                     return float('inf') if not reverse else float('-inf')
                 # Remove commas and convert to float
+                try:
+                    return float(val.replace(',', ''))
+                except:
+                    return float('inf') if not reverse else float('-inf')
+            data.sort(key=sort_key, reverse=reverse)
+        elif col == "Hotspots":
+            # Hotspots column - extract number from formats like "Plat (2)" or "LTD (3), Plat (2)"
+            import re
+            def sort_key(item):
+                val = item[0]
+                if val == "No data" or val == "" or val == "-":
+                    return float('inf') if not reverse else float('-inf')
+                # Try to extract first number in parentheses
+                match = re.search(r'\((\d+)\)', val)
+                if match:
+                    return int(match.group(1))
+                # Fallback: try direct number parse
                 try:
                     return float(val.replace(',', ''))
                 except:
@@ -3830,6 +3847,7 @@ class RingFinder:
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.find_sell_station'), command=self._find_sell_station)
         self.context_menu.add_separator()
+        self.context_menu.add_command(label=t('context_menu.edit_hotspots'), command=self._show_edit_hotspots_dialog)
         self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
         self.context_menu.add_command(label=t('context_menu.set_res'), command=self._show_res_dialog)
         self.context_menu.add_separator()
@@ -4412,6 +4430,144 @@ class RingFinder:
         except Exception as e:
             print(f"Error getting RES display: {e}")
             return ""
+
+    def _show_edit_hotspots_dialog(self):
+        """Show dialog to edit hotspot counts for a ring"""
+        try:
+            selection = self.results_tree.selection()
+            if not selection:
+                self.status_var.set(t('ring_finder.no_selection'))
+                return
+            
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if not values or len(values) < 7:
+                self.status_var.set(t('ring_finder.invalid_selection'))
+                return
+            
+            system_name = values[2]  # System column
+            ring_name = values[4]    # Ring column
+            
+            if not system_name or not ring_name:
+                self.status_var.set(t('ring_finder.missing_info'))
+                return
+            
+            # Get all hotspots for this ring from database
+            import sqlite3
+            hotspots_data = []
+            with sqlite3.connect(self.user_db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT material_name, hotspot_count 
+                    FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ?
+                    ORDER BY material_name
+                ''', (system_name, ring_name))
+                hotspots_data = cursor.fetchall()
+            
+            if not hotspots_data:
+                self.status_var.set(t('ring_finder.no_hotspots_found'))
+                return
+            
+            # Create dialog
+            dialog = tk.Toplevel(self.parent)
+            dialog.title(t('context_menu.edit_hotspots_title'))
+            dialog.resizable(False, False)
+            dialog.transient(self.parent.winfo_toplevel())
+            
+            # Set app icon
+            try:
+                from app_utils import get_app_icon_path
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+            
+            frame = ttk.Frame(dialog, padding=15)
+            frame.pack(fill="both", expand=True)
+            
+            # Header
+            ttk.Label(frame, text=t('context_menu.edit_hotspots_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=3, sticky="w")
+            ttk.Label(frame, text=f"{ring_name}", font=("Segoe UI", 9)).grid(row=2, column=0, columnspan=3, sticky="w", pady=(0, 10))
+            
+            # Column headers
+            ttk.Label(frame, text=t('context_menu.material_header'), font=("Segoe UI", 9, "bold")).grid(row=3, column=0, sticky="w", padx=(0, 20))
+            ttk.Label(frame, text=t('context_menu.count_header'), font=("Segoe UI", 9, "bold")).grid(row=3, column=1, sticky="w")
+            
+            # Create entry fields for each material
+            entry_vars = {}
+            for idx, (material_name, count) in enumerate(hotspots_data):
+                row = idx + 4
+                
+                # Material name (display formatted)
+                display_name = self._format_material_for_display(material_name)
+                ttk.Label(frame, text=display_name).grid(row=row, column=0, sticky="w", pady=2, padx=(0, 20))
+                
+                # Count entry
+                var = tk.StringVar(value=str(count or 0))
+                entry = ttk.Entry(frame, textvariable=var, width=8, justify="center")
+                entry.grid(row=row, column=1, sticky="w", pady=2)
+                entry_vars[material_name] = var
+            
+            # Buttons
+            button_frame = ttk.Frame(frame)
+            button_frame.grid(row=len(hotspots_data) + 5, column=0, columnspan=3, pady=(15, 0))
+            
+            def save():
+                try:
+                    with sqlite3.connect(self.user_db.db_path) as conn:
+                        cursor = conn.cursor()
+                        for material_name, var in entry_vars.items():
+                            try:
+                                new_count = int(var.get())
+                                if new_count < 0:
+                                    new_count = 0
+                            except ValueError:
+                                new_count = 0
+                            
+                            cursor.execute('''
+                                UPDATE hotspot_data 
+                                SET hotspot_count = ?
+                                WHERE system_name = ? AND body_name = ? AND material_name = ?
+                            ''', (new_count, system_name, ring_name, material_name))
+                        conn.commit()
+                    
+                    self.status_var.set(t('context_menu.hotspots_updated'))
+                    # Refresh the display
+                    self._refresh_row_hotspots(item, system_name, ring_name)
+                    dialog.destroy()
+                except Exception as e:
+                    self.status_var.set(f"Error: {e}")
+            
+            ttk.Button(button_frame, text=t('save'), command=save).pack(side="left", padx=5)
+            ttk.Button(button_frame, text=t('cancel'), command=dialog.destroy).pack(side="left", padx=5)
+            
+            # Center dialog
+            dialog.update_idletasks()
+            x = self.parent.winfo_rootx() + (self.parent.winfo_width() - dialog.winfo_width()) // 2
+            y = self.parent.winfo_rooty() + (self.parent.winfo_height() - dialog.winfo_height()) // 2
+            dialog.geometry(f"+{x}+{y}")
+            
+            dialog.grab_set()
+            dialog.focus_set()
+            
+        except Exception as e:
+            print(f"Error showing edit hotspots dialog: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _refresh_row_hotspots(self, item, system_name, ring_name):
+        """Refresh the hotspots display for a specific row after editing"""
+        try:
+            hotspots_display = self._get_ring_hotspots_display(system_name, ring_name)
+            values = list(self.results_tree.item(item, 'values'))
+            if len(values) > 6:
+                values[6] = hotspots_display  # Hotspots column
+                self.results_tree.item(item, values=values)
+        except Exception as e:
+            print(f"Error refreshing row hotspots: {e}")
 
     def _show_overlap_dialog(self):
         """Show dialog to tag overlap for selected hotspot"""

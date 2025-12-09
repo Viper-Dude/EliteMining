@@ -28,8 +28,6 @@
 - Configure your mining hotkeys in the "Custom Key-binds for Mining Control" category
 
 ## Notes!
-- [Important note 1]
-- [Important note 2]
 - If installer fails with errors, right-click the installer and select "Run as administrator"
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

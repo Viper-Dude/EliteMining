@@ -741,7 +741,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.69"
+APP_VERSION = "v4.70"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -13249,10 +13249,35 @@ class App(tk.Tk):
         # Define columns (faction removed - users can right-click → Inara for details)
         columns = ("system", "distance", "security", "allegiance", "state", "population", "economy")
         
-        # Configure treeview style for orange theme
+        # Configure treeview style based on theme
+        from config import load_theme
+        current_theme = load_theme()
         style = ttk.Style()
-        style.configure("SystemFinder.Treeview", background="#1e1e1e", foreground="#ffffff", fieldbackground="#1e1e1e")
-        style.configure("SystemFinder.Treeview.Heading", background="#1a1a1a", foreground="#ff8c00")
+        
+        if current_theme == "elite_orange":
+            tree_bg = "#1e1e1e"
+            tree_fg = "#ff8c00"
+            header_bg = "#1a1a1a"
+            selection_bg = "#ff6600"
+            selection_fg = "#000000"
+        else:
+            tree_bg = "#1e1e1e"
+            tree_fg = "#e6e6e6"
+            header_bg = "#2a2a2a"
+            selection_bg = "#0078d7"
+            selection_fg = "#ffffff"
+        
+        style.configure("SystemFinder.Treeview",
+                       rowheight=25,
+                       background=tree_bg,
+                       foreground=tree_fg,
+                       fieldbackground=tree_bg)
+        style.configure("SystemFinder.Treeview.Heading",
+                       background=header_bg,
+                       foreground=tree_fg)
+        style.map("SystemFinder.Treeview",
+                 background=[('selected', selection_bg)],
+                 foreground=[('selected', selection_fg)])
         
         self.sysfinder_tree = ttk.Treeview(
             table_frame, columns=columns, show="headings", height=15, style="SystemFinder.Treeview"
