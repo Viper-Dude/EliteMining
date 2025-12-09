@@ -9614,10 +9614,9 @@ class ProspectorPanel(ttk.Frame):
                 is_enabled = self.announce_map.get(name_for_lookup.title(), False)
             if pct_val is not None and is_enabled and pct_val >= eff_th:
                 # For TTS, use friendly name for proper pronunciation
-                # e.g., "Low Temp Diamonds" instead of "LTD"
                 tts_name = name
                 if name in ['Low Temperature Diamonds', 'Low-Temperature Diamonds']:
-                    tts_name = 'Low Temp Diamonds'
+                    tts_name = 'Low Temperature Diamonds'
                 speak_entry = f"{tts_name} {pct_text}".strip()
                 speak_parts.append(speak_entry)
                 triggered = True
