@@ -1011,20 +1011,24 @@ class RefineryDialog:
             row = 0
             col = 0
             for material, quantity in self.current_cargo_items.items():
-                if material in MINING_MATERIALS:  # Only show known mining materials
+                # Normalize material name for comparison
+                normalized_material = material.replace("LowTemperatureDiamonds", "Low Temperature Diamonds")
+                if normalized_material in MINING_MATERIALS:  # Only show known mining materials
+                    # Use the normalized name for display
+                    display_material = normalized_material
                     material_frame = tk.Frame(cargo_inner, bg="#1e1e1e")
                     material_frame.grid(row=row, column=col, padx=5, pady=5, sticky="w")
                     
-                    # Material label
-                    mat_label = tk.Label(material_frame, text=f"{material}:", 
+                    # Material label - use normalized name
+                    mat_label = tk.Label(material_frame, text=f"{display_material}:", 
                                        bg="#1e1e1e", fg="#ffffff", 
                                        font=("Segoe UI", 9))
                     mat_label.pack(side="left")
                     
-                    # Quick add buttons
+                    # Quick add buttons - use normalized name
                     for amount in [1, 4, 6, 8, 10]:
                         btn = tk.Button(material_frame, text=f"+{amount}t", 
-                                      command=lambda m=material, a=amount: self._quick_add_material(m, a),
+                                      command=lambda m=display_material, a=amount: self._quick_add_material(m, a),
                                       bg="#404040", fg="#ffffff", 
                                       font=("Segoe UI", 8), width=6)
                         btn.pack(side="left", padx=2)
