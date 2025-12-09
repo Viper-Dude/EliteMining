@@ -12844,14 +12844,25 @@ class App(tk.Tk):
                              "Osmium", "Painite", "Palladium", "Platinum", "Praseodymium", 
                              "Rhodplumsite", "Rutile", "Samarium", "Serendibite", "Silver", 
                              "Tritium", "Uraninite", "Void Opals"]
-        self._commodity_map = {k: get_material(k) for k in self._commodity_order}
+        
+        # Helper to format commodity display names (abbreviate long names)
+        def format_commodity_display(name):
+            localized = get_material(name)
+            # Use abbreviated display for Low Temperature Diamonds
+            if name == "Low Temperature Diamonds" or localized == "Low Temperature Diamonds":
+                return "Low Temp. Diamonds"
+            return localized
+        
+        self._commodity_map = {k: format_commodity_display(k) for k in self._commodity_order}
         self._commodity_rev_map = {v: k for k, v in self._commodity_map.items()}
+        # Also map the full name for reverse lookup
+        self._commodity_rev_map["Low Temperature Diamonds"] = "Low Temperature Diamonds"
         
         saved_commodity = cfg.get('marketplace_commodity', 'Alexandrite')
         self.marketplace_commodity = tk.StringVar(value=self._commodity_map.get(saved_commodity, saved_commodity))
         sorted_commodities = [self._commodity_map[k] for k in self._commodity_order]
         commodity_combo = ttk.Combobox(row1_frame, textvariable=self.marketplace_commodity,
-                                     values=sorted_commodities, state="readonly", width=18)
+                                     values=sorted_commodities, state="readonly", width=20)
         commodity_combo.pack(side="left")
         commodity_combo.bind("<Return>", lambda e: self._search_marketplace())
         commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
