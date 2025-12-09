@@ -243,6 +243,11 @@ class SessionAnalytics:
                 localized_name = material_data.get('Name_Localised', '').strip()
                 raw_name = material_data.get('Name', '').strip()
                 material_name = localized_name if localized_name else raw_name
+                
+                # Normalize material names to match KNOWN_MATERIALS (handles all languages)
+                from journal_parser import JournalParser
+                material_name = JournalParser.normalize_material_name(material_name)
+                
                 percentage = material_data.get('Proportion', 0.0)
                 
                 if material_name and percentage > 0:

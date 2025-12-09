@@ -259,6 +259,8 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
         # Materials list
         materials_mined = session_data.get('materials_mined', {})
         mineral_performance = session_data.get('mineral_performance', {})
+        sorted_materials = []  # Initialize before conditional
+        best_performer = None  # Initialize before conditional
         if materials_mined:
             # Sort by quantity (highest first) - handle both dict and numeric values
             # Convert all materials to normalized format first

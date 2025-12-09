@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 log = logging.getLogger("EliteMining.MissionsTab")
 
 
-class MiningMissionsTab(ttk.Frame):
+class MiningMissionsTab(tk.Frame):
     """Full tab for tracking mining missions with progress and integration with Ring Finder"""
     
     def __init__(self, parent, ring_finder=None, cargo_monitor=None, main_app=None, **kwargs):
@@ -35,13 +35,14 @@ class MiningMissionsTab(ttk.Frame):
             self.theme = "dark_gray"
         
         self._setup_colors()
+        self.configure(bg=self.bg_color)
         self._build_ui()
         self._register_tracker_callback()
     
     def _setup_colors(self):
         """Setup theme colors"""
         if self.theme == "elite_orange":
-            self.bg_color = "#000000"
+            self.bg_color = "#1e1e1e"
             self.fg_color = "#ff8c00"
             self.fg_bright = "#ffa500"
             self.fg_dim = "#888888"

@@ -741,7 +741,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.68"
+APP_VERSION = "v4.69"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1165,22 +1165,10 @@ class RefineryDialog:
     
     def _check_and_trigger_csv_update(self, added_materials: dict):
         """Check if we should trigger CSV update when materials are added manually"""
-    # import os removed (already imported globally)
-        # Only trigger updates if we have a cargo monitor reference and it has the update function
-        if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, '_update_csv_after_refinery_addition'):
-            # Check if there are recent session files that might need updating
-            try:
-                prospector_panel = getattr(self.cargo_monitor, 'main_app_ref', None)
-                if prospector_panel and hasattr(prospector_panel, 'prospector_panel'):
-                    reports_dir = prospector_panel.prospector_panel.reports_dir
-                    if os.path.exists(reports_dir):
-                        session_files = [f for f in os.listdir(reports_dir) 
-                                       if f.startswith("Session_") and f.endswith(".txt")]
-                        if session_files:
-                            # Trigger the update with accumulated refinery contents
-                            self.cargo_monitor._update_csv_after_refinery_addition(self.refinery_contents.copy())
-            except Exception as e:
-                print(f"Error checking for CSV update: {e}")
+        # DISABLED: Refinery materials are now handled in end_session_tracking()
+        # This function was causing double-writes and cross-session data contamination
+        # The materials are stored in refinery_contents and added to the report at session end
+        pass
 
     def _remove_selected(self):
         """Remove selected material from refinery contents"""
@@ -3580,6 +3568,14 @@ cargo panel forces Elite to write detailed inventory data.
                     if hasattr(self, 'status_label'):
                         self.status_label.configure(text=f"🗑️ Ejected {count}x {item_name}")
                     
+                    # Subtract ejected cargo from multi-session tracking
+                    # This ensures ejected materials don't count in session totals
+                    if found_key in self.session_minerals_mined:
+                        self.session_minerals_mined[found_key] = max(0, self.session_minerals_mined[found_key] - count)
+                        if self.session_minerals_mined[found_key] == 0:
+                            del self.session_minerals_mined[found_key]
+                        print(f"[DEBUG] Ejected {count}t of {found_key}, session_minerals_mined updated: {self.session_minerals_mined.get(found_key, 0)}t remaining")
+                    
                     # Notify prospector panel for multi-session tracking (counts as LOSS)
                     if self.update_callback:
                         self.update_callback(event_type="EjectCargo", count=count)
@@ -3981,16 +3977,17 @@ cargo panel forces Elite to write detailed inventory data.
                 if end_qty > start_qty:
                     materials_mined[item_name] = end_qty - start_qty
         
-        # Add refinery contents to materials_mined (not just totals)
-        # Check current refinery contents
+        # Add refinery contents that user manually added (not already in cargo)
+        # Refinery materials are additional to cargo - they represent bins that weren't collected yet
         if hasattr(self, 'refinery_contents') and self.refinery_contents:
             for material_name, refinery_qty in self.refinery_contents.items():
                 if material_name in materials_mined:
                     materials_mined[material_name] += refinery_qty
                 else:
                     materials_mined[material_name] = refinery_qty
+            print(f"[SESSION] Added refinery contents to report: {self.refinery_contents}")
         
-        # Clear refinery contents after adding to prevent reuse in next session
+        # Clear refinery contents after session to prevent reuse in next session
         if hasattr(self, 'refinery_contents'):
             self.refinery_contents = {}
         
@@ -4093,7 +4090,6 @@ cargo panel forces Elite to write detailed inventory data.
             dict: Material name -> tons mined (e.g., {'Platinum': 12.3, 'Painite': 8.5})
         """
         if not self.session_start_snapshot:
-            print("[DEBUG] get_live_session_materials: No session snapshot!")
             return {}
         
         # Check if multi-session mode is active via prospector panel
@@ -4103,24 +4099,16 @@ cargo panel forces Elite to write detailed inventory data.
             hasattr(self.prospector_panel, 'multi_session_var')):
             is_multi_session = bool(self.prospector_panel.multi_session_var.get())
         
-        print(f"[DEBUG] get_live_session_materials: is_multi_session={is_multi_session}")
-        print(f"[DEBUG] session_minerals_mined={self.session_minerals_mined}")
-        print(f"[DEBUG] current cargo_items={self.cargo_items}")
-        
         materials_mined = {}
         
         if is_multi_session:
             # Multi-session mode: Use cumulative session tracking (already includes refinery)
             for material_name, total_mined in self.session_minerals_mined.items():
                 materials_mined[material_name] = round(total_mined, 1)
-            print(f"[DEBUG] Multi-session materials_mined result: {materials_mined}")
         else:
             # Normal mode: Compare current cargo to session start (existing behavior)
             start_items = self.session_start_snapshot['cargo_items']
             current_items = self.cargo_items
-            
-            print(f"[DEBUG] Single-session start_items: {start_items}")
-            print(f"[DEBUG] Single-session current_items: {current_items}")
             
             # Calculate materials that increased during the session
             for item_name, current_qty in current_items.items():
@@ -4129,11 +4117,14 @@ cargo panel forces Elite to write detailed inventory data.
                     "scrap" in item_name.lower() or 
                     "data" in item_name.lower()):
                     continue
+                
+                # Normalize material name to match KNOWN_MATERIALS (handles all languages)
+                from journal_parser import JournalParser
+                normalized_name = JournalParser.normalize_material_name(item_name)
                     
                 start_qty = start_items.get(item_name, 0)
                 if current_qty > start_qty:
-                    materials_mined[item_name] = round(current_qty - start_qty, 1)
-            print(f"[DEBUG] Single-session materials_mined result: {materials_mined}")
+                    materials_mined[normalized_name] = round(current_qty - start_qty, 1)
             
             # Add refinery contents only in normal mode
             if hasattr(self, 'refinery_contents') and self.refinery_contents:
@@ -4144,7 +4135,6 @@ cargo panel forces Elite to write detailed inventory data.
                         materials_mined[material_name] = refinery_qty
                     materials_mined[material_name] = round(materials_mined[material_name], 1)
         
-        print(f"[DEBUG] FINAL materials_mined (with refinery): {materials_mined}")
         return materials_mined
 
     def get_live_session_engineering_materials(self):
@@ -4232,13 +4222,23 @@ cargo panel forces Elite to write detailed inventory data.
             import re
             # import os removed (already imported globally)
             
-            # Check if we have access to the prospector panel
-            if not hasattr(self, 'main_app_ref') or not hasattr(self.main_app_ref, 'prospector_panel'):
+            # Check if we have access to the prospector panel (try multiple paths)
+            prospector_panel = None
+            print(f"DEBUG REFINERY: hasattr prospector_panel = {hasattr(self, 'prospector_panel')}")
+            print(f"DEBUG REFINERY: hasattr main_app_ref = {hasattr(self, 'main_app_ref')}")
+            if hasattr(self, 'prospector_panel') and self.prospector_panel:
+                prospector_panel = self.prospector_panel
+                print("DEBUG REFINERY: Using self.prospector_panel")
+            elif hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'prospector_panel'):
+                prospector_panel = self.main_app_ref.prospector_panel
+                print("DEBUG REFINERY: Using main_app_ref.prospector_panel")
+            
+            if not prospector_panel:
                 print("No prospector panel reference - cannot auto-update CSV")
                 return
                 
-            prospector_panel = self.main_app_ref.prospector_panel
             reports_dir = prospector_panel.reports_dir
+            print(f"DEBUG REFINERY: reports_dir = {reports_dir}")
             
             if not os.path.exists(reports_dir):
                 print("Reports directory not found - cannot auto-update CSV")
@@ -4263,33 +4263,20 @@ cargo panel forces Elite to write detailed inventory data.
             with open(session_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # Parse existing material breakdown and add new materials
+            # Use only the new refinery materials (don't accumulate from existing section)
             updated_materials = {}
             total_added = 0.0
             
-            # Check if there's already a REFINED CARGO TRACKING section
-            cargo_section_match = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
-            if cargo_section_match:
-                # Parse existing materials
-                cargo_text = cargo_section_match.group(1)
-                existing_materials = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
-                for mat_name, quantity in existing_materials:
-                    # Filter out summary entries like "Total Cargo Collected"
-                    mat_name_clean = mat_name.strip()
-                    if mat_name_clean.lower() not in ['total cargo collected', 'total', 'cargo collected']:
-                        updated_materials[mat_name_clean] = float(quantity)
-            
-            # Add new refinery materials
+            # Add new refinery materials directly (replacing any existing section, not accumulating)
             for material_name, quantity in refinery_materials.items():
-                if material_name in updated_materials:
-                    updated_materials[material_name] += quantity
-                else:
-                    updated_materials[material_name] = quantity
+                updated_materials[material_name] = quantity
                 total_added += quantity
             
-            # Update session header with new total
+            # Update session header with new total (only add if no existing REFINED CARGO TRACKING)
+            cargo_section_match = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
             header_match = re.search(r'^(Session: .* — .* — .* — Total )(\d+(?:\.\d+)?)t', content, re.MULTILINE)
-            if header_match:
+            if header_match and not cargo_section_match:
+                # Only update header if this is the first time adding refinery
                 old_total = float(header_match.group(2))
                 new_total = old_total + total_added
                 new_header = f"{header_match.group(1)}{new_total:.0f}t"
@@ -4297,11 +4284,6 @@ cargo panel forces Elite to write detailed inventory data.
             
             # Update or add REFINED CARGO TRACKING section
             cargo_breakdown_text = "\n=== REFINED CARGO TRACKING ===\n"
-            prospectors_line = ""
-            if "Prospector Limpets Used:" in content:
-                prospector_match = re.search(r'Prospector Limpets Used:\s*(\d+)', content)
-                if prospector_match:
-                    cargo_breakdown_text += f"Prospector Limpets Used: {prospector_match.group(1)}\n"
             
             cargo_breakdown_text += f"Refined Materials: {len(updated_materials)} types\n\n"
             
@@ -8314,7 +8296,7 @@ class App(tk.Tk):
         dialog.wait_window()
         return result if result else None
 
-    def _ask_new_preset_name(self) -> Optional[str]:
+    def _ask_new_preset_name(self, preselect_ship: Optional[str] = None) -> Optional[str]:
         """Dialog for creating new preset with Ship Type dropdown and custom name"""
         # Complete Elite Dangerous ship list (alphabetical)
         ship_types = [
@@ -8428,7 +8410,9 @@ class App(tk.Tk):
         tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
                 font=("Segoe UI", 10)).pack(side=tk.LEFT)
         
-        ship_var = tk.StringVar(value=ship_types[0])
+        # Pre-select ship if provided
+        default_ship = preselect_ship if preselect_ship and preselect_ship in ship_types else ship_types[0]
+        ship_var = tk.StringVar(value=default_ship)
         ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
                                   state="readonly", width=28, font=("Segoe UI", 10),
                                   style="Preset.TCombobox")
@@ -8529,7 +8513,18 @@ class App(tk.Tk):
         return None
 
     def _save_as_new(self) -> None:
-        name = self._ask_new_preset_name()
+        # Detect current ship folder selection
+        current_ship = None
+        selection = self.preset_list.selection()
+        if selection:
+            selected_item = selection[0]
+            parent = self.preset_list.parent(selected_item)
+            if parent:  # Item is inside a folder
+                folder_text = self.preset_list.item(parent, "text")
+                if folder_text.startswith("📁 "):
+                    current_ship = folder_text[2:].strip()
+        
+        name = self._ask_new_preset_name(preselect_ship=current_ship)
         if not name:
             return
         path = self._settings_path(name)
@@ -11268,7 +11263,7 @@ class App(tk.Tk):
         
         self._version_label = tk.Label(
             parent_frame,
-            text=f"v{version}",
+            text="About",
             font=("Segoe UI", 8),
             bg=_vbtn_bg,
             fg=_vbtn_fg,
@@ -12200,11 +12195,13 @@ class App(tk.Tk):
                         report_count = 0
                         for root, dirs, files in os.walk(reports_root):
                             for file_name in files:
-                                if file_name.endswith(('.csv', '.txt', '.json')):
+                                # Include all report types: CSV, TXT, JSON, PNG (graphs/cards), HTML
+                                if file_name.endswith(('.csv', '.txt', '.json', '.png', '.html')):
                                     file_path = os.path.join(root, file_name)
                                     rel_path = os.path.relpath(file_path, os.path.dirname(reports_root))
                                     zipf.write(file_path, rel_path)
                                     report_count += 1
+                                    print(f"BACKUP DEBUG: Added report: {rel_path}")
                         print(f"BACKUP DEBUG: Total report files backed up: {report_count}")
                     else:
                         print(f"BACKUP DEBUG: Reports folder NOT FOUND!")
@@ -13241,8 +13238,13 @@ class App(tk.Tk):
         # Define columns (faction removed - users can right-click → Inara for details)
         columns = ("system", "distance", "security", "allegiance", "state", "population", "economy")
         
+        # Configure treeview style for orange theme
+        style = ttk.Style()
+        style.configure("SystemFinder.Treeview", background="#1e1e1e", foreground="#ffffff", fieldbackground="#1e1e1e")
+        style.configure("SystemFinder.Treeview.Heading", background="#1a1a1a", foreground="#ff8c00")
+        
         self.sysfinder_tree = ttk.Treeview(
-            table_frame, columns=columns, show="headings", height=15
+            table_frame, columns=columns, show="headings", height=15, style="SystemFinder.Treeview"
         )
         
         # Column headings
@@ -13280,7 +13282,7 @@ class App(tk.Tk):
         
         # Configure row tags for alternating colors (like Ring Finder)
         self.sysfinder_tree.tag_configure('oddrow', background='#1e1e1e')
-        self.sysfinder_tree.tag_configure('evenrow', background='#252525')
+        self.sysfinder_tree.tag_configure('evenrow', background='#1a1a1a')
         
         # Grid layout for treeview and scrollbars (like Ring Finder)
         self.sysfinder_tree.grid(row=0, column=0, sticky="nsew")
@@ -15518,6 +15520,16 @@ class App(tk.Tk):
         )
         subtitle_label.pack(pady=(0, 10))
         
+        # Configure progress bar style for orange theme
+        style = ttk.Style()
+        if self.current_theme == "elite_orange":
+            style.configure("Migration.Horizontal.TProgressbar", 
+                          background="#ff8c00", 
+                          troughcolor="#333333",
+                          bordercolor="#ff6600",
+                          lightcolor="#ff9933",
+                          darkcolor="#ff6600")
+        
         # Progress bar
         progress_var = tk.DoubleVar(value=0)
         progress_bar = ttk.Progressbar(
@@ -15525,7 +15537,8 @@ class App(tk.Tk):
             variable=progress_var, 
             maximum=100,
             length=350,
-            mode='determinate'
+            mode='determinate',
+            style="Migration.Horizontal.TProgressbar"
         )
         progress_bar.pack(pady=10)
         

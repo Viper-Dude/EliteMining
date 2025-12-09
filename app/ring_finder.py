@@ -1217,7 +1217,9 @@ class RingFinder:
                 self.material_var.set(self._ring_type_map.get(settings["ring_type"], settings["ring_type"]))
             if "specific_material" in settings:
                 try:
-                    self.specific_material_var.set(get_material(settings["specific_material"]))
+                    # Convert stored canonical name to display format (e.g., "Low Temperature Diamonds" -> "Low Temp.Diamonds")
+                    display_name = self._format_material_for_display(settings["specific_material"])
+                    self.specific_material_var.set(display_name)
                 except Exception:
                     self.specific_material_var.set(settings["specific_material"])
             if "distance" in settings:

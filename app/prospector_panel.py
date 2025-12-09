@@ -2286,6 +2286,8 @@ class ProspectorPanel(ttk.Frame):
                     self.min_pct_map[material] = v
                     self._save_min_pct_map()
                     self._save_last_material_settings()  # Save last settings when min_pct changes
+                    # Refresh Material Analysis table to show updated threshold
+                    self._refresh_statistics_display()
                 except Exception:
                     pass
             return _on_change
@@ -9580,14 +9582,12 @@ class ProspectorPanel(ttk.Frame):
         speak_parts: List[str] = []      # for TTS (filtered)
         triggered = False
         th = float(self.threshold.get())
-        
-        print(f"[ANNOUNCE DEBUG] _summaries_from_event called, materials count: {len(materials)}, threshold: {th}")
 
         # Abbreviations for long material names in Prospector Reports table
         material_abbreviations = {
             'Methanol Monohydrate Crystals': 'Methanol Cryst',
-            'Low Temperature Diamonds': 'LTD',
-            'Low-Temperature Diamonds': 'LTD',
+            'Low Temperature Diamonds': 'Low Temp Diamonds',
+            'Low-Temperature Diamonds': 'Low Temp Diamonds',
             'Lithium Hydroxide': 'Lithium Hydro',
             'Hydrogen Peroxide': 'H. Peroxide',
             'Methane Clathrate': 'Methane Clath',
@@ -9609,15 +9609,17 @@ class ProspectorPanel(ttk.Frame):
             # Normalize material name to English for lookup in announce_map
             # This ensures German/French/Spanish names match English settings
             name_for_lookup = JournalParser.normalize_material_name(name)
-            print(f"[ANNOUNCE DEBUG] Material: '{name}' → Normalized: '{name_for_lookup}'")
             is_enabled = self.announce_map.get(name_for_lookup, False)
-            print(f"[ANNOUNCE DEBUG] announce_map.get('{name_for_lookup}') = {is_enabled}")
             if not is_enabled and name_for_lookup != name_for_lookup.title():
                 is_enabled = self.announce_map.get(name_for_lookup.title(), False)
-                print(f"[ANNOUNCE DEBUG] Retry with title case: '{name_for_lookup.title()}' = {is_enabled}")
-            print(f"[ANNOUNCE DEBUG] Final enabled={is_enabled}, pct={pct_val}, threshold={eff_th}")
             if pct_val is not None and is_enabled and pct_val >= eff_th:
-                speak_parts.append(entry)
+                # For TTS, use friendly name for proper pronunciation
+                # e.g., "Low Temp Diamonds" instead of "LTD"
+                tts_name = name
+                if name in ['Low Temperature Diamonds', 'Low-Temperature Diamonds']:
+                    tts_name = 'Low Temp Diamonds'
+                speak_entry = f"{tts_name} {pct_text}".strip()
+                speak_parts.append(speak_entry)
                 triggered = True
 
         mother = evt.get("MotherlodeMaterial_Localised") or evt.get("MotherlodeMaterial")
@@ -9673,8 +9675,6 @@ class ProspectorPanel(ttk.Frame):
             # Sync current UI thresholds to min_pct_map before processing
             self._sync_spinboxes_to_min_pct_map()
             
-
-            
             # Add the prospector result to analytics with properly selected materials and thresholds
             self.session_analytics.add_prospector_event(evt, selected_materials, self.min_pct_map)
             
@@ -9695,8 +9695,8 @@ class ProspectorPanel(ttk.Frame):
         # Then abbreviate for display
         abbreviations = {
             'Methanol Monohydrate Crystals': 'Methanol Cryst',
-            'Low Temperature Diamonds': 'LTD',
-            'Low-Temperature Diamonds': 'LTD',
+            'Low Temperature Diamonds': 'Low Temp. Diamonds',
+            'Low-Temperature Diamonds': 'Low Temp. Diamonds',
             'Lithium Hydroxide': 'Lithium Hydro',
             'Hydrogen Peroxide': 'H. Peroxide',
             'Methane Clathrate': 'Methane Clath',
@@ -11220,13 +11220,9 @@ class ProspectorPanel(ttk.Frame):
             if add_comment:
                 session_comment = self._show_comment_dialog()
             
-            # Update session totals with any refinery materials that were added
-            if cargo_session_data and 'materials_mined' in cargo_session_data:
-                for material_name, quantity in cargo_session_data['materials_mined'].items():
-                    if material_name in self.session_totals:
-                        self.session_totals[material_name] = max(self.session_totals[material_name], quantity)
-                    else:
-                        self.session_totals[material_name] = quantity
+            # NOTE: session_totals from MiningRefined events is NOT used for totals
+            # We use cargo_session_data which compares actual cargo at end vs start
+            # This ensures ejected materials don't count - only what you bring home matters
         
         except Exception as e:
             print(f"Error during session end dialogs: {e}")
@@ -11243,15 +11239,16 @@ class ProspectorPanel(ttk.Frame):
 
         # Session summary (removed yield table functionality)
         lines = []
-        # Calculate actual mined tons from cargo session data
+        # Calculate actual mined tons from CARGO data only (not MiningRefined events)
+        # This ensures ejected materials don't count - only what you bring home matters
+        
         if cargo_session_data and 'total_tons_mined' in cargo_session_data:
             total_tons = cargo_session_data['total_tons_mined']
+            print(f"[SESSION] Total tons from cargo: {total_tons}t (cargo-based)")
         else:
-            # Fallback to session totals for older sessions
+            # Fallback if cargo tracking wasn't available
             total_tons = 0.0
-            for mat in sorted(self.session_totals.keys(), key=str.casefold):
-                tons = self.session_totals[mat]
-                total_tons += tons
+            print(f"[SESSION] Warning: No cargo_session_data available, total_tons = 0")
 
         # Generate lines using actual mined materials from cargo data
         if cargo_session_data and 'materials_mined' in cargo_session_data:
@@ -11261,11 +11258,8 @@ class ProspectorPanel(ttk.Frame):
                 tph = tons / active_hours
                 lines.append(f"{mat} {tons:.0f}t ({tph:.2f} t/hr)")
         else:
-            # Fallback for older sessions without cargo data
-            for mat in sorted(self.session_totals.keys(), key=str.casefold):
-                tons = self.session_totals[mat]
-                tph = tons / active_hours
-                lines.append(f"{mat} {tons:.0f}t ({tph:.2f} t/hr)")
+            # No cargo data available - empty session
+            print(f"[SESSION] Warning: No materials_mined in cargo data")
 
         sysname = self.session_system.get().strip() or self.last_system or "Unknown System"
         # Use preserved mining body if available (prevents docking from overwriting actual mining location)
