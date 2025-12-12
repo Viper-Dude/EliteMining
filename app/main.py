@@ -741,7 +741,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.70"
+APP_VERSION = "v4.71"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1740,9 +1740,9 @@ class CargoMonitor:
             # Ring Finder exists - refresh it now
             main_app._refresh_ring_finder(is_new_discovery=is_new_discovery)
             
-            # Auto-search refresh: Only if NEW hotspots were discovered
-            if is_new_discovery:
-                # Get scanned system/body from CargoMonitor (self), not main_app
+            # Auto-search refresh: Only if NEW hotspots were discovered AND not during catchup scan
+            if is_new_discovery and not getattr(self, '_catchup_scan_in_progress', False):
+                # Get scanned system/body from CargoMonitor (self) where it's stored during SAASignalsFound processing
                 scanned_system = getattr(self, '_current_saa_system', None)
                 scanned_body = getattr(self, '_current_saa_body', None)
                 if scanned_system:
@@ -1815,8 +1815,9 @@ class CargoMonitor:
             if not current_reference_system:
                 ring_finder.system_var.set(scanned_system)
                 current_reference_system = scanned_system
-                print(f"🔍 Auto-refresh: Reference system was empty, set to {scanned_system}")
-            elif current_reference_system.lower() != scanned_system.lower():
+            elif not (current_reference_system.lower() == scanned_system.lower() or
+                      scanned_system.lower().startswith(current_reference_system.lower()) or
+                      current_reference_system.lower().startswith(scanned_system.lower())):
                 # Different system - reset first scan flag but don't refresh
                 self._first_ring_scan_in_system = True
                 return
@@ -1826,37 +1827,31 @@ class CargoMonitor:
                 main_app.after_cancel(self._auto_refresh_timer)
                 self._auto_refresh_timer = None
             
-            # Determine delay: 0 for first scan, 2s for subsequent scans
-            if self._first_ring_scan_in_system:
-                delay = 0  # Immediate refresh for first ring scan
-                delay_text = "immediately"
-                self._first_ring_scan_in_system = False  # Mark that first scan is done
-            else:
-                delay = self._auto_refresh_delay  # 2 second delay for subsequent scans
-                delay_text = "in 2s"
+            # Always use 1s delay to ensure database has time to update
+            delay = 1000  # 1 second delay
+            delay_text = "in 1s"
             
-            print(f"🔍 Auto-refresh: New hotspots found in {scanned_system} - {'updating' if delay == 0 else 'scheduling search'} {delay_text}")
+            # Track first scan for future use if needed
+            if self._first_ring_scan_in_system:
+                self._first_ring_scan_in_system = False
             
             # Set status message
-            if delay == 0:
-                ring_finder.status_var.set(f"Found new hotspots - updating results")
-            else:
-                ring_finder.status_var.set(f"Found new hotspots - search in 2s")
+            ring_finder.status_var.set(f"Found new hotspots - search {delay_text}")
             
             # Schedule the actual refresh with appropriate delay
             def do_delayed_refresh(body_to_highlight=scanned_body, system_to_highlight=scanned_system):
                 try:
-                    if delay > 0:  # Only update status if there was a delay
-                        ring_finder.status_var.set(f"Found new hotspots - updating results")
+                    ring_finder.status_var.set(f"Found new hotspots - updating results")
+                    
                     # Pass the specific scanned system+body so ONLY that ring gets highlighted
                     ring_finder.search_hotspots(highlight_body=body_to_highlight, highlight_system=system_to_highlight)
                     # Clear status after 3 seconds
                     ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
                     self._auto_refresh_timer = None  # Clear timer reference
                 except Exception as e:
-                    print(f"Auto-refresh error: {e}")
+                    pass  # Silent fail in delayed refresh
             
-            # Schedule refresh with appropriate delay (0 = immediate, >0 = delayed)
+            # Schedule refresh with 1s delay
             self._auto_refresh_timer = main_app.after(delay, do_delayed_refresh)
             
         except Exception as e:
@@ -3611,8 +3606,30 @@ cargo panel forces Elite to write detailed inventory data.
                         self.cargo_window.after(1000, self._delayed_capacity_refresh)
 
             elif event_type in ["FSDJump", "CarrierJump"]:
-                # Player jumped to a new system - update current system via centralized method
-                # This will also record the visit (handled by update_current_system)
+                # Player jumped to a new system - update current system
+                # NOTE: Visit counting happens in update_current_system (centralized)
+                # Do NOT call add_visited_system here to avoid double counting!
+                system_name = event.get("StarSystem", "")
+                star_pos = event.get("StarPos", [])
+                event_ts = event.get("timestamp", "")
+                
+                if system_name:
+                    coords = None
+                    if len(star_pos) >= 3:
+                        coords = (star_pos[0], star_pos[1], star_pos[2])
+                    
+                    # Use centralized method to update displays AND record visit
+                    # Pass event timestamp to prevent double-counting if catchup also processes this
+                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'update_current_system'):
+                        self.main_app_ref.update_current_system(system_name, coords, count_visit=True, event_timestamp=event_ts)
+                    else:
+                        self.current_system = system_name
+                    
+                    print(f"[JUMP] {event_type}: Arrived at {system_name}")
+            
+            elif event_type == "Location":
+                # Game loaded - update current system but DON'T count as visit
+                # Location events just indicate where you are when loading the game
                 system_name = event.get("StarSystem", "")
                 star_pos = event.get("StarPos", [])
                 
@@ -3621,31 +3638,25 @@ cargo panel forces Elite to write detailed inventory data.
                     if len(star_pos) >= 3:
                         coords = (star_pos[0], star_pos[1], star_pos[2])
                     
-                    # Use centralized method - this handles visit counting
+                    # Use centralized method but DON'T count as visit
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'update_current_system'):
-                        self.main_app_ref.update_current_system(system_name, coords)
+                        self.main_app_ref.update_current_system(system_name, coords, count_visit=False)
                     else:
                         self.current_system = system_name
-                    
-                    print(f"[JUMP] {event_type}: Arrived at {system_name}")
             
-            elif event_type == "Location":
-                # Game loaded - just update current system display, don't count as visit
-                # (Player was already here, they didn't "arrive")
+            elif event_type == "CarrierLocation":
+                # CarrierLocation tells us where YOUR carrier is
+                # This is informational - it does NOT count as a visit because:
+                # - If carrier jumped while online, CarrierJump event already counted
+                # - If carrier jumped while offline, this just tells us where it is now
+                # We only use this to update the current system display
+                carrier_type = event.get("CarrierType", "")
                 system_name = event.get("StarSystem", "")
-                star_pos = event.get("StarPos", [])
                 
-                if system_name:
-                    self.current_system = system_name
-                    
-                    # Update display only (no visit counting)
-                    if hasattr(self, 'main_app_ref'):
-                        if hasattr(self.main_app_ref, 'distance_current_system'):
-                            self.main_app_ref.distance_current_system.set(system_name)
-                        if hasattr(self.main_app_ref, '_update_cmdr_system_display'):
-                            self.main_app_ref.after(100, self.main_app_ref._update_cmdr_system_display)
-                        if hasattr(self.main_app_ref, '_update_home_fc_distances'):
-                            self.main_app_ref.after(100, self.main_app_ref._update_home_fc_distances)
+                if system_name and carrier_type == "FleetCarrier":
+                    # Update current system display but DON'T count as visit
+                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'update_current_system'):
+                        self.main_app_ref.update_current_system(system_name, None, count_visit=False)
                         
             elif event_type == "Scan":
                 # Process Scan events through JournalParser to store ring info
@@ -3659,14 +3670,15 @@ cargo panel forces Elite to write detailed inventory data.
                 try:
                     body_name = event.get("BodyName", "")
                     
-                    # Extract system name from body name if current_system is not set
+                    # Use current_system which is set by FSDJump/Location events
+                    # This is more reliable than extracting from body name
                     scanned_system = self.current_system
+                    
+                    # Only try extraction as last resort if current_system not set
                     if not scanned_system and body_name:
-                        # Body name format: "System Name Body" (e.g., "Col 359 Sector JB-X d1-69 11 A Ring")
-                        # Extract system name by removing body designation
                         import re
-                        # Match pattern: system name followed by space and body number/letter
-                        match = re.match(r'^(.+?)\s+\d+(\s+[A-Z])?(\s+Ring)?$', body_name)
+                        # Match pattern for ring: ends with " X Ring" where X is letter(s)
+                        match = re.match(r'^(.+?)\s+(?:[A-Z]\s+)?\d+(?:\s+[A-Z])?\s+[A-Z]+\s+Ring$', body_name, re.IGNORECASE)
                         if match:
                             scanned_system = match.group(1).strip()
                             print(f"🔍 Extracted system name from body: {scanned_system}")
@@ -4814,12 +4826,8 @@ class App(tk.Tk):
         # Early distance calculation using cached data (before journal scan)
         self.after(1500, self._update_home_fc_distances)
         
-        # Ring finder auto-search runs first so user sees results quickly
-        # (uses existing database data before journal scan updates it)
-        self.after(2000, self._trigger_ring_auto_search)
-        
-        # Full journal scan runs silently in background after ring search starts
-        # When complete, triggers distance calculation again with updated data
+        # Full journal scan runs first
+        # Ring finder auto-search will be triggered AFTER journal scan completes
         self.after(3000, self._background_journal_catchup)
 
     def _cleanup_legacy_files(self):
@@ -5013,11 +5021,18 @@ class App(tk.Tk):
         self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.system_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.visits_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
-        self.visits_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.visits_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"), cursor="hand2")
         self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.route_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.total_systems_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
         self.total_systems_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        
+        # Make visits clickable to edit
+        self.visits_label_value.bind("<Button-1>", lambda e: self._show_edit_visits_dialog_for_current_system())
+        self.visits_label_prefix.bind("<Button-1>", lambda e: self._show_edit_visits_dialog_for_current_system())
+        self.visits_label_prefix.config(cursor="hand2")
+        ToolTip(self.visits_label_value, t('status_bar.click_to_edit_visits'))
+        ToolTip(self.visits_label_prefix, t('status_bar.click_to_edit_visits'))
         
         # Grid them horizontally (tighter spacing) - shift columns to make room for logo
         self.cmdr_label_prefix.grid(row=0, column=1, sticky="e")
@@ -7834,6 +7849,133 @@ class App(tk.Tk):
         except Exception as e:
             print(f"Error updating CMDR/system display: {e}")
 
+    def _show_edit_visits_dialog_for_current_system(self):
+        """Show dialog to edit visit count for the current system"""
+        try:
+            current_system = self.get_current_system()
+            if not current_system:
+                return
+            
+            # Get current visit data
+            visit_data = None
+            current_count = 0
+            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                visit_data = self.cargo_monitor.user_db.is_system_visited(current_system)
+                current_count = visit_data.get('visit_count', 0) if visit_data else 0
+            
+            # Create dialog
+            dialog = tk.Toplevel(self)
+            dialog.title(t('context_menu.edit_visits_title'))
+            dialog.resizable(False, False)
+            dialog.transient(self)
+            
+            # Set app icon
+            try:
+                from app_utils import get_app_icon_path
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+            
+            # Theme colors
+            if self.current_theme == "elite_orange":
+                bg_color = "#000000"
+                fg_color = "#ff8c00"
+                entry_bg = "#1a1a1a"
+                entry_fg = "#ffffff"
+            else:
+                bg_color = "#1e1e1e"
+                fg_color = "#e0e0e0"
+                entry_bg = "#2b2b2b"
+                entry_fg = "#ffffff"
+            
+            dialog.configure(bg=bg_color)
+            
+            # Main frame
+            frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
+            frame.pack(fill="both", expand=True)
+            
+            # System name label
+            tk.Label(frame, text=t('context_menu.edit_visits_for'), 
+                    bg=bg_color, fg=fg_color, font=("Segoe UI", 9)).pack(anchor="w")
+            
+            tk.Label(frame, text=current_system, 
+                    bg=bg_color, fg=fg_color, font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 15))
+            
+            # Visit count entry
+            count_frame = tk.Frame(frame, bg=bg_color)
+            count_frame.pack(fill="x", pady=5)
+            
+            tk.Label(count_frame, text=t('context_menu.visit_count_label'), 
+                    bg=bg_color, fg=fg_color, font=("Segoe UI", 9)).pack(side="left")
+            
+            count_var = tk.StringVar(value=str(current_count))
+            count_entry = tk.Entry(count_frame, textvariable=count_var, width=10,
+                                  bg=entry_bg, fg=entry_fg, insertbackground=fg_color,
+                                  relief="solid", bd=1, font=("Segoe UI", 10))
+            count_entry.pack(side="left", padx=(10, 0))
+            count_entry.select_range(0, tk.END)
+            
+            # Buttons
+            btn_frame = tk.Frame(frame, bg=bg_color)
+            btn_frame.pack(fill="x", pady=(20, 0))
+            
+            def save_and_close():
+                try:
+                    new_count = int(count_var.get())
+                    if new_count < 0:
+                        new_count = 0
+                    
+                    if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                        self.cargo_monitor.user_db.update_visit_count(current_system, new_count)
+                        self._set_status(t('context_menu.visits_updated'), 3000)
+                        # Refresh the status bar display
+                        self._update_cmdr_system_display()
+                except ValueError:
+                    pass  # Invalid input - ignore
+                
+                dialog.destroy()
+            
+            def cancel():
+                dialog.destroy()
+            
+            save_btn = tk.Button(btn_frame, text=t('dialogs.save'), command=save_and_close,
+                                bg="#2a5a2a", fg="#ffffff", 
+                                activebackground="#3a6a3a", activeforeground="#ffffff",
+                                relief="solid", bd=1, cursor="hand2", 
+                                pady=6, padx=15, font=("Segoe UI", 9))
+            save_btn.pack(side="right", padx=(8, 0))
+            
+            cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=cancel,
+                                  bg="#5a2a2a", fg="#ffffff", 
+                                  activebackground="#6a3a3a", activeforeground="#ffffff",
+                                  relief="solid", bd=1, cursor="hand2", 
+                                  pady=6, padx=15, font=("Segoe UI", 9))
+            cancel_btn.pack(side="right")
+            
+            # Center dialog
+            dialog.update_idletasks()
+            w = dialog.winfo_width()
+            h = dialog.winfo_height()
+            px = self.winfo_x()
+            py = self.winfo_y()
+            pw = self.winfo_width()
+            ph = self.winfo_height()
+            x = px + (pw // 2) - (w // 2)
+            y = py + (ph // 2) - (h // 2)
+            dialog.geometry(f"+{x}+{y}")
+            
+            dialog.grab_set()
+            count_entry.focus_set()
+            
+            # Bind Enter to save
+            dialog.bind("<Return>", lambda e: save_and_close())
+            dialog.bind("<Escape>", lambda e: cancel())
+            
+        except Exception as e:
+            print(f"Error showing edit visits dialog: {e}")
+
     def _import_all_from_txt(self) -> None:
         found: List[str] = []
         missing: List[str] = []
@@ -8193,7 +8335,7 @@ class App(tk.Tk):
                     "btn": (self.tool_btn[t].get() if t in self.tool_btn else None)}
                 for t in TOOL_ORDER
             },
-            "Toggles": {k: v.get() for k, v in self.toggle_vars.items()},
+            "Toggles": {k: v.get() for k, v in self.toggle_vars.items() if k != "FSD Jump Sequence"},
             "Announcements": announcement_settings,
             "Timers": {k: v.get() for k, v in self.timer_vars.items()},
         }
@@ -8207,7 +8349,8 @@ class App(tk.Tk):
             if t in self.tool_btn and isinstance(btn, int) and btn in (1, 2):
                 self.tool_btn[t].set(btn)
         for k, v in data.get("Toggles", {}).items():
-            if k in self.toggle_vars:
+            # Skip FSD Jump Sequence - it's not saved in presets
+            if k in self.toggle_vars and k != "FSD Jump Sequence":
                 self.toggle_vars[k].set(int(v))
         
         # Handle announcements: if section exists, load it; if not, set all to disabled (0)
@@ -9170,7 +9313,8 @@ class App(tk.Tk):
                         # Update UI on main thread
                         def update_ui():
                             if current_system:
-                                self.update_current_system(current_system)
+                                # This is a refresh/scan - NOT a visit
+                                self.update_current_system(current_system, count_visit=False)
                                 results.append(f"System: {current_system}")
                             
                             if carrier_system:
@@ -9330,46 +9474,39 @@ class App(tk.Tk):
             self.distance_status_label.config(text=f"✗ Error: {str(e)[:50]}", fg="#ff6666")
             self._set_status("Distance calculation failed")
     
+    def _refresh_visit_count(self, system_name):
+        """Refresh the visit count display for a system"""
+        if hasattr(self, 'distance_visits_label') and system_name:
+            visits_count = 0
+            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db') and self.cargo_monitor.user_db:
+                try:
+                    visit_data = self.cargo_monitor.user_db.is_system_visited(system_name)
+                    if visit_data:
+                        visits_count = visit_data.get('visit_count', 0)
+                except:
+                    pass
+            self.distance_visits_label.config(text=f"{t('distance_calculator.visits_label')} {visits_count}")
+    
     def _update_home_fc_distances(self):
-        """Update distances to Home and FC from current system"""
+        """Update distance displays for Home and FC from current system"""
         try:
-            # Get current system from centralized source
-            current_system = self.get_current_system()
-            
-            # Update current system display
-            if hasattr(self, 'distance_current_system'):
-                if current_system:
-                    self.distance_current_system.set(current_system)
-                    # Calculate distance from current system to Sol
-                    sol_distance, _ = self.distance_calculator.get_distance_to_sol(current_system)
-                    if sol_distance is not None:
-                        self.current_sol_label.config(text=f"➤ {sol_distance:.2f} {t('distance_calculator.from_sol')}", fg="#ffcc00")
-                    else:
-                        self.current_sol_label.config(text="")
-                    
-                    # Update visit count for CURRENT system from database
-                    if hasattr(self, 'distance_visits_label'):
-                        visits_count = 0
-                        if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db') and self.cargo_monitor.user_db:
-                            try:
-                                visit_data = self.cargo_monitor.user_db.is_system_visited(current_system)
-                                if visit_data:
-                                    visits_count = visit_data.get('visit_count', 0)
-                            except:
-                                pass
-                        self.distance_visits_label.config(text=f"{t('distance_calculator.visits_label')} {visits_count}")
-                else:
-                    self.distance_current_system.set("---")
-                    self.current_sol_label.config(text="")
-                    if hasattr(self, 'distance_visits_label'):
-                        self.distance_visits_label.config(text="")
-            
+            current_system = self.distance_current_system.get().strip()
             if not current_system:
                 self.distance_to_home_label.config(text="")
                 self.home_sol_label.config(text="")
                 self.distance_to_fc_label.config(text="")
                 self.fc_sol_label.config(text="")
+                if hasattr(self, 'current_sol_label'):
+                    self.current_sol_label.config(text="")
                 return
+            
+            # Calculate distance from current system to Sol
+            if hasattr(self, 'current_sol_label'):
+                sol_distance, _ = self.distance_calculator.get_distance_to_sol(current_system)
+                if sol_distance is not None:
+                    self.current_sol_label.config(text=f"➤ {sol_distance:.2f} LY from Sol", fg="#ffcc00")
+                else:
+                    self.current_sol_label.config(text="")
             
             # Calculate distance to Home
             home_system = self.distance_home_system.get().strip()
@@ -15727,7 +15864,8 @@ class App(tk.Tk):
                             event = json.loads(line)
                             event_type = event.get('event', '')
                             
-                            # Process visits - ONLY FSDJump and CarrierJump
+                            # Process visits - FSDJump and CarrierJump are actual arrivals
+                            # NOTE: CarrierLocation is NOT processed during catchup to prevent double-counting
                             if event_type in ['FSDJump', 'CarrierJump']:
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
@@ -15736,16 +15874,9 @@ class App(tk.Tk):
                                     star_pos = event.get('StarPos', [])
                                     coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
                                     
-                                    try:
-                                        self.cargo_monitor.user_db.add_visited_system(
-                                            system_name=system_name,
-                                            visit_date=timestamp,
-                                            system_address=system_address,
-                                            coordinates=coordinates
-                                        )
+                                    # Use single source of truth for visit recording
+                                    if self.record_system_visit(system_name, timestamp, coordinates, system_address):
                                         visits_added += 1
-                                    except:
-                                        pass
                                     current_system = system_name
                                     
                             elif event_type == 'Location':
@@ -15904,6 +16035,9 @@ class App(tk.Tk):
         hotspots_added = 0
         missions_found = 0
         
+        # Set flag to prevent auto-refresh triggers during catchup scan
+        self.cargo_monitor._catchup_scan_in_progress = True
+        
         # Start batch mode for mission tracker to avoid UI spam during scan
         mission_tracker = None
         try:
@@ -15934,8 +16068,12 @@ class App(tk.Tk):
                             event = json.loads(line)
                             event_type = event.get('event', '')
                             
-                            # Process visits - ONLY FSDJump and CarrierJump count as real arrivals
-                            # Location events are just game loads, not actual travel
+                            # Process visits - FSDJump and CarrierJump are actual arrivals
+                            # NOTE: CarrierLocation is NOT processed during catchup because:
+                            # - If carrier jumped while online, CarrierJump is already in journal
+                            # - If carrier jumped while offline, CarrierLocation will be processed
+                            #   by LIVE event handler when app is running
+                            # Processing CarrierLocation here would cause double-counting
                             if event_type in ['FSDJump', 'CarrierJump']:
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
@@ -15944,18 +16082,11 @@ class App(tk.Tk):
                                     star_pos = event.get('StarPos', [])
                                     coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
                                     
-                                    try:
-                                        self.cargo_monitor.user_db.add_visited_system(
-                                            system_name=system_name,
-                                            visit_date=timestamp,
-                                            system_address=system_address,
-                                            coordinates=coordinates
-                                        )
+                                    # Use single source of truth for visit recording
+                                    if self.record_system_visit(system_name, timestamp, coordinates, system_address):
                                         visits_added += 1
-                                    except:
-                                        pass
                                     current_system = system_name
-                                    
+                            
                             elif event_type == 'Location':
                                 # Location = game loaded, just track current system for context
                                 system_name = event.get('StarSystem', '')
@@ -16035,6 +16166,9 @@ class App(tk.Tk):
             except:
                 pass
         
+        # Clear catchup scan flag
+        self.cargo_monitor._catchup_scan_in_progress = False
+        
         print(f"[JOURNAL] ✓ Scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
         log.info(f"Journal scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
         
@@ -16052,14 +16186,22 @@ class App(tk.Tk):
         if hasattr(self, '_update_cmdr_system_display'):
             self.after(0, self._update_cmdr_system_display)
         
+        # Ensure current system has a visit record (handles offline carrier jumps)
+        # If you're in a system but no FSDJump/CarrierJump was recorded (e.g., carrier jumped while offline),
+        # this ensures you have at least 1 visit recorded for where you ARE now
+        self.after(50, self._ensure_current_system_visited)
+        
         # Distance calculation runs AFTER journal scan is complete (now has accurate visit data)
         if hasattr(self, '_update_home_fc_distances'):
             print("[JOURNAL] Triggering distance calculation...")
             self.after(100, self._update_home_fc_distances)
         
+        # Ring finder auto-search runs AFTER journal scan is complete
+        self.after(200, self._trigger_ring_auto_search)
+        
         # Also trigger System A ↔ B calculation if both fields are populated
         if hasattr(self, '_calculate_distances'):
-            self.after(200, self._auto_calculate_if_populated)
+            self.after(300, self._auto_calculate_if_populated)
 
     def _auto_calculate_if_populated(self):
         """Auto-calculate System A ↔ B distance if both fields have values"""
@@ -16069,6 +16211,42 @@ class App(tk.Tk):
             
             if system_a and system_b:
                 self._calculate_distances()
+        except Exception:
+            pass
+
+    def _ensure_current_system_visited(self):
+        """Ensure current system has a visit record.
+        
+        This ONLY creates a record if the system has NEVER been visited.
+        It does NOT increment the count - that only happens on actual jumps
+        (FSDJump/CarrierJump events).
+        
+        Purpose: Handle edge case where user is in a system but has no
+        record of ever visiting it (e.g., first time running the app).
+        """
+        try:
+            current_system = self.get_current_system()
+            if not current_system:
+                return
+            
+            user_db = None
+            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                user_db = self.cargo_monitor.user_db
+            
+            if not user_db:
+                return
+            
+            # Check if system was EVER visited
+            visit_data = user_db.is_system_visited(current_system)
+            
+            if not visit_data:
+                # System never visited - create initial record with count=1
+                # Use a minimal timestamp so future actual visits will be newer
+                self.record_system_visit(current_system, "0001-01-01T00:00:00Z")
+            
+            # Refresh the display (shows current count)
+            self._update_cmdr_system_display()
+            
         except Exception:
             pass
 
@@ -16099,53 +16277,94 @@ class App(tk.Tk):
                 return
             
             parser = JournalParser(journal_dir)
-            last_system = parser.get_last_known_system()
+            last_system, location_timestamp = parser.get_last_known_system_with_timestamp()
             
             if last_system:
+                # Store the location timestamp for offline carrier jump detection
+                self._location_event_timestamp = location_timestamp
+                
                 # Use update_current_system to notify all components
-                self.update_current_system(last_system)
+                # This is startup/refresh - NOT a visit
+                self.update_current_system(last_system, count_visit=False)
                 
         except Exception:
             pass
     
-    def update_current_system(self, system_name: str, coords: Optional[tuple] = None) -> None:
+    def record_system_visit(self, system_name: str, event_timestamp: str, coordinates: Optional[tuple] = None, system_address: Optional[int] = None) -> bool:
+        """Single source of truth for recording system visits.
+        
+        This method handles all visit recording logic:
+        - Uses journal event timestamp for duplicate detection
+        - Calls add_visited_system which checks if visit_date > last_visit
+        
+        Args:
+            system_name: Name of the star system
+            event_timestamp: ISO timestamp from the journal event (REQUIRED)
+            coordinates: Optional (x, y, z) coordinates
+            system_address: Optional system address from journal
+            
+        Returns:
+            True if visit was recorded, False if skipped (duplicate/error)
+        """
+        if not system_name or not event_timestamp:
+            return False
+        
+        try:
+            user_db = None
+            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                user_db = self.cargo_monitor.user_db
+            elif hasattr(self, 'user_db'):
+                user_db = self.user_db
+                
+            if user_db:
+                user_db.add_visited_system(
+                    system_name=system_name,
+                    visit_date=event_timestamp,
+                    system_address=system_address,
+                    coordinates=coordinates
+                )
+                return True
+        except Exception:
+            pass
+        return False
+    
+    def update_current_system(self, system_name: str, coords: Optional[tuple] = None, count_visit: bool = True, event_timestamp: Optional[str] = None) -> None:
         """Centralized method to update current system - notifies all interested components
         
-        This is the ONLY place where visit counting should happen.
-        Called when: FSD jump, carrier jump, or any real system change.
-        NOT called for: Location events at startup (those just read current position).
+        Args:
+            system_name: Name of the current system
+            coords: Optional (x, y, z) coordinates
+            count_visit: Whether to count this as a visit. Set False for Location events
+                         (game startup) which shouldn't count as arrivals.
+            event_timestamp: Optional ISO timestamp from the journal event. If provided,
+                             uses this for visit recording to prevent duplicate counting.
+                             If None, uses current UTC time.
         """
         if not system_name:
             return
         
         # Check if this is actually a NEW system (not same as before)
         previous_system = getattr(self, 'current_system', None)
-        is_new_system = previous_system and previous_system != system_name
+        is_different_system = previous_system != system_name
             
         # Update central cache
         self.current_system = system_name
         self.current_system_coords = coords
         
-        # Count visit ONLY if we moved to a different system
-        if is_new_system:
-            try:
-                # Use cargo_monitor.user_db which is the same db used for display
-                user_db = None
-                if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
-                    user_db = self.cargo_monitor.user_db
-                elif hasattr(self, 'user_db'):
-                    user_db = self.user_db
-                    
-                if user_db:
-                    import datetime
-                    user_db.add_visited_system(
-                        system_name=system_name,
-                        visit_date=datetime.datetime.utcnow().isoformat() + "Z",
-                        coordinates=coords
-                    )
-                    print(f"[VISIT] Recorded visit to {system_name}")
-            except Exception as e:
-                print(f"[VISIT] Error recording visit: {e}")
+        # Count visit if we're in a different system than before AND count_visit is True
+        # This includes first arrival (when previous_system is None)
+        # count_visit should be False for Location events (game startup) since those
+        # aren't actual arrivals - just loading into a system you were already in
+        if is_different_system and count_visit:
+            # Use event timestamp if provided, otherwise generate current UTC time
+            if event_timestamp:
+                timestamp = event_timestamp
+            else:
+                import datetime
+                timestamp = datetime.datetime.utcnow().isoformat() + "Z"
+            
+            # Use single source of truth for visit recording
+            self.record_system_visit(system_name, timestamp, coords)
         
         # Notify all components that use current system
         # 1. Update ring finder reference system
@@ -16165,9 +16384,13 @@ class App(tk.Tk):
             self.prospector_panel.session_system.set(system_name)
         
         # 4. Update CMDR/System display in actions bar (including visit count)
-        # Use a small delay to ensure database write is committed
+        # Use a delay to ensure database write is committed
         if hasattr(self, 'system_label_value'):
             self.after(100, self._update_cmdr_system_display)
+        
+        # 5. Refresh visit count display after database update
+        if hasattr(self, 'distance_visits_label'):
+            self.after(150, lambda: self._refresh_visit_count(system_name))
         
         # 5. Update System Finder current system display and reference field
         if hasattr(self, 'sysfinder_reference_system'):

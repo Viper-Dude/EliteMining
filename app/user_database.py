@@ -852,6 +852,10 @@ class UserDatabase:
                     elif hotspot_count > existing_count:
                         should_update = True
                         update_reason = "higher hotspot count"
+                    # Always update if it's a newer scan with new data (regardless of coord_source)
+                    elif scan_date > existing_date and new_data_count > 0:
+                        should_update = True
+                        update_reason = "newer scan with data"
                     # Update if journal has more complete information
                     elif coord_source == "visited_systems":
                         # Check for ring mass/density updates
@@ -1214,7 +1218,7 @@ class UserDatabase:
                 return dict(result) if result else None
                 
         except Exception as e:
-            log.error(f"Error checking visited system: {e}")
+            log.error(f"Error checking visited system '{system_name}': {e}")
             return None
     
     def format_visited_status(self, system_name: str) -> str:
@@ -1286,6 +1290,59 @@ class UserDatabase:
         visit_data = self.is_system_visited(system_name)
         return visit_data is not None
     
+    def update_visit_count(self, system_name: str, new_count: int) -> bool:
+        """Update the visit count for a system (for manual correction)
+        
+        Args:
+            system_name: Name of the star system
+            new_count: New visit count (0 to delete the record)
+            
+        Returns:
+            True if update was successful
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                if new_count <= 0:
+                    # Delete the visit record
+                    cursor.execute('''
+                        DELETE FROM visited_systems WHERE system_name = ?
+                    ''', (system_name,))
+                    log.info(f"Deleted visit record for: {system_name}")
+                else:
+                    # Check if record exists
+                    cursor.execute('SELECT 1 FROM visited_systems WHERE system_name = ?', (system_name,))
+                    exists = cursor.fetchone() is not None
+                    
+                    # Get current timestamp for the update
+                    from datetime import datetime
+                    current_timestamp = datetime.utcnow().isoformat() + "Z"
+                    
+                    if exists:
+                        # Update existing record - also update last_visit_date
+                        cursor.execute('''
+                            UPDATE visited_systems 
+                            SET visit_count = ?, last_visit_date = ?
+                            WHERE system_name = ?
+                        ''', (new_count, current_timestamp, system_name))
+                    else:
+                        # Create new record
+                        cursor.execute('''
+                            INSERT INTO visited_systems 
+                            (system_name, first_visit_date, last_visit_date, visit_count)
+                            VALUES (?, ?, ?, ?)
+                        ''', (system_name, current_timestamp, current_timestamp, new_count))
+                    
+                    log.info(f"Updated visit count for {system_name} to {new_count}")
+                
+                conn.commit()
+                return True
+                
+        except Exception as e:
+            log.error(f"Error updating visit count: {e}")
+            return False
+
     def set_overlap_tag(self, system_name: str, body_name: str, material_name: str, overlap_tag: Optional[str]) -> bool:
         """Set overlap tag for a specific hotspot
         

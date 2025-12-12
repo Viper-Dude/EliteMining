@@ -418,6 +418,13 @@ class JournalParser:
             ring_mass = None
             density = None
             
+            # Normalize body name FIRST for database lookup
+            # (database stores without system name prefix, e.g., "2 A Ring" not "Namnetes 2 A Ring")
+            normalized_body_name = body_name
+            if system_name and body_name.lower().startswith(system_name.lower()):
+                normalized_body_name = body_name[len(system_name):].strip()
+            normalized_body_name = ' '.join(normalized_body_name.split())  # Ensure proper spacing
+            
             if system_address and body_name:
                 key = (system_address, body_name)
                 ring_data = self.ring_info.get(key)
@@ -431,8 +438,9 @@ class JournalParser:
                     log.debug(f"Found ring info for {body_name}: Class={ring_class}, LS={ls_distance}, Inner={inner_radius}, Outer={outer_radius}, Mass={ring_mass}")
                 else:
                     # Ring info not in cache - try to get from database (previously scanned)
-                    log.debug(f"Ring info not in cache for: {key}, attempting database lookup")
-                    db_metadata = self.user_db.get_ring_metadata(system_name, body_name)
+                    # Use normalized body name for database lookup
+                    log.debug(f"Ring info not in cache for: {key}, attempting database lookup with normalized name: {normalized_body_name}")
+                    db_metadata = self.user_db.get_ring_metadata(system_name, normalized_body_name)
                     if db_metadata:
                         ring_class = db_metadata.get('ring_type')
                         ls_distance = db_metadata.get('ls_distance')
@@ -468,14 +476,7 @@ class JournalParser:
                     # Normalize material name to prevent duplicates (e.g., "tritium" -> "Tritium")
                     material_name = self.normalize_material_name(raw_material_name)
                     
-                    # Normalize body_name to match how it's stored in database
-                    # (database stores without system name prefix, e.g., "B 1 A Ring" not "Omicron Capricorni B B 1 A Ring")
-                    normalized_body_name = body_name
-                    if system_name and body_name.lower().startswith(system_name.lower()):
-                        normalized_body_name = body_name[len(system_name):].strip()
-                    normalized_body_name = ' '.join(normalized_body_name.split())  # Ensure proper spacing
-                    
-                    # Check if this hotspot already exists (using normalized body name)
+                    # Check if this hotspot already exists (using normalized body name from above)
                     import sqlite3
                     with sqlite3.connect(self.user_db.db_path) as conn:
                         cursor = conn.cursor()
@@ -510,7 +511,10 @@ class JournalParser:
             # Trigger callback ONCE after all hotspots are processed (not inside loop)
             # Pass True ONLY if at least one hotspot was NEW (not already in database)
             if self.on_hotspot_added and hotspots_are_new:
+                print(f"[HOTSPOT] Triggering on_hotspot_added callback (is_new_discovery=True)")
                 self.on_hotspot_added(is_new_discovery=True)
+            elif self.on_hotspot_added and not hotspots_are_new:
+                print(f"[HOTSPOT] Hotspots already exist, skipping callback")
                     
         except Exception as e:
             log.error(f"Error processing SAASignalsFound event: {e}")
@@ -768,12 +772,27 @@ class JournalParser:
         Priority: FSDJump, Location, Docked > CarrierJump (based on timestamp, not order).
         This handles cases where old Location events exist after a CarrierJump.
         """
+        system, _ = self.get_last_known_system_with_timestamp()
+        return system
+    
+    def get_last_known_system_with_timestamp(self) -> tuple:
+        """Scan journal files for the most recent system location event by timestamp.
+        
+        Returns:
+            Tuple of (system_name, timestamp_string) or (None, None) if not found
+        
+        Compares timestamps to find the actual LATEST event that includes system info.
+        Priority: FSDJump, Location, Docked > CarrierJump (based on timestamp, not order).
+        This handles cases where old Location events exist after a CarrierJump.
+        """
         files = self.find_journal_files()
         if not files:
-            return self._get_system_from_status_json()
+            system = self._get_system_from_status_json()
+            return (system, None) if system else (None, None)
         
         latest_event = None
         latest_timestamp = None
+        latest_timestamp_str = None
         
         # Scan all events to find the most recent one that includes system info
         for file_path in reversed(files):
@@ -806,11 +825,13 @@ class JournalParser:
                                 
                                 if latest_timestamp is None or event_time > latest_timestamp:
                                     latest_timestamp = event_time
+                                    latest_timestamp_str = timestamp_str
                                     latest_event = (event_type, system)
                             except Exception:
                                 # Fallback: just use the first one we find
                                 if latest_event is None:
                                     latest_event = (event_type, system)
+                                    latest_timestamp_str = timestamp_str
                         else:
                             # No timestamp, use if we haven't found anything
                             if latest_event is None:
@@ -821,10 +842,11 @@ class JournalParser:
         
         if latest_event:
             event_type, system = latest_event
-            return system
+            return (system, latest_timestamp_str)
         
         # Final fallback: check Status.json for current system
-        return self._get_system_from_status_json()
+        system = self._get_system_from_status_json()
+        return (system, None) if system else (None, None)
     
     def _get_system_from_status_json(self) -> Optional[str]:
         """Read the current system from Status.json if available"""

@@ -162,7 +162,8 @@
     "visits": "| Besuche:",
     "systems_in_route": "| Syst. in Route:",
     "total_systems": "| Ges. Syst:",
-    "total_systems_tooltip": "Gesamt besuchte Systeme (aus Spielstatistik). Aktualisiert beim Neustart von Elite Dangerous."
+    "total_systems_tooltip": "Gesamt besuchte Systeme (aus Spielstatistik). Aktualisiert beim Neustart von Elite Dangerous.",
+    "click_to_edit_visits": "Klicken um Besuchsanzahl für aktuelles System zu bearbeiten"
   },
   "mining_missions": {
     "title": "Bergbau-Missionen",
@@ -454,7 +455,7 @@
     "help_headtracker": "Aktiviert/deaktiviert automatische Headtracker-Andocksteuerung (schaltet die F9-Taste um).",
     "help_laser_extra": "Fügt eine zweite Laserbergbau-Periode nach einer Pause hinzu (siehe Pause-Timer).",
     "help_night_vision": "Schaltet automatisch Nachtsicht ein beim Starten oder Zurücksetzen der Bergbausequenz.",
-    "help_fsd_jump": "Nach FSD-Sprung: Systemkarte öffnen/schließen, dann Auto-Sprung",
+    "help_fsd_jump": "Nach FSD-Sprung: Systemkarte öffnen/schließen, dann Auto-Sprung (nicht in Schiff-Presets gespeichert)",
     "help_power": "Aktiviert = Max. Energie zu Antrieben, deaktiviert = Energie ausbalancieren wenn Laserbergbau abgeschlossen.",
     "help_prospector": "Zielt automatisch auf den Prospektor nach dem Abschuss.",
     "help_pulse_wave": "Wechselt zurück zur Pulswellenanalysator-Feuergruppe wenn Laserbergbau abgeschlossen.",
@@ -585,6 +586,11 @@
     "set_overlap": "Überlappung setzen...",
     "set_res": "RES setzen...",
     "edit_hotspots": "Hotspots bearbeiten...",
+    "edit_visits": "Besuche bearbeiten...",
+    "edit_visits_title": "Besuchszähler bearbeiten",
+    "edit_visits_for": "Besuchszähler bearbeiten für:",
+    "visit_count_label": "Anzahl Besuche:",
+    "visits_updated": "Besuchszähler aktualisiert",
     "edit_hotspots_title": "Hotspots bearbeiten",
     "edit_hotspots_for": "Hotspot-Anzahl bearbeiten für:",
     "material_header": "Material",

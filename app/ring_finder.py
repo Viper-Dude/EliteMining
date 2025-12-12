@@ -1584,6 +1584,11 @@ class RingFinder:
             highlight_system: Specific system name for the body (e.g., 'Synuefe XR-H d11-45')
                            Only this exact system+ring will be highlighted green. None = no highlighting.
         """
+        # If this is an auto-refresh (has highlight info), clear cache first to get fresh data
+        if highlight_body and highlight_system:
+            if hasattr(self, 'local_db') and hasattr(self.local_db, 'clear_cache'):
+                self.local_db.clear_cache()
+        
         # Store highlight info for use in _update_results (accumulate multiple highlights)
         if not hasattr(self, '_pending_highlights'):
             self._pending_highlights = set()
@@ -3471,7 +3476,37 @@ class RingFinder:
                             if distance <= max_distance and system_name not in systems_in_range:
                                 systems_in_range.append(system_name)
                                 user_systems_in_range += 1
+                        
+                        # ALSO check hotspot_data table for systems with hotspots
+                        # This ensures newly scanned hotspots are found immediately
+                        # Use bounding box filter for efficiency (like galaxy database query)
+                        x_min = reference_coords['x'] - max_distance
+                        x_max = reference_coords['x'] + max_distance
+                        y_min = reference_coords['y'] - max_distance
+                        y_max = reference_coords['y'] + max_distance
+                        z_min = reference_coords['z'] - max_distance
+                        z_max = reference_coords['z'] + max_distance
+                        
+                        user_cursor.execute("""
+                            SELECT DISTINCT system_name, x_coord, y_coord, z_coord 
+                            FROM hotspot_data
+                            WHERE x_coord IS NOT NULL
+                            AND x_coord BETWEEN ? AND ?
+                            AND y_coord BETWEEN ? AND ?
+                            AND z_coord BETWEEN ? AND ?
+                        """, (x_min, x_max, y_min, y_max, z_min, z_max))
+                        
+                        hotspot_systems_added = 0
+                        for system_name, x, y, z in user_cursor.fetchall():
+                            if system_name in systems_in_range:
+                                continue
+                            system_coords = {'x': x, 'y': y, 'z': z}
+                            distance = self._calculate_distance(reference_coords, system_coords)
                             
+                            if distance <= max_distance:
+                                systems_in_range.append(system_name)
+                                hotspot_systems_added += 1
+                        
                 except Exception:
                     pass
                 
@@ -3566,7 +3601,12 @@ class RingFinder:
             normalized_highlight = ' '.join(normalized_highlight.split())
             
             for system_name, body_name in current_results:
-                if body_name == normalized_highlight and system_name.lower() == highlight_system.lower():
+                # Use flexible matching: exact match OR one starts with the other (for multi-star systems)
+                system_match = (body_name == normalized_highlight and 
+                               (system_name.lower() == highlight_system.lower() or
+                                system_name.lower().startswith(highlight_system.lower()) or
+                                highlight_system.lower().startswith(system_name.lower())))
+                if system_match:
                     top_entries.add((system_name, body_name))
                     # Only add to green if still in green_highlights
                     if (highlight_system, highlight_body) in self._green_highlights:
@@ -3850,6 +3890,7 @@ class RingFinder:
         self.context_menu.add_command(label=t('context_menu.edit_hotspots'), command=self._show_edit_hotspots_dialog)
         self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
         self.context_menu.add_command(label=t('context_menu.set_res'), command=self._show_res_dialog)
+        self.context_menu.add_command(label=t('context_menu.edit_visits'), command=self._show_edit_visits_dialog)
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.bookmark_location'), command=self._bookmark_selected)
     
@@ -4568,6 +4609,171 @@ class RingFinder:
                 self.results_tree.item(item, values=values)
         except Exception as e:
             print(f"Error refreshing row hotspots: {e}")
+
+    def _show_edit_visits_dialog(self):
+        """Show dialog to edit visit count for selected system"""
+        try:
+            selection = self.results_tree.selection()
+            if not selection:
+                self.status_var.set("No system selected")
+                return
+            
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if not values or len(values) < 3:
+                return
+            
+            system_name = values[2]  # System is column index 2
+            
+            # Get current visit data
+            visit_data = self.user_db.is_system_visited(system_name)
+            current_count = visit_data.get('visit_count', 0) if visit_data else 0
+            
+            # Create dialog
+            dialog = tk.Toplevel(self.parent)
+            dialog.title(t('context_menu.edit_visits_title'))
+            dialog.resizable(False, False)
+            dialog.transient(self.parent.winfo_toplevel())
+            
+            # Set app icon
+            try:
+                from app_utils import get_app_icon_path
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+            
+            # Theme colors
+            from config import load_theme
+            theme = load_theme()
+            if theme == "elite_orange":
+                bg_color = "#000000"
+                fg_color = "#ff8c00"
+                entry_bg = "#1a1a1a"
+                entry_fg = "#ffffff"
+            else:
+                bg_color = "#1e1e1e"
+                fg_color = "#e0e0e0"
+                entry_bg = "#2b2b2b"
+                entry_fg = "#ffffff"
+            
+            dialog.configure(bg=bg_color)
+            
+            # Main frame
+            frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
+            frame.pack(fill="both", expand=True)
+            
+            # System name label
+            tk.Label(frame, text=t('context_menu.edit_visits_for'), 
+                    bg=bg_color, fg=fg_color, font=("Segoe UI", 9)).pack(anchor="w")
+            
+            tk.Label(frame, text=system_name, 
+                    bg=bg_color, fg=fg_color, font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 15))
+            
+            # Visit count entry
+            count_frame = tk.Frame(frame, bg=bg_color)
+            count_frame.pack(fill="x", pady=5)
+            
+            tk.Label(count_frame, text=t('context_menu.visit_count_label'), 
+                    bg=bg_color, fg=fg_color, font=("Segoe UI", 9)).pack(side="left")
+            
+            count_var = tk.StringVar(value=str(current_count))
+            count_entry = tk.Entry(count_frame, textvariable=count_var, width=10,
+                                  bg=entry_bg, fg=entry_fg, insertbackground=fg_color,
+                                  relief="solid", bd=1, font=("Segoe UI", 10))
+            count_entry.pack(side="left", padx=(10, 0))
+            count_entry.select_range(0, tk.END)
+            
+            # Buttons
+            btn_frame = tk.Frame(frame, bg=bg_color)
+            btn_frame.pack(fill="x", pady=(20, 0))
+            
+            def save_and_close():
+                try:
+                    new_count = int(count_var.get())
+                    if new_count < 0:
+                        new_count = 0
+                    
+                    if self.user_db.update_visit_count(system_name, new_count):
+                        self.status_var.set(t('context_menu.visits_updated'))
+                        # Refresh the row to show updated visit status
+                        self._refresh_row_visits(item, system_name)
+                    dialog.destroy()
+                except ValueError:
+                    # Invalid input - just close
+                    dialog.destroy()
+            
+            def cancel():
+                dialog.destroy()
+            
+            save_btn = tk.Button(btn_frame, text=t('dialogs.save'), command=save_and_close,
+                                bg="#2a5a2a", fg="#ffffff", 
+                                activebackground="#3a6a3a", activeforeground="#ffffff",
+                                relief="solid", bd=1, cursor="hand2", 
+                                pady=6, padx=15, font=("Segoe UI", 9))
+            save_btn.pack(side="right", padx=(8, 0))
+            
+            cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=cancel,
+                                  bg="#5a2a2a", fg="#ffffff", 
+                                  activebackground="#6a3a3a", activeforeground="#ffffff",
+                                  relief="solid", bd=1, cursor="hand2", 
+                                  pady=6, padx=15, font=("Segoe UI", 9))
+            cancel_btn.pack(side="right")
+            
+            # Center dialog
+            dialog.update_idletasks()
+            w = dialog.winfo_width()
+            h = dialog.winfo_height()
+            parent = self.parent.winfo_toplevel()
+            px = parent.winfo_x()
+            py = parent.winfo_y()
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            x = px + (pw // 2) - (w // 2)
+            y = py + (ph // 2) - (h // 2)
+            dialog.geometry(f"+{x}+{y}")
+            
+            dialog.grab_set()
+            count_entry.focus_set()
+            
+            # Bind Enter to save
+            dialog.bind('<Return>', lambda e: save_and_close())
+            dialog.bind('<Escape>', lambda e: cancel())
+            
+        except Exception as e:
+            print(f"Error showing edit visits dialog: {e}")
+    
+    def _refresh_row_visits(self, item, system_name):
+        """Refresh the visit status display for a row after editing"""
+        try:
+            # Get formatted visit status
+            visit_status = self.user_db.format_visited_status(system_name)
+            
+            # Update the row - Visit Status is column index 1
+            values = list(self.results_tree.item(item, 'values'))
+            if len(values) > 1:
+                values[1] = visit_status
+                self.results_tree.item(item, values=values)
+            
+            # Also refresh the main app status bar if this is the current system
+            main_app = self.parent.winfo_toplevel()
+            if hasattr(main_app, '_update_cmdr_system_display'):
+                # Schedule update on main thread
+                main_app.after(50, main_app._update_cmdr_system_display)
+            
+            # Also refresh distance calculator visits display for the edited system
+            if hasattr(main_app, '_refresh_visit_count'):
+                main_app.after(100, lambda: main_app._refresh_visit_count(system_name))
+            
+            # Refresh the current system visits in distance calculator if it matches
+            if hasattr(main_app, 'distance_current_system') and hasattr(main_app, '_refresh_visit_count'):
+                current_sys = main_app.distance_current_system.get().strip()
+                if current_sys == system_name:
+                    main_app.after(100, lambda: main_app._refresh_visit_count(current_sys))
+                
+        except Exception as e:
+            print(f"Error refreshing row visits: {e}")
 
     def _show_overlap_dialog(self):
         """Show dialog to tag overlap for selected hotspot"""

@@ -1111,8 +1111,9 @@ class ProspectorPanel(ttk.Frame):
             print(f"[STARTUP] UI updated - System: '{self.session_system.get()}', Body: '{self.session_body.get()}'")
             
             # Notify main app of current system (single source of truth)
+            # This is startup - NOT a visit (just loading saved location)
             if self.main_app and hasattr(self.main_app, 'update_current_system'):
-                self.main_app.update_current_system(self.last_system)
+                self.main_app.update_current_system(self.last_system, count_visit=False)
     
     def _read_initial_location_from_journal(self) -> None:
         """Read the most recent journal file to populate initial system/body location on startup
@@ -9107,8 +9108,10 @@ class ProspectorPanel(ttk.Frame):
                         coords = tuple(evt["StarPos"])
                     
                     # Notify main app - centralized system update
+                    # Location is NOT a visit (game startup), FSDJump IS a visit
+                    should_count = (ev == "FSDJump")
                     if self.main_app and hasattr(self.main_app, 'update_current_system'):
-                        self.main_app.update_current_system(self.last_system, coords)
+                        self.main_app.update_current_system(self.last_system, coords, count_visit=should_count)
                         # Update distances in background (non-blocking)
                         if hasattr(self.main_app, '_update_home_fc_distances'):
                             self.main_app.after(100, self.main_app._update_home_fc_distances)
@@ -9145,8 +9148,10 @@ class ProspectorPanel(ttk.Frame):
                         coords = tuple(evt["StarPos"])
                     
                     # Notify main app - centralized system update
+                    # CarrierLocation is NOT a visit - it's position info, not arrival
+                    # The actual arrival was recorded by CarrierJump event
                     if self.main_app and hasattr(self.main_app, 'update_current_system'):
-                        self.main_app.update_current_system(self.last_system, coords)
+                        self.main_app.update_current_system(self.last_system, coords, count_visit=False)
                     
                     # Update distances in Distance Calculator (non-blocking)
                     if hasattr(self.app, '_update_home_fc_distances'):
