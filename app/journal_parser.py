@@ -511,10 +511,10 @@ class JournalParser:
             # Trigger callback ONCE after all hotspots are processed (not inside loop)
             # Pass True ONLY if at least one hotspot was NEW (not already in database)
             if self.on_hotspot_added and hotspots_are_new:
-                print(f"[HOTSPOT] Triggering on_hotspot_added callback (is_new_discovery=True)")
+                log.debug("[HOTSPOT] Triggering on_hotspot_added callback (is_new_discovery=True)")
                 self.on_hotspot_added(is_new_discovery=True)
             elif self.on_hotspot_added and not hotspots_are_new:
-                print(f"[HOTSPOT] Hotspots already exist, skipping callback")
+                log.debug("[HOTSPOT] Hotspots already exist, skipping callback")
                     
         except Exception as e:
             log.error(f"Error processing SAASignalsFound event: {e}")

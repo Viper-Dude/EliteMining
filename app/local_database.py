@@ -513,11 +513,17 @@ class LocalSystemsDatabase:
             keys_to_remove = [key for key in self.query_cache.keys() if context_filter in key]
             for key in keys_to_remove:
                 del self.query_cache[key]
-            print(f"🗑️ Query cache cleared for context '{context_filter}' ({len(keys_to_remove)} entries)")
+            import logging
+            logging.getLogger(__name__).debug(
+                "Query cache cleared for context '%s' (%d entries)",
+                context_filter,
+                len(keys_to_remove),
+            )
         else:
             # Clear all cache
             self.query_cache.clear()
-            print("🗑️ Query cache cleared (all entries)")
+            import logging
+            logging.getLogger(__name__).debug("Query cache cleared (all entries)")
         
     def get_cache_stats(self) -> Dict:
         """Get cache performance statistics"""

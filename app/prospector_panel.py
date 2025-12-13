@@ -7041,8 +7041,21 @@ class ProspectorPanel(ttk.Frame):
         ]
         self._filter_display_to_key = {display: key for key, display in self._filter_options}
         filter_display_values = [display for key, display in self._filter_options]
-        
-        self.date_filter_var = tk.StringVar(value=t('reports.all_sessions'))
+
+        # Restore last used report filter (persisted as internal key in config)
+        initial_filter_display = t('reports.all_sessions')
+        try:
+            from config import _load_cfg
+            saved_key = _load_cfg().get('reports_date_filter_key')
+            if saved_key:
+                for key, display in self._filter_options:
+                    if key == saved_key:
+                        initial_filter_display = display
+                        break
+        except Exception:
+            pass
+
+        self.date_filter_var = tk.StringVar(value=initial_filter_display)
         date_filter_combo = ttk.Combobox(filter_frame, textvariable=self.date_filter_var, 
                                         values=filter_display_values, 
                                         state="readonly", width=32)
@@ -8151,6 +8164,15 @@ class ProspectorPanel(ttk.Frame):
 
     def _on_date_filter_changed(self, event=None) -> None:
         """Handle date filter dropdown change"""
+        # Persist last used filter as internal key (stable across localization)
+        try:
+            from config import update_config_value
+            filter_display = self.date_filter_var.get() if hasattr(self, 'date_filter_var') else ''
+            filter_key = getattr(self, '_filter_display_to_key', {}).get(filter_display)
+            if filter_key:
+                update_config_value('reports_date_filter_key', filter_key)
+        except Exception:
+            pass
         self._refresh_reports_tab()
 
     def _edit_comment_inline(self, item, event) -> None:

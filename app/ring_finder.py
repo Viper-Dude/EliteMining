@@ -815,7 +815,8 @@ class RingFinder:
         """Update the database info label with total hotspots and systems count"""
         try:
             import sqlite3
-            print(f"[DB INFO] Updating database info from: {self.user_db.db_path}")
+            import logging
+            logging.getLogger(__name__).debug("[DB INFO] Updating database info from: %s", self.user_db.db_path)
             with sqlite3.connect(self.user_db.db_path) as conn:
                 cursor = conn.cursor()
                 
@@ -832,10 +833,11 @@ class RingFinder:
                 systems_str = f"{total_systems:,}"
                 
                 info_text = t('ring_finder.total_hotspots_in_systems').format(hotspots=hotspots_str, systems=systems_str)
-                print(f"[DB INFO] Setting text: {info_text}")
+                logging.getLogger(__name__).debug("[DB INFO] Setting text: %s", info_text)
                 self.db_info_var.set(info_text)
         except Exception as e:
-            print(f"[DB INFO] Error updating database info: {e}")
+            import logging
+            logging.getLogger(__name__).debug("[DB INFO] Error updating database info: %s", e)
             import traceback
             traceback.print_exc()
             self.db_info_var.set(t('ring_finder.total_hotspots_in_systems').format(hotspots="...", systems="..."))
