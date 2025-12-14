@@ -817,6 +817,7 @@ class ProspectorPanel(ttk.Frame):
         self.prompt_on_cargo_full = False
         self.cargo_full_start_time = None  # Track when cargo became full
         self.cargo_full_prompted = False  # Track if we already prompted
+        self._dialog_in_progress = False  # Guard flag to prevent concurrent modal dialogs (race condition fix)
         try:
             prompt_full_file = os.path.join(self.vars_dir, "promptWhenFull.txt")
             print(f"[DEBUG] Loading prompt-when-full from: {prompt_full_file}")
@@ -9434,13 +9435,18 @@ class ProspectorPanel(ttk.Frame):
                 materials_txt, content_txt, time_txt, panel_summary, speak_summary, triggered = self._summaries_from_event(evt)
                 self.history.insert(0, (materials_txt, content_txt, time_txt))
                 
-                # Track yield data during session for later CSV calculation
-                self._track_session_yield_data(materials_txt)
+                # Track yield data and update statistics ONLY if session is active AND not paused
+                # This prevents counting prospector events when session is paused
+                if self.session_active and not self.session_paused:
+                    # Track yield data during session for later CSV calculation
+                    self._track_session_yield_data(materials_txt)
+                    
+                    # Update mining statistics with the prospector result
+                    self._update_mining_statistics(evt)
+                elif self.session_paused:
+                    print("[PROSPECTOR] Session paused - skipping statistics tracking")
                 
                 self._refresh_table()
-                
-                # Update mining statistics with the prospector result
-                self._update_mining_statistics(evt)
                 # Remove old enabled check - announcements now controlled by core/non-core toggles
 
                 # Always update the full on-screen readout
@@ -10266,10 +10272,12 @@ class ProspectorPanel(ttk.Frame):
                 # Check if 60 seconds have passed
                 elapsed = current_time - self.cargo_full_start_time
                 if elapsed >= 60 and not self.cargo_full_prompted:
+                    # Set prompted flag BEFORE showing dialog to prevent re-entry race condition
+                    self.cargo_full_prompted = True
                     # Show prompt (but don't auto-end in multi-session mode)
-                    if not self.multi_session_mode:
+                    # Also check dialog guard to prevent showing while another modal is active
+                    if not self.multi_session_mode and not self._dialog_in_progress:
                         self._prompt_end_session_cargo_full()
-                    self.cargo_full_prompted = True  # Don't prompt again until cargo changes
             else:
                 # Cargo not full - reset tracking
                 if self.cargo_full_start_time is not None:
@@ -10280,6 +10288,14 @@ class ProspectorPanel(ttk.Frame):
 
     def _prompt_end_session_cargo_full(self) -> None:
         """Show dialog prompting user to end session when cargo is full and idle"""
+        # Guard against concurrent dialogs - prevents race condition freeze
+        if self._dialog_in_progress:
+            print("[CARGO FULL] Dialog already in progress, skipping prompt")
+            return
+        
+        self._dialog_in_progress = True
+        print("[CARGO FULL] Showing cargo full dialog (dialog guard set)")
+        
         # Play discreet warning sound
         try:
             import winsound
@@ -10353,7 +10369,15 @@ class ProspectorPanel(ttk.Frame):
         
         dialog.update_idletasks()
         dialog.deiconify()  # Show centered dialog immediately
-        dialog.focus_force()
+        
+        # Set proper modal behavior with grab_set() - wrapped in try-except for safety
+        try:
+            dialog.transient(self.winfo_toplevel())
+            dialog.grab_set()
+            dialog.focus_force()
+        except Exception as e:
+            print(f"[DEBUG] Error setting modal behavior: {e}")
+            dialog.focus_force()  # At least try to focus
         
         # Message frame
         msg_frame = tk.Frame(dialog, bg="#1e1e1e")
@@ -10373,23 +10397,39 @@ class ProspectorPanel(ttk.Frame):
         btn_frame.pack(side="bottom", pady=(0, 20))
         
         def on_yes():
+            # Clear dialog guard FIRST before any other operations
+            self._dialog_in_progress = False
+            print("[CARGO FULL] User chose Yes - dialog guard cleared")
             # Hide persistent overlay
             if overlay_shown and self.text_overlay:
                 try:
                     self.text_overlay.hide_overlay()
                 except:
                     pass
+            # Release grab before destroying to prevent orphaned grab state
+            try:
+                dialog.grab_release()
+            except:
+                pass
             dialog.destroy()
             self._session_stop()
             self._set_status("Session ended (cargo full)")
         
         def on_no():
+            # Clear dialog guard
+            self._dialog_in_progress = False
+            print("[CARGO FULL] User chose No - dialog guard cleared")
             # Hide persistent overlay
             if overlay_shown and self.text_overlay:
                 try:
                     self.text_overlay.hide_overlay()
                 except:
                     pass
+            # Release grab before destroying to prevent orphaned grab state
+            try:
+                dialog.grab_release()
+            except:
+                pass
             dialog.destroy()
         
         # Yes button
@@ -11181,6 +11221,10 @@ class ProspectorPanel(ttk.Frame):
         cargo_session_data = None
         session_comment = ""
         
+        # Set dialog guard to prevent cargo full dialog from triggering during session end
+        self._dialog_in_progress = True
+        print("[SESSION STOP] Dialog guard set - preventing concurrent dialogs")
+        
         try:
             # Ask if user wants to add refinery materials BEFORE ending session tracking
             # Skip for multi-session mode (refinery already captured after each transfer/sale)
@@ -11254,6 +11298,11 @@ class ProspectorPanel(ttk.Frame):
             print(f"Error during session end dialogs: {e}")
             import traceback
             traceback.print_exc()
+        
+        finally:
+            # ALWAYS clear dialog guard, even if there was an error
+            self._dialog_in_progress = False
+            print("[SESSION STOP] Dialog guard cleared in finally block")
         
         # ALWAYS restore button states, even if there was an error above
         self._set_status("Session ended.")

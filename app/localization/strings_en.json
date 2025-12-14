@@ -61,7 +61,12 @@
     "res_normal_pirates": "Medium pirates",
     "res_low_pirates": "Low pirates",
     "res_mining": "Bonus",
-    "res_tip": "Mining bonus within 20km of RES beacon. Increases fragments & ore yield."
+    "res_tip": "Mining bonus within 20km of RES beacon. Increases fragments & ore yield.",
+    "res_security_title": "System Security",
+    "res_security_info": "The security in systems directly affects the expected ship spawn rate and quite possibly the expected bounty amounts as well.",
+    "res_security_levels": "The three security levels are Low, Medium, and High. Systems that do not have a population will have the system security level of Anarchy.",
+    "res_security_tip": "For the best possible spawn of wanted ships, High Intensity RES in star systems with high security are the ideal place.",
+    "res_source": "Source: Elite Dangerous Wiki"
   },
   "ring_finder": {
     "title": "Search For Hotspots",

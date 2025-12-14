@@ -260,7 +260,7 @@ class RingGuideTab(tk.Frame):
         
         # Tip about mining bonus
         tip_frame = tk.Frame(content, bg=self.section_bg)
-        tip_frame.pack(fill="x", pady=(8, 5))
+        tip_frame.pack(fill="x", pady=(8, 5), padx=5)
         
         tk.Label(
             tip_frame,
@@ -268,9 +268,89 @@ class RingGuideTab(tk.Frame):
             font=("Segoe UI", 8, "italic"),
             bg=self.section_bg,
             fg=self.fg_dim,
-            wraplength=250,
-            justify="left"
-        ).pack(side="left", padx=5)
+            wraplength=260,
+            justify="left",
+            anchor="w"
+        ).pack(fill="x")
+        
+        # Security info section
+        security_header = tk.Frame(content, bg=self.section_bg)
+        security_header.pack(fill="x", pady=(10, 3), padx=5)
+        
+        tk.Label(
+            security_header,
+            text="🛡️ " + t('ring_guide.res_security_title'),
+            font=("Segoe UI", 9, "bold"),
+            bg=self.section_bg,
+            fg=self.fg_bright,
+            anchor="w"
+        ).pack(fill="x")
+        
+        # Security info text
+        security_info_frame = tk.Frame(content, bg=self.section_bg)
+        security_info_frame.pack(fill="x", pady=(0, 3), padx=5)
+        
+        tk.Label(
+            security_info_frame,
+            text=t('ring_guide.res_security_info'),
+            font=("Segoe UI", 8),
+            bg=self.section_bg,
+            fg=self.fg_color,
+            wraplength=260,
+            justify="left",
+            anchor="w"
+        ).pack(fill="x")
+        
+        # Security levels text
+        security_levels_frame = tk.Frame(content, bg=self.section_bg)
+        security_levels_frame.pack(fill="x", pady=(0, 3), padx=5)
+        
+        tk.Label(
+            security_levels_frame,
+            text=t('ring_guide.res_security_levels'),
+            font=("Segoe UI", 8),
+            bg=self.section_bg,
+            fg=self.fg_color,
+            wraplength=260,
+            justify="left",
+            anchor="w"
+        ).pack(fill="x")
+        
+        # Security tip
+        security_tip_frame = tk.Frame(content, bg=self.section_bg)
+        security_tip_frame.pack(fill="x", pady=(0, 5), padx=5)
+        
+        tk.Label(
+            security_tip_frame,
+            text="💡 " + t('ring_guide.res_security_tip'),
+            font=("Segoe UI", 8, "italic"),
+            bg=self.section_bg,
+            fg=self.fg_dim,
+            wraplength=260,
+            justify="left",
+            anchor="w"
+        ).pack(fill="x")
+        
+        # Source reference
+        source_frame = tk.Frame(content, bg=self.section_bg)
+        source_frame.pack(fill="x", pady=(5, 5), padx=5)
+        
+        source_label = tk.Label(
+            source_frame,
+            text="📖 " + t('ring_guide.res_source'),
+            font=("Segoe UI", 7),
+            bg=self.section_bg,
+            fg="#4da6ff",
+            cursor="hand2",
+            anchor="w"
+        )
+        source_label.pack(fill="x")
+        source_label.bind("<Button-1>", lambda e: self._open_wiki_link())
+    
+    def _open_wiki_link(self):
+        """Open the Elite Dangerous Wiki RES page in browser"""
+        import webbrowser
+        webbrowser.open("https://elite-dangerous.fandom.com/wiki/Resource_Extraction_Site")
     
     def _on_mousewheel(self, event):
         """Handle mousewheel scrolling"""

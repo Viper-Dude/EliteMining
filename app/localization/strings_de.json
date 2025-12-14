@@ -61,7 +61,12 @@
     "res_normal_pirates": "Mittlere Piraten",
     "res_low_pirates": "Wenig Piraten",
     "res_mining": "Bonus",
-    "res_tip": "Bergbau-Bonus im Umkreis von 20km des RES-Beacons. Erhöht Fragmente & Erz-Ertrag."
+    "res_tip": "Bergbau-Bonus im Umkreis von 20km des RES-Beacons. Erhöht Fragmente & Erz-Ertrag.",
+    "res_security_title": "Systemsicherheit",
+    "res_security_info": "Die Sicherheit in Systemen beeinflusst direkt die erwartete Schiffs-Spawnrate und möglicherweise auch die erwarteten Kopfgeldbeträge.",
+    "res_security_levels": "Die drei Sicherheitsstufen sind Niedrig, Mittel und Hoch. Systeme ohne Bevölkerung haben die Sicherheitsstufe Anarchie.",
+    "res_security_tip": "Für die bestmöglichen Spawns gesuchter Schiffe sind High Intensity RES in Sternensystemen mit hoher Sicherheit der ideale Ort.",
+    "res_source": "Quelle: Elite Dangerous Wiki"
   },
   "ring_finder": {
     "title": "Hotspot-Suche",
