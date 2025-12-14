@@ -14522,6 +14522,8 @@ class App(tk.Tk):
                 results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
             
             # Filter by Station Type (Surface/Orbital/Carrier/MegaShip/Stronghold)
+            # NOTE: Stations with null stationType (Unknown) are only shown when filter is "All"
+            # This is correct behavior - we can't categorize stations without metadata
             if station_type_filter == "Orbital":
                 # Orbital stations: Coriolis, Orbis, Ocellus, Outpost, AsteroidBase, Dodec (EXACT MATCH only)
                 # BUG FIX: Use exact match to prevent CraterOutpost matching "Outpost" substring
@@ -15106,7 +15108,10 @@ class App(tk.Tk):
                 location = f"{result['systemName']} / {result['stationName'][:25]}"
                 
                 # TYPE (Station type) - Show category/specific type
-                api_type = result.get('stationType', 'Unknown')
+                # Handle null/None values from API (some stations lack metadata)
+                api_type = result.get('stationType')
+                if api_type is None or api_type == '':
+                    api_type = 'Unknown'
                 
                 # Orbital starports - show as "Orbital/Type"
                 if api_type == 'AsteroidBase':
@@ -15127,6 +15132,9 @@ class App(tk.Tk):
                     station_type = 'Stronghold'
                 elif api_type == 'MegaShip':
                     station_type = 'MegaShip'
+                elif api_type == 'Unknown':
+                    # Station lacks metadata in EDData API - show as Unknown
+                    station_type = 'Unknown'
                 else:
                     station_type = api_type  # Fallback to original name
                 

@@ -6,11 +6,13 @@ from typing import List, Dict, Optional
 
 
 class MarketplaceAPI:
-    """EDData API integration for commodity market data"""
+    """Ardent API integration for commodity market data (with EDData fallback)"""
     
     # Primary and fallback API URLs
-    PRIMARY_URL = "https://api.eddata.dev/v2"
-    FALLBACK_URL = "https://api.ardent-insight.com/v2"
+    # NOTE: Ardent is primary because it has more complete station metadata (stationType, maxLandingPadSize)
+    # EDData's commodity endpoints often return null for station metadata fields
+    PRIMARY_URL = "https://api.ardent-insight.com/v2"
+    FALLBACK_URL = "https://api.eddata.dev/v2"
     BASE_URL = PRIMARY_URL  # Active URL (will switch on failure)
     
     # Map EliteMining commodity names to EDData API names
