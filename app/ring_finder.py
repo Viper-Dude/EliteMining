@@ -1577,7 +1577,7 @@ class RingFinder:
         
         return abbreviations.get(res_tag, res_tag)
     
-    def search_hotspots(self, auto_refresh=False, highlight_body=None, highlight_system=None):
+    def search_hotspots(self, auto_refresh=False, highlight_body=None, highlight_system=None, highlight_bodies=None):
         """Search for mining hotspots using reference system as center point
         
         Args:
@@ -1585,17 +1585,30 @@ class RingFinder:
             highlight_body: Specific body/ring name to highlight (e.g., '1 A Ring')
             highlight_system: Specific system name for the body (e.g., 'Synuefe XR-H d11-45')
                            Only this exact system+ring will be highlighted green. None = no highlighting.
+            highlight_bodies: List of (system, body) tuples to highlight (for multiple rapid scans)
         """
         # If this is an auto-refresh (has highlight info), clear cache first to get fresh data
         if highlight_body and highlight_system:
+            if hasattr(self, 'local_db') and hasattr(self.local_db, 'clear_cache'):
+                self.local_db.clear_cache()
+        if highlight_bodies:
             if hasattr(self, 'local_db') and hasattr(self.local_db, 'clear_cache'):
                 self.local_db.clear_cache()
         
         # Store highlight info for use in _update_results (accumulate multiple highlights)
         if not hasattr(self, '_pending_highlights'):
             self._pending_highlights = set()
+        
+        # Add single highlight
         if highlight_body and highlight_system:
             self._pending_highlights.add((highlight_system.lower(), highlight_body))
+        
+        # Add multiple highlights from list
+        if highlight_bodies:
+            for system, body in highlight_bodies:
+                if system and body:
+                    self._pending_highlights.add((system.lower(), body))
+        
         self._is_auto_refresh = auto_refresh  # Keep for backwards compatibility but prefer highlight_body
         
         reference_system = self.system_var.get().strip()

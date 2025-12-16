@@ -124,23 +124,33 @@ class UserDatabase:
             # Migration v4.4.6: Normalize material names to fix language duplicates
             self._migrate_material_names_v446()
             
-            # v4.6.0: Apply overlap data from CSV file (version 2 - fixed path)
-            if self._get_migration_version('overlap_csv') < 2:
+            # v4.7.2: Apply overlap data from CSV file (version 3 - added new overlaps)
+            if self._get_migration_version('overlap_csv') < 3:
                 log.info("[Migration] Applying overlap data from CSV...")
                 print("[MIGRATION] Applying overlap data from CSV...")
                 self._apply_overlap_data_from_csv()
-                self._set_migration_version('overlap_csv', 2)
+                self._set_migration_version('overlap_csv', 3)
             else:
-                log.info("[Migration] Overlap CSV already applied (version 2)")
+                log.info("[Migration] Overlap CSV already applied (version 3)")
             
-            # v4.6.0: Apply RES site data from CSV file (version 2 - fixed path)
-            if self._get_migration_version('res_csv') < 2:
+            # v4.7.2: Apply RES site data from CSV file (version 3 - added new RES sites)
+            if self._get_migration_version('res_csv') < 3:
                 log.info("[Migration] Applying RES site data from CSV...")
                 print("[MIGRATION] Applying RES site data from CSV...")
                 self._apply_res_data_from_csv()
-                self._set_migration_version('res_csv', 2)
+                self._set_migration_version('res_csv', 3)
             else:
-                log.info("[Migration] RES CSV already applied (version 2)")
+                log.info("[Migration] RES CSV already applied (version 3)")
+            
+            # v4.7.2: Merge hotspot data from bundled install database (one-time migration)
+            # This adds 34K+ community hotspots while preserving user's existing data
+            if self._get_migration_version('hotspot_merge_v472') < 1:
+                log.info("[Migration] Merging hotspot data from bundled database...")
+                print("[MIGRATION] Merging hotspot data from bundled database...")
+                self._merge_hotspots_from_bundled_db()
+                self._set_migration_version('hotspot_merge_v472', 1)
+            else:
+                log.info("[Migration] Hotspot merge v4.7.2 already applied")
                 
         except Exception as e:
             print(f"[MIGRATION ERROR] {e}")
@@ -576,6 +586,123 @@ class UserDatabase:
             # Don't fail startup if CSV processing fails
             print(f"[RES DATA] Warning: Could not apply RES data: {e}")
             log.warning(f"[RES Data] Could not apply RES data: {e}")
+    
+    def _merge_hotspots_from_bundled_db(self) -> None:
+        """Merge hotspot data from bundled install database (v4.7.2 one-time migration)
+        
+        This migration:
+        1. Reads hotspots from the bundled 'UserDb for install/user_data.db'
+        2. Adds ONLY hotspots that don't exist in user's database
+        3. Does NOT overwrite any existing user data
+        4. Does NOT touch visited_systems table
+        
+        This gives new installs AND existing users access to 34K+ community hotspots.
+        """
+        from datetime import datetime
+        
+        try:
+            # Find the bundled database
+            bundled_db_paths = [
+                os.path.join(os.path.dirname(__file__), 'data', 'UserDb for install', 'user_data.db'),
+                os.path.join(get_app_data_dir(), 'data', 'UserDb for install', 'user_data.db'),
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), 'app', 'data', 'UserDb for install', 'user_data.db'),
+            ]
+            
+            log.info("[Migration v4.7.2] Searching for bundled hotspot database...")
+            bundled_db_path = None
+            for path in bundled_db_paths:
+                exists = os.path.exists(path)
+                log.info(f"[Migration v4.7.2] Checking: {path} - {'EXISTS' if exists else 'NOT FOUND'}")
+                if exists:
+                    bundled_db_path = path
+                    break
+            
+            if not bundled_db_path:
+                log.warning("[Migration v4.7.2] Bundled database not found - skipping migration")
+                print("[MIGRATION v4.7.2] Bundled hotspot database not found - skipping")
+                return
+            
+            # Don't try to merge with ourselves
+            if os.path.normpath(bundled_db_path) == os.path.normpath(self.db_path):
+                log.info("[Migration v4.7.2] Bundled DB is same as user DB - skipping")
+                return
+            
+            print(f"[MIGRATION v4.7.2] Merging hotspots from: {bundled_db_path}")
+            log.info(f"[Migration v4.7.2] Source database: {bundled_db_path}")
+            
+            inserted_count = 0
+            skipped_count = 0
+            
+            # Open bundled database (read-only)
+            bundled_conn = sqlite3.connect(f"file:{bundled_db_path}?mode=ro", uri=True)
+            bundled_cursor = bundled_conn.cursor()
+            
+            # Get all hotspots from bundled database
+            bundled_cursor.execute('''
+                SELECT system_name, body_name, material_name, hotspot_count, scan_date,
+                       system_address, body_id, x_coord, y_coord, z_coord, coord_source,
+                       ring_type, ls_distance, density, data_source, 
+                       inner_radius, outer_radius, ring_mass, overlap_tag, res_tag
+                FROM hotspot_data
+            ''')
+            
+            bundled_hotspots = bundled_cursor.fetchall()
+            bundled_conn.close()
+            
+            log.info(f"[Migration v4.7.2] Found {len(bundled_hotspots)} hotspots in bundled database")
+            print(f"[MIGRATION v4.7.2] Processing {len(bundled_hotspots)} hotspots...")
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                for row in bundled_hotspots:
+                    system_name, body_name, material_name = row[0], row[1], row[2]
+                    
+                    # Check if this hotspot already exists in user's database
+                    cursor.execute('''
+                        SELECT id FROM hotspot_data 
+                        WHERE system_name = ? AND body_name = ? AND material_name = ?
+                    ''', (system_name, body_name, material_name))
+                    
+                    if cursor.fetchone() is not None:
+                        # Hotspot already exists - DO NOT overwrite user's data
+                        skipped_count += 1
+                        continue
+                    
+                    # Insert new hotspot (user doesn't have this one)
+                    try:
+                        cursor.execute('''
+                            INSERT INTO hotspot_data 
+                            (system_name, body_name, material_name, hotspot_count, scan_date,
+                             system_address, body_id, x_coord, y_coord, z_coord, coord_source,
+                             ring_type, ls_distance, density, data_source,
+                             inner_radius, outer_radius, ring_mass, overlap_tag, res_tag)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', row)
+                        inserted_count += 1
+                    except sqlite3.IntegrityError:
+                        # Race condition - entry was added between check and insert
+                        skipped_count += 1
+                
+                conn.commit()
+            
+            total_in_user_db = 0
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM hotspot_data")
+                total_in_user_db = cursor.fetchone()[0]
+            
+            print(f"[MIGRATION v4.7.2] Added {inserted_count} new hotspots, skipped {skipped_count} existing")
+            print(f"[MIGRATION v4.7.2] User database now has {total_in_user_db} total hotspots")
+            log.info(f"[Migration v4.7.2] Added {inserted_count} new hotspots, skipped {skipped_count} existing")
+            log.info(f"[Migration v4.7.2] User database now has {total_in_user_db} total hotspots")
+            
+        except Exception as e:
+            # Don't fail startup if migration fails
+            print(f"[MIGRATION v4.7.2] Warning: Could not merge hotspots: {e}")
+            log.warning(f"[Migration v4.7.2] Could not merge hotspots: {e}")
+            import traceback
+            log.error(traceback.format_exc())
         
     def _create_tables(self) -> None:
         """Create database tables if they don't exist"""
@@ -939,6 +1066,59 @@ class UserDatabase:
                 
         except Exception as e:
             log.error(f"Error adding hotspot data: {e}")
+
+    def update_ring_metadata(self, system_name: str, body_name: str, ring_type: str = None,
+                            ls_distance: float = None, inner_radius: float = None,
+                            outer_radius: float = None, ring_mass: float = None,
+                            density: float = None) -> int:
+        """Update ring metadata for hotspots that are missing it
+        
+        This is called when a Scan event provides ring data after SAASignalsFound
+        already created the hotspot records with NULL metadata.
+        
+        Args:
+            system_name: Star system name
+            body_name: Ring body name (e.g., "3 A Ring")
+            ring_type: Ring type (Rocky, Metallic, Icy, Metal Rich)
+            ls_distance: Distance from arrival star in light seconds
+            inner_radius: Inner radius in meters
+            outer_radius: Outer radius in meters
+            ring_mass: Ring mass in megatons
+            density: Calculated ring density
+            
+        Returns:
+            Number of records updated
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Only update records that are missing the metadata
+                cursor.execute('''
+                    UPDATE hotspot_data
+                    SET ring_type = COALESCE(ring_type, ?),
+                        ls_distance = COALESCE(ls_distance, ?),
+                        inner_radius = COALESCE(inner_radius, ?),
+                        outer_radius = COALESCE(outer_radius, ?),
+                        ring_mass = COALESCE(ring_mass, ?),
+                        density = COALESCE(density, ?)
+                    WHERE system_name = ? 
+                      AND body_name = ?
+                      AND (ring_type IS NULL OR ls_distance IS NULL)
+                ''', (ring_type, ls_distance, inner_radius, outer_radius, ring_mass, density,
+                      system_name, body_name))
+                
+                updated = cursor.rowcount
+                conn.commit()
+                
+                if updated > 0:
+                    log.info(f"Updated ring metadata for {updated} hotspots in {system_name} - {body_name}")
+                
+                return updated
+                
+        except Exception as e:
+            log.error(f"Error updating ring metadata: {e}")
+            return 0
 
     def _get_coordinates_from_visited_systems(self, system_name: str) -> Optional[Tuple[float, float, float]]:
         """Get coordinates for a system from visited_systems table"""

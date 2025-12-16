@@ -1,18 +1,17 @@
 """
-Marketplace API for commodity price lookups using Ardent API
+Marketplace API for commodity price lookups using EDData API
 """
 import requests
 from typing import List, Dict, Optional
 
 
 class MarketplaceAPI:
-    """Ardent API integration for commodity market data (with EDData fallback)"""
+    """EDData API integration for commodity market data (with Ardent fallback)"""
     
     # Primary and fallback API URLs
-    # NOTE: Ardent is primary because it has more complete station metadata (stationType, maxLandingPadSize)
-    # EDData's commodity endpoints often return null for station metadata fields
-    PRIMARY_URL = "https://api.ardent-insight.com/v2"
-    FALLBACK_URL = "https://api.eddata.dev/v2"
+    # NOTE: EDData is primary, Ardent is fallback for redundancy
+    PRIMARY_URL = "https://api.eddata.dev/v2"
+    FALLBACK_URL = "https://api.ardent-insight.com/v2"
     BASE_URL = PRIMARY_URL  # Active URL (will switch on failure)
     
     # Map EliteMining commodity names to EDData API names

@@ -338,6 +338,7 @@ class JournalParser:
             system_address = event.get('SystemAddress')
             body_id = event.get('BodyID')
             ls_distance = event.get('DistanceFromArrivalLS')
+            star_system = event.get('StarSystem')  # System name from event
             
             if not system_address or body_id is None:
                 return
@@ -369,8 +370,52 @@ class JournalParser:
                     }
                     log.debug(f"Stored ring info: {ring_name} -> Class: {clean_ring_class}, LS: {ls_distance}, Mass: {ring_mass}")
                     
+                    # Update existing hotspot records that are missing this metadata
+                    # This fixes the timing issue where SAASignalsFound may come before Scan
+                    if star_system:
+                        self._update_hotspots_with_ring_metadata(
+                            star_system, ring_name, clean_ring_class, ls_distance,
+                            inner_radius, outer_radius, ring_mass
+                        )
+                    
         except Exception as e:
             log.error(f"Error processing Scan event: {e}")
+    
+    def _update_hotspots_with_ring_metadata(self, system_name: str, ring_name: str, 
+                                            ring_type: str, ls_distance: float,
+                                            inner_radius: float, outer_radius: float,
+                                            ring_mass: float) -> None:
+        """Update existing hotspot records that are missing ring metadata
+        
+        This handles the case where SAASignalsFound event was processed before the
+        Scan event, leaving hotspots with NULL ring_type and ls_distance.
+        """
+        try:
+            # Extract body name from ring name (remove system prefix)
+            # e.g., "Kovantani 3 A Ring" -> "3 A Ring"
+            body_name = ring_name
+            if system_name and ring_name.lower().startswith(system_name.lower()):
+                body_name = ring_name[len(system_name):].strip()
+            
+            # Calculate density if we have the data
+            density = None
+            if ring_mass and inner_radius and outer_radius:
+                from user_database import calculate_ring_density
+                density = calculate_ring_density(ring_mass, inner_radius, outer_radius)
+            
+            # Update hotspots for this ring that are missing metadata
+            self.user_db.update_ring_metadata(
+                system_name=system_name,
+                body_name=body_name,
+                ring_type=ring_type,
+                ls_distance=ls_distance,
+                inner_radius=inner_radius,
+                outer_radius=outer_radius,
+                ring_mass=ring_mass,
+                density=density
+            )
+        except Exception as e:
+            log.debug(f"Could not update hotspots with ring metadata: {e}")
     
     def process_saa_signals_found(self, event: Dict[str, Any], current_system: str) -> None:
         """Process SAASignalsFound event to extract hotspot data

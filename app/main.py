@@ -741,7 +741,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.71"
+APP_VERSION = "v4.72"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1701,6 +1701,9 @@ class CargoMonitor:
         self._auto_refresh_timer = None
         self._auto_refresh_delay = 2000  # 2 seconds - reduced since EDSM fallback now happens immediately
         
+        # List to accumulate bodies to highlight when scanning multiple rings quickly
+        self._pending_highlight_bodies = []  # List of (system, body) tuples
+        
         # EDSM fallback cache to prevent duplicate queries for same system
         self._edsm_fallback_cache = set()  # Track systems already processed
         self._edsm_cache_clear_timer = None  # Timer to clear cache periodically
@@ -1820,34 +1823,50 @@ class CargoMonitor:
                       current_reference_system.lower().startswith(scanned_system.lower())):
                 # Different system - reset first scan flag but don't refresh
                 self._first_ring_scan_in_system = True
+                self._pending_highlight_bodies = []  # Clear pending highlights for new system
                 return
             
-            # Cancel any existing timer (reset approach)
+            # Add this body to the pending highlights (accumulate, don't replace)
+            if scanned_body:
+                body_tuple = (scanned_system, scanned_body)
+                if body_tuple not in self._pending_highlight_bodies:
+                    self._pending_highlight_bodies.append(body_tuple)
+            
+            # Cancel existing timer and restart (debounce)
+            # This ensures we wait for a brief pause in scanning before refreshing
             if self._auto_refresh_timer:
                 main_app.after_cancel(self._auto_refresh_timer)
                 self._auto_refresh_timer = None
             
-            # Always use 1s delay to ensure database has time to update
-            delay = 1000  # 1 second delay
-            delay_text = "in 1s"
+            # Use 2s delay to allow grouping multiple ring scans together
+            delay = 2000  # 2 seconds delay
+            delay_text = "in 2s"
             
             # Track first scan for future use if needed
             if self._first_ring_scan_in_system:
                 self._first_ring_scan_in_system = False
             
             # Set status message
-            ring_finder.status_var.set(f"Found new hotspots - search {delay_text}")
+            pending_count = len(self._pending_highlight_bodies)
+            if pending_count > 1:
+                ring_finder.status_var.set(f"Found {pending_count} new rings - search {delay_text}")
+            else:
+                ring_finder.status_var.set(f"Found new hotspots - search {delay_text}")
+            
+            # Capture the accumulated bodies for the closure
+            bodies_to_highlight = list(self._pending_highlight_bodies)
             
             # Schedule the actual refresh with appropriate delay
-            def do_delayed_refresh(body_to_highlight=scanned_body, system_to_highlight=scanned_system):
+            def do_delayed_refresh():
                 try:
                     ring_finder.status_var.set(f"Found new hotspots - updating results")
                     
-                    # Pass the specific scanned system+body so ONLY that ring gets highlighted
-                    ring_finder.search_hotspots(highlight_body=body_to_highlight, highlight_system=system_to_highlight)
+                    # Pass ALL accumulated bodies so they all get highlighted
+                    ring_finder.search_hotspots(highlight_bodies=bodies_to_highlight)
                     # Clear status after 3 seconds
                     ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
                     self._auto_refresh_timer = None  # Clear timer reference
+                    self._pending_highlight_bodies = []  # Clear after successful refresh
                 except Exception as e:
                     pass  # Silent fail in delayed refresh
             
@@ -3670,18 +3689,29 @@ cargo panel forces Elite to write detailed inventory data.
                 try:
                     body_name = event.get("BodyName", "")
                     
-                    # Use current_system which is set by FSDJump/Location events
-                    # This is more reliable than extracting from body name
-                    scanned_system = self.current_system
+                    # IMPORTANT: For rings, extract system name from body name (most reliable)
+                    # Ring body names always start with system name: "Sol 1 A Ring" = system "Sol"
+                    # current_system can be stale if FSDJump event was missed
+                    scanned_system = None
                     
-                    # Only try extraction as last resort if current_system not set
-                    if not scanned_system and body_name:
+                    if body_name:
                         import re
                         # Match pattern for ring: ends with " X Ring" where X is letter(s)
+                        # Examples: "Sol 1 A Ring", "Kovantani 3 A Ring", "Col 359 Sector JW-V d2-32 2 A Ring"
                         match = re.match(r'^(.+?)\s+(?:[A-Z]\s+)?\d+(?:\s+[A-Z])?\s+[A-Z]+\s+Ring$', body_name, re.IGNORECASE)
                         if match:
                             scanned_system = match.group(1).strip()
-                            print(f"🔍 Extracted system name from body: {scanned_system}")
+                            print(f"🔍 Extracted system name from ring body: {scanned_system}")
+                    
+                    # Fallback to current_system only if extraction failed
+                    if not scanned_system:
+                        scanned_system = self.current_system
+                        print(f"🔍 Using current_system as fallback: {scanned_system}")
+                    
+                    # Also update current_system to keep it in sync
+                    if scanned_system and scanned_system != self.current_system:
+                        print(f"🔄 Updating current_system: {self.current_system} -> {scanned_system}")
+                        self.current_system = scanned_system
                     
                     print(f"🔍 Processing SAASignalsFound: {body_name} in {scanned_system}")
                     
@@ -14291,6 +14321,48 @@ class App(tk.Tk):
         }
         return age_map.get(age_str, 1)  # Default to 1 day
     
+    def _filter_results_by_age(self, results, max_age_str):
+        """Filter results by max age locally (for accurate hour-level filtering)
+        
+        The API only supports maxDaysAgo (integer days), so for hour-based filters
+        we need to filter the results locally using the updatedAt timestamp.
+        """
+        from datetime import datetime, timezone, timedelta
+        
+        # Map age string to hours
+        age_hours_map = {
+            "Any": None,       # No filtering
+            "1 hour": 1,
+            "8 hours": 8,
+            "16 hours": 16,
+            "1 day": 24,
+            "2 days": 48
+        }
+        
+        max_hours = age_hours_map.get(max_age_str)
+        if max_hours is None:
+            return results  # No age filtering
+        
+        now = datetime.now(timezone.utc)
+        cutoff_time = now - timedelta(hours=max_hours)
+        
+        filtered = []
+        for result in results:
+            updated_at = result.get('updatedAt')
+            if not updated_at:
+                continue  # Skip results without timestamp
+            
+            try:
+                # Parse ISO timestamp (e.g., "2024-11-03T12:30:00Z" or "2024-11-03T12:30:00.000Z")
+                updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                if updated_time >= cutoff_time:
+                    filtered.append(result)
+            except Exception:
+                # If parsing fails, include the result (conservative)
+                filtered.append(result)
+        
+        return filtered
+    
     def _use_current_system_marketplace(self):
         """Use current system from journal/hotspots finder for marketplace search"""
         try:
@@ -14550,6 +14622,10 @@ class App(tk.Tk):
             if large_pad_only:
                 # Only show stations with Large pads (maxLandingPadSize == 3)
                 results = [r for r in results if r.get('maxLandingPadSize') == 3]
+            
+            # Filter by Max Age (local filtering for hour-based options since API only supports days)
+            # This provides accurate hour-level filtering that the API cannot do
+            results = self._filter_results_by_age(results, max_age_str)
             
             if results:
                 # Sort results based on "Order by" selection
