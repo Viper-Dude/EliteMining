@@ -741,7 +741,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.72"
+APP_VERSION = "v4.73"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1846,12 +1846,12 @@ class CargoMonitor:
             if self._first_ring_scan_in_system:
                 self._first_ring_scan_in_system = False
             
-            # Set status message
+            # Set status message - must be on main thread
             pending_count = len(self._pending_highlight_bodies)
             if pending_count > 1:
-                ring_finder.status_var.set(f"Found {pending_count} new rings - search {delay_text}")
+                main_app.after(0, lambda: ring_finder.status_var.set(f"Found {pending_count} new rings - search {delay_text}"))
             else:
-                ring_finder.status_var.set(f"Found new hotspots - search {delay_text}")
+                main_app.after(0, lambda: ring_finder.status_var.set(f"Found new hotspots - search {delay_text}"))
             
             # Capture the accumulated bodies for the closure
             bodies_to_highlight = list(self._pending_highlight_bodies)
@@ -1859,6 +1859,7 @@ class CargoMonitor:
             # Schedule the actual refresh with appropriate delay
             def do_delayed_refresh():
                 try:
+                    # All UI updates must be on main thread
                     ring_finder.status_var.set(f"Found new hotspots - updating results")
                     
                     # Pass ALL accumulated bodies so they all get highlighted
@@ -1870,7 +1871,7 @@ class CargoMonitor:
                 except Exception as e:
                     pass  # Silent fail in delayed refresh
             
-            # Schedule refresh with 1s delay
+            # Schedule refresh with delay - already on main thread via after()
             self._auto_refresh_timer = main_app.after(delay, do_delayed_refresh)
             
         except Exception as e:
@@ -11265,10 +11266,10 @@ class App(tk.Tk):
         # Toggle theme
         if self.current_theme == "elite_orange":
             new_theme = "dark_gray"
-            theme_name = t('settings.dark_gray') if 'settings.dark_gray' in t('settings.dark_gray') else "Dark Gray"
+            theme_name = t('dialogs.theme_dark_gray')
         else:
             new_theme = "elite_orange"
-            theme_name = t('settings.elite_orange') if 'settings.elite_orange' in t('settings.elite_orange') else "Elite Orange"
+            theme_name = t('dialogs.theme_elite_orange')
         
         # Save new theme
         save_theme(new_theme)
