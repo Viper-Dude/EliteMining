@@ -6,12 +6,13 @@
 ### Announcement Presets
 - You can now rename announcement presets (Ctrl+Click on preset buttons)
 - Custom names are saved and persist across sessions
+- Added 6th preset slot (now 6 presets available)
 
 ### VoiceAttack Mining Controls
-- Removed "Prospector Sequence" toggle
-- Added two new independent toggles 
+- **Prospector Sequence** now acts as a master toggle - controls two sub-features:
   - **Target Prospector** - automatically target the prospector after launching it
   - **Thrust Up** - apply upward thrust when firing a prospector limpet (to prevent prospector crash)
+- Sub-features are only active when Prospector Sequence is enabled
 
 ### Voiceattack Profile
 - New functions added, update is required to v4.7.3 (included in the installer and zip file)

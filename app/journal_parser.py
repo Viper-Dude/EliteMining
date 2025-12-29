@@ -493,7 +493,7 @@ class JournalParser:
                         inner_radius = db_metadata.get('inner_radius')
                         outer_radius = db_metadata.get('outer_radius')
                         ring_mass = db_metadata.get('ring_mass')
-                        log.info(f"Retrieved ring metadata from database: {body_name} = Type:{ring_class}, LS:{ls_distance}, Density:{density}")
+                        log.debug(f"Retrieved ring metadata from database: {body_name} = Type:{ring_class}, LS:{ls_distance}, Density:{density}")
                     else:
                         # Only warn once per ring to reduce log spam
                         warn_key = f"{system_name}_{body_name}"

@@ -462,6 +462,7 @@
     "help_night_vision": "Schaltet automatisch Nachtsicht ein beim Starten oder Zurücksetzen der Bergbausequenz.",
     "help_fsd_jump": "Nach FSD-Sprung: Systemkarte öffnen/schließen, dann Auto-Sprung (nicht in Schiff-Presets gespeichert)",
     "help_power": "Aktiviert = Max. Energie zu Antrieben, deaktiviert = Energie ausbalancieren wenn Laserbergbau abgeschlossen.",
+    "help_prospector_sequence": "Aktiviert Prospektor-Sequenz-Funktionen (Hauptsteuerung für Prospektor zielen und Aufwärtsschub).",
     "help_target_prospector": "Zielt automatisch auf den Prospektor nach dem Abschuss.",
     "help_thrust_up": "Aufwärtsschub beim Abfeuern eines Prospektors anwenden. Timing anpassen im ((Thrust Up)) Befehl in VA Called Commands - Misc Kategorie.",
     "help_pulse_wave": "Wechselt zurück zur Pulswellenanalysator-Feuergruppe wenn Laserbergbau abgeschlossen.",

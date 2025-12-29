@@ -5808,7 +5808,7 @@ class App(tk.Tk):
                 
                 # Main controls frame
                 main_controls = ttk.Frame(frame)
-                main_controls.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+                main_controls.grid(row=1, column=0, sticky="ew", pady=(0, 2))
                 frame.columnconfigure(0, weight=1)
                 
                 # Left side: Announcement toggles
@@ -5869,7 +5869,7 @@ class App(tk.Tk):
 
                 # Materials section label
                 ttk.Label(frame, text=t('settings.select_minerals'),
-                          font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(8, 4))
+                          font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(2, 2))
 
                 # Create the full material tree with functionality
                 materials_frame = ttk.Frame(frame)
@@ -6019,7 +6019,7 @@ class App(tk.Tk):
                 preset_names = cfg.get('preset_names', {})
                 
                 # Add preset buttons
-                for i in range(1, 6):  # Preset 1 to 5
+                for i in range(1, 7):  # Preset 1 to 6
                     # Get custom name or use default
                     custom_name = preset_names.get(str(i), f"Preset {i}")
                     
@@ -7667,6 +7667,7 @@ class App(tk.Tk):
             "Night Vision": "voiceattack.help_night_vision",
             "FSD Jump Sequence": "voiceattack.help_fsd_jump",
             "Power Settings": "voiceattack.help_power",
+            "Prospector Sequence": "voiceattack.help_prospector_sequence",
             "Target Prospector": "voiceattack.help_target_prospector",
             "Thrust Up": "voiceattack.help_thrust_up",
             "Pulse Wave Analyser": "voiceattack.help_pulse_wave",
@@ -7678,9 +7679,17 @@ class App(tk.Tk):
                  fg=_toggle_tip_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).grid(row=0, column=1, sticky="")
         r += 1
         
+        # Store checkbox widgets for dependent toggles
+        self.toggle_checkboxes = {}
+        
         for name, (_fname, helptext) in TOGGLES.items():
             rowf = ttk.Frame(frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            # Indent dependent toggles
+            indent = 20 if name in ["Target Prospector", "Thrust Up"] else 0
+            if indent > 0:
+                tk.Label(rowf, text="", bg=_toggle_bg, width=2).pack(side="left")
             
             checkbox = tk.Checkbutton(rowf, text=f"{t('voiceattack.enable')} {name}", variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
@@ -7688,6 +7697,13 @@ class App(tk.Tk):
                                     highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
+            
+            # Store checkbox reference for dependency control
+            self.toggle_checkboxes[name] = checkbox
+            
+            # Add callback for Prospector Sequence to control dependent toggles
+            if name == "Prospector Sequence":
+                self.toggle_vars[name].trace_add("write", lambda *args: self._update_prospector_dependencies())
             
             # Get localized help text
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
@@ -7699,6 +7715,31 @@ class App(tk.Tk):
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
+        
+        # Initialize dependent toggle states
+        self._update_prospector_dependencies()
+
+    def _update_prospector_dependencies(self):
+        """Enable/disable Target Prospector and Thrust Up based on Prospector Sequence state"""
+        try:
+            if "Prospector Sequence" not in self.toggle_vars or "Prospector Sequence" not in self.toggle_checkboxes:
+                return
+            
+            # Get master toggle state
+            master_enabled = self.toggle_vars["Prospector Sequence"].get() == 1
+            
+            # Update dependent checkboxes
+            for dependent in ["Target Prospector", "Thrust Up"]:
+                if dependent in self.toggle_checkboxes:
+                    checkbox = self.toggle_checkboxes[dependent]
+                    if master_enabled:
+                        checkbox.configure(state="normal")
+                    else:
+                        checkbox.configure(state="disabled")
+                        # Also uncheck them when disabled
+                        self.toggle_vars[dependent].set(0)
+        except Exception as e:
+            print(f"Error updating prospector dependencies: {e}")
 
     # ---------- Status helper ----------
     def _set_status(self, msg: str, clear_after: int = 5000) -> None:

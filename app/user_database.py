@@ -1271,7 +1271,7 @@ class UserDatabase:
                         'outer_radius': result[4],
                         'ring_mass': result[5]
                     }
-                    log.info(f"Retrieved ring metadata from database: {system_name} - {body_name} = {metadata}")
+                    log.debug(f"Retrieved ring metadata from database: {system_name} - {body_name} = {metadata}")
                     return metadata
                 return None
                 

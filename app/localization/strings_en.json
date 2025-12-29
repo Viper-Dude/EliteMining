@@ -462,6 +462,7 @@
     "help_night_vision": "Automatically turn on night vision when starting or resetting mining sequence.",
     "help_fsd_jump": "After FSD jump: open/close system map, then auto-jump (not saved in ship presets)",
     "help_power": "Enable = Max power to engines, disable = balance power when laser mining is completed.",
+    "help_prospector_sequence": "Enable prospector sequence features (master control for Target Prospector and Thrust Up).",
     "help_target_prospector": "Automatically target the prospector after launching it.",
     "help_thrust_up": "Apply upward thrust when firing a prospector. Adjust timing in ((Thrust Up)) command in VA Called Commands - Misc category.",
     "help_pulse_wave": "Switch back to the Pulse Wave Analyser firegroup when laser mining is completed.",

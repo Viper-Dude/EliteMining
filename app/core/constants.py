@@ -44,6 +44,7 @@ TOGGLES = {
     "Night Vision": ("nightvisionToggle.txt", "Automatically turn on night vision when starting or resetting mining sequence."),
     "FSD Jump Sequence": ("toggleSystem.txt", "After FSD jump: open/close system map, then auto-jump (not saved in ship presets)"),
     "Power Settings": ("powersettingsToggle.txt", "Enable = Max power to engines, disable = balance power when laser mining is completed."),
+    "Prospector Sequence": ("prospectorSeq.txt", "Enable prospector sequence features (master control for Target Prospector and Thrust Up)."),
     "Target Prospector": ("prospectorTarget.txt", "Automatically target the prospector after launching it."),
     "Thrust Up": ("thrustUp.txt", "Apply upward thrust when firing a prospector. Adjust timing in ((Thrust Up)) command in VA Called Commands - Misc category."),
     "Pulse Wave Analyser": ("Pulsewavetoggle.txt", "Switch back to the Pulse Wave Analyser firegroup when laser mining is completed."),

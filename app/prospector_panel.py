@@ -2249,7 +2249,7 @@ class ProspectorPanel(ttk.Frame):
         ttk.Label(thr, text="%").pack(side="left")
 
         ttk.Label(ann, text="Select minerals and set minimum percentages:",
-                  font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", pady=(8, 4))
+                  font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", pady=(2, 2))
 
         self.mat_tree = ttk.Treeview(ann, columns=("announce", "material", "minpct"), show="headings", height=14)
         self.mat_tree.heading("announce", text="Announce")
