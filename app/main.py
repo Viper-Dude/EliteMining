@@ -6010,15 +6010,29 @@ class App(tk.Tk):
                 unselect_all_btn.pack(side="left", padx=(6, 0))
                 ToolTip(unselect_all_btn, t('tooltips.unselect_all_materials'))
                 
+                # Store preset buttons for dynamic updates
+                if not hasattr(self, 'preset_buttons'):
+                    self.preset_buttons = {}
+                
+                # Load custom preset names from config
+                cfg = self.prospector_panel._load_cfg() if hasattr(self, 'prospector_panel') else {}
+                preset_names = cfg.get('preset_names', {})
+                
                 # Add preset buttons
                 for i in range(1, 6):  # Preset 1 to 5
-                    preset_btn = tk.Button(btns, text=t('settings.preset_button').format(num=i),
+                    # Get custom name or use default
+                    custom_name = preset_names.get(str(i), f"Preset {i}")
+                    
+                    preset_btn = tk.Button(btns, text=custom_name,
                                          bg="#4a4a2a", fg="#ffffff",
                                          activebackground="#5a5a3a", activeforeground="#ffffff",
                                          relief="solid", bd=1,
-                                         width=8, font=("Segoe UI", 9), cursor="hand2", pady=3,
+                                         width=13, font=("Segoe UI", 9), cursor="hand2", pady=3,
                                          highlightbackground="#2a2a1a", highlightcolor="#2a2a1a")
                     preset_btn.pack(side="left", padx=(8, 0))
+                    
+                    # Store button reference
+                    self.preset_buttons[i] = preset_btn
                     
                     # Bind left and right click events
                     if i == 1:
@@ -6028,11 +6042,16 @@ class App(tk.Tk):
                         preset_btn.bind("<Button-1>", lambda e, num=i: self._ann_load_preset(num))
                         preset_btn.bind("<Button-3>", lambda e, num=i: self._ann_save_preset(num))
                     
+                    # Ctrl+Click (left or right) or Middle-click to rename preset
+                    preset_btn.bind("<Button-2>", lambda e, num=i: self._rename_preset(num))
+                    preset_btn.bind("<Control-Button-1>", lambda e, num=i: self._rename_preset(num))
+                    preset_btn.bind("<Control-Button-3>", lambda e, num=i: self._rename_preset(num))
+                    
                     # Fix button state after right-click
                     preset_btn.bind("<ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
                     
                     # Add tooltip
-                    ToolTip(preset_btn, t('tooltips.preset_load_save').format(num=i))
+                    ToolTip(preset_btn, f"Left-click: Load | Right-click: Save | Ctrl+Click: Rename")
                 
             except ImportError:
                 # Fallback if imports fail
@@ -6225,6 +6244,98 @@ class App(tk.Tk):
                 self._set_status(f"Loaded Preset {num}.")
             except Exception as e:
                 print(f"Error loading preset {num}: {e}")
+
+    def _rename_preset(self, num):
+        """Rename a preset with a custom name"""
+        try:
+            from config import load_theme
+            from app_utils import get_app_icon_path
+            
+            cfg = self.prospector_panel._load_cfg() if hasattr(self, 'prospector_panel') else {}
+            preset_names = cfg.get('preset_names', {})
+            current_name = preset_names.get(str(num), f"Preset {num}")
+            
+            # Theme colors
+            theme = load_theme()
+            bg = "#000000" if theme == "elite_orange" else "#1e1e1e"
+            fg = "#ff8c00" if theme == "elite_orange" else "#e0e0e0"
+            btn_bg = "#2a2a2a" if theme == "elite_orange" else "#3a3a3a"
+            btn_fg = "#ff9900" if theme == "elite_orange" else "#ffffff"
+            
+            # Create dialog
+            dialog = tk.Toplevel(self)
+            dialog.title(t('settings.rename_preset').format(num=num))
+            dialog.configure(bg=bg)
+            dialog.resizable(False, False)
+            dialog.transient(self)
+            dialog.grab_set()
+            
+            # Set icon
+            try:
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+            
+            # Main frame
+            frame = tk.Frame(dialog, bg=bg, padx=20, pady=15)
+            frame.pack(fill="both", expand=True)
+            
+            # Label
+            tk.Label(frame, text=t('settings.enter_preset_name').format(num=num),
+                    bg=bg, fg=fg,
+                    font=("Segoe UI", 10)).pack(pady=(0, 10))
+            
+            # Entry field
+            name_var = tk.StringVar(value=current_name)
+            entry = tk.Entry(frame, textvariable=name_var, 
+                           width=25, font=("Segoe UI", 10),
+                           bg="#2a2a2a", fg="#ffffff",
+                           insertbackground="#ffffff")
+            entry.pack(pady=5)
+            entry.select_range(0, tk.END)
+            
+            def save_name():
+                new_name = name_var.get().strip()
+                if new_name:
+                    # Save to config
+                    if 'preset_names' not in cfg:
+                        cfg['preset_names'] = {}
+                    cfg['preset_names'][str(num)] = new_name
+                    self.prospector_panel._save_cfg(cfg)
+                    
+                    # Update button text
+                    if hasattr(self, 'preset_buttons') and num in self.preset_buttons:
+                        self.preset_buttons[num].config(text=new_name)
+                    
+                    self._set_status(t('settings.preset_renamed').format(num=num, name=new_name))
+                dialog.destroy()
+            
+            # Buttons
+            btn_frame = tk.Frame(dialog, bg=bg)
+            btn_frame.pack(pady=10)
+            
+            tk.Button(btn_frame, text=t('common.save'), command=save_name,
+                     bg=btn_bg, fg=btn_fg, width=8,
+                     activebackground="#4a4a4a", activeforeground=btn_fg,
+                     font=("Segoe UI", 9), relief="flat").pack(side="left", padx=5)
+            tk.Button(btn_frame, text=t('common.cancel'), command=dialog.destroy,
+                     bg=btn_bg, fg=btn_fg, width=8,
+                     activebackground="#4a4a4a", activeforeground=btn_fg,
+                     font=("Segoe UI", 9), relief="flat").pack(side="left", padx=5)
+            
+            # Enter key to save
+            entry.bind("<Return>", lambda e: save_name())
+            
+            # CRITICAL: Center on parent window
+            dialog.update_idletasks()
+            self._center_dialog_on_parent(dialog)
+            
+            entry.focus_set()
+            
+        except Exception as e:
+            print(f"Error renaming preset {num}: {e}")
 
     def _build_interface_options_tab(self, frame: ttk.Frame) -> None:
         # Theme-aware background color

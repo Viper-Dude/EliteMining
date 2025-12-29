@@ -3,9 +3,9 @@
 
 ## New Features & Improvements
 
-### Hotspot Database
-- Updated database now includes 63,000+ hotspots with HAZ RES and Overlap data
-- Existing users receive new hotspots while keeping their own data
+### Announcement Presets
+- You can now rename announcement presets (Ctrl+Click on preset buttons)
+- Custom names are saved and persist across sessions
 
 ## Bug Fixes
 
