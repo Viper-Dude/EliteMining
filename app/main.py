@@ -7667,7 +7667,8 @@ class App(tk.Tk):
             "Night Vision": "voiceattack.help_night_vision",
             "FSD Jump Sequence": "voiceattack.help_fsd_jump",
             "Power Settings": "voiceattack.help_power",
-            "Prospector Sequence": "voiceattack.help_prospector",
+            "Target Prospector": "voiceattack.help_target_prospector",
+            "Thrust Up": "voiceattack.help_thrust_up",
             "Pulse Wave Analyser": "voiceattack.help_pulse_wave",
             "Target": "voiceattack.help_target",
         }
@@ -8214,8 +8215,14 @@ class App(tk.Tk):
 
             msg = f"Imported {len(found)} values"
             if missing:
-                msg += f"; {len(missing)} missing/invalid"
+                msg += f"; {len(missing)} missing/invalid: {', '.join(missing[:3])}"
+                if len(missing) > 3:
+                    msg += f" +{len(missing)-3} more"
             self._set_status(msg)
+            
+            # Also print to console for debugging
+            if missing:
+                print(f"Missing/invalid files: {missing}")
         except Exception as e:
             messagebox.showerror("Import failed", str(e))
 

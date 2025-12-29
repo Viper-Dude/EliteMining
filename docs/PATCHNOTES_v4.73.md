@@ -1,5 +1,5 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2025-12-16
+**Release Date:** 2025-12-29
 
 ## New Features & Improvements
 
@@ -7,14 +7,14 @@
 - You can now rename announcement presets (Ctrl+Click on preset buttons)
 - Custom names are saved and persist across sessions
 
-## Bug Fixes
-
-### User Interface
-- Fixed theme change dialog showing internal settings names instead of proper theme names
-- Fixed "loop is not in main thread" error when Ring Finder auto-updates from journal scanning
+### VoiceAttack Mining Controls
+- Removed "Prospector Sequence" toggle
+- Added two new independent toggles 
+  - **Target Prospector** - automatically target the prospector after launching it
+  - **Thrust Up** - apply upward thrust when firing a prospector limpet (to prevent prospector crash)
 
 ### Voiceattack Profile
-- No changes - latest version is v4.6.0 (included in the installer and zip file)
+- New functions added, update is required to v4.7.3 (included in the installer and zip file)
 
 ### How to update to the latest profile
 - Backup and delete existing EliteMining profile

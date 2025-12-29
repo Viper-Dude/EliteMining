@@ -40,11 +40,12 @@ TOGGLES = {
     "Cargo Scoop": ("cargoScoopToggle.txt", "Retracts the cargo scoop when laser mining is completed."),
     "Headtracker Docking Control": ("toggleHeadtracker.txt", "Enable/disable automatic headtracker docking control (toggles the F9 key)."),
     "Laser Mining Extra": ("laserminingextraToggle.txt", "Adds a second period of laser mining after a pause (see Pause timer)."),
-    # "Multi-Session Mode": ("multiSessionMode.txt", "Accumulate statistics across multiple cargo loads without resetting."),  # Removed - only available in Mining Analytics panel
+    # "Multi-Session Mode": ("multiSessionMode.txt", "Accumulate statistics across multiple cargo loads without resetting.")  # Removed - only available in Mining Analytics panel
     "Night Vision": ("nightvisionToggle.txt", "Automatically turn on night vision when starting or resetting mining sequence."),
     "FSD Jump Sequence": ("toggleSystem.txt", "After FSD jump: open/close system map, then auto-jump (not saved in ship presets)"),
     "Power Settings": ("powersettingsToggle.txt", "Enable = Max power to engines, disable = balance power when laser mining is completed."),
-    "Prospector Sequence": ("miningToggle.txt", "Automatically target the prospector after launching it."),
+    "Target Prospector": ("prospectorTarget.txt", "Automatically target the prospector after launching it."),
+    "Thrust Up": ("thrustUp.txt", "Apply upward thrust when firing a prospector. Adjust timing in ((Thrust Up)) command in VA Called Commands - Misc category."),
     "Pulse Wave Analyser": ("Pulsewavetoggle.txt", "Switch back to the Pulse Wave Analyser firegroup when laser mining is completed."),
     "Target": ("targetToggle.txt", "Deselect prospector when laser mining is completed."),
 }
