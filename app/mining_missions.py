@@ -198,7 +198,9 @@ class MiningMissionTracker:
         }
         
         self.active_missions[mission_id] = mission_data
-        log.info(f"Mining mission accepted: {commodity} x{count} (ID: {mission_id})")
+        # Use DEBUG for batch/historical replay, INFO for real-time events
+        log_fn = log.debug if self._batch_mode else log.info
+        log_fn(f"Mining mission accepted: {commodity} x{count} (ID: {mission_id})")
         self._save_state()
         self._notify_callbacks()
     
@@ -209,7 +211,8 @@ class MiningMissionTracker:
             mission = self.active_missions.pop(mission_id)
             mission['completed_at'] = event.get('timestamp')
             self.completed_missions.append(mission)
-            log.info(f"Mining mission completed: {mission.get('commodity')} (ID: {mission_id})")
+            log_fn = log.debug if self._batch_mode else log.info
+            log_fn(f"Mining mission completed: {mission.get('commodity')} (ID: {mission_id})")
             self._save_state()
             self._notify_callbacks()
     
@@ -218,7 +221,8 @@ class MiningMissionTracker:
         mission_id = event.get('MissionID')
         if mission_id and mission_id in self.active_missions:
             mission = self.active_missions.pop(mission_id)
-            log.info(f"Mining mission abandoned: {mission.get('commodity')} (ID: {mission_id})")
+            log_fn = log.debug if self._batch_mode else log.info
+            log_fn(f"Mining mission abandoned: {mission.get('commodity')} (ID: {mission_id})")
             self._save_state()
             self._notify_callbacks()
     
@@ -227,7 +231,8 @@ class MiningMissionTracker:
         mission_id = event.get('MissionID')
         if mission_id and mission_id in self.active_missions:
             mission = self.active_missions.pop(mission_id)
-            log.info(f"Mining mission failed: {mission.get('commodity')} (ID: {mission_id})")
+            log_fn = log.debug if self._batch_mode else log.info
+            log_fn(f"Mining mission failed: {mission.get('commodity')} (ID: {mission_id})")
             self._save_state()
             self._notify_callbacks()
     
@@ -258,7 +263,8 @@ class MiningMissionTracker:
         old_delivered = mission.get('delivered', 0)
         if items_delivered != old_delivered:
             mission['delivered'] = items_delivered
-            log.info(f"Mining mission delivery: {mission.get('commodity')} - {items_delivered}/{mission.get('count')} delivered (ID: {mission_id})")
+            log_fn = log.debug if self._batch_mode else log.info
+            log_fn(f"Mining mission delivery: {mission.get('commodity')} - {items_delivered}/{mission.get('count')} delivered (ID: {mission_id})")
             self._save_state()
             self._notify_callbacks()
     

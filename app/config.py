@@ -10,6 +10,11 @@ VA_TTS_ANNOUNCEMENT = "ttsProspectorAnnouncement"
 _last_load_time = 0
 _cached_config = {}
 
+# Rate limiting for config saving to prevent log spam
+_last_save_time = 0
+_pending_save = None
+_save_throttle_seconds = 0.5  # Minimum time between saves
+
 # Get the correct config file path based on execution context
 def _get_config_path() -> str:
     # Always try to use a shared config location for consistency
@@ -71,7 +76,17 @@ def _load_cfg() -> Dict[str, Any]:
     return {}
 
 def _save_cfg(cfg: Dict[str, Any]) -> None:
-    global _cached_config, _last_load_time
+    global _cached_config, _last_load_time, _last_save_time
+    
+    now = time.time()
+    
+    # Throttle saves - if we saved less than 0.5 seconds ago, skip with DEBUG log
+    if now - _last_save_time < _save_throttle_seconds:
+        log.debug(f"Config save throttled (last save {now - _last_save_time:.2f}s ago)")
+        # Update cache anyway so the data isn't lost
+        _cached_config = cfg.copy()
+        return
+    
     try:
         # Ensure the directory exists
         config_dir = os.path.dirname(CONFIG_FILE)
@@ -79,15 +94,16 @@ def _save_cfg(cfg: Dict[str, Any]) -> None:
             os.makedirs(config_dir, exist_ok=True)
             log.info(f"Created config directory: {config_dir}")
         
-        # Single concise log message instead of 3 verbose ones
-        log.info(f"Config saved (v{cfg.get('config_version', 'MISSING')}): {os.path.basename(CONFIG_FILE)}")
+        # Use DEBUG level for routine saves to reduce log spam
+        log.debug(f"Config saved (v{cfg.get('config_version', 'MISSING')}): {os.path.basename(CONFIG_FILE)}")
         
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
         
-        # Update cache immediately after save
+        # Update cache and save time
         _cached_config = cfg.copy()
-        _last_load_time = time.time()
+        _last_load_time = now
+        _last_save_time = now
             
         # Only log verification if there's an issue
         if not os.path.exists(CONFIG_FILE):
