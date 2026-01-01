@@ -1124,15 +1124,30 @@ class RingFinder:
         # Start with empty cache - coordinates will be fetched from EDSM as needed
         self.systems_data = {}
         
-        # Load saved filter settings
-        self._load_filter_settings()
+        # Schedule tkinter operations on main thread to avoid "main thread is not in main loop" error
+        # These operations involve tkinter variable .set() and trace_add() calls
+        def _setup_filter_settings_on_main_thread():
+            try:
+                if not self.parent.winfo_exists():
+                    return
+                # Load saved filter settings (uses .set() on tkinter variables)
+                self._load_filter_settings()
+                
+                # Add traces to save settings when they change
+                self.material_var.trace_add('write', lambda *args: self._save_filter_settings())
+                self.specific_material_var.trace_add('write', lambda *args: self._save_filter_settings())
+                self.distance_var.trace_add('write', lambda *args: self._save_filter_settings())
+                self.max_results_var.trace_add('write', lambda *args: self._save_filter_settings())
+                self.min_hotspots_var.trace_add('write', lambda *args: self._save_filter_settings())
+            except Exception as e:
+                print(f"Warning: Could not setup filter settings: {e}")
         
-        # Add traces to save settings when they change
-        self.material_var.trace_add('write', lambda *args: self._save_filter_settings())
-        self.specific_material_var.trace_add('write', lambda *args: self._save_filter_settings())
-        self.distance_var.trace_add('write', lambda *args: self._save_filter_settings())
-        self.max_results_var.trace_add('write', lambda *args: self._save_filter_settings())
-        self.min_hotspots_var.trace_add('write', lambda *args: self._save_filter_settings())
+        # Use after(0, ...) to ensure this runs on the main thread
+        try:
+            if self.parent.winfo_exists():
+                self.parent.after(0, _setup_filter_settings_on_main_thread)
+        except Exception:
+            pass  # Window may not be ready yet
     
     def _on_material_change(self, event=None):
         """Update confirmed hotspots checkbox when material filter changes"""
