@@ -5825,8 +5825,8 @@ class App(tk.Tk):
                 self._import_all_from_txt()
                 self._set_status("Imported settings from game")
         elif action == "APPLY":
-            if hasattr(self, '_apply_all_to_txt'):
-                self._apply_all_to_txt()
+            if hasattr(self, '_save_all_to_txt'):
+                self._save_all_to_txt()
                 self._set_status("Applied settings to game")
     
     def _va_handle_announcement_preset(self, action: str, num: int):
