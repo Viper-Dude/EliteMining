@@ -488,7 +488,7 @@ These commands trigger in-game actions. Configure your keybinds in the "Custom K
 |---------------|--------|
 | Start mining sequence | Begin automated mining |
 | Start prospector | Deploy prospector limpet |
-| Deploy SSDM | Fire Sub-Surface Displacement Missile |
+| Deploy Sub-Surface Displacement Missile | Fire SSDM |
 | Start Pulse wave scanning | Enable PWA scanner |
 | Stop Pulse wave scanning | Disable PWA scanner |
 | Deploy seismic charge launcher | Fire seismic charge |
