@@ -350,16 +350,17 @@ Calculate distances between any two systems using real-time EDSM data. Perfect f
 ### Key / HOTAS Bindings  
 | Action | Description |
 |--------|-------------|
-| Stop profiles command | Stops all running commands |
-| Start Mining Sequence | Starts laser mining |
-| Reset Mining Sequence | Stops/resets mining |
-| Deploy Seismic Charge Launcher | Switch to launcher |
-| Deploy Sub-surface Displ Missile | Switch to SSDM |
-| Deploy Weapons | Switch to weapons |
-| Start Scanning for Cores | Scanning sequence |
-| Stop Scanning for Cores | Stops scanning |
-| Clear and Jump | Clears mass lock & jumps |
-| TrackIR Integration | Pause toggle = **F9** |
+| Start mining sequence | Begin automated mining |
+| Start prospector | Deploy prospector limpet |
+| Reset mining sequence | Reset to default state |
+| Deploy seismic charge launcher | Fire seismic charge |
+| Deploy Sub-Surface Displacement Missile | Fire SSDM |
+| Deploy weapons | Deploy hardpoints |
+| Start Pulse wave scanning | Enable PWA scanner |
+| Stop Pulse wave scanning | Disable PWA scanner |
+| Clear and jump | Retract hardpoints and jump |
+| Toggle Listening | Enable/disable voice recognition |
+| Stop all | Emergency stop all sequences |
 
 </details>
 
