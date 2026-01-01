@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 EliteMining - Elite Dangerous Mining Assistant
-Copyright (C) 2024-2025 Viper-Dude
+Copyright (C) 2024-2026 Viper-Dude
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
