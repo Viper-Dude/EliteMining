@@ -5385,6 +5385,9 @@ class App(tk.Tk):
         
         # Start on Hotspots Finder tab by default
         self.after(100, lambda: self.switch_to_tab('hotspots_finder'))
+        
+        # Start VoiceAttack command watcher (delay to ensure all components are ready)
+        self.after(2000, self._start_va_command_watcher)
 
     def _create_integrated_cargo_monitor(self, parent_frame):
         """
@@ -5639,6 +5642,229 @@ class App(tk.Tk):
         # Schedule next update
         self.after(2000, self._periodic_integrated_cargo_update)  # Every 2 seconds
     
+    # =========================================================================
+    # VoiceAttack Command Watcher
+    # =========================================================================
+    def _start_va_command_watcher(self):
+        """Start watching for VoiceAttack commands via text file"""
+        self._va_command_file = os.path.join(self.va_root, "Variables", "eliteMiningCommand.txt")
+        self._va_last_command = ""
+        self._va_command_watcher_running = True
+        
+        # Write exe path so VoiceAttack can find it to launch
+        self._write_exe_path()
+        
+        self._check_va_command()
+        log.info(f"VA command watcher started: {self._va_command_file}")
+        print(f"[VA WATCHER] Watching: {self._va_command_file}")
+    
+    def _write_exe_path(self):
+        """Write the EliteMining executable path to a file for VoiceAttack to use"""
+        try:
+            # Determine the exe path
+            if getattr(sys, 'frozen', False):
+                exe_path = sys.executable
+            else:
+                # For dev mode, point to the script location
+                exe_path = os.path.abspath(__file__)
+            
+            # Write to Variables folder
+            path_file = os.path.join(self.va_root, "Variables", "eliteMiningExePath.txt")
+            with open(path_file, 'w', encoding='utf-8') as f:
+                f.write(exe_path)
+            print(f"[VA] Wrote exe path: {exe_path}")
+        except Exception as e:
+            log.error(f"Failed to write exe path: {e}")
+    
+    def _check_va_command(self):
+        """Check for new VoiceAttack commands (called periodically)"""
+        if not getattr(self, '_va_command_watcher_running', False):
+            return
+        
+        try:
+            if os.path.exists(self._va_command_file):
+                with open(self._va_command_file, 'r', encoding='utf-8') as f:
+                    command = f.read().strip()
+                
+                # Only process if there's a new non-empty command
+                if command and command != self._va_last_command:
+                    print(f"[VA COMMAND] Received: {command}")
+                    self._va_last_command = command
+                    self._execute_va_command(command)
+                    
+                    # Clear the file after processing
+                    try:
+                        with open(self._va_command_file, 'w', encoding='utf-8') as f:
+                            f.write('')
+                        self._va_last_command = ""  # Reset so same command can be sent again
+                    except:
+                        pass
+        except Exception as e:
+            log.debug(f"VA command check error: {e}")
+        
+        # Check again in 250ms (fast response)
+        self.after(250, self._check_va_command)
+    
+    def _execute_va_command(self, command: str):
+        """Execute a VoiceAttack command"""
+        log.info(f"VA command received: {command}")
+        
+        try:
+            parts = command.upper().split(':')
+            cmd_type = parts[0] if parts else ""
+            
+            if cmd_type == "TAB":
+                # Tab switching: TAB:MINING, TAB:HOTSPOTS, etc.
+                tab_name = parts[1] if len(parts) > 1 else ""
+                self._va_switch_tab(tab_name)
+                
+            elif cmd_type == "PRESET":
+                # Preset handling: PRESET:LOAD:1, PRESET:SAVE:1
+                action = parts[1] if len(parts) > 1 else ""
+                num = int(parts[2]) if len(parts) > 2 else 1
+                self._va_handle_preset(action, num)
+                
+            elif cmd_type == "SESSION":
+                # Session control: SESSION:START, SESSION:END, SESSION:RESET
+                action = parts[1] if len(parts) > 1 else ""
+                self._va_handle_session(action)
+                
+            elif cmd_type == "SETTINGS":
+                # Settings commands: SETTINGS:IMPORT, SETTINGS:APPLY
+                action = parts[1] if len(parts) > 1 else ""
+                self._va_handle_settings(action)
+                
+            elif cmd_type == "ANNOUNCEMENT":
+                # Announcement presets: ANNOUNCEMENT:LOAD:1
+                action = parts[1] if len(parts) > 1 else ""
+                num = int(parts[2]) if len(parts) > 2 else 1
+                self._va_handle_announcement_preset(action, num)
+                
+            elif cmd_type == "APP":
+                # App control: APP:CLOSE, APP:MINIMIZE, APP:RESTORE
+                action = parts[1] if len(parts) > 1 else ""
+                self._va_handle_app(action)
+                
+            else:
+                log.warning(f"Unknown VA command: {command}")
+                
+        except Exception as e:
+            log.error(f"Error executing VA command '{command}': {e}")
+    
+    def _va_switch_tab(self, tab_name: str):
+        """Switch to specified tab"""
+        tab_mapping = {
+            'MINING': 'mining_session',
+            'HOTSPOTS': 'hotspots_finder',
+            'MARKET': 'commodity_market',
+            'SYSTEMS': 'system_finder',
+            'DISTANCE': 'distance_calculator',
+            'VOICEATTACK': 'voiceattack',
+            'BOOKMARKS': 'bookmarks',
+            'SETTINGS': 'settings',
+        }
+        
+        internal_name = tab_mapping.get(tab_name)
+        if internal_name:
+            self.switch_to_tab(internal_name)
+            self._set_status(f"Switched to {tab_name.title()} tab")
+            log.info(f"VA: Switched to tab {internal_name}")
+        else:
+            log.warning(f"VA: Unknown tab name: {tab_name}")
+    
+    def _va_handle_preset(self, action: str, num: int):
+        """Handle ship preset commands"""
+        if action == "LOAD":
+            # Load ship preset
+            if hasattr(self, '_load_preset_by_number'):
+                self._load_preset_by_number(num)
+                self._set_status(f"Loaded ship preset {num}")
+            elif hasattr(self, 'preset_tree'):
+                # Fallback: try to select and load from tree
+                self._set_status(f"Ship preset {num} (tree method not implemented)")
+        elif action == "SAVE":
+            self._set_status(f"Save preset via voice not supported")
+    
+    def _va_handle_session(self, action: str):
+        """Handle mining session commands"""
+        if not hasattr(self, 'prospector_panel') or not self.prospector_panel:
+            log.warning("VA: Prospector panel not available")
+            return
+        
+        # Auto-switch to Mining Session tab for session commands
+        self.switch_to_tab('mining_session')
+            
+        if action == "START":
+            if hasattr(self.prospector_panel, '_session_start'):
+                self.prospector_panel._session_start()
+                self._set_status("Mining session started")
+        elif action == "STOP":
+            # Stop = save session data
+            if hasattr(self.prospector_panel, '_session_stop'):
+                self.prospector_panel._session_stop()
+                self._set_status("Mining session stopped and saved")
+        elif action == "PAUSE":
+            # Pause/Resume toggle
+            if hasattr(self.prospector_panel, '_toggle_pause_resume'):
+                self.prospector_panel._toggle_pause_resume()
+                # Check if now paused or resumed
+                if getattr(self.prospector_panel, 'session_paused', False):
+                    self._set_status("Mining session paused")
+                else:
+                    self._set_status("Mining session resumed")
+        elif action == "CANCEL":
+            # Cancel = discard session data
+            if hasattr(self.prospector_panel, '_session_cancel'):
+                self.prospector_panel._session_cancel()
+                self._set_status("Mining session cancelled")
+    
+    def _va_handle_settings(self, action: str):
+        """Handle settings commands (import/apply)"""
+        if action == "IMPORT":
+            if hasattr(self, '_import_all_from_txt'):
+                self._import_all_from_txt()
+                self._set_status("Imported settings from game")
+        elif action == "APPLY":
+            if hasattr(self, '_apply_all_to_txt'):
+                self._apply_all_to_txt()
+                self._set_status("Applied settings to game")
+    
+    def _va_handle_announcement_preset(self, action: str, num: int):
+        """Handle announcement preset commands"""
+        if action == "LOAD":
+            if hasattr(self, '_ann_load_preset'):
+                self._ann_load_preset(num)
+                self._set_status(f"Loaded announcement preset {num}")
+    
+    def _va_handle_app(self, action: str):
+        """Handle app control commands"""
+        if action == "CLOSE":
+            # Gracefully close the app
+            print("[VA COMMAND] Closing EliteMining...")
+            self._set_status("Closing EliteMining...")
+            self.after(500, self._close_app_gracefully)
+        elif action == "MINIMIZE":
+            self.iconify()
+            self._set_status("EliteMining minimized")
+        elif action == "RESTORE":
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+            self._set_status("EliteMining restored")
+    
+    def _close_app_gracefully(self):
+        """Close the app gracefully, saving state"""
+        try:
+            # Stop the command watcher
+            self._va_command_watcher_running = False
+            # Trigger normal close
+            self.destroy()
+        except Exception as e:
+            log.error(f"Error during graceful close: {e}")
+            self.destroy()
+    
+    # =========================================================================
+
     def _on_cargo_changed(self, event_type=None, count=0):
         """Callback when cargo monitor data changes - update integrated display
         
@@ -10622,11 +10848,12 @@ class App(tk.Tk):
                 'mining_session': 0,
                 'hotspots_finder': 1,
                 'commodity_market': 2,
-                'distance_calculator': 3,
-                'voiceattack': 4,
-                'bookmarks': 5,
-                'settings': 6,
-                'about': 7
+                'system_finder': 3,
+                'distance_calculator': 4,
+                'voiceattack': 5,
+                'bookmarks': 6,
+                'settings': 7,
+                'about': 8
             }
             
             if tab_name in tab_indices:

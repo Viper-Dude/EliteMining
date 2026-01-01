@@ -11,10 +11,10 @@
 - Improved overlay readability and contrast so text is easier to see in bright in‑game scenes; text sizes adjusted (default is now larger and a new smaller option was added)
 
 ### Announcements
-- Fixed an issue where the first asteroid scan after starting the app wasn't announced.
+- Fixed an issue where the first asteroid scan after starting the app sometimes wasn't announced.
 
 ### Voiceattack Profile
-- Adjusted prospector sequence commad for better flow. 
+- Adjusted prospector sequence command for better flow. 
 - Update is required to v4.7.4 (included in the installer and zip file)
 
 ### How to update to the latest profile

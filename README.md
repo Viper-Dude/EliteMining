@@ -511,6 +511,65 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 ---
 
+## Voice Control Commands (EliteMining App)
+<details>
+<summary>Click to expand</summary>
+
+Control the EliteMining app directly with voice commands. These commands are included in the VoiceAttack profile.
+
+### App Control
+| Voice Command | Action |
+|---------------|--------|
+| Open Elite Mining | Launch the app |
+| Close Elite Mining | Close app gracefully |
+| Minimize Elite Mining | Minimize to taskbar |
+| Restore Elite Mining | Restore from taskbar |
+
+### Tab Navigation
+| Voice Command | Action |
+|---------------|--------|
+| Show mining | Switch to Mining Session tab |
+| Show hotspots | Switch to Hotspots Finder tab |
+| Show market | Switch to Commodity Market tab |
+| Show missions | Switch to Mining Missions tab |
+| Show ring guide | Switch to Ring Mining Reference tab |
+| Show systems | Switch to Star Systems tab |
+| Show distance | Switch to Distance Calculator tab |
+| Show voice attack | Switch to VoiceAttack tab |
+| Show bookmarks | Switch to Bookmarks tab |
+| Show settings | Switch to Settings tab |
+
+### Mining Session Control
+| Voice Command | Action |
+|---------------|--------|
+| Start mining | Start mining session |
+| Pause mining | Pause/Resume session |
+| Stop mining | Stop and save session |
+| Cancel mining | Cancel without saving |
+
+### Ship Presets
+| Voice Command | Action |
+|---------------|--------|
+| Load preset 1-6 | Load ship preset |
+| Save preset 1-6 | Save current config to preset |
+
+### Announcement Presets
+| Voice Command | Action |
+|---------------|--------|
+| Load announcement 1-6 | Load announcement preset |
+
+### Settings
+| Voice Command | Action |
+|---------------|--------|
+| Import settings | Import settings from game |
+| Apply settings | Apply settings to game |
+
+</details>
+
+[Back to Top](#top)
+
+---
+
 ## Mining Presets
 <details>
 <summary>Click to expand</summary>
