@@ -506,7 +506,7 @@ These commands trigger in-game actions. Configure your keybinds in the "Custom K
 | Minimize Elite Mining | Minimize to taskbar |
 | Restore Elite Mining | Restore from taskbar |
 
-### Tab Navigation
+### UI Navigation
 | Voice Command | Action |
 |---------------|--------|
 | Show mining | Switch to Mining Session tab |
