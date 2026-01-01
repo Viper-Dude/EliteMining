@@ -23,8 +23,7 @@
 - [Star Systems](#star-systems)
 - [Distance Calculator](#distance-calculator)
 - [Getting Started](#getting-started)
-- [Commands](#commands)
-- [Voice Control Commands](#voice-control-commands-elitemining-app)
+- [VoiceAttack Commands](#voiceattack-commands)
 - [Mining Presets](#mining-presets)
 - [Usage Tips](#usage-tips)
 - [Known Limitations](#known-limitations)
@@ -476,47 +475,28 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 ---
 
-## Commands
+## VoiceAttack Commands
 <details>
 <summary>Click to expand</summary>
 
-### Status Checks  
-| Spoken Command | Description |
-|----------------|-------------|
-| "Say firegroup for weapons" | Reports FG for weapons |
-| "Say firegroup for mining lasers" | Reports FG for lasers |
-| "Say firegroup for SSDM" | Reports FG for SSDMs |
-| "Say firegroup for PWA" | Reports FG for PWA |
-| "Say toggle for cargo scoop" | Reports toggle status |
-| "Say timer for laser mining" | Reports active timer |
+Control EliteMining with voice commands. These require VoiceAttack with the EliteMining profile.
 
-### Firegroup & Parameter Commands  
-| Spoken Command | Description |
-|----------------|-------------|
-| "Set firegroup for Discovery Scanner to [A–H]" | Assigns Discovery Scanner |
-| "Set firegroup for mining lasers to [A–H]" | Assigns Mining Lasers |
-| "Set firegroup for PWA to [A–H]" | Assigns PWA |
-| "Set firegroup for Seismic Launcher to [A–H]" | Assigns Launcher |
-| "Set firegroup for SSDM to [A–H]" | Assigns SSDM |
-| "Set firegroup for weapons to [A–H]" | Assigns weapons |
+### Mining Sequences (Custom Keybinds)
+These commands trigger in-game actions. Configure your keybinds in the "Custom Keybinds for Mining Control" category.
 
-### Miscellaneous  
-| Spoken Command | Description |
-|----------------|-------------|
-| "Landing Request" | Requests docking |
-| "Enable/Disable Autohonk" | Toggles auto scan |
-
-</details>
-
-[Back to Top](#top)
-
----
-
-## Voice Control Commands (EliteMining App)
-<details>
-<summary>Click to expand</summary>
-
-Control the EliteMining app directly with voice commands. These commands are included in the VoiceAttack profile.
+| Voice Command | Action |
+|---------------|--------|
+| Start mining sequence | Begin automated mining |
+| Start prospector | Deploy prospector limpet |
+| Deploy SSDM | Fire Sub-Surface Displacement Missile |
+| Start Pulse wave scanning | Enable PWA scanner |
+| Stop Pulse wave scanning | Disable PWA scanner |
+| Deploy seismic charge launcher | Fire seismic charge |
+| Clear and jump | Retract hardpoints and jump |
+| Deploy weapons | Deploy hardpoints |
+| Toggle Listening | Enable/disable voice recognition |
+| Stop all | Emergency stop all sequences |
+| Reset mining sequence | Reset to default state |
 
 ### App Control
 | Voice Command | Action |
@@ -548,15 +528,11 @@ Control the EliteMining app directly with voice commands. These commands are inc
 | Stop mining | Stop and save session |
 | Cancel mining | Cancel without saving |
 
-### Ship Presets
+### Ship & Announcement Presets
 | Voice Command | Action |
 |---------------|--------|
 | Load preset 1-6 | Load ship preset |
 | Save preset 1-6 | Save current config to preset |
-
-### Announcement Presets
-| Voice Command | Action |
-|---------------|--------|
 | Load announcement 1-6 | Load announcement preset |
 
 ### Settings
@@ -564,6 +540,12 @@ Control the EliteMining app directly with voice commands. These commands are inc
 |---------------|--------|
 | Import settings | Import settings from game |
 | Apply settings | Apply settings to game |
+
+> 💡 **Tip:** The VoiceAttack profile contains many more commands including firegroup assignments, status checks, and custom sequences. To see all available commands:
+> 1. Open VoiceAttack and edit the EliteMining profile
+> 2. Go to **File → Save Profile to Text File (Quick Command Reference)**
+>
+> This generates a complete reference document of all voice commands.
 
 </details>
 
