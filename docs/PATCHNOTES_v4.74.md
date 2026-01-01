@@ -15,6 +15,7 @@
 
 ### Voiceattack Profile
 - Adjusted prospector sequence command for better flow. 
+- Added voice commands to control the EliteMining app: open/close, switch tabs, start/stop mining sessions, and load presets
 - Update is required to v4.7.4 (included in the installer and zip file)
 
 ### How to update to the latest profile
