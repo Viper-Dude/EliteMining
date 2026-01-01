@@ -24,6 +24,7 @@
 - [Distance Calculator](#distance-calculator)
 - [Getting Started](#getting-started)
 - [Commands](#commands)
+- [Voice Control Commands](#voice-control-commands-elitemining-app)
 - [Mining Presets](#mining-presets)
 - [Usage Tips](#usage-tips)
 - [Known Limitations](#known-limitations)
