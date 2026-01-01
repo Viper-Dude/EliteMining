@@ -154,6 +154,7 @@
     "drone": "Drone",
     "drones": "Drones",
     "refinery_note": "Note: Contents in Refinery not included in totals",
+    "limpet_click_help": "Tip: Click Limpet to fix count if game file is out of sync",
     "dark_theme": "Dark Theme",
     "orange_theme": "Orange Theme",
     "empty_cargo": "Empty cargo hold",
@@ -907,7 +908,11 @@
     "capacity_detected": "Capacity detected successfully",
     "default_capacity": "Using default capacity - open cargo in game to update",
     "got_it": "Got It!",
-    "refinery_total": "Refinery Total: {count} tons"
+    "refinery_total": "Refinery Total: {count} tons",
+    "adjust_limpets_title": "Adjust Limpet Count",
+    "adjust_limpets_info": "Current limpet count: {count}",
+    "adjust_limpets_prompt": "Enter new limpet count:",
+    "adjust_limpets_tooltip": "Click to manually adjust limpet count if out of sync"
   },
   "messages": {
     "error_no_journal": "No journal files found",

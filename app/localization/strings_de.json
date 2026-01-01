@@ -154,6 +154,7 @@
     "drone": "Drohne",
     "drones": "Drohnen",
     "refinery_note": "Hinweis: Inhalt in Raffinerie nicht in Summen enthalten",
+    "limpet_click_help": "Tipp: Drohne anklicken falls Spieldatei falsche Anzahl zeigt",
     "dark_theme": "Dunkles Design",
     "orange_theme": "Orange Design",
     "empty_cargo": "Leerer Frachtraum",
@@ -907,7 +908,11 @@
     "capacity_detected": "Kapazität erfolgreich erkannt",
     "default_capacity": "Verwende Standardkapazität - Frachtraum im Spiel öffnen",
     "got_it": "Verstanden!",
-    "refinery_total": "Raffinerie Gesamt: {count} Tonnen"
+    "refinery_total": "Raffinerie Gesamt: {count} Tonnen",
+    "adjust_limpets_title": "Drohnenanzahl anpassen",
+    "adjust_limpets_info": "Aktuelle Drohnenanzahl: {count}",
+    "adjust_limpets_prompt": "Neue Drohnenanzahl eingeben:",
+    "adjust_limpets_tooltip": "Klicken um Drohnenanzahl manuell anzupassen"
   },
   "messages": {
     "error_no_journal": "Keine Journal-Dateien gefunden",

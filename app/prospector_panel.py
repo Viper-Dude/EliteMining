@@ -8972,6 +8972,8 @@ class ProspectorPanel(ttk.Frame):
     def _enable_realtime_mode(self) -> None:
         """Switch from startup processing mode to real-time event processing"""
         self.startup_processing = False
+        # Clear startup skip flag - from now on, all events are real-time
+        self._startup_skip = False
         
     def _tick(self) -> None:
         try:

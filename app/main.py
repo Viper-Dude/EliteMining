@@ -429,7 +429,7 @@ class TextOverlay:
         self.transparency = 0.9  # Default transparency (90%)
         self.text_color = "#FFFFFF"  # Default white color
         self.position = "upper_left"  # Fixed position
-        self.font_size = 14  # Default font size (Normal)
+        self.font_size = 12  # Default font size (Normal)
         
     def create_overlay(self):
         """Create the overlay window"""
@@ -448,37 +448,20 @@ class TextOverlay:
         # Position based on setting
         self._set_window_position()
         
-        # Create text label with transparent background
-        self.text_label = tk.Label(
+        # Create canvas with transparent background
+        self.canvas = tk.Canvas(
             self.overlay_window,
-            text="",
             bg="#000001",  # Same as transparent color - will be invisible
-            fg=self.text_color,  # Use current color (will be updated with brightness)
-            font=("Segoe UI", self.font_size, "normal"),  # Use current font_size setting
-            wraplength=0,  # Disable wrapping - let newlines control line breaks
-            justify="left",
-            relief="flat",
-            bd=0,
-            highlightthickness=0
+            highlightthickness=0,
+            bd=0
         )
-        self.text_label.pack(anchor="nw", padx=10, pady=5)
+        self.canvas.pack(fill="both", expand=True, padx=10, pady=5)
         
         # Hide initially
         self.overlay_window.withdraw()
         
         # Apply current color and brightness settings
-        self._update_text_color()
-        
-    def _get_background_color(self):
-        """Calculate background color based on transparency setting"""
-        # At 10% transparency -> very light background
-        # At 100% transparency -> dark background
-        alpha_factor = self.transparency
-        if alpha_factor < 0.3:  # Very transparent - use light gray
-            gray_value = int(64 + (1.0 - alpha_factor) * 64)  # Light gray
-        else:  # More opaque - use darker
-            gray_value = int(30 + alpha_factor * 30)  # Dark gray
-        return f"#{gray_value:02x}{gray_value:02x}{gray_value:02x}"
+        # self._update_text_color() # No text item yet
         
     def show_message(self, message: str):
         """Display a message in the overlay"""
@@ -488,8 +471,7 @@ class TextOverlay:
         if not self.overlay_window:
             self.create_overlay()
             
-        # Update text
-        self.text_label.config(text=message)
+        self._draw_text(message)
         
         # CRITICAL: Reposition window every time before showing (Windows can reset position)
         self._set_window_position()
@@ -512,14 +494,44 @@ class TextOverlay:
         if not self.overlay_window:
             self.create_overlay()
             
-        # Update text and show window
-        self.text_label.config(text=message)
+        self._draw_text(message)
         self.overlay_window.deiconify()
         
         # Cancel any existing timer - this message stays until manually hidden
         if self.fade_timer:
             self.overlay_window.after_cancel(self.fade_timer)
             self.fade_timer = None
+
+    def _draw_text(self, message: str):
+        """Draw text with outline on canvas"""
+        self.canvas.delete("all")
+        
+        font_spec = ("Segoe UI", self.font_size, "normal")
+        text_color = self._get_current_color()
+        
+        # Draw outline (shadow)
+        # Offset by 2 pixels to ensure outline is not clipped
+        base_x, base_y = 2, 2
+        offsets = [(-1, -1), (1, -1), (-1, 1), (1, 1), (0, 1), (0, -1), (1, 0), (-1, 0)]
+        for ox, oy in offsets:
+            self.canvas.create_text(
+                base_x + ox, base_y + oy,
+                text=message,
+                font=font_spec,
+                fill="black",
+                anchor="nw",
+                justify="left"
+            )
+            
+        # Draw main text
+        self.text_item = self.canvas.create_text(
+            base_x, base_y,
+            text=message,
+            font=font_spec,
+            fill=text_color,
+            anchor="nw",
+            justify="left"
+        )
     
     def hide_overlay(self):
         """Hide the overlay window"""
@@ -533,35 +545,27 @@ class TextOverlay:
             self.hide_overlay()
             
     def set_transparency(self, transparency_percent: int):
-        """Set text brightness (10-100%) - affects text brightness, background stays transparent"""
+        """Set text brightness (10-100%)"""
         self.transparency = transparency_percent / 100.0
-        if self.overlay_window and hasattr(self, 'text_label'):
-            try:
-                # Apply brightness to the current color
-                self._update_text_color()
-            except Exception as e:
-                print(f"Error setting text brightness: {e}")
+        if self.overlay_window:
+            self._update_text_color()
     
     def set_color(self, color_hex: str):
         """Set the base text color"""
         self.text_color = color_hex
-        if self.overlay_window and hasattr(self, 'text_label'):
-            try:
-                # Apply current brightness to the new color
-                self._update_text_color()
-            except Exception as e:
-                print(f"Error setting text color: {e}")
+        if self.overlay_window:
+            self._update_text_color()
     
-    def _update_text_color(self):
-        """Update text color by applying current brightness to base color"""
+    def _get_current_color(self):
+        """Calculate text color based on brightness setting"""
         # Parse the base color
         base_color = self.text_color.lstrip('#')
         r = int(base_color[0:2], 16)
         g = int(base_color[2:4], 16) 
         b = int(base_color[4:6], 16)
         
-        # For crystal clear text, use full brightness instead of transparency-based dimming
-        brightness_factor = 1.0  # Always use full brightness for clear text
+        # Use transparency setting to control brightness (0.1 to 1.0)
+        brightness_factor = self.transparency
         
         # Calculate new RGB values
         new_r = int(r * brightness_factor)
@@ -573,8 +577,16 @@ class TextOverlay:
         new_g = min(255, max(0, new_g))
         new_b = min(255, max(0, new_b))
         
-        final_color = f"#{new_r:02x}{new_g:02x}{new_b:02x}"
-        self.text_label.configure(fg=final_color)
+        return f"#{new_r:02x}{new_g:02x}{new_b:02x}"
+
+    def _update_text_color(self):
+        """Update text color of existing text item"""
+        if hasattr(self, 'canvas') and hasattr(self, 'text_item'):
+            try:
+                final_color = self._get_current_color()
+                self.canvas.itemconfig(self.text_item, fill=final_color)
+            except Exception as e:
+                print(f"Error updating text color: {e}")
     
     def set_position(self, position: str):
         """Set overlay position - always upper left"""
@@ -585,12 +597,11 @@ class TextOverlay:
     def set_font_size(self, size: int):
         """Set text font size"""
         self.font_size = size
-        if self.overlay_window and hasattr(self, 'text_label'):
+        if self.overlay_window and hasattr(self, 'canvas'):
             try:
-                # Use Segoe UI (original font) with normal weight
-                family = "Segoe UI"
-                style = "normal"
-                self.text_label.configure(font=(family, size, style))
+                # Update all text items (shadows and main text)
+                font_spec = ("Segoe UI", size, "normal")
+                self.canvas.itemconfig("all", font=font_spec)
             except Exception as e:
                 print(f"Error setting font size: {e}")
     
@@ -741,7 +752,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.73"
+APP_VERSION = "v4.74"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -2616,6 +2627,16 @@ cargo panel forces Elite to write detailed inventory data.
             # Sort items by quantity (highest first)
             sorted_items = sorted(self.cargo_items.items(), key=lambda x: x[1], reverse=True)
             
+            # Configure clickable limpet tag (color + hand cursor)
+            self.cargo_text.tag_configure("limpet_clickable", 
+                                         foreground="#ff8c00")
+            self.cargo_text.tag_bind("limpet_clickable", "<Button-1>", 
+                                    lambda e: self.adjust_limpet_count())
+            self.cargo_text.tag_bind("limpet_clickable", "<Enter>", 
+                                    lambda e: self.cargo_text.configure(cursor="hand2"))
+            self.cargo_text.tag_bind("limpet_clickable", "<Leave>", 
+                                    lambda e: self.cargo_text.configure(cursor=""))
+            
             # Add each cargo item with type icons - single line format with proper alignment
             for i, (item_name, quantity) in enumerate(sorted_items, 1):
                 # Format item name (remove underscores, capitalize) 
@@ -2624,9 +2645,12 @@ cargo panel forces Elite to write detailed inventory data.
                 if len(display_name) > 12:
                     display_name = display_name[:12]
                 
+                # Check if this is a limpet
+                is_limpet = "limpet" in item_name.lower()
+                
                 # Add type-specific icons (no space after - we'll add it in formatting)
                 icon = ""
-                if "limpet" in item_name.lower():
+                if is_limpet:
                     icon = "🤖"  # Robot for limpets
                 elif any(mineral in item_name.lower() for mineral in ['painite', 'diamond', 'opal', 'alexandrite', 'serendibite', 'benitoite']):
                     icon = "💎"  # Diamond for precious materials
@@ -2636,8 +2660,13 @@ cargo panel forces Elite to write detailed inventory data.
                     icon = "📦"  # Box for other cargo
                 
                 # Single line format with proper alignment: Icon + Name + Quantity
-                line = f"{icon} {display_name:<12} {quantity:>4}t"
-                self.cargo_text.insert(tk.END, f"{line}\n")
+                line = f"{icon} {display_name:<12} {quantity:>4}t\n"
+                
+                # Make limpet lines clickable
+                if is_limpet:
+                    self.cargo_text.insert(tk.END, line, "limpet_clickable")
+                else:
+                    self.cargo_text.insert(tk.END, line)
             
             # Add total at bottom
             self.cargo_text.insert(tk.END, "─" * 30 + "\n")
@@ -4212,6 +4241,236 @@ cargo panel forces Elite to write detailed inventory data.
                 limpet_count += qty
         return limpet_count
 
+    def adjust_limpet_count(self):
+        """Show dialog to manually adjust limpet count and update Cargo.json
+        
+        This is useful when the game's Cargo.json gets out of sync during
+        fast-paced mining (rapid limpet launches + material collection).
+        
+        Follows DIALOG_GUIDELINES.md for proper centering and theming.
+        """
+        try:
+            from config import load_theme
+            from app_utils import get_app_icon_path
+            
+            # Get current limpet count
+            current_count = self._get_prospector_count()
+            
+            # Find the parent window - prefer main app if available
+            if hasattr(self, 'main_app_ref') and self.main_app_ref:
+                parent = self.main_app_ref
+            elif self.cargo_window:
+                parent = self.cargo_window
+            else:
+                parent = None
+            
+            # Theme colors (per DIALOG_GUIDELINES.md)
+            theme = load_theme()
+            if theme == "elite_orange":
+                bg_color = "#000000"
+                fg_color = "#ff8c00"
+                btn_bg = "#1a1a1a"
+                btn_fg = "#ff9900"
+                entry_bg = "#1a1a1a"
+            else:
+                bg_color = "#1e1e1e"
+                fg_color = "#569cd6"
+                btn_bg = "#2a3a4a"
+                btn_fg = "#e0e0e0"
+                entry_bg = "#2a2a2a"
+            
+            # Create dialog
+            dialog = tk.Toplevel(parent)
+            dialog.title(t('dialogs.adjust_limpets_title'))
+            dialog.configure(bg=bg_color)
+            dialog.resizable(False, False)
+            dialog.transient(parent)
+            dialog.grab_set()
+            
+            # Set app icon
+            try:
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+            
+            # Main content frame
+            frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
+            frame.pack(fill="both", expand=True)
+            
+            # Info label
+            tk.Label(frame, 
+                    text=t('dialogs.adjust_limpets_info').format(count=current_count),
+                    bg=bg_color, fg=fg_color, 
+                    font=("Segoe UI", 10)).pack(pady=(0, 10))
+            
+            # Instruction label
+            tk.Label(frame, 
+                    text=t('dialogs.adjust_limpets_prompt'),
+                    bg=bg_color, fg=fg_color, 
+                    font=("Segoe UI", 10)).pack(pady=(0, 5))
+            
+            # Entry for new count
+            entry_frame = tk.Frame(frame, bg=bg_color)
+            entry_frame.pack(pady=5)
+            
+            count_var = tk.StringVar(value=str(current_count))
+            entry = tk.Entry(entry_frame, textvariable=count_var, 
+                           width=8, font=("Segoe UI", 12),
+                           bg=entry_bg, fg=fg_color,
+                           insertbackground=fg_color,
+                           justify="center")
+            entry.pack()
+            entry.select_range(0, tk.END)
+            entry.focus_set()
+            
+            # Result variable
+            result = {"value": None}
+            
+            def on_ok():
+                try:
+                    value = int(count_var.get())
+                    if 0 <= value <= 999:
+                        result["value"] = value
+                        dialog.destroy()
+                    else:
+                        entry.configure(bg="#4a2020")  # Red tint for error
+                except ValueError:
+                    entry.configure(bg="#4a2020")
+            
+            def on_cancel():
+                dialog.destroy()
+            
+            # Button frame
+            btn_frame = tk.Frame(frame, bg=bg_color)
+            btn_frame.pack(pady=(15, 0))
+            
+            tk.Button(btn_frame, text=t('dialogs.ok'), command=on_ok,
+                     bg=btn_bg, fg=btn_fg, padx=20, pady=3,
+                     font=("Segoe UI", 10)).pack(side="left", padx=5)
+            
+            tk.Button(btn_frame, text=t('dialogs.cancel'), command=on_cancel,
+                     bg=btn_bg, fg=btn_fg, padx=20, pady=3,
+                     font=("Segoe UI", 10)).pack(side="left", padx=5)
+            
+            # Bind Enter key
+            entry.bind('<Return>', lambda e: on_ok())
+            dialog.bind('<Escape>', lambda e: on_cancel())
+            
+            # Center dialog on parent (per DIALOG_GUIDELINES.md)
+            dialog.update_idletasks()
+            if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_center_dialog_on_parent'):
+                self.main_app_ref._center_dialog_on_parent(dialog)
+            else:
+                # Fallback centering
+                dialog.geometry(f"+{parent.winfo_x() + 100}+{parent.winfo_y() + 100}" if parent else "")
+            
+            # Wait for dialog to close
+            dialog.wait_window()
+            
+            # Process result
+            if result["value"] is not None and result["value"] != current_count:
+                success = self._update_limpet_count_in_cargo_json(result["value"])
+                if success:
+                    print(f"[LIMPET] Adjusted limpet count from {current_count} to {result['value']}")
+                    # Force re-read of Cargo.json
+                    self.last_cargo_mtime = 0
+                    self.read_cargo_json()
+                    self.update_display()
+                    # Also update integrated display if available
+                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_integrated_cargo_display'):
+                        self.main_app_ref._update_integrated_cargo_display()
+                else:
+                    print(f"[LIMPET] Failed to update Cargo.json")
+                    
+        except Exception as e:
+            print(f"[LIMPET] Error adjusting limpet count: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _update_limpet_count_in_cargo_json(self, new_count: int) -> bool:
+        """Update the limpet count in Cargo.json file
+        
+        Args:
+            new_count: The new limpet count to set
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if not os.path.exists(self.cargo_json_path):
+                print(f"[LIMPET] Cargo.json not found at: {self.cargo_json_path}")
+                return False
+            
+            # Read current Cargo.json
+            with open(self.cargo_json_path, 'r', encoding='utf-8') as f:
+                cargo_data = json.load(f)
+            
+            inventory = cargo_data.get("Inventory", [])
+            limpet_found = False
+            old_count = 0
+            
+            # Find and update limpet entry
+            for item in inventory:
+                name = item.get("Name", "").lower()
+                if "drone" in name or "limpet" in name:
+                    old_count = item.get("Count", 0)
+                    item["Count"] = new_count
+                    limpet_found = True
+                    break
+            
+            # If no limpet entry exists and new_count > 0, add one
+            if not limpet_found and new_count > 0:
+                inventory.append({
+                    "Name": "drones",
+                    "Name_Localised": "Limpet",
+                    "Count": new_count,
+                    "Stolen": 0
+                })
+                old_count = 0
+            
+            # If limpet exists but new_count is 0, remove the entry
+            if limpet_found and new_count == 0:
+                inventory = [item for item in inventory 
+                            if "drone" not in item.get("Name", "").lower() 
+                            and "limpet" not in item.get("Name", "").lower()]
+            
+            # Update total count
+            cargo_data["Inventory"] = inventory
+            cargo_data["Count"] = sum(item.get("Count", 0) for item in inventory)
+            
+            # Write back to Cargo.json
+            with open(self.cargo_json_path, 'w', encoding='utf-8') as f:
+                json.dump(cargo_data, f, indent=2)
+            
+            # Update internal cargo items
+            limpet_key = None
+            for item_name in list(self.cargo_items.keys()):
+                if "limpet" in item_name.lower():
+                    limpet_key = item_name
+                    break
+            
+            if limpet_key:
+                if new_count > 0:
+                    self.cargo_items[limpet_key] = new_count
+                else:
+                    del self.cargo_items[limpet_key]
+            elif new_count > 0:
+                self.cargo_items["Limpet"] = new_count
+            
+            # Update current cargo total
+            self.current_cargo = sum(self.cargo_items.values())
+            
+            print(f"[LIMPET] Updated Cargo.json: {old_count} -> {new_count} limpets")
+            return True
+            
+        except Exception as e:
+            print(f"[LIMPET] Error updating Cargo.json: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
     def show_refinery_dialog(self):
         """Show the refinery adjustment dialog and store the results"""
         try:
@@ -4752,9 +5011,9 @@ class App(tk.Tk):
         # Text size options for overlay
         self.text_overlay_size = tk.StringVar(value="Normal")  # Default normal size
         self.size_options = {
-            "Small": 12,      # Small text
-            "Normal": 16,     # Normal text
-            "Large": 20       # Large text (increased from 18)
+            "Small": 10,      # Small text (reduced from 12)
+            "Normal": 12,     # Normal text (was Small)
+            "Large": 16       # Large text (was Normal)
         }
         
         # Initialize text overlay for TTS announcements (before loading preferences)
@@ -5242,6 +5501,16 @@ class App(tk.Tk):
             # Vertical list with better alignment - show ALL items
             sorted_items = sorted(cargo.cargo_items.items(), key=lambda x: x[1], reverse=True)
             
+            # Configure clickable limpet tag (color + hand cursor)
+            self.integrated_cargo_text.tag_configure("limpet_clickable", 
+                                                     foreground=self.theme_colors.get("accent", "#ff8c00"))
+            self.integrated_cargo_text.tag_bind("limpet_clickable", "<Button-1>", 
+                                                lambda e: self.cargo_monitor.adjust_limpet_count())
+            self.integrated_cargo_text.tag_bind("limpet_clickable", "<Enter>", 
+                                                lambda e: self.integrated_cargo_text.configure(cursor="hand2"))
+            self.integrated_cargo_text.tag_bind("limpet_clickable", "<Leave>", 
+                                                lambda e: self.integrated_cargo_text.configure(cursor=""))
+            
             # Show all items
             for i, (item_name, quantity) in enumerate(sorted_items):
                 # Clean up item name for display - use full name, not truncated
@@ -5252,11 +5521,12 @@ class App(tk.Tk):
                     display_name = 'LTD'
                 
                 # Localize limpet to Drohne for German
-                if "limpet" in item_name.lower():
+                is_limpet = "limpet" in item_name.lower()
+                if is_limpet:
                     display_name = t('sidebar.limpet')
                 
                 # Simple icons with better spacing
-                if "limpet" in item_name.lower():
+                if is_limpet:
                     icon = "🤖"
                 elif any(m in item_name.lower() for m in ['painite', 'diamond', 'opal']):
                     icon = "💎"
@@ -5271,7 +5541,13 @@ class App(tk.Tk):
                 quantity_text = f"{quantity}t"
                 
                 line = f"{icon} {name_field} {quantity_text:>4}"
-                self.integrated_cargo_text.insert(tk.END, line)
+                
+                # Mark start position for limpet lines (to make clickable)
+                if is_limpet:
+                    start_pos = self.integrated_cargo_text.index(tk.END)
+                    self.integrated_cargo_text.insert(tk.END, line, "limpet_clickable")
+                else:
+                    self.integrated_cargo_text.insert(tk.END, line)
                 
                 # Add newline for all but the last item
                 if i < len(sorted_items) - 1:
@@ -5323,6 +5599,12 @@ class App(tk.Tk):
         # Insert refinery note with formatting - get position before inserting
         note_start_index = self.integrated_cargo_text.index(tk.INSERT)
         self.integrated_cargo_text.insert(tk.END, "\n" + t('sidebar.refinery_note'))
+        
+        # Add limpet help text if limpets are present
+        has_limpets = any("limpet" in name.lower() for name in cargo.cargo_items.keys())
+        if has_limpets:
+            self.integrated_cargo_text.insert(tk.END, "\n" + t('sidebar.limpet_click_help'))
+        
         note_end_index = self.integrated_cargo_text.index(tk.INSERT)
         
         # Apply formatting to the note text only
@@ -10966,7 +11248,7 @@ class App(tk.Tk):
     def _on_size_change(self, *args) -> None:
         """Called when text size selection is changed"""
         size_name = self.text_overlay_size.get()
-        size_value = self.size_options.get(size_name, 14)
+        size_value = self.size_options.get(size_name, 12)
         self.text_overlay.set_font_size(size_value)
         self._save_text_overlay_preference()
         

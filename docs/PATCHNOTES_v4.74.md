@@ -1,20 +1,21 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2025-12-16
+**Release Date:** 2025-12-31
 
 ## New Features & Improvements
 
-### Hotspot Database
-- Updated database now includes 63,000+ hotspots with HAZ RES and Overlap data
-- Existing users receive new hotspots while keeping their own data
+### Cargo Monitor
+- Click on the Limpet entry to manually correct the limpets count when the game file is out of sync
 
-## Bug Fixes
+### Text Overlay
+- Fixed text brightness slider not controlling text visibility
+- Improved overlay readability and contrast so text is easier to see in bright in‑game scenes; text sizes adjusted (default is now larger and a new smaller option was added)
 
-### User Interface
-- Fixed theme change dialog showing internal settings names instead of proper theme names
-- Fixed "loop is not in main thread" error when Ring Finder auto-updates from journal scanning
+### Announcements
+- Fixed an issue where the first asteroid scan after starting the app wasn't announced.
 
 ### Voiceattack Profile
-- No changes - latest version is v4.6.0 (included in the installer and zip file)
+- Adjusted prospector sequence commad for better flow. 
+- Update is required to v4.7.4 (included in the installer and zip file)
 
 ### How to update to the latest profile
 - Backup and delete existing EliteMining profile

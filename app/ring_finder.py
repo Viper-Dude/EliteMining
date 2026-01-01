@@ -973,7 +973,8 @@ class RingFinder:
             # Check if parent window still exists
             if not self.parent.winfo_exists():
                 return
-            self.status_var.set(t('ring_finder.loading_database'))
+            # Use after(0, ...) to update status on main thread
+            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.loading_database')) if self.parent.winfo_exists() else None)
             self._load_systems_cache()
             if self.parent.winfo_exists():
                 self.parent.after(0, lambda: self.status_var.set(t('ring_finder.database_ready')) if self.parent.winfo_exists() else None)
