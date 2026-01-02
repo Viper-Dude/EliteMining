@@ -8,12 +8,12 @@ When modifying cargo display:
 
 ✅ 1. INTEGRATED DISPLAY (PRIMARY)
    Method: _update_integrated_cargo_display()
-   Line: ~3570 in main.py
+   Line: ~5140 in main.py
    THIS IS WHAT USERS SEE!
 
 ⚠️ 2. POPUP WINDOW (SECONDARY)
    Method: update_display()
-   Line: ~1850 in main.py
+   Line: ~2248 in main.py
    Rarely used, but keep in sync!
 
 📚 See full documentation:

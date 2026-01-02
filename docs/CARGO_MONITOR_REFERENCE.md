@@ -17,8 +17,8 @@ The CargoMonitor class has **TWO INDEPENDENT DISPLAY METHODS** that must be kept
 ### Code Location
 
 - **Class**: `EliteMiningApp` in `app/main.py`
-- **Creation Method**: `_create_integrated_cargo_monitor()` - Line ~3516
-- **Update Method**: `_update_integrated_cargo_display()` - Line ~3570
+- **Creation Method**: `_create_integrated_cargo_monitor()` - Line ~5066
+- **Update Method**: `_update_integrated_cargo_display()` - Line ~5140
 - **Update Trigger**: `_periodic_integrated_cargo_update()` - Every 1 second
 
 ### Widgets
@@ -45,8 +45,8 @@ self.integrated_status_label    # Status line (hidden but functional)
 ### Code Location
 
 - **Class**: `CargoMonitor` in `app/main.py`
-- **Creation Method**: `create_window()` - Line ~1195
-- **Update Method**: `update_display()` - Line ~1850
+- **Creation Method**: `create_window()` - Line ~1596
+- **Update Method**: `update_display()` - Line ~2248
 - **Update Trigger**: Called when cargo data changes
 
 ### Widgets
@@ -70,14 +70,14 @@ self.capacity_label  # Capacity info
 
    ```text
    File: app/main.py
-   Method: _update_integrated_cargo_display() (line ~3570)
+   Method: _update_integrated_cargo_display() (line ~5140)
    ```
 
 2. **THEN UPDATE POPUP WINDOW**
 
    ```text
    File: app/main.py
-   Method: update_display() (line ~1850)
+   Method: update_display() (line ~2248)
    ```
 
 3. **TEST BOTH DISPLAYS**
@@ -108,17 +108,17 @@ self.refinery_contents = {}     # Refinery hopper contents
 
 | Task | Integrated Display | Popup Window |
 |------|-------------------|--------------|
-| Add new section | `_update_integrated_cargo_display()` Line ~3630 | `update_display()` Line ~1883 |
+| Add new section | `_update_integrated_cargo_display()` Line ~5200 | `update_display()` Line ~2280 |
 | Change formatting | `_update_integrated_cargo_display()` | `update_display()` |
-| Add new widget | `_create_integrated_cargo_monitor()` Line ~3516 | `create_window()` Line ~1195 |
+| Add new widget | `_create_integrated_cargo_monitor()` Line ~5066 | `create_window()` Line ~1596 |
 | Change colors/fonts | Both methods | Both methods |
 
 ### Data Collection:
 
 | Task | Location |
 |------|----------|
-| Add event handler | `process_journal_event()` Line ~2245 |
-| Add data storage | `__init__()` Line ~1081 |
+| Add event handler | `process_journal_event()` Line ~2981 |
+| Add data storage | `__init__()` Line ~1191 |
 | Reset data | Create new method + hook into session |
 
 ---
@@ -127,9 +127,9 @@ self.refinery_contents = {}     # Refinery hopper contents
 
 When modifying cargo display:
 
-- [ ] Modify `_update_integrated_cargo_display()` FIRST (line ~3570)
+- [ ] Modify `_update_integrated_cargo_display()` FIRST (line ~5140)
 - [ ] Test in main app window
-- [ ] Modify `update_display()` SECOND (line ~1850)
+- [ ] Modify `update_display()` SECOND (line ~2248)
 - [ ] Test popup window (if applicable)
 - [ ] Verify both displays show same data
 - [ ] Update this documentation if architecture changes
