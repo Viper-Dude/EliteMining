@@ -114,8 +114,8 @@ VoiceAttack profile includes a dedicated **"Custom Keybinds for Mining Control"*
 ### Included Components  
 The installer bundles the **EliteVA plugin**. No separate download required.  
 
-### VoiceAttack Profile Installation  
-1. Open VoiceAttack → **Profile > Import Profile**  
+### VoiceAttack  Installation  
+1. Open VoiceAttack → ** > Import **  
 2. Select **EliteMining-Profile.vap**  
 3. Configure your mining hotkeys in the **"Custom Keybinds for Mining Control"** category
 
@@ -543,9 +543,9 @@ These commands trigger in-game actions. Configure your keybinds in the "Custom K
 | Apply settings | Apply settings to game |
 
 > 💡 **Tip:** The VoiceAttack profile contains many more commands including firegroup assignments, status checks, and custom sequences. To see all available commands:
-> 1. Open VoiceAttack and edit the EliteMining profile
-> 2. Go to **File → Save Profile to Text File (Quick Command Reference)**
->
+> 1. Open VoiceAttack and export EliteMining profile
+> 2. Select export **File → Save Profile to HTML (Quick Reference) list as HTML**
+
 > This generates a complete reference document of all voice commands.
 
 </details>
