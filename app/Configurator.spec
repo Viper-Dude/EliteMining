@@ -55,7 +55,9 @@ a = Analysis(
         'PIL.ImageTk',
         'requests',
         'packaging',
-        'packaging.version'
+        'packaging.version',
+        # UI module components
+        'ui', 'ui.theme', 'ui.tooltip', 'ui.dialogs'
     ],
     hookspath=[],
     hooksconfig={},

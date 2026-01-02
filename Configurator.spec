@@ -17,7 +17,9 @@ a = Analysis(
         # Matplotlib for charts and graphs
         'matplotlib', 'matplotlib.pyplot', 'matplotlib.dates', 'matplotlib.backends.backend_tkagg',
         # Additional dependencies
-        'ctypes', 'ctypes.wintypes'
+        'ctypes', 'ctypes.wintypes',
+        # UI module components
+        'ui', 'ui.theme', 'ui.tooltip', 'ui.dialogs'
     ],
     hookspath=[],
     hooksconfig={},
