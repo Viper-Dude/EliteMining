@@ -544,7 +544,7 @@ These commands trigger in-game actions. Configure your keybinds in the "Custom K
 
 > 💡 **Tip:** The VoiceAttack profile contains many more commands including firegroup assignments, status checks, and custom sequences. To see all available commands:
 > 1. Open VoiceAttack and export EliteMining profile
-> 2. Select export **File → Save Profile to HTML (Quick Reference) list as HTML**
+> 2. Select export → Save Profile to HTML (Quick Reference) list as HTML**
 
 > This generates a complete reference document of all voice commands.
 
