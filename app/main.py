@@ -37,143 +37,15 @@ if hasattr(sys, '_MEIPASS'):
 else:
     app_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Legacy debug log (kept for compatibility, but logging_setup.py is now primary)
-log_path = os.path.join(app_dir, "debug_log.txt")
 import json
 import glob
 import re
 import shutil
 import datetime as dt
 import logging
-import logging
 from logging.handlers import RotatingFileHandler
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-def centered_yesno_dialog(parent, title, message):
-    """Show a Yes/No dialog centered over parent window. Returns True for Yes, False for No."""
-    from tkinter import ttk
-    
-    dialog = tk.Toplevel(parent)
-    dialog.withdraw()  # Prevent flicker while we layout and center
-    try:
-        from app_utils import get_app_icon_path
-        icon_path = get_app_icon_path()
-        if icon_path and icon_path.endswith('.ico'):
-            dialog.iconbitmap(icon_path)
-        elif icon_path:
-            dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
-    except Exception:
-        pass
-    dialog.title(title)
-    dialog.resizable(False, False)
-    
-    # Use ttk frame for themed look
-    frame = ttk.Frame(dialog, padding=20)
-    frame.pack(fill="both", expand=True)
-    
-    ttk.Label(frame, text=message, font=("Segoe UI", 10)).pack(pady=(0, 15))
-    
-    btn_frame = ttk.Frame(frame)
-    btn_frame.pack()
-    
-    result = {'value': None}
-    def on_yes():
-        result['value'] = True
-        dialog.destroy()
-    def on_no():
-        result['value'] = False
-        dialog.destroy()
-    
-    yes_btn = ttk.Button(btn_frame, text=t('common.yes'), width=10, command=on_yes)
-    yes_btn.pack(side=tk.LEFT, padx=(0, 10))
-    no_btn = ttk.Button(btn_frame, text=t('common.no'), width=10, command=on_no)
-    no_btn.pack(side=tk.LEFT)
-    
-    # Keyboard bindings
-    dialog.bind("<Return>", lambda e: on_yes())
-    dialog.bind("<Escape>", lambda e: on_no())
-    
-    # Center on parent window manually
-    dialog.update_idletasks()
-    dialog_width = dialog.winfo_reqwidth()
-    dialog_height = dialog.winfo_reqheight()
-    
-    # Get parent's actual position and size
-    parent.update_idletasks()
-    parent_x = parent.winfo_rootx()
-    parent_y = parent.winfo_rooty()
-    parent_width = parent.winfo_width()
-    parent_height = parent.winfo_height()
-    
-    # Calculate centered position
-    x = parent_x + (parent_width - dialog_width) // 2
-    y = parent_y + (parent_height - dialog_height) // 2
-    
-    dialog.geometry(f"+{x}+{y}")
-    dialog.deiconify()  # Show centered immediately
-    
-    # Now set modal behavior
-    dialog.transient(parent)
-    dialog.grab_set()
-    dialog.attributes('-topmost', True)
-    dialog.lift()
-    yes_btn.focus_set()
-    dialog.wait_window()
-    return result['value']
-
-def center_window(child, parent):
-    """Center `child` (Toplevel) on `parent` (Tk or Toplevel)."""
-    parent.update_idletasks()
-    child.update_idletasks()
-    pw = parent.winfo_width()
-    ph = parent.winfo_height()
-    px = parent.winfo_rootx()
-    py = parent.winfo_rooty()
-    cw = child.winfo_width()
-    ch = child.winfo_height()
-    x = px + (pw - cw) // 2
-    y = py + (ph - ch) // 2
-    child.geometry(f"+{x}+{y}")
-
-def centered_info_dialog(parent, title, message):
-    """Show an Info dialog centered over parent window with orange theme. Returns when OK pressed."""
-    dialog = tk.Toplevel(parent)
-    dialog.withdraw()  # Prevent flicker while laying out
-    dialog.configure(bg="#1e1e1e")
-    try:
-        from app_utils import get_app_icon_path
-        icon_path = get_app_icon_path()
-        if icon_path and icon_path.endswith('.ico'):
-            dialog.iconbitmap(icon_path)
-        elif icon_path:
-            dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
-    except Exception:
-        pass
-    dialog.title(title)
-    dialog.resizable(False, False)
-    label = tk.Label(dialog, text=message, padx=20, pady=20, 
-                    bg="#1e1e1e", fg="#ff9800", font=("Segoe UI", 10),
-                    justify="left", wraplength=500)
-    label.pack()
-    btn_frame = tk.Frame(dialog, bg="#1e1e1e")
-    btn_frame.pack(pady=(0, 15))
-    def on_ok():
-        dialog.destroy()
-    ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=10, command=on_ok,
-                      bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
-                      activebackground="#4a4a4a", activeforeground="#ffffff",
-                      cursor="hand2")
-    ok_btn.pack()
-    top_parent = parent.winfo_toplevel() if parent else None
-    if top_parent:
-        center_window(dialog, top_parent)
-    dialog.deiconify()  # Show centered
-    dialog.transient(parent)
-    dialog.grab_set()
-    dialog.attributes('-topmost', True)
-    dialog.lift()
-    dialog.focus_force()
-    dialog.wait_window()
 from typing import Dict, Optional, Any, List
 import sys
 import threading
@@ -204,7 +76,6 @@ except Exception as e:
 
 # Now import modules that depend on localization
 from ring_finder import RingFinder
-# from marketplace_finder import MarketplaceFinder  # No longer used - using external sites
 from marketplace_api import MarketplaceAPI
 from config import _load_cfg, _save_cfg, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry, load_cargo_window_position, save_cargo_window_position
 from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
@@ -212,212 +83,15 @@ from update_checker import UpdateChecker
 from user_database import UserDatabase
 from journal_parser import JournalParser
 from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir, get_variables_dir, get_ship_presets_dir
+
+# Import UI components from ui module
+from ui.theme import THEME_ELITE_ORANGE, THEME_DARK_GRAY, get_theme_colors
+from ui.tooltip import ToolTip
+from ui.dialogs import centered_yesno_dialog, center_window, centered_info_dialog, set_translate_func
+
+# Set up translation for dialogs module
+set_translate_func(t)
 from path_utils import get_ship_presets_dir, get_reports_dir
-
-# ============================================================================
-# CENTRALIZED THEME COLOR CONFIGURATION
-# ============================================================================
-# Adjust these values to customize the Elite Orange theme appearance.
-# All orange/accent colors throughout the app will use these values.
-
-THEME_ELITE_ORANGE = {
-    # Main background colors
-    "bg": "#000000",              # Pure black background
-    "bg_dark": "#0a0a0a",         # Slightly lighter black for contrast
-    "bg_accent": "#1a1a1a",       # Dark gray for panels/accents
-    
-    # Orange text colors (adjust brightness here)
-    "fg": "#ff8c00",              # Primary orange text (Dark Orange)
-    "fg_bright": "#ffa500",       # Brighter orange for highlights
-    "fg_dim": "#cc7000",          # Dimmer orange for secondary text
-    "fg_muted": "#888888",        # Gray for disabled/help text
-    
-    # Selection colors
-    "selection_bg": "#ff6600",    # Orange selection background
-    "selection_fg": "#000000",    # Black text on selection
-    
-    # Button colors
-    "btn_bg": "#333333",          # Button background
-    "btn_bg_hover": "#444444",    # Button hover
-    "btn_bg_disabled": "#1a1a1a", # Button disabled
-    "btn_fg": "#ff8c00",          # Button text (orange)
-    "btn_fg_disabled": "#666666", # Disabled button text
-    
-    # Treeview/Table colors
-    "tree_bg": "#000000",         # Tree background
-    "tree_fg": "#ff8c00",         # Tree text
-    "tree_selected_bg": "#ff6600", # Selected row
-    "tree_selected_fg": "#000000", # Selected row text
-    "tree_heading_bg": "#1a1a1a", # Column headers
-    "tree_heading_fg": "#ffa500", # Column header text
-    
-    # Tip/info colors
-    "tip_fg": "#ffa500",          # Tip text (bright orange)
-    "help_fg": "#888888",         # Help text (gray)
-}
-
-THEME_DARK_GRAY = {
-    # Main background colors
-    "bg": "#1e1e1e",              # Dark gray background
-    "bg_dark": "#1e1e1e",         # Same as bg
-    "bg_accent": "#2d2d2d",       # Lighter gray for panels
-    
-    # Text colors
-    "fg": "#e6e6e6",              # Light gray text
-    "fg_bright": "#ffffff",       # White for highlights
-    "fg_dim": "#cccccc",          # Dimmer for secondary
-    "fg_muted": "gray",           # Gray for help text
-    
-    # Selection colors
-    "selection_bg": "#444444",    # Gray selection
-    "selection_fg": "#ffffff",    # White text on selection
-    
-    # Button colors
-    "btn_bg": "#333333",
-    "btn_bg_hover": "#444444",
-    "btn_bg_disabled": "#1a1a1a",
-    "btn_fg": "#ffffff",
-    "btn_fg_disabled": "#666666",
-    
-    # Treeview/Table colors
-    "tree_bg": "#1e1e1e",
-    "tree_fg": "#e6e6e6",
-    "tree_selected_bg": "#444444",
-    "tree_selected_fg": "#ffffff",
-    "tree_heading_bg": "#2d2d2d",
-    "tree_heading_fg": "#ffffff",
-    
-    # Tip/info colors
-    "tip_fg": "#ffa500",          # Orange tips
-    "help_fg": "gray",
-}
-
-def get_theme_colors(theme_name: str) -> dict:
-    """Get the color dictionary for the specified theme."""
-    if theme_name == "elite_orange":
-        return THEME_ELITE_ORANGE
-    else:
-        return THEME_DARK_GRAY
-
-# ============================================================================
-
-# --- Simple Tooltip class with global enable/disable ---
-class ToolTip:
-    tooltips_enabled = True  # Global tooltip enable/disable flag
-    _tooltip_instances = {}  # Store references to prevent garbage collection
-    
-    def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
-        self.tooltip_window = None
-        self.tooltip_timer = None  # For delay timer
-        
-        # Remove any existing tooltip for this widget
-        if widget in ToolTip._tooltip_instances:
-            old_tooltip = ToolTip._tooltip_instances[widget]
-            try:
-                widget.unbind("<Enter>")
-                widget.unbind("<Leave>")
-                # Cancel any existing timer
-                if old_tooltip.tooltip_timer:
-                    widget.after_cancel(old_tooltip.tooltip_timer)
-            except:
-                pass
-        
-        # Store this instance to prevent garbage collection
-        ToolTip._tooltip_instances[widget] = self
-        
-        self.widget.bind("<Enter>", self.on_enter)
-        self.widget.bind("<Leave>", self.on_leave)
-        self.tooltip_window = None
-
-    def on_enter(self, event=None):
-        if self.tooltip_window or not self.text or not ToolTip.tooltips_enabled:
-            return
-        
-        # Cancel any existing timer
-        if self.tooltip_timer:
-            self.widget.after_cancel(self.tooltip_timer)
-        
-        # Start a timer to show tooltip after 700ms delay (best practice)
-        self.tooltip_timer = self.widget.after(700, self._show_tooltip)
-
-    def _show_tooltip(self):
-        """Actually create and show the tooltip window"""
-        if self.tooltip_window or not self.text or not ToolTip.tooltips_enabled:
-            return
-            
-        try:
-            # Get widget position and size
-            widget_x = self.widget.winfo_rootx()
-            widget_y = self.widget.winfo_rooty()
-            widget_width = self.widget.winfo_width()
-            widget_height = self.widget.winfo_height()
-            
-            # Get the main window bounds for positioning reference
-            root_window = self.widget.winfo_toplevel()
-            root_x = root_window.winfo_x()
-            root_y = root_window.winfo_y()
-            root_width = root_window.winfo_width()
-            root_height = root_window.winfo_height()
-            
-            # Tooltip dimensions
-            tooltip_width = 250
-            tooltip_height = 60
-            
-            # Check if widget is in the bottom area of the window (like the Import/Apply buttons)
-            widget_relative_y = widget_y - root_y
-            if widget_relative_y > root_height * 0.8:  # If widget is in bottom 20% of window
-                # Position tooltip to the right of the widget at same level
-                x = widget_x + widget_width + 15
-                y = widget_y + (widget_height // 2) - (tooltip_height // 2)  # Center vertically with widget
-            else:
-                # Default position: below and slightly right of the widget
-                x = widget_x + 10
-                y = widget_y + widget_height + 8
-            
-            # Horizontal positioning adjustments
-            if x + tooltip_width > root_x + root_width:
-                x = widget_x + widget_width - tooltip_width - 10
-            
-            # Ensure tooltip stays within reasonable bounds of the main window
-            x = max(root_x - 50, min(x, root_x + root_width + 50))
-            y = max(root_y + 20, min(y, root_y + root_height - 20))
-
-            self.tooltip_window = tw = tk.Toplevel(self.widget)
-            tw.wm_overrideredirect(True)
-            tw.wm_geometry(f"+{x}+{y}")
-            
-            # Ensure tooltip appears on top
-            tw.wm_attributes("-topmost", True)
-            tw.lift()
-            
-            label = tk.Label(tw, text=self.text, justify=tk.LEFT,
-                            background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                            font=("Segoe UI", "8"), wraplength=250,
-                            padx=4, pady=2)
-            label.pack()
-            
-            # Make sure it's visible
-            tw.update()
-        except Exception as e:
-            self.tooltip_window = None
-
-    def on_leave(self, event=None):
-        # Cancel the timer if mouse leaves before tooltip appears
-        if self.tooltip_timer:
-            self.widget.after_cancel(self.tooltip_timer)
-            self.tooltip_timer = None
-            
-        # Hide tooltip if it's currently showing
-        if self.tooltip_window:
-            self.tooltip_window.destroy()
-            self.tooltip_window = None
-    
-    @classmethod
-    def set_enabled(cls, enabled: bool):
-        """Enable or disable all tooltips globally"""
-        cls.tooltips_enabled = enabled
 
 # --- Text Overlay class for TTS announcements ---
 class TextOverlay:
@@ -752,7 +426,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.74"
+APP_VERSION = "v4.75"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
