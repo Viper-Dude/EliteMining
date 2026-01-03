@@ -641,7 +641,7 @@ Join our Discord server for real-time help, mining tips, and community discussio
 
 ## License & Third-Party Notices  
 
-**EliteMining** © 2024-2025 CMDR ViperDude (Viper-Dude).  
+**EliteMining** © 2024-2026 CMDR ViperDude (Viper-Dude).  
 Licensed under the [GNU General Public License v3.0](LICENSE).  
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
