@@ -1,0 +1,12 @@
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\bin\Release\net8.0\EliteMiningPlugin.deps.json
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\bin\Release\net8.0\EliteMiningPlugin.dll
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\bin\Release\net8.0\EliteMiningPlugin.pdb
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\obj\Release\net8.0\EliteMiningPlugin.GeneratedMSBuildEditorConfig.editorconfig
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\obj\Release\net8.0\EliteMiningPlugin.AssemblyInfoInputs.cache
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\obj\Release\net8.0\EliteMiningPlugin.AssemblyInfo.cs
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\obj\Release\net8.0\EliteMiningPlugin.csproj.CoreCompileInputs.cache
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\obj\Release\net8.0\EliteMiningPlugin.sourcelink.json
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\obj\Release\net8.0\EliteMiningPlugin.dll
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\obj\Release\net8.0\refint\EliteMiningPlugin.dll
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\obj\Release\net8.0\EliteMiningPlugin.pdb
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\EliteMiningPlugin\obj\Release\net8.0\ref\EliteMiningPlugin.dll

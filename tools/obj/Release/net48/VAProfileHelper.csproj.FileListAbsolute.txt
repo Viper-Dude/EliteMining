@@ -1,0 +1,11 @@
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\obj\Release\net48\VAProfileHelper.csproj.AssemblyReference.cache
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\obj\Release\net48\VAProfileHelper.GeneratedMSBuildEditorConfig.editorconfig
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\obj\Release\net48\VAProfileHelper.AssemblyInfoInputs.cache
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\obj\Release\net48\VAProfileHelper.AssemblyInfo.cs
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\obj\Release\net48\VAProfileHelper.csproj.CoreCompileInputs.cache
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\obj\Release\net48\VAProfileHelper.sourcelink.json
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\bin\Release\net48\VAProfileHelper.exe.config
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\bin\Release\net48\VAProfileHelper.exe
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\bin\Release\net48\VAProfileHelper.pdb
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\obj\Release\net48\VAProfileHelper.exe
+D:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\tools\obj\Release\net48\VAProfileHelper.pdb

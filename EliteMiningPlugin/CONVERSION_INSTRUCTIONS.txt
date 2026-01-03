@@ -1,0 +1,285 @@
+ELITEMINING VOICEATTACK COMMAND CONVERSION INSTRUCTIONS
+================================================================================
+
+This file contains step-by-step instructions for converting each command
+from direct file writing to using the EliteMiningPlugin.
+
+For each command below:
+  1. Open VoiceAttack
+  2. Edit Profile
+  3. Find and select the command
+  4. Delete the OLD ACTION
+  5. Add the NEW ACTIONS as shown
+  6. Save
+  7. Test
+
+
+============================================================
+COMMAND: Abort mining
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'SESSION:CANCEL' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'CANCEL'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'SESSION'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Announcement 1
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'ANNOUNCEMENT:LOAD:1' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'LOAD'
+  2. Set integer [EM.ParamInt] to 1
+  3. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'ANNOUNCEMENT'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Announcement 2
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'ANNOUNCEMENT:LOAD:2' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'LOAD'
+  2. Set integer [EM.ParamInt] to 2
+  3. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'ANNOUNCEMENT'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Announcement 3
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'ANNOUNCEMENT:LOAD:3' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'LOAD'
+  2. Set integer [EM.ParamInt] to 3
+  3. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'ANNOUNCEMENT'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Announcement 4
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'ANNOUNCEMENT:LOAD:4' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'LOAD'
+  2. Set integer [EM.ParamInt] to 4
+  3. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'ANNOUNCEMENT'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Announcement 5
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'ANNOUNCEMENT:LOAD:5' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'LOAD'
+  2. Set integer [EM.ParamInt] to 5
+  3. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'ANNOUNCEMENT'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Announcement 6
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'ANNOUNCEMENT:LOAD:6' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'LOAD'
+  2. Set integer [EM.ParamInt] to 6
+  3. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'ANNOUNCEMENT'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Apply game settings
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'SETTINGS:APPLY' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'APPLY'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'SETTINGS'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Begin mining
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'SESSION:START' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'START'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'SESSION'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Commodity market
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'TAB:MARKET' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'MARKET'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'TAB'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Distance calculator
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'TAB:DISTANCE' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'DISTANCE'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'TAB'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: End mining session
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'SESSION:END' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'END'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'SESSION'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Exit Elite Mining
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'APP:CLOSE' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'CLOSE'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'APP'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Find hotspots
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'TAB:HOTSPOTS' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'HOTSPOTS'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'TAB'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Go to bookmarks
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'TAB:BOOKMARKS' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'BOOKMARKS'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'TAB'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Go to mining
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'TAB:MINING' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'MINING'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'TAB'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Go to settings
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'TAB:SETTINGS' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'SETTINGS'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'TAB'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Go to systems
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'TAB:SYSTEMS' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'SYSTEMS'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'TAB'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Go to voice attack
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'TAB:VOICEATTACK' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'VOICEATTACK'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'TAB'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Import from game
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'SETTINGS:IMPORT' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'IMPORT'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'SETTINGS'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Show Elite Mining
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'APP:RESTORE' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'RESTORE'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'APP'
+      ✓ Check 'Wait for the plugin function to finish before continuing'
+
+============================================================
+COMMAND: Minimize Elite Mining
+============================================================
+
+OLD ACTION:
+  Write (overwrite), 'APP:MINIMIZE' to file '{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt'
+
+NEW ACTIONS:
+  1. Set text [EM.Param1] to 'MINIMIZE'
+  2. Execute plugin 'EliteMiningPlugin v1.0.0 - Viper-Dude' with context 'APP'
+      ✓ Check 'Wait for the plugin function to finish before continuing'

@@ -5472,11 +5472,11 @@ class App(tk.Tk):
             if hasattr(self.prospector_panel, '_session_start'):
                 self.prospector_panel._session_start()
                 self._set_status("Mining session started")
-        elif action == "STOP":
-            # Stop = save session data
+        elif action == "STOP" or action == "END":
+            # Stop/End = save session data
             if hasattr(self.prospector_panel, '_session_stop'):
                 self.prospector_panel._session_stop()
-                self._set_status("Mining session stopped and saved")
+                self._set_status("Mining session ended and saved")
         elif action == "PAUSE":
             # Pause/Resume toggle
             if hasattr(self.prospector_panel, '_toggle_pause_resume'):

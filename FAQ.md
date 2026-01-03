@@ -18,6 +18,22 @@ Yes. All features work in standalone mode except automated mining sequence contr
 <summary><b>How do I import the VoiceAttack profile?</b></summary>
 
 Open VoiceAttack → Profile → Import Profile. Select EliteMining-Profile.vap from the install folder.
+
+**Note:** Starting with v4.75, the profile is in XML format. You'll need to reconfigure your keybinds one time after importing.
+</details>
+
+<details>
+<summary><b>How do I preserve my VoiceAttack keybinds during updates?</b></summary>
+
+Before updating (v4.7.6+):
+1. Open VoiceAttack
+2. Profile → Export Profile
+3. Save as type: **"VoiceAttack Profile Expanded as XML (*.vap)"**
+4. Save as `EliteMining-Backup.vap` in a safe location
+5. Install the update
+6. Your keybinds will be automatically restored (when feature is available)
+
+**Note:** This feature will be available in v4.8.0 and later versions.
 </details>
 
 <details>
