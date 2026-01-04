@@ -22,6 +22,19 @@ import os
 import sys
 import logging
 
+# Set DPI awareness BEFORE importing tkinter to prevent scaling issues
+# Use System DPI awareness (1) for better compatibility with saved geometry
+try:
+    import ctypes
+    # Use System DPI awareness - safer for multi-monitor and geometry restoration
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
+except Exception:
+    try:
+        # Fallback to older method
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass  # Non-Windows or older Windows version
+
 # Initialize logging for installer version (per-session logs with auto-cleanup)
 from logging_setup import setup_logging
 log_file = setup_logging()  # Only activates when running as packaged executable
@@ -426,7 +439,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.75"
+APP_VERSION = "v4.76"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4788,7 +4801,14 @@ class App(tk.Tk):
         self.after(1000, self._check_for_updates_startup)  # Check after 1 second
         
         # Early distance calculation using cached data (before journal scan)
-        self.after(1500, self._update_home_fc_distances)
+        self.after(2000, self._update_home_fc_distances)
+        
+        # Full journal scan runs first
+        # Ring finder auto-search will be triggered AFTER journal scan completes
+        self.after(3000, self._background_journal_catchup)
+        
+        # Check for VA profile updates AFTER everything is loaded and settled
+        self.after(5000, self._check_va_profile_update)
         
         # Full journal scan runs first
         # Ring finder auto-search will be triggered AFTER journal scan completes
@@ -12741,42 +12761,48 @@ class App(tk.Tk):
                 
                 # Add VoiceAttack profile
                 if include_va_profile:
+                    import glob
+                    va_profile_path = None
+                    
                     # VoiceAttack profile is in the installer dir at \Apps\EliteMining\
                     if getattr(sys, 'frozen', False):
-                        # Running as executable - profile is in the same directory as the executable
+                        # Running as executable - profile is in parent directory
                         exe_dir = os.path.dirname(sys.executable)
-                        va_profile_path = os.path.join(exe_dir, "EliteMining-Profile.vap")
+                        parent_dir = os.path.dirname(exe_dir)
                         
-                        # Also check if we're in the Configurator subdirectory (installed version)
-                        if not os.path.exists(va_profile_path):
-                            # Check parent directory (Apps\EliteMining\)
-                            parent_dir = os.path.dirname(exe_dir)
-                            va_profile_path = os.path.join(parent_dir, "EliteMining-Profile.vap")
-                            
-                            # If still not found, check if we're in VoiceAttack\Apps\EliteMining\Configurator\
-                            # and need to go up to VoiceAttack\Apps\EliteMining\
-                            if not os.path.exists(va_profile_path):
-                                # Go up one more level from Configurator to Apps\EliteMining
-                                grandparent_dir = os.path.dirname(parent_dir)  
-                                if os.path.basename(grandparent_dir) == "Apps":
-                                    # We're in VoiceAttack\Apps\EliteMining\Configurator
-                                    va_profile_path = os.path.join(parent_dir, "EliteMining-Profile.vap")
+                        # Look for versioned profile pattern first
+                        profile_pattern = os.path.join(parent_dir, "EliteMining v*-Profile.vap")
+                        profile_files = glob.glob(profile_pattern)
+                        
+                        if profile_files:
+                            va_profile_path = profile_files[0]
+                        else:
+                            # Fallback to old naming
+                            old_path = os.path.join(parent_dir, "EliteMining-Profile.vap")
+                            if os.path.exists(old_path):
+                                va_profile_path = old_path
                     else:
                         # Running in development - profile is in project root
-                        va_profile_path = os.path.join(os.path.dirname(app_data_dir), "EliteMining-Profile.vap")
+                        project_root = os.path.dirname(os.path.dirname(app_data_dir))
+                        profile_pattern = os.path.join(project_root, "EliteMining v*-Profile.vap")
+                        profile_files = glob.glob(profile_pattern)
+                        
+                        if profile_files:
+                            va_profile_path = profile_files[0]
+                        else:
+                            # Fallback
+                            old_path = os.path.join(project_root, "EliteMining-Profile.vap")
+                            if os.path.exists(old_path):
+                                va_profile_path = old_path
                     
-                    if not getattr(sys, 'frozen', False):  # Only show debug in development
-                        print(f"DEBUG: Executable location: {sys.executable if getattr(sys, 'frozen', False) else 'Development mode'}")
-                        print(f"DEBUG: Looking for VoiceAttack profile at: {va_profile_path}")
-                        print(f"DEBUG: Profile exists: {os.path.exists(va_profile_path)}")
-                    
-                    if os.path.exists(va_profile_path):
-                        zipf.write(va_profile_path, "EliteMining-Profile.vap")
-                        if not getattr(sys, 'frozen', False):  # Only show debug in development
-                            print(f"DEBUG: Successfully added VoiceAttack profile to backup")
+                    if va_profile_path and os.path.exists(va_profile_path):
+                        # Use original filename in backup
+                        zipf.write(va_profile_path, os.path.basename(va_profile_path))
+                        if not getattr(sys, 'frozen', False):
+                            print(f"DEBUG: Successfully added VoiceAttack profile to backup: {os.path.basename(va_profile_path)}")
                     else:
-                        if not getattr(sys, 'frozen', False):  # Only show debug in development
-                            print(f"DEBUG: VoiceAttack profile not found at expected location")
+                        if not getattr(sys, 'frozen', False):
+                            print(f"DEBUG: VoiceAttack profile not found")
                 
                 # Add user database
                 if include_userdb:
@@ -12863,7 +12889,8 @@ class App(tk.Tk):
                     has_presets = any(f.startswith("Settings/") and f.endswith(".json") for f in file_list)
                     has_reports = any(f.startswith("Reports/") for f in file_list)
                     has_bookmarks = "mining_bookmarks.json" in file_list
-                    has_va_profile = "EliteMining-Profile.vap" in file_list
+                    # Check for versioned or old profile naming
+                    has_va_profile = any(f.endswith("-Profile.vap") or f == "EliteMining-Profile.vap" for f in file_list)
                     has_userdb = "data/user_data.db" in file_list
                     has_journals = any(f.startswith("Journals/") and f.endswith(".log") for f in file_list)
                     
@@ -15908,6 +15935,239 @@ class App(tk.Tk):
         """Manually check for updates (from menu)"""
         self.update_checker.manual_check(self)
     
+    def _check_va_profile_update(self):
+        """Check for VoiceAttack profile updates on startup"""
+        try:
+            # Only check if VoiceAttack is detected
+            if not hasattr(self, 'va_root') or not self.va_root:
+                return
+            
+            va_folder = self.va_root
+            if not os.path.exists(va_folder):
+                return
+            
+            from path_utils import get_app_data_dir
+            import json
+            import glob
+            import re
+            
+            # State file to track installed profile version
+            state_file = os.path.join(get_app_data_dir(), "va_profile_state.json")
+            
+            # Get the new profile file that came with this installation
+            # va_folder is already the EliteMining folder
+            # Look for versioned profile: EliteMining v*-Profile.vap
+            profile_pattern = os.path.join(va_folder, "EliteMining v*-Profile.vap")
+            profile_files = glob.glob(profile_pattern)
+            
+            if not profile_files:
+                # Fallback to old naming convention
+                old_profile = os.path.join(va_folder, "EliteMining-Profile.vap")
+                if os.path.exists(old_profile):
+                    profile_files = [old_profile]
+            
+            if not profile_files:
+                logging.info(f"[VA_PROFILE] No profile file found in: {va_folder}")
+                return
+            
+            # If multiple profile files, pick the one with highest version
+            def extract_version(filepath):
+                """Extract version number from profile filename"""
+                basename = os.path.basename(filepath)
+                match = re.search(r'v([\d.]+)-Profile\.vap', basename)
+                if match:
+                    return match.group(1)
+                return "0"
+            
+            # Sort by version (highest first) and pick the newest
+            from packaging import version as pkg_version
+            try:
+                profile_files.sort(key=lambda f: pkg_version.parse(extract_version(f)), reverse=True)
+            except:
+                # Fallback to string sort if packaging not available
+                profile_files.sort(key=lambda f: extract_version(f), reverse=True)
+            
+            new_profile_path = profile_files[0]
+            logging.info(f"[VA_PROFILE] Found {len(profile_files)} profile(s), using newest: {new_profile_path}")
+            
+            # Parse new profile to get its version
+            try:
+                from va_profile_parser import VAProfileParser
+                parser = VAProfileParser()
+                tree = parser.parse(new_profile_path)
+                new_version = parser.get_profile_version(tree)
+                
+                if new_version == "unknown":
+                    logging.info("[VA_PROFILE] Could not extract version from profile")
+                    return
+                
+                # Load last known installed version from state file
+                installed_version = None
+                if os.path.exists(state_file):
+                    try:
+                        with open(state_file, 'r') as f:
+                            state = json.load(f)
+                            installed_version = state.get('installed_version')
+                    except:
+                        pass
+                
+                logging.info(f"[VA_PROFILE] Installed: {installed_version}, Available: {new_version}")
+                
+                # If first run or version is different, show dialog
+                if installed_version is None:
+                    # First run - just save the version, don't show dialog
+                    self._save_va_profile_state(state_file, new_version)
+                    logging.info(f"[VA_PROFILE] First run - saved version: {new_version}")
+                elif installed_version != new_version:
+                    # Version changed - show update dialog
+                    logging.info(f"[VA_PROFILE] Update available: {installed_version} -> {new_version}")
+                    self._show_va_profile_update_dialog(installed_version, new_version, new_profile_path)
+                else:
+                    logging.info(f"[VA_PROFILE] Profile up to date: {new_version}")
+                    
+            except Exception as e:
+                logging.error(f"[VA_PROFILE] Error checking new profile version: {e}")
+                
+        except Exception as e:
+            logging.error(f"[VA_PROFILE] Error checking for profile update: {e}")
+    
+    def _save_va_profile_state(self, state_file, version):
+        """Save the installed VA profile version to state file"""
+        import json
+        try:
+            os.makedirs(os.path.dirname(state_file), exist_ok=True)
+            with open(state_file, 'w') as f:
+                json.dump({'installed_version': version}, f)
+        except Exception as e:
+            logging.error(f"[VA_PROFILE] Error saving state: {e}")
+    
+    def _show_va_profile_update_dialog(self, current_version, new_version, profile_path):
+        """Show dialog for VA profile update with keybind preservation option"""
+        try:
+            from app_utils import centered_askyesno, centered_message
+            from path_utils import get_app_data_dir
+            from tkinter import filedialog
+            import json
+            
+            message = t("voiceattack.profile_update_message").format(
+                current=current_version,
+                new=new_version
+            )
+            
+            result = centered_askyesno(
+                self,
+                t("voiceattack.profile_update_title"),
+                message
+            )
+            
+            if result:
+                # Get the EliteMining folder path for instructions
+                elitemining_folder = self.va_root if hasattr(self, 'va_root') and self.va_root else profile_path.rsplit(os.sep, 1)[0]
+                suggested_filename = f"EliteMining v{current_version}_old-Profile.vap"
+                
+                # Ask user to select their exported XML profile
+                export_instructions = t("voiceattack.export_instructions").format(
+                    folder=elitemining_folder,
+                    filename=suggested_filename
+                )
+                
+                centered_message(self, t("voiceattack.export_step_title"), export_instructions)
+                
+                # Open file dialog starting in the EliteMining folder
+                old_profile_path = filedialog.askopenfilename(
+                    parent=self,
+                    title=t("voiceattack.select_exported_profile"),
+                    filetypes=[("VoiceAttack Profile", "*.vap"), ("All files", "*.*")],
+                    initialdir=elitemining_folder,
+                    initialfile=suggested_filename
+                )
+                
+                if old_profile_path:
+                    # Try to merge keybinds
+                    try:
+                        self._merge_profiles_with_keybinds(old_profile_path, profile_path, new_version)
+                    except Exception as e:
+                        logging.error(f"[VA_PROFILE] Merge failed: {e}")
+                        centered_message(
+                            self, 
+                            "Merge Failed", 
+                            f"Could not merge keybinds automatically:\n{e}\n\n"
+                            f"Please import the new profile manually from:\n{profile_path}"
+                        )
+                else:
+                    # User cancelled - show manual instructions
+                    manual_instructions = f"""Manual update:
+
+Import the new profile from:
+{profile_path}
+
+Your keybinds will need to be reconfigured manually."""
+                    centered_message(self, "Manual Update", manual_instructions)
+            
+            # Save the new version to state file (user has been notified)
+            state_file = os.path.join(get_app_data_dir(), "va_profile_state.json")
+            self._save_va_profile_state(state_file, new_version)
+            logging.info(f"[VA_PROFILE] Saved new version to state: {new_version}")
+                
+        except Exception as e:
+            logging.error(f"[VA_PROFILE] Error showing update dialog: {e}")
+    
+    def _merge_profiles_with_keybinds(self, old_profile_path, new_profile_path, new_version):
+        """Merge keybinds from old profile into new profile"""
+        from va_profile_parser import VAProfileParser
+        from va_keybind_extractor import VAKeybindExtractor
+        from va_keybind_applier import VAKeybindApplier
+        from app_utils import centered_message
+        from path_utils import get_app_data_dir
+        import shutil
+        from datetime import datetime
+        
+        logging.info(f"[VA_PROFILE] Merging keybinds from {old_profile_path} to {new_profile_path}")
+        
+        parser = VAProfileParser()
+        extractor = VAKeybindExtractor()
+        applier = VAKeybindApplier()
+        
+        # Step 1: Parse old profile and extract keybinds
+        old_tree = parser.parse(old_profile_path)
+        keybinds = extractor.extract(old_tree)
+        keybind_count = len(keybinds)
+        logging.info(f"[VA_PROFILE] Extracted {keybind_count} keybinds from old profile")
+        
+        if keybind_count == 0:
+            centered_message(
+                self,
+                t("voiceattack.no_keybinds_title"),
+                t("voiceattack.no_keybinds_message")
+            )
+            return
+        
+        # Step 2: Parse new profile
+        new_tree = parser.parse(new_profile_path)
+        
+        # Step 3: Apply keybinds to new profile
+        merged_tree = applier.apply(new_tree, keybinds)
+        
+        # Step 4: Create backup of original new profile
+        backup_dir = os.path.join(get_app_data_dir(), "Backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Step 5: Save merged profile (overwrite the new profile in place)
+        # IMPORTANT: Save as uncompressed XML so user can import it in VoiceAttack
+        parser.save(merged_tree, new_profile_path, compress=False)
+        logging.info(f"[VA_PROFILE] Merged profile saved to: {new_profile_path}")
+        
+        # Step 6: Show success message
+        centered_message(
+            self,
+            t("voiceattack.merge_success_title"),
+            t("voiceattack.merge_success_message").format(
+                count=keybind_count,
+                path=new_profile_path
+            )
+        )
+    
     def _background_journal_catchup(self):
         """Background scan of journals at startup.
         
@@ -16030,15 +16290,18 @@ class App(tk.Tk):
                                 scan_data = json.load(f)
                                 last_scan_version = scan_data.get('version', '')
                                 
-                                # If already scanned for this version, no need to rescan
-                                if last_scan_version == current_version:
-                                    print(f"[STARTUP] Full scan already done for v{current_version}")
+                                # Full scan already done for some version - no need to rescan
+                                # The v4.7.2 migration features (CSV imports, hotspot merge) 
+                                # are handled separately in user_database.py with their own tracking.
+                                # Only the first full scan matters, subsequent updates don't need full rescan.
+                                if last_scan_version:
+                                    print(f"[STARTUP] Full scan already done (v{last_scan_version}), no migration needed")
                                     return 'none'
                                 else:
-                                    print(f"[STARTUP] Version changed: {last_scan_version} → {current_version}, needs migration")
+                                    print(f"[STARTUP] Empty scan version, needs migration")
                                     return 'migration'
                         else:
-                            # No scan status file = needs full scan (update from old version)
+                            # No scan status file = needs full scan (update from pre-v4.7.2)
                             print(f"[STARTUP] No scan status file found, needs migration for v{current_version}")
                             return 'migration'
                             

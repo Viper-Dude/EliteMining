@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.75
+AppVersion=v4.76
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -24,6 +24,10 @@ UninstallDisplayIcon={app}\Configurator\EliteMining.exe
 Type: files; Name: "{app}\Configurator\Configurator.exe"
 ; Delete old MIT LICENSE.txt (replaced with GPLv3 LICENSE in v4.4.1+)
 Type: files; Name: "{app}\LICENSE.txt"
+; Delete old versioned profile files (keep only the new version)
+Type: files; Name: "{app}\EliteMining v*-Profile.vap"
+; Delete old non-versioned profile file
+Type: files; Name: "{app}\EliteMining-Profile.vap"
 
 [Files]
 ; Only include specific file types from needed subfolders (exclude .py files)
@@ -58,13 +62,16 @@ Source: "scripts\installer\set_db_version.py"; DestDir: "{tmp}"; Flags: deleteaf
 Source: "Doc\*"; DestDir: "{app}\Doc"; Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
 ; VoiceAttack-specific files (only installed if VA detected)
 Source: "Variables\*"; DestDir: "{app}\Variables"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Check: IsVADetected
-; v4.1.9+: Force update VoiceAttack profile to apply command behavior corrections
-Source: "EliteMining-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninstall skipifsourcedoesntexist; Check: IsVADetected
+; v4.7.6+: Update profile only if newer - app detects version changes and prompts user
+; Profile filename includes version for clarity (EliteMining v4.76-Profile.vap)
+Source: "EliteMining v*-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninstall; Check: IsVADetected
 ; v4.1.5+: Never overwrite config.json - preserves user settings
 ; NOTE: Use template file to avoid including developer's personal paths
 Source: "app\config.json.template"; DestDir: "{app}"; DestName: "config.json"; Flags: onlyifdoesntexist
 Source: "app\mining_bookmarks.json"; DestDir: "{app}\app"; Flags: onlyifdoesntexist skipifsourcedoesntexist
-Source: "app\EliteVA\*"; DestDir: "{app}\..\EliteVA"; Flags: recursesubdirs createallsubdirs; Check: IsVADetected
+; EliteVA files - EliteAPI.dll gets updated if newer, other files only if missing
+Source: "app\EliteVA\EliteAPI.dll"; DestDir: "{app}\..\EliteVA"; Flags: comparetimestamp; Check: IsVADetected
+Source: "app\EliteVA\*"; DestDir: "{app}\..\EliteVA"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "EliteAPI.dll"; Check: IsVADetected
 Source: "LICENSE"; DestDir: "{app}"
 Source: "NOTICE"; DestDir: "{app}"
 

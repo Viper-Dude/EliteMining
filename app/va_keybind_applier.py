@@ -63,7 +63,9 @@ class VAKeybindApplier:
             self.set_joystick_shortcut(
                 command,
                 keybinds.joystick_shortcut,
-                keybinds.joystick_release
+                keybinds.joystick_release,
+                keybinds.joystick_number,
+                keybinds.joystick_button
             )
         
         # Apply mouse shortcut
@@ -73,6 +75,9 @@ class VAKeybindApplier:
                 keybinds.mouse_shortcut,
                 keybinds.mouse_release
             )
+        
+        # Apply shortcut options
+        self.set_shortcut_options(command, keybinds)
         
         # Apply enabled state
         self.set_enabled(command, keybinds.enabled)
@@ -97,7 +102,8 @@ class VAKeybindApplier:
             release_elem = ET.SubElement(command, "KeysReleased")
         release_elem.text = "true" if release else "false"
     
-    def set_joystick_shortcut(self, command: ET.Element, shortcut: str, release: bool = False):
+    def set_joystick_shortcut(self, command: ET.Element, shortcut: str, release: bool = False,
+                               joystick_number: str = None, joystick_button: str = None):
         """Set joystick shortcut on command"""
         use_joystick = command.find("UseJoystick")
         if use_joystick is None:
@@ -108,6 +114,19 @@ class VAKeybindApplier:
         if shortcut_elem is None:
             shortcut_elem = ET.SubElement(command, "JoystickValue")
         shortcut_elem.text = shortcut
+        
+        # Set joystick number and button if provided
+        if joystick_number is not None:
+            num_elem = command.find("joystickNumber")
+            if num_elem is None:
+                num_elem = ET.SubElement(command, "joystickNumber")
+            num_elem.text = joystick_number
+        
+        if joystick_button is not None:
+            btn_elem = command.find("joystickButton")
+            if btn_elem is None:
+                btn_elem = ET.SubElement(command, "joystickButton")
+            btn_elem.text = joystick_button
         
         release_elem = command.find("JoystickButtonsReleased")
         if release_elem is None:
@@ -137,6 +156,87 @@ class VAKeybindApplier:
         if enabled_elem is None:
             enabled_elem = ET.SubElement(command, "Enabled")
         enabled_elem.text = "true" if enabled else "false"
+    
+    def set_shortcut_options(self, command: ET.Element, keybinds: CommandKeybinds):
+        """Set shortcut options on command using correct VoiceAttack element names"""
+        # Boolean options
+        bool_options = [
+            ("DoubleTapInvoked", keybinds.double_tap_invoked),
+            ("LongTapInvoked", keybinds.long_tap_invoked),
+            ("ShortTapDelayedInvoked", keybinds.short_tap_delayed_invoked),
+            ("KeepRepeating", keybinds.keep_repeating),
+            ("RepeatIfKeysDown", keybinds.repeat_if_keys_down),
+            ("RepeatIfMouseDown", keybinds.repeat_if_mouse_down),
+            ("RepeatIfJoystickDown", keybinds.repeat_if_joystick_down),
+            ("NoOtherKeysDown", keybinds.no_other_keys_down),
+            ("NoOtherMouseButtonsDown", keybinds.no_other_mouse_buttons_down),
+            ("NoOtherJoystickButtonsDown", keybinds.no_other_joystick_buttons_down),
+            ("UseVariableJoystickShortcut", keybinds.use_variable_joystick_shortcut),
+            ("UseVariableMouseShortcut", keybinds.use_variable_mouse_shortcut),
+        ]
+        
+        for elem_name, value in bool_options:
+            elem = command.find(elem_name)
+            if elem is None:
+                elem = ET.SubElement(command, elem_name)
+            elem.text = "true" if value else "false"
+        
+        # Integer level options
+        int_options = [
+            ("HotkeyDoubleTapLevel", keybinds.hotkey_double_tap_level),
+            ("MouseDoubleTapLevel", keybinds.mouse_double_tap_level),
+            ("JoystickDoubleTapLevel", keybinds.joystick_double_tap_level),
+            ("HotkeyLongTapLevel", keybinds.hotkey_long_tap_level),
+            ("MouseLongTapLevel", keybinds.mouse_long_tap_level),
+            ("JoystickLongTapLevel", keybinds.joystick_long_tap_level),
+        ]
+        
+        for elem_name, value in int_options:
+            elem = command.find(elem_name)
+            if elem is None:
+                elem = ET.SubElement(command, elem_name)
+            elem.text = str(value)
+    
+    def clear_shortcut_options(self, command: ET.Element):
+        """Clear all shortcut options (reset to defaults)"""
+        # Boolean options to set to false
+        bool_options_to_clear = [
+            "DoubleTapInvoked",
+            "LongTapInvoked",
+            "ShortTapDelayedInvoked",
+            "KeepRepeating",
+            "RepeatIfKeysDown",
+            "RepeatIfMouseDown",
+            "RepeatIfJoystickDown",
+            "NoOtherKeysDown",
+            "NoOtherMouseButtonsDown",
+            "NoOtherJoystickButtonsDown",
+            "UseVariableJoystickShortcut",
+            "UseVariableMouseShortcut",
+            "KeysReleased",
+            "JoystickButtonsReleased",
+            "MouseButtonsReleased",
+        ]
+        
+        for elem_name in bool_options_to_clear:
+            elem = command.find(elem_name)
+            if elem is not None:
+                elem.text = "false"
+        
+        # Integer options to set to 0
+        int_options_to_clear = [
+            "HotkeyDoubleTapLevel",
+            "MouseDoubleTapLevel",
+            "JoystickDoubleTapLevel",
+            "HotkeyLongTapLevel",
+            "MouseLongTapLevel",
+            "JoystickLongTapLevel",
+        ]
+        
+        for elem_name in int_options_to_clear:
+            elem = command.find(elem_name)
+            if elem is not None:
+                elem.text = "0"
     
     def get_command_name(self, command: ET.Element) -> str:
         """Get command name"""

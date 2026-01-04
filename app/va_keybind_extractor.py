@@ -19,9 +19,34 @@ class CommandKeybinds:
     keyboard_release: bool = False
     joystick_shortcut: Optional[str] = None
     joystick_release: bool = False
+    joystick_number: Optional[str] = None
+    joystick_button: Optional[str] = None
     mouse_shortcut: Optional[str] = None
     mouse_release: bool = False
     enabled: bool = True
+    # Shortcut options (using correct VoiceAttack element names)
+    double_tap_invoked: bool = False  # "Shortcut is invoked when pressed twice (double tap)"
+    long_tap_invoked: bool = False  # "Shortcut is invoked when long-pressed"
+    short_tap_delayed_invoked: bool = False  # "Invoke also on short/standard press (Advanced)"
+    # Level settings (0=disabled, 1=keyboard, 2=mouse, 3=joystick)
+    hotkey_double_tap_level: int = 0
+    mouse_double_tap_level: int = 0
+    joystick_double_tap_level: int = 0
+    hotkey_long_tap_level: int = 0
+    mouse_long_tap_level: int = 0
+    joystick_long_tap_level: int = 0
+    # Repeat settings
+    keep_repeating: bool = False
+    repeat_if_keys_down: bool = False
+    repeat_if_mouse_down: bool = False
+    repeat_if_joystick_down: bool = False
+    # No other buttons
+    no_other_keys_down: bool = False
+    no_other_mouse_buttons_down: bool = False
+    no_other_joystick_buttons_down: bool = False
+    # Variable shortcuts
+    use_variable_joystick_shortcut: bool = False
+    use_variable_mouse_shortcut: bool = False
 
 
 class VAKeybindExtractor:
@@ -50,9 +75,34 @@ class VAKeybindExtractor:
                 keyboard_release=self.get_keyboard_release(command),
                 joystick_shortcut=self.extract_joystick_shortcut(command),
                 joystick_release=self.get_joystick_release(command),
+                joystick_number=self.get_joystick_number(command),
+                joystick_button=self.get_joystick_button(command),
                 mouse_shortcut=self.extract_mouse_shortcut(command),
                 mouse_release=self.get_mouse_release(command),
-                enabled=self.is_command_enabled(command)
+                enabled=self.is_command_enabled(command),
+                # Shortcut options (correct VoiceAttack element names)
+                double_tap_invoked=self.get_bool_option(command, "DoubleTapInvoked"),
+                long_tap_invoked=self.get_bool_option(command, "LongTapInvoked"),
+                short_tap_delayed_invoked=self.get_bool_option(command, "ShortTapDelayedInvoked"),
+                # Level settings
+                hotkey_double_tap_level=self.get_int_option(command, "HotkeyDoubleTapLevel"),
+                mouse_double_tap_level=self.get_int_option(command, "MouseDoubleTapLevel"),
+                joystick_double_tap_level=self.get_int_option(command, "JoystickDoubleTapLevel"),
+                hotkey_long_tap_level=self.get_int_option(command, "HotkeyLongTapLevel"),
+                mouse_long_tap_level=self.get_int_option(command, "MouseLongTapLevel"),
+                joystick_long_tap_level=self.get_int_option(command, "JoystickLongTapLevel"),
+                # Repeat settings
+                keep_repeating=self.get_bool_option(command, "KeepRepeating"),
+                repeat_if_keys_down=self.get_bool_option(command, "RepeatIfKeysDown"),
+                repeat_if_mouse_down=self.get_bool_option(command, "RepeatIfMouseDown"),
+                repeat_if_joystick_down=self.get_bool_option(command, "RepeatIfJoystickDown"),
+                # No other buttons
+                no_other_keys_down=self.get_bool_option(command, "NoOtherKeysDown"),
+                no_other_mouse_buttons_down=self.get_bool_option(command, "NoOtherMouseButtonsDown"),
+                no_other_joystick_buttons_down=self.get_bool_option(command, "NoOtherJoystickButtonsDown"),
+                # Variable shortcuts
+                use_variable_joystick_shortcut=self.get_bool_option(command, "UseVariableJoystickShortcut"),
+                use_variable_mouse_shortcut=self.get_bool_option(command, "UseVariableMouseShortcut"),
             )
         
         # Filter to only commands with keybinds
@@ -145,3 +195,34 @@ class VAKeybindExtractor:
         if enabled is not None:
             return enabled.text == "True"
         return True  # Default to enabled
+    
+    def get_bool_option(self, command: ET.Element, element_name: str) -> bool:
+        """Get a boolean option from command XML"""
+        elem = command.find(element_name)
+        if elem is not None and elem.text:
+            return elem.text.lower() == "true"
+        return False
+    
+    def get_int_option(self, command: ET.Element, element_name: str) -> int:
+        """Get an integer option from command XML"""
+        elem = command.find(element_name)
+        if elem is not None and elem.text:
+            try:
+                return int(elem.text)
+            except ValueError:
+                return 0
+        return 0
+    
+    def get_joystick_number(self, command: ET.Element) -> Optional[str]:
+        """Get joystick number"""
+        elem = command.find("joystickNumber")
+        if elem is not None and elem.text:
+            return elem.text
+        return None
+    
+    def get_joystick_button(self, command: ET.Element) -> Optional[str]:
+        """Get joystick button"""
+        elem = command.find("joystickButton")
+        if elem is not None and elem.text:
+            return elem.text
+        return None

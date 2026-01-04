@@ -24,9 +24,7 @@
 
 ### How to update to the latest profile
 - Backup and delete existing EliteMining profile
-- Open VoiceAttack → Profile > Import Profile
-- Select EliteMining-Profile.vap
-- Configure your mining hotkeys in the "Custom Key-binds for Mining Control" category
+
 
 ## Notes!
 - If installer fails with errors, right-click the installer and select "Run as administrator"

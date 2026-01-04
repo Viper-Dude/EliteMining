@@ -356,10 +356,31 @@ class VAProfileUpdater:
             
         Returns:
             Dict of command keybinds
+            
+        Raises:
+            UpdateError: If profile format is not supported
         """
-        tree = self.parser.parse(profile_path)
-        keybinds = self.keybind_extractor.extract(tree)
-        return keybinds
+        try:
+            tree = self.parser.parse(profile_path)
+            keybinds = self.keybind_extractor.extract(tree)
+            return keybinds
+        except Exception as e:
+            error_msg = str(e)
+            if "Cannot decompress" in error_msg or "binary format" in error_msg.lower():
+                raise UpdateError(
+                    "Cannot read profile format!\n\n"
+                    "Your VoiceAttack profile appears to be in binary/compressed format.\n\n"
+                    "To preserve your keybinds, you need to export as XML:\n"
+                    "1. Open VoiceAttack\n"
+                    "2. Right-click your EliteMining profile\n"
+                    "3. Select 'Export Profile'\n"
+                    "4. UNCHECK 'Export as compressed binary'\n"
+                    "5. Save the file and try again\n\n"
+                    "Without XML format, keybind preservation cannot work."
+                )
+            else:
+                # Re-raise other parsing errors
+                raise UpdateError(f"Failed to extract keybinds: {error_msg}")
     
     def install_profile(self, new_vap_path: str):
         """

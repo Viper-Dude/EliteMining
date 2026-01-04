@@ -128,6 +128,48 @@ def clear_keybinds_from_profile(input_profile: str, output_profile: str):
         if mouse_released is not None:
             command.remove(mouse_released)
         
+        # Remove shortcut options (long press, double tap, etc.)
+        # These are the ACTUAL element names used by VoiceAttack
+        shortcut_options_to_remove = [
+            # Invoked flags
+            "DoubleTapInvoked",
+            "LongTapInvoked",
+            "ShortTapDelayedInvoked",
+            # Level settings (controls which input triggers long/double tap)
+            "HotkeyDoubleTapLevel",
+            "MouseDoubleTapLevel",
+            "JoystickDoubleTapLevel",
+            "HotkeyLongTapLevel",
+            "MouseLongTapLevel",
+            "JoystickLongTapLevel",
+            # Repeat settings
+            "KeepRepeating",
+            "RepeatIfKeysDown",
+            "RepeatIfMouseDown",
+            "RepeatIfJoystickDown",
+            # Variable shortcuts
+            "UseVariableMouseShortcut",
+            "UseVariableJoystickShortcut",
+            "VariableJoystickShortcut",
+            "VariableMouseShortcut",
+            # Other options
+            "NoOtherKeysDown",
+            "NoOtherMouseButtonsDown",
+            "NoOtherJoystickButtonsDown",
+            # Legacy names (just in case)
+            "DoubleTap",
+            "LongPress",
+            "InvokeOnSingleTap",
+            "InvokeOnShortPress",
+            "NoOtherButtonsDown",
+            "RepeatWhileHeld",
+        ]
+        
+        for option_name in shortcut_options_to_remove:
+            option_elem = command.find(option_name)
+            if option_elem is not None:
+                command.remove(option_elem)
+        
         if had_keybind:
             cleared_count += 1
             logger.debug(f"  Cleared: {cmd_name}")

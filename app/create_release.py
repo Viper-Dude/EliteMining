@@ -144,9 +144,17 @@ class ReleaseBuilder:
                 # Add configuration files in EliteMining root
                 config_files = [
                     ("app/config.json.template", "config.json"),  # Use template for clean config
-                    ("EliteMining-Profile.vap", "EliteMining-Profile.vap"),
                     ("LICENSE.txt", "LICENSE.txt")
                 ]
+                
+                # Find versioned profile file (EliteMining v*-Profile.vap)
+                profile_files = list(self.project_root.glob("EliteMining v*-Profile.vap"))
+                if profile_files:
+                    profile_file = profile_files[0]  # Use first match
+                    zipf.write(profile_file, f"EliteMining/{profile_file.name}")
+                    print(f"✅ Added: EliteMining/{profile_file.name}")
+                else:
+                    print("⚠️  No versioned profile file found (EliteMining v*-Profile.vap)")
                 
                 for source_file, dest_file in config_files:
                     config_path = self.project_root / source_file
