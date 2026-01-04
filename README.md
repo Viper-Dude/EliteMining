@@ -115,20 +115,21 @@ VoiceAttack profile includes a dedicated **"Custom Keybinds for Mining Control"*
 The installer bundles the **EliteVA plugin**. No separate download required.  
 
 ### VoiceAttack  Installation  
-1. Open VoiceAttack → ** > Import **  
-2. Select **EliteMining-Profile.vap**  
+1. Open VoiceAttack → Profile → Import Profile  
+2. Select **EliteMining v4.76-Profile.vap** (versioned format)  
 3. Configure your mining hotkeys in the **"Custom Keybinds for Mining Control"** category
 
-**Important (v4.75+):** The profile is now in XML format. You'll need to reconfigure your keybinds one time after importing. Future updates (v4.7.6+) will automatically preserve your keybinds.
+**Note (v4.76+):** Keybind preservation is now automatic! When updating, EliteMining will prompt you to export your profile and automatically merge your keybinds into the new version.
 
-### Preserving Keybinds During Updates (v4.8.0+)
-Before updating EliteMining:
-1. Open VoiceAttack
-2. Profile → Export Profile
-3. Save as type: **"VoiceAttack Profile Expanded as XML (*.vap)"**
-4. Save as `EliteMining-Backup.vap` in a safe location
-5. Install the update
-6. Your keybinds will be automatically restored
+### Preserving Keybinds During Updates (v4.76+)
+EliteMining now automatically detects when a new VoiceAttack profile is available and guides you through keybind preservation:
+1. Start EliteMining after updating
+2. Follow the on-screen prompt to export your current profile as XML
+3. Select the exported file
+4. Your keybinds will be automatically merged into the new profile
+5. Import the updated profile in VoiceAttack
+
+**Manual method:** You can also export your profile beforehand (Profile → Export Profile, save as XML format) and use it during the merge process.
 
 [Back to Top](#top)
 

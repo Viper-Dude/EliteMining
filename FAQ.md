@@ -25,15 +25,20 @@ Open VoiceAttack → Profile → Import Profile. Select EliteMining-Profile.vap 
 <details>
 <summary><b>How do I preserve my VoiceAttack keybinds during updates?</b></summary>
 
-Before updating (v4.7.6+):
-1. Open VoiceAttack
-2. Profile → Export Profile
-3. Save as type: **"VoiceAttack Profile Expanded as XML (*.vap)"**
-4. Save as `EliteMining-Backup.vap` in a safe location
-5. Install the update
-6. Your keybinds will be automatically restored (when feature is available)
+**Automatic Method (v4.76+):**
+EliteMining will automatically detect when a new VoiceAttack profile is available and prompt you to preserve your keybinds. Simply follow the on-screen instructions:
+1. Export your current profile as XML when prompted
+2. Select the exported file
+3. Your keybinds will be automatically merged into the new profile
 
-**Note:** This feature will be available in v4.8.0 and later versions.
+**Manual Method:**
+If you prefer to do it manually:
+1. Open VoiceAttack
+2. Right-click your EliteMining profile → Export Profile
+3. Save as type: **"VoiceAttack Profile Expanded as XML (*.vap)"**
+4. Save with a descriptive name (e.g., `EliteMining-Backup.vap`)
+5. Install the update
+6. Run EliteMining - it will detect the new profile and guide you through the merge process
 </details>
 
 <details>
