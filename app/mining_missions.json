@@ -308,6 +308,24 @@
       "completed_at": "2025-12-05T15:54:52Z"
     },
     {
+      "mission_id": 1037921815,
+      "name": "Mission_Mining",
+      "localised_name": "Mine 236 Units of Bromellite",
+      "commodity": "Bromellite",
+      "commodity_raw": "$Bromellite_Name;",
+      "count": 236,
+      "collected": 0,
+      "delivered": 236,
+      "reward": 32077200,
+      "expiry": "2025-12-12T09:12:00Z",
+      "faction": "Cartel of Yaso Kondi",
+      "destination_system": "Ngolona",
+      "destination_station": "Huss Port",
+      "wing": true,
+      "accepted_at": "2025-12-05T09:12:44Z",
+      "completed_at": "2025-12-05T15:54:52Z"
+    },
+    {
       "mission_id": 1037880102,
       "name": "Mission_Mining",
       "localised_name": "Mine 165 Units of Bromellite",
@@ -342,25 +360,7 @@
       "wing": true,
       "accepted_at": "2025-12-05T09:12:44Z",
       "completed_at": "2025-12-05T15:54:52Z"
-    },
-    {
-      "mission_id": 1037921815,
-      "name": "Mission_Mining",
-      "localised_name": "Mine 236 Units of Bromellite",
-      "commodity": "Bromellite",
-      "commodity_raw": "$Bromellite_Name;",
-      "count": 236,
-      "collected": 0,
-      "delivered": 236,
-      "reward": 32077200,
-      "expiry": "2025-12-12T09:12:00Z",
-      "faction": "Cartel of Yaso Kondi",
-      "destination_system": "Ngolona",
-      "destination_station": "Huss Port",
-      "wing": true,
-      "accepted_at": "2025-12-05T09:12:44Z",
-      "completed_at": "2025-12-05T15:54:52Z"
     }
   ],
-  "updated": "2026-01-05T12:41:28.909424+00:00"
+  "updated": "2026-01-05T17:09:05.870686+00:00"
 }

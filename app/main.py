@@ -543,7 +543,7 @@ class RefineryDialog:
         self.dialog = tk.Toplevel(parent)
         self.dialog.withdraw()
         self.dialog.title(t('refinery_dialog.title'))
-        self.dialog.geometry("600x650")
+        self.dialog.geometry("600x750")
         self.dialog.configure(bg="#1e1e1e")
         self.dialog.resizable(True, True)  # Allow resizing so user can adjust if needed
         
@@ -589,11 +589,11 @@ class RefineryDialog:
             parent_height = parent.winfo_height()
             
             # Calculate dynamic height based on material count
-            base_height = 650
+            base_height = 750
             if material_count > 2:
                 # Add 60px for each row of materials (2 materials per row)
                 extra_rows = (material_count - 2 + 1) // 2  # Round up
-                dialog_height = min(850, base_height + (extra_rows * 60))
+                dialog_height = min(950, base_height + (extra_rows * 60))
             else:
                 dialog_height = base_height
             
@@ -601,10 +601,10 @@ class RefineryDialog:
             y = parent_y + (parent_height - dialog_height) // 2
         else:
             # Fallback to screen center
-            base_height = 650
+            base_height = 750
             if material_count > 2:
                 extra_rows = (material_count - 2 + 1) // 2
-                dialog_height = min(850, base_height + (extra_rows * 60))
+                dialog_height = min(950, base_height + (extra_rows * 60))
             else:
                 dialog_height = base_height
             x = (self.dialog.winfo_screenwidth() // 2) - (dialog_width // 2)

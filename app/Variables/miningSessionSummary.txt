@@ -1,2 +1,2 @@
-Session: Antliae Sector PX-U b2-8 — 4 A Ring — 00:00:00 — Total 6t (Single Session)
-Ship: Mega Bumper - Type-11 Prospector | Bromellite 4t (35216.78 t/hr); Tritium 2t (17608.39 t/hr)
+Session: Col 285 Sector BW-Z b15-3 — Unknown Body — 00:00:00 — Total 0t (Single Session)
+Ship: Mega Bumper - Type-11 Prospector | No refined materials.
