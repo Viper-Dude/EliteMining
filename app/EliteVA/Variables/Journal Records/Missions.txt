@@ -1,7 +1,0 @@
- ### ((EliteAPI.Missions)) ###
-
-{DATE:EliteAPI.Missions.timestamp}
-{INT:EliteAPI.Missions.Failed.Length}
-{TXT:EliteAPI.Missions.event}
-{INT:EliteAPI.Missions.Complete.Length}
-{INT:EliteAPI.Missions.Active.Length}

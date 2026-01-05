@@ -1,8 +1,0 @@
- ### ((EliteAPI.Powerplay)) ###
-
-{DATE:EliteAPI.Powerplay.timestamp}
-{INT:EliteAPI.Powerplay.TimePledged}
-{INT:EliteAPI.Powerplay.Rank}
-{TXT:EliteAPI.Powerplay.Power}
-{INT:EliteAPI.Powerplay.Merits}
-{TXT:EliteAPI.Powerplay.event}

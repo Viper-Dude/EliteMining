@@ -11,8 +11,8 @@ SolidCompression=yes
 SetupIconFile=app\Images\logo_multi.ico
 CloseApplications=force
 RestartApplications=no
-; Close running EliteMining processes (handles both old Configurator.exe and new EliteMining.exe)
-CloseApplicationsFilter=*.exe
+; Close running EliteMining and VoiceAttack processes
+CloseApplicationsFilter=*.exe,VoiceAttack.exe,VoiceAttackEngine.exe
 
 ; Place uninstaller in app folder
 UninstallFilesDir={app}
@@ -28,6 +28,8 @@ Type: files; Name: "{app}\LICENSE.txt"
 Type: files; Name: "{app}\EliteMining v*-Profile.vap"
 ; Delete old non-versioned profile file
 Type: files; Name: "{app}\EliteMining-Profile.vap"
+; v4.7.6+: Clean EliteAPI folder completely to ensure fresh install of all files (only if user confirmed)
+Type: filesandordirs; Name: "{app}\..\EliteAPI\*"; Check: ShouldInstallEliteAPI
 
 [Files]
 ; Only include specific file types from needed subfolders (exclude .py files)
@@ -40,6 +42,9 @@ Source: "app\Ship Presets\*";  DestDir: "{app}\app\Ship Presets";  Flags: recurs
 
 ; New Configurator executable
 Source: "dist\EliteMining.exe"; DestDir: "{app}\Configurator"; Flags: ignoreversion
+
+; EliteMiningPlugin.dll (VoiceAttack plugin for variable access)
+Source: "EliteMiningPlugin\bin\Release\net48\EliteMiningPlugin.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Check: IsVADetected
 
 ; Local systems database (~14 MB) - populated systems within the bubble for fast searches
 Source: "app\data\galaxy_systems.db"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
@@ -69,9 +74,9 @@ Source: "EliteMining v*-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninsta
 ; NOTE: Use template file to avoid including developer's personal paths
 Source: "app\config.json.template"; DestDir: "{app}"; DestName: "config.json"; Flags: onlyifdoesntexist
 Source: "app\mining_bookmarks.json"; DestDir: "{app}\app"; Flags: onlyifdoesntexist skipifsourcedoesntexist
-; EliteVA files - EliteAPI.dll gets updated if newer, other files only if missing
-Source: "app\EliteVA\EliteAPI.dll"; DestDir: "{app}\..\EliteVA"; Flags: comparetimestamp; Check: IsVADetected
-Source: "app\EliteVA\*"; DestDir: "{app}\..\EliteVA"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "EliteAPI.dll"; Check: IsVADetected
+; EliteAPI files - v4.7.6+: Force complete replacement of all files (only if user confirmed)
+; Destination is dynamic - uses existing installation path if found, otherwise defaults to EliteAPI
+Source: "app\EliteAPI\*"; DestDir: "{code:GetEliteAPIDestDir}"; Flags: recursesubdirs createallsubdirs ignoreversion; Check: ShouldInstallEliteAPI
 Source: "LICENSE"; DestDir: "{app}"
 Source: "NOTICE"; DestDir: "{app}"
 
@@ -113,10 +118,91 @@ UninstalledAll=EliteMining has been successfully uninstalled.%n%nNOTE: Some file
 [Code]
 var
   VADetected: Boolean;
+  InstallEliteAPI: Boolean;
+  VABasePath: String;  { Store VoiceAttack base path for EliteAPI checking }
+  ExistingEliteAPIPath: String;  { Store actual path where EliteAPI.dll was found }
+  VersionFile: String;  { Path to EliteAPI_Version.txt }
+  ExistingVersion: AnsiString;  { Version string from EliteAPI_Version.txt }
 
 function IsVADetected: Boolean;
 begin
   Result := VADetected;
+end;
+
+function BoolToStr(Value: Boolean): String;
+begin
+  if Value then
+    Result := 'True'
+  else
+    Result := 'False';
+end;
+
+function ShouldInstallEliteAPI: Boolean;
+begin
+  Result := InstallEliteAPI;
+end;
+
+function IsVoiceAttackRunning: Boolean;
+var
+  ResultCode: Integer;
+  FindHandle: HWND;
+begin
+  { Check if VoiceAttack window is open using FindWindowByClassName }
+  { VoiceAttack's main window class is typically "WindowsForms10.Window" but we can also check by title }
+  FindHandle := FindWindowByWindowName('VoiceAttack');
+  Result := (FindHandle <> 0);
+end;
+
+function GetEliteAPIDestDir(Param: String): String;
+begin
+  { If we found existing installation, use that path; otherwise default to EliteAPI }
+  if ExistingEliteAPIPath <> '' then
+    Result := ExistingEliteAPIPath
+  else
+    Result := ExpandConstant('{app}\..\EliteAPI');
+end;
+
+function FindEliteAPIInDirectory(const BasePath: String): String;
+var
+  FindRec: TFindRec;
+  SubPath: String;
+begin
+  Result := '';
+  
+  { Search for EliteAPI.dll in base directory }
+  if FileExists(BasePath + '\EliteAPI.dll') then
+  begin
+    Result := BasePath;
+    Exit;
+  end;
+  
+  { Search recursively in subdirectories }
+  if FindFirst(BasePath + '\*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0) and
+           (FindRec.Name <> '.') and (FindRec.Name <> '..') then
+        begin
+          SubPath := BasePath + '\' + FindRec.Name;
+          
+          { Check for EliteAPI.dll or EliteVA.dll in this subdirectory }
+          if FileExists(SubPath + '\EliteAPI.dll') or FileExists(SubPath + '\EliteVA.dll') then
+          begin
+            Result := SubPath;
+            Exit;
+          end;
+          
+          { Recursively search deeper }
+          Result := FindEliteAPIInDirectory(SubPath);
+          if Result <> '' then
+            Exit;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
 end;
 
 function GetDefaultInstallDir(Default: String): String;
@@ -127,6 +213,7 @@ var
 begin
   { Initialize VA detection flag }
   VADetected := False;
+  VABasePath := '';
   
   { Method 1: Check Windows Registry for VoiceAttack installation }
   if RegQueryStringValue(HKLM, 'SOFTWARE\VoiceAttack', 'InstallPath', Result) then
@@ -134,6 +221,7 @@ begin
     if DirExists(Result) and FileExists(Result + '\VoiceAttack.exe') then
     begin
       VADetected := True;
+      VABasePath := Result;
       Result := Result + '\Apps';
       Exit;
     end;
@@ -144,6 +232,7 @@ begin
     if DirExists(Result) and FileExists(Result + '\VoiceAttack.exe') then
     begin
       VADetected := True;
+      VABasePath := Result;
       Result := Result + '\Apps';
       Exit;
     end;
@@ -156,13 +245,15 @@ begin
     if DirExists(SteamPath + '\steamapps\common\VoiceAttack 2') then
     begin
       VADetected := True;
-      Result := SteamPath + '\steamapps\common\VoiceAttack 2\Apps';
+      VABasePath := SteamPath + '\steamapps\common\VoiceAttack 2';
+      Result := VABasePath + '\Apps';
       Exit;
     end
     else if DirExists(SteamPath + '\steamapps\common\VoiceAttack') then
     begin
       VADetected := True;
-      Result := SteamPath + '\steamapps\common\VoiceAttack\Apps';
+      VABasePath := SteamPath + '\steamapps\common\VoiceAttack';
+      Result := VABasePath + '\Apps';
       Exit;
     end;
   end;
@@ -181,37 +272,43 @@ begin
     if DirExists(Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack 2') then
     begin
       VADetected := True;
-      Result := Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack 2\Apps';
+      VABasePath := Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack 2';
+      Result := VABasePath + '\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack 2') then
     begin
       VADetected := True;
-      Result := Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack 2\Apps';
+      VABasePath := Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack 2';
+      Result := VABasePath + '\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\SteamLibrary\steamapps\common\VoiceAttack 2') then
     begin
       VADetected := True;
-      Result := Drive + ':\SteamLibrary\steamapps\common\VoiceAttack 2\Apps';
+      VABasePath := Drive + ':\SteamLibrary\steamapps\common\VoiceAttack 2';
+      Result := VABasePath + '\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack') then
     begin
       VADetected := True;
-      Result := Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack\Apps';
+      VABasePath := Drive + ':\Program Files (x86)\Steam\steamapps\common\VoiceAttack';
+      Result := VABasePath + '\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack') then
     begin
       VADetected := True;
-      Result := Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack\Apps';
+      VABasePath := Drive + ':\Program Files\Steam\steamapps\common\VoiceAttack';
+      Result := VABasePath + '\Apps';
       Exit;
     end
     else if DirExists(Drive + ':\SteamLibrary\steamapps\common\VoiceAttack') then
     begin
       VADetected := True;
-      Result := Drive + ':\SteamLibrary\steamapps\common\VoiceAttack\Apps';
+      VABasePath := Drive + ':\SteamLibrary\steamapps\common\VoiceAttack';
+      Result := VABasePath + '\Apps';
       Exit;
     end;
   end;
@@ -221,45 +318,226 @@ begin
   if DirExists('C:\Program Files\VoiceAttack 2') then
   begin
     VADetected := True;
-    Result := 'C:\Program Files\VoiceAttack 2\Apps';
+    VABasePath := 'C:\Program Files\VoiceAttack 2';
+    Result := VABasePath + '\Apps';
   end
   else if DirExists('C:\Program Files\VoiceAttack') then
   begin
     VADetected := True;
-    Result := 'C:\Program Files\VoiceAttack\Apps';
+    VABasePath := 'C:\Program Files\VoiceAttack';
+    Result := VABasePath + '\Apps';
   end
   { Then check using Inno Setup constants }
   else if DirExists(ExpandConstant('{pf}\VoiceAttack 2')) then
   begin
     VADetected := True;
-    Result := ExpandConstant('{pf}\VoiceAttack 2\Apps');
+    VABasePath := ExpandConstant('{pf}\VoiceAttack 2');
+    Result := VABasePath + '\Apps';
   end
   else if DirExists(ExpandConstant('{pf32}\VoiceAttack 2')) then
   begin
     VADetected := True;
-    Result := ExpandConstant('{pf32}\VoiceAttack 2\Apps');
+    VABasePath := ExpandConstant('{pf32}\VoiceAttack 2');
+    Result := VABasePath + '\Apps';
   end
   else if DirExists(ExpandConstant('{pf}\VoiceAttack')) then
   begin
     VADetected := True;
-    Result := ExpandConstant('{pf}\VoiceAttack\Apps');
+    VABasePath := ExpandConstant('{pf}\VoiceAttack');
+    Result := VABasePath + '\Apps';
   end
   else if DirExists(ExpandConstant('{pf32}\VoiceAttack')) then
   begin
     VADetected := True;
-    Result := ExpandConstant('{pf32}\VoiceAttack\Apps');
+    VABasePath := ExpandConstant('{pf32}\VoiceAttack');
+    Result := VABasePath + '\Apps';
   end
   else
   begin
     { Fallback to standalone installation in user AppData (no admin rights required) }
     VADetected := False;
+    VABasePath := '';
     Result := ExpandConstant('{localappdata}');
   end;
 end;
 
 procedure InitializeWizard;
+var
+  MsgResult: Integer;
+  FolderName: String;
 begin
   { Installer automatically appends \EliteMining to base directory }
+  
+  { Check if VoiceAttack is running }
+  if IsVoiceAttackRunning then
+  begin
+    MsgResult := MsgBox(
+      '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
+      'VoiceAttack must be CLOSED before installing EliteMining.' + #13#10 +
+      'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
+      'Please close VoiceAttack now and click OK to continue.' + #13#10 +
+      'Click Cancel to exit the installer.',
+      mbError, MB_OKCANCEL);
+    
+    if MsgResult = IDCANCEL then
+    begin
+      WizardForm.Close;
+      Exit;
+    end;
+  end;
+  
+  { Default: Install EliteAPI if VoiceAttack is detected }
+  InstallEliteAPI := VADetected;
+  ExistingEliteAPIPath := '';
+  
+  Log('VADetected: ' + BoolToStr(VADetected));
+  Log('VABasePath: ' + VABasePath);
+  
+  { If VoiceAttack detected, search for existing EliteAPI installation }
+  if VADetected and (VABasePath <> '') then
+  begin
+    Log('Searching for EliteAPI in: ' + VABasePath);
+    { Search for EliteAPI.dll or EliteVA.dll in VoiceAttack directory }
+    ExistingEliteAPIPath := FindEliteAPIInDirectory(VABasePath);
+    Log('ExistingEliteAPIPath: ' + ExistingEliteAPIPath);
+    
+    { Check version of existing installation }
+    if ExistingEliteAPIPath <> '' then
+    begin
+      VersionFile := ExistingEliteAPIPath + '\EliteAPI_Version.txt';
+      if FileExists(VersionFile) then
+      begin
+        if LoadStringFromFile(VersionFile, ExistingVersion) then
+        begin
+          ExistingVersion := Trim(ExistingVersion);
+          Log('Existing EliteAPI version: ' + ExistingVersion);
+          
+          { If already v5.0.7, silently install without prompting }
+          if ExistingVersion = '5.0.7' then
+          begin
+            Log('EliteAPI v5.0.7 already installed - auto-updating silently');
+            InstallEliteAPI := True;
+            { Skip to end - no dialog needed }
+          end
+          else
+          begin
+            { Older version - ask about update }
+            FolderName := ExtractFileName(ExistingEliteAPIPath);
+            
+            MsgResult := MsgBox(
+              'EliteAPI v' + ExistingVersion + ' detected in folder:' + #13#10 +
+              FolderName + #13#10 +
+              'Full path: ' + ExistingEliteAPIPath + #13#10 + #13#10 +
+              'This release includes EliteAPI v5.0.7 with improved stability.' + #13#10 + #13#10 +
+              'Do you want to UPDATE your EliteAPI installation?' + #13#10 + #13#10 +
+              'YES - Update to EliteAPI v5.0.7 (RECOMMENDED)' + #13#10 +
+              '  • All existing files will be deleted and replaced' + #13#10 +
+              '  • Latest features and bug fixes' + #13#10 +
+              '  • Full VoiceAttack voice command support' + #13#10 + #13#10 +
+              'NO - Keep current EliteAPI v' + ExistingVersion + #13#10 +
+              '  ⚠️ WARNING: Many EliteMining VoiceAttack functions will NOT work!' + #13#10 +
+              '  ⚠️ Voice commands may fail or behave incorrectly' + #13#10 +
+              '  • Only choose this if you have specific custom modifications' + #13#10 + #13#10 +
+              'Learn more about EliteAPI: https://github.com/Somfic/EliteAPI',
+              mbConfirmation, MB_YESNO);
+              
+            if MsgResult = IDYES then
+              InstallEliteAPI := True
+            else
+              InstallEliteAPI := False;
+          end;
+        end;  { End of if LoadStringFromFile }
+      end
+      else
+      begin
+        { No version file - old installation, ask about update }
+        FolderName := ExtractFileName(ExistingEliteAPIPath);
+        Log('No version file found - old EliteAPI installation');
+        
+        MsgResult := MsgBox(
+          'EliteAPI installation detected in folder:' + #13#10 +
+          FolderName + #13#10 +
+          'Full path: ' + ExistingEliteAPIPath + #13#10 + #13#10 +
+          'This release includes EliteAPI v5.0.7 with improved stability.' + #13#10 + #13#10 +
+          'Do you want to UPDATE your EliteAPI installation?' + #13#10 + #13#10 +
+          'YES - Update to EliteAPI v5.0.7 (RECOMMENDED)' + #13#10 +
+          '  • All existing files will be deleted and replaced' + #13#10 +
+          '  • Latest features and bug fixes' + #13#10 +
+          '  • Full VoiceAttack voice command support' + #13#10 + #13#10 +
+          'NO - Keep current EliteAPI' + #13#10 +
+          '  ⚠️ WARNING: Many EliteMining VoiceAttack functions will NOT work!' + #13#10 +
+          '  ⚠️ Voice commands may fail or behave incorrectly' + #13#10 +
+          '  • Only choose this if you have specific custom modifications' + #13#10 + #13#10 +
+          'Learn more about EliteAPI: https://github.com/Somfic/EliteAPI',
+          mbConfirmation, MB_YESNO);
+          
+        if MsgResult = IDYES then
+          InstallEliteAPI := True
+        else
+          InstallEliteAPI := False;
+      end;
+    end
+    else
+    begin
+      { No existing installation - ask about fresh INSTALL }
+      MsgResult := MsgBox(
+        'VoiceAttack detected but EliteAPI not found.' + #13#10 + #13#10 +
+        'This release includes EliteAPI v5.0.7.' + #13#10 + #13#10 +
+        'Do you want to INSTALL EliteAPI?' + #13#10 + #13#10 +
+        'YES - Install EliteAPI v5.0.7 (RECOMMENDED)' + #13#10 +
+        '  • Enables VoiceAttack voice commands' + #13#10 +
+        '  • Full mining assistance automation' + #13#10 +
+        '  • Real-time game state integration' + #13#10 + #13#10 +
+        'NO - Skip EliteAPI installation' + #13#10 +
+        '  ⚠️ WARNING: VoiceAttack voice commands will NOT work!' + #13#10 +
+        '  • Only configurator features will be available' + #13#10 + #13#10 +
+        'Learn more about EliteAPI: https://github.com/Somfic/EliteAPI',
+        mbConfirmation, MB_YESNO);
+        
+      if MsgResult = IDYES then
+        InstallEliteAPI := True
+      else
+        InstallEliteAPI := False;
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  OldEliteVAPath: String;
+begin
+  { Clean up old EliteVA folder from previous versions (renamed to EliteAPI) }
+  if (CurStep = ssInstall) and (VABasePath <> '') then
+  begin
+    OldEliteVAPath := VABasePath + '\Apps\EliteVA';
+    if DirExists(OldEliteVAPath) then
+    begin
+      Log('Found old EliteVA folder, removing: ' + OldEliteVAPath);
+      if DelTree(OldEliteVAPath, True, True, True) then
+        Log('Successfully removed old EliteVA folder')
+      else
+        Log('Warning: Failed to remove old EliteVA folder');
+    end;
+  end;
+  
+  { Clean existing EliteAPI folder before installing new version }
+  if (CurStep = ssInstall) and ShouldInstallEliteAPI and (ExistingEliteAPIPath <> '') then
+  begin
+    if DirExists(ExistingEliteAPIPath) then
+    begin
+      Log('Cleaning existing EliteAPI installation at: ' + ExistingEliteAPIPath);
+      
+      { Delete all files and subdirectories in the existing folder }
+      { Parameters: Path, DeleteFiles, DeleteSubdirs, BreakOnError }
+      if not DelTree(ExistingEliteAPIPath + '\*', True, True, True) then
+      begin
+        Log('Warning: Failed to completely clean EliteAPI folder');
+        { Continue anyway - installer will overwrite what it can }
+      end
+      else
+        Log('Successfully cleaned EliteAPI folder');
+    end;
+  end;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;

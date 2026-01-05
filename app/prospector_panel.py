@@ -10818,6 +10818,7 @@ class ProspectorPanel(ttk.Frame):
         """
         One-time wipe of Mining Session folder on v4.3.0 upgrade.
         Deletes entire folder and recreates it clean.
+        Only shows notification if old data was actually wiped (not on fresh install).
         """
         try:
             import shutil
@@ -10825,14 +10826,53 @@ class ProspectorPanel(ttk.Frame):
             # self.reports_dir already points to Reports/Mining Session
             wipe_flag = os.path.join(os.path.dirname(self.reports_dir), ".v430_wipe_done")
             
-            # Check if wipe already done
+            # Check if wipe already done - EXIT IMMEDIATELY if flag exists
             if os.path.exists(wipe_flag):
                 return
             
-            # Delete entire Mining Session folder
+            # Check if there's actually old data to wipe (BEFORE the folder was just created)
+            had_old_data = False
+            if os.path.exists(self.reports_dir):
+                # Check if folder has any actual content (not just empty installer-created folders)
+                try:
+                    contents = os.listdir(self.reports_dir)
+                    # Filter out folders/files created by installer, standard structure, or app initialization
+                    ignored_items = [
+                        'Detailed Reports', 'Screenshots', 'Cards', '.gitkeep',
+                        'sessions_index.csv',  # Created by app on first run
+                        'detailed_report_mappings.json'  # Created by app on first run
+                    ]
+                    meaningful_contents = [c for c in contents if c not in ignored_items]
+                    
+                    # Check if there are any actual files (not just empty folders)
+                    if meaningful_contents:
+                        had_old_data = True
+                    else:
+                        # Check if standard folders have any files in them (excluding new app-created files)
+                        for folder in ['Detailed Reports', 'Screenshots', 'Cards']:
+                            folder_path = os.path.join(self.reports_dir, folder)
+                            if os.path.exists(folder_path) and os.path.isdir(folder_path):
+                                try:
+                                    folder_contents = os.listdir(folder_path)
+                                    # Also ignore app-created files in subfolders
+                                    filtered_contents = [f for f in folder_contents 
+                                                       if f not in ignored_items and 
+                                                       os.path.isfile(os.path.join(folder_path, f))]
+                                    if filtered_contents:
+                                        had_old_data = True
+                                        break
+                                except:
+                                    pass
+                except:
+                    had_old_data = False
+            
+            # Delete entire Mining Session folder if it exists
             if os.path.exists(self.reports_dir):
                 shutil.rmtree(self.reports_dir)
-                print("[V4.3.0 UPGRADE] Deleted entire Mining Session folder")
+                if had_old_data:
+                    print("[V4.3.0 UPGRADE] Deleted entire Mining Session folder with old data")
+                else:
+                    print("[V4.3.0 UPGRADE] Removed empty Mining Session folder (first install)")
             
             # Recreate clean folder structure
             os.makedirs(os.path.join(self.reports_dir, "Detailed Reports", "Screenshots"), exist_ok=True)
@@ -10841,10 +10881,13 @@ class ProspectorPanel(ttk.Frame):
             with open(wipe_flag, 'w') as f:
                 f.write("v4.3.0 wipe completed")
             
-            print("[V4.3.0 UPGRADE] Mining Session folder recreated - all old data removed")
+            print("[V4.3.0 UPGRADE] Mining Session folder recreated")
             
-            # Show user notification
-            self._show_upgrade_notification()
+            # Only show user notification if we actually wiped old data (not on fresh install)
+            if had_old_data:
+                self._show_upgrade_notification()
+            else:
+                print("[V4.3.0 UPGRADE] First install detected - no notification needed")
         except Exception as e:
             print(f"[V4.3.0 UPGRADE] Error during wipe: {e}")
     

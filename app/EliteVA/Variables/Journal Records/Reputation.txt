@@ -1,8 +1,0 @@
- ### ((EliteAPI.Reputation)) ###
-
-{DATE:EliteAPI.Reputation.timestamp}
-{DEC:EliteAPI.Reputation.Independent}
-{DEC:EliteAPI.Reputation.Federation}
-{TXT:EliteAPI.Reputation.event}
-{DEC:EliteAPI.Reputation.Empire}
-{DEC:EliteAPI.Reputation.Alliance}

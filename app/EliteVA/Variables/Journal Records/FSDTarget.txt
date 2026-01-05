@@ -1,8 +1,0 @@
- ### ((EliteAPI.FSDTarget)) ###
-
-{DATE:EliteAPI.FSDTarget.timestamp}
-{TXT:EliteAPI.FSDTarget.SystemAddress}
-{TXT:EliteAPI.FSDTarget.StarClass}
-{INT:EliteAPI.FSDTarget.RemainingJumpsInRoute}
-{TXT:EliteAPI.FSDTarget.Name}
-{TXT:EliteAPI.FSDTarget.event}

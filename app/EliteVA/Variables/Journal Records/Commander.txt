@@ -1,6 +1,0 @@
- ### ((EliteAPI.Commander)) ###
-
-{DATE:EliteAPI.Commander.timestamp}
-{TXT:EliteAPI.Commander.Name}
-{TXT:EliteAPI.Commander.FID}
-{TXT:EliteAPI.Commander.event}

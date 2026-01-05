@@ -1,5 +1,0 @@
- ### ((EliteAPI.RepairAll)) ###
-
-{DATE:EliteAPI.RepairAll.timestamp}
-{TXT:EliteAPI.RepairAll.event}
-{INT:EliteAPI.RepairAll.Cost}

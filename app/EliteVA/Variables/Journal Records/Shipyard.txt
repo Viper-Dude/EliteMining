@@ -1,7 +1,0 @@
- ### ((EliteAPI.Shipyard)) ###
-
-{DATE:EliteAPI.Shipyard.timestamp}
-{TXT:EliteAPI.Shipyard.StationName}
-{TXT:EliteAPI.Shipyard.StarSystem}
-{TXT:EliteAPI.Shipyard.MarketID}
-{TXT:EliteAPI.Shipyard.event}

@@ -1,7 +1,0 @@
- ###  Backpack.json  ### 
-{DATE:EliteAPI.Backpack.timestamp}: 07.07.2025 08:36:20
- {TXT:EliteAPI.Backpack.event}: Backpack
- {INT:EliteAPI.Backpack.Items.Length}: 0
- {INT:EliteAPI.Backpack.Components.Length}: 0
- {INT:EliteAPI.Backpack.Consumables.Length}: 0
- {INT:EliteAPI.Backpack.Data.Length}: 0

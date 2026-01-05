@@ -1,7 +1,0 @@
- ### ((EliteAPI.FSSAllBodiesFound)) ###
-
-{DATE:EliteAPI.FSSAllBodiesFound.timestamp}
-{TXT:EliteAPI.FSSAllBodiesFound.SystemName}
-{TXT:EliteAPI.FSSAllBodiesFound.SystemAddress}
-{TXT:EliteAPI.FSSAllBodiesFound.event}
-{INT:EliteAPI.FSSAllBodiesFound.Count}

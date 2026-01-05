@@ -1,5 +1,0 @@
- ### ((EliteAPI.BuyAmmo)) ###
-
-{DATE:EliteAPI.BuyAmmo.timestamp}
-{TXT:EliteAPI.BuyAmmo.event}
-{INT:EliteAPI.BuyAmmo.Cost}

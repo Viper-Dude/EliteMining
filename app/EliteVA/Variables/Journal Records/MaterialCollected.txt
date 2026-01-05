@@ -1,8 +1,0 @@
- ### ((EliteAPI.MaterialCollected)) ###
-
-{DATE:EliteAPI.MaterialCollected.timestamp}
-{TXT:EliteAPI.MaterialCollected.Name_Localised}
-{TXT:EliteAPI.MaterialCollected.Name}
-{TXT:EliteAPI.MaterialCollected.event}
-{INT:EliteAPI.MaterialCollected.Count}
-{TXT:EliteAPI.MaterialCollected.Category}

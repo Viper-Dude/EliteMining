@@ -1,4 +1,0 @@
- ###  NavRoute.json  ### 
-{DATE:EliteAPI.NavRouteClear.timestamp}: 01.09.2025 20:32:29
- {TXT:EliteAPI.NavRouteClear.event}: NavRouteClear
- {INT:EliteAPI.NavRouteClear.Route.Length}: 0

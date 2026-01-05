@@ -1,9 +1,0 @@
- ### ((EliteAPI.CarrierLocation)) ###
-
-{DATE:EliteAPI.CarrierLocation.timestamp}
-{TXT:EliteAPI.CarrierLocation.SystemAddress}
-{TXT:EliteAPI.CarrierLocation.StarSystem}
-{TXT:EliteAPI.CarrierLocation.event}
-{TXT:EliteAPI.CarrierLocation.CarrierType}
-{TXT:EliteAPI.CarrierLocation.CarrierID}
-{TXT:EliteAPI.CarrierLocation.BodyID}

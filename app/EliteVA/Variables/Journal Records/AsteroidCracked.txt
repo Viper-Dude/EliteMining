@@ -1,5 +1,0 @@
- ### ((EliteAPI.AsteroidCracked)) ###
-
-{DATE:EliteAPI.AsteroidCracked.timestamp}
-{TXT:EliteAPI.AsteroidCracked.event}
-{TXT:EliteAPI.AsteroidCracked.Body}

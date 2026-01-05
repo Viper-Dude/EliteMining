@@ -1,5 +1,0 @@
- ### ((EliteAPI.UnderAttack)) ###
-
-{DATE:EliteAPI.UnderAttack.timestamp}
-{TXT:EliteAPI.UnderAttack.Target}
-{TXT:EliteAPI.UnderAttack.event}

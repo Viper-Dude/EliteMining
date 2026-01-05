@@ -1,7 +1,0 @@
- ### ((EliteAPI.CollectCargo)) ###
-
-{TXT:EliteAPI.CollectCargo.Type_Localised}
-{TXT:EliteAPI.CollectCargo.Type}
-{DATE:EliteAPI.CollectCargo.timestamp}
-{BOOL:EliteAPI.CollectCargo.Stolen}
-{TXT:EliteAPI.CollectCargo.event}

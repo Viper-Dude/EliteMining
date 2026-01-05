@@ -1,8 +1,0 @@
- ### ((EliteAPI.Synthesis)) ###
-
-{DATE:EliteAPI.Synthesis.timestamp}
-{TXT:EliteAPI.Synthesis.Name}
-{TXT:EliteAPI.Synthesis.Materials[n].Name}
-{INT:EliteAPI.Synthesis.Materials[n].Count}
-{INT:EliteAPI.Synthesis.Materials.Length}
-{TXT:EliteAPI.Synthesis.event}

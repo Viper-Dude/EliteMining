@@ -1,8 +1,0 @@
- ### ((EliteAPI.SupercruiseDestinationDrop)) ###
-
-{TXT:EliteAPI.SupercruiseDestinationDrop.Type_Localised}
-{TXT:EliteAPI.SupercruiseDestinationDrop.Type}
-{DATE:EliteAPI.SupercruiseDestinationDrop.timestamp}
-{INT:EliteAPI.SupercruiseDestinationDrop.Threat}
-{TXT:EliteAPI.SupercruiseDestinationDrop.MarketID}
-{TXT:EliteAPI.SupercruiseDestinationDrop.event}

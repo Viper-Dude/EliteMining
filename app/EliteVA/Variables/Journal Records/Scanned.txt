@@ -1,5 +1,0 @@
- ### ((EliteAPI.Scanned)) ###
-
-{DATE:EliteAPI.Scanned.timestamp}
-{TXT:EliteAPI.Scanned.ScanType}
-{TXT:EliteAPI.Scanned.event}

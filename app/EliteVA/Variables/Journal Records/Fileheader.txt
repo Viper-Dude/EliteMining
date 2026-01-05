@@ -1,9 +1,0 @@
- ### ((EliteAPI.Fileheader)) ###
-
-{DATE:EliteAPI.Fileheader.timestamp}
-{INT:EliteAPI.Fileheader.part}
-{BOOL:EliteAPI.Fileheader.Odyssey}
-{TXT:EliteAPI.Fileheader.language}
-{TXT:EliteAPI.Fileheader.gameversion}
-{TXT:EliteAPI.Fileheader.event}
-{TXT:EliteAPI.Fileheader.build}

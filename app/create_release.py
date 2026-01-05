@@ -162,15 +162,15 @@ class ReleaseBuilder:
                         zipf.write(config_path, f"EliteMining/{dest_file}")
                         print(f"✅ Added: EliteMining/{dest_file}")
                 
-                # Add EliteVA directory at VoiceAttack Apps level
-                eliteva_dir = self.project_root / "app" / "EliteVA"
-                if eliteva_dir.exists():
-                    for root, dirs, files in os.walk(eliteva_dir):
+                # Add EliteAPI directory at VoiceAttack Apps level
+                eliteapi_dir = self.project_root / "app" / "EliteAPI"
+                if eliteapi_dir.exists():
+                    for root, dirs, files in os.walk(eliteapi_dir):
                         for file in files:
                             file_path = Path(root) / file
-                            arc_path = f"EliteVA/{file_path.relative_to(eliteva_dir)}"
+                            arc_path = f"EliteAPI/{file_path.relative_to(eliteapi_dir)}"
                             zipf.write(file_path, arc_path)
-                    print(f"✅ Added: EliteVA/ (directory)")
+                    print(f"✅ Added: EliteAPI/ (directory)")
                 
                 # Add app folder contents (Images, Settings, Reports, etc.) under EliteMining/app/
                 app_dir = self.project_root / "app"
@@ -290,7 +290,23 @@ class ReleaseBuilder:
         existing_installer = output_dir / "EliteMiningSetup.exe"
         if existing_installer.exists():
             print(f"🗑️  Removing existing installer: {existing_installer}")
-            existing_installer.unlink()
+            try:
+                # Try to delete, retry a few times if locked
+                for attempt in range(3):
+                    try:
+                        existing_installer.unlink()
+                        print("✅ Existing installer removed")
+                        break
+                    except PermissionError:
+                        if attempt < 2:
+                            print(f"⏳ File locked, waiting... (attempt {attempt + 1}/3)")
+                            time.sleep(2)
+                        else:
+                            print("⚠️  Could not delete existing installer (file may be in use)")
+                            print("   Continuing anyway - Inno Setup will overwrite it")
+            except Exception as e:
+                print(f"⚠️  Could not delete existing installer: {e}")
+                print("   Continuing anyway - Inno Setup will overwrite it")
         
         # Try to find Inno Setup compiler
         possible_inno_paths = [

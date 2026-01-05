@@ -1,8 +1,0 @@
- ### ((EliteAPI.BuyDrones)) ###
-
-{TXT:EliteAPI.BuyDrones.Type}
-{INT:EliteAPI.BuyDrones.TotalCost}
-{DATE:EliteAPI.BuyDrones.timestamp}
-{TXT:EliteAPI.BuyDrones.event}
-{INT:EliteAPI.BuyDrones.Count}
-{INT:EliteAPI.BuyDrones.BuyPrice}

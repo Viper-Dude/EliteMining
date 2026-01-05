@@ -1,9 +1,0 @@
- ### ((EliteAPI.FSSDiscoveryScan)) ###
-
-{DATE:EliteAPI.FSSDiscoveryScan.timestamp}
-{TXT:EliteAPI.FSSDiscoveryScan.SystemName}
-{TXT:EliteAPI.FSSDiscoveryScan.SystemAddress}
-{DEC:EliteAPI.FSSDiscoveryScan.Progress}
-{INT:EliteAPI.FSSDiscoveryScan.NonBodyCount}
-{TXT:EliteAPI.FSSDiscoveryScan.event}
-{INT:EliteAPI.FSSDiscoveryScan.BodyCount}

@@ -1,4 +1,0 @@
- ### ((EliteAPI.NavRoute)) ###
-
-{DATE:EliteAPI.NavRoute.timestamp}
-{TXT:EliteAPI.NavRoute.event}

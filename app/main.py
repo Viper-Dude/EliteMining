@@ -505,6 +505,14 @@ def detect_va_folder_interactive(parent: tk.Tk) -> Optional[str]:
             app_root = os.path.dirname(exe_dir)  # Go up to EliteMining folder
             save_va_folder(app_root)
             return app_root
+    else:
+        # Dev mode: running from source - use project root (parent of 'app' folder)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if os.path.basename(script_dir).lower() == 'app':
+            dev_root = os.path.dirname(script_dir)  # Go up to project root
+            print(f"[DEV MODE] Using project root: {dev_root}")
+            save_va_folder(dev_root)
+            return dev_root
     
     # Try VA install locations
     candidates = [
@@ -4810,16 +4818,12 @@ class App(tk.Tk):
         # Early distance calculation using cached data (before journal scan)
         self.after(2000, self._update_home_fc_distances)
         
-        # Full journal scan runs first
+        # Full journal scan runs first (only call once!)
         # Ring finder auto-search will be triggered AFTER journal scan completes
         self.after(3000, self._background_journal_catchup)
         
         # Check for VA profile updates AFTER everything is loaded and settled
         self.after(5000, self._check_va_profile_update)
-        
-        # Full journal scan runs first
-        # Ring finder auto-search will be triggered AFTER journal scan completes
-        self.after(3000, self._background_journal_catchup)
 
     def _cleanup_legacy_files(self):
         """Remove legacy files from older versions that are no longer used"""
@@ -11358,6 +11362,14 @@ class App(tk.Tk):
         geom = wcfg.get("geometry")
         zoomed = wcfg.get("zoomed", False)
         
+        # Default window size - larger for better first-run experience
+        DEFAULT_WIDTH = 1350
+        DEFAULT_HEIGHT = 780
+        
+        # Old default size (upgrade users from old default)
+        OLD_DEFAULT_WIDTH = 1220
+        OLD_DEFAULT_HEIGHT = 700
+        
         if geom:
             try:
                 # Parse geometry string: WIDTHxHEIGHT+X+Y
@@ -11365,6 +11377,11 @@ class App(tk.Tk):
                 match = re.match(r'(\d+)x(\d+)\+(-?\d+)\+(-?\d+)', geom)
                 if match:
                     width, height, x, y = map(int, match.groups())
+                    
+                    # Upgrade old default size to new default size
+                    if width == OLD_DEFAULT_WIDTH and height == OLD_DEFAULT_HEIGHT:
+                        print(f"[WINDOW] Upgrading old default size to new: {DEFAULT_WIDTH}x{DEFAULT_HEIGHT}")
+                        width, height = DEFAULT_WIDTH, DEFAULT_HEIGHT
                     
                     # For multi-monitor setups, allow negative and large positive coordinates
                     # Only reset if window is EXTREMELY far off-screen (likely corrupt data)
@@ -11376,17 +11393,19 @@ class App(tk.Tk):
                         x = (screen_width - width) // 2
                         y = (screen_height - height) // 2
                         geom = f"{width}x{height}+{x}+{y}"
+                    else:
+                        geom = f"{width}x{height}+{x}+{y}"
                     
                     self.geometry(geom)
                 else:
                     # Geometry string doesn't have position, use default centered
-                    self.geometry("1220x700")
+                    self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}")
                     self.update_idletasks()
                     screen_width = self.winfo_screenwidth()
                     screen_height = self.winfo_screenheight()
-                    x = (screen_width - 1220) // 2
-                    y = (screen_height - 700) // 2
-                    self.geometry(f"1220x700+{x}+{y}")
+                    x = (screen_width - DEFAULT_WIDTH) // 2
+                    y = (screen_height - DEFAULT_HEIGHT) // 2
+                    self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}+{x}+{y}")
                 
                 # Restore zoomed/maximized state
                 if zoomed:
@@ -11396,24 +11415,24 @@ class App(tk.Tk):
                 self.deiconify()
             except Exception:
                 # If saved geometry fails, center on screen with default size
-                self.geometry("1220x700")
+                self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}")
                 self.update_idletasks()
                 screen_width = self.winfo_screenwidth()
                 screen_height = self.winfo_screenheight()
-                x = (screen_width - 1220) // 2
-                y = (screen_height - 700) // 2
-                self.geometry(f"1220x700+{x}+{y}")
+                x = (screen_width - DEFAULT_WIDTH) // 2
+                y = (screen_height - DEFAULT_HEIGHT) // 2
+                self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}+{x}+{y}")
                 self.deiconify()
         else:
             print(f"[DEBUG] No saved geometry, using defaults")
             # No saved geometry, center on screen with default size
-            self.geometry("1220x700")
+            self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}")
             self.update_idletasks()
             screen_width = self.winfo_screenwidth()
             screen_height = self.winfo_screenheight()
-            x = (screen_width - 1220) // 2
-            y = (screen_height - 700) // 2
-            self.geometry(f"1220x700+{x}+{y}")
+            x = (screen_width - DEFAULT_WIDTH) // 2
+            y = (screen_height - DEFAULT_HEIGHT) // 2
+            self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}+{x}+{y}")
             
             # Show window after geometry is set
             self.deiconify()
@@ -12522,8 +12541,9 @@ class App(tk.Tk):
         try:
             dialog = tk.Toplevel(self)
             dialog.title(t('dialogs.backup_title'))
-            dialog.geometry("450x480")
-            dialog.resizable(False, False)
+            dialog.geometry("450x600")
+            dialog.resizable(True, True)
+            dialog.minsize(450, 600)
             dialog.configure(bg="#1e1e1e")
             dialog.transient(self)
             dialog.grab_set()
@@ -12955,8 +12975,9 @@ class App(tk.Tk):
         try:
             dialog = tk.Toplevel(self)
             dialog.title(t('dialogs.restore_title'))
-            dialog.geometry("450x620")
-            dialog.resizable(False, False)
+            dialog.geometry("450x680")
+            dialog.resizable(True, True)
+            dialog.minsize(450, 680)
             dialog.configure(bg="#1e1e1e")
             dialog.transient(self)
             dialog.grab_set()
