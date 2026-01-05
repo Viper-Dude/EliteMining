@@ -235,6 +235,17 @@ class MiningChartsPanel:
         self.bar_canvas.get_tk_widget().configure(bg=self.chart_bg, highlightthickness=0)
         self.bar_canvas.get_tk_widget().pack(fill="both", expand=True)
         
+        # Store frame references for resize handling
+        self.timeline_frame = timeline_frame
+        self.bar_frame = bar_frame
+        
+        # Bind Configure event to resize charts when container changes
+        timeline_frame.bind("<Configure>", self._on_timeline_frame_configure)
+        bar_frame.bind("<Configure>", self._on_bar_frame_configure)
+        
+        # Schedule initial resize after window is fully displayed
+        self.frame.after(100, self._force_initial_resize)
+        
         # Initialize charts
         self._setup_chart_styles()
         self.refresh_charts()
@@ -270,6 +281,63 @@ class MiningChartsPanel:
         self.bar_ax.xaxis.label.set_color('white')
         self.bar_ax.yaxis.label.set_color('white')
         self.bar_ax.title.set_color('white')
+    
+    def _force_initial_resize(self):
+        """Force charts to resize properly on initial display"""
+        if not MATPLOTLIB_AVAILABLE:
+            return
+        try:
+            # Get the current size of the frames and resize figures accordingly
+            self._resize_figure_to_frame(self.timeline_frame, self.timeline_fig, self.timeline_canvas)
+            self._resize_figure_to_frame(self.bar_frame, self.bar_fig, self.bar_canvas)
+        except Exception as e:
+            print(f"[Charts] Initial resize error: {e}")
+    
+    def _resize_figure_to_frame(self, frame, fig, canvas):
+        """Resize a matplotlib figure to fit its container frame"""
+        try:
+            frame.update_idletasks()
+            width = frame.winfo_width()
+            height = frame.winfo_height()
+            
+            # Only resize if we have valid dimensions (> 1 pixel)
+            if width > 50 and height > 50:
+                # Convert pixels to inches (matplotlib uses inches)
+                dpi = fig.get_dpi()
+                fig.set_size_inches(width / dpi, height / dpi)
+                canvas.draw_idle()
+        except Exception:
+            pass
+    
+    def _on_timeline_frame_configure(self, event=None):
+        """Handle timeline frame resize"""
+        if not MATPLOTLIB_AVAILABLE:
+            return
+        # Use after_idle to debounce rapid resize events
+        if hasattr(self, '_timeline_resize_pending'):
+            return
+        self._timeline_resize_pending = True
+        self.frame.after(50, self._do_timeline_resize)
+    
+    def _do_timeline_resize(self):
+        """Perform the actual timeline resize"""
+        self._timeline_resize_pending = False
+        self._resize_figure_to_frame(self.timeline_frame, self.timeline_fig, self.timeline_canvas)
+    
+    def _on_bar_frame_configure(self, event=None):
+        """Handle bar chart frame resize"""
+        if not MATPLOTLIB_AVAILABLE:
+            return
+        # Use after_idle to debounce rapid resize events
+        if hasattr(self, '_bar_resize_pending'):
+            return
+        self._bar_resize_pending = True
+        self.frame.after(50, self._do_bar_resize)
+    
+    def _do_bar_resize(self):
+        """Perform the actual bar chart resize"""
+        self._bar_resize_pending = False
+        self._resize_figure_to_frame(self.bar_frame, self.bar_fig, self.bar_canvas)
     
     def _get_material_color(self, material_name: str) -> str:
         """Get color for a material"""

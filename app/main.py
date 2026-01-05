@@ -7630,22 +7630,24 @@ class App(tk.Tk):
         # Configure treeview style for selection highlight (theme-aware)
         style = ttk.Style()
         
-        # Configure Ship Presets treeview font
+        # Configure Ship Presets treeview font and row height
         if self.current_theme == "elite_orange":
             style.configure("ShipPresets.Treeview",
-                           font=("Segoe UI", 9),
+                           font=("Segoe UI", 10),
                            background="#1e1e1e",
                            foreground="#ff8c00",
-                           fieldbackground="#1e1e1e")
+                           fieldbackground="#1e1e1e",
+                           rowheight=22)
             style.map("ShipPresets.Treeview",
                      background=[("selected", "#ff8c00")],
                      foreground=[("selected", "#000000")])
         else:
             style.configure("ShipPresets.Treeview",
-                           font=("Segoe UI", 9),
+                           font=("Segoe UI", 10),
                            background="#1e1e1e",
                            foreground="#e0e0e0",
-                           fieldbackground="#1e1e1e")
+                           fieldbackground="#1e1e1e",
+                           rowheight=22)
             style.map("ShipPresets.Treeview",
                      background=[("selected", "#404040")],
                      foreground=[("selected", "#ffffff")])
