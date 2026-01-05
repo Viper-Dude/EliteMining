@@ -1679,7 +1679,7 @@ class CargoMonitor:
             list_frame,
             bg="#1e1e1e",
             fg="#ffffff",
-            font=("Consolas", 10, "normal"),
+            font=("Segoe UI", 9, "normal"),
             relief="flat",
             bd=0,
             highlightthickness=0,
@@ -2091,7 +2091,7 @@ cargo panel forces Elite to write detailed inventory data.
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             
             text_widget = tk.Text(text_frame, bg="#34495e", fg="#ecf0f1", 
-                                 font=("Consolas", 10), wrap=tk.WORD,
+                                 font=("Segoe UI", 9), wrap=tk.WORD,
                                  yscrollcommand=scrollbar.set)
             text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
             scrollbar.config(command=text_widget.yview)
@@ -2103,7 +2103,7 @@ cargo panel forces Elite to write detailed inventory data.
             close_btn = tk.Button(help_window, text="✅ " + t('dialogs.got_it'), 
                                  command=help_window.destroy,
                                  bg="#27ae60", fg="white", 
-                                 font=("Arial", 12, "bold"))
+                                 font=("Segoe UI", 10, "bold"))
             close_btn.pack(pady=10)
         except Exception as e:
             print(f"Error showing help window: {e}")
@@ -4438,6 +4438,10 @@ class App(tk.Tk):
                   foreground=[("active", "#ffffff"), ("pressed", "#ffffff")],
                   relief=[("pressed", "sunken")])
 
+        # Default button style
+        style.configure("TButton",
+                        font=("Segoe UI", 9))
+
 
         # --- Force clam theme for Notebook to allow tab styling ---
         try:
@@ -4532,14 +4536,16 @@ class App(tk.Tk):
         style.configure("TEntry",
                         fieldbackground=dark_bg,
                         foreground=dark_fg,
-                        insertcolor=dark_fg)
+                        insertcolor=dark_fg,
+                        font=("Segoe UI", 9))
 
         # Global Treeview styling (theme-aware)
         style.configure("Treeview",
                         background=dark_bg,
                         fieldbackground=dark_bg,
                         foreground=dark_fg,
-                        borderwidth=0)
+                        borderwidth=0,
+                        font=("Segoe UI", 9))
         style.map("Treeview",
                    background=[("selected", selection_bg)],
                    foreground=[("selected", selection_fg)])
@@ -4547,7 +4553,8 @@ class App(tk.Tk):
         style.configure("Treeview.Heading",
                         background=accent,
                         foreground=dark_fg,
-                        relief="raised")
+                        relief="raised",
+                        font=("Segoe UI", 9, "bold"))
         style.map("Treeview.Heading",
                    background=[("active", "#333333"), ("pressed", dark_bg)],
                    foreground=[("active", dark_fg), ("pressed", dark_fg)])
@@ -5128,7 +5135,7 @@ class App(tk.Tk):
             content_frame,
             bg=_cargo_bg,
             fg=_cargo_fg,
-            font=("Consolas", 9, "normal"),  # Monospace font for perfect alignment
+            font=("Segoe UI", 9, "normal"),  # Match app-wide font
             relief="flat",
             bd=0,
             highlightthickness=0,
@@ -5255,10 +5262,10 @@ class App(tk.Tk):
             # Calculate separator width based on widget width (in characters)
             try:
                 widget_width = self.integrated_cargo_text.winfo_width()
-                font_width = 7  # Approximate width of Consolas 9pt character
-                sep_chars = max(10, min(25, (widget_width // font_width) - 2))
+                font_width = 8  # Approximate width of Segoe UI 9pt character (wider than Consolas)
+                sep_chars = max(8, min(15, (widget_width // font_width) - 2))
             except:
-                sep_chars = 18  # Fallback
+                sep_chars = 12  # Fallback
             self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
             self.integrated_cargo_text.insert(tk.END, "\n" + t('mining_session.engineering_materials') + " 🔩\n")
             
@@ -5284,14 +5291,14 @@ class App(tk.Tk):
         # Calculate separator width based on widget width (in characters)
         try:
             widget_width = self.integrated_cargo_text.winfo_width()
-            font_width = 7  # Approximate width of Consolas 9pt character
-            sep_chars = max(10, min(25, (widget_width // font_width) - 2))
+            font_width = 8  # Approximate width of Segoe UI 9pt character (wider than Consolas)
+            sep_chars = max(8, min(15, (widget_width // font_width) - 2))
         except:
-            sep_chars = 18  # Fallback
+            sep_chars = 12  # Fallback
         self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
         
         # Configure tag for small italic text - left aligned
-        self.integrated_cargo_text.tag_configure("small_italic", font=("Consolas", 8, "italic"), foreground="#888888", justify="left")
+        self.integrated_cargo_text.tag_configure("small_italic", font=("Segoe UI", 8, "italic"), foreground="#888888", justify="left")
         
         # Insert refinery note with formatting - get position before inserting
         note_start_index = self.integrated_cargo_text.index(tk.INSERT)
@@ -6071,7 +6078,7 @@ class App(tk.Tk):
 
                 # Materials section label
                 ttk.Label(frame, text=t('settings.select_minerals'),
-                          font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(2, 2))
+                          font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(0, 2))
 
                 # Create the full material tree with functionality
                 materials_frame = ttk.Frame(frame)
@@ -6080,8 +6087,28 @@ class App(tk.Tk):
                 materials_frame.rowconfigure(0, weight=1)
                 frame.rowconfigure(3, weight=1)
 
+                # Configure Announcements Treeview style to match other tables
+                style = ttk.Style()
+                from config import load_theme
+                ann_theme = load_theme()
+                if ann_theme == "elite_orange":
+                    ann_fg = "#ff8c00"
+                    ann_bg = "#1e1e1e"
+                else:
+                    ann_fg = "#e6e6e6"
+                    ann_bg = "#1e1e1e"
+                
+                style.configure("Announcements.Treeview",
+                               background=ann_bg,
+                               fieldbackground=ann_bg,
+                               foreground=ann_fg,
+                               font=("Segoe UI", 9))
+                style.configure("Announcements.Treeview.Heading",
+                               foreground=ann_fg,
+                               font=("Segoe UI", 9, "bold"))
+
                 # Material tree
-                self.ann_mat_tree = ttk.Treeview(materials_frame, columns=("announce", "material", "minpct"), show="headings", height=14)
+                self.ann_mat_tree = ttk.Treeview(materials_frame, columns=("announce", "material", "minpct"), show="headings", height=18, style="Announcements.Treeview")
                 self.ann_mat_tree.heading("announce", text=t('settings.announce'))
                 self.ann_mat_tree.heading("material", text=t('settings.mineral'))
                 self.ann_mat_tree.heading("minpct", text=t('settings.minimal_pct'))
@@ -7341,7 +7368,7 @@ class App(tk.Tk):
         apikey_frame.grid(row=r, column=0, sticky="w", pady=(4, 8))
         tk.Label(apikey_frame, text=t('settings.api_key'), bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
         apikey_entry = tk.Entry(apikey_frame, textvariable=self.api_key, 
-                               bg="#2d2d2d", fg="#888888", font=("Consolas", 9), width=50, show="*", state="disabled")
+                               bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=50, show="*", state="disabled")
         apikey_entry.pack(side="left", padx=(8, 0))
         
         # Show/hide API key button (DISABLED)
@@ -7602,17 +7629,29 @@ class App(tk.Tk):
         
         # Configure treeview style for selection highlight (theme-aware)
         style = ttk.Style()
+        
+        # Configure Ship Presets treeview font
         if self.current_theme == "elite_orange":
-            style.map("Treeview",
+            style.configure("ShipPresets.Treeview",
+                           font=("Segoe UI", 9),
+                           background="#1e1e1e",
+                           foreground="#ff8c00",
+                           fieldbackground="#1e1e1e")
+            style.map("ShipPresets.Treeview",
                      background=[("selected", "#ff8c00")],
                      foreground=[("selected", "#000000")])
         else:
-            style.map("Treeview",
+            style.configure("ShipPresets.Treeview",
+                           font=("Segoe UI", 9),
+                           background="#1e1e1e",
+                           foreground="#e0e0e0",
+                           fieldbackground="#1e1e1e")
+            style.map("ShipPresets.Treeview",
                      background=[("selected", "#404040")],
                      foreground=[("selected", "#ffffff")])
         
         # Scrollable preset list - hierarchical treeview with ship groups
-        self.preset_list = ttk.Treeview(presets_pane, columns=("name",), show="tree", selectmode="browse")
+        self.preset_list = ttk.Treeview(presets_pane, columns=("name",), show="tree", selectmode="browse", style="ShipPresets.Treeview")
         self.preset_list.column("#0", anchor="w", stretch=True, width=280, minwidth=220)
         self.preset_list.column("name", width=0, stretch=False)  # Hidden column to store full preset name
         self.preset_list.grid(row=2, column=0, sticky="nsew")
@@ -8524,12 +8563,12 @@ class App(tk.Tk):
     def _configure_preset_list_row_colors(self) -> None:
         """Configure row colors for preset list based on current theme"""
         if self.current_theme == "elite_orange":
-            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#ff8c00')
-            self.preset_list.tag_configure('evenrow', background='#252525', foreground='#ff8c00')
+            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#ff8c00', font=("Segoe UI", 9))
+            self.preset_list.tag_configure('evenrow', background='#252525', foreground='#ff8c00', font=("Segoe UI", 9))
             self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#ffcc00', font=("Segoe UI", 9, "bold"))
         else:
-            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6')
-            self.preset_list.tag_configure('evenrow', background='#282828', foreground='#e6e6e6')
+            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6', font=("Segoe UI", 9))
+            self.preset_list.tag_configure('evenrow', background='#282828', foreground='#e6e6e6', font=("Segoe UI", 9))
             self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#aaaaaa', font=("Segoe UI", 9, "bold"))
     
     def _parse_preset_ship_type(self, preset_name: str) -> tuple:
@@ -8794,11 +8833,11 @@ class App(tk.Tk):
         
         # Label
         label = tk.Label(dialog, text="Enter a name for this preset:", 
-                        bg="#2c3e50", fg="#ecf0f1", font=("Arial", 10))
+                        bg="#2c3e50", fg="#ecf0f1", font=("Segoe UI", 9))
         label.pack(pady=(20, 10))
         
         # Entry
-        entry = tk.Entry(dialog, font=("Arial", 10), width=30)
+        entry = tk.Entry(dialog, font=("Segoe UI", 9), width=30)
         entry.pack(pady=5)
         if initial:
             entry.insert(0, initial)
@@ -8817,12 +8856,12 @@ class App(tk.Tk):
             dialog.destroy()
             
         ok_btn = tk.Button(btn_frame, text=t('common.ok'), command=on_ok,
-                          bg="#27ae60", fg="white", font=("Arial", 10),
+                          bg="#27ae60", fg="white", font=("Segoe UI", 9),
                           width=10)
         ok_btn.pack(side=tk.LEFT, padx=5)
         
         cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
-                              bg="#e74c3c", fg="white", font=("Arial", 10),
+                              bg="#e74c3c", fg="white", font=("Segoe UI", 9),
                               width=10)
         cancel_btn.pack(side=tk.LEFT, padx=5)
         
@@ -9388,12 +9427,12 @@ class App(tk.Tk):
         
         # Current system Sol distance label
         self.current_sol_label = tk.Label(config_frame, text="", 
-                                         font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+                                         font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
         self.current_sol_label.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
         
         # Visits count label (separate column, aligned vertically)
         self.distance_visits_label = tk.Label(config_frame, text="", 
-                                              font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="e")
+                                              font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
         self.distance_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
         
         # Home System
@@ -9412,16 +9451,16 @@ class App(tk.Tk):
         home_info_frame.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
         
         self.distance_to_home_label = tk.Label(home_info_frame, text="", 
-                                               font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+                                               font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
         self.distance_to_home_label.pack(side="left")
         
         self.home_sol_label = tk.Label(home_info_frame, text="", 
-                                       font=("Segoe UI", 8), fg="#888888", bg="#1e1e1e", anchor="w")
+                                       font=("Segoe UI", 9), fg="#888888", bg="#1e1e1e", anchor="w")
         self.home_sol_label.pack(side="left", padx=(10, 0))
         
         # Home visits label (column 4, aligned with current system visits)
         self.home_visits_label = tk.Label(config_frame, text="", 
-                                          font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="e")
+                                          font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
         self.home_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
         
         # Fleet Carrier System (auto-detected, read-only)
@@ -9439,16 +9478,16 @@ class App(tk.Tk):
         fc_info_frame.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
         
         self.distance_to_fc_label = tk.Label(fc_info_frame, text="", 
-                                             font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+                                             font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
         self.distance_to_fc_label.pack(side="left")
         
         self.fc_sol_label = tk.Label(fc_info_frame, text="", 
-                                     font=("Segoe UI", 8), fg="#888888", bg="#1e1e1e", anchor="w")
+                                     font=("Segoe UI", 9), fg="#888888", bg="#1e1e1e", anchor="w")
         self.fc_sol_label.pack(side="left", padx=(10, 0))
         
         # FC visits label (column 4, aligned with other visits)
         self.fc_visits_label = tk.Label(config_frame, text="", 
-                                        font=("Segoe UI", 8), fg="#ffcc00", bg="#1e1e1e", anchor="e")
+                                        font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
         self.fc_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
         
         # Refresh locations button (current system + FC)
@@ -13372,11 +13411,10 @@ class App(tk.Tk):
                                     bg="#4a3a2a", fg="#e0e0e0", activebackground="#5a4a3a", activeforeground="#ffffff",
                                     relief="ridge", bd=1, padx=6, pady=2, font=("Segoe UI", 8), cursor="hand2",
                                     highlightbackground=_mkt_cb_bg, highlightcolor=_mkt_cb_bg)
-        self.marketplace_use_current_btn.pack(side="left", padx=(0, 20))
+        self.marketplace_use_current_btn.pack(side="left", padx=(0, 35))
         
-        # Commodity label - language-specific padding
-        _commodity_padx = (59, 34) if get_language() == "de" else (59, 17)  # Adjust English values as needed
-        ttk.Label(row1_frame, text=t('marketplace.commodity')).pack(side="left", padx=_commodity_padx)
+        # Commodity label with consistent spacing
+        ttk.Label(row1_frame, text=t('marketplace.commodity')).pack(side="left", padx=(0, 8))
         
         # Commodity list with localization
         self._commodity_order = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
@@ -13462,12 +13500,11 @@ class App(tk.Tk):
                       bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
-        large_pad_cb.pack(side="left", padx=(0, 8))
+        large_pad_cb.pack(side="left", padx=(0, 30))
         ToolTip(large_pad_cb, t('tooltips.large_pads'))
         
-        # Sort by label - language-specific padding
-        _sort_padx = (0, 3) if get_language() == "de" else (55, 43)
-        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=_sort_padx)
+        # Sort by label with adjustable spacing
+        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=(0, 8))  # Adjust first number for left offset
         saved_sort = cfg.get('marketplace_order_by', 'Distance')
         # Determine initial sort options based on sell mode (default)
         initial_sort_order = ['Best price (highest)', 'Distance', 'Best demand', 'Last update']
@@ -13475,7 +13512,7 @@ class App(tk.Tk):
         self.marketplace_order_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_order_by,
                                      values=[self._sort_options_map.get(k, k) for k in initial_sort_order],
                                      state="readonly", width=20)
-        self.marketplace_order_combo.pack(side="left")
+        self.marketplace_order_combo.pack(side="left", padx=(29, 0))  # Adjust first number to move dropdown
         self.marketplace_order_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         ToolTip(self.marketplace_order_combo, t('tooltips.sort_by'))
         
@@ -13491,18 +13528,16 @@ class App(tk.Tk):
                               font=("Segoe UI", 9, "bold"), cursor="hand2")
         search_btn.pack(side="left")
         
-        # Max Age moved to row 3 - aligned below "Sort by:" / "Sortieren nach:"
-        # Language-specific padding and theme-appropriate text color
+        # Max Age with left padding to align under Sort by above
         _max_age_fg = "#ff8c00" if _mkt_cb_theme == "elite_orange" else "#e0e0e0"
-        _max_age_padx = (369, 26) if get_language() == "de" else (365, 33)  # (left, gap) - language specific
         max_age_label = tk.Label(row3_frame, text=t('marketplace.max_age'), bg=_mkt_cb_bg, fg=_max_age_fg)
-        max_age_label.pack(side="left", padx=_max_age_padx)
+        max_age_label.pack(side="left", padx=(399, 8))  # Left padding to align with Sort by
         saved_age = cfg.get('marketplace_max_age', '8 hours')
         self.marketplace_max_age = tk.StringVar(value=self._age_map.get(saved_age, saved_age))
         age_combo = ttk.Combobox(row3_frame, textvariable=self.marketplace_max_age,
                                 values=[self._age_map[k] for k in self._age_order],
                                 state="readonly", width=10)
-        age_combo.pack(side="left")
+        age_combo.pack(side="left", padx=(17, 0))  # Add left padding here
         age_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         ToolTip(age_combo, t('tooltips.max_age'))
         
@@ -13526,7 +13561,7 @@ class App(tk.Tk):
         
         # Status label (moved to header, right side)
         self.marketplace_total_label = tk.Label(results_header, text=t('marketplace.enter_system_commodity'),
-                                               bg=_mkt_cb_bg, fg="gray", font=("TkDefaultFont", 8))
+                                               bg=_mkt_cb_bg, fg="gray", font=("Segoe UI", 8))
         self.marketplace_total_label.pack(side="right")
         
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
@@ -13695,8 +13730,8 @@ class App(tk.Tk):
         
         # Reference system info - using multiple labels for white/yellow styling
         # Labels in white, values in yellow (like CMDR status line)
-        font_label = ("Segoe UI", 8)
-        font_value = ("Segoe UI", 8, "bold")
+        font_label = ("Segoe UI", 9)
+        font_value = ("Segoe UI", 9, "bold")
         
         # Row 1: System name (centered)
         row1_container = tk.Frame(ref_info_frame, bg=sf_bg)
@@ -13812,10 +13847,12 @@ class App(tk.Tk):
                        rowheight=25,
                        background=tree_bg,
                        foreground=tree_fg,
-                       fieldbackground=tree_bg)
+                       fieldbackground=tree_bg,
+                       font=("Segoe UI", 9))
         style.configure("SystemFinder.Treeview.Heading",
                        background=header_bg,
-                       foreground=tree_fg)
+                       foreground=tree_fg,
+                       font=("Segoe UI", 9, "bold"))
         style.map("SystemFinder.Treeview",
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
@@ -14289,7 +14326,8 @@ class App(tk.Tk):
                        bordercolor="#333333",
                        background=_mkt_bg,
                        foreground=_mkt_fg,
-                       fieldbackground=_mkt_bg)
+                       fieldbackground=_mkt_bg,
+                       font=("Segoe UI", 9))
         
         # Column header styling with borders
         style.configure("Marketplace.Treeview.Heading",
@@ -14298,7 +14336,8 @@ class App(tk.Tk):
                        background=_mkt_hdr,
                        foreground=_mkt_fg,
                        padding=[5, 5],
-                       anchor="w")  # Left-align all headers
+                       anchor="w",
+                       font=("Segoe UI", 9, "bold"))  # Left-align all headers
         
         # Row selection styling
         style.map("Marketplace.Treeview",

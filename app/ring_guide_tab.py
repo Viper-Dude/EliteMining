@@ -128,12 +128,12 @@ class RingGuideTab(tk.Frame):
         main_container.pack(fill="both", expand=True, padx=10, pady=5)
         
         # Left column - Ring types (fixed width, scrollable)
-        left_column = tk.Frame(main_container, bg=self.bg_color, width=420)
-        left_column.pack(side="left", fill="both", expand=True)
+        left_column = tk.Frame(main_container, bg=self.bg_color, width=450)
+        left_column.pack(side="left", fill="y", expand=False, padx=(0, 15))
         left_column.pack_propagate(False)  # Keep fixed width
         
         # Canvas for scrolling
-        self.canvas = tk.Canvas(left_column, bg=self.bg_color, highlightthickness=0, width=400)
+        self.canvas = tk.Canvas(left_column, bg=self.bg_color, highlightthickness=0, width=430)
         scrollbar = ttk.Scrollbar(left_column, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = tk.Frame(self.canvas, bg=self.bg_color)
         
@@ -157,8 +157,8 @@ class RingGuideTab(tk.Frame):
             self._create_ring_section(ring_type)
         
         # Right column - RES Sites info (fixed width)
-        right_column = tk.Frame(main_container, bg=self.bg_color, width=280)
-        right_column.pack(side="left", fill="y", padx=(15, 0))
+        right_column = tk.Frame(main_container, bg=self.bg_color, width=320)
+        right_column.pack(side="left", fill="y", padx=(5, 0))
         right_column.pack_propagate(False)  # Keep fixed width
         
         # Add RES Sites info section to right column
@@ -211,7 +211,7 @@ class RingGuideTab(tk.Frame):
         # Content frame
         content = tk.Frame(section, bg=self.section_bg)
         if res_expanded:
-            content.pack(fill="x", padx=(10, 0), pady=(5, 0))
+            content.pack(fill="x", padx=(0, 0), pady=(5, 0))
         self._section_frames["RES Sites"] = content
         
         # Bind click to toggle
@@ -438,7 +438,7 @@ class RingGuideTab(tk.Frame):
             if self._expanded[section_name]:
                 # Different padding for RES Sites vs ring types
                 if section_name == "RES Sites":
-                    content.pack(fill="x", padx=(10, 0), pady=(5, 0))
+                    content.pack(fill="x", padx=(0, 0), pady=(5, 0))
                 else:
                     content.pack(fill="x", padx=(20, 0))
             else:

@@ -445,9 +445,22 @@ class JournalParser:
             system_address = event.get('SystemAddress')
             body_id = event.get('BodyID')
             
-            # Extract system name from ring body name if current_system not available
+            # Extract system name from ring body name
             extracted_system, ring_designation = self.extract_system_and_body_from_ring_name(body_name)
-            system_name = current_system or extracted_system
+            
+            # FIX: Use extracted system name if body_name doesn't start with current_system
+            # This handles multi-star systems where ring names can have different prefixes
+            # e.g., system="Palliyan" but body="HIP 54072 A 1 A Ring"
+            if current_system and body_name.lower().startswith(current_system.lower()):
+                # Body name matches current system - use current system
+                system_name = current_system
+            elif extracted_system:
+                # Body name has a different system prefix - use extracted system name
+                system_name = extracted_system
+                log.debug(f"Using extracted system name '{extracted_system}' instead of current system '{current_system}' for ring: {body_name}")
+            else:
+                # Fallback to current system
+                system_name = current_system
             
             if not system_name:
                 log.warning(f"Could not determine system name for ring: {body_name}")
@@ -537,7 +550,7 @@ class JournalParser:
                     
                     self.user_db.add_hotspot_data(
                         system_name=system_name,
-                        body_name=body_name,
+                        body_name=normalized_body_name,  # Use normalized name (without system prefix)
                         material_name=material_name,
                         hotspot_count=count,
                         scan_date=timestamp,
@@ -551,7 +564,7 @@ class JournalParser:
                         density=density
                     )
                     
-                    log.debug(f"Added hotspot: {system_name} - {body_name} - {material_name} ({count})")
+                    log.debug(f"Added hotspot: {system_name} - {normalized_body_name} - {material_name} ({count})")
             
             # Trigger callback ONCE after all hotspots are processed (not inside loop)
             # Pass True ONLY if at least one hotspot was NEW (not already in database)

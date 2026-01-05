@@ -151,6 +151,16 @@ class UserDatabase:
                 self._set_migration_version('hotspot_merge_v472', 1)
             else:
                 log.info("[Migration] Hotspot merge v4.7.2 already applied")
+            
+            # v4.7.6: Fix corrupted body_name entries where body_name has wrong system prefix
+            # e.g., system_name="Palliyan" but body_name="HIP 54072 A 1 A Ring"
+            if self._get_migration_version('fix_body_name_prefix_v476') < 1:
+                log.info("[Migration] Fixing corrupted body_name prefixes...")
+                print("[MIGRATION] Fixing corrupted body_name prefixes...")
+                self._fix_body_name_prefix_corruption()
+                self._set_migration_version('fix_body_name_prefix_v476', 1)
+            else:
+                log.info("[Migration] Body name prefix fix v4.7.6 already applied")
                 
         except Exception as e:
             print(f"[MIGRATION ERROR] {e}")
@@ -701,6 +711,113 @@ class UserDatabase:
             # Don't fail startup if migration fails
             print(f"[MIGRATION v4.7.2] Warning: Could not merge hotspots: {e}")
             log.warning(f"[Migration v4.7.2] Could not merge hotspots: {e}")
+            import traceback
+            log.error(traceback.format_exc())
+    
+    def _fix_body_name_prefix_corruption(self) -> None:
+        """Fix corrupted body_name entries where body_name has wrong system prefix (v4.7.6)
+        
+        This fixes entries like:
+        - system_name="Palliyan", body_name="HIP 54072 A 1 A Ring" 
+        Should become:
+        - system_name="HIP 54072", body_name="A 1 A Ring"
+        
+        The bug occurred when scanning rings in multi-star systems where the ring
+        body name had a different system prefix than the current system.
+        """
+        import re
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Find entries where body_name contains a system-like prefix that doesn't match system_name
+                # Pattern: body_name starts with letters/numbers but NOT with the system_name
+                # and contains " Ring" indicating it's a full ring name with wrong prefix
+                cursor.execute('''
+                    SELECT id, system_name, body_name, material_name, hotspot_count, scan_date,
+                           system_address, body_id, x_coord, y_coord, z_coord, coord_source,
+                           ring_type, ls_distance, density, data_source,
+                           inner_radius, outer_radius, ring_mass, overlap_tag, res_tag
+                    FROM hotspot_data
+                    WHERE body_name LIKE '% Ring'
+                    AND body_name NOT LIKE system_name || ' %'
+                    AND body_name GLOB '[A-Za-z]*'
+                    AND LENGTH(body_name) > 15
+                ''')
+                
+                corrupted_entries = cursor.fetchall()
+                
+                if not corrupted_entries:
+                    print("[MIGRATION v4.7.6] No corrupted body_name prefixes found - database is clean")
+                    log.info("[Migration v4.7.6] No corrupted body_name prefixes found - database is clean")
+                    return
+                
+                print(f"[MIGRATION v4.7.6] Found {len(corrupted_entries)} entries with potentially corrupted body_name prefixes")
+                log.info(f"[Migration v4.7.6] Found {len(corrupted_entries)} entries to check")
+                
+                fixed_count = 0
+                deleted_duplicates = 0
+                
+                for row in corrupted_entries:
+                    entry_id = row[0]
+                    old_system = row[1]
+                    old_body = row[2]
+                    material_name = row[3]
+                    
+                    # Extract the real system name from the body_name
+                    # Pattern: "HIP 54072 A 1 A Ring" -> system="HIP 54072", body="A 1 A Ring"
+                    ring_match = re.search(r'\s+([A-Z]?\s*\d*\s*[A-Z]\s+Ring)$', old_body, re.IGNORECASE)
+                    if not ring_match:
+                        continue
+                    
+                    ring_part = ring_match.group(1).strip()
+                    extracted_system = old_body[:ring_match.start()].strip()
+                    
+                    # Validate: extracted system should be different from stored system
+                    if extracted_system.lower() == old_system.lower():
+                        continue
+                    
+                    # Normalize the ring designation
+                    normalized_body = ' '.join(ring_part.split())
+                    
+                    # Check if a correct entry already exists
+                    cursor.execute('''
+                        SELECT id FROM hotspot_data 
+                        WHERE system_name = ? AND body_name = ? AND material_name = ?
+                    ''', (extracted_system, normalized_body, material_name))
+                    
+                    existing = cursor.fetchone()
+                    
+                    if existing:
+                        # Correct entry already exists - delete the corrupted duplicate
+                        cursor.execute('DELETE FROM hotspot_data WHERE id = ?', (entry_id,))
+                        deleted_duplicates += 1
+                        log.debug(f"[Migration v4.7.6] Deleted duplicate: {old_system}/{old_body} (correct entry exists for {extracted_system}/{normalized_body})")
+                    else:
+                        # Update the entry with correct system and body names
+                        cursor.execute('''
+                            UPDATE hotspot_data 
+                            SET system_name = ?, body_name = ?
+                            WHERE id = ?
+                        ''', (extracted_system, normalized_body, entry_id))
+                        fixed_count += 1
+                        log.debug(f"[Migration v4.7.6] Fixed: {old_system}/{old_body} -> {extracted_system}/{normalized_body}")
+                
+                conn.commit()
+                
+                total_processed = fixed_count + deleted_duplicates
+                if total_processed > 0:
+                    print(f"[MIGRATION v4.7.6] ✅ Fixed {fixed_count} entries, removed {deleted_duplicates} duplicates")
+                    log.info(f"[Migration v4.7.6] Fixed {fixed_count} entries, removed {deleted_duplicates} duplicates")
+                else:
+                    print("[MIGRATION v4.7.6] ✅ All entries verified - no fixes needed")
+                    log.info("[Migration v4.7.6] All entries verified - no fixes needed")
+                    
+        except Exception as e:
+            # Don't fail startup if migration fails
+            print(f"[MIGRATION v4.7.6] Warning: Could not fix body_name prefixes: {e}")
+            log.warning(f"[Migration v4.7.6] Could not fix body_name prefixes: {e}")
             import traceback
             log.error(traceback.format_exc())
         

@@ -379,7 +379,7 @@ class RingFinder:
                                            bg=_cb_bg, fg="#e0e0e0", 
                                            activebackground="#2e2e2e", activeforeground="#ffffff",
                                            selectcolor=_cb_select, relief="flat",
-                                           font=("Segoe UI", 8, "normal"))
+                                           font=("Segoe UI", 9))
         self.auto_search_cb.pack(side="left")
         
         # Tooltip for auto-search
@@ -400,7 +400,7 @@ class RingFinder:
                                            bg=_cb_bg, fg="#e0e0e0", 
                                            activebackground="#2e2e2e", activeforeground="#ffffff",
                                            selectcolor=_cb_select, relief="flat",
-                                           font=("Segoe UI", 8, "normal"))
+                                           font=("Segoe UI", 9))
         self.auto_switch_tabs_cb.pack(side="left", padx=(18, 0))
         
         # Tooltip for auto-switch tabs
@@ -422,7 +422,7 @@ class RingFinder:
                                           bg=_cb_bg, fg="#e0e0e0",
                                           activebackground="#2e2e2e", activeforeground="#ffffff",
                                           selectcolor=_cb_select, relief="flat",
-                                          font=("Segoe UI", 8, "normal"))
+                                          font=("Segoe UI", 9))
         # self.any_ring_cb.grid(row=1, column=1, sticky="e", padx=(130, 0), pady=5)  # Hidden - feature disabled
         # ToolTip(self.any_ring_cb, t('ring_finder.any_ring_tooltip'))
         
@@ -462,10 +462,10 @@ class RingFinder:
                                                bg=_cb_bg, fg="#e0e0e0",
                                                activebackground="#2e2e2e", activeforeground="#ffffff",
                                                selectcolor=_cb_select, relief="flat",
-                                               font=("Segoe UI", 8, "normal"))
+                                               font=("Segoe UI", 9))
         # Dynamic padding based on language (German text is shorter after abbreviation)
         from localization import get_language
-        _overlaps_padx = (16, 0) if get_language() == 'de' else (26, 0)
+        _overlaps_padx = (5, 0)  # Align with Auto-Search above
         self.overlaps_only_cb.pack(side="left", padx=_overlaps_padx)
         ToolTip(self.overlaps_only_cb, t('ring_finder.tooltip_overlaps'))
         
@@ -477,8 +477,8 @@ class RingFinder:
                                           bg=_cb_bg, fg="#e0e0e0",
                                           activebackground="#2e2e2e", activeforeground="#ffffff",
                                           selectcolor=_cb_select, relief="flat",
-                                          font=("Segoe UI", 8, "normal"))
-        _res_padx = (25, 0) if get_language() == 'de' else (10, 0)
+                                          font=("Segoe UI", 9))
+        _res_padx = (8, 0)  # Match spacing of Auto-Switch Tabs above
         self.res_only_cb.pack(side="left", padx=_res_padx)
         ToolTip(self.res_only_cb, t('ring_finder.tooltip_res'))
         
@@ -581,7 +581,8 @@ class RingFinder:
                        bordercolor="#333333",
                        background=tree_bg,
                        foreground=tree_fg,
-                       fieldbackground=tree_bg)
+                       fieldbackground=tree_bg,
+                       font=("Segoe UI", 9))
         
         # Column header styling with borders
         style.configure("RingFinder.Treeview.Heading",
@@ -590,7 +591,8 @@ class RingFinder:
                        background=header_bg,
                        foreground=tree_fg,
                        padding=[5, 5],
-                       anchor="w")
+                       anchor="w",
+                       font=("Segoe UI", 9, "bold"))
         
         # Row selection styling
         style.map("RingFinder.Treeview",
@@ -934,6 +936,38 @@ class RingFinder:
             self.res_only_cb.configure(state="normal")
             self._on_material_changed()  # Restore min hotspots state
             self.status_var.set("")
+    
+    def _start_search_spinner(self):
+        """Start animated spinner on search button"""
+        self.search_spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        self.search_spinner_index = 0
+        self.search_spinner_active = True
+        self._update_search_spinner()
+    
+    def _stop_search_spinner(self):
+        """Stop animated spinner on search button"""
+        self.search_spinner_active = False
+        # Restore original button text
+        from localization import t
+        if hasattr(self, 'search_btn') and self.search_btn.winfo_exists():
+            self.search_btn.configure(text=t('ring_finder.search'))
+    
+    def _update_search_spinner(self):
+        """Update spinner animation frame"""
+        if not self.search_spinner_active:
+            return
+        
+        try:
+            from localization import t
+            char = self.search_spinner_chars[self.search_spinner_index]
+            self.search_btn.configure(text=f"{char} {t('ring_finder.search')}")
+            self.search_spinner_index = (self.search_spinner_index + 1) % len(self.search_spinner_chars)
+            
+            # Schedule next frame
+            if hasattr(self, 'parent') and self.parent.winfo_exists():
+                self.parent.after(100, self._update_search_spinner)
+        except:
+            self.search_spinner_active = False
     
     def _format_material_for_display(self, material_name: str) -> str:
         """Format material name for display in dropdown"""
@@ -1724,8 +1758,9 @@ class RingFinder:
             except (ValueError, AttributeError):
                 min_hotspots = 1
         
-        # Disable search button
-        self.search_btn.configure(state="disabled", text=t('ring_finder.searching'))
+        # Disable search button and start spinner
+        self.search_btn.configure(state="disabled")
+        self._start_search_spinner()
         self.status_var.set(t('ring_finder.searching'))
         
         # Check if Any Ring mode is enabled
@@ -1811,10 +1846,11 @@ class RingFinder:
             except:
                 pass  # Window already destroyed
         finally:
-            # Re-enable search button
+            # Re-enable search button and stop spinner
             try:
                 if self.parent.winfo_exists():
-                    self.parent.after(0, lambda: self.search_btn.configure(state="normal", text=t('ring_finder.search')) if self.parent.winfo_exists() else None)
+                    self._stop_search_spinner()
+                    self.parent.after(0, lambda: self.search_btn.configure(state="normal") if self.parent.winfo_exists() else None)
             except:
                 pass  # Window already destroyed
     

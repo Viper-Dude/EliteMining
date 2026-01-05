@@ -1800,14 +1800,16 @@ class ProspectorPanel(ttk.Frame):
                        bordercolor="#333333",
                        background=tree_bg,
                        foreground=tree_fg,
-                       fieldbackground=tree_bg)
+                       fieldbackground=tree_bg,
+                       font=("Segoe UI", 9))
         style.configure("ProspectorReports.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
                        background=header_bg,
                        foreground=tree_fg,
                        padding=[5, 5],
-                       anchor="w")
+                       anchor="w",
+                       font=("Segoe UI", 9, "bold"))
         style.map("ProspectorReports.Treeview",
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
@@ -1910,14 +1912,16 @@ class ProspectorPanel(ttk.Frame):
                        bordercolor="#333333",
                        background=tree_bg,
                        foreground=tree_fg,
-                       fieldbackground=tree_bg)
+                       fieldbackground=tree_bg,
+                       font=("Segoe UI", 9))
         style.configure("MineralAnalysis.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
                        background=header_bg,
                        foreground=tree_fg,
                        padding=[5, 5],
-                       anchor="w")
+                       anchor="w",
+                       font=("Segoe UI", 9, "bold"))
         style.map("MineralAnalysis.Treeview",
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
@@ -2613,14 +2617,16 @@ class ProspectorPanel(ttk.Frame):
                        bordercolor="#333333",
                        background=_rpt_bg,
                        foreground=_rpt_fg,
-                       fieldbackground=_rpt_bg)
+                       fieldbackground=_rpt_bg,
+                       font=("Segoe UI", 9))
         style.configure("Reports.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
                        background=_rpt_hdr,
                        foreground=_rpt_fg,
                        padding=[5, 5],
-                       anchor="w")
+                       anchor="w",
+                       font=("Segoe UI", 9, "bold"))
         style.map("Reports.Treeview",
                  background=[('selected', _rpt_sel_bg)],
                  foreground=[('selected', _rpt_sel_fg)])
@@ -4688,7 +4694,7 @@ class ProspectorPanel(ttk.Frame):
                 prompt_text = "Enter your name for Discord posts:"
                 
             title_label = tk.Label(main_frame, text=prompt_text, 
-                                  font=("Arial", 12), 
+                                  font=("Segoe UI", 10), 
                                   fg="#ffffff", bg="#1e1e1e",
                                   justify="left")
             title_label.pack(pady=(0, 10))
@@ -4720,7 +4726,7 @@ class ProspectorPanel(ttk.Frame):
             # Main info text
             main_text = "This will post your mining report to the\nEliteMining Community Discord server."
             main_label = tk.Label(info_frame, text=main_text,
-                                 font=("Arial", 9), 
+                                 font=("Segoe UI", 9), 
                                  fg="#ffffff", bg="#2a2a2a",
                                  justify="center")
             main_label.pack(padx=15, pady=(10, 5))
@@ -4743,7 +4749,7 @@ class ProspectorPanel(ttk.Frame):
             # "Join our community" text - always show this
             link_text = "Join our community"
             link_label = tk.Label(link_frame, text=link_text,
-                                 font=("Arial", 9, "underline"), 
+                                 font=("Segoe UI", 9, "underline"), 
                                  fg="#5865F2", bg="#2a2a2a",  # Discord blurple color
                                  cursor="hand2")
             if discord_logo:
@@ -4754,7 +4760,7 @@ class ProspectorPanel(ttk.Frame):
             
             # Add Discord URL below the link text for clarity
             url_label = tk.Label(link_frame, text="discord.gg/5dsF3UshRR",
-                                font=("Arial", 8), 
+                                font=("Segoe UI", 8), 
                                 fg="#888888", bg="#2a2a2a")
             if discord_logo:
                 url_label.pack(side="left", padx=(8, 0))
@@ -4762,7 +4768,7 @@ class ProspectorPanel(ttk.Frame):
                 url_label.pack(pady=(2, 0))
             
             # Username input
-            username_entry = tk.Entry(main_frame, font=("Arial", 11), width=35,
+            username_entry = tk.Entry(main_frame, font=("Segoe UI", 9), width=35,
                                      bg="#333333", fg="#ffffff", 
                                      insertbackground="#ffffff",
                                      relief="solid", bd=1)
@@ -7095,14 +7101,16 @@ class ProspectorPanel(ttk.Frame):
                        bordercolor="#333333",
                        background=_tab_bg,
                        foreground=_tab_fg,
-                       fieldbackground=_tab_bg)
+                       fieldbackground=_tab_bg,
+                       font=("Segoe UI", 9))
         style.configure("ReportsTab.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
                        background=_tab_hdr,
                        foreground=_tab_fg,
                        padding=[5, 5],
-                       anchor="w")
+                       anchor="w",
+                       font=("Segoe UI", 9, "bold"))
         style.map("ReportsTab.Treeview",
                  background=[('selected', _tab_sel_bg)],
                  foreground=[('selected', _tab_sel_fg)])

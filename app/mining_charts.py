@@ -146,7 +146,7 @@ class MiningChartsPanel:
                             text=t('graphs.charts_not_available') + "\n"
                                  "Charts functionality is disabled in this build",
                             justify='center',
-                            font=('TkDefaultFont', 10))
+                            font=('Segoe UI', 9))
             label.pack(expand=True)
             return
         
