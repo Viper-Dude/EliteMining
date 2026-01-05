@@ -1715,7 +1715,7 @@ class ProspectorPanel(ttk.Frame):
         rep = ttk.Frame(nb, padding=8)
         rep.columnconfigure(0, weight=1)
         rep.columnconfigure(1, weight=0)
-        rep.rowconfigure(4, weight=1)  # Updated for new ship info row
+        rep.rowconfigure(4, weight=1)  # PanedWindow gets the weight
         nb.add(rep, text=t('mining_session.mining_analytics'))
 
         # --- Distance and Ship Info Row ---
@@ -1771,7 +1771,17 @@ class ProspectorPanel(ttk.Frame):
         # self.va_lbl = tk.Label(vrow, text=self.vars_dir, fg="gray", font=("Segoe UI", 9))
         # self.va_lbl.pack(side="left", padx=(6, 0))
 
-        ttk.Label(rep, text=t('mining_session.prospector_reports'), font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 4))
+        # Create PanedWindow for adjustable table heights
+        self.tables_paned = ttk.PanedWindow(rep, orient=tk.VERTICAL)
+        self.tables_paned.grid(row=3, column=0, rowspan=2, columnspan=2, sticky="nsew", pady=(6, 0))
+        
+        # Prospector Reports pane
+        prospector_pane = ttk.Frame(self.tables_paned)
+        self.tables_paned.add(prospector_pane, weight=1)
+        prospector_pane.columnconfigure(0, weight=1)
+        prospector_pane.rowconfigure(1, weight=1)
+        
+        ttk.Label(prospector_pane, text=t('mining_session.prospector_reports'), font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 4))
 
         # Configure Prospector Reports Treeview style based on theme
         from config import load_theme
@@ -1825,10 +1835,10 @@ class ProspectorPanel(ttk.Frame):
         ])
 
         # Create wrapper frame for bordered table
-        tree_frame_prospector = ttk.Frame(rep, relief="solid", borderwidth=1)
-        tree_frame_prospector.grid(row=4, column=0, sticky="nsew")
+        tree_frame_prospector = ttk.Frame(prospector_pane, relief="solid", borderwidth=1)
+        tree_frame_prospector.grid(row=1, column=0, sticky="nsew")
 
-        self.tree = ttk.Treeview(tree_frame_prospector, columns=("materials", "content", "time"), show="headings", height=5, style="ProspectorReports.Treeview")
+        self.tree = ttk.Treeview(tree_frame_prospector, columns=("materials", "content", "time"), show="headings", height=4, style="ProspectorReports.Treeview")
         self.tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
         self.tree.heading("materials", text=t('mining_session.minerals'), anchor="w")
@@ -1892,17 +1902,24 @@ class ProspectorPanel(ttk.Frame):
         self.tree.bind("<Leave>", hide_prospector_tooltip)
 
         # --- Live Mining Statistics Section ---
-        mineral_header_frame = ttk.Frame(rep)
-        mineral_header_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(10, 4))
+        # Material Analysis pane
+        material_pane = ttk.Frame(self.tables_paned)
+        self.tables_paned.add(material_pane, weight=1)
+        material_pane.columnconfigure(0, weight=1)
+        material_pane.rowconfigure(1, weight=1)
+        
+        mineral_header_frame = ttk.Frame(material_pane)
+        mineral_header_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         mineral_header_frame.columnconfigure(1, weight=1)
         
         ttk.Label(mineral_header_frame, text=t('mining_session.material_analysis'), font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
         ttk.Label(mineral_header_frame, text=t('mining_session.double_click_hint'), 
                   font=("Segoe UI", 8), foreground="#888888").grid(row=0, column=1, sticky="e")
         
-        stats_frame = ttk.Frame(rep)
-        stats_frame.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(0, 0))
+        stats_frame = ttk.Frame(material_pane)
+        stats_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(0, 0))
         stats_frame.columnconfigure(0, weight=1)
+        stats_frame.rowconfigure(0, weight=1)
         
         # Configure Mineral Analysis Treeview style (theme-aware - uses same vars from ProspectorReports)
         style.configure("MineralAnalysis.Treeview",
@@ -1942,7 +1959,7 @@ class ProspectorPanel(ttk.Frame):
         
         # Statistics tree for live percentage yields
         self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"), 
-                           show="headings", height=5, style="MineralAnalysis.Treeview")
+                           show="headings", height=7, style="MineralAnalysis.Treeview")
         self.stats_tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.stats_tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
         self.stats_tree.heading("material", text=t('mining_session.mineral_thr'), anchor="w")
@@ -2028,9 +2045,9 @@ class ProspectorPanel(ttk.Frame):
         
         self.stats_tree.bind("<Leave>", hide_mineral_tooltip)
         
-        # Session summary labels
-        summary_frame = ttk.Frame(stats_frame)
-        summary_frame.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        # Session summary labels (below PanedWindow)
+        summary_frame = ttk.Frame(rep)
+        summary_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         summary_frame.columnconfigure(1, weight=1)
         
         ttk.Label(summary_frame, text=t('mining_session.session_summary'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w")
@@ -2038,8 +2055,8 @@ class ProspectorPanel(ttk.Frame):
         self.stats_summary_label.grid(row=0, column=1, sticky="w", padx=(10, 0))
         
         # Session controls (moved from Session tab)
-        controls_frame = ttk.Frame(stats_frame)
-        controls_frame.grid(row=3, column=0, sticky="ew", pady=(4, 0))
+        controls_frame = ttk.Frame(rep)
+        controls_frame.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(4, 0))
         controls_frame.columnconfigure(0, weight=0)  # Left: session controls
         controls_frame.columnconfigure(1, weight=1, minsize=140)  # Center: elapsed time (expandable with min width)
         controls_frame.columnconfigure(2, weight=0)  # Right: export button
