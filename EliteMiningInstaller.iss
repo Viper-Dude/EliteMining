@@ -41,8 +41,10 @@ Source: "app\Ship Presets\*";  DestDir: "{app}\app\Ship Presets";  Flags: recurs
 ; New Configurator executable
 Source: "dist\EliteMining.exe"; DestDir: "{app}\Configurator"; Flags: ignoreversion
 
-; EliteMiningPlugin.dll (VoiceAttack plugin for variable access)
-Source: "EliteMiningPlugin\bin\Release\net48\EliteMiningPlugin.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Check: IsVADetected
+; EliteMiningPlugin.dll (VoiceAttack plugin for variable access) - only update if version changed
+Source: "EliteMiningPlugin\bin\Release\net48\EliteMiningPlugin.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Check: ShouldInstallPlugin
+; Plugin version file
+Source: "app\elitemining_plugin_version.txt"; DestDir: "{app}\app"; Flags: ignoreversion; Check: IsVADetected
 
 ; Local systems database (~14 MB) - populated systems within the bubble for fast searches
 Source: "app\data\galaxy_systems.db"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
@@ -117,10 +119,14 @@ UninstalledAll=EliteMining has been successfully uninstalled.%n%nNOTE: Some file
 var
   VADetected: Boolean;
   InstallEliteAPI: Boolean;
+  InstallPlugin: Boolean;
   VABasePath: String;  { Store VoiceAttack base path for EliteAPI checking }
   ExistingEliteAPIPath: String;  { Store actual path where EliteAPI.dll was found }
   VersionFile: String;  { Path to EliteAPI_Version.txt }
   ExistingVersion: AnsiString;  { Version string from EliteAPI_Version.txt }
+  PluginVersionFile: String;  { Path to elitemining_plugin_version.txt }
+  ExistingPluginVersion: AnsiString;  { Version string from plugin version file }
+  NewPluginVersion: AnsiString;  { New plugin version being installed }
 
 function IsVADetected: Boolean;
 begin
@@ -138,6 +144,43 @@ end;
 function ShouldInstallEliteAPI: Boolean;
 begin
   Result := InstallEliteAPI;
+end;
+
+function ShouldInstallPlugin: Boolean;
+begin
+  Result := InstallPlugin and IsVADetected;
+end;
+
+function ComparePluginVersion: Boolean;
+var
+  ExistingVerStr: String;
+  NewVerStr: String;
+begin
+  { Default to install if can't determine }
+  Result := True;
+  
+  { Check if existing version file exists }
+  PluginVersionFile := ExpandConstant('{app}') + '\app\elitemining_plugin_version.txt';
+  if not FileExists(PluginVersionFile) then
+    Exit;  { No existing version, install }
+  
+  { Load existing version }
+  if not LoadStringFromFile(PluginVersionFile, ExistingPluginVersion) then
+    Exit;  { Can't read, install }
+  
+  ExistingVerStr := Trim(String(ExistingPluginVersion));
+  
+  { Load new version from source }
+  if not LoadStringFromFile(ExpandConstant('{src}\app\elitemining_plugin_version.txt'), NewPluginVersion) then
+    Exit;  { Can't read new version, install }
+  
+  NewVerStr := Trim(String(NewPluginVersion));
+  
+  { Compare versions - if different, need to install }
+  Result := (ExistingVerStr <> NewVerStr);
+  
+  if not Result then
+    Log('Plugin version unchanged (' + ExistingVerStr + '), skipping DLL update');
 end;
 
 function IsVoiceAttackRunning: Boolean;
@@ -370,8 +413,12 @@ begin
   InstallEliteAPI := VADetected;
   ExistingEliteAPIPath := '';
   
+  { Check if plugin version needs updating }
+  InstallPlugin := ComparePluginVersion();
+  
   Log('VADetected: ' + BoolToStr(VADetected));
   Log('VABasePath: ' + VABasePath);
+  Log('InstallPlugin: ' + BoolToStr(InstallPlugin));
   
   { If VoiceAttack detected, search for existing EliteAPI installation }
   if VADetected and (VABasePath <> '') then
