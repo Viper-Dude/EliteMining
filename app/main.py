@@ -15999,14 +15999,50 @@ class App(tk.Tk):
     
     def _check_va_profile_update(self):
         """Check for VoiceAttack profile updates on startup"""
+        # DEBUG: Write to file for troubleshooting
+        debug_file = None
         try:
-            # Only check if VoiceAttack is detected
-            if not hasattr(self, 'va_root') or not self.va_root:
+            from path_utils import get_app_data_dir
+            debug_file = os.path.join(get_app_data_dir(), "va_profile_check_debug.txt")
+            with open(debug_file, 'w') as f:
+                f.write("=== VA Profile Check Debug Log ===\n")
+        except:
+            pass
+        
+        def debug_log(msg):
+            if debug_file:
+                try:
+                    with open(debug_file, 'a') as f:
+                        f.write(f"{msg}\n")
+                except:
+                    pass
+            logging.info(f"[VA_PROFILE] {msg}")
+        
+        try:
+            import os  # Ensure os is available throughout this function
+            debug_log("Check started")
+            
+            # Determine VA folder - use configured root or try to find it
+            va_folder = None
+            if hasattr(self, 'va_root') and self.va_root:
+                va_folder = self.va_root
+                debug_log(f"Using configured VA root: {va_folder}")
+            else:
+                debug_log("No va_root attribute, trying standard location")
+                # Try to find VA Apps/EliteMining folder for testing
+                # Standard VA location: C:\Users\<user>\AppData\Local\VoiceAttack.com\VoiceAttack\Apps\EliteMining
+                local_appdata = os.getenv('LOCALAPPDATA')
+                if local_appdata:
+                    test_path = os.path.join(local_appdata, 'VoiceAttack.com', 'VoiceAttack', 'Apps', 'EliteMining')
+                    if os.path.exists(test_path):
+                        va_folder = test_path
+                        debug_log(f"Found VA folder at standard location: {test_path}")
+            
+            if not va_folder or not os.path.exists(va_folder):
+                debug_log(f"No VA folder found, exiting (va_folder={va_folder})")
                 return
             
-            va_folder = self.va_root
-            if not os.path.exists(va_folder):
-                return
+            debug_log(f"VA folder confirmed: {va_folder}")
             
             from path_utils import get_app_data_dir
             import json
@@ -16029,8 +16065,10 @@ class App(tk.Tk):
                     profile_files = [old_profile]
             
             if not profile_files:
-                logging.info(f"[VA_PROFILE] No profile file found in: {va_folder}")
+                debug_log(f"No profile file found in: {va_folder}")
                 return
+            
+            debug_log(f"Found {len(profile_files)} profile file(s): {profile_files}")
             
             # If multiple profile files, pick the one with highest version
             def extract_version(filepath):
@@ -16050,7 +16088,7 @@ class App(tk.Tk):
                 profile_files.sort(key=lambda f: extract_version(f), reverse=True)
             
             new_profile_path = profile_files[0]
-            logging.info(f"[VA_PROFILE] Found {len(profile_files)} profile(s), using newest: {new_profile_path}")
+            debug_log(f"Using profile: {new_profile_path}")
             
             # Parse new profile to get its version
             try:
@@ -16058,9 +16096,10 @@ class App(tk.Tk):
                 parser = VAProfileParser()
                 tree = parser.parse(new_profile_path)
                 new_version = parser.get_profile_version(tree)
+                debug_log(f"Profile version: {new_version}")
                 
                 if new_version == "unknown":
-                    logging.info("[VA_PROFILE] Could not extract version from profile")
+                    debug_log("Could not extract version from profile, exiting")
                     return
                 
                 # Load last known installed version from state file
@@ -16070,22 +16109,50 @@ class App(tk.Tk):
                         with open(state_file, 'r') as f:
                             state = json.load(f)
                             installed_version = state.get('installed_version')
-                    except:
-                        pass
+                        debug_log(f"State file exists, installed_version: {installed_version}")
+                    except Exception as e:
+                        debug_log(f"Error reading state file: {e}")
+                else:
+                    debug_log("No state file found (first run)")
                 
-                logging.info(f"[VA_PROFILE] Installed: {installed_version}, Available: {new_version}")
+                debug_log(f"Installed: {installed_version}, Available: {new_version}")
                 
-                # If first run or version is different, show dialog
+                # Check if this is truly a first install or an existing user
                 if installed_version is None:
-                    # First run - just save the version, don't show dialog
-                    self._save_va_profile_state(state_file, new_version)
-                    logging.info(f"[VA_PROFILE] First run - saved version: {new_version}")
+                    # No state file - check if old profile exists (existing user from pre-v4.76)
+                    # Old naming convention: EliteMining-Profile.vap (no version in filename)
+                    # New naming convention: EliteMining v4.76-Profile.vap (version in filename)
+                    old_profile = os.path.join(va_folder, "EliteMining-Profile.vap")
+                    
+                    if os.path.exists(old_profile):
+                        # Old profile exists - this is an existing user upgrading from v4.75 or earlier
+                        debug_log(f"Found old profile format: {old_profile}")
+                        try:
+                            old_tree = parser.parse(old_profile)
+                            old_version = parser.get_profile_version(old_tree)
+                            debug_log(f"Old profile version: {old_version}")
+                            
+                            if old_version != "unknown":
+                                # Show update dialog with old version
+                                debug_log(f"Upgrade from old profile: {old_version} -> {new_version}")
+                                self._show_va_profile_update_dialog(old_version, new_version, new_profile_path)
+                            else:
+                                # Couldn't parse old version - show dialog anyway for existing users
+                                debug_log("Existing user (old profile, version unknown) - showing dialog")
+                                self._show_va_profile_update_dialog(None, new_version, new_profile_path)
+                        except Exception as e:
+                            debug_log(f"Error parsing old profile: {e} - showing dialog anyway")
+                            self._show_va_profile_update_dialog(None, new_version, new_profile_path)
+                    else:
+                        # No old profile - true first install (only new versioned profile exists)
+                        debug_log("True first install - creating state file silently")
+                        self._save_va_profile_state(state_file, new_version)
                 elif installed_version != new_version:
-                    # Version changed - show update dialog
-                    logging.info(f"[VA_PROFILE] Update available: {installed_version} -> {new_version}")
+                    # Version changed - show update dialog with keybind preservation
+                    debug_log(f"Update available: {installed_version} -> {new_version}")
                     self._show_va_profile_update_dialog(installed_version, new_version, new_profile_path)
                 else:
-                    logging.info(f"[VA_PROFILE] Profile up to date: {new_version}")
+                    debug_log(f"Profile up to date: {new_version}")
                     
             except Exception as e:
                 logging.error(f"[VA_PROFILE] Error checking new profile version: {e}")
@@ -16111,6 +16178,7 @@ class App(tk.Tk):
             from tkinter import filedialog
             import json
             
+            # Show update message with keybind preservation info
             message = t("voiceattack.profile_update_message").format(
                 current=current_version,
                 new=new_version

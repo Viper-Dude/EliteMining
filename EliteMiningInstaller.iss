@@ -24,10 +24,8 @@ UninstallDisplayIcon={app}\Configurator\EliteMining.exe
 Type: files; Name: "{app}\Configurator\Configurator.exe"
 ; Delete old MIT LICENSE.txt (replaced with GPLv3 LICENSE in v4.4.1+)
 Type: files; Name: "{app}\LICENSE.txt"
-; Delete old versioned profile files (keep only the new version)
-Type: files; Name: "{app}\EliteMining v*-Profile.vap"
-; Delete old non-versioned profile file
-Type: files; Name: "{app}\EliteMining-Profile.vap"
+; NOTE: Never delete profile files - user's choice what to keep
+; The app handles profile version detection and keybind preservation
 ; v4.7.6+: Clean EliteAPI folder completely to ensure fresh install of all files (only if user confirmed)
 Type: filesandordirs; Name: "{app}\..\EliteAPI\*"; Check: ShouldInstallEliteAPI
 
@@ -505,6 +503,12 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   OldEliteVAPath: String;
+  StateFilePath: String;
+  OldProfilePath: String;
+  StateContent: AnsiString;
+  ProfileVersion: String;
+  FindRec: TFindRec;
+  ProfileFilename: String;
 begin
   { Clean up old EliteVA folder from previous versions (renamed to EliteAPI) }
   if (CurStep = ssInstall) and (VABasePath <> '') then
@@ -517,6 +521,75 @@ begin
         Log('Successfully removed old EliteVA folder')
       else
         Log('Warning: Failed to remove old EliteVA folder');
+    end;
+  end;
+  
+  { Create VA profile state file only on TRUE FIRST INSTALL }
+  { If old profile (EliteMining-Profile.vap) exists, this is an upgrade - let app handle it }
+  if (CurStep = ssPostInstall) and IsVADetected then
+  begin
+    StateFilePath := ExpandConstant('{app}\app\va_profile_state.json');
+    OldProfilePath := ExpandConstant('{app}\EliteMining-Profile.vap');
+    
+    { Only create state file if:
+      1. State file doesn't already exist
+      2. AND no old profile exists (true first install, not upgrade from v4.75) }
+    if (not FileExists(StateFilePath)) and (not FileExists(OldProfilePath)) then
+    begin
+      ProfileVersion := '';
+      
+      { Find installed profile file and extract version from filename }
+      { Pattern: EliteMining v4.76-Profile.vap -> extract "4.76" }
+      { Skip Dev profiles - only use production profiles }
+      if FindFirst(ExpandConstant('{app}\EliteMining v*-Profile.vap'), FindRec) then
+      begin
+        try
+          ProfileFilename := FindRec.Name;
+          
+          { Skip if this is a Dev profile }
+          if Pos('Dev', ProfileFilename) > 0 then
+          begin
+            Log('Skipping Dev profile: ' + ProfileFilename);
+          end
+          else
+          begin
+            Log('Found production profile file: ' + ProfileFilename);
+          
+            { Extract version between "v" and "-Profile.vap" }
+            { Example: "EliteMining v4.76-Profile.vap" -> "4.76" }
+            if Pos('v', ProfileFilename) > 0 then
+            begin
+              ProfileVersion := Copy(ProfileFilename, Pos('v', ProfileFilename) + 1, Length(ProfileFilename));
+              ProfileVersion := Copy(ProfileVersion, 1, Pos('-Profile.vap', ProfileVersion) - 1);
+              Log('Extracted profile version: ' + ProfileVersion);
+            end;
+          end;
+        finally
+          FindClose(FindRec);
+        end;
+      end;
+      
+      { Fallback to app version if profile version extraction failed }
+      if ProfileVersion = '' then
+      begin
+        ProfileVersion := '4.76';
+        Log('Warning: Could not extract profile version from filename, using default: ' + ProfileVersion);
+      end;
+      
+      StateContent := '{"installed_version": "' + ProfileVersion + '"}';
+      Log('True first install - Creating VA profile state file: ' + StateFilePath);
+      if SaveStringToFile(StateFilePath, StateContent, False) then
+        Log('Successfully created va_profile_state.json with version ' + ProfileVersion)
+      else
+        Log('Warning: Failed to create va_profile_state.json');
+    end
+    else if FileExists(OldProfilePath) then
+    begin
+      Log('Upgrade detected - Old profile exists (EliteMining-Profile.vap), app will handle keybind preservation');
+    end
+    else
+    begin
+      Log('Update detected - Preserving existing va_profile_state.json, app will detect profile changes');
     end;
   end;
   

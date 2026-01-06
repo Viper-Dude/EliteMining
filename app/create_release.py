@@ -147,14 +147,16 @@ class ReleaseBuilder:
                     ("LICENSE.txt", "LICENSE.txt")
                 ]
                 
-                # Find versioned profile file (EliteMining v*-Profile.vap)
+                # Find versioned profile file (EliteMining v*-Profile.vap), exclude Dev profiles
                 profile_files = list(self.project_root.glob("EliteMining v*-Profile.vap"))
+                # Filter out Dev profiles
+                profile_files = [f for f in profile_files if 'Dev' not in f.name]
                 if profile_files:
                     profile_file = profile_files[0]  # Use first match
                     zipf.write(profile_file, f"EliteMining/{profile_file.name}")
                     print(f"✅ Added: EliteMining/{profile_file.name}")
                 else:
-                    print("⚠️  No versioned profile file found (EliteMining v*-Profile.vap)")
+                    print("⚠️  No production profile file found (EliteMining v*-Profile.vap, excluding Dev)")
                 
                 for source_file, dest_file in config_files:
                     config_path = self.project_root / source_file

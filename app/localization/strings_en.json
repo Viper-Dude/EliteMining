@@ -486,7 +486,7 @@
     "no_keybinds_title": "No Keybinds Found",
     "no_keybinds_message": "No custom keybinds found in your exported profile.\n\nThis is normal if you haven't customized any voice commands.\n\nImport the new profile normally - no keybinds to preserve.",
     "merge_success_title": "Keybinds Merged Successfully!",
-    "merge_success_message": "✅ {count} keybinds have been merged into the new profile!\n\nNow import the updated profile into VoiceAttack:\n\n1. Open VoiceAttack\n2. Click 'Import Profile'\n3. Select:\n   {path}\n\nYour keybinds will be preserved in the new profile.\n\nOptional cleanup:\nAfter successful import, you can delete the old profile in VoiceAttack\nand remove the backup file (recommended: keep backup for safety).",
+    "merge_success_message": "✅ {count} keybinds have been merged into the new profile!\n\nNow import the updated profile into VoiceAttack:\n\n1. Open VoiceAttack\n2. Click 'Import Profile'\n3. Select:\n   {path}\n\nYour keybinds are now preserved in the new profile.\n\nOptional cleanup (after successful import):\n• Delete the old profile inside VoiceAttack\n• Delete old profile file(s) from the EliteMining folder\n  (e.g., EliteMining-Profile.vap or old versioned profiles)",
     "tool_seismic": "Seismic charge launcher:",
     "tool_weapons": "Weapons:",
     "tool_ssm": "Sub-surface displacement missile:"
