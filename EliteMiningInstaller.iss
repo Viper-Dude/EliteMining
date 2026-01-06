@@ -151,38 +151,6 @@ begin
   Result := InstallPlugin and IsVADetected;
 end;
 
-function ComparePluginVersion: Boolean;
-var
-  ExistingVerStr: String;
-  NewVerStr: String;
-begin
-  { Default to install if can't determine }
-  Result := True;
-  
-  { Check if existing version file exists }
-  PluginVersionFile := ExpandConstant('{app}') + '\app\elitemining_plugin_version.txt';
-  if not FileExists(PluginVersionFile) then
-    Exit;  { No existing version, install }
-  
-  { Load existing version }
-  if not LoadStringFromFile(PluginVersionFile, ExistingPluginVersion) then
-    Exit;  { Can't read, install }
-  
-  ExistingVerStr := Trim(String(ExistingPluginVersion));
-  
-  { Load new version from source }
-  if not LoadStringFromFile(ExpandConstant('{src}\app\elitemining_plugin_version.txt'), NewPluginVersion) then
-    Exit;  { Can't read new version, install }
-  
-  NewVerStr := Trim(String(NewPluginVersion));
-  
-  { Compare versions - if different, need to install }
-  Result := (ExistingVerStr <> NewVerStr);
-  
-  if not Result then
-    Log('Plugin version unchanged (' + ExistingVerStr + '), skipping DLL update');
-end;
-
 function IsVoiceAttackRunning: Boolean;
 var
   ResultCode: Integer;
@@ -413,11 +381,54 @@ begin
   InstallEliteAPI := VADetected;
   ExistingEliteAPIPath := '';
   
-  { Check if plugin version needs updating }
-  InstallPlugin := ComparePluginVersion();
+  { Default: Install plugin if VoiceAttack detected }
+  InstallPlugin := VADetected;
   
   Log('VADetected: ' + BoolToStr(VADetected));
   Log('VABasePath: ' + VABasePath);
+  
+  { Check if plugin version needs updating (only if VA detected) }
+  { NOTE: New version is HARDCODED here - update when plugin changes! }
+  if VADetected and (VABasePath <> '') then
+  begin
+    { Get the installation directory - use VABasePath + Apps\EliteMining }
+    PluginVersionFile := VABasePath + '\Apps\EliteMining\app\elitemining_plugin_version.txt';
+    
+    Log('Checking plugin version file: ' + PluginVersionFile);
+    
+    if FileExists(PluginVersionFile) then
+    begin
+      { Load existing version }
+      if LoadStringFromFile(PluginVersionFile, ExistingPluginVersion) then
+      begin
+        ExistingPluginVersion := Trim(ExistingPluginVersion);
+        Log('Existing plugin version: ' + String(ExistingPluginVersion));
+        
+        { Compare with hardcoded new version (same approach as EliteAPI) }
+        if ExistingPluginVersion = '1.0.0' then
+        begin
+          Log('Plugin version unchanged (1.0.0) - skipping plugin update');
+          InstallPlugin := False;
+        end
+        else
+        begin
+          Log('Plugin version different - will update plugin');
+          InstallPlugin := True;
+        end;
+      end
+      else
+      begin
+        Log('Could not read existing plugin version - will install');
+        InstallPlugin := True;
+      end;
+    end
+    else
+    begin
+      Log('No existing plugin version file - will install');
+      InstallPlugin := True;
+    end;
+  end;
+  
   Log('InstallPlugin: ' + BoolToStr(InstallPlugin));
   
   { If plugin needs updating and VoiceAttack is running, warn user }
@@ -458,11 +469,11 @@ begin
           ExistingVersion := Trim(ExistingVersion);
           Log('Existing EliteAPI version: ' + ExistingVersion);
           
-          { If already v5.0.7, silently install without prompting }
+          { If already v5.0.7, skip - no need to update }
           if ExistingVersion = '5.0.7' then
           begin
-            Log('EliteAPI v5.0.7 already installed - auto-updating silently');
-            InstallEliteAPI := True;
+            Log('EliteAPI v5.0.7 already installed - skipping EliteAPI update');
+            InstallEliteAPI := False;
             { Skip to end - no dialog needed }
           end
           else
