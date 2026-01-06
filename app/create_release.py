@@ -180,6 +180,7 @@ class ReleaseBuilder:
                     item_path = app_dir / item
                     if item_path.exists():
                         if item_path.is_dir():
+                            has_files = False
                             # Add directory and all its contents
                             for file_path in item_path.rglob('*'):
                                 if file_path.is_file():
@@ -189,7 +190,17 @@ class ReleaseBuilder:
                                         continue
                                     arc_name = f"EliteMining/app/{item}/{file_path.relative_to(item_path)}"
                                     zipf.write(file_path, arc_name)
-                            print(f"✅ Added: EliteMining/app/{item}/ (directory)")
+                                    has_files = True
+                            
+                            # For Reports folder, ensure empty structure exists even if no files
+                            if item == "Reports" and not has_files:
+                                # Create empty Reports/Mining Session directory structure
+                                zipf.writestr(f"EliteMining/app/Reports/Mining Session/", "")
+                                zipf.writestr(f"EliteMining/app/Reports/Mining Session/Cards/", "")
+                                zipf.writestr(f"EliteMining/app/Reports/Mining Session/Detailed Reports/", "")
+                                print(f"✅ Added: EliteMining/app/Reports/ (empty structure)")
+                            else:
+                                print(f"✅ Added: EliteMining/app/{item}/ (directory)")
                 
                 # Add localization folder (required for UI translations)
                 localization_dir = app_dir / "localization"
