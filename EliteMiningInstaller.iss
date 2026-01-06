@@ -366,24 +366,6 @@ var
 begin
   { Installer automatically appends \EliteMining to base directory }
   
-  { Check if VoiceAttack is running }
-  if IsVoiceAttackRunning then
-  begin
-    MsgResult := MsgBox(
-      '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
-      'VoiceAttack must be CLOSED before installing EliteMining.' + #13#10 +
-      'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
-      'Please close VoiceAttack now and click OK to continue.' + #13#10 +
-      'Click Cancel to exit the installer.',
-      mbError, MB_OKCANCEL);
-    
-    if MsgResult = IDCANCEL then
-    begin
-      WizardForm.Close;
-      Exit;
-    end;
-  end;
-  
   { Default: Install EliteAPI if VoiceAttack is detected }
   InstallEliteAPI := VADetected;
   ExistingEliteAPIPath := '';
@@ -419,24 +401,38 @@ begin
           end
           else
           begin
-            { Older version - ask about update }
+            { Older version - ask about update, but first check if VoiceAttack is running }
+            if IsVoiceAttackRunning then
+            begin
+              MsgResult := MsgBox(
+                '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
+                'VoiceAttack must be CLOSED before installing EliteMining.' + #13#10 +
+                'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
+                'Please close VoiceAttack now and click OK to continue.' + #13#10 +
+                'Click Cancel to exit the installer.',
+                mbError, MB_OKCANCEL);
+              
+              if MsgResult = IDCANCEL then
+              begin
+                WizardForm.Close;
+                Exit;
+              end;
+            end;
+            
             FolderName := ExtractFileName(ExistingEliteAPIPath);
             
             MsgResult := MsgBox(
-              'EliteAPI v' + ExistingVersion + ' detected in folder:' + #13#10 +
-              FolderName + #13#10 +
-              'Full path: ' + ExistingEliteAPIPath + #13#10 + #13#10 +
-              'This release includes EliteAPI v5.0.7 with improved stability.' + #13#10 + #13#10 +
-              'Do you want to UPDATE your EliteAPI installation?' + #13#10 + #13#10 +
-              'YES - Update to EliteAPI v5.0.7 (RECOMMENDED)' + #13#10 +
-              '  • All existing files will be deleted and replaced' + #13#10 +
-              '  • Latest features and bug fixes' + #13#10 +
-              '  • Full VoiceAttack voice command support' + #13#10 + #13#10 +
-              'NO - Keep current EliteAPI v' + ExistingVersion + #13#10 +
-              '  ⚠️ WARNING: Many EliteMining VoiceAttack functions will NOT work!' + #13#10 +
-              '  ⚠️ Voice commands may fail or behave incorrectly' + #13#10 +
-              '  • Only choose this if you have specific custom modifications' + #13#10 + #13#10 +
-              'Learn more about EliteAPI: https://github.com/Somfic/EliteAPI',
+              'EliteAPI v' + ExistingVersion + ' found in: ' + FolderName + #13#10 +
+              'Path: ' + ExistingEliteAPIPath + #13#10 + #13#10 +
+              'Update to v5.0.7 (RECOMMENDED)?'  + #13#10 + #13#10 +
+              'YES:' + #13#10 +
+              '  ✔ Latest features & bug fixes' + #13#10 +
+              '  ✔ Full VoiceAttack support' + #13#10 +
+              '  • Existing files replaced' + #13#10 + #13#10 +
+              'NO:' + #13#10 +
+              '  ⚠️ Voice commands may fail' + #13#10 +
+              '  • Only if you have custom mods' + #13#10 + #13#10 +
+              'ⓘ EliteAPI by Somfic | Only one EliteAPI/EliteVA installation allowed',
               mbConfirmation, MB_YESNO);
               
             if MsgResult = IDYES then
@@ -448,25 +444,39 @@ begin
       end
       else
       begin
-        { No version file - old installation, ask about update }
+        { No version file - old installation, ask about update, but first check if VoiceAttack is running }
+        if IsVoiceAttackRunning then
+        begin
+          MsgResult := MsgBox(
+            '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
+            'VoiceAttack must be CLOSED before installing EliteMining.' + #13#10 +
+            'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
+            'Please close VoiceAttack now and click OK to continue.' + #13#10 +
+            'Click Cancel to exit the installer.',
+            mbError, MB_OKCANCEL);
+          
+          if MsgResult = IDCANCEL then
+          begin
+            WizardForm.Close;
+            Exit;
+          end;
+        end;
+        
         FolderName := ExtractFileName(ExistingEliteAPIPath);
         Log('No version file found - old EliteAPI installation');
         
         MsgResult := MsgBox(
-          'EliteAPI installation detected in folder:' + #13#10 +
-          FolderName + #13#10 +
-          'Full path: ' + ExistingEliteAPIPath + #13#10 + #13#10 +
-          'This release includes EliteAPI v5.0.7 with improved stability.' + #13#10 + #13#10 +
-          'Do you want to UPDATE your EliteAPI installation?' + #13#10 + #13#10 +
-          'YES - Update to EliteAPI v5.0.7 (RECOMMENDED)' + #13#10 +
-          '  • All existing files will be deleted and replaced' + #13#10 +
-          '  • Latest features and bug fixes' + #13#10 +
-          '  • Full VoiceAttack voice command support' + #13#10 + #13#10 +
-          'NO - Keep current EliteAPI' + #13#10 +
-          '  ⚠️ WARNING: Many EliteMining VoiceAttack functions will NOT work!' + #13#10 +
-          '  ⚠️ Voice commands may fail or behave incorrectly' + #13#10 +
-          '  • Only choose this if you have specific custom modifications' + #13#10 + #13#10 +
-          'Learn more about EliteAPI: https://github.com/Somfic/EliteAPI',
+          'EliteAPI found in: ' + FolderName + #13#10 +
+          'Path: ' + ExistingEliteAPIPath + #13#10 + #13#10 +
+          'Update to v5.0.7 (RECOMMENDED)?'  + #13#10 + #13#10 +
+          'YES:' + #13#10 +
+          '  ✔ Latest features & bug fixes' + #13#10 +
+          '  ✔ Full VoiceAttack support' + #13#10 +
+          '  • Existing files replaced' + #13#10 + #13#10 +
+          'NO:' + #13#10 +
+          '  ⚠️ Voice commands may fail' + #13#10 +
+          '  • Only if you have custom mods' + #13#10 + #13#10 +
+          'ⓘ EliteAPI by Somfic | Only one EliteAPI/EliteVA installation allowed',
           mbConfirmation, MB_YESNO);
           
         if MsgResult = IDYES then
@@ -478,18 +488,35 @@ begin
     else
     begin
       { No existing installation - ask about fresh INSTALL }
+      { Check if VoiceAttack is running before installing EliteAPI }
+      if IsVoiceAttackRunning then
+      begin
+        MsgResult := MsgBox(
+          '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
+          'VoiceAttack must be CLOSED before installing EliteMining.' + #13#10 +
+          'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
+          'Please close VoiceAttack now and click OK to continue.' + #13#10 +
+          'Click Cancel to exit the installer.',
+          mbError, MB_OKCANCEL);
+        
+        if MsgResult = IDCANCEL then
+        begin
+          WizardForm.Close;
+          Exit;
+        end;
+      end;
+      
       MsgResult := MsgBox(
-        'VoiceAttack detected but EliteAPI not found.' + #13#10 + #13#10 +
-        'This release includes EliteAPI v5.0.7.' + #13#10 + #13#10 +
-        'Do you want to INSTALL EliteAPI?' + #13#10 + #13#10 +
-        'YES - Install EliteAPI v5.0.7 (RECOMMENDED)' + #13#10 +
-        '  • Enables VoiceAttack voice commands' + #13#10 +
-        '  • Full mining assistance automation' + #13#10 +
-        '  • Real-time game state integration' + #13#10 + #13#10 +
-        'NO - Skip EliteAPI installation' + #13#10 +
-        '  ⚠️ WARNING: VoiceAttack voice commands will NOT work!' + #13#10 +
-        '  • Only configurator features will be available' + #13#10 + #13#10 +
-        'Learn more about EliteAPI: https://github.com/Somfic/EliteAPI',
+        'VoiceAttack detected!' + #13#10 +
+        'EliteAPI v5.0.7 not found.' + #13#10 + #13#10 +
+        'Install EliteAPI (RECOMMENDED)?' + #13#10 + #13#10 +
+        'YES:' + #13#10 +
+        '  ✔ Enables voice commands' + #13#10 +
+        '  ✔ Full mining automation' + #13#10 +
+        '  ✔ Real-time game integration' + #13#10 + #13#10 +
+        'NO:' + #13#10 +
+        '  ⚠️ No voice automation' + #13#10 + #13#10 +
+        'ⓘ EliteAPI by Somfic | Only one EliteAPI/EliteVA installation allowed',
         mbConfirmation, MB_YESNO);
         
       if MsgResult = IDYES then
@@ -510,17 +537,35 @@ var
   FindRec: TFindRec;
   ProfileFilename: String;
 begin
-  { Clean up old EliteVA folder from previous versions (renamed to EliteAPI) }
+  { Rename old EliteVA or EliteApi folders to EliteAPI (standardize naming) }
   if (CurStep = ssInstall) and (VABasePath <> '') then
   begin
+    { Check for EliteVA folder }
     OldEliteVAPath := VABasePath + '\Apps\EliteVA';
     if DirExists(OldEliteVAPath) then
     begin
-      Log('Found old EliteVA folder, removing: ' + OldEliteVAPath);
-      if DelTree(OldEliteVAPath, True, True, True) then
-        Log('Successfully removed old EliteVA folder')
+      Log('Found old EliteVA folder, renaming to EliteAPI: ' + OldEliteVAPath);
+      if RenameFile(OldEliteVAPath, VABasePath + '\Apps\EliteAPI') then
+      begin
+        Log('Successfully renamed EliteVA to EliteAPI');
+        ExistingEliteAPIPath := VABasePath + '\Apps\EliteAPI';
+      end
       else
-        Log('Warning: Failed to remove old EliteVA folder');
+        Log('Warning: Failed to rename EliteVA folder, will try to delete and reinstall');
+    end;
+    
+    { Also check for EliteApi folder (wrong casing) }
+    OldEliteVAPath := VABasePath + '\Apps\EliteApi';
+    if DirExists(OldEliteVAPath) and not DirExists(VABasePath + '\Apps\EliteAPI') then
+    begin
+      Log('Found EliteApi folder (wrong casing), renaming to EliteAPI: ' + OldEliteVAPath);
+      if RenameFile(OldEliteVAPath, VABasePath + '\Apps\EliteAPI') then
+      begin
+        Log('Successfully renamed EliteApi to EliteAPI');
+        ExistingEliteAPIPath := VABasePath + '\Apps\EliteAPI';
+      end
+      else
+        Log('Warning: Failed to rename EliteApi folder');
     end;
   end;
   

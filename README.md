@@ -636,6 +636,8 @@ Want to help translate EliteMining into your language? See our [Translation Guid
 Join our Discord server for real-time help, mining tips, and community discussions:  
 [![Discord](https://img.shields.io/badge/EliteMining%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
 
+**Your feedback is always appreciated!**
+
 [Back to Top](#top)
 
 ---

@@ -16193,7 +16193,7 @@ class App(tk.Tk):
             if result:
                 # Get the EliteMining folder path for instructions
                 elitemining_folder = self.va_root if hasattr(self, 'va_root') and self.va_root else profile_path.rsplit(os.sep, 1)[0]
-                suggested_filename = f"EliteMining v{current_version}_old-Profile.vap"
+                suggested_filename = "EliteMining_old-Profile.vap"
                 
                 # Ask user to select their exported XML profile
                 export_instructions = t("voiceattack.export_instructions").format(
@@ -16208,8 +16208,7 @@ class App(tk.Tk):
                     parent=self,
                     title=t("voiceattack.select_exported_profile"),
                     filetypes=[("VoiceAttack Profile", "*.vap"), ("All files", "*.*")],
-                    initialdir=elitemining_folder,
-                    initialfile=suggested_filename
+                    initialdir=elitemining_folder
                 )
                 
                 if old_profile_path:
