@@ -420,6 +420,25 @@ begin
   Log('VABasePath: ' + VABasePath);
   Log('InstallPlugin: ' + BoolToStr(InstallPlugin));
   
+  { If plugin needs updating and VoiceAttack is running, warn user }
+  if InstallPlugin and VADetected and IsVoiceAttackRunning then
+  begin
+    MsgResult := MsgBox(
+      '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
+      'EliteMining plugin DLL needs to be updated.' + #13#10 +
+      'VoiceAttack must be CLOSED before updating the plugin.' + #13#10 +
+      'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
+      'Please close VoiceAttack now and click OK to continue.' + #13#10 +
+      'Click Cancel to exit the installer.',
+      mbError, MB_OKCANCEL);
+    
+    if MsgResult = IDCANCEL then
+    begin
+      WizardForm.Close;
+      Exit;
+    end;
+  end;
+  
   { If VoiceAttack detected, search for existing EliteAPI installation }
   if VADetected and (VABasePath <> '') then
   begin
