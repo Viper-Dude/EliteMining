@@ -1019,6 +1019,13 @@
     "prompt_full": "Aufforderung zur Sitzungsbeendigung wenn Fracht 100% voll ist\nund 1 Minute inaktiv (keine Änderungen) war\nDenken Sie daran, die Sitzung VOR dem Entladen zu beenden!",
     "multi_session": "Statistiken über mehrere Frachtladungen akkumulieren\nStats werden nicht zurückgesetzt bis Sie die Sitzung manuell beenden",
     
+    "cargo_full_title": "Fracht voll - Sitzung beenden?",
+    "cargo_full_message": "Ihre Fracht ist {percent}% voll und war {minutes} Minute inaktiv.",
+    "cargo_full_question": "Möchten Sie die aktuelle Bergbau-Sitzung beenden?",
+    "cargo_full_warning": "⚠️ Wichtig: Sitzung VOR dem Entladen beenden\num Daten für den Bericht zu erhalten.",
+    "cargo_full_yes": "Ja - Sitzung beenden",
+    "cargo_full_no": "Nein - Fortsetzen",
+    
     "rebuild_csv": "CSV-Index aus allen Textdateien im Berichtsordner neu erstellen. Verwenden Sie dies bei Datenabweichungen zwischen Tabelle und Dateien.",
     "open_folder": "Berichtsordner im Windows Explorer öffnen um alle Sitzungsdateien zu durchsuchen.",
     "export_csv": "Sitzungsdaten in eine CSV-Datei exportieren, die in Excel oder anderen Tabellenkalkulationsprogrammen geöffnet werden kann.",

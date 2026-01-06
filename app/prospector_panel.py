@@ -10344,84 +10344,62 @@ class ProspectorPanel(ttk.Frame):
         # Create a non-modal dialog that doesn't block TTS announcements
         import tkinter as tk
         from tkinter import ttk
+        from config import load_theme
+        from localization import t
+        
+        # Load theme colors
+        theme = load_theme()
+        if theme == "elite_orange":
+            bg_color = "#000000"
+            fg_color = "#ff8c00"
+            btn_bg = "#1a1a1a"
+            btn_fg = "#ff9900"
+            btn_active_bg = "#2a2a2a"
+            btn_active_fg = "#ffcc00"
+            yes_btn_bg = "#2a3a1a"  # Darker green tint
+            yes_btn_active = "#3a4a2a"
+        else:
+            bg_color = "#1e1e1e"
+            fg_color = "#e0e0e0"
+            btn_bg = "#2a3a4a"
+            btn_fg = "#e0e0e0"
+            btn_active_bg = "#3a4a5a"
+            btn_active_fg = "#ffffff"
+            yes_btn_bg = "#2a4a2a"
+            yes_btn_active = "#3a5a3a"
         
         # Create toplevel window
         dialog = tk.Toplevel(self.winfo_toplevel())
-        dialog.withdraw()  # Prevent flicker while positioning and packing
-        dialog.title("Cargo Full - End Session?")
-        dialog.configure(bg="#1e1e1e")
+        dialog.title(t('session.cargo_full_title'))
+        dialog.configure(bg=bg_color)
         dialog.resizable(False, False)
+        dialog.transient(self.winfo_toplevel())
         
         # Set app icon
         try:
-            from icon_utils import set_window_icon
-            set_window_icon(dialog)
+            from app_utils import get_app_icon_path
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
         except Exception as e:
             print(f"[DEBUG] Could not set dialog icon: {e}")
         
-        # Make it appear on top but not block other windows
-        dialog.attributes('-topmost', True)
+        # Main content frame
+        msg_frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=20)
+        msg_frame.pack(fill="both", expand=True)
         
-        # Position dialog relative to main EliteMining window (same monitor)
-        # Set geometry first, then update, then position
-        dialog_width = 450
-        dialog_height = 200
-        dialog.geometry(f"{dialog_width}x{dialog_height}")
-        dialog.update_idletasks()
+        # Message text with localization
+        msg_line1 = t('session.cargo_full_message').format(percent=100, minutes=1)
+        msg_line2 = "\n" + t('session.cargo_full_question')
+        msg_line3 = "\n\n" + t('session.cargo_full_warning')
+        msg = msg_line1 + msg_line2 + msg_line3
         
-        # Get main app window position
-        try:
-            if self.main_app:
-                # Force update to get accurate position
-                self.main_app.update_idletasks()
-                main_x = self.main_app.winfo_x()
-                main_y = self.main_app.winfo_y()
-                main_width = self.main_app.winfo_width()
-                main_height = self.main_app.winfo_height()
-                
-                # Center dialog on main app window
-                x = main_x + (main_width - dialog_width) // 2
-                y = main_y + (main_height - dialog_height) // 2
-                
-                dialog.geometry(f"+{x}+{y}")
-            else:
-                # Fallback: center on screen
-                x = (dialog.winfo_screenwidth() // 2) - (dialog_width // 2)
-                y = (dialog.winfo_screenheight() // 2) - (dialog_height // 2)
-                dialog.geometry(f"+{x}+{y}")
-        except Exception as e:
-            print(f"[DEBUG] Error positioning dialog: {e}")
-            # Final fallback
-            dialog.geometry(f"+{(dialog.winfo_screenwidth() // 2) - 225}+{(dialog.winfo_screenheight() // 2) - 100}")
-        
-        dialog.update_idletasks()
-        dialog.deiconify()  # Show centered dialog immediately
-        
-        # Set proper modal behavior with grab_set() - wrapped in try-except for safety
-        try:
-            dialog.transient(self.winfo_toplevel())
-            dialog.grab_set()
-            dialog.focus_force()
-        except Exception as e:
-            print(f"[DEBUG] Error setting modal behavior: {e}")
-            dialog.focus_force()  # At least try to focus
-        
-        # Message frame
-        msg_frame = tk.Frame(dialog, bg="#1e1e1e")
-        msg_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        # Message text
-        msg = ("Your cargo is 100% full and has been idle for 1 minute.\n\n"
-               "Do you want to end the current mining session?\n\n"
-               "⚠️ Important: End session BEFORE unloading cargo\n"
-               "to preserve data for the report.")
-        
-        tk.Label(msg_frame, text=msg, bg="#1e1e1e", fg="#ffffff", 
+        tk.Label(msg_frame, text=msg, bg=bg_color, fg=fg_color, 
                 font=("Segoe UI", 10), justify="left", wraplength=400).pack()
         
         # Buttons frame
-        btn_frame = tk.Frame(dialog, bg="#1e1e1e")
-        btn_frame.pack(side="bottom", pady=(0, 20))
+        btn_frame = tk.Frame(dialog, bg=bg_color)
+        btn_frame.pack(pady=(0, 20))
         
         def on_yes():
             # Clear dialog guard FIRST before any other operations
@@ -10460,19 +10438,54 @@ class ProspectorPanel(ttk.Frame):
             dialog.destroy()
         
         # Yes button
-        tk.Button(btn_frame, text="Yes - End Session", command=on_yes,
-                 bg="#2a4a2a", fg="#ffffff", font=("Segoe UI", 9, "bold"),
+        tk.Button(btn_frame, text=t('session.cargo_full_yes'), command=on_yes,
+                 bg=yes_btn_bg, fg=btn_fg, font=("Segoe UI", 9, "bold"),
                  padx=20, pady=8, cursor="hand2", relief="raised", bd=2,
-                 activebackground="#3a5a3a", activeforeground="#ffffff").pack(side="left", padx=5)
+                 activebackground=yes_btn_active, activeforeground=btn_active_fg).pack(side="left", padx=5)
         
         # No button  
-        tk.Button(btn_frame, text="No - Continue", command=on_no,
-                 bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 9),
+        tk.Button(btn_frame, text=t('session.cargo_full_no'), command=on_no,
+                 bg=btn_bg, fg=btn_fg, font=("Segoe UI", 9),
                  padx=20, pady=8, cursor="hand2", relief="raised", bd=2,
-                 activebackground="#4a4a4a", activeforeground="#ffffff").pack(side="left", padx=5)
+                 activebackground=btn_active_bg, activeforeground=btn_active_fg).pack(side="left", padx=5)
         
         # Handle dialog close (X button) - same as No
         dialog.protocol("WM_DELETE_WINDOW", on_no)
+        
+        # Center dialog on parent window (CRITICAL per DIALOG_GUIDELINES.md)
+        dialog.update_idletasks()
+        if self.main_app and hasattr(self.main_app, '_center_dialog_on_parent'):
+            self.main_app._center_dialog_on_parent(dialog)
+        else:
+            # Fallback centering if main_app not available
+            dialog_width = dialog.winfo_reqwidth()
+            dialog_height = dialog.winfo_reqheight()
+            if dialog_width < 50:
+                dialog_width = 450
+            if dialog_height < 50:
+                dialog_height = 250
+            
+            try:
+                parent = self.winfo_toplevel()
+                parent_x = parent.winfo_x()
+                parent_y = parent.winfo_y()
+                parent_width = parent.winfo_width()
+                parent_height = parent.winfo_height()
+                
+                x = parent_x + (parent_width - dialog_width) // 2
+                y = parent_y + (parent_height - dialog_height) // 2
+                dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+            except:
+                # Final fallback
+                screen_width = dialog.winfo_screenwidth()
+                screen_height = dialog.winfo_screenheight()
+                x = (screen_width - dialog_width) // 2
+                y = (screen_height - dialog_height) // 2
+                dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        
+        # Set focus and modal behavior
+        dialog.grab_set()
+        dialog.focus_set()
 
     def _edit_comment_popup(self, event):
         """Edit Body or Comment column in reports popup window"""

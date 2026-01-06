@@ -183,9 +183,9 @@ class ReleaseBuilder:
                             # Add directory and all its contents
                             for file_path in item_path.rglob('*'):
                                 if file_path.is_file():
-                                    # Skip test data files from Reports directory
-                                    if item == "Reports" and file_path.name == "sessions_index.csv":
-                                        print(f"⏩ Skipped: {file_path.name} (test data)")
+                                    # Skip test data and version flag files from Reports directory
+                                    if item == "Reports" and file_path.name in ["sessions_index.csv", ".v430_wipe_done"]:
+                                        print(f"⏩ Skipped: {file_path.name} (development/test file)")
                                         continue
                                     arc_name = f"EliteMining/app/{item}/{file_path.relative_to(item_path)}"
                                     zipf.write(file_path, arc_name)

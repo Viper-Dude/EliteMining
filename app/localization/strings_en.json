@@ -1010,6 +1010,13 @@
     "prompt_full": "Show prompt to end session when cargo is 100% full\nand has been idle (no changes) for 1 minute\nRemember to end session BEFORE unloading cargo!",
     "multi_session": "Accumulate statistics across multiple cargo loads\nStats won't reset until you manually end the session",
     
+    "cargo_full_title": "Cargo Full - End Session?",
+    "cargo_full_message": "Your cargo is {percent}% full and has been idle for {minutes} minute.",
+    "cargo_full_question": "Do you want to end the current mining session?",
+    "cargo_full_warning": "⚠️ Important: End session BEFORE unloading cargo\nto preserve data for the report.",
+    "cargo_full_yes": "Yes - End Session",
+    "cargo_full_no": "No - Continue",
+    
     "rebuild_csv": "Rebuild the CSV index from all text files in the reports folder. Use this if data doesn't match between the table and files.",
     "open_folder": "Open the reports folder in Windows Explorer to browse all session files.",
     "export_csv": "Export session data to a CSV file that can be opened in Excel or other spreadsheet programs.",

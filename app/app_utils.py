@@ -249,31 +249,40 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
     except ImportError:
         t = lambda key, **kw: key
     
-    # Get theme from config
+    # Get theme from config (following DIALOG_GUIDELINES.md)
     try:
         from config import load_theme
         theme = load_theme()
     except:
         theme = "elite_orange"
     
-    # Set colors based on theme
+    # Set colors based on theme (following DIALOG_GUIDELINES.md)
     if theme == "elite_orange":
-        bg_color = "#1e1e1e"
-        fg_color = "#ff9800"
-        btn_bg = "#3a3a3a"
+        bg_color = "#000000"  # Black for elite_orange
+        fg_color = "#ff8c00"  # Orange text
+        btn_bg = "#1a1a1a"
+        btn_fg = "#ff9900"
     else:  # dark_gray
         bg_color = "#1e1e1e"
-        fg_color = "#e6e6e6"
-        btn_bg = "#3a3a3a"
+        fg_color = "#e0e0e0"
+        btn_bg = "#2a3a4a"
+        btn_fg = "#e0e0e0"
     
     dialog = tk.Toplevel(parent)
-    dialog.withdraw()
     dialog.title(title)
     dialog.resizable(False, False)
     dialog.configure(bg=bg_color)
-    set_window_icon(dialog)
+    dialog.transient(parent)
     
-    # Main frame with dark background
+    # Set icon (following DIALOG_GUIDELINES.md)
+    try:
+        icon_path = get_app_icon_path()
+        if icon_path and icon_path.endswith('.ico'):
+            dialog.iconbitmap(icon_path)
+    except:
+        pass
+    
+    # Main frame with themed background
     frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=20)
     frame.pack(fill="both", expand=True)
     
@@ -288,38 +297,56 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
         dialog.destroy()
     
     ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=12, command=on_ok,
-                      bg=btn_bg, fg="#ffffff", font=("Segoe UI", 10),
-                      activebackground="#4a4a4a", activeforeground="#ffffff",
-                      cursor="hand2")
+                      bg=btn_bg, fg=btn_fg, font=("Segoe UI", 10),
+                      activebackground="#2a2a2a" if theme == "elite_orange" else "#3a4a5a",
+                      activeforeground="#ffcc00" if theme == "elite_orange" else "#ffffff",
+                      cursor="hand2", relief="raised", bd=2)
     ok_btn.pack()
     
     # Keyboard binding
     dialog.bind("<Return>", lambda e: on_ok())
     dialog.bind("<Escape>", lambda e: on_ok())
     
-    # Center on parent window manually
+    # Center on parent window (following DIALOG_GUIDELINES.md)
     dialog.update_idletasks()
-    dialog_width = dialog.winfo_reqwidth()
-    dialog_height = dialog.winfo_reqheight()
     
-    if parent:
-        parent.update_idletasks()
-        parent_x = parent.winfo_rootx()
-        parent_y = parent.winfo_rooty()
-        parent_width = parent.winfo_width()
-        parent_height = parent.winfo_height()
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
+    # Use _center_dialog_on_parent if available
+    if parent and hasattr(parent, '_center_dialog_on_parent'):
+        parent._center_dialog_on_parent(dialog)
     else:
-        x = (dialog.winfo_screenwidth() - dialog_width) // 2
-        y = (dialog.winfo_screenheight() - dialog_height) // 2
+        # Fallback centering
+        dialog_width = dialog.winfo_reqwidth()
+        dialog_height = dialog.winfo_reqheight()
+        
+        if dialog_width < 50:
+            dialog_width = dialog.winfo_width()
+        if dialog_height < 50:
+            dialog_height = dialog.winfo_height()
+        if dialog_width < 50:
+            dialog_width = 450
+        if dialog_height < 50:
+            dialog_height = 250
+        
+        if parent:
+            try:
+                parent.update_idletasks()
+                parent_x = parent.winfo_x()
+                parent_y = parent.winfo_y()
+                parent_width = parent.winfo_width()
+                parent_height = parent.winfo_height()
+                x = parent_x + (parent_width - dialog_width) // 2
+                y = parent_y + (parent_height - dialog_height) // 2
+            except:
+                x = (dialog.winfo_screenwidth() - dialog_width) // 2
+                y = (dialog.winfo_screenheight() - dialog_height) // 2
+        else:
+            x = (dialog.winfo_screenwidth() - dialog_width) // 2
+            y = (dialog.winfo_screenheight() - dialog_height) // 2
+        
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
     
-    dialog.geometry(f"+{x}+{y}")
-    dialog.deiconify()
-    dialog.transient(parent)
     dialog.grab_set()
-    dialog.attributes('-topmost', True)
-    dialog.lift()
+    dialog.focus_set()
     ok_btn.focus_set()
     dialog.wait_window()
 
