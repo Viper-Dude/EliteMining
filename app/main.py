@@ -1687,7 +1687,7 @@ class CargoMonitor:
             list_frame,
             bg="#1e1e1e",
             fg="#ffffff",
-            font=("Segoe UI", 9, "normal"),
+            font=("Consolas", 9, "normal"),  # Monospace font for proper alignment
             relief="flat",
             bd=0,
             highlightthickness=0,
@@ -2355,7 +2355,7 @@ cargo panel forces Elite to write detailed inventory data.
                     icon = "📦"  # Box for other cargo
                 
                 # Single line format with proper alignment: Icon + Name + Quantity
-                line = f"{icon} {display_name:<12} {quantity:>4}t\n"
+                line = f"{icon} {display_name:<12} {quantity:>5}t\n"
                 
                 # Make limpet lines clickable
                 if is_limpet:
@@ -3349,10 +3349,8 @@ cargo panel forces Elite to write detailed inventory data.
                     if hasattr(self, 'cargo_window') and self.cargo_window:
                         self.cargo_window.after(1000, self._delayed_capacity_refresh)
 
-            elif event_type in ["FSDJump", "CarrierJump"]:
-                # Player jumped to a new system - update current system
-                # NOTE: Visit counting happens in update_current_system (centralized)
-                # Do NOT call add_visited_system here to avoid double counting!
+            elif event_type == "FSDJump":
+                # Player jumped to a new system in their own ship - count as visit
                 system_name = event.get("StarSystem", "")
                 star_pos = event.get("StarPos", [])
                 event_ts = event.get("timestamp", "")
@@ -3369,7 +3367,28 @@ cargo panel forces Elite to write detailed inventory data.
                     else:
                         self.current_system = system_name
                     
-                    print(f"[JUMP] {event_type}: Arrived at {system_name}")
+                    print(f"[JUMP] FSDJump: Arrived at {system_name}")
+            
+            elif event_type == "CarrierJump":
+                # Player is docked on Fleet Carrier that jumped - update current system
+                # NOTE: CarrierJump is for FC location tracking, NOT visit counting
+                # Visit counting uses current system as reference (safety net in update_current_system)
+                system_name = event.get("StarSystem", "")
+                star_pos = event.get("StarPos", [])
+                
+                if system_name:
+                    coords = None
+                    if len(star_pos) >= 3:
+                        coords = (star_pos[0], star_pos[1], star_pos[2])
+                    
+                    # Update current system but DON'T count as visit directly
+                    # The safety net in update_current_system will ensure visit >= 1
+                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'update_current_system'):
+                        self.main_app_ref.update_current_system(system_name, coords, count_visit=False)
+                    else:
+                        self.current_system = system_name
+                    
+                    print(f"[CARRIER] CarrierJump: Now at {system_name}")
             
             elif event_type == "Location":
                 # Game loaded - update current system but DON'T count as visit
@@ -5139,7 +5158,7 @@ class App(tk.Tk):
             content_frame,
             bg=_cargo_bg,
             fg=_cargo_fg,
-            font=("Segoe UI", 9, "normal"),  # Match app-wide font
+            font=("Consolas", 9, "normal"),  # Monospace font for proper alignment
             relief="flat",
             bd=0,
             highlightthickness=0,
@@ -5244,11 +5263,11 @@ class App(tk.Tk):
                     icon = "📦"
                 
                 # Use precise character positioning with monospace font
-                # Format: Icon(2) + Space(1) + Name(15) + Quantity(right-aligned)
-                name_field = f"{display_name:<15}"[:15]  # Exactly 15 characters, truncated if needed
+                # Format: Icon(2) + Space(1) + Name(12) + Quantity(right-aligned)
+                name_field = f"{display_name:<12}"[:12]  # Exactly 12 characters, truncated if needed
                 quantity_text = f"{quantity}t"
                 
-                line = f"{icon} {name_field} {quantity_text:>4}"
+                line = f"{icon} {name_field} {quantity_text:>5}"
                 
                 # Mark start position for limpet lines (to make clickable)
                 if is_limpet:
@@ -5263,13 +5282,8 @@ class App(tk.Tk):
         
         # Display Engineering Materials section
         if cargo.materials_collected:
-            # Calculate separator width based on widget width (in characters)
-            try:
-                widget_width = self.integrated_cargo_text.winfo_width()
-                font_width = 8  # Approximate width of Segoe UI 9pt character (wider than Consolas)
-                sep_chars = max(8, min(15, (widget_width // font_width) - 2))
-            except:
-                sep_chars = 12  # Fallback
+            # Fixed separator width to match cargo line: icon(2) + space(1) + name(12) + space(1) + qty(5) = 21 + extra padding
+            sep_chars = 24
             self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
             self.integrated_cargo_text.insert(tk.END, "\n" + t('mining_session.engineering_materials') + " 🔩\n")
             
@@ -5281,9 +5295,9 @@ class App(tk.Tk):
                 grade = cargo.MATERIAL_GRADES.get(material_name, 0)
                 
                 # Use localized name for display if available, otherwise use English name
-                display_name = cargo.materials_localized_names.get(material_name, material_name)[:13]
+                display_name = cargo.materials_localized_names.get(material_name, material_name)[:12]
                 grade_text = f"(G{grade})"
-                line = f"{display_name:<13} {grade_text} {quantity:>4}"
+                line = f"{display_name:<12} {grade_text} {quantity:>3}"
                 self.integrated_cargo_text.insert(tk.END, line)
                 
                 # Add newline for all but the last item
@@ -5292,13 +5306,8 @@ class App(tk.Tk):
         
         
         # Add refinery note at the very bottom with proper spacing
-        # Calculate separator width based on widget width (in characters)
-        try:
-            widget_width = self.integrated_cargo_text.winfo_width()
-            font_width = 8  # Approximate width of Segoe UI 9pt character (wider than Consolas)
-            sep_chars = max(8, min(15, (widget_width // font_width) - 2))
-        except:
-            sep_chars = 12  # Fallback
+        # Fixed separator width to match cargo/engineering materials line
+        sep_chars = 24
         self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
         
         # Configure tag for small italic text - left aligned
@@ -16683,9 +16692,9 @@ Your keybinds will need to be reconfigured manually."""
                             event = json.loads(line)
                             event_type = event.get('event', '')
                             
-                            # Process visits - FSDJump and CarrierJump are actual arrivals
-                            # NOTE: CarrierLocation is NOT processed during catchup to prevent double-counting
-                            if event_type in ['FSDJump', 'CarrierJump']:
+                            # Process visits - ONLY FSDJump counts as a player visit
+                            # CarrierJump is for FC location tracking, not visit counting
+                            if event_type == 'FSDJump':
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     timestamp = event.get('timestamp', '')
@@ -16696,6 +16705,12 @@ Your keybinds will need to be reconfigured manually."""
                                     # Use single source of truth for visit recording
                                     if self.record_system_visit(system_name, timestamp, coordinates, system_address):
                                         visits_added += 1
+                                    current_system = system_name
+                            
+                            elif event_type == 'CarrierJump':
+                                # CarrierJump just tracks current system context, not visits
+                                system_name = event.get('StarSystem', '')
+                                if system_name:
                                     current_system = system_name
                                     
                             elif event_type == 'Location':
@@ -16887,13 +16902,10 @@ Your keybinds will need to be reconfigured manually."""
                             event = json.loads(line)
                             event_type = event.get('event', '')
                             
-                            # Process visits - FSDJump and CarrierJump are actual arrivals
-                            # NOTE: CarrierLocation is NOT processed during catchup because:
-                            # - If carrier jumped while online, CarrierJump is already in journal
-                            # - If carrier jumped while offline, CarrierLocation will be processed
-                            #   by LIVE event handler when app is running
-                            # Processing CarrierLocation here would cause double-counting
-                            if event_type in ['FSDJump', 'CarrierJump']:
+                            # Process visits - ONLY FSDJump counts as a player visit
+                            # CarrierJump is for FC location tracking, not visit counting
+                            # Visit counting uses current system as reference (safety net)
+                            if event_type == 'FSDJump':
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     timestamp = event.get('timestamp', '')
@@ -16904,6 +16916,12 @@ Your keybinds will need to be reconfigured manually."""
                                     # Use single source of truth for visit recording
                                     if self.record_system_visit(system_name, timestamp, coordinates, system_address):
                                         visits_added += 1
+                                    current_system = system_name
+                            
+                            elif event_type == 'CarrierJump':
+                                # CarrierJump just tracks current system context, not visits
+                                system_name = event.get('StarSystem', '')
+                                if system_name:
                                     current_system = system_name
                             
                             elif event_type == 'Location':
@@ -17005,9 +17023,8 @@ Your keybinds will need to be reconfigured manually."""
         if hasattr(self, '_update_cmdr_system_display'):
             self.after(0, self._update_cmdr_system_display)
         
-        # Ensure current system has a visit record (handles offline carrier jumps)
-        # If you're in a system but no FSDJump/CarrierJump was recorded (e.g., carrier jumped while offline),
-        # this ensures you have at least 1 visit recorded for where you ARE now
+        # Ensure current system has a visit record (safety net for carrier jumps, etc.)
+        # Uses current system as reference - if player is HERE, visits must be >= 1
         self.after(50, self._ensure_current_system_visited)
         
         # Distance calculation runs AFTER journal scan is complete (now has accurate visit data)
@@ -17037,11 +17054,16 @@ Your keybinds will need to be reconfigured manually."""
         """Ensure current system has a visit record.
         
         This ONLY creates a record if the system has NEVER been visited.
-        It does NOT increment the count - that only happens on actual jumps
-        (FSDJump/CarrierJump events).
+        It does NOT increment the count - that only happens on FSDJump events.
         
-        Purpose: Handle edge case where user is in a system but has no
-        record of ever visiting it (e.g., first time running the app).
+        Purpose: Safety net for ALL edge cases where player is in a system
+        but has no visit record:
+        - Fleet Carrier jump (docked or undocked, your carrier or another player's)
+        - Game startup (Location event)
+        - Any missed or unprocessed arrival events
+        - First time running the app
+        
+        Logic: If player is HERE, visits must be >= 1
         """
         try:
             current_system = self.get_current_system()
@@ -17184,6 +17206,15 @@ Your keybinds will need to be reconfigured manually."""
             
             # Use single source of truth for visit recording
             self.record_system_visit(system_name, timestamp, coords)
+        
+        # SAFETY NET: Ensure visit count is at least 1 when player is in a system
+        # This handles ALL edge cases where player arrived without a proper jump event:
+        # - Fleet Carrier jump (docked or undocked)
+        # - Traveling on another player's Fleet Carrier
+        # - Any missed or unprocessed arrival events
+        # Logic: If player is HERE, visits must be >= 1
+        if is_different_system:
+            self.after(50, self._ensure_current_system_visited)
         
         # Notify all components that use current system
         # 1. Update ring finder reference system

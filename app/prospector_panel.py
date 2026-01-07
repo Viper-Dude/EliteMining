@@ -9689,7 +9689,7 @@ class ProspectorPanel(ttk.Frame):
             mother_for_lookup = JournalParser.normalize_material_name(mother)
             # Only add to speak_parts if Core Asteroids toggle is enabled
             core_toggle = bool(self.announcement_vars["Core Asteroids"].get())
-            if self.announce_map.get(mother_for_lookup, False):   # Default to False for consistency
+            if self.announce_map.get(mother_for_lookup, True):   # Default to True (same as _load_announce_map)
                 speak_parts.insert(0, f"Motherlode: {mother}")
                 triggered = True
 
@@ -10370,7 +10370,7 @@ class ProspectorPanel(ttk.Frame):
         
         # Create toplevel window
         dialog = tk.Toplevel(self.winfo_toplevel())
-        dialog.title(t('session.cargo_full_title'))
+        dialog.title(t('tooltips.cargo_full_title'))
         dialog.configure(bg=bg_color)
         dialog.resizable(False, False)
         dialog.transient(self.winfo_toplevel())
@@ -10389,9 +10389,9 @@ class ProspectorPanel(ttk.Frame):
         msg_frame.pack(fill="both", expand=True)
         
         # Message text with localization
-        msg_line1 = t('session.cargo_full_message').format(percent=100, minutes=1)
-        msg_line2 = "\n" + t('session.cargo_full_question')
-        msg_line3 = "\n\n" + t('session.cargo_full_warning')
+        msg_line1 = t('tooltips.cargo_full_message').format(percent=100, minutes=1)
+        msg_line2 = "\n" + t('tooltips.cargo_full_question')
+        msg_line3 = "\n\n" + t('tooltips.cargo_full_warning')
         msg = msg_line1 + msg_line2 + msg_line3
         
         tk.Label(msg_frame, text=msg, bg=bg_color, fg=fg_color, 
@@ -10438,13 +10438,13 @@ class ProspectorPanel(ttk.Frame):
             dialog.destroy()
         
         # Yes button
-        tk.Button(btn_frame, text=t('session.cargo_full_yes'), command=on_yes,
+        tk.Button(btn_frame, text=t('tooltips.cargo_full_yes'), command=on_yes,
                  bg=yes_btn_bg, fg=btn_fg, font=("Segoe UI", 9, "bold"),
                  padx=20, pady=8, cursor="hand2", relief="raised", bd=2,
                  activebackground=yes_btn_active, activeforeground=btn_active_fg).pack(side="left", padx=5)
         
         # No button  
-        tk.Button(btn_frame, text=t('session.cargo_full_no'), command=on_no,
+        tk.Button(btn_frame, text=t('tooltips.cargo_full_no'), command=on_no,
                  bg=btn_bg, fg=btn_fg, font=("Segoe UI", 9),
                  padx=20, pady=8, cursor="hand2", relief="raised", bd=2,
                  activebackground=btn_active_bg, activeforeground=btn_active_fg).pack(side="left", padx=5)
