@@ -9810,10 +9810,30 @@ class ProspectorPanel(ttk.Frame):
                     latest_pct = f"{stats['latest_percentage']:.1f}%" if stats and stats['latest_percentage'] > 0 else "0.0%"
                     quality_hits = str(stats['quality_hits']) if stats else "0"
                     display_name = self._abbreviate_material_for_stats(material_name)
-                    # Core-only materials don't have percentage thresholds
+                    
+                    # Check if material has both core (0.0%) and non-core (>0%) finds (hybrid)
+                    has_core_finds = False
+                    has_noncore_finds = False
+                    if material_stats_all and hasattr(material_stats_all, 'finds'):
+                        for find in material_stats_all.finds:
+                            if find.percentage == 0.0:
+                                has_core_finds = True
+                            elif find.percentage > 0.0:
+                                has_noncore_finds = True
+                    
+                    # Determine display format based on find types
                     if material_name in CORE_ONLY:
+                        # Core-only materials always show (Core)
+                        material_display = f"{display_name} (Core)"
+                    elif has_core_finds and has_noncore_finds:
+                        # Hybrid: both core and non-core finds detected
+                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
+                        material_display = f"{display_name} (Core, {threshold:.1f}%)"
+                    elif has_core_finds:
+                        # Only core finds detected
                         material_display = f"{display_name} (Core)"
                     else:
+                        # Only non-core finds (or no finds yet)
                         threshold = self.min_pct_map.get(material_name, self.threshold.get())
                         material_display = f"{display_name} ({threshold:.1f}%)"
                     
@@ -9862,10 +9882,31 @@ class ProspectorPanel(ttk.Frame):
                 if material_name not in displayed_materials and material_tons > 0:
                     # This material was mined but never announced (below threshold)
                     display_name = self._abbreviate_material_for_stats(material_name)
-                    # Core-only materials don't have percentage thresholds
+                    
+                    # Check if material has both core (0.0%) and non-core (>0%) finds (hybrid)
+                    material_stats_all = self.session_analytics.material_stats_all.get(material_name)
+                    has_core_finds = False
+                    has_noncore_finds = False
+                    if material_stats_all and hasattr(material_stats_all, 'finds'):
+                        for find in material_stats_all.finds:
+                            if find.percentage == 0.0:
+                                has_core_finds = True
+                            elif find.percentage > 0.0:
+                                has_noncore_finds = True
+                    
+                    # Determine display format based on find types
                     if material_name in CORE_ONLY:
+                        # Core-only materials always show (Core)
+                        material_display = f"{display_name} (Core)"
+                    elif has_core_finds and has_noncore_finds:
+                        # Hybrid: both core and non-core finds detected
+                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
+                        material_display = f"{display_name} (Core, {threshold:.1f}%)"
+                    elif has_core_finds:
+                        # Only core finds detected
                         material_display = f"{display_name} (Core)"
                     else:
+                        # Only non-core finds (or no finds yet)
                         threshold = self.min_pct_map.get(material_name, self.threshold.get())
                         material_display = f"{display_name} ({threshold:.1f}%)"
                     tons_str = f"{material_tons:.1f}"
