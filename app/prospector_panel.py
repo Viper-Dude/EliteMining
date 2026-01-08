@@ -6583,7 +6583,7 @@ class ProspectorPanel(ttk.Frame):
                 column = tree.identify_column(event.x)
                 
                 tooltips = {
-                    "#1": "Shows material name with your announcement threshold\nExample: Platinum (27%) means you're only alerted when\nasteroids have 27% or higher Platinum content",
+                    "#1": "Shows material name with your announcement threshold\nExample: Platinum (27%) means you're only alerted when\nasteroids have 27% or higher Platinum content\n\nCore-only materials (Void Opals, Alexandrite, etc.) show\n'(Core)' as percentage thresholds don't apply to them",
                     "#2": "Total tons of this material collected this session",
                     "#3": "Mining rate: Tons per hour for this material",
                     "#4": "Average % across ALL asteroids you prospected\n(includes low-quality asteroids below threshold)",
@@ -9809,9 +9809,13 @@ class ProspectorPanel(ttk.Frame):
                     best_pct = f"{stats['best_percentage']:.1f}%" if stats and stats['best_percentage'] > 0 else "0.0%"
                     latest_pct = f"{stats['latest_percentage']:.1f}%" if stats and stats['latest_percentage'] > 0 else "0.0%"
                     quality_hits = str(stats['quality_hits']) if stats else "0"
-                    threshold = self.min_pct_map.get(material_name, self.threshold.get())
                     display_name = self._abbreviate_material_for_stats(material_name)
-                    material_display = f"{display_name} ({threshold:.1f}%)"
+                    # Core-only materials don't have percentage thresholds
+                    if material_name in CORE_ONLY:
+                        material_display = f"{display_name} (Core)"
+                    else:
+                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
+                        material_display = f"{display_name} ({threshold:.1f}%)"
                     
                     # Get tons and TPH for this material
                     material_tons = None
@@ -9857,9 +9861,13 @@ class ProspectorPanel(ttk.Frame):
             for material_name, material_tons in live_materials.items():
                 if material_name not in displayed_materials and material_tons > 0:
                     # This material was mined but never announced (below threshold)
-                    threshold = self.min_pct_map.get(material_name, self.threshold.get())
                     display_name = self._abbreviate_material_for_stats(material_name)
-                    material_display = f"{display_name} ({threshold:.1f}%)"
+                    # Core-only materials don't have percentage thresholds
+                    if material_name in CORE_ONLY:
+                        material_display = f"{display_name} (Core)"
+                    else:
+                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
+                        material_display = f"{display_name} ({threshold:.1f}%)"
                     tons_str = f"{material_tons:.1f}"
                     
                     material_tph = 0.0
