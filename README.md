@@ -229,9 +229,12 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 
 ## Commodity Market
 
-The Commodity Market helps you find the best sell prices for your mined commodities using real-time market data from the Ardent API, with automatic distance calculations to help you maximize profits.
+The Commodity Market helps you find the best prices for mining commodities and trade goods using real-time market data from the Ardent API, with automatic distance calculations to help you maximize profits.
 
 ### Key Features
+- **Two Tabs:**
+  - **Mining Commodities** – Search for 28 mineable resources (Painite, Platinum, Low Temperature Diamonds, etc.)
+  - **Trade Commodities** – Search across 15 categories of trade goods (Chemicals, Machinery, Medicines, Technology, and more)
 - **Two Search Modes:**
   - **Near System** – Find top 30 stations within 500 LY, filtered by distance
   - **Galaxy-Wide** – Find top 30 best prices anywhere in the galaxy with calculated distances
@@ -252,10 +255,13 @@ The Commodity Market helps you find the best sell prices for your mined commodit
   - Open system in EDSM (system page with all stations)
   - Copy system name to clipboard
 
-Perfect for planning your mining runs and finding the most profitable stations to sell your haul.
+Perfect for planning your mining runs and finding the most profitable stations to sell your haul or locate trade goods.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commidity_marked.png" width="600"><br>  
-*Commodity Market showing search results with filters and distance calculations.*
+*Commodity Market showing mining commodities search results with filters and distance calculations.*
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/trade_commodities.png" width="600"><br>  
+*Trade Commodities tab with 15 categories covering all tradeable goods in Elite Dangerous.*
 
 [Back to Top](#top)
 

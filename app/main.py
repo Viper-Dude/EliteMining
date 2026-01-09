@@ -439,7 +439,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.76"
+APP_VERSION = "v4.77"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4628,6 +4628,17 @@ class App(tk.Tk):
         # Use centralized path utilities for consistent dev/installer handling
         self.vars_dir = get_variables_dir()  # Variables folder (dev-aware)
         self.settings_dir = get_ship_presets_dir()  # Ship Presets (dev-aware)
+        
+        # Load commodities database for trade market tab
+        self.commodities_data = {}
+        try:
+            commodities_path = os.path.join(os.path.dirname(__file__), 'data', 'commodities.json')
+            with open(commodities_path, 'r', encoding='utf-8') as f:
+                self.commodities_data = json.load(f)
+            log.info(f"Loaded {len(self.commodities_data)} commodity categories")
+        except Exception as e:
+            log.error(f"Failed to load commodities.json: {e}")
+            self.commodities_data = {}
             
         # Initialize cargo monitor with correct app directory (after va_root is set)
         app_dir = get_app_data_dir() if getattr(sys, 'frozen', False) else None
@@ -8180,6 +8191,22 @@ class App(tk.Tk):
                                     if event_type == 'FSDTarget':
                                         jumps = event.get('RemainingJumpsInRoute')
                                         if jumps is not None:
+                                            # Check if we've arrived at final destination
+                                            # If current system matches last system in route, set jumps to 0
+                                            if jumps > 0 and os.path.exists(navroute_path):
+                                                try:
+                                                    with open(navroute_path, 'r', encoding='utf-8') as nf:
+                                                        navroute_data = json.load(nf)
+                                                        route = navroute_data.get('Route', [])
+                                                        if route:
+                                                            final_system = route[-1].get('StarSystem', '')
+                                                            current_system = self.get_current_system()
+                                                            if current_system and final_system and current_system == final_system:
+                                                                # Arrived at final destination - route complete
+                                                                jumps = 0
+                                                except Exception:
+                                                    pass
+                                            
                                             cached_jumps = getattr(self, '_cached_route_jumps', None)
                                             if cached_jumps != jumps:
                                                 self._cached_route_jumps = jumps
@@ -13365,7 +13392,23 @@ class App(tk.Tk):
             traceback.print_exc()
 
     def _build_marketplace_tab(self, frame: ttk.Frame) -> None:
-        """Build the Commodity Market tab - matches Hotspots Finder design"""
+        """Build the Commodity Market tab with sub-tabs for Mining and Trade commodities"""
+        # Create sub-notebook for Mining vs Trade commodities
+        sub_notebook = ttk.Notebook(frame)
+        sub_notebook.pack(fill="both", expand=True)
+        
+        # Mining Commodities sub-tab
+        mining_tab = ttk.Frame(sub_notebook, padding=8)
+        self._build_mining_commodities_tab(mining_tab)
+        sub_notebook.add(mining_tab, text=t('tabs.mining_commodities'))
+        
+        # Trade Commodities sub-tab
+        trade_tab = ttk.Frame(sub_notebook, padding=8)
+        self._build_trade_commodities_tab(trade_tab)
+        sub_notebook.add(trade_tab, text=t('tabs.trade_commodities'))
+    
+    def _build_mining_commodities_tab(self, frame: ttk.Frame) -> None:
+        """Build the Mining Commodities sub-tab - matches original Commodity Market design"""
         # Main container
         main_container = ttk.Frame(frame)
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
@@ -13612,6 +13655,238 @@ class App(tk.Tk):
         
         # Initialize dropdown options based on current buy/sell mode
         self._update_marketplace_order_options()
+    
+    def _build_trade_commodities_tab(self, frame: ttk.Frame) -> None:
+        """Build the Trade Commodities sub-tab with category selection"""
+        # Main container
+        main_container = ttk.Frame(frame)
+        main_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Search section
+        search_frame = ttk.LabelFrame(main_container, text=t('marketplace.search_title'), padding=10)
+        search_frame.pack(fill="x", pady=(0, 10))
+        
+        # Configure grid weights
+        search_frame.columnconfigure(1, weight=1)
+        
+        # Load marketplace preferences from config
+        cfg = _load_cfg()
+        self.trade_search_mode = tk.StringVar(value=cfg.get('trade_search_mode', 'near_system'))
+        self.trade_sell_mode = tk.BooleanVar(value=cfg.get('trade_sell_mode', True))
+        self.trade_buy_mode = tk.BooleanVar(value=cfg.get('trade_buy_mode', False))
+        
+        # Get theme for checkbox/radiobutton styling
+        from config import load_theme
+        _trade_cb_theme = load_theme()
+        if _trade_cb_theme == "elite_orange":
+            _trade_cb_bg = "#000000"
+            _trade_cb_select = "#000000"
+        else:
+            _trade_cb_bg = "#1e1e1e"
+            _trade_cb_select = "#1e1e1e"
+        
+        # Row 0: Search Mode (Near/Galaxy) + Sell/Buy
+        row0_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
+        row0_frame.grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 10))
+        
+        rb1 = tk.Radiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.trade_search_mode,
+                      value="near_system", bg=_trade_cb_bg, fg="#ffffff", selectcolor=_trade_cb_select,
+                      activebackground=_trade_cb_bg, activeforeground="#ffffff",
+                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+        rb1.pack(side="left", padx=(0, 15))
+        rb1.config(takefocus=0)
+        ToolTip(rb1, t('tooltips.near_system_search'))
+        
+        rb2 = tk.Radiobutton(row0_frame, text=t('marketplace.galaxy_wide'), variable=self.trade_search_mode,
+                      value="galaxy_wide", bg=_trade_cb_bg, fg="#ffffff", selectcolor=_trade_cb_select,
+                      activebackground=_trade_cb_bg, activeforeground="#ffffff",
+                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+        rb2.pack(side="left", padx=(0, 20))
+        rb2.config(takefocus=0)
+        ToolTip(rb2, t('tooltips.galaxy_wide_search'))
+        
+        ttk.Separator(row0_frame, orient="vertical").pack(side="left", fill="y", padx=(0, 15))
+        
+        sell_cb = tk.Checkbutton(row0_frame, text=t('marketplace.sell'), variable=self.trade_sell_mode,
+                      command=self._on_trade_sell_mode_toggle, bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
+                      activebackground=_trade_cb_bg, activeforeground="#ffffff",
+                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+        sell_cb.pack(side="left", padx=(0, 10))
+        ToolTip(sell_cb, t('tooltips.sell_mode'))
+        
+        buy_cb = tk.Checkbutton(row0_frame, text=t('marketplace.buy'), variable=self.trade_buy_mode,
+                      command=self._on_trade_buy_mode_toggle, bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
+                      activebackground=_trade_cb_bg, activeforeground="#ffffff",
+                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+        buy_cb.pack(side="left")
+        ToolTip(buy_cb, t('tooltips.buy_mode'))
+        
+        # Row 1: Reference System + Category + Commodity
+        row1_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
+        row1_frame.grid(row=1, column=0, columnspan=5, sticky="w", pady=(0, 10))
+        
+        ttk.Label(row1_frame, text=t('marketplace.ref_system'), width=12).pack(side="left", padx=(0, 5))
+        self.trade_reference_system = tk.StringVar(value=cfg.get('trade_reference_system', ''))
+        self.trade_ref_entry = ttk.Entry(row1_frame, textvariable=self.trade_reference_system, width=30)
+        self.trade_ref_entry.pack(side="left", padx=(0, 5))
+        self.trade_ref_entry.bind("<Return>", lambda e: self._search_trade_market())
+        
+        self.trade_use_current_btn = tk.Button(row1_frame, text=t('marketplace.use_current'), 
+                                    command=self._use_current_system_trade,
+                                    bg="#4a3a2a", fg="#e0e0e0", activebackground="#5a4a3a", activeforeground="#ffffff",
+                                    relief="ridge", bd=1, padx=6, pady=2, font=("Segoe UI", 8), cursor="hand2",
+                                    highlightbackground=_trade_cb_bg, highlightcolor=_trade_cb_bg)
+        self.trade_use_current_btn.pack(side="left", padx=(0, 15))
+        
+        # Category dropdown
+        ttk.Label(row1_frame, text=t('marketplace.category')).pack(side="left", padx=(0, 8))
+        
+        # Get sorted category list from commodities data
+        self._trade_categories = sorted(self.commodities_data.keys()) if self.commodities_data else []
+        saved_category = cfg.get('trade_category', self._trade_categories[0] if self._trade_categories else 'Chemicals')
+        self.trade_category = tk.StringVar(value=saved_category)
+        category_combo = ttk.Combobox(row1_frame, textvariable=self.trade_category,
+                                     values=self._trade_categories, state="readonly", width=18)
+        category_combo.pack(side="left", padx=(0, 15))
+        category_combo.bind("<<ComboboxSelected>>", self._on_trade_category_changed)
+        
+        # Commodity dropdown (populated based on category)
+        ttk.Label(row1_frame, text=t('marketplace.commodity')).pack(side="left", padx=(0, 8))
+        self.trade_commodity = tk.StringVar()
+        self.trade_commodity_combo = ttk.Combobox(row1_frame, textvariable=self.trade_commodity,
+                                                 values=[], state="readonly", width=20)
+        self.trade_commodity_combo.pack(side="left")
+        self.trade_commodity_combo.bind("<Return>", lambda e: self._search_trade_market())
+        self.trade_commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_trade_preferences())
+        
+        # Populate initial commodity list
+        self._update_trade_commodity_list()
+        
+        # Row 2: All filters (same as mining tab)
+        row2_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
+        row2_frame.grid(row=2, column=0, columnspan=5, sticky="w", pady=(0, 10))
+        
+        # Station type
+        station_type_map = get_station_types()
+        self._trade_station_type_order = ['All', 'Orbital', 'Surface', 'Fleet Carrier', 'Megaship', 'Stronghold']
+        self._trade_station_type_map = {k: station_type_map.get(k, k) for k in self._trade_station_type_order}
+        self._trade_station_type_rev_map = {v: k for k, v in self._trade_station_type_map.items()}
+        
+        # Sort options
+        self._trade_sort_options_map = get_sort_options()
+        self._trade_sort_rev_map = {v: k for k, v in self._trade_sort_options_map.items()}
+        
+        # Age options
+        age_options_map = get_age_options()
+        self._trade_age_order = ['Any', '1 hour', '8 hours', '16 hours', '1 day', '2 days']
+        self._trade_age_map = {k: age_options_map.get(k, k) for k in self._trade_age_order}
+        self._trade_age_rev_map = {v: k for k, v in self._trade_age_map.items()}
+        
+        station_label = ttk.Label(row2_frame, text=t('marketplace.station'), width=12)
+        station_label.pack(side="left", padx=(0, 5))
+        saved_station = cfg.get('trade_station_type', 'All')
+        self.trade_station_type = tk.StringVar(value=self._trade_station_type_map.get(saved_station, saved_station))
+        station_combo = ttk.Combobox(row2_frame, textvariable=self.trade_station_type,
+                                values=[self._trade_station_type_map[k] for k in self._trade_station_type_order],
+                                state="readonly", width=12)
+        station_combo.pack(side="left", padx=(0, 15))
+        ToolTip(station_combo, t('tooltips.station_type_filter'))
+        
+        def on_trade_station_type_change(*args):
+            selected = self.trade_station_type.get()
+            english_val = self._trade_station_type_rev_map.get(selected, selected)
+            if english_val == "Fleet Carrier":
+                self.trade_exclude_carriers.set(False)
+            self._save_trade_preferences()
+        self.trade_station_type.trace_add("write", on_trade_station_type_change)
+        
+        self.trade_exclude_carriers = tk.BooleanVar(value=cfg.get('trade_exclude_carriers', True))
+        exclude_cb = tk.Checkbutton(row2_frame, text=t('marketplace.exclude_carriers'), variable=self.trade_exclude_carriers,
+                      command=self._save_trade_preferences,
+                      bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
+                      activebackground=_trade_cb_bg, activeforeground="#ffffff",
+                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+        exclude_cb.pack(side="left", padx=(0, 10))
+        ToolTip(exclude_cb, t('tooltips.exclude_carriers'))
+        
+        self.trade_large_pad_only = tk.BooleanVar(value=cfg.get('trade_large_pad_only', False))
+        large_pad_cb = tk.Checkbutton(row2_frame, text=t('marketplace.large_pads'), variable=self.trade_large_pad_only,
+                      command=self._save_trade_preferences,
+                      bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
+                      activebackground=_trade_cb_bg, activeforeground="#ffffff",
+                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+        large_pad_cb.pack(side="left", padx=(0, 11))
+        ToolTip(large_pad_cb, t('tooltips.large_pads'))
+        
+        # Sort by
+        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=(0, 8))
+        saved_sort = cfg.get('trade_order_by', 'Distance')
+        initial_sort_order = ['Best price (highest)', 'Distance', 'Best demand', 'Last update']
+        self.trade_order_by = tk.StringVar(value=self._trade_sort_options_map.get(saved_sort, saved_sort))
+        self.trade_order_combo = ttk.Combobox(row2_frame, textvariable=self.trade_order_by,
+                                     values=[self._trade_sort_options_map.get(k, k) for k in initial_sort_order],
+                                     state="readonly", width=18)
+        self.trade_order_combo.pack(side="left", padx=(11, 0))
+        self.trade_order_combo.bind("<<ComboboxSelected>>", lambda e: self._save_trade_preferences())
+        ToolTip(self.trade_order_combo, t('tooltips.sort_by'))
+        
+        # Row 3: Search button and Max Age
+        row3_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
+        row3_frame.grid(row=3, column=0, columnspan=5, sticky="w")
+        
+        search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'), 
+                              command=self._search_trade_market,
+                              bg="#2a4a2a", fg="#e0e0e0", 
+                              activebackground="#3a5a3a", activeforeground="#ffffff",
+                              relief="ridge", bd=1, padx=10, pady=4,
+                              font=("Segoe UI", 9, "bold"), cursor="hand2")
+        search_btn.pack(side="left")
+        
+        # Max Age
+        _max_age_fg = "#ff8c00" if _trade_cb_theme == "elite_orange" else "#e0e0e0"
+        max_age_label = tk.Label(row3_frame, text=t('marketplace.max_age'), bg=_trade_cb_bg, fg=_max_age_fg)
+        max_age_label.pack(side="left", padx=(376, 0))
+        saved_age = cfg.get('trade_max_age', '8 hours')
+        self.trade_max_age = tk.StringVar(value=self._trade_age_map.get(saved_age, saved_age))
+        age_combo = ttk.Combobox(row3_frame, textvariable=self.trade_max_age,
+                                values=[self._trade_age_map[k] for k in self._trade_age_order],
+                                state="readonly", width=10)
+        age_combo.pack(side="left", padx=(12, 0))
+        age_combo.bind("<<ComboboxSelected>>", lambda e: self._save_trade_preferences())
+        ToolTip(age_combo, t('tooltips.max_age'))
+        
+        # Results section
+        results_header = tk.Frame(main_container, bg=_trade_cb_bg)
+        results_header.pack(fill="x", pady=(10, 0))
+        
+        tk.Label(results_header, text=t('marketplace.search_results'), 
+                bg=_trade_cb_bg, fg="#ffffff", 
+                font=("Segoe UI", 10, "bold")).pack(side="left")
+        
+        tk.Label(results_header, text="  •  " + t('marketplace.right_click_options'),
+                bg=_trade_cb_bg, fg="#888888",
+                font=("Segoe UI", 8)).pack(side="left")
+        
+        # Status label
+        self.trade_total_label = tk.Label(results_header, text=t('marketplace.enter_system_commodity'),
+                                               bg=_trade_cb_bg, fg="gray", font=("Segoe UI", 8))
+        self.trade_total_label.pack(side="right")
+        
+        results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
+        results_frame.pack(fill="both", expand=True, pady=(5, 0))
+        
+        # Create results table
+        self._create_trade_results_table(results_frame)
+        
+        # Add tooltips
+        ToolTip(self.trade_ref_entry, t('tooltips.reference_system'))
+        ToolTip(self.trade_use_current_btn, t('tooltips.use_current_market'))
+        ToolTip(search_btn, t('tooltips.search_market'))
+        ToolTip(category_combo, t('tooltips.select_category'))
+        ToolTip(self.trade_commodity_combo, t('tooltips.select_commodity'))
+        
+        # Initialize dropdown options based on current buy/sell mode
+        self._update_trade_order_options()
     
     # ==================== SYSTEM FINDER TAB ====================
     def _build_system_finder_tab(self, frame: ttk.Frame) -> None:
@@ -14956,6 +15231,238 @@ class App(tk.Tk):
             "marketplace_max_age": max_age_english
         }
         update_config_values(updates)
+    
+    # ==================== TRADE COMMODITIES TAB HELPERS ====================
+    def _on_trade_category_changed(self, event=None):
+        """Update commodity list when category changes"""
+        self._update_trade_commodity_list()
+        self._save_trade_preferences()
+    
+    def _update_trade_commodity_list(self):
+        """Populate commodity dropdown based on selected category"""
+        category = self.trade_category.get()
+        if category in self.commodities_data:
+            commodities = sorted(self.commodities_data[category])
+            self.trade_commodity_combo['values'] = commodities
+            # Select first commodity if current value not in new list
+            current = self.trade_commodity.get()
+            if current not in commodities and commodities:
+                self.trade_commodity.set(commodities[0])
+    
+    def _on_trade_sell_mode_toggle(self):
+        """Handle sell mode toggle for trade tab"""
+        if not self.trade_sell_mode.get():
+            self.trade_sell_mode.set(True)
+        else:
+            self.trade_buy_mode.set(False)
+        self._update_trade_order_options()
+        self._save_trade_preferences()
+    
+    def _on_trade_buy_mode_toggle(self):
+        """Handle buy mode toggle for trade tab"""
+        if not self.trade_buy_mode.get():
+            self.trade_buy_mode.set(True)
+        else:
+            self.trade_sell_mode.set(False)
+        self._update_trade_order_options()
+        self._save_trade_preferences()
+    
+    def _update_trade_order_options(self):
+        """Update sort options based on sell/buy mode for trade tab"""
+        if self.trade_sell_mode.get():
+            sort_order = ['Best price (highest)', 'Distance', 'Best demand', 'Last update']
+        else:
+            sort_order = ['Best price (lowest)', 'Distance', 'Best stock', 'Last update']
+        self.trade_order_combo['values'] = [self._trade_sort_options_map.get(k, k) for k in sort_order]
+    
+    def _use_current_system_trade(self):
+        """Fill trade reference system with current system"""
+        if self.current_system:
+            self.trade_reference_system.set(self.current_system)
+            self._save_trade_preferences()
+    
+    def _save_trade_preferences(self):
+        """Save all trade preferences to config"""
+        from config import update_config_values
+        station_type_english = self._trade_station_type_rev_map.get(self.trade_station_type.get(), self.trade_station_type.get())
+        order_by_english = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
+        max_age_english = self._trade_age_rev_map.get(self.trade_max_age.get(), self.trade_max_age.get())
+        updates = {
+            "trade_search_mode": str(self.trade_search_mode.get()),
+            "trade_sell_mode": bool(self.trade_sell_mode.get()),
+            "trade_buy_mode": bool(self.trade_buy_mode.get()),
+            "trade_reference_system": str(self.trade_reference_system.get()),
+            "trade_category": str(self.trade_category.get()),
+            "trade_commodity": str(self.trade_commodity.get()),
+            "trade_station_type": station_type_english,
+            "trade_exclude_carriers": bool(self.trade_exclude_carriers.get()),
+            "trade_large_pad_only": bool(self.trade_large_pad_only.get()),
+            "trade_order_by": order_by_english,
+            "trade_max_age": max_age_english
+        }
+        update_config_values(updates)
+    
+    def _search_trade_market(self):
+        """Search for trade commodity prices using same backend as mining commodities"""
+        try:
+            self._save_trade_preferences()
+            
+            commodity = self.trade_commodity.get()
+            search_mode = self.trade_search_mode.get()
+            
+            if not commodity:
+                self.trade_total_label.config(text=t('marketplace.select_commodity'))
+                return
+            
+            if search_mode == "near_system":
+                ref_system = self.trade_reference_system.get().strip()
+                if not ref_system:
+                    self.trade_total_label.config(text=t('marketplace.enter_system'))
+                    return
+            
+            # Convert max age to days
+            max_age_str = self._trade_age_rev_map.get(self.trade_max_age.get(), self.trade_max_age.get())
+            max_days_ago = self._convert_age_to_days(max_age_str)
+            
+            # Determine buy/sell mode
+            is_buy_mode = self.trade_buy_mode.get()
+            is_sell_mode = self.trade_sell_mode.get()
+            
+            # Get exclude carriers setting
+            exclude_carriers = self.trade_exclude_carriers.get()
+            
+            # Show searching status
+            if is_buy_mode:
+                self.trade_total_label.config(text=t('marketplace.searching_buying'))
+            else:
+                self.trade_total_label.config(text=t('marketplace.searching_selling'))
+            self.update()
+            
+            # Call appropriate API based on search mode and buy/sell mode
+            if search_mode == "galaxy_wide":
+                if is_buy_mode:
+                    results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
+                else:
+                    results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
+            else:
+                reference_system = self.trade_reference_system.get().strip()
+                if is_buy_mode:
+                    results = MarketplaceAPI.search_sellers(commodity, reference_system, None, max_days_ago, exclude_carriers)
+                else:
+                    results = MarketplaceAPI.search_buyers(commodity, reference_system, None, max_days_ago)
+            
+            # Apply filters
+            station_type_filter = self._trade_station_type_rev_map.get(self.trade_station_type.get(), self.trade_station_type.get())
+            original_count = len(results)
+            
+            # Filter out stations with 0 demand/stock
+            if is_buy_mode:
+                results = [r for r in results if r.get('stock', 0) > 0]
+            else:
+                results = [r for r in results if r.get('demand', 0) > 0]
+            
+            # Filter by Fleet Carriers
+            if exclude_carriers and station_type_filter != "Fleet Carrier":
+                results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
+            
+            # Filter by Station Type
+            if station_type_filter == "Orbital":
+                orbital_types = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Dodec"]
+                results = [r for r in results if r.get('stationType', '') in orbital_types]
+            elif station_type_filter == "Surface":
+                surface_types = ["Crater", "OnFoot", "Planetary", "Surface"]
+                results = [r for r in results if any((r.get('stationType') or '').startswith(t) for t in surface_types)]
+            elif station_type_filter == "Fleet Carrier":
+                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
+            elif station_type_filter == "Megaship":
+                results = [r for r in results if r.get('stationType', '') == "MegaShip"]
+            elif station_type_filter == "Stronghold":
+                results = [r for r in results if "StrongholdCarrier" in (r.get('stationType') or '')]
+            
+            # Filter by Landing Pad Size
+            large_pad_only = self.trade_large_pad_only.get()
+            if large_pad_only:
+                results = [r for r in results if r.get('maxLandingPadSize') == 3]
+            
+            # Filter by Max Age
+            results = self._filter_results_by_age(results, max_age_str)
+            
+            if results:
+                # Sort results
+                order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
+                
+                if "Distance" in order_by:
+                    results_sorted = sorted(results, key=lambda x: x.get('distance', 999999), reverse=False)
+                elif "Best price" in order_by:
+                    if is_buy_mode:
+                        results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 999999), reverse=False)
+                    else:
+                        results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
+                elif "supply" in order_by or "demand" in order_by:
+                    results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
+                elif "Last update" in order_by:
+                    results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
+                else:
+                    results_sorted = sorted(results, key=lambda x: x.get('distance', 999999), reverse=False)
+                
+                # Display results using marketplace table (shared between both tabs)
+                if search_mode == "galaxy_wide":
+                    reference_system = self.trade_reference_system.get().strip()
+                    if reference_system:
+                        self._display_marketplace_results(results_sorted[:30])
+                        self.trade_total_label.config(text=t('marketplace.calculating_distances'))
+                        self.config(cursor="watch")
+                        self.update_idletasks()
+                        
+                        import threading
+                        def calculate_distances_thread():
+                            try:
+                                top_30 = results_sorted[:30]
+                                top_30_with_dist = MarketplaceAPI.add_distances_to_results(top_30, reference_system)
+                                self.after(0, lambda: self._update_trade_with_distances(top_30_with_dist, len(results)))
+                            except Exception as e:
+                                print(f"[TRADE] Distance calculation error: {e}")
+                                self.after(0, lambda: self._restore_trade_cursor(len(results)))
+                        
+                        thread = threading.Thread(target=calculate_distances_thread, daemon=True)
+                        thread.start()
+                    else:
+                        self._display_marketplace_results(results_sorted[:30])
+                        self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
+                elif search_mode == "near_system":
+                    self._display_marketplace_results(results_sorted[:30])
+                    self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
+            else:
+                self._clear_marketplace_results()
+                if original_count > 0:
+                    self.trade_total_label.config(text=t('marketplace.no_results_after_filter'))
+                else:
+                    self.trade_total_label.config(text=t('marketplace.no_results'))
+            
+        except Exception as e:
+            log.error(f"Trade search failed: {e}")
+            self.trade_total_label.config(text=f"Error: {str(e)}")
+    
+    def _update_trade_with_distances(self, results_with_distances: list, total_count: int):
+        """Update trade results with calculated distances"""
+        self._display_marketplace_results(results_with_distances)
+        self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=total_count))
+        self.config(cursor="")
+    
+    def _restore_trade_cursor(self, total_count: int):
+        """Restore cursor after distance calculation error"""
+        self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=total_count))
+        self.config(cursor="")
+    
+    def _perform_trade_search(self, commodity: str, search_mode: str):
+        """Perform the actual trade commodity search"""
+        # This function is no longer used - _search_trade_market() handles everything
+        pass
+    
+    def _create_trade_results_table(self, parent_frame):
+        """Create results table for trade commodities - same structure as mining table"""
+        # Reuse marketplace table structure
+        self._create_marketplace_results_table(parent_frame)
     
     # ==================== UNUSED MARKETPLACE SEARCH METHODS (Kept for reference) ====================
     # These methods are no longer used - marketplace now uses external websites (Inara, edtools.cc)
@@ -17211,11 +17718,12 @@ Your keybinds will need to be reconfigured manually."""
         
         # SAFETY NET: Ensure visit count is at least 1 when player is in a system
         # This handles ALL edge cases where player arrived without a proper jump event:
-        # - Fleet Carrier jump (docked or undocked)
+        # - Fleet Carrier jump where commander IS onboard (count_visit=True)
         # - Traveling on another player's Fleet Carrier
         # - Any missed or unprocessed arrival events
         # Logic: If player is HERE, visits must be >= 1
-        if is_different_system:
+        # IMPORTANT: Only run safety net when count_visit=True (means commander actually arrived)
+        if is_different_system and count_visit:
             self.after(50, self._ensure_current_system_visited)
         
         # Notify all components that use current system
