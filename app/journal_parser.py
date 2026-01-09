@@ -290,6 +290,97 @@ class JournalParser:
         """
         return bool(self.ring_pattern.match(body_name))
     
+    def normalize_multistar_system_name(self, extracted_system: str, body_name: str) -> Tuple[str, str]:
+        """Normalize multi-star system names for consistent database storage
+        
+        Multi-star systems like "HIP 39383 BC" should be stored as:
+        - system_name: "HIP 39383" (base system, matches visited_systems)
+        - body_name: "BC 3 A Ring" (star designation moved to body name)
+        
+        This ensures coordinates can be found from visited_systems table.
+        
+        Args:
+            extracted_system: System name extracted from ring body name (e.g., "HIP 39383 BC")
+            body_name: Original full body name (e.g., "HIP 39383 BC 3 A Ring")
+            
+        Returns:
+            Tuple of (normalized_system_name, normalized_body_name)
+        """
+        import sqlite3
+        
+        if not extracted_system:
+            return extracted_system, body_name
+        
+        # Check if this exact system exists in visited_systems with coordinates
+        try:
+            with sqlite3.connect(self.user_db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT system_name FROM visited_systems 
+                    WHERE system_name = ? AND x_coord IS NOT NULL
+                    LIMIT 1
+                ''', (extracted_system,))
+                if cursor.fetchone():
+                    # Exact match found - system name is correct
+                    # Normalize body name by removing system prefix
+                    normalized_body = body_name
+                    if body_name.lower().startswith(extracted_system.lower()):
+                        normalized_body = body_name[len(extracted_system):].strip()
+                    return extracted_system, normalized_body
+                
+                # Try to find a base system by stripping star designations
+                # Pattern: system name may end with " A", " B", " AB", " BC", " ABC", etc.
+                star_designation_pattern = re.compile(r'^(.+?)\s+([A-Z]{1,3})$')
+                match = star_designation_pattern.match(extracted_system)
+                
+                if match:
+                    base_system = match.group(1)
+                    star_designation = match.group(2)
+                    
+                    # Check if base system exists in visited_systems
+                    cursor.execute('''
+                        SELECT system_name FROM visited_systems 
+                        WHERE system_name = ? AND x_coord IS NOT NULL
+                        LIMIT 1
+                    ''', (base_system,))
+                    if cursor.fetchone():
+                        # Base system found! Use it and move star designation to body name
+                        # e.g., "HIP 39383 BC 3 A Ring" -> system="HIP 39383", body="BC 3 A Ring"
+                        normalized_body = body_name
+                        if body_name.lower().startswith(base_system.lower()):
+                            normalized_body = body_name[len(base_system):].strip()
+                        log.info(f"Normalized multi-star system: '{extracted_system}' -> '{base_system}', body: '{normalized_body}'")
+                        return base_system, normalized_body
+                    
+                    # Also check galaxy_systems.db for base system
+                    # This handles cases where we haven't visited the system yet
+                    try:
+                        from pathlib import Path
+                        script_dir = Path(__file__).parent
+                        galaxy_db_path = script_dir / "data" / "galaxy_systems.db"
+                        if galaxy_db_path.exists():
+                            with sqlite3.connect(str(galaxy_db_path)) as galaxy_conn:
+                                galaxy_cursor = galaxy_conn.cursor()
+                                galaxy_cursor.execute('SELECT name FROM systems WHERE name = ? LIMIT 1', (base_system,))
+                                if galaxy_cursor.fetchone():
+                                    # Base system found in galaxy database
+                                    normalized_body = body_name
+                                    if body_name.lower().startswith(base_system.lower()):
+                                        normalized_body = body_name[len(base_system):].strip()
+                                    log.info(f"Normalized multi-star system (galaxy DB): '{extracted_system}' -> '{base_system}', body: '{normalized_body}'")
+                                    return base_system, normalized_body
+                    except Exception as e:
+                        log.debug(f"Galaxy DB lookup failed: {e}")
+                        
+        except Exception as e:
+            log.warning(f"Error normalizing multi-star system name: {e}")
+        
+        # No normalization needed or possible - return original
+        normalized_body = body_name
+        if extracted_system and body_name.lower().startswith(extracted_system.lower()):
+            normalized_body = body_name[len(extracted_system):].strip()
+        return extracted_system, normalized_body
+    
     def extract_system_and_body_from_ring_name(self, body_name: str) -> Tuple[Optional[str], str]:
         """Extract system name and ring designation from ring body name
         
@@ -466,7 +557,13 @@ class JournalParser:
                 log.warning(f"Could not determine system name for ring: {body_name}")
                 return
             
-            log.debug(f"Processing ring scan: {system_name} - {body_name}")
+            # CRITICAL FIX: Normalize multi-star system names for consistent database storage
+            # This ensures coordinates can be found from visited_systems table
+            # e.g., "HIP 39383 BC" -> "HIP 39383" with body "BC 3 A Ring"
+            system_name, normalized_body_name = self.normalize_multistar_system_name(system_name, body_name)
+            normalized_body_name = ' '.join(normalized_body_name.split())  # Ensure proper spacing
+            
+            log.debug(f"Processing ring scan: {system_name} - {normalized_body_name}")
             
             # Look up ring info from previously stored Scan event
             ring_class = None
@@ -475,13 +572,6 @@ class JournalParser:
             outer_radius = None
             ring_mass = None
             density = None
-            
-            # Normalize body name FIRST for database lookup
-            # (database stores without system name prefix, e.g., "2 A Ring" not "Namnetes 2 A Ring")
-            normalized_body_name = body_name
-            if system_name and body_name.lower().startswith(system_name.lower()):
-                normalized_body_name = body_name[len(system_name):].strip()
-            normalized_body_name = ' '.join(normalized_body_name.split())  # Ensure proper spacing
             
             if system_address and body_name:
                 key = (system_address, body_name)
