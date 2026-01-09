@@ -15324,37 +15324,60 @@ class App(tk.Tk):
                     self.trade_total_label.config(text=t('marketplace.enter_system'))
                     return
             
-            # Convert max age to days
-            max_age_str = self._trade_age_rev_map.get(self.trade_max_age.get(), self.trade_max_age.get())
-            max_days_ago = self._convert_age_to_days(max_age_str)
-            
-            # Determine buy/sell mode
-            is_buy_mode = self.trade_buy_mode.get()
-            is_sell_mode = self.trade_sell_mode.get()
-            
-            # Get exclude carriers setting
-            exclude_carriers = self.trade_exclude_carriers.get()
-            
             # Show searching status
+            is_buy_mode = self.trade_buy_mode.get()
             if is_buy_mode:
                 self.trade_total_label.config(text=t('marketplace.searching_buying'))
             else:
                 self.trade_total_label.config(text=t('marketplace.searching_selling'))
+            self.config(cursor="watch")
             self.update()
             
-            # Call appropriate API based on search mode and buy/sell mode
-            if search_mode == "galaxy_wide":
-                if is_buy_mode:
-                    results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
-                else:
-                    results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
-            else:
-                reference_system = self.trade_reference_system.get().strip()
-                if is_buy_mode:
-                    results = MarketplaceAPI.search_sellers(commodity, reference_system, None, max_days_ago, exclude_carriers)
-                else:
-                    results = MarketplaceAPI.search_buyers(commodity, reference_system, None, max_days_ago)
+            # Run search in background thread to prevent UI freeze
+            import threading
+            def search_thread():
+                try:
+                    # Convert max age to days
+                    max_age_str = self._trade_age_rev_map.get(self.trade_max_age.get(), self.trade_max_age.get())
+                    max_days_ago = self._convert_age_to_days(max_age_str)
+                    
+                    # Determine buy/sell mode
+                    is_buy_mode = self.trade_buy_mode.get()
+                    is_sell_mode = self.trade_sell_mode.get()
+                    
+                    # Get exclude carriers setting
+                    exclude_carriers = self.trade_exclude_carriers.get()
+                    
+                    # Call appropriate API based on search mode and buy/sell mode
+                    if search_mode == "galaxy_wide":
+                        if is_buy_mode:
+                            results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
+                        else:
+                            results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
+                    else:
+                        reference_system = self.trade_reference_system.get().strip()
+                        if is_buy_mode:
+                            results = MarketplaceAPI.search_sellers(commodity, reference_system, None, max_days_ago, exclude_carriers)
+                        else:
+                            results = MarketplaceAPI.search_buyers(commodity, reference_system, None, max_days_ago)
+                    
+                    # Update UI in main thread with results
+                    self.after(0, lambda: self._process_trade_search_results(results, search_mode, is_buy_mode, max_age_str))
+                except Exception as e:
+                    log.error(f"Trade search failed: {e}")
+                    self.after(0, lambda: self._trade_search_error(str(e)))
             
+            thread = threading.Thread(target=search_thread, daemon=True)
+            thread.start()
+            
+        except Exception as e:
+            log.error(f"Trade search failed: {e}")
+            self.trade_total_label.config(text=f"Error: {str(e)}")
+            self.config(cursor="")
+    
+    def _process_trade_search_results(self, results: list, search_mode: str, is_buy_mode: bool, max_age_str: str):
+        """Process and display trade search results (runs on main thread)"""
+        try:
             # Apply filters
             station_type_filter = self._trade_station_type_rev_map.get(self.trade_station_type.get(), self.trade_station_type.get())
             original_count = len(results)
@@ -15366,6 +15389,7 @@ class App(tk.Tk):
                 results = [r for r in results if r.get('demand', 0) > 0]
             
             # Filter by Fleet Carriers
+            exclude_carriers = self.trade_exclude_carriers.get()
             if exclude_carriers and station_type_filter != "Fleet Carrier":
                 results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
             
@@ -15409,11 +15433,11 @@ class App(tk.Tk):
                 else:
                     results_sorted = sorted(results, key=lambda x: x.get('distance', 999999), reverse=False)
                 
-                # Display results using marketplace table (shared between both tabs)
+                # Display results using trade table (separate from mining table)
                 if search_mode == "galaxy_wide":
                     reference_system = self.trade_reference_system.get().strip()
                     if reference_system:
-                        self._display_marketplace_results(results_sorted[:30])
+                        self._display_trade_results(results_sorted[:30])
                         self.trade_total_label.config(text=t('marketplace.calculating_distances'))
                         self.config(cursor="watch")
                         self.update_idletasks()
@@ -15431,25 +15455,34 @@ class App(tk.Tk):
                         thread = threading.Thread(target=calculate_distances_thread, daemon=True)
                         thread.start()
                     else:
-                        self._display_marketplace_results(results_sorted[:30])
+                        self._display_trade_results(results_sorted[:30])
                         self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
+                        self.config(cursor="")
                 elif search_mode == "near_system":
-                    self._display_marketplace_results(results_sorted[:30])
+                    self._display_trade_results(results_sorted[:30])
                     self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
+                    self.config(cursor="")
             else:
-                self._clear_marketplace_results()
+                self._clear_trade_results()
+                self.config(cursor="")
                 if original_count > 0:
                     self.trade_total_label.config(text=t('marketplace.no_results_after_filter'))
                 else:
                     self.trade_total_label.config(text=t('marketplace.no_results'))
-            
+                    
         except Exception as e:
-            log.error(f"Trade search failed: {e}")
+            log.error(f"Trade search results processing failed: {e}")
             self.trade_total_label.config(text=f"Error: {str(e)}")
+            self.config(cursor="")
+    
+    def _trade_search_error(self, error_msg: str):
+        """Handle trade search error (runs on main thread)"""
+        self.trade_total_label.config(text=f"Error: {error_msg}")
+        self.config(cursor="")
     
     def _update_trade_with_distances(self, results_with_distances: list, total_count: int):
         """Update trade results with calculated distances"""
-        self._display_marketplace_results(results_with_distances)
+        self._display_trade_results(results_with_distances)
         self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=total_count))
         self.config(cursor="")
     
@@ -15464,9 +15497,196 @@ class App(tk.Tk):
         pass
     
     def _create_trade_results_table(self, parent_frame):
-        """Create results table for trade commodities - same structure as mining table"""
-        # Reuse marketplace table structure
-        self._create_marketplace_results_table(parent_frame)
+        """Create results table for trade commodities - separate from mining table"""
+        # Create own table frame
+        table_frame = tk.Frame(parent_frame, bg="#1a1a1a")
+        table_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # Column definitions - same structure as marketplace
+        columns = ("location", "type", "pad", "distance", "demand", "price", "updated")
+        
+        # Create separate Treeview for trade tab
+        self.trade_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
+        
+        # Define headings with sorting
+        numeric_columns = {"distance", "demand", "price", "updated"}
+        for col in columns:
+            is_numeric = col in numeric_columns
+            self.trade_tree.heading(col, text=self._get_column_title(col), 
+                                    anchor="w",
+                                    command=lambda c=col, n=is_numeric: self._sort_trade_column(c, n))
+        
+        # Track sort state
+        self.trade_sort_column = None
+        self.trade_sort_reverse = False
+        
+        # Set column widths
+        self.trade_tree.column("location", width=255, minwidth=150, anchor="w", stretch=False)
+        self.trade_tree.column("type", width=95, minwidth=70, anchor="w", stretch=False)
+        self.trade_tree.column("pad", width=45, minwidth=40, anchor="w", stretch=False)
+        self.trade_tree.column("distance", width=70, minwidth=55, anchor="w", stretch=False)
+        self.trade_tree.column("demand", width=75, minwidth=55, anchor="w", stretch=False)
+        self.trade_tree.column("price", width=125, minwidth=80, anchor="w", stretch=False)
+        self.trade_tree.column("updated", width=95, minwidth=70, anchor="w", stretch=True)
+        
+        # Vertical scrollbar
+        v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.trade_tree.yview)
+        self.trade_tree.configure(yscrollcommand=v_scrollbar.set)
+        
+        # Horizontal scrollbar
+        h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.trade_tree.xview)
+        self.trade_tree.configure(xscrollcommand=h_scrollbar.set)
+        
+        # Configure row tags for alternating colors
+        self.trade_tree.tag_configure('oddrow', background='#1e1e1e')
+        self.trade_tree.tag_configure('evenrow', background='#252525')
+        
+        # Grid layout for treeview and scrollbars (like Mining Commodities)
+        self.trade_tree.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        
+        # Configure grid weights
+        table_frame.grid_columnconfigure(0, weight=1)
+        table_frame.grid_rowconfigure(0, weight=1)
+        
+        # Bind right-click for context menu (use lambda to delay method lookup)
+        self.trade_tree.bind("<Button-3>", lambda e: self._on_marketplace_right_click(e))
+        self.trade_tree.bind("<Double-1>", lambda e: self._on_marketplace_double_click(e))
+    
+    def _sort_trade_column(self, col: str, is_numeric: bool):
+        """Sort trade results table by column"""
+        # Toggle sort direction
+        if self.trade_sort_column == col:
+            self.trade_sort_reverse = not self.trade_sort_reverse
+        else:
+            self.trade_sort_column = col
+            self.trade_sort_reverse = False
+        
+        # Get all items
+        items = [(self.trade_tree.set(item, col), item) for item in self.trade_tree.get_children('')]
+        
+        # Sort items
+        if is_numeric:
+            def parse_value(val):
+                try:
+                    # Handle distance like "123 LY"
+                    val = val.replace(' LY', '').replace(',', '').replace('K', '000')
+                    return float(val) if val and val != '-' else 999999
+                except:
+                    return 999999
+            items.sort(key=lambda x: parse_value(x[0]), reverse=self.trade_sort_reverse)
+        else:
+            items.sort(key=lambda x: x[0].lower(), reverse=self.trade_sort_reverse)
+        
+        # Rearrange items
+        for index, (val, item) in enumerate(items):
+            self.trade_tree.move(item, '', index)
+    
+    def _display_trade_results(self, results: list):
+        """Display trade search results in trade table"""
+        # Clear existing results
+        for item in self.trade_tree.get_children():
+            self.trade_tree.delete(item)
+        
+        # Determine mode for correct field handling
+        is_buy_mode = self.trade_buy_mode.get()
+        
+        # Display results
+        for result in results:
+            # LOCATION (System + Station)
+            location = f"{result.get('systemName', 'Unknown')} / {result.get('stationName', 'Unknown')[:25]}"
+            
+            # TYPE (Station type)
+            api_type = result.get('stationType')
+            if api_type is None or api_type == '':
+                api_type = 'Unknown'
+            
+            if api_type == 'AsteroidBase':
+                station_type = 'Orbital/Asteroid'
+            elif api_type in ['Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Dodec']:
+                station_type = f'Orbital/{api_type}'
+            elif api_type == 'CraterOutpost':
+                station_type = 'Surface/Crater'
+            elif api_type == 'CraterPort':
+                station_type = 'Surface/Port'
+            elif api_type == 'SurfaceStation':
+                station_type = 'Surface Station'
+            elif api_type == 'OnFootSettlement':
+                station_type = 'Surface/OnFoot'
+            elif api_type == 'FleetCarrier':
+                station_type = 'Carrier'
+            elif api_type == 'StrongholdCarrier':
+                station_type = 'Stronghold'
+            elif api_type == 'MegaShip':
+                station_type = 'MegaShip'
+            else:
+                station_type = api_type
+            
+            # PAD (Landing pad size)
+            pad_size = result.get('maxLandingPadSize')
+            if isinstance(pad_size, int):
+                pad_map = {0: '?', 1: 'S', 2: 'M', 3: 'L'}
+                pad = pad_map.get(pad_size, '?')
+            elif isinstance(pad_size, str):
+                pad = pad_size.upper()
+            else:
+                pad = '?'
+            
+            # DISTANCE
+            if 'distance' in result and result['distance'] is not None:
+                distance = f"{result['distance']:.1f}"
+            else:
+                distance = "-"
+            
+            # DEMAND/STOCK
+            if is_buy_mode:
+                volume = f"{result.get('stock', 0):,}" if result.get('stock', 0) > 0 else "0"
+            else:
+                volume = f"{result.get('demand', 0):,}" if result.get('demand', 0) > 0 else "0"
+            
+            # PRICE
+            if is_buy_mode:
+                price = f"{result.get('buyPrice', 0):,} CR"
+            else:
+                price = f"{result.get('sellPrice', 0):,} CR"
+            
+            # UPDATED (Data age)
+            updated_at = result.get('updatedAt', '')
+            if updated_at:
+                try:
+                    from datetime import datetime, timezone
+                    updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                    now = datetime.now(timezone.utc)
+                    diff = now - updated_time
+                    total_minutes = diff.total_seconds() / 60
+                    if total_minutes < 60:
+                        updated = f"{int(total_minutes)}m"
+                    elif total_minutes < 1440:
+                        updated = f"{int(total_minutes / 60)}h"
+                    else:
+                        updated = f"{int(total_minutes / 1440)}d"
+                except Exception:
+                    updated = '-'
+            else:
+                updated = '-'
+            
+            # Insert row
+            self.trade_tree.insert('', 'end', values=(
+                f" {location} ",
+                f" {station_type} ",
+                f" {pad} ",
+                f" {distance} ",
+                f" {volume} ",
+                f" {price} ",
+                f" {updated} "
+            ))
+    
+    def _clear_trade_results(self):
+        """Clear trade results table"""
+        if hasattr(self, 'trade_tree'):
+            for item in self.trade_tree.get_children():
+                self.trade_tree.delete(item)
     
     # ==================== UNUSED MARKETPLACE SEARCH METHODS (Kept for reference) ====================
     # These methods are no longer used - marketplace now uses external websites (Inara, edtools.cc)
