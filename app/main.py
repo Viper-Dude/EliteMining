@@ -1427,11 +1427,13 @@ class CargoMonitor:
         self.refresh_ship_capacity()
         logging.basicConfig(filename="debug_log.txt", level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
     
-    def _on_hotspot_added(self, is_new_discovery: bool = False):
+    def _on_hotspot_added(self, is_new_discovery: bool = False, normalized_system: str = None, normalized_body: str = None):
         """Callback triggered when new hotspot data is added to database
         
         Args:
             is_new_discovery: True if these are newly discovered hotspots (not already in database)
+            normalized_system: The normalized system name (e.g., "HIP 39383" not "HIP 39383 BC")
+            normalized_body: The normalized body name (e.g., "BC 3 A Ring" not "3 A Ring")
         """
         try:
             # Access main app through main_app_ref if this is called from CargoMonitor
@@ -1451,9 +1453,9 @@ class CargoMonitor:
             
             # Auto-search refresh: Only if NEW hotspots were discovered AND not during catchup scan
             if is_new_discovery and not getattr(self, '_catchup_scan_in_progress', False):
-                # Get scanned system/body from CargoMonitor (self) where it's stored during SAASignalsFound processing
-                scanned_system = getattr(self, '_current_saa_system', None)
-                scanned_body = getattr(self, '_current_saa_body', None)
+                # Use normalized system/body names if provided, otherwise fall back to stored values
+                scanned_system = normalized_system or getattr(self, '_current_saa_system', None)
+                scanned_body = normalized_body or getattr(self, '_current_saa_body', None)
                 if scanned_system:
                     self._check_auto_refresh_ring_finder(scanned_system, scanned_body, hotspots_were_new=True)
             

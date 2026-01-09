@@ -658,9 +658,14 @@ class JournalParser:
             
             # Trigger callback ONCE after all hotspots are processed (not inside loop)
             # Pass True ONLY if at least one hotspot was NEW (not already in database)
+            # Also pass normalized system/body names for highlighting
             if self.on_hotspot_added and hotspots_are_new:
                 log.debug("[HOTSPOT] Triggering on_hotspot_added callback (is_new_discovery=True)")
-                self.on_hotspot_added(is_new_discovery=True)
+                self.on_hotspot_added(
+                    is_new_discovery=True, 
+                    normalized_system=system_name, 
+                    normalized_body=normalized_body_name
+                )
             elif self.on_hotspot_added and not hotspots_are_new:
                 log.debug("[HOTSPOT] Hotspots already exist, skipping callback")
                     

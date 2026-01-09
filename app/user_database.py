@@ -161,6 +161,16 @@ class UserDatabase:
                 self._set_migration_version('fix_body_name_prefix_v476', 1)
             else:
                 log.info("[Migration] Body name prefix fix v4.7.6 already applied")
+            
+            # v4.7.7: Normalize multi-star system names and backfill coordinates
+            # e.g., system="HIP 39383 BC", body="3 A Ring" -> system="HIP 39383", body="BC 3 A Ring"
+            if self._get_migration_version('normalize_multistar_systems') < 1:
+                log.info("[Migration] Normalizing multi-star system names...")
+                print("[MIGRATION] Normalizing multi-star system names...")
+                self._normalize_multistar_system_names()
+                self._set_migration_version('normalize_multistar_systems', 1)
+            else:
+                log.info("[Migration] Multi-star system normalization already applied")
                 
         except Exception as e:
             print(f"[MIGRATION ERROR] {e}")
@@ -818,6 +828,177 @@ class UserDatabase:
             # Don't fail startup if migration fails
             print(f"[MIGRATION v4.7.6] Warning: Could not fix body_name prefixes: {e}")
             log.warning(f"[Migration v4.7.6] Could not fix body_name prefixes: {e}")
+            import traceback
+            log.error(traceback.format_exc())
+    
+    def _normalize_multistar_system_names(self) -> None:
+        """Normalize multi-star system names for consistent database storage (v4.7.7)
+        
+        Multi-star systems like "HIP 39383 BC" should be stored as:
+        - system_name: "HIP 39383" (base system, matches visited_systems for coordinates)
+        - body_name: "BC 3 A Ring" (star designation moved to body name)
+        
+        This ensures coordinates can be found from visited_systems table and 
+        hotspots appear immediately in searches.
+        """
+        import re
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Find entries where system_name ends with a star designation (A, B, AB, BC, etc.)
+                # Pattern: ends with " A", " B", " AB", " BC", " ABC", etc.
+                cursor.execute('''
+                    SELECT id, system_name, body_name, material_name, hotspot_count, scan_date,
+                           system_address, body_id, x_coord, y_coord, z_coord, coord_source,
+                           ring_type, ls_distance, density, inner_radius, outer_radius, ring_mass
+                    FROM hotspot_data
+                    WHERE body_name LIKE '% Ring'
+                ''')
+                
+                all_entries = cursor.fetchall()
+                
+                if not all_entries:
+                    print("[MIGRATION v4.7.7] No ring entries to process")
+                    log.info("[Migration v4.7.7] No ring entries to process")
+                    return
+                
+                # Pattern to detect star designation at end of system name
+                star_designation_pattern = re.compile(r'^(.+?)\s+([A-Z]{1,3})$')
+                
+                # Load visited_systems for coordinate lookup
+                cursor.execute('SELECT system_name, x_coord, y_coord, z_coord FROM visited_systems WHERE x_coord IS NOT NULL')
+                visited_systems = {row[0]: (row[1], row[2], row[3]) for row in cursor.fetchall()}
+                
+                # Also load galaxy database systems
+                galaxy_systems = set()
+                try:
+                    from pathlib import Path
+                    script_dir = Path(__file__).parent
+                    galaxy_db_path = script_dir / "data" / "galaxy_systems.db"
+                    if galaxy_db_path.exists():
+                        with sqlite3.connect(str(galaxy_db_path)) as galaxy_conn:
+                            galaxy_cursor = galaxy_conn.cursor()
+                            galaxy_cursor.execute('SELECT name FROM systems')
+                            galaxy_systems = {row[0] for row in galaxy_cursor.fetchall()}
+                except Exception as e:
+                    log.debug(f"[Migration v4.7.7] Could not load galaxy systems: {e}")
+                
+                fixed_count = 0
+                coords_backfilled = 0
+                deleted_duplicates = 0
+                
+                for row in all_entries:
+                    entry_id = row[0]
+                    old_system = row[1]
+                    old_body = row[2]
+                    material_name = row[3]
+                    x_coord = row[8]
+                    
+                    # Skip if already has coordinates (likely already correct)
+                    # But still check for system name normalization
+                    
+                    # Check if system name ends with star designation
+                    match = star_designation_pattern.match(old_system)
+                    if not match:
+                        # No star designation - just try to backfill coordinates if missing
+                        if x_coord is None and old_system in visited_systems:
+                            coords = visited_systems[old_system]
+                            cursor.execute('''
+                                UPDATE hotspot_data 
+                                SET x_coord = ?, y_coord = ?, z_coord = ?, coord_source = 'visited_systems'
+                                WHERE id = ?
+                            ''', (coords[0], coords[1], coords[2], entry_id))
+                            coords_backfilled += 1
+                        continue
+                    
+                    base_system = match.group(1)
+                    star_designation = match.group(2)
+                    
+                    # Check if base system exists in visited_systems or galaxy database
+                    base_exists = base_system in visited_systems or base_system in galaxy_systems
+                    full_exists = old_system in visited_systems or old_system in galaxy_systems
+                    
+                    # Only normalize if base system exists but full name doesn't
+                    if not base_exists:
+                        # Base system not found - can't normalize, just try coordinate backfill
+                        if x_coord is None and old_system in visited_systems:
+                            coords = visited_systems[old_system]
+                            cursor.execute('''
+                                UPDATE hotspot_data 
+                                SET x_coord = ?, y_coord = ?, z_coord = ?, coord_source = 'visited_systems'
+                                WHERE id = ?
+                            ''', (coords[0], coords[1], coords[2], entry_id))
+                            coords_backfilled += 1
+                        continue
+                    
+                    if full_exists:
+                        # Full system name exists (e.g., "HIP 39383 BC" is a real system in galaxy)
+                        # Don't normalize, just backfill coordinates if needed
+                        if x_coord is None and old_system in visited_systems:
+                            coords = visited_systems[old_system]
+                            cursor.execute('''
+                                UPDATE hotspot_data 
+                                SET x_coord = ?, y_coord = ?, z_coord = ?, coord_source = 'visited_systems'
+                                WHERE id = ?
+                            ''', (coords[0], coords[1], coords[2], entry_id))
+                            coords_backfilled += 1
+                        continue
+                    
+                    # Base system exists but full name doesn't - normalize!
+                    # Move star designation to body name
+                    new_system = base_system
+                    new_body = f"{star_designation} {old_body}" if not old_body.startswith(star_designation) else old_body
+                    new_body = ' '.join(new_body.split())  # Clean up spacing
+                    
+                    # Check if normalized entry already exists
+                    cursor.execute('''
+                        SELECT id, x_coord FROM hotspot_data 
+                        WHERE system_name = ? AND body_name = ? AND material_name = ?
+                    ''', (new_system, new_body, material_name))
+                    
+                    existing = cursor.fetchone()
+                    
+                    if existing:
+                        # Correct entry already exists - delete this one
+                        cursor.execute('DELETE FROM hotspot_data WHERE id = ?', (entry_id,))
+                        deleted_duplicates += 1
+                        log.debug(f"[Migration v4.7.7] Deleted duplicate: {old_system}/{old_body} (correct entry exists)")
+                    else:
+                        # Update to normalized format
+                        new_coords = visited_systems.get(new_system)
+                        if new_coords:
+                            cursor.execute('''
+                                UPDATE hotspot_data 
+                                SET system_name = ?, body_name = ?, 
+                                    x_coord = ?, y_coord = ?, z_coord = ?, coord_source = 'visited_systems'
+                                WHERE id = ?
+                            ''', (new_system, new_body, new_coords[0], new_coords[1], new_coords[2], entry_id))
+                            coords_backfilled += 1
+                        else:
+                            cursor.execute('''
+                                UPDATE hotspot_data 
+                                SET system_name = ?, body_name = ?
+                                WHERE id = ?
+                            ''', (new_system, new_body, entry_id))
+                        fixed_count += 1
+                        log.debug(f"[Migration v4.7.7] Normalized: {old_system}/{old_body} -> {new_system}/{new_body}")
+                
+                conn.commit()
+                
+                total_processed = fixed_count + deleted_duplicates + coords_backfilled
+                if total_processed > 0:
+                    print(f"[MIGRATION v4.7.7] ✅ Normalized {fixed_count} entries, backfilled {coords_backfilled} coordinates, removed {deleted_duplicates} duplicates")
+                    log.info(f"[Migration v4.7.7] Normalized {fixed_count} entries, backfilled {coords_backfilled} coordinates, removed {deleted_duplicates} duplicates")
+                else:
+                    print("[MIGRATION v4.7.7] ✅ All entries verified - no fixes needed")
+                    log.info("[Migration v4.7.7] All entries verified - no fixes needed")
+                    
+        except Exception as e:
+            # Don't fail startup if migration fails
+            print(f"[MIGRATION v4.7.7] Warning: Could not normalize multi-star systems: {e}")
+            log.warning(f"[Migration v4.7.7] Could not normalize multi-star systems: {e}")
             import traceback
             log.error(traceback.format_exc())
         

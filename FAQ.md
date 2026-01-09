@@ -110,11 +110,8 @@ Log out and back into Elite Dangerous once. Make sure the game journal files are
 
 If you scan a ring and discover new hotspots but they don't appear in the Hotspot Finder results, the mining session may have been running during the scan.
 
-**Why this happens:** When a mining session is running, the app is actively reading journal files and accessing the hotspot database. This can prevent new hotspot data from being written to the database during ring scans.
-
 **Solution:** 
-1. Stop the current mining session
-2. Restart the app
+1. Restart the app
 3. Search in the Hotspot Finder - the new hotspots should now appear
 
 **Prevention:** Stop your mining session before scanning rings for discovery purposes. You can restart the session after scanning is complete.
