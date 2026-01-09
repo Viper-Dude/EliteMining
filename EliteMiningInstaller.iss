@@ -54,6 +54,9 @@ Source: "app\data\database_metadata.json"; DestDir: "{app}\app\data"; Flags: ign
 Source: "app\data\overlaps.csv"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "app\data\res_sites.csv"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 
+; v4.7.7+: Trade commodities data
+Source: "app\data\commodities.json"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
+
 ; v4.1.8+: Use smart version checking instead of forced overwrite
 ; Database will only update if new version > existing version, with automatic backup
 Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\app\data"; Flags: onlyifdoesntexist

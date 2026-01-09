@@ -4632,7 +4632,11 @@ class App(tk.Tk):
         # Load commodities database for trade market tab
         self.commodities_data = {}
         try:
-            commodities_path = os.path.join(os.path.dirname(__file__), 'data', 'commodities.json')
+            # Use get_app_data_dir() for installer compatibility
+            if getattr(sys, 'frozen', False):
+                commodities_path = os.path.join(get_app_data_dir(), 'data', 'commodities.json')
+            else:
+                commodities_path = os.path.join(os.path.dirname(__file__), 'data', 'commodities.json')
             with open(commodities_path, 'r', encoding='utf-8') as f:
                 self.commodities_data = json.load(f)
             log.info(f"Loaded {len(self.commodities_data)} commodity categories")
