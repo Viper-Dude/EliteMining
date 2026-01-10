@@ -9623,7 +9623,16 @@ class App(tk.Tk):
         row += 1
         self.distance_status_label = tk.Label(calc_frame, text="", 
                                               font=("Segoe UI", 8, "italic"), fg="#888888", bg=_dc_bg)
-        self.distance_status_label.grid(row=row, column=0, columnspan=3, pady=(0, 5))
+        self.distance_status_label.grid(row=row, column=0, columnspan=2, pady=(0, 5))
+        
+        # EDSM API status indicator
+        self.edsm_status_label = tk.Label(calc_frame, text="⚫ EDSM: checking...", 
+                                          font=("Segoe UI", 8), fg="#888888", bg=_dc_bg, anchor="e")
+        self.edsm_status_label.grid(row=row, column=2, pady=(0, 5), sticky="e", padx=(5, 0))
+        ToolTip(self.edsm_status_label, t('tooltips.edsm_status'))
+        
+        # Start EDSM status check
+        self.after(500, self._check_edsm_status)
         
         # Results section
         results_frame = ttk.LabelFrame(main_container, text=t('distance_calculator.results'), padding=10)
@@ -9840,7 +9849,7 @@ class App(tk.Tk):
             print(f"Error saving distance calculator systems: {e}")
     
     def _calculate_distances(self):
-        """Calculate distances between systems"""
+        """Calculate distances between systems - runs in background thread"""
         system_a = self.distance_system_a.get().strip()
         system_b = self.distance_system_b.get().strip()
         
@@ -9855,35 +9864,49 @@ class App(tk.Tk):
         # Save systems to config
         self._save_distance_systems()
         
+        # Show calculating status
+        self.distance_status_label.config(text="🔍 Querying EDSM...", fg="#4da6ff")
+        self._set_status("Calculating distances...")
+        
+        # Reset labels
+        self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}: ...", fg="#cccccc")
+        self.distance_a_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
+        self.distance_a_coords_label.config(text=t('distance_calculator.coordinates') + " ---", fg="#ffffff")
+        self.distance_b_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
+        self.distance_b_coords_label.config(text=t('distance_calculator.coordinates') + " ---", fg="#ffffff")
+        
+        # Run calculation in background thread
+        def _background_calc():
+            try:
+                # Get system info from EDSM
+                sys_a_info = None
+                sys_b_info = None
+                
+                if system_a:
+                    sys_a_info = self.distance_calculator.get_system_coordinates(system_a)
+                
+                if system_b:
+                    sys_b_info = self.distance_calculator.get_system_coordinates(system_b)
+                
+                # Update UI on main thread
+                self.after(0, lambda: self._apply_distance_results(system_a, system_b, sys_a_info, sys_b_info))
+                    
+            except Exception as e:
+                self.after(0, lambda: self._show_distance_error(str(e)))
+        
+        threading.Thread(target=_background_calc, daemon=True).start()
+    
+    def _apply_distance_results(self, system_a, system_b, sys_a_info, sys_b_info):
+        """Apply distance calculation results to UI - called on main thread"""
         try:
-            # Show calculating status
-            self.distance_status_label.config(text="🔍 Querying EDSM...", fg="#4da6ff")
-            self._set_status("Calculating distances...")
-            self.update()
+            # Show errors if systems not found
+            if system_a and not sys_a_info:
+                self.distance_a_sol_label.config(text=f"➤ System '{system_a}' not found in EDSM", fg="#ff6666")
+                self._set_status(f"System A '{system_a}' not found")
             
-            # Reset labels
-            self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}: ...", fg="#cccccc")
-            self.distance_a_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
-            self.distance_a_coords_label.config(text=t('distance_calculator.coordinates') + " ---", fg="#ffffff")
-            self.distance_b_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
-            self.distance_b_coords_label.config(text=t('distance_calculator.coordinates') + " ---", fg="#ffffff")
-            self.update()
-            
-            # Get system info from EDSM
-            sys_a_info = None
-            sys_b_info = None
-            
-            if system_a:
-                sys_a_info = self.distance_calculator.get_system_coordinates(system_a)
-                if not sys_a_info:
-                    self.distance_a_sol_label.config(text=f"➤ System '{system_a}' not found in EDSM", fg="#ff6666")
-                    self._set_status(f"System A '{system_a}' not found")
-            
-            if system_b:
-                sys_b_info = self.distance_calculator.get_system_coordinates(system_b)
-                if not sys_b_info:
-                    self.distance_b_sol_label.config(text=f"➤ System '{system_b}' not found in EDSM", fg="#ff6666")
-                    self._set_status(f"System B '{system_b}' not found")
+            if system_b and not sys_b_info:
+                self.distance_b_sol_label.config(text=f"➤ System '{system_b}' not found in EDSM", fg="#ff6666")
+                self._set_status(f"System B '{system_b}' not found")
             
             # Calculate distance between A and B
             if sys_a_info and sys_b_info:
@@ -9949,9 +9972,13 @@ class App(tk.Tk):
             self._set_status("Distance calculation complete")
             
         except Exception as e:
-            print(f"Error calculating distances: {e}")
-            self.distance_status_label.config(text=f"✗ Error: {str(e)[:50]}", fg="#ff6666")
-            self._set_status("Distance calculation failed")
+            self._show_distance_error(str(e))
+    
+    def _show_distance_error(self, error_msg: str):
+        """Show distance calculation error - called on main thread"""
+        print(f"Error calculating distances: {error_msg}")
+        self.distance_status_label.config(text=f"✗ Error: {error_msg[:50]}", fg="#ff6666")
+        self._set_status("Distance calculation failed")
     
     def _refresh_visit_count(self, system_name):
         """Refresh the visit count display for a system"""
@@ -9968,89 +9995,119 @@ class App(tk.Tk):
     
     def _update_home_fc_distances(self):
         """Update distance displays for Home and FC from current system"""
-        try:
-            current_system = self.distance_current_system.get().strip()
-            if not current_system:
-                self.distance_to_home_label.config(text="")
-                self.home_sol_label.config(text="")
-                self.distance_to_fc_label.config(text="")
-                self.fc_sol_label.config(text="")
+        # Run in background thread to avoid blocking UI during network calls
+        def _background_update():
+            try:
+                current_system = self.distance_current_system.get().strip()
+                if not current_system:
+                    self.after(0, lambda: self._clear_distance_labels())
+                    return
+                
+                # Calculate distance from current system to Sol
+                sol_distance = None
                 if hasattr(self, 'current_sol_label'):
-                    self.current_sol_label.config(text="")
-                return
-            
-            # Calculate distance from current system to Sol
+                    sol_distance, _ = self.distance_calculator.get_distance_to_sol(current_system)
+                
+                # Calculate distance to Home
+                home_system = self.distance_home_system.get().strip()
+                home_distance = None
+                home_sol_distance = None
+                home_visits = 0
+                if home_system:
+                    home_distance, home_info, current_info = self.distance_calculator.get_distance_between_systems(
+                        current_system, home_system
+                    )
+                    home_sol_distance, _ = self.distance_calculator.get_distance_to_sol(home_system)
+                    
+                    if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                        try:
+                            visit_data = self.cargo_monitor.user_db.is_system_visited(home_system)
+                            home_visits = visit_data.get('visit_count', 0) if visit_data else 0
+                        except:
+                            pass
+                
+                # Calculate distance to FC
+                fc_system = self.distance_fc_system.get().strip()
+                fc_distance = None
+                fc_sol_distance = None
+                fc_visits = 0
+                if fc_system:
+                    fc_distance, fc_info, current_info = self.distance_calculator.get_distance_between_systems(
+                        current_system, fc_system
+                    )
+                    fc_sol_distance, _ = self.distance_calculator.get_distance_to_sol(fc_system)
+                    
+                    if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
+                        try:
+                            visit_data = self.cargo_monitor.user_db.is_system_visited(fc_system)
+                            fc_visits = visit_data.get('visit_count', 0) if visit_data else 0
+                        except:
+                            pass
+                
+                # Update UI on main thread with all calculated values
+                self.after(0, lambda: self._apply_distance_updates(
+                    sol_distance, home_distance, home_sol_distance, home_visits,
+                    fc_distance, fc_sol_distance, fc_visits
+                ))
+                
+            except Exception as e:
+                print(f"Error updating home/FC distances: {e}")
+        
+        # Start background thread
+        threading.Thread(target=_background_update, daemon=True).start()
+    
+    def _clear_distance_labels(self):
+        """Clear all distance labels - called on UI thread"""
+        self.distance_to_home_label.config(text="")
+        self.home_sol_label.config(text="")
+        self.distance_to_fc_label.config(text="")
+        self.fc_sol_label.config(text="")
+        if hasattr(self, 'current_sol_label'):
+            self.current_sol_label.config(text="")
+    
+    def _apply_distance_updates(self, sol_distance, home_distance, home_sol_distance, home_visits,
+                                 fc_distance, fc_sol_distance, fc_visits):
+        """Apply distance calculations to UI labels - called on UI thread"""
+        try:
+            # Update current system Sol distance
             if hasattr(self, 'current_sol_label'):
-                sol_distance, _ = self.distance_calculator.get_distance_to_sol(current_system)
                 if sol_distance is not None:
                     self.current_sol_label.config(text=f"➤ {sol_distance:.2f} LY from Sol", fg="#ffcc00")
                 else:
                     self.current_sol_label.config(text="")
             
-            # Calculate distance to Home
-            home_system = self.distance_home_system.get().strip()
-            if home_system:
-                # Distance from current to home
-                distance, home_info, current_info = self.distance_calculator.get_distance_between_systems(
-                    current_system, home_system
-                )
-                if distance is not None:
-                    self.distance_to_home_label.config(text=f"➤ {distance:.2f} {t('distance_calculator.from_current')}", fg="#ffcc00")
-                else:
-                    self.distance_to_home_label.config(text="", fg="#888888")
-                
-                # Distance from home to Sol
-                sol_distance, _ = self.distance_calculator.get_distance_to_sol(home_system)
-                if sol_distance is not None:
-                    self.home_sol_label.config(text=f"({t('distance_calculator.sol_distance')} {sol_distance:.2f} LY)", fg="#888888")
-                else:
-                    self.home_sol_label.config(text="")
-                
-                # Home visits count
-                if hasattr(self, 'home_visits_label') and hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
-                    try:
-                        visit_data = self.cargo_monitor.user_db.is_system_visited(home_system)
-                        visits_count = visit_data.get('visit_count', 0) if visit_data else 0
-                        self.home_visits_label.config(text=f"{t('distance_calculator.visits_label')} {visits_count}")
-                    except:
-                        self.home_visits_label.config(text="")
+            # Update Home distances
+            if home_distance is not None:
+                self.distance_to_home_label.config(text=f"➤ {home_distance:.2f} {t('distance_calculator.from_current')}", fg="#ffcc00")
             else:
                 self.distance_to_home_label.config(text="")
+            
+            if home_sol_distance is not None:
+                self.home_sol_label.config(text=f"({t('distance_calculator.sol_distance')} {home_sol_distance:.2f} LY)", fg="#888888")
+            else:
                 self.home_sol_label.config(text="")
-                if hasattr(self, 'home_visits_label'):
+            
+            if hasattr(self, 'home_visits_label'):
+                if home_visits > 0:
+                    self.home_visits_label.config(text=f"{t('distance_calculator.visits_label')} {home_visits}")
+                else:
                     self.home_visits_label.config(text="")
             
-            # Calculate distance to FC
-            fc_system = self.distance_fc_system.get().strip()
-            if fc_system:
-                # Distance from current to FC
-                distance, fc_info, current_info = self.distance_calculator.get_distance_between_systems(
-                    current_system, fc_system
-                )
-                if distance is not None:
-                    self.distance_to_fc_label.config(text=f"➤ {distance:.2f} {t('distance_calculator.from_current')}", fg="#ffcc00")
-                else:
-                    self.distance_to_fc_label.config(text="", fg="#888888")
-                
-                # Distance from FC to Sol
-                sol_distance, _ = self.distance_calculator.get_distance_to_sol(fc_system)
-                if sol_distance is not None:
-                    self.fc_sol_label.config(text=f"({t('distance_calculator.sol_distance')} {sol_distance:.2f} LY)", fg="#888888")
-                else:
-                    self.fc_sol_label.config(text="")
-                
-                # FC visits count
-                if hasattr(self, 'fc_visits_label') and hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
-                    try:
-                        visit_data = self.cargo_monitor.user_db.is_system_visited(fc_system)
-                        visits_count = visit_data.get('visit_count', 0) if visit_data else 0
-                        self.fc_visits_label.config(text=f"{t('distance_calculator.visits_label')} {visits_count}")
-                    except:
-                        self.fc_visits_label.config(text="")
+            # Update FC distances
+            if fc_distance is not None:
+                self.distance_to_fc_label.config(text=f"➤ {fc_distance:.2f} {t('distance_calculator.from_current')}", fg="#ffcc00")
             else:
                 self.distance_to_fc_label.config(text="")
+            
+            if fc_sol_distance is not None:
+                self.fc_sol_label.config(text=f"({t('distance_calculator.sol_distance')} {fc_sol_distance:.2f} LY)", fg="#888888")
+            else:
                 self.fc_sol_label.config(text="")
-                if hasattr(self, 'fc_visits_label'):
+            
+            if hasattr(self, 'fc_visits_label'):
+                if fc_visits > 0:
+                    self.fc_visits_label.config(text=f"{t('distance_calculator.visits_label')} {fc_visits}")
+                else:
                     self.fc_visits_label.config(text="")
             
             # Notify Mining Session and Ring Finder to update their distance displays
@@ -10058,10 +10115,11 @@ class App(tk.Tk):
                 self.prospector_panel._update_distance_display()
             
             if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, '_update_sol_distance'):
+                current_system = self.distance_current_system.get().strip()
                 self.ring_finder._update_sol_distance(current_system)
                 
         except Exception as e:
-            print(f"Error updating home/FC distances: {e}")
+            print(f"Error applying distance updates: {e}")
     
     def get_distance_info_text(self) -> str:
         """Get formatted distance info string for display in other tabs
@@ -10097,6 +10155,103 @@ class App(tk.Tk):
             
         except Exception as e:
             return f"➤ {t('mining_session.sol')} --- | {t('mining_session.home')} --- | {t('mining_session.fleet_carrier')} ---"
+    
+    def _check_edsm_status(self):
+        """Check EDSM API status in background and update indicator"""
+        def _background_check():
+            import requests
+            try:
+                response = requests.get("https://www.edsm.net/api-v1/system", 
+                                       params={"systemName": "Sol", "showCoordinates": 1}, 
+                                       timeout=3)
+                if response.status_code == 200 and response.text.strip():
+                    self.after(0, lambda: self._update_edsm_status("online"))
+                elif response.status_code >= 500:
+                    # Server errors (500+) = offline
+                    self.after(0, lambda: self._update_edsm_status("offline"))
+                elif response.status_code >= 400:
+                    # Client errors (400+) = slow/error
+                    self.after(0, lambda: self._update_edsm_status("error"))
+                else:
+                    self.after(0, lambda: self._update_edsm_status("error"))
+            except (requests.Timeout, requests.exceptions.ReadTimeout, requests.exceptions.ConnectTimeout):
+                # All timeout types = offline (server not responding)
+                self.after(0, lambda: self._update_edsm_status("offline"))
+            except requests.exceptions.RequestException:
+                # Other connection errors = offline
+                self.after(0, lambda: self._update_edsm_status("offline"))
+            except Exception:
+                # Unexpected errors = offline
+                self.after(0, lambda: self._update_edsm_status("offline"))
+        
+        threading.Thread(target=_background_check, daemon=True).start()
+    
+    def _update_edsm_status(self, status: str):
+        """Update EDSM status label - called on UI thread"""
+        if not hasattr(self, 'edsm_status_label'):
+            return
+            
+        if status == "online":
+            self.edsm_status_label.config(text="🟢 EDSM: Online", fg="#00ff00")
+        elif status == "error":
+            self.edsm_status_label.config(text="🟡 EDSM: Slow", fg="#ffaa00")
+        else:
+            self.edsm_status_label.config(text="🔴 EDSM: Offline", fg="#ff4444")
+    
+    def _check_eddata_status(self):
+        """Check EDDATA API status in background and update indicator"""
+        def _background_check():
+            import requests
+            try:
+                # Test primary EDDATA API first
+                primary_url = "https://api.eddata.dev/v2/system/name/Sol/commodity/name/platinum/nearby/imports?minVolume=1&maxDaysAgo=2&maxDistance=50"
+                try:
+                    response = requests.get(primary_url, timeout=5)
+                    if response.status_code == 200:
+                        self.after(0, lambda: self._update_eddata_status("online"))
+                        return
+                except:
+                    pass  # Try fallback
+                
+                # If primary fails, test fallback Ardent API
+                fallback_url = "https://api.ardent-insight.com/v2/system/name/Sol/commodity/name/platinum/nearby/imports?minVolume=1&maxDaysAgo=2&maxDistance=50"
+                try:
+                    response = requests.get(fallback_url, timeout=5)
+                    if response.status_code == 200:
+                        # Fallback is working (yellow = using fallback)
+                        self.after(0, lambda: self._update_eddata_status("error"))
+                        return
+                except:
+                    pass
+                
+                # Both failed = offline
+                self.after(0, lambda: self._update_eddata_status("offline"))
+                
+            except Exception:
+                self.after(0, lambda: self._update_eddata_status("offline"))
+        
+        threading.Thread(target=_background_check, daemon=True).start()
+    
+    def _update_eddata_status(self, status: str):
+        """Update EDDATA status labels - called on UI thread"""
+        status_text = ""
+        status_color = ""
+        
+        if status == "online":
+            status_text = "🟢 EDDATA: Online"
+            status_color = "#00ff00"
+        elif status == "error":
+            status_text = "🟡 EDDATA: Fallback"
+            status_color = "#ffaa00"
+        else:
+            status_text = "🔴 EDDATA: Offline"
+            status_color = "#ff4444"
+        
+        # Update both commodity tab status labels
+        if hasattr(self, 'eddata_mining_status_label'):
+            self.eddata_mining_status_label.config(text=status_text, fg=status_color)
+        if hasattr(self, 'eddata_trade_status_label'):
+            self.eddata_trade_status_label.config(text=status_text, fg=status_color)
     
     # ==================== END DISTANCE CALCULATOR ====================
 
@@ -13585,7 +13740,7 @@ class App(tk.Tk):
         ToolTip(large_pad_cb, t('tooltips.large_pads'))
         
         # Sort by label with adjustable spacing
-        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=(0, 8))  # Adjust first number for left offset
+        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=(0, 8))  # Aligned with Commodity above
         saved_sort = cfg.get('marketplace_order_by', 'Distance')
         # Determine initial sort options based on sell mode (default)
         initial_sort_order = ['Best price (highest)', 'Distance', 'Best demand', 'Last update']
@@ -13599,7 +13754,7 @@ class App(tk.Tk):
         
         # Row 3: Search button and Max Age
         row3_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
-        row3_frame.grid(row=3, column=0, columnspan=5, sticky="w")
+        row3_frame.grid(row=3, column=0, columnspan=5, sticky="ew")
         
         search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'), 
                               command=self._search_marketplace,
@@ -13608,6 +13763,15 @@ class App(tk.Tk):
                               relief="ridge", bd=1, padx=10, pady=4,
                               font=("Segoe UI", 9, "bold"), cursor="hand2")
         search_btn.pack(side="left")
+        
+        # EDDATA API status indicator (pack FIRST on right side to claim far right position)
+        self.eddata_mining_status_label = tk.Label(row3_frame, text="⚫ EDDATA: checking...", 
+                                          font=("Segoe UI", 8), fg="#888888", bg=_mkt_cb_bg)
+        self.eddata_mining_status_label.pack(side="right", padx=(0, 10))
+        ToolTip(self.eddata_mining_status_label, t('tooltips.eddata_status'))
+        
+        # Start EDDATA status check
+        self.after(1000, self._check_eddata_status)
         
         # Max Age with left padding to align under Sort by above
         _max_age_fg = "#ff8c00" if _mkt_cb_theme == "elite_orange" else "#e0e0e0"
@@ -13823,7 +13987,7 @@ class App(tk.Tk):
         ToolTip(large_pad_cb, t('tooltips.large_pads'))
         
         # Sort by
-        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=(0, 8))
+        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=(0, 8))  # Aligned with Commodity above
         saved_sort = cfg.get('trade_order_by', 'Distance')
         initial_sort_order = ['Best price (highest)', 'Distance', 'Best demand', 'Last update']
         self.trade_order_by = tk.StringVar(value=self._trade_sort_options_map.get(saved_sort, saved_sort))
@@ -13836,7 +14000,7 @@ class App(tk.Tk):
         
         # Row 3: Search button and Max Age
         row3_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
-        row3_frame.grid(row=3, column=0, columnspan=5, sticky="w")
+        row3_frame.grid(row=3, column=0, columnspan=5, sticky="ew")
         
         search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'), 
                               command=self._search_trade_market,
@@ -13845,6 +14009,12 @@ class App(tk.Tk):
                               relief="ridge", bd=1, padx=10, pady=4,
                               font=("Segoe UI", 9, "bold"), cursor="hand2")
         search_btn.pack(side="left")
+        
+        # EDDATA API status indicator (pack FIRST on right side to claim far right position)
+        self.eddata_trade_status_label = tk.Label(row3_frame, text="⚫ EDDATA: checking...", 
+                                          font=("Segoe UI", 8), fg="#888888", bg=_trade_cb_bg)
+        self.eddata_trade_status_label.pack(side="right", padx=(0, 10))
+        ToolTip(self.eddata_trade_status_label, t('tooltips.eddata_status'))
         
         # Max Age
         _max_age_fg = "#ff8c00" if _trade_cb_theme == "elite_orange" else "#e0e0e0"

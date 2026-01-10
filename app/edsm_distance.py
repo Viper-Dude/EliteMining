@@ -17,7 +17,7 @@ class EDSMDistanceCalculator:
     
     def __init__(self):
         self.api_base_url = "https://www.edsm.net/api-v1/system"
-        self.timeout = 10  # seconds
+        self.timeout = 3  # seconds - reduced from 10 to fail faster on server errors
         self.cache = {}  # Cache system coordinates
         self.cache_expiry = 300  # 5 minutes
         self.last_request_time = 0
@@ -84,6 +84,12 @@ class EDSMDistanceCalculator:
                 
                 logger.info(f"Querying EDSM for system: {system_name}")
                 response = requests.get(self.api_base_url, params=params, timeout=self.timeout)
+                
+                # Fast-fail on server errors (5xx) - don't retry
+                if response.status_code >= 500:
+                    logger.error(f"EDSM server error {response.status_code} for {system_name} - not retrying")
+                    return None
+                
                 response.raise_for_status()
                 
                 data = response.json()

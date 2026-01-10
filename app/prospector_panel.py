@@ -9524,8 +9524,12 @@ class ProspectorPanel(ttk.Frame):
                                 else:
                                     parts = p.rsplit(' ', 1)  # Split at last space only
                                     if len(parts) == 2:
-                                        # Swap: "Material Name 18.7%" -> "18.7% Material Name"
-                                        reordered_materials.append(f"{parts[1]} {parts[0]}")
+                                        # Swap: "Material Name 18.7%" -> "18.7 percent Material Name"
+                                        # Remove % sign and add "percent" for better TTS pronunciation
+                                        pct_part = parts[1].replace('%', '').strip()
+                                        material_name = parts[0].strip()
+                                        # Format for TTS: "point nine eight percent" for better clarity
+                                        reordered_materials.append(f"{pct_part} percent {material_name}")
                                     else:
                                         reordered_materials.append(p)
                             
