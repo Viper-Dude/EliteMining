@@ -518,7 +518,7 @@
     "location": "Location",
     "type": "Type",
     "minerals_found": "Minerals Found",
-    "avg_yield": "Avg Yield %",
+    "avg_yield": "T/hr",
     "overlap": "Overlap",
     "res_site": "RES Site",
     "rating": "Rating",
@@ -527,7 +527,7 @@
     "body_ring": "Body/Ring:",
     "ring_type": "Ring Type:",
     "minerals_found_label": "Minerals Found:",
-    "average_yield": "Average Yield %:",
+    "average_yield": "T/hr (Tons per Hour):",
     "overlap_minerals": "Overlap Minerals:",
     "overlap_type_label": "Overlap Type:",
     "res_site_label": "RES Site:",
@@ -535,6 +535,10 @@
     "rating_label": "Rating:",
     "rating_hint": "(0=None, 5=Best)",
     "notes_label": "Notes:",
+    "set_today": "Today",
+    "clear_date": "Clear",
+    "date_format_hint": "(YYYY-MM-DD)",
+    "dialog_help": "T/hr (tons per hour) represents a single session's mining rate. For accurate location assessment, mine the location multiple times and update this value with your observed average rate.",
     "error_required_fields": "System and Body/Ring are required fields"
   },
   "refinery_dialog": {
@@ -1033,6 +1037,7 @@
     
     "bookmark_filter": "Filter bookmarks by material type",
     "bookmark_search": "Search bookmarks by system, body, or materials",
+    "bookmark_avg_yield": "Mining rate (tons per hour) from a single session. Mine location multiple times for accurate assessment.",
     "add_bookmark": "Add a new mining location bookmark",
     "edit_bookmark": "Edit the selected bookmark",
     "delete_bookmark": "Delete the selected bookmark(s) - use Ctrl+click or Shift+click to select multiple",

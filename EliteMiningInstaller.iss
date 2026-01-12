@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.77
+AppVersion=v4.78
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -72,7 +72,8 @@ Source: "Doc\*"; DestDir: "{app}\Doc"; Flags: recursesubdirs createallsubdirs un
 Source: "Variables\*"; DestDir: "{app}\Variables"; Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Check: IsVADetected
 ; v4.7.6+: Update profile only if newer - app detects version changes and prompts user
 ; Profile filename includes version for clarity (EliteMining v4.76-Profile.vap)
-Source: "EliteMining v*-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninstall; Check: IsVADetected
+; v4.7.8+: Use profile from Voiceattack Profile folder instead of root
+Source: "Voiceattack Profile\EliteMining v*-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninstall; Check: IsVADetected
 ; v4.1.5+: Never overwrite config.json - preserves user settings
 ; NOTE: Use template file to avoid including developer's personal paths
 Source: "app\config.json.template"; DestDir: "{app}"; DestName: "config.json"; Flags: onlyifdoesntexist

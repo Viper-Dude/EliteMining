@@ -1,0 +1,107 @@
+{
+  "description": "This is an example of the JSON payload that EliteMining sends to the configured API endpoint",
+  "endpoint": "{configured_endpoint_url}/api/mining/session",
+  "endpoint_note": "The base URL is configurable in EliteMining settings. Default placeholder is https://elitemining.example.com",
+  "method": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "X-API-Key": "your_api_key_here"
+  },
+  "payload_example": {
+    "cmdr_name": "CMDR Example",
+    "timestamp": "2025-01-15T14:30:00",
+    "system": "Delkar",
+    "body": "Delkar 7 A Ring",
+    "ship": "Python",
+    "session_type": "Laser Mining",
+    "duration": "01:45",
+    "total_tons": 192.5,
+    "tph": 110.3,
+    "prospectors_used": 47,
+    "asteroids_prospected": 152,
+    "asteroids_with_materials": 89,
+    "hit_rate_percent": 58.6,
+    "avg_quality_percent": 15.3,
+    "total_average_yield": 45.8,
+    "materials_tracked": 3,
+    "total_finds": 89,
+    "best_material": "Platinum (18.5%)",
+    "comment": "Great hotspot, high quality rocks",
+    "materials_mined": {
+      "Platinum": {
+        "tons": 128.5,
+        "tph": 73.4,
+        "avg_percentage": 18.5,
+        "best_percentage": 32.8,
+        "find_count": 45
+      },
+      "Painite": {
+        "tons": 42.0,
+        "tph": 24.0,
+        "avg_percentage": 15.2,
+        "best_percentage": 28.3,
+        "find_count": 28
+      },
+      "Osmium": {
+        "tons": 22.0,
+        "tph": 12.9,
+        "avg_percentage": 12.1,
+        "best_percentage": 22.1,
+        "find_count": 16
+      }
+    },
+    "mineral_performance": {
+      "Platinum": {
+        "prospected": 152,
+        "hit_rate": 29.6
+      },
+      "Painite": {
+        "prospected": 152,
+        "hit_rate": 18.4
+      },
+      "Osmium": {
+        "prospected": 152,
+        "hit_rate": 10.5
+      }
+    }
+  },
+  "field_descriptions": {
+    "cmdr_name": "Commander name from config",
+    "timestamp": "Session start time in ISO format (YYYY-MM-DDTHH:MM:SS)",
+    "system": "Star system name",
+    "body": "Mining location (planet/ring name)",
+    "ship": "Ship type used",
+    "session_type": "Type of mining (currently always 'Laser Mining')",
+    "duration": "Session duration in HH:MM format",
+    "total_tons": "Total cargo refined in tons",
+    "tph": "Mining efficiency in tons per hour",
+    "prospectors_used": "Number of prospector limpets fired",
+    "asteroids_prospected": "Total number of asteroids scanned",
+    "asteroids_with_materials": "Number of asteroids that had tracked materials",
+    "hit_rate_percent": "Percentage of asteroids with materials",
+    "avg_quality_percent": "Average material content percentage across all finds",
+    "total_average_yield": "Sum of all material average percentages",
+    "materials_tracked": "Number of different materials being tracked",
+    "total_finds": "Total number of material hits/finds",
+    "best_material": "Material with highest average percentage (optional)",
+    "comment": "User's session notes (optional)",
+    "materials_mined": "Detailed breakdown per material mined",
+    "materials_mined.*.tons": "Tons mined of this material",
+    "materials_mined.*.tph": "Tons per hour for this material",
+    "materials_mined.*.avg_percentage": "Average content % in asteroids",
+    "materials_mined.*.best_percentage": "Best content % found",
+    "materials_mined.*.find_count": "Number of times found",
+    "mineral_performance": "Prospecting statistics per material",
+    "mineral_performance.*.prospected": "Total asteroids prospected (shared across all materials)",
+    "mineral_performance.*.hit_rate": "Percentage of prospected asteroids containing this material"
+  },
+  "notes": [
+    "The plugin sends this data when a mining session report is generated",
+    "Data is parsed from the TXT session report files",
+    "Failed uploads are queued and retried later",
+    "API endpoint can be configured in settings",
+    "Authentication uses X-API-Key header",
+    "Timeout is set to 10 seconds",
+    "Retry delays: immediate, 30s, 2min, 5min"
+  ]
+}

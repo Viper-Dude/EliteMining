@@ -148,7 +148,13 @@ class ReleaseBuilder:
                 ]
                 
                 # Find versioned profile file (EliteMining v*-Profile.vap), exclude Dev profiles
-                profile_files = list(self.project_root.glob("EliteMining v*-Profile.vap"))
+                # v4.7.8+: Look in Voiceattack Profile folder
+                profile_dir = self.project_root / "Voiceattack Profile"
+                if profile_dir.exists():
+                    profile_files = list(profile_dir.glob("EliteMining v*-Profile.vap"))
+                else:
+                    # Fallback to root if folder doesn't exist
+                    profile_files = list(self.project_root.glob("EliteMining v*-Profile.vap"))
                 # Filter out Dev profiles
                 profile_files = [f for f in profile_files if 'Dev' not in f.name]
                 if profile_files:

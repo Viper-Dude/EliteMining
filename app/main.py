@@ -439,7 +439,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.77"
+APP_VERSION = "v4.78"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -3372,40 +3372,55 @@ cargo panel forces Elite to write detailed inventory data.
                     print(f"[JUMP] FSDJump: Arrived at {system_name}")
             
             elif event_type == "CarrierJump":
-                # Player is docked on Fleet Carrier that jumped - update current system
-                # NOTE: CarrierJump is for FC location tracking, NOT visit counting
-                # Visit counting uses current system as reference (safety net in update_current_system)
+                # Player is docked on Fleet Carrier that jumped - player arrived at new system
+                # CarrierJump only fires when player is docked, so this is a real arrival - count as visit
                 system_name = event.get("StarSystem", "")
                 star_pos = event.get("StarPos", [])
+                event_ts = event.get("timestamp", "")
                 
                 if system_name:
                     coords = None
                     if len(star_pos) >= 3:
                         coords = (star_pos[0], star_pos[1], star_pos[2])
                     
-                    # Update current system but DON'T count as visit directly
-                    # The safety net in update_current_system will ensure visit >= 1
+                    # Update current system and count as visit (player arrived at new system)
+                    # CarrierJump only fires when player is docked, so it's a real arrival like FSDJump
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'update_current_system'):
-                        self.main_app_ref.update_current_system(system_name, coords, count_visit=False)
+                        self.main_app_ref.update_current_system(system_name, coords, count_visit=True, event_timestamp=event_ts)
                     else:
                         self.current_system = system_name
                     
                     print(f"[CARRIER] CarrierJump: Now at {system_name}")
             
             elif event_type == "Location":
-                # Game loaded - update current system but DON'T count as visit
-                # Location events just indicate where you are when loading the game
+                # Game loaded - check if this is offline carrier jump or normal login
+                # If Location shows different system than last visited, count as visit (offline carrier jump)
                 system_name = event.get("StarSystem", "")
                 star_pos = event.get("StarPos", [])
+                event_ts = event.get("timestamp", "")
                 
                 if system_name:
                     coords = None
                     if len(star_pos) >= 3:
                         coords = (star_pos[0], star_pos[1], star_pos[2])
                     
-                    # Use centralized method but DON'T count as visit
+                    # Check if this is an offline carrier jump by comparing with last visited system
+                    count_visit = False
+                    try:
+                        if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'cargo_monitor'):
+                            user_db = self.main_app_ref.cargo_monitor.user_db
+                            if user_db:
+                                last_visited = user_db.get_last_visited_system()
+                                # If Location shows different system than last visited, it's an offline carrier jump
+                                if last_visited and last_visited != system_name:
+                                    count_visit = True
+                                    print(f"[LOCATION] Offline carrier jump detected: {last_visited} -> {system_name}")
+                    except Exception as e:
+                        print(f"[LOCATION] Could not check for offline carrier jump: {e}")
+                    
+                    # Update system and count visit only if it's an offline carrier jump
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'update_current_system'):
-                        self.main_app_ref.update_current_system(system_name, coords, count_visit=False)
+                        self.main_app_ref.update_current_system(system_name, coords, count_visit=count_visit, event_timestamp=event_ts)
                     else:
                         self.current_system = system_name
             
@@ -13823,6 +13838,9 @@ class App(tk.Tk):
         
         # Initialize dropdown options based on current buy/sell mode
         self._update_marketplace_order_options()
+        
+        # Load saved preferences
+        self._load_marketplace_preferences()
     
     def _build_trade_commodities_tab(self, frame: ttk.Frame) -> None:
         """Build the Trade Commodities sub-tab with category selection"""
@@ -14061,6 +14079,9 @@ class App(tk.Tk):
         
         # Initialize dropdown options based on current buy/sell mode
         self._update_trade_order_options()
+        
+        # Load saved preferences
+        self._load_trade_preferences()
     
     # ==================== SYSTEM FINDER TAB ====================
     def _build_system_finder_tab(self, frame: ttk.Frame) -> None:
@@ -14780,8 +14801,8 @@ class App(tk.Tk):
         table_frame = ttk.Frame(parent_frame, relief="solid", borderwidth=1)
         table_frame.pack(fill="both", expand=True, padx=2, pady=2)
         
-        # Define columns (removed St Dist due to API data inaccuracies)
-        columns = ("location", "type", "pad", "distance", "demand", "price", "updated")
+        # Define columns with LS (light-seconds from star)
+        columns = ("location", "type", "pad", "distance", "ls", "demand", "price", "updated")
         
         # Configure Marketplace Treeview style (theme-aware)
         from config import load_theme
@@ -14842,7 +14863,7 @@ class App(tk.Tk):
         self.marketplace_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
         
         # Define headings with sorting - explicitly set anchor to left-align header text
-        numeric_columns = {"distance", "demand", "price", "updated"}
+        numeric_columns = {"distance", "ls", "demand", "price", "updated"}
         for col in columns:
             is_numeric = col in numeric_columns
             self.marketplace_tree.heading(col, text=self._get_column_title(col), 
@@ -14859,6 +14880,7 @@ class App(tk.Tk):
         self.marketplace_tree.column("type", width=95, minwidth=70, anchor="w", stretch=False)
         self.marketplace_tree.column("pad", width=45, minwidth=40, anchor="w", stretch=False)
         self.marketplace_tree.column("distance", width=70, minwidth=55, anchor="w", stretch=False)
+        self.marketplace_tree.column("ls", width=70, minwidth=50, anchor="w", stretch=False)
         self.marketplace_tree.column("demand", width=75, minwidth=55, anchor="w", stretch=False)
         self.marketplace_tree.column("price", width=125, minwidth=80, anchor="w", stretch=False)
         self.marketplace_tree.column("updated", width=95, minwidth=70, anchor="w", stretch=True)
@@ -14929,6 +14951,7 @@ class App(tk.Tk):
             "type": t('marketplace.type'),
             "pad": t('marketplace.pad'),
             "distance": t('marketplace.distance'),
+            "ls": "LS",
             "demand": t('marketplace.supply') if is_buy_mode else t('marketplace.demand'),  # Dynamic based on mode
             "price": t('marketplace.price'),
             "updated": t('marketplace.updated')
@@ -14938,8 +14961,8 @@ class App(tk.Tk):
     def _update_marketplace_column_headers(self):
         """Update column headers when mode changes"""
         if hasattr(self, 'marketplace_tree'):
-            numeric_columns = {"distance", "demand", "price", "updated"}
-            for col in ("location", "type", "pad", "distance", "demand", "price", "updated"):
+            numeric_columns = {"distance", "ls", "demand", "price", "updated"}
+            for col in ("location", "type", "pad", "distance", "ls", "demand", "price", "updated"):
                 is_numeric = col in numeric_columns
                 self.marketplace_tree.heading(col, text=self._get_column_title(col), 
                                             anchor="w",
@@ -14973,6 +14996,33 @@ class App(tk.Tk):
         self.marketplace_context_menu.add_command(label=t('context_menu.find_hotspots'), command=self._find_hotspots_from_marketplace)
         self.marketplace_context_menu.add_separator()
         self.marketplace_context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_marketplace_system)
+    
+    def _create_trade_context_menu(self):
+        """Create right-click context menu for trade commodities results (without Find Hotspots)"""
+        # Get theme-aware menu colors
+        from config import load_theme
+        current_theme = load_theme()
+        if current_theme == "elite_orange":
+            menu_bg = "#1e1e1e"
+            menu_fg = "#ff8c00"
+            menu_active_bg = "#ff6600"
+            menu_active_fg = "#000000"
+        else:
+            menu_bg = MENU_COLORS["bg"]
+            menu_fg = MENU_COLORS["fg"]
+            menu_active_bg = MENU_COLORS["activebackground"]
+            menu_active_fg = MENU_COLORS["activeforeground"]
+        
+        self.trade_context_menu = tk.Menu(self, tearoff=0,
+                                          bg=menu_bg, fg=menu_fg,
+                                          activebackground=menu_active_bg,
+                                          activeforeground=menu_active_fg,
+                                          selectcolor=menu_active_bg)
+        self.trade_context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara_from_trade_menu)
+        self.trade_context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm_from_trade_menu)
+        self.trade_context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh_from_trade_menu)
+        self.trade_context_menu.add_separator()
+        self.trade_context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_trade_system)
     
     def _open_inara_from_menu(self):
         """Open Inara station search from context menu"""
@@ -15126,6 +15176,92 @@ class App(tk.Tk):
             print(f"[MARKETPLACE] Error opening hotspots finder: {e}")
             import traceback
             traceback.print_exc()
+    
+    def _open_inara_from_trade_menu(self):
+        """Open Inara station search from Trade context menu"""
+        selection = self.trade_tree.selection()
+        if selection:
+            try:
+                item = selection[0]
+                values = self.trade_tree.item(item, 'values')
+                if values and len(values) > 0:
+                    location = values[0]  # "System / Station"
+                    if ' / ' in location:
+                        system_name, station_name = location.split(' / ', 1)
+                        import urllib.parse
+                        encoded_station = urllib.parse.quote_plus(station_name.strip())
+                        url = f"https://inara.cz/elite/stations/?search={encoded_station}"
+                        import webbrowser
+                        webbrowser.open(url)
+                        print(f"[TRADE] Opening Inara for station: {station_name}")
+            except Exception as e:
+                print(f"[TRADE] Error opening Inara: {e}")
+    
+    def _open_edsm_from_trade_menu(self):
+        """Open EDSM station search from Trade context menu"""
+        selection = self.trade_tree.selection()
+        if selection:
+            try:
+                item = selection[0]
+                values = self.trade_tree.item(item, 'values')
+                if values and len(values) > 0:
+                    location = values[0]  # "System / Station"
+                    if ' / ' in location:
+                        system_name, station_name = location.split(' / ', 1)
+                        import urllib.parse
+                        encoded_station = urllib.parse.quote(station_name.strip())
+                        url = f"https://www.edsm.net/en/search/stations/index/name/{encoded_station}/"
+                        import webbrowser
+                        webbrowser.open(url)
+                        print(f"[TRADE] Opening EDSM for station: {station_name}")
+            except Exception as e:
+                print(f"[TRADE] Error opening EDSM: {e}")
+    
+    def _open_spansh_from_trade_menu(self):
+        """Open Spansh system search from Trade context menu"""
+        selection = self.trade_tree.selection()
+        if selection:
+            try:
+                item = selection[0]
+                values = self.trade_tree.item(item, 'values')
+                if values and len(values) > 0:
+                    location = values[0]  # "System / Station"
+                    if ' / ' in location:
+                        system_name, station_name = location.split(' / ', 1)
+                        import urllib.parse
+                        import webbrowser
+                        url = f"https://spansh.co.uk/search/{urllib.parse.quote(system_name.strip())}"
+                        webbrowser.open(url)
+                        print(f"[TRADE] Opening Spansh for system: {system_name}")
+            except Exception as e:
+                print(f"[TRADE] Error opening Spansh: {e}")
+    
+    def _show_trade_context_menu(self, event):
+        """Show context menu on right-click in Trade Commodities table"""
+        try:
+            # Select item under cursor
+            item = self.trade_tree.identify_row(event.y)
+            if item:
+                self.trade_tree.selection_set(item)
+                self.trade_tree.focus(item)
+                self.trade_context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.trade_context_menu.grab_release()
+    
+    def _copy_trade_system(self):
+        """Copy system name from Trade Commodities location column"""
+        selection = self.trade_tree.selection()
+        if selection:
+            item = selection[0]
+            values = self.trade_tree.item(item, 'values')
+            if values and len(values) > 0:
+                location = values[0]  # Location is first column
+                # Extract system name (before the " / ")
+                if " / " in location:
+                    system_name = location.split(" / ")[0]
+                    self.clipboard_clear()
+                    self.clipboard_append(system_name)
+                    self.trade_total_label.config(text=t('marketplace.copied_to_clipboard').format(system=system_name))
     
     def _populate_marketplace_system(self):
         """Auto-populate marketplace system on startup (same as ring finder)"""
@@ -15384,6 +15520,55 @@ class App(tk.Tk):
         """Clear marketplace cache - no longer needed (using external sites)"""
         self.marketplace_total_label.config(text=t('marketplace.cache_not_needed'))
     
+    def _load_marketplace_preferences(self):
+        """Load all marketplace preferences from config and apply them"""
+        from config import _load_cfg
+        cfg = _load_cfg()
+        
+        # Load search mode
+        if 'marketplace_search_mode' in cfg:
+            self.marketplace_search_mode.set(cfg['marketplace_search_mode'])
+        
+        # Load buy/sell mode
+        if 'marketplace_sell_mode' in cfg:
+            self.marketplace_sell_mode.set(cfg['marketplace_sell_mode'])
+        if 'marketplace_buy_mode' in cfg:
+            self.marketplace_buy_mode.set(cfg['marketplace_buy_mode'])
+        
+        # Load commodity (convert English to localized)
+        if 'marketplace_commodity' in cfg:
+            commodity_english = cfg['marketplace_commodity']
+            commodity_localized = self._commodity_map.get(commodity_english, commodity_english)
+            if commodity_localized in self._commodity_map.values():
+                self.marketplace_commodity.set(commodity_localized)
+        
+        # Load station type (convert English to localized)
+        if 'marketplace_station_type' in cfg:
+            station_type_english = cfg['marketplace_station_type']
+            station_type_localized = self._station_type_map.get(station_type_english, station_type_english)
+            if station_type_localized in self._station_type_map.values():
+                self.marketplace_station_type.set(station_type_localized)
+        
+        # Load checkboxes
+        if 'marketplace_exclude_carriers' in cfg:
+            self.marketplace_exclude_carriers.set(cfg['marketplace_exclude_carriers'])
+        if 'marketplace_large_pad_only' in cfg:
+            self.marketplace_large_pad_only.set(cfg['marketplace_large_pad_only'])
+        
+        # Load order by (convert English to localized)
+        if 'marketplace_order_by' in cfg:
+            order_by_english = cfg['marketplace_order_by']
+            order_by_localized = self._sort_options_map.get(order_by_english, order_by_english)
+            if order_by_localized in self._sort_options_map.values():
+                self.marketplace_order_by.set(order_by_localized)
+        
+        # Load max age (convert English to localized)
+        if 'marketplace_max_age' in cfg:
+            max_age_english = cfg['marketplace_max_age']
+            max_age_localized = self._age_map.get(max_age_english, max_age_english)
+            if max_age_localized in self._age_map.values():
+                self.marketplace_max_age.set(max_age_localized)
+    
     def _save_marketplace_preferences(self):
         """Save all marketplace preferences to config"""
         from config import update_config_values
@@ -15454,6 +15639,63 @@ class App(tk.Tk):
         if self.current_system:
             self.trade_reference_system.set(self.current_system)
             self._save_trade_preferences()
+    
+    def _load_trade_preferences(self):
+        """Load all trade preferences from config and apply them"""
+        from config import _load_cfg
+        cfg = _load_cfg()
+        
+        # Load search mode
+        if 'trade_search_mode' in cfg:
+            self.trade_search_mode.set(cfg['trade_search_mode'])
+        
+        # Load buy/sell mode
+        if 'trade_sell_mode' in cfg:
+            self.trade_sell_mode.set(cfg['trade_sell_mode'])
+        if 'trade_buy_mode' in cfg:
+            self.trade_buy_mode.set(cfg['trade_buy_mode'])
+        
+        # Load category and update commodity list
+        if 'trade_category' in cfg:
+            category = cfg['trade_category']
+            if category in self._trade_categories:
+                self.trade_category.set(category)
+                self._update_trade_commodity_list()
+        
+        # Load commodity
+        if 'trade_commodity' in cfg:
+            commodity = cfg['trade_commodity']
+            # Check if commodity is in current category's list
+            current_values = self.trade_commodity_combo['values']
+            if commodity in current_values:
+                self.trade_commodity.set(commodity)
+        
+        # Load station type (convert English to localized)
+        if 'trade_station_type' in cfg:
+            station_type_english = cfg['trade_station_type']
+            station_type_localized = self._trade_station_type_map.get(station_type_english, station_type_english)
+            if station_type_localized in self._trade_station_type_map.values():
+                self.trade_station_type.set(station_type_localized)
+        
+        # Load checkboxes
+        if 'trade_exclude_carriers' in cfg:
+            self.trade_exclude_carriers.set(cfg['trade_exclude_carriers'])
+        if 'trade_large_pad_only' in cfg:
+            self.trade_large_pad_only.set(cfg['trade_large_pad_only'])
+        
+        # Load order by (convert English to localized)
+        if 'trade_order_by' in cfg:
+            order_by_english = cfg['trade_order_by']
+            order_by_localized = self._trade_sort_options_map.get(order_by_english, order_by_english)
+            if order_by_localized in self._trade_sort_options_map.values():
+                self.trade_order_by.set(order_by_localized)
+        
+        # Load max age (convert English to localized)
+        if 'trade_max_age' in cfg:
+            max_age_english = cfg['trade_max_age']
+            max_age_localized = self._trade_age_map.get(max_age_english, max_age_english)
+            if max_age_localized in self._trade_age_map.values():
+                self.trade_max_age.set(max_age_localized)
     
     def _save_trade_preferences(self):
         """Save all trade preferences to config"""
@@ -15672,14 +15914,14 @@ class App(tk.Tk):
         table_frame = tk.Frame(parent_frame, bg="#1a1a1a")
         table_frame.pack(fill="both", expand=True, padx=5, pady=5)
         
-        # Column definitions - same structure as marketplace
-        columns = ("location", "type", "pad", "distance", "demand", "price", "updated")
+        # Column definitions - same structure as marketplace with LS column
+        columns = ("location", "type", "pad", "distance", "ls", "demand", "price", "updated")
         
         # Create separate Treeview for trade tab
         self.trade_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
         
         # Define headings with sorting
-        numeric_columns = {"distance", "demand", "price", "updated"}
+        numeric_columns = {"distance", "ls", "demand", "price", "updated"}
         for col in columns:
             is_numeric = col in numeric_columns
             self.trade_tree.heading(col, text=self._get_column_title(col), 
@@ -15695,9 +15937,39 @@ class App(tk.Tk):
         self.trade_tree.column("type", width=95, minwidth=70, anchor="w", stretch=False)
         self.trade_tree.column("pad", width=45, minwidth=40, anchor="w", stretch=False)
         self.trade_tree.column("distance", width=70, minwidth=55, anchor="w", stretch=False)
+        self.trade_tree.column("ls", width=70, minwidth=50, anchor="w", stretch=False)
         self.trade_tree.column("demand", width=75, minwidth=55, anchor="w", stretch=False)
         self.trade_tree.column("price", width=125, minwidth=80, anchor="w", stretch=False)
         self.trade_tree.column("updated", width=95, minwidth=70, anchor="w", stretch=True)
+        
+        # Load saved column widths from config
+        try:
+            from config import load_trade_commodities_column_widths
+            saved_widths = load_trade_commodities_column_widths()
+            if saved_widths:
+                for col_name, width in saved_widths.items():
+                    try:
+                        self.trade_tree.column(col_name, width=width)
+                    except:
+                        pass
+        except Exception as e:
+            print(f"[DEBUG] Could not load Trade Commodities column widths: {e}")
+
+        # Bind column resize event to save widths
+        def save_trade_widths(event=None):
+            try:
+                from config import save_trade_commodities_column_widths
+                widths = {}
+                for col in columns:
+                    try:
+                        widths[col] = self.trade_tree.column(col, "width")
+                    except:
+                        pass
+                save_trade_commodities_column_widths(widths)
+            except Exception as e:
+                print(f"[DEBUG] Could not save Trade Commodities column widths: {e}")
+        
+        self.trade_tree.bind("<ButtonRelease-1>", save_trade_widths)
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.trade_tree.yview)
@@ -15720,9 +15992,9 @@ class App(tk.Tk):
         table_frame.grid_columnconfigure(0, weight=1)
         table_frame.grid_rowconfigure(0, weight=1)
         
-        # Bind right-click for context menu (use lambda to delay method lookup)
-        self.trade_tree.bind("<Button-3>", lambda e: self._on_marketplace_right_click(e))
-        self.trade_tree.bind("<Double-1>", lambda e: self._on_marketplace_double_click(e))
+        # Add right-click context menu
+        self._create_trade_context_menu()
+        self.trade_tree.bind("<Button-3>", self._show_trade_context_menu)
     
     def _sort_trade_column(self, col: str, is_numeric: bool):
         """Sort trade results table by column"""
@@ -15740,8 +16012,11 @@ class App(tk.Tk):
         if is_numeric:
             def parse_value(val):
                 try:
-                    # Handle distance like "123 LY"
-                    val = val.replace(' LY', '').replace(',', '').replace('K', '000')
+                    # Handle "?" for unknown values
+                    if val == '?':
+                        return 999999
+                    # Remove commas and spaces, handle distance like "123 LY"
+                    val = val.replace(' LY', '').replace(',', '').strip()
                     return float(val) if val and val != '-' else 999999
                 except:
                     return 999999
@@ -15809,6 +16084,14 @@ class App(tk.Tk):
             else:
                 distance = "-"
             
+            # LS (Station distance from star)
+            station_ls = result.get('distanceToArrival')
+            if station_ls is not None:
+                # 0 is valid for fleet carriers at arrival point
+                ls = f"{int(station_ls):,}"
+            else:
+                ls = "?"
+            
             # DEMAND/STOCK
             if is_buy_mode:
                 volume = f"{result.get('stock', 0):,}" if result.get('stock', 0) > 0 else "0"
@@ -15847,6 +16130,7 @@ class App(tk.Tk):
                 f" {station_type} ",
                 f" {pad} ",
                 f" {distance} ",
+                f" {ls} ",
                 f" {volume} ",
                 f" {price} ",
                 f" {updated} "
@@ -16577,6 +16861,14 @@ class App(tk.Tk):
                 else:
                     distance = "Unknown"  # No distance available
                 
+                # LS (Station distance from star) - from distanceToArrival field
+                station_ls = result.get('distanceToArrival')
+                if station_ls is not None:
+                    # 0 is valid for fleet carriers at arrival point
+                    ls = f"{int(station_ls):,}"
+                else:
+                    ls = "?"
+                
                 # DEMAND/STOCK - depends on mode
                 if is_buy_mode:
                     # Buy mode (exports endpoint): use 'stock' field
@@ -16630,6 +16922,7 @@ class App(tk.Tk):
                     f" {station_type} ",
                     f" {pad} ",
                     f" {distance} ",
+                    f" {ls} ",
                     f" {volume} ",
                     f" {price} ",
                     f" {updated} "
@@ -16744,7 +17037,7 @@ class App(tk.Tk):
                 self.marketplace_sort_reverse = False
             
             # Get column index - column IDs, not display names
-            column_ids = ("location", "type", "pad", "distance", "demand", "price", "updated")
+            column_ids = ("location", "type", "pad", "distance", "ls", "demand", "price", "updated")
             
             # Map display names to column IDs
             display_to_id = {
@@ -16752,6 +17045,7 @@ class App(tk.Tk):
                 "Station Type": "type", 
                 "Pad": "pad",
                 "Distance": "distance",
+                "LS": "ls",
                 "Demand": "demand",
                 "Price": "price",
                 "Updated": "updated"
@@ -16766,7 +17060,13 @@ class App(tk.Tk):
                 def sort_key(item):
                     value = item[0][col_index]
                     try:
-                        if col_id == "distance":
+                        if col_id == "ls":
+                            # Handle LS column with commas: "88,009" or "?"
+                            if value.strip() == '?':
+                                return 999999
+                            # Remove commas and convert to number
+                            return float(value.replace(',', '').strip())
+                        elif col_id == "distance":
                             # Remove " LY" suffix and convert to float
                             return float(value.replace(" LY", ""))
                         elif col_id == "price":
@@ -18164,6 +18464,32 @@ Your keybinds will need to be reconfigured manually."""
 
 
 if __name__ == "__main__":
+    # Single instance check - prevent multiple instances from running
+    import win32event
+    import win32api
+    import winerror
+    
+    mutex_name = "Global\\EliteMining_SingleInstance_Mutex"
+    mutex = None
+    
+    try:
+        mutex = win32event.CreateMutex(None, False, mutex_name)
+        last_error = win32api.GetLastError()
+        
+        if last_error == winerror.ERROR_ALREADY_EXISTS:
+            # Another instance is already running
+            import tkinter.messagebox as messagebox
+            messagebox.showerror(
+                "EliteMining Already Running",
+                "EliteMining is already running.\n\n"
+                "Only one instance can run at a time to prevent duplicate announcements and conflicts.\n\n"
+                "Please close the other instance first."
+            )
+            sys.exit(0)
+    except Exception as e:
+        print(f"Warning: Could not create mutex for single instance check: {e}")
+        # Continue anyway - better to run than to fail completely
+    
     # Clean up any restart flag from previous run
     try:
         import sys

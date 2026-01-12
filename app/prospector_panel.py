@@ -732,8 +732,10 @@ class ProspectorPanel(ttk.Frame):
         # Initialize bookmarks system - use centralized path utility
         from path_utils import get_bookmarks_file
         self.bookmarks_file = get_bookmarks_file()
+        print(f"[BOOKMARKS PATH] Using bookmarks file: {self.bookmarks_file}")
         self.bookmarks_data = []
         self._load_bookmarks()
+        print(f"[BOOKMARKS PATH] Loaded {len(self.bookmarks_data)} bookmarks")
 
         # Load journal directory from config or detect default
         from config import _load_cfg
@@ -1907,6 +1909,30 @@ class ProspectorPanel(ttk.Frame):
         self.tables_paned.add(material_pane, weight=1)
         material_pane.columnconfigure(0, weight=1)
         material_pane.rowconfigure(1, weight=1)
+        
+        # Restore saved sash position after a short delay (to ensure window is rendered)
+        def restore_sash_position():
+            try:
+                from config import load_prospector_tables_sash_position
+                saved_pos = load_prospector_tables_sash_position()
+                if saved_pos is not None:
+                    self.tables_paned.sashpos(0, saved_pos)
+                    print(f"[DEBUG] Restored prospector tables sash position: {saved_pos}")
+            except Exception as e:
+                print(f"[DEBUG] Could not restore prospector tables sash position: {e}")
+        
+        self.after(100, restore_sash_position)
+        
+        # Save sash position when it changes
+        def save_sash_position(event=None):
+            try:
+                from config import save_prospector_tables_sash_position
+                pos = self.tables_paned.sashpos(0)
+                save_prospector_tables_sash_position(pos)
+            except Exception as e:
+                print(f"[DEBUG] Could not save prospector tables sash position: {e}")
+        
+        self.tables_paned.bind("<ButtonRelease-1>", save_sash_position)
         
         mineral_header_frame = ttk.Frame(material_pane)
         mineral_header_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
@@ -11643,8 +11669,21 @@ class ProspectorPanel(ttk.Frame):
     def _save_bookmarks(self) -> None:
         """Save bookmarks to JSON file"""
         try:
+            # Log to file for debugging installer issues
+            log_file = os.path.join(os.path.dirname(self.bookmarks_file), "bookmarks_debug.log")
+            with open(log_file, 'a', encoding='utf-8') as log:
+                log.write(f"\n=== SAVE at {dt.datetime.now()} ===\n")
+                log.write(f"Saving to: {self.bookmarks_file}\n")
+                log.write(f"File exists before save: {os.path.exists(self.bookmarks_file)}\n")
+            
             with open(self.bookmarks_file, 'w', encoding='utf-8') as f:
                 json.dump(self.bookmarks_data, f, indent=2, ensure_ascii=False)
+            
+            # Verify and log
+            with open(log_file, 'a', encoding='utf-8') as log:
+                log.write(f"Saved {len(self.bookmarks_data)} bookmarks\n")
+                for i, bm in enumerate(self.bookmarks_data):
+                    log.write(f"  [{i}] system={bm.get('system')}, last_mined={bm.get('last_mined')}\n")
         except Exception as e:
             print(f"Error saving bookmarks: {e}")
             import traceback
@@ -11666,7 +11705,7 @@ class ProspectorPanel(ttk.Frame):
 
         # Filter frame
         filter_frame = ttk.Frame(main_frame)
-        filter_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        filter_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 24))
         
         ttk.Label(filter_frame, text=t('bookmarks.filter')).pack(side="left", padx=(0, 5))
         
@@ -11782,6 +11821,54 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.heading("res_site", text=t('bookmarks.res_site'), anchor="w")
         self.bookmarks_tree.heading("rating", text=t('bookmarks.rating'), anchor="center")
         self.bookmarks_tree.heading("notes", text=t('bookmarks.notes'), anchor="w")
+        
+        # Add tooltip to avg_yield column header (hover over the column header itself)
+        # Create an invisible label over the column header area for tooltip
+        try:
+            # Get the treeview's heading bbox to position the tooltip trigger
+            def create_column_tooltip(tree, column_id, tooltip_text):
+                """Create a tooltip for a treeview column header"""
+                # Store tooltip text in the tree widget
+                if not hasattr(tree, '_column_tooltips'):
+                    tree._column_tooltips = {}
+                tree._column_tooltips[column_id] = tooltip_text
+                
+                # Bind motion event to show tooltip when hovering over header
+                def on_motion(event):
+                    region = tree.identify_region(event.x, event.y)
+                    if region == "heading":
+                        col = tree.identify_column(event.x)
+                        col_num = int(col.replace('#', ''))
+                        columns = tree['columns']
+                        if 0 < col_num <= len(columns):
+                            col_id = columns[col_num - 1]
+                            if col_id in tree._column_tooltips:
+                                # Show tooltip with word wrapping
+                                if hasattr(tree, '_header_tooltip_label'):
+                                    tree._header_tooltip_label.destroy()
+                                tree._header_tooltip_label = tk.Label(tree, text=tree._column_tooltips[col_id],
+                                                                     background="#2a2a2a", foreground="#e0e0e0",
+                                                                     relief="solid", borderwidth=1,
+                                                                     font=("Segoe UI", 9), padx=6, pady=4,
+                                                                     wraplength=300, justify="left")
+                                tree._header_tooltip_label.place(x=event.x + 10, y=event.y + 10)
+                                return
+                    # Hide tooltip if not over a column with tooltip
+                    if hasattr(tree, '_header_tooltip_label'):
+                        tree._header_tooltip_label.destroy()
+                        delattr(tree, '_header_tooltip_label')
+                
+                def on_leave(event):
+                    if hasattr(tree, '_header_tooltip_label'):
+                        tree._header_tooltip_label.destroy()
+                        delattr(tree, '_header_tooltip_label')
+                
+                tree.bind('<Motion>', on_motion, add='+')
+                tree.bind('<Leave>', on_leave, add='+')
+            
+            create_column_tooltip(self.bookmarks_tree, 'avg_yield', t('tooltips.bookmark_avg_yield'))
+        except Exception as e:
+            print(f"Could not create column tooltip: {e}")
         
         # Configure column widths
         self.bookmarks_tree.column("last_mined", width=100, stretch=False, anchor="center")
@@ -12144,27 +12231,36 @@ class ProspectorPanel(ttk.Frame):
         dialog.columnconfigure(0, weight=1)
         dialog.rowconfigure(0, weight=1)
         
+        # Add help text at the top
+        help_frame = tk.Frame(frame, bg="#3a3a2a", relief="solid", bd=1)
+        help_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        
+        help_text = tk.Label(help_frame, text="ℹ " + t('bookmarks.dialog_help'), 
+                            bg="#3a3a2a", fg="#e0e0e0", 
+                            font=("Segoe UI", 8), wraplength=450, justify="left", padx=8, pady=6)
+        help_text.pack(fill="x")
+        
         # System field
-        ttk.Label(frame, text=t('bookmarks.system') + ":").grid(row=0, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.system') + ":").grid(row=1, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         system_var = tk.StringVar(value=bookmark_data.get('system', '') if bookmark_data else '')
         system_entry = ttk.Entry(frame, textvariable=system_var, width=35)
-        system_entry.grid(row=0, column=1, sticky="w", pady=(0, 5))
+        system_entry.grid(row=1, column=1, sticky="w", pady=(0, 5))
         
         # Body field
-        ttk.Label(frame, text=t('bookmarks.body_ring')).grid(row=1, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.body_ring')).grid(row=2, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         body_var = tk.StringVar(value=bookmark_data.get('body', '') if bookmark_data else '')
         body_entry = ttk.Entry(frame, textvariable=body_var, width=35)
-        body_entry.grid(row=1, column=1, sticky="w", pady=(0, 5))
+        body_entry.grid(row=2, column=1, sticky="w", pady=(0, 5))
         
         # Hotspot field - Ring Type dropdown
-        ttk.Label(frame, text=t('bookmarks.ring_type')).grid(row=2, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.ring_type')).grid(row=3, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         hotspot_var = tk.StringVar(value=bookmark_data.get('hotspot', '') if bookmark_data else '')
         hotspot_combo = ttk.Combobox(frame, textvariable=hotspot_var, width=32, state="readonly")
         hotspot_combo['values'] = ("", t('ring_finder.metallic'), t('ring_finder.rocky'), t('ring_finder.icy'), t('ring_finder.metal_rich'))
-        hotspot_combo.grid(row=2, column=1, sticky="w", pady=(0, 5))
+        hotspot_combo.grid(row=3, column=1, sticky="w", pady=(0, 5))
         
         # Materials field - convert stored English names to localized display names
-        ttk.Label(frame, text=t('bookmarks.minerals_found_label')).grid(row=3, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.minerals_found_label')).grid(row=4, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         stored_materials = bookmark_data.get('materials', '') if bookmark_data else ''
         # Convert each mineral name to localized version
         if stored_materials:
@@ -12175,16 +12271,50 @@ class ProspectorPanel(ttk.Frame):
             display_materials = ''
         materials_var = tk.StringVar(value=display_materials)
         materials_entry = ttk.Entry(frame, textvariable=materials_var, width=35)
-        materials_entry.grid(row=3, column=1, sticky="w", pady=(0, 5))
+        materials_entry.grid(row=4, column=1, sticky="w", pady=(0, 5))
         
         # Average Yield field
-        ttk.Label(frame, text=t('bookmarks.average_yield')).grid(row=4, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.average_yield')).grid(row=5, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         yield_var = tk.StringVar(value=bookmark_data.get('avg_yield', '') if bookmark_data else '')
         yield_entry = ttk.Entry(frame, textvariable=yield_var, width=35)
-        yield_entry.grid(row=4, column=1, sticky="w", pady=(0, 5))
+        yield_entry.grid(row=5, column=1, sticky="w", pady=(0, 5))
+        
+        # Last Mined Date field
+        ttk.Label(frame, text=t('bookmarks.last_mined') + ":").grid(row=6, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        last_mined_var = tk.StringVar(value=bookmark_data.get('last_mined', '') if bookmark_data else '')
+        last_mined_frame = ttk.Frame(frame)
+        last_mined_frame.grid(row=6, column=1, sticky="w", pady=(0, 5))
+        
+        last_mined_entry = ttk.Entry(last_mined_frame, textvariable=last_mined_var, width=15)
+        last_mined_entry.pack(side="left", padx=(0, 5))
+        
+        # Button to set to today's date
+        def set_today():
+            last_mined_var.set(dt.datetime.now().strftime('%Y-%m-%d'))
+        
+        today_btn = tk.Button(last_mined_frame, text=t('bookmarks.set_today'), command=set_today,
+                            bg="#2a4a2a", fg="#ffffff", 
+                            activebackground="#3a5a3a", activeforeground="#ffffff",
+                            relief="solid", bd=1, cursor="hand2",
+                            pady=2, padx=8, font=("Segoe UI", 8))
+        today_btn.pack(side="left", padx=(0, 5))
+        
+        # Button to clear date
+        def clear_date():
+            last_mined_var.set('')
+        
+        clear_btn = tk.Button(last_mined_frame, text=t('bookmarks.clear_date'), command=clear_date,
+                            bg="#4a2a2a", fg="#ffffff", 
+                            activebackground="#5a3a3a", activeforeground="#ffffff",
+                            relief="solid", bd=1, cursor="hand2",
+                            pady=2, padx=8, font=("Segoe UI", 8))
+        clear_btn.pack(side="left")
+        
+        ttk.Label(last_mined_frame, text="  " + t('bookmarks.date_format_hint'), 
+                 foreground="#888888", font=("Segoe UI", 8)).pack(side="left")
         
         # Target Material dropdown field
-        ttk.Label(frame, text=t('bookmarks.overlap_minerals')).grid(row=5, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.overlap_minerals')).grid(row=7, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         
         # English names for internal storage
         target_materials_en = ['', 'Alexandrite', 'Benitoite', 'Bromellite', 'Grandidierite', 'Low-Temperature Diamonds', 
@@ -12203,24 +12333,24 @@ class ProspectorPanel(ttk.Frame):
         
         target_material_combo = ttk.Combobox(frame, textvariable=target_material_var, width=32, state="readonly")
         target_material_combo['values'] = tuple(target_materials_display)
-        target_material_combo.grid(row=5, column=1, sticky="w", pady=(0, 5))
+        target_material_combo.grid(row=7, column=1, sticky="w", pady=(0, 5))
         
         # Overlap field
-        ttk.Label(frame, text=t('bookmarks.overlap_type_label')).grid(row=6, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.overlap_type_label')).grid(row=8, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         overlap_var = tk.StringVar(value=bookmark_data.get('overlap_type', '') if bookmark_data else '')
         overlap_combo = ttk.Combobox(frame, textvariable=overlap_var, width=32, state="readonly")
         overlap_combo['values'] = ('', '2x', '3x')
-        overlap_combo.grid(row=6, column=1, sticky="w", pady=(0, 5))
+        overlap_combo.grid(row=8, column=1, sticky="w", pady=(0, 5))
         
         # RES Site field
-        ttk.Label(frame, text=t('bookmarks.res_site_label')).grid(row=7, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.res_site_label')).grid(row=9, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         res_var = tk.StringVar(value=bookmark_data.get('res_site', '') if bookmark_data else '')
         res_combo = ttk.Combobox(frame, textvariable=res_var, width=32, state="readonly")
         res_combo['values'] = ('', 'Hazardous', 'High', 'Normal', 'Low')
-        res_combo.grid(row=7, column=1, sticky="w", pady=(0, 5))
+        res_combo.grid(row=9, column=1, sticky="w", pady=(0, 5))
         
         # RES Minerals dropdown field (separate from Overlap Minerals)
-        ttk.Label(frame, text=t('bookmarks.res_minerals')).grid(row=8, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.res_minerals')).grid(row=10, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         
         # Get current RES material value and convert to display name
         current_res_value = bookmark_data.get('res_material', '') if bookmark_data else ''
@@ -12229,22 +12359,22 @@ class ProspectorPanel(ttk.Frame):
         
         res_material_combo = ttk.Combobox(frame, textvariable=res_material_var, width=32, state="readonly")
         res_material_combo['values'] = tuple(target_materials_display)  # Same materials list
-        res_material_combo.grid(row=8, column=1, sticky="w", pady=(0, 5))
+        res_material_combo.grid(row=10, column=1, sticky="w", pady=(0, 5))
         
         # Rating field (1-5 stars)
-        ttk.Label(frame, text=t('bookmarks.rating_label')).grid(row=9, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.rating_label')).grid(row=11, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         rating_var = tk.IntVar(value=bookmark_data.get('rating', 0) if bookmark_data else 0)
         rating_frame = ttk.Frame(frame)
-        rating_frame.grid(row=9, column=1, sticky="w", pady=(0, 5))
+        rating_frame.grid(row=11, column=1, sticky="w", pady=(0, 5))
         rating_combo = ttk.Combobox(rating_frame, textvariable=rating_var, width=10, state="readonly")
         rating_combo['values'] = (0, 1, 2, 3, 4, 5)
         rating_combo.pack(side="left")
         ttk.Label(rating_frame, text="  " + t('bookmarks.rating_hint')).pack(side="left")
         
         # Notes field
-        ttk.Label(frame, text=t('bookmarks.notes_label')).grid(row=10, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.notes_label')).grid(row=12, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
         notes_text = tk.Text(frame, width=35, height=4, insertbackground="#ffffff")  # White cursor for visibility
-        notes_text.grid(row=10, column=1, sticky="w", pady=(0, 10))
+        notes_text.grid(row=12, column=1, sticky="w", pady=(0, 10))
         if bookmark_data:
             notes_text.insert("1.0", bookmark_data.get('notes', ''))
         
@@ -12295,7 +12425,7 @@ class ProspectorPanel(ttk.Frame):
         
         # Buttons
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=11, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=13, column=0, columnspan=2, pady=(10, 0))
         
         def save_bookmark():
             system = system_var.get().strip()
@@ -12331,10 +12461,14 @@ class ProspectorPanel(ttk.Frame):
                 'res_site': res_var.get(),
                 'res_material': res_mat_en,
                 'rating': rating_var.get(),
-                'last_mined': bookmark_data.get('last_mined', '') if bookmark_data else '',
+                'last_mined': last_mined_var.get().strip(),
                 'notes': notes_text.get("1.0", "end-1c").strip(),
                 'date_added': bookmark_data.get('date_added', dt.datetime.now().strftime('%Y-%m-%d')) if bookmark_data else dt.datetime.now().strftime('%Y-%m-%d')
             }
+            
+            # Debug: Print what we're saving
+            print(f"[BOOKMARK SAVE DEBUG] last_mined value: '{last_mined_var.get()}'")
+            print(f"[BOOKMARK SAVE DEBUG] Full bookmark: {bookmark}")
             
             # Sync overlap/RES to database for Ring Finder integration
             try:
@@ -12374,12 +12508,16 @@ class ProspectorPanel(ttk.Frame):
             if bookmark_index is not None:
                 # Edit existing bookmark
                 self.bookmarks_data[bookmark_index] = bookmark
+                print(f"[BOOKMARK DEBUG] Updated bookmark at index {bookmark_index}")
+                print(f"[BOOKMARK DEBUG] Updated data: {self.bookmarks_data[bookmark_index]}")
             else:
                 # Add new bookmark
                 self.bookmarks_data.append(bookmark)
+                print(f"[BOOKMARK DEBUG] Added new bookmark")
             
             self._save_bookmarks()
             self._refresh_bookmarks()
+            print(f"[BOOKMARK DEBUG] Refresh called, total bookmarks: {len(self.bookmarks_data)}")
             dialog.destroy()
         
         def cancel():

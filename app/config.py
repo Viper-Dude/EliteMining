@@ -211,6 +211,17 @@ def save_commodity_market_column_widths(widths: Dict[str, int]) -> None:
     cfg["commodity_market_column_widths"] = widths
     _save_cfg(cfg)
 
+def load_trade_commodities_column_widths() -> Dict[str, int]:
+    """Load Trade Commodities table column widths from config"""
+    cfg = _load_cfg()
+    return cfg.get("trade_commodities_column_widths", {})
+
+def save_trade_commodities_column_widths(widths: Dict[str, int]) -> None:
+    """Save Trade Commodities table column widths to config"""
+    cfg = _load_cfg()
+    cfg["trade_commodities_column_widths"] = widths
+    _save_cfg(cfg)
+
 def load_prospector_report_column_widths() -> Dict[str, int]:
     """Load Prospector Report table column widths from config"""
     cfg = _load_cfg()
@@ -627,6 +638,17 @@ def save_main_sash_position(position: int) -> None:
     """Save main horizontal sash position"""
     cfg = _load_cfg()
     cfg["main_sash_position"] = position
+    _save_cfg(cfg)
+
+def load_prospector_tables_sash_position() -> Optional[int]:
+    """Load saved prospector tables sash position (Prospector Reports / Material Analysis split)"""
+    cfg = _load_cfg()
+    return cfg.get("prospector_tables_sash_position")
+
+def save_prospector_tables_sash_position(position: int) -> None:
+    """Save prospector tables sash position"""
+    cfg = _load_cfg()
+    cfg["prospector_tables_sash_position"] = position
     _save_cfg(cfg)
 
 def load_preset_expanded_groups() -> list:

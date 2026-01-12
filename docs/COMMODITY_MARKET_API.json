@@ -1,0 +1,219 @@
+{
+  "description": "EliteMining uses these EDData API endpoints for commodity market lookups",
+  "primary_api": "https://api.eddata.dev/v2",
+  "fallback_api": "https://api.ardent-insight.com/v2",
+  
+  "endpoints_used": {
+    "search_buyers": {
+      "description": "Find stations buying a commodity (where to SELL)",
+      "endpoint": "/system/name/{system}/commodity/name/{commodity}/nearby/imports",
+      "method": "GET",
+      "example_url": "https://api.eddata.dev/v2/system/name/Sol/commodity/name/platinum/nearby/imports",
+      "parameters": {
+        "minVolume": "Minimum demand volume (default: 1)",
+        "maxDaysAgo": "Maximum data age in days (default: 2)",
+        "maxDistance": "Maximum distance in light years (max: 500)"
+      },
+      "example_request": {
+        "url": "https://api.eddata.dev/v2/system/name/Delkar/commodity/name/platinum/nearby/imports",
+        "params": {
+          "minVolume": 1,
+          "maxDaysAgo": 2,
+          "maxDistance": 500
+        }
+      },
+      "response_format": "Array of station objects",
+      "response_fields": [
+        "systemName",
+        "stationName",
+        "stationType",
+        "sellPrice (price they pay you)",
+        "demand",
+        "distance (ly from reference system)",
+        "stationDistance (ls from star)",
+        "updatedAt"
+      ]
+    },
+    
+    "search_sellers": {
+      "description": "Find stations selling a commodity (where to BUY)",
+      "endpoint": "/system/name/{system}/commodity/name/{commodity}/nearby/exports",
+      "method": "GET",
+      "example_url": "https://api.eddata.dev/v2/system/name/Sol/commodity/name/tritium/nearby/exports",
+      "parameters": {
+        "minVolume": "Minimum stock volume (default: 1)",
+        "maxDaysAgo": "Maximum data age in days (default: 2)",
+        "maxDistance": "Maximum distance in light years (max: 500)",
+        "fleetCarriers": "Include fleet carriers (default: false)"
+      },
+      "example_request": {
+        "url": "https://api.eddata.dev/v2/system/name/Sol/commodity/name/tritium/nearby/exports",
+        "params": {
+          "minVolume": 1,
+          "maxDaysAgo": 2,
+          "maxDistance": 500,
+          "fleetCarriers": false
+        }
+      },
+      "response_format": "Array of station objects",
+      "response_fields": [
+        "systemName",
+        "stationName",
+        "stationType",
+        "buyPrice (price you pay)",
+        "stock",
+        "distance (ly from reference system)",
+        "stationDistance (ls from star)",
+        "updatedAt"
+      ]
+    },
+    
+    "local_system_imports": {
+      "description": "Get all commodities imported by stations in a specific system",
+      "endpoint": "/system/name/{system}/commodities/imports",
+      "method": "GET",
+      "example_url": "https://api.eddata.dev/v2/system/name/Delkar/commodities/imports",
+      "parameters": {
+        "minVolume": "Minimum demand volume (default: 1)",
+        "maxDaysAgo": "Maximum data age in days (default: 2)"
+      },
+      "example_request": {
+        "url": "https://api.eddata.dev/v2/system/name/Delkar/commodities/imports",
+        "params": {
+          "minVolume": 1,
+          "maxDaysAgo": 2
+        }
+      },
+      "note": "Used to get local system results (distance=0) that nearby endpoint excludes"
+    }
+  },
+  
+  "commodity_name_mapping": {
+    "description": "EliteMining normalizes commodity names before API calls",
+    "examples": {
+      "Void Opals": "opal",
+      "Low Temperature Diamonds": "lowtemperaturediamond",
+      "LTD": "lowtemperaturediamond",
+      "Platinum": "platinum",
+      "Painite": "painite",
+      "Bromellite": "bromellite",
+      "Alexandrite": "alexandrite",
+      "Benitoite": "benitoite",
+      "Grandidierite": "grandidierite",
+      "Monazite": "monazite",
+      "Musgravite": "musgravite",
+      "Rhodplumsite": "rhodplumsite",
+      "Serendibite": "serendibite",
+      "Taaffeite": "taaffeite",
+      "Tritium": "tritium"
+    },
+    "normalization_rules": [
+      "Convert to lowercase",
+      "Remove spaces",
+      "Use mapping table for special cases"
+    ]
+  },
+  
+  "technical_details": {
+    "timeout": "10 seconds per request",
+    "automatic_fallback": "If api.eddata.dev fails, automatically switches to api.ardent-insight.com",
+    "url_encoding": "System and commodity names are URL-encoded",
+    "headers": "Standard GET request, no authentication required",
+    "response_type": "JSON array of objects"
+  },
+  
+  "galaxy_wide_endpoints": {
+    "galaxy_buyers": {
+      "description": "Top 100 best buying prices galaxy-wide (where to SELL)",
+      "endpoint": "/commodity/name/{commodity}/imports",
+      "method": "GET",
+      "example_url": "https://api.eddata.dev/v2/commodity/name/platinum/imports",
+      "parameters": {
+        "minVolume": "Minimum demand volume (default: 1)",
+        "maxDaysAgo": "Maximum data age in days (default: 2)",
+        "fleetCarriers": "Include fleet carriers (default: false)"
+      },
+      "example_request": {
+        "url": "https://api.eddata.dev/v2/commodity/name/platinum/imports",
+        "params": {
+          "minVolume": 1,
+          "maxDaysAgo": 2,
+          "fleetCarriers": false
+        }
+      },
+      "response_format": "Array of top 100 stations sorted by highest price",
+      "response_fields": [
+        "systemName",
+        "systemX, systemY, systemZ (coordinates for distance calc)",
+        "stationName",
+        "stationType",
+        "sellPrice (price they pay you)",
+        "demand",
+        "stationDistance (ls from star)",
+        "updatedAt"
+      ],
+      "note": "No reference system needed - returns galaxy-wide best prices"
+    },
+    
+    "galaxy_sellers": {
+      "description": "Top 100 best selling prices galaxy-wide (where to BUY)",
+      "endpoint": "/commodity/name/{commodity}/exports",
+      "method": "GET",
+      "example_url": "https://api.eddata.dev/v2/commodity/name/tritium/exports",
+      "parameters": {
+        "minVolume": "Minimum stock volume (default: 1)",
+        "maxDaysAgo": "Maximum data age in days (default: 2)",
+        "fleetCarriers": "Include fleet carriers (default: false)"
+      },
+      "example_request": {
+        "url": "https://api.eddata.dev/v2/commodity/name/tritium/exports",
+        "params": {
+          "minVolume": 1,
+          "maxDaysAgo": 2,
+          "fleetCarriers": false
+        }
+      },
+      "response_format": "Array of top 100 stations sorted by lowest price",
+      "response_fields": [
+        "systemName",
+        "systemX, systemY, systemZ (coordinates for distance calc)",
+        "stationName",
+        "stationType",
+        "buyPrice (price you pay)",
+        "stock",
+        "stationDistance (ls from star)",
+        "updatedAt"
+      ],
+      "note": "No reference system needed - returns galaxy-wide best prices"
+    }
+  },
+
+  "usage_flow": {
+    "mining_tab": {
+      "1": "User searches for best price in Mining tab",
+      "2": "EliteMining normalizes commodity name",
+      "3": "Calls nearby/imports endpoint with current system",
+      "4": "Also calls local system imports endpoint (distance=0)",
+      "5": "Merges results and sorts by price",
+      "6": "Displays top stations in UI"
+    },
+    "trade_tab": {
+      "1": "User searches in Trade/Commodity Market tab",
+      "2": "EliteMining normalizes commodity name",
+      "3a": "If 'Near System' mode: calls nearby endpoints (imports or exports)",
+      "3b": "If 'Galaxy Wide' mode: calls galaxy endpoints (imports or exports)",
+      "4": "For galaxy-wide results, calculates distances from system coordinates",
+      "5": "Applies filters (station type, pad size, age, carriers)",
+      "6": "Displays filtered results in UI"
+    },
+    "fallback": "If primary API fails, automatically retries with fallback API"
+  },
+  
+  "distance_calculation": {
+    "description": "For galaxy-wide searches, distances are calculated client-side",
+    "method": "Uses systemX/Y/Z coordinates included in API response",
+    "formula": "distance = sqrt((x2-x1)² + (y2-y1)² + (z2-z1)²)",
+    "reference_coords_source": "Local database (instant) or EDSM fallback",
+    "advantage": "No additional API calls needed - coordinates already in response"
+  }
+}

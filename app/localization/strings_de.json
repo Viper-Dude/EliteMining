@@ -527,7 +527,7 @@
     "location": "Standort",
     "type": "Typ",
     "minerals_found": "Gefundene Mineralien",
-    "avg_yield": "Durchschn. Ausbeute %",
+    "avg_yield": "T/Std",
     "overlap": "Überlappung",
     "res_site": "RES-Standort",
     "rating": "Bewertung",
@@ -536,7 +536,7 @@
     "body_ring": "Körper/Ring:",
     "ring_type": "Ringtyp:",
     "minerals_found_label": "Gefundene Mineralien:",
-    "average_yield": "Durchschn. Ausbeute %:",
+    "average_yield": "T/Std (Tonnen pro Stunde):",
     "overlap_minerals": "Überlappungs-Mineralien:",
     "overlap_type_label": "Überlappungstyp:",
     "res_site_label": "RES-Standort:",
@@ -544,6 +544,10 @@
     "rating_label": "Bewertung:",
     "rating_hint": "(0=Keine, 5=Beste)",
     "notes_label": "Notizen:",
+    "set_today": "Heute",
+    "clear_date": "Löschen",
+    "date_format_hint": "(JJJJ-MM-TT)",
+    "dialog_help": "T/Std (Tonnen pro Stunde) stellt die Abbaurate einer einzelnen Sitzung dar. Für eine genaue Standortbewertung sollten Sie den Standort mehrmals abbauen und diesen Wert mit Ihrer beobachteten durchschnittlichen Rate aktualisieren.",
     "error_required_fields": "System und Körper/Ring sind Pflichtfelder"
   },
   "refinery_dialog": {
@@ -1044,6 +1048,7 @@
     
     "bookmark_filter": "Lesezeichen nach Materialtyp filtern",
     "bookmark_search": "Lesezeichen nach System, Körper oder Materialien durchsuchen",
+    "bookmark_avg_yield": "Abbaurate (Tonnen pro Stunde) aus einer einzelnen Sitzung. Bauen Sie den Standort mehrmals ab für genaue Bewertung.",
     "add_bookmark": "Neues Bergbau-Standort-Lesezeichen hinzufügen",
     "edit_bookmark": "Ausgewähltes Lesezeichen bearbeiten",
     "delete_bookmark": "Ausgewählte(s) Lesezeichen löschen - Strg+Klick oder Umschalt+Klick für Mehrfachauswahl verwenden",

@@ -20,7 +20,7 @@
 
 
 ### Voiceattack Profile
-- No changes - latest version is v4.6.0 (included in the installer and zip file)
+- No changes - latest version is v4.7.7 (included in the installer and zip file)
 
 ### How to update to the latest profile
 - Backup and delete existing EliteMining profile
