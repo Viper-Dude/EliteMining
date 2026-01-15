@@ -1712,9 +1712,10 @@ class RingFinder:
         self._last_search_key = current_search_key
 
         # Set reference system coordinates for distance calculations (case insensitive)
+        # NOTE: Coordinate lookup moved to background thread to prevent UI freeze
         self.current_system_coords = None
 
-        # Try exact match first
+        # Try exact match from cached systems data (fast lookup)
         self.current_system_coords = self.systems_data.get(reference_system.lower())
         if not self.current_system_coords:
             # Try partial match (case insensitive)
@@ -1723,30 +1724,8 @@ class RingFinder:
                     self.current_system_coords = sys_coords
                     break
 
-        if not self.current_system_coords:
-            # Try to get coordinates from galaxy database first
-            galaxy_coords = self._get_system_coords_from_galaxy_db(reference_system)
-            if galaxy_coords:
-                self.current_system_coords = galaxy_coords
-                print(f" DEBUG: Using galaxy database coordinates for '{reference_system}'")
-            else:
-                # Try visited_systems table in user database
-                try:
-                    visited_coords = self.user_db._get_coordinates_from_visited_systems(reference_system)
-                    if visited_coords:
-                        # Convert tuple (x, y, z) to dict {'x': ..., 'y': ..., 'z': ...}
-                        self.current_system_coords = {'x': visited_coords[0], 'y': visited_coords[1], 'z': visited_coords[2]}
-                except Exception:
-                    pass
-                
-                if not self.current_system_coords:
-                    # Use EDSM as final fallback
-                    edsm_coords = self._get_system_coords_from_edsm(reference_system)
-                    if edsm_coords:
-                        self.current_system_coords = edsm_coords
-
-            if not self.current_system_coords:
-                self.status_var.set(t('ring_finder.coords_not_found_warning').format(system=reference_system))
+        # Don't do heavy lookups (DB/API) here - let background thread handle it
+        # This prevents UI freeze when searching large distances
 
         # Get min hotspots filter (only valid for specific materials)
         min_hotspots = 1  # Default
@@ -1791,6 +1770,36 @@ class RingFinder:
             # Check if window still exists before accessing tkinter vars
             if not self.parent.winfo_exists():
                 return
+            
+            # Perform coordinate lookup in background thread to prevent UI freeze
+            if not reference_coords:
+                # Try galaxy database first
+                galaxy_coords = self._get_system_coords_from_galaxy_db(reference_system)
+                if galaxy_coords:
+                    reference_coords = galaxy_coords
+                    print(f" DEBUG: Using galaxy database coordinates for '{reference_system}'")
+                else:
+                    # Try visited_systems table in user database
+                    try:
+                        visited_coords = self.user_db._get_coordinates_from_visited_systems(reference_system)
+                        if visited_coords:
+                            # Convert tuple (x, y, z) to dict {'x': ..., 'y': ..., 'z': ...}
+                            reference_coords = {'x': visited_coords[0], 'y': visited_coords[1], 'z': visited_coords[2]}
+                    except Exception:
+                        pass
+                    
+                    if not reference_coords:
+                        # Use EDSM as final fallback
+                        edsm_coords = self._get_system_coords_from_edsm(reference_system)
+                        if edsm_coords:
+                            reference_coords = edsm_coords
+                
+                if not reference_coords:
+                    # Update UI with error message
+                    self.parent.after(0, lambda: self.status_var.set(t('ring_finder.coords_not_found_warning').format(system=reference_system)))
+                    self.parent.after(0, lambda: self.search_btn.configure(state="normal"))
+                    self.parent.after(0, self._stop_search_spinner)
+                    return
             
             # Set the reference system coords for this worker thread
             self.current_system_coords = reference_coords

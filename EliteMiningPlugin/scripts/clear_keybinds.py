@@ -187,6 +187,10 @@ def clear_keybinds_from_profile(input_profile: str, output_profile: str):
 def main():
     """Main entry point"""
     
+    # Standard path for VoiceAttack profile
+    project_root = Path(__file__).parent.parent.parent
+    standard_profile_dir = project_root / "Voiceattack Profile"
+    
     # Check if arguments provided
     if len(sys.argv) >= 2:
         input_profile = sys.argv[1]
@@ -201,15 +205,49 @@ def main():
         print("VoiceAttack Profile Keybind Cleaner")
         print("="*60)
         
-        # Prompt for input file
-        input_profile = input("\nEnter input profile path: ").strip().strip('"')
+        # Find profile in standard directory
+        if standard_profile_dir.exists():
+            profiles = list(standard_profile_dir.glob("EliteMining*.vap"))
+            if profiles:
+                # Use the most recent profile
+                profiles.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                default_input = str(profiles[0])
+                print(f"\nDefault profile directory: {standard_profile_dir}")
+                print(f"Found profile: {profiles[0].name}")
+            else:
+                default_input = ""
+        else:
+            default_input = ""
         
-        # Suggest output file
+        # Prompt for input file
+        if default_input:
+            input_choice = input(f"\nInput profile [{default_input}]: ").strip().strip('"')
+            if input_choice:
+                # If user entered just a filename (not a full path), resolve it relative to standard dir
+                input_path_obj = Path(input_choice)
+                if not input_path_obj.is_absolute() and standard_profile_dir.exists():
+                    input_profile = str(standard_profile_dir / input_choice)
+                else:
+                    input_profile = input_choice
+            else:
+                input_profile = default_input
+        else:
+            input_profile = input("\nEnter input profile path: ").strip().strip('"')
+        
+        # Suggest output file in same directory
         input_path = Path(input_profile)
         suggested_output = str(input_path.parent / f"{input_path.stem}-Clean{input_path.suffix}")
         
         output_choice = input(f"\nOutput file [{suggested_output}]: ").strip().strip('"')
-        output_profile = output_choice if output_choice else suggested_output
+        if output_choice:
+            # If user entered just a filename (not a full path), resolve it relative to input file's directory
+            output_path_obj = Path(output_choice)
+            if not output_path_obj.is_absolute():
+                output_profile = str(input_path.parent / output_choice)
+            else:
+                output_profile = output_choice
+        else:
+            output_profile = suggested_output
         
         print()
     

@@ -5,12 +5,21 @@
 
 ### Commodity Market Tab
 - Added "LS" column showing station distance from star (light-seconds)
+- Dropdown selections now remembered when restarting the app
+- Right-click menu added to Trade Commodities (Open in Inara/EDSM/Spansh, Copy System)
+- Column widths now saved for both Mining Commodities and Trade Commodities tables
+
+### Mining Session Tab
+- Vertical splitter position between Prospector Reports and Material Analysis tables now remembered
 
 ### Bookmarks Tab
 - Added "Last Mined" date field (set manually, use "Today" button, or leave empty)
+- Renamed "Avg Yield %" column to "T/hr" for clarity
 
 ### Bug Fixes
-- Fixed fleet carrier jumps now correctly count as system visits (Will count on next app restart)
+- Fixed fleet carrier jumps now correctly count as system visits
+- Fixed station type filters not matching all variants (e.g., "Ocellus Starport" now matches "Orbital" filter)
+- Prevented multiple app instances from running simultaneously
 
 ## Hotfix
 No hotfixes in this release

@@ -439,7 +439,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.78"
+APP_VERSION = "v4.79"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -7885,7 +7885,34 @@ class App(tk.Tk):
 
     # ---------- Timers/Toggles tab ----------
     def _build_timers_tab(self, frame: ttk.Frame) -> None:
-        frame.columnconfigure(0, weight=1)
+        # Theme-aware background color
+        from config import load_theme
+        _mc_theme = load_theme()
+        _mc_bg = "#000000" if _mc_theme == "elite_orange" else "#1e1e1e"
+        
+        # Create a canvas and scrollbar for scrollable content
+        canvas = tk.Canvas(frame, bg=_mc_bg, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Bind mousewheel to canvas
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        # Now build content in scrollable_frame instead of frame
+        scrollable_frame.columnconfigure(0, weight=1)
         
         # Timer name translation mapping (English key -> translation key)
         timer_translations = {
@@ -7908,11 +7935,11 @@ class App(tk.Tk):
         }
         
         # Timers section
-        ttk.Label(frame, text=t('voiceattack.timers'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(scrollable_frame, text=t('voiceattack.timers'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
         r = 1
         for name, spec in TIMERS.items():
             _fname, lo, hi, helptext = spec
-            rowf = ttk.Frame(frame)
+            rowf = ttk.Frame(scrollable_frame)
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
             # Spinbox first
@@ -7933,11 +7960,11 @@ class App(tk.Tk):
             r += 1
         
         # Add some spacing between sections
-        ttk.Separator(frame, orient='horizontal').grid(row=r, column=0, sticky="ew", pady=(20, 10))
+        ttk.Separator(scrollable_frame, orient='horizontal').grid(row=r, column=0, sticky="ew", pady=(20, 10))
         r += 1
         
         # Toggles section with tip on same row
-        toggles_header = ttk.Frame(frame)
+        toggles_header = ttk.Frame(scrollable_frame)
         toggles_header.grid(row=r, column=0, sticky="ew", pady=(0, 8))
         toggles_header.columnconfigure(1, weight=1)  # Make middle column expand
         
@@ -7956,6 +7983,7 @@ class App(tk.Tk):
             "FSD Jump Sequence": "voiceattack.help_fsd_jump",
             "Power Settings": "voiceattack.help_power",
             "Prospector Sequence": "voiceattack.help_prospector_sequence",
+            "Prospector Sound Effect": "voiceattack.help_prospector_sound",
             "Target Prospector": "voiceattack.help_target_prospector",
             "Thrust Up": "voiceattack.help_thrust_up",
             "Pulse Wave Analyser": "voiceattack.help_pulse_wave",
@@ -7971,11 +7999,11 @@ class App(tk.Tk):
         self.toggle_checkboxes = {}
         
         for name, (_fname, helptext) in TOGGLES.items():
-            rowf = ttk.Frame(frame, style="Dark.TFrame")
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
             # Indent dependent toggles
-            indent = 20 if name in ["Target Prospector", "Thrust Up"] else 0
+            indent = 20 if name in ["Prospector Sound Effect", "Target Prospector", "Thrust Up"] else 0
             if indent > 0:
                 tk.Label(rowf, text="", bg=_toggle_bg, width=2).pack(side="left")
             
@@ -8008,7 +8036,7 @@ class App(tk.Tk):
         self._update_prospector_dependencies()
 
     def _update_prospector_dependencies(self):
-        """Enable/disable Target Prospector and Thrust Up based on Prospector Sequence state"""
+        """Enable/disable dependent toggles based on Prospector Sequence state"""
         try:
             if "Prospector Sequence" not in self.toggle_vars or "Prospector Sequence" not in self.toggle_checkboxes:
                 return
@@ -8017,7 +8045,7 @@ class App(tk.Tk):
             master_enabled = self.toggle_vars["Prospector Sequence"].get() == 1
             
             # Update dependent checkboxes
-            for dependent in ["Target Prospector", "Thrust Up"]:
+            for dependent in ["Prospector Sound Effect", "Target Prospector", "Thrust Up"]:
                 if dependent in self.toggle_checkboxes:
                     checkbox = self.toggle_checkboxes[dependent]
                     if master_enabled:
@@ -15807,17 +15835,28 @@ class App(tk.Tk):
             
             # Filter by Station Type
             if station_type_filter == "Orbital":
-                orbital_types = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Dodec"]
-                results = [r for r in results if r.get('stationType', '') in orbital_types]
+                # Debug: Print unique station types to understand API format
+                unique_types = set(r.get('stationType', 'None') for r in results[:50])
+                print(f"[DEBUG Trade Filter] Sample station types before orbital filter: {unique_types}")
+                
+                # Orbital stations - use substring match to handle variants like "Coriolis Starport"
+                orbital_keywords = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
+                results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in orbital_keywords)]
+                
+                print(f"[DEBUG Trade Filter] After orbital filter: {len(results)} stations")
             elif station_type_filter == "Surface":
-                surface_types = ["Crater", "OnFoot", "Planetary", "Surface"]
-                results = [r for r in results if any((r.get('stationType') or '').startswith(t) for t in surface_types)]
+                # Surface stations - use substring match for variants
+                surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
+                results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in surface_keywords)]
             elif station_type_filter == "Fleet Carrier":
-                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
+                # Fleet Carriers - use substring match
+                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '') or "Carrier" in (r.get('stationType') or '')]
             elif station_type_filter == "Megaship":
-                results = [r for r in results if r.get('stationType', '') == "MegaShip"]
+                # MegaShips - use substring match
+                results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
             elif station_type_filter == "Stronghold":
-                results = [r for r in results if "StrongholdCarrier" in (r.get('stationType') or '')]
+                # Stronghold Carriers - use substring match
+                results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
             
             # Filter by Landing Pad Size
             large_pad_only = self.trade_large_pad_only.get()
@@ -16225,24 +16264,22 @@ class App(tk.Tk):
             # NOTE: Stations with null stationType (Unknown) are only shown when filter is "All"
             # This is correct behavior - we can't categorize stations without metadata
             if station_type_filter == "Orbital":
-                # Orbital stations: Coriolis, Orbis, Ocellus, Outpost, AsteroidBase, Dodec (EXACT MATCH only)
-                # BUG FIX: Use exact match to prevent CraterOutpost matching "Outpost" substring
-                orbital_types = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Dodec"]
-                results = [r for r in results if r.get('stationType', '') in orbital_types]
+                # Orbital stations - use substring match to handle variants like "Coriolis Starport"
+                orbital_keywords = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
+                results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in orbital_keywords)]
             elif station_type_filter == "Surface":
-                # Surface stations: CraterOutpost, CraterPort, OnFootSettlement, etc. (substring match for variants)
-                # Use startswith/contains for surface types since they have variants (CraterOutpost, CraterPort, OnFootSettlement, OnFootStation)
-                surface_types = ["Crater", "OnFoot", "Planetary", "Surface"]
-                results = [r for r in results if any((r.get('stationType') or '').startswith(t) for t in surface_types)]
+                # Surface stations - use substring match for variants
+                surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
+                results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in surface_keywords)]
             elif station_type_filter == "Fleet Carrier":
-                # Fleet Carriers only
-                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
+                # Fleet Carriers - use substring match
+                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '') or "Carrier" in (r.get('stationType') or '')]
             elif station_type_filter == "Megaship":
-                # MegaShips only
-                results = [r for r in results if r.get('stationType', '') == "MegaShip"]
+                # MegaShips - use substring match
+                results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
             elif station_type_filter == "Stronghold":
-                # Stronghold Carriers only
-                results = [r for r in results if "StrongholdCarrier" in (r.get('stationType') or '')]
+                # Stronghold Carriers - use substring match
+                results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
             
             # Filter by Landing Pad Size (Large only if checked)
             large_pad_only = self.marketplace_large_pad_only.get()
