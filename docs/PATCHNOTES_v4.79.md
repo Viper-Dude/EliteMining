@@ -1,27 +1,14 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2025-01-14
+**Release Date:** 2025-01-15
 
 ## New Features & Improvements
 
-### Prospector Sequence Audio
+### Prospector Sequence 
 - Added sound effect when prospector sequence is ready for firing next prospector
 - New toggle "Enable Prospector Sound Effect" in VoiceAttack Controls tab (Mining Controls)
 
-### UI Improvements
-- Added vertical scrollbar to Mining Controls tab for better navigation
-
-## Hotfix
-
-### [System/Component Name]
-- Fixed [issue description]
-
-
 ### Voiceattack Profile
-- Updated VoiceAttack profile (included in the installer and zip file)
-
-### How to update to the latest profile
-- Backup and delete existing EliteMining profile
-
+- Updated to v4.7.9 - Added commands for toggle sound effect when prospector sequence is ready for firing next prospector (included in the installer and zip file)
 
 ## Notes!
 - If installer fails with errors, right-click the installer and select "Run as administrator"

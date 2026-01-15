@@ -7906,10 +7906,11 @@ class App(tk.Tk):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Bind mousewheel to canvas
-        def _on_mousewheel(event):
+        # Bind mousewheel to canvas - only when mouse is over canvas
+        def _on_mousewheel_mc(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel_mc))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
         # Now build content in scrollable_frame instead of frame
         scrollable_frame.columnconfigure(0, weight=1)
