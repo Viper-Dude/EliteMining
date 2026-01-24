@@ -439,7 +439,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.79"
+APP_VERSION = "v4.80"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -2397,8 +2397,17 @@ cargo panel forces Elite to write detailed inventory data.
         # Make text widget read-only
         self.cargo_text.configure(state="disabled")
         
-        # Auto-scroll to bottom to see new items
-        self.cargo_text.see(tk.END)
+        # Only auto-scroll if user was already at bottom (don't fight manual scrolling)
+        # Check if scrollbar is at or near bottom (within 5% of end)
+        try:
+            yview = self.cargo_text.yview()
+            # yview returns (top, bottom) as fractions 0.0 to 1.0
+            # Only scroll to end if bottom is at least 0.95 (user is near bottom)
+            if yview[1] >= 0.95:
+                self.cargo_text.see(tk.END)
+        except:
+            # If check fails, default to scrolling to end
+            self.cargo_text.see(tk.END)
         
         # Update window size to fit content (but keep resizable)
         self.cargo_window.update_idletasks()
@@ -5247,6 +5256,12 @@ class App(tk.Tk):
         summary_text = f"{cargo.current_cargo}/{cargo.max_cargo}t ({percentage:.0f}%){status_color}"
         self.integrated_cargo_summary.configure(text=summary_text)
         
+        # Save current scroll position before updating
+        try:
+            scroll_position = self.integrated_cargo_text.yview()
+        except:
+            scroll_position = None
+        
         # Update cargo list - very compact format
         self.integrated_cargo_text.configure(state="normal")
         self.integrated_cargo_text.delete(1.0, tk.END)
@@ -5364,6 +5379,13 @@ class App(tk.Tk):
             pass
         
         self.integrated_cargo_text.configure(state="disabled")
+        
+        # Restore scroll position to prevent jumping
+        if scroll_position:
+            try:
+                self.integrated_cargo_text.yview_moveto(scroll_position[0])
+            except:
+                pass
         
         # Update status - more compact
         try:
@@ -15840,9 +15862,12 @@ class App(tk.Tk):
                 unique_types = set(r.get('stationType', 'None') for r in results[:50])
                 print(f"[DEBUG Trade Filter] Sample station types before orbital filter: {unique_types}")
                 
-                # Orbital stations - use substring match to handle variants like "Coriolis Starport"
+                # Orbital stations - use substring match but exclude Surface types
                 orbital_keywords = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
-                results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in orbital_keywords)]
+                surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
+                results = [r for r in results 
+                          if any(keyword in (r.get('stationType') or '') for keyword in orbital_keywords)
+                          and not any(surface_kw in (r.get('stationType') or '') for surface_kw in surface_keywords)]
                 
                 print(f"[DEBUG Trade Filter] After orbital filter: {len(results)} stations")
             elif station_type_filter == "Surface":
@@ -16265,9 +16290,12 @@ class App(tk.Tk):
             # NOTE: Stations with null stationType (Unknown) are only shown when filter is "All"
             # This is correct behavior - we can't categorize stations without metadata
             if station_type_filter == "Orbital":
-                # Orbital stations - use substring match to handle variants like "Coriolis Starport"
+                # Orbital stations - use substring match but exclude Surface types
                 orbital_keywords = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
-                results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in orbital_keywords)]
+                surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
+                results = [r for r in results 
+                          if any(keyword in (r.get('stationType') or '') for keyword in orbital_keywords)
+                          and not any(surface_kw in (r.get('stationType') or '') for surface_kw in surface_keywords)]
             elif station_type_filter == "Surface":
                 # Surface stations - use substring match for variants
                 surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]

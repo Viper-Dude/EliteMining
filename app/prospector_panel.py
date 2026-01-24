@@ -535,8 +535,8 @@ class ProspectorPanel(ttk.Frame):
         dialog.update_idletasks()
         parent = self.winfo_toplevel()
         x = parent.winfo_x() + (parent.winfo_width() - 350) // 2
-        y = parent.winfo_y() + (parent.winfo_height() - 200) // 2
-        dialog.geometry(f"350x200+{x}+{y}")
+        y = parent.winfo_y() + (parent.winfo_height() - 240) // 2
+        dialog.geometry(f"350x240+{x}+{y}")
         
         # Main frame
         main_frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
