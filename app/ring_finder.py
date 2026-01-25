@@ -413,6 +413,7 @@ class RingFinder:
         self.material_combo = ttk.Combobox(search_frame, textvariable=self.material_var, width=15, state="readonly")
         self.material_combo['values'] = tuple(self._ring_type_map[k] for k in self._ring_type_order)
         self.material_combo.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        self.material_combo.bind('<<ComboboxSelected>>', self._on_ring_type_changed)
         
         # "Any Ring" checkbox - DISABLED (hidden) - searches Spansh for rings without requiring hotspot data
         self.any_ring_var = tk.BooleanVar(value=False)
@@ -972,6 +973,23 @@ class RingFinder:
                 self.confirmed_only_var.set(True)
             if hasattr(self, 'confirmed_checkbox') and self.confirmed_checkbox:
                 self.confirmed_checkbox.configure(state="disabled", fg="#888888")
+    
+    def _on_ring_type_changed(self, event=None):
+        """Handle Ring Type filter change - disable Ring Type Only checkbox when 'All' is selected"""
+        ring_type = self.material_var.get()
+        ring_type_english = self._ring_type_rev_map.get(ring_type, ring_type)
+        
+        if ring_type_english == 'All':
+            # Disable "Ring Type Only" checkbox when "All" ring types selected
+            # (Ring Type Only doesn't make sense with "All")
+            if hasattr(self, 'ring_type_only_var'):
+                self.ring_type_only_var.set(False)  # Uncheck it
+            if hasattr(self, 'ring_type_only_cb'):
+                self.ring_type_only_cb.configure(state="disabled")
+        else:
+            # Enable "Ring Type Only" checkbox for specific ring types
+            if hasattr(self, 'ring_type_only_cb'):
+                self.ring_type_only_cb.configure(state="normal")
     
     def _on_any_ring_changed(self):
         """Handle Any Ring checkbox change - enables Spansh search mode"""
@@ -2213,12 +2231,12 @@ class RingFinder:
             if ring_type_english != 'All':
                 filters['rings'] = [{'type': [ring_type_english]}]
             
-            # For "All Minerals" searches, use pagination to get more results covering larger distances
-            # Spansh returns bodies sorted by distance, but with no mineral filter there are many bodies
-            # so 500 results might only cover 10-20 LY. Fetch multiple pages to reach max_distance.
-            use_pagination = self._is_all_minerals(specific_material)
+            # For "All Minerals" or "All Ring Types" searches, use pagination to get more results covering larger distances
+            # Spansh returns bodies sorted by distance, but with no filters there are many bodies
+            # so 500 results might only cover 10-40 LY. Fetch multiple pages to reach max_distance.
+            use_pagination = self._is_all_minerals(specific_material) or ring_type_english == 'All'
             page_size = 500 if use_pagination else 200
-            max_pages = 10 if use_pagination else 1  # Up to 5000 results for "All Minerals" to reach further distances
+            max_pages = 50 if use_pagination else 1  # Up to 25000 results to reach very far distances (e.g., 300 LY)
             
             payload_template = {
                 'filters': filters,
@@ -2265,15 +2283,21 @@ class RingFinder:
                 total_count = data.get('count', 0)
                 results = data.get('results', [])
                 
+                print(f"[SPANSH PAGINATION] Page {page_num}: Got {len(results)} bodies, total available: {total_count}")
+                
                 if not results:
+                    print(f"[SPANSH PAGINATION] No results on page {page_num}, stopping")
                     break
                 
                 # Check if we've reached bodies beyond max_distance
                 last_body_distance = results[-1].get('distance', 0) if results else 0
                 all_results.extend(results)
                 
+                print(f"[SPANSH PAGINATION] Page {page_num}: Distance range {results[0].get('distance', 0):.1f} - {last_body_distance:.1f} LY")
+                
                 # Stop if we've gone beyond max_distance
                 if last_body_distance >= max_distance:
+                    print(f"[SPANSH PAGINATION] Reached max distance ({max_distance} LY) at page {page_num}, stopping")
                     break
             
             results = all_results

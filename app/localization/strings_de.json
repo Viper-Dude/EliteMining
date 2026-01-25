@@ -76,7 +76,7 @@
     "reference_system": "Referenzsystem:",
     "use_current_system": "Aktuelles System",
     "search_results": "Suchergebnisse",
-    "search_help": "Suche: Benutzerdatenbank (Ihre Scans) + Spansh (Community-Daten, ~30-120 LJ Reichweite)",
+    "search_help": "Suche: Benutzerdatenbank (Ihre Scans) + Spansh (Web-API)",
     "no_data_help": "'Keine Daten' = Nicht besucht oder keine Informationen verfügbar",
     "right_click_help": "Rechtsklick für Optionen",
     "ring_type": "Ringtyp",
@@ -96,7 +96,7 @@
     "data_source_database": "Datenbank",
     "data_source_spansh": "Spansh",
     "data_source_both": "Beide",
-    "data_source_tooltip": "Datenbank: Ihre gescannten Hotspots\nSpansh: Community-Daten (spansh.co.uk)\nBeide: Zusammengeführte Ergebnisse",
+    "data_source_tooltip": "Datenbank: Ihre gescannten Hotspots\nSpansh: spansh.co.uk API\nBeide: Zusammengeführte Ergebnisse",
     "overlaps_requires_db": "Nur Überlappungen erfordert Datenbank oder Beide",
     "res_requires_db": "Nur RES erfordert Datenbank oder Beide",
     "any_ring": "Alle Ringe",
@@ -1026,7 +1026,7 @@
     "select_commodity": "Rohstoff zum Suchen auswählen",
     
     "min_hotspots": "Mindest-Hotspot-Anzahl Filter\nZeigt nur Ringe mit X oder mehr Hotspots\n(Nur aktiv wenn bestimmtes Mineral ausgewählt)",
-    "max_distance": "Maximaler Suchradius in Lichtjahren\nEmpfohlen: 10-50 LY für bessere Leistung\nGrößere Entfernungen können länger dauern\n(Hauptsächlich für Datenbank - Spansh nutzt anderen Suchansatz)",
+    "max_distance": "Maximaler Suchradius in Lichtjahren\nGilt für Datenbank- und Spansh-Suchen\nEmpfohlen: 10-50 LY für bessere Leistung\nGrößere Entfernungen können länger dauern",
     
     "system_entry": "Aktueller Systemname. (Kann auch manuell eingegeben werden)",
     "body_entry": "Aktueller Standort: Ringe, Planeten, Stationen oder Träger. (Kann auch manuell eingegeben werden)",
