@@ -983,6 +983,12 @@ class RingFinder:
                 self.ring_type_only_var.set(False)  # Uncheck it
             if hasattr(self, 'ring_type_only_cb'):
                 self.ring_type_only_cb.configure(state="disabled")
+            
+            # Re-enable Database and Both radio buttons (in case they were disabled by Ring Type Only)
+            if hasattr(self, 'data_source_db_rb'):
+                self.data_source_db_rb.configure(state="normal")
+            if hasattr(self, 'data_source_both_rb'):
+                self.data_source_both_rb.configure(state="normal")
         else:
             # Enable "Ring Type Only" checkbox for specific ring types
             if hasattr(self, 'ring_type_only_cb'):
@@ -2228,12 +2234,12 @@ class RingFinder:
             if ring_type_english != 'All':
                 filters['rings'] = [{'type': [ring_type_english]}]
             
-            # For "All Minerals" or "All Ring Types" searches, use pagination to get more results covering larger distances
+            # For "All Minerals" or "All Ring Types" or "Ring Type Only" searches, use pagination to get more results covering larger distances
             # Spansh returns bodies sorted by distance, but with no filters there are many bodies
-            # so 500 results might only cover 10-40 LY. Fetch multiple pages to reach max_distance.
-            use_pagination = self._is_all_minerals(specific_material) or ring_type_english == 'All'
+            # so 500 results might only cover 10-15 LY per page in dense regions. Fetch multiple pages to reach max_distance.
+            use_pagination = self._is_all_minerals(specific_material) or ring_type_english == 'All' or ring_type_only
             page_size = 500 if use_pagination else 200
-            max_pages = 50 if use_pagination else 1  # Up to 25000 results to reach very far distances (e.g., 300 LY)
+            max_pages = 30 if use_pagination else 1  # Up to 15,000 results (30 pages x 500) - should reach 300 LY even in dense regions
             
             payload_template = {
                 'filters': filters,
@@ -2676,7 +2682,7 @@ class RingFinder:
                     material_filter, 
                     specific_material, 
                     max_distance, 
-                    individual_limit or 50,
+                    individual_limit,  # Don't default to 50 - pass None if user selected "All"
                     self.current_system_coords,
                     ring_type_only=ring_type_only_active
                 )
