@@ -678,7 +678,7 @@ class RingFinder:
                      arrowcolor=[('readonly', '#ff8c00')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Visits", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Density", "Source")
+        columns = ("Distance", "LS", "System", "Visits", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Reserve", "Source")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
         
         # Set column widths - similar to EDTOOLS layout
@@ -692,7 +692,7 @@ class RingFinder:
             "Overlap": 80,
             "RES Site": 80,
             "Visits": 60,
-            "Density": 110,
+            "Reserve": 110,
             "Source": 70
         }
         
@@ -707,7 +707,7 @@ class RingFinder:
             "Hotspots": t('ring_finder.col_hotspots'),
             "Overlap": t('ring_finder.col_overlap'),
             "RES Site": t('ring_finder.col_res'),
-            "Density": t('ring_finder.col_density'),
+            "Reserve": t('ring_finder.col_reserve'),
             "Source": "Source"
         }
         
@@ -739,9 +739,9 @@ class RingFinder:
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Source":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
-            elif col == "Density":
-                # Hide density column - data is unreliable
-                self.results_tree.column(col, width=0, minwidth=0, anchor="w", stretch=False)
+            elif col == "Reserve":
+                # Reserve column - visible and showing reserve level
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
         
         # Load saved column widths from config
         try:
@@ -749,9 +749,6 @@ class RingFinder:
             saved_widths = load_ring_finder_column_widths()
             if saved_widths:
                 for col_name, width in saved_widths.items():
-                    # Skip Density column - always hidden
-                    if col_name == "Density":
-                        continue
                     try:
                         self.results_tree.column(col_name, width=width)
                     except:
@@ -835,7 +832,7 @@ class RingFinder:
         data = [(self.results_tree.set(child, col), child) for child in self.results_tree.get_children('')]
         
         # Sort data - handle numeric columns specially
-        if col in ["Distance", "LS", "Density"]:
+        if col in ["Distance", "LS", "Reserve"]:
             # Numeric sort - handle N/A values
             def sort_key(item):
                 val = item[0]
@@ -1532,7 +1529,7 @@ class RingFinder:
                     'ring_type': ring_type or "No data",
                     'ls': ls_display,  # Display uses 'ls' key
                     'ls_distance': ls_distance,  # Keep raw value for EDSM compatibility
-                    'density': density,
+                    'density': '',  # Don't show old density data - reserve level is for Spansh only
                     'data_source': 'Overlap Database',
                     'overlap_tag': overlap_tag
                 })
@@ -1705,7 +1702,7 @@ class RingFinder:
                     'ring_type': ring_type or "No data",
                     'ls': ls_display,
                     'ls_distance': ls_distance,
-                    'density': density,
+                    'density': '',  # Don't show old density data - reserve level is for Spansh only
                     'data_source': 'RES Database',
                     'overlap_tag': overlap_tag,
                     'res_tag': res_display
@@ -2309,6 +2306,7 @@ class RingFinder:
                 body_name = body.get('name', '')
                 distance_ly = body.get('distance', 0)
                 distance_ls = body.get('distance_to_arrival', 0)
+                reserve_level = body.get('reserve_level', '')  # Extract reserve level from Spansh
                 
                 rings = body.get('rings', [])
                 for ring in rings:
@@ -2361,7 +2359,7 @@ class RingFinder:
                         'ring_type': ring_type,
                         'ls': ls_display,  # Formatted string with commas
                         'ls_distance': distance_ls,  # Raw value
-                        'density': "No data",
+                        'density': reserve_level if reserve_level else '-',  # Use reserve_level from Spansh, or dash if not available
                         'inner_radius': None,
                         'outer_radius': None,
                         'source': 'Spansh',
@@ -2372,6 +2370,12 @@ class RingFinder:
                     hotspots.append(hotspot_entry)
             
             print(f"[SPANSH] Converted {len(hotspots)} rings to hotspot format")
+            
+            # Apply max_results limit if specified
+            if max_results and len(hotspots) > max_results:
+                print(f"[SPANSH] Limiting results from {len(hotspots)} to {max_results}")
+                hotspots = hotspots[:max_results]
+            
             return hotspots
             
         except requests.exceptions.Timeout:
@@ -2653,9 +2657,12 @@ class RingFinder:
         user_results = []
         spansh_results = []
         
+        # When using "both", don't limit individual sources - limit the combined result instead
+        individual_limit = max_results if data_source != "both" else None
+        
         # Query user database if selected
         if data_source in ["database", "both"]:
-            user_results = self._search_user_database_first(reference_system, material_filter, specific_material, max_distance, max_results)
+            user_results = self._search_user_database_first(reference_system, material_filter, specific_material, max_distance, individual_limit)
             print(f"[SEARCH] User database returned {len(user_results)} results")
         
         # Query Spansh if selected
@@ -2669,7 +2676,7 @@ class RingFinder:
                     material_filter, 
                     specific_material, 
                     max_distance, 
-                    max_results or 50,
+                    individual_limit or 50,
                     self.current_system_coords,
                     ring_type_only=ring_type_only_active
                 )
@@ -2704,6 +2711,15 @@ class RingFinder:
                     combined_results.append(result)
             
             print(f"[SEARCH] Combined: {len(user_results)} from DB + {len(spansh_results)} from Spansh = {len(combined_results)} total (after deduplication)")
+            
+            # Sort combined results by distance to ensure closest results regardless of source
+            combined_results.sort(key=lambda x: float(x.get('distance', 999999)))
+            
+            # Apply max_results limit to combined results
+            if max_results and len(combined_results) > max_results:
+                print(f"[SEARCH] Limiting combined results from {len(combined_results)} to {max_results}")
+                combined_results = combined_results[:max_results]
+            
             return combined_results
     
     def _search_user_database_first(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int = None) -> List[Dict]:
@@ -2730,7 +2746,7 @@ class RingFinder:
                 # Get distance (already calculated in user_hotspots)
                 distance = hotspot.get('distance', 0)
                 ls_distance = hotspot.get('ls_distance', "No data")  # Use actual LS distance from database
-                density = hotspot.get('density', "No data")  # Use actual density from database
+                # Don't show old density data - Reserve level is only available from Spansh
                 
                 # Format LS distance properly for display with comma separators
                 if ls_distance != "No data" and ls_distance is not None:
@@ -2763,7 +2779,7 @@ class RingFinder:
                     'distance': f"{distance:.1f}" if distance > 0 else "0.0",
                     'mass': "No data",  # User database doesn't store ring mass
                     'radius': "No data",  # User database doesn't store ring radius
-                    'density': density,  # Include density from database
+                    'density': '',  # Don't show old density data - Reserve level is only available from Spansh
                     'inner_radius': hotspot.get('inner_radius'),  # Include inner radius from database
                     'outer_radius': hotspot.get('outer_radius'),  # Include outer radius from database
                     'has_hotspots': True,
