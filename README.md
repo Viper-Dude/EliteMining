@@ -193,14 +193,14 @@ Control mining sequence timing and automated behaviors:
 
 ## Hotspot Finder
 
-The Hotspot Finder provides access to a comprehensive database of 61,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities, plus integrated community data from Spansh.
+The Hotspot Finder provides access to a comprehensive database of 61,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities, plus integrated Spansh data.
 
 ### Key Features
 - **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
 - **Filter by Minerals** – Search for specific minerals (Painite, Platinum, Low Temperature Diamonds, etc.)
-- **Community Data Integration** – Search includes Spansh.co.uk community data alongside your personal scans for comprehensive coverage (~30-120 LY range)
+- **Spansh Data Integration** – Search includes Spansh.co.uk data alongside your personal scans for comprehensive coverage (~50 LY typical, Ring Search mode reaches 300 LY)
 - **Ring Type Only Search** – Find rings by type without requiring hotspot data, useful for exploring unmarked rings
-- **Data Source Selection** – Choose between Database (your scans), Spansh (community data), or Both for best results
+- **Data Source Selection** – Choose between Database (your scans), Spansh (Spansh data), or Both for best results
 - **Min Hotspots Filter** – Filter results to show only rings with X or more hotspots (1-20 range, available when specific mineral selected)
 - **Auto-Search** – Automatically searches for hotspots when jumping to new systems and auto-refreshes results when scanning rings (remembers preference across restarts)
 - **Pre-loaded Database** – 61,000+ hotspots with minerals types, ring densities
