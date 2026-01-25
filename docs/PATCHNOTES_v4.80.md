@@ -6,22 +6,12 @@
 ### Hotspot Finder
 - **Community Data Integration** - Search now includes mining locations from Spansh.co.uk alongside your scanned hotspots
 - **Data Source Selection** - Choose between Database (your scans), Spansh (community data), or Both for comprehensive results
-- **Extended Search Range** - Spansh provides additional hotspot coverage up to ~60 light-years
-- **Visual Source Indicators** - Results clearly show whether data is from your database or community sources
-- **Ring Type Only Search** - New search mode to find rings by type (Metallic, Metal Rich, etc.) without requiring hotspot data, useful for exploring unmarked rings
-
-## Hotfix
-
-### [System/Component Name]
-- Fixed [issue description]
-
+- **Extended Search Range** - Spansh provides additional hotspot coverage up to ~120 light-years
+- **Visual Source Indicators** - Results clearly show whether data is from your database or Spansh
+- **Ring Type Only Search** - New search mode to find rings by type (Metallic, Metal Rich, etc.) without requiring hotspot data.
 
 ### Voiceattack Profile
 - No changes - latest version is v4.7.9 (included in the installer and zip file)
-
-### How to update to the latest profile
-- Backup and delete existing EliteMining profile
-
 
 ## Notes!
 - If installer fails with errors, right-click the installer and select "Run as administrator"

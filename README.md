@@ -3,8 +3,6 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
 
-> **Latest Update:** Fixed text overlay brightness slider now controls text visibility as intended.
-
 **EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 61,000+ mining locations, overlaps, and RES sites as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
 
 ---
@@ -195,11 +193,14 @@ Control mining sequence timing and automated behaviors:
 
 ## Hotspot Finder
 
-The Hotspot Finder provides access to a comprehensive database of 61,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities.
+The Hotspot Finder provides access to a comprehensive database of 61,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities, plus integrated community data from Spansh.
 
 ### Key Features
 - **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
 - **Filter by Minerals** – Search for specific minerals (Painite, Platinum, Low Temperature Diamonds, etc.)
+- **Community Data Integration** – Search includes Spansh.co.uk community data alongside your personal scans for comprehensive coverage (~30-120 LY range)
+- **Ring Type Only Search** – Find rings by type without requiring hotspot data, useful for exploring unmarked rings
+- **Data Source Selection** – Choose between Database (your scans), Spansh (community data), or Both for best results
 - **Min Hotspots Filter** – Filter results to show only rings with X or more hotspots (1-20 range, available when specific mineral selected)
 - **Auto-Search** – Automatically searches for hotspots when jumping to new systems and auto-refreshes results when scanning rings (remembers preference across restarts)
 - **Pre-loaded Database** – 61,000+ hotspots with minerals types, ring densities
