@@ -485,7 +485,7 @@ class RingFinder:
         
         # Ring Type Only checkbox - searches for ring types regardless of hotspot data (Spansh only)
         self.ring_type_only_var = tk.BooleanVar(value=False)
-        self.ring_type_only_cb = tk.Checkbutton(right_filters_frame_row1, text="Ring Type Only",
+        self.ring_type_only_cb = tk.Checkbutton(right_filters_frame_row1, text="Ring Search (Spansh)",
                                                  variable=self.ring_type_only_var,
                                                  command=self._on_ring_type_only_changed,
                                                  bg=_cb_bg, fg="#e0e0e0",
@@ -494,6 +494,9 @@ class RingFinder:
                                                  font=("Segoe UI", 9))
         self.ring_type_only_cb.pack(side="left", padx=(8, 0))
         ToolTip(self.ring_type_only_cb, "Search for ring type only (ignores hotspot data)\nUseful for finding nearest ring of a specific type")
+        
+        # Initialize Ring Type Only state based on current ring type selection
+        self._on_ring_type_changed()
         
         # Max Results filter - in sub-frame with fixed label width to align dropdowns
         ttk.Label(right_filters_frame_row2, text=t('ring_finder.max_results') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
@@ -2239,7 +2242,15 @@ class RingFinder:
             # so 500 results might only cover 10-15 LY per page in dense regions. Fetch multiple pages to reach max_distance.
             use_pagination = self._is_all_minerals(specific_material) or ring_type_english == 'All' or ring_type_only
             page_size = 500 if use_pagination else 200
-            max_pages = 30 if use_pagination else 1  # Up to 15,000 results (30 pages x 500) - should reach 300 LY even in dense regions
+            
+            # Ring Type Only mode: allow many pages to reach 300 LY (for finding distant rings)
+            # Normal hotspot searches: limit to 5 pages (~50 LY typical) for speed
+            if ring_type_only:
+                max_pages = 30  # Up to 15,000 results - reach 300 LY even in dense regions
+            elif use_pagination:
+                max_pages = 5   # Up to 2,500 results - keeps normal searches fast (~50 LY typical)
+            else:
+                max_pages = 1   # Single page for specific material searches
             
             payload_template = {
                 'filters': filters,
@@ -2297,6 +2308,11 @@ class RingFinder:
                 all_results.extend(results)
                 
                 print(f"[SPANSH PAGINATION] Page {page_num}: Distance range {results[0].get('distance', 0):.1f} - {last_body_distance:.1f} LY")
+                
+                # Stop early if we have enough bodies for max_results (optimization for limited searches)
+                if max_results and len(all_results) >= max_results * 2:
+                    print(f"[SPANSH PAGINATION] Have {len(all_results)} bodies (max_results is {max_results}), stopping early")
+                    break
                 
                 # Stop if we've gone beyond max_distance
                 if last_body_distance >= max_distance:
@@ -2663,12 +2679,18 @@ class RingFinder:
         user_results = []
         spansh_results = []
         
-        # When using "both", don't limit individual sources - limit the combined result instead
-        individual_limit = max_results if data_source != "both" else None
+        # When using "both", fetch more from database (user's confirmed scans) than from Spansh
+        # This ensures database results have priority while still getting Spansh supplementary coverage
+        if data_source == "both" and max_results:
+            db_limit = max_results * 4  # Fetch 4x from database (priority)
+            spansh_limit = max_results * 2  # Fetch 2x from Spansh (supplementary)
+        else:
+            db_limit = max_results
+            spansh_limit = max_results
         
         # Query user database if selected
         if data_source in ["database", "both"]:
-            user_results = self._search_user_database_first(reference_system, material_filter, specific_material, max_distance, individual_limit)
+            user_results = self._search_user_database_first(reference_system, material_filter, specific_material, max_distance, db_limit)
             print(f"[SEARCH] User database returned {len(user_results)} results")
         
         # Query Spansh if selected
@@ -2682,7 +2704,7 @@ class RingFinder:
                     material_filter, 
                     specific_material, 
                     max_distance, 
-                    individual_limit,  # Don't default to 50 - pass None if user selected "All"
+                    spansh_limit,  # Use spansh_limit (2x for Both mode, or max_results for spansh-only)
                     self.current_system_coords,
                     ring_type_only=ring_type_only_active
                 )
