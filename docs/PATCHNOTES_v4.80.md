@@ -6,7 +6,7 @@
 ### Hotspot Finder
 - **Community Data Integration** - Search now includes mining locations from Spansh.co.uk alongside your scanned hotspots
 - **Data Source Selection** - Choose between Database (your scans), Spansh (community data), or Both for comprehensive results
-- **Extended Search Range** - Spansh provides additional hotspot coverage up to ~120 light-years
+- **Extended Search Coverage** - Spansh provides additional hotspot coverage 
 - **Visual Source Indicators** - Results clearly show whether data is from your database or Spansh
 - **Ring Type Only Search** - New search mode to find rings by type (Metallic, Metal Rich, etc.) without requiring hotspot data.
 

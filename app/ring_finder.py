@@ -525,19 +525,30 @@ class RingFinder:
         source_frame = tk.Frame(search_frame, bg=_cb_bg)
         source_frame.grid(row=3, column=1, columnspan=3, sticky="w", padx=5, pady=5)
         
-        self.data_source_var = tk.StringVar(value="both")  # Default: both
+        self.data_source_var = tk.StringVar(value="database")  # Default: database (faster startup)
         
         # Radio button styling
         rb_style = {"bg": _cb_bg, "fg": "#e0e0e0", "activebackground": "#2e2e2e", 
                     "activeforeground": "#ffffff", "selectcolor": _cb_select, 
                     "relief": "flat", "font": ("Segoe UI", 9)}
         
+        # Database radio button - white for dark theme, orange for orange theme
+        rb_style_db = rb_style.copy()
+        if _cb_theme == "elite_orange":
+            rb_style_db["fg"] = "#FF8C00"  # Orange color for Database (orange theme)
+        else:
+            rb_style_db["fg"] = "#FFFFFF"  # White color for Database (dark theme)
+        
+        # Spansh radio button with cyan color (works for both themes)
+        rb_style_spansh = rb_style.copy()
+        rb_style_spansh["fg"] = "#00CED1"  # Cyan color for Spansh
+        
         self.data_source_db_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_database'), variable=self.data_source_var, 
-                      value="database", command=self._save_filter_settings, **rb_style)
+                      value="database", command=self._save_filter_settings, **rb_style_db)
         self.data_source_db_rb.pack(side="left", padx=(0, 15))
         
         self.data_source_spansh_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_spansh'), variable=self.data_source_var, 
-                      value="spansh", command=self._save_filter_settings, **rb_style)
+                      value="spansh", command=self._save_filter_settings, **rb_style_spansh)
         self.data_source_spansh_rb.pack(side="left", padx=(0, 15))
         
         self.data_source_both_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_both'), variable=self.data_source_var, 
@@ -2160,9 +2171,6 @@ class RingFinder:
         # Update status to show Spansh search is starting
         self.parent.after(0, lambda: self.status_var.set("Querying Spansh API...") if self.parent.winfo_exists() else None)
         
-        print(f"[SPANSH] Searching for {specific_material} in {material_filter} rings within {max_distance}ly of {reference_system}")
-        print(f"[SPANSH] Ring Type Only mode: {ring_type_only}")
-        
         try:
             # Throttle API calls (1.5 second minimum between requests)
             if not hasattr(self, '_last_spansh_call'):
@@ -2177,15 +2185,10 @@ class RingFinder:
             # Resolve reference system name to correct capitalization (case-insensitive)
             resolved_system = self._resolve_spansh_system_name(reference_system.strip())
             if resolved_system:
-                print(f"[SPANSH DEBUG] Resolved '{reference_system}' -> '{resolved_system}'")
                 reference_system = resolved_system
-            else:
-                print(f"[SPANSH DEBUG] Using original system name: '{reference_system}'")
             
             # Convert localized ring type back to English for API
             ring_type_english = self._ring_type_rev_map.get(material_filter, material_filter)
-            print(f"[SPANSH DEBUG] Ring type: '{material_filter}' -> English: '{ring_type_english}'")
-            print(f"[SPANSH DEBUG] Specific material: '{specific_material}'")
             
             # Build filter payload
             filters = {
@@ -2194,8 +2197,8 @@ class RingFinder:
             
             # Ring Type Only mode: search for ring types without requiring hotspots
             if ring_type_only:
-                print(f"[SPANSH DEBUG] Ring Type Only mode - no hotspot filter")
                 # Don't add ring_signals filter - we want ALL rings of the type
+                pass
             else:
                 # Normal mode - only add ring_signals filter if searching for SPECIFIC material
                 if not self._is_all_minerals(specific_material):
@@ -2205,19 +2208,10 @@ class RingFinder:
                         'count': [1, 9999],
                         'name': [specific_material]  # Single material as list
                     }]
-                    print(f"[SPANSH DEBUG] Added material filter: [{specific_material}]")
-                else:
-                    # "All Minerals" - DON'T add ring_signals filter (EDMC approach)
-                    # Spansh will return all rings with the distance/type filters
-                    print(f"[SPANSH DEBUG] No material filter (All Minerals)")
             
             # Add ring type filter (both modes) - only if specific type selected
             if ring_type_english != 'All':
                 filters['rings'] = [{'type': [ring_type_english]}]
-                print(f"[SPANSH DEBUG] Added ring type filter: [{ring_type_english}]")
-            else:
-                # For 'All' - DON'T add rings filter (EDMC approach)
-                print(f"[SPANSH DEBUG] No ring type filter (All ring types)")
             
             # For "All Minerals" searches, use pagination to get more results covering larger distances
             # Spansh returns bodies sorted by distance, but with no mineral filter there are many bodies
@@ -2233,9 +2227,6 @@ class RingFinder:
                 'size': page_size,
                 'page': 0
             }
-            
-            print(f"[SPANSH DEBUG] Pagination: {use_pagination}, Pages: {max_pages}, Size per page: {page_size}")
-            print(f"[SPANSH DEBUG] Filters: {filters}")
             
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -2255,7 +2246,6 @@ class RingFinder:
                 elapsed = time.time() - self._last_spansh_call
                 if elapsed < 1.5 and page_num > 0:
                     sleep_time = 1.5 - elapsed
-                    print(f"[SPANSH] Page {page_num}: throttling {sleep_time:.1f}s...")
                     time.sleep(sleep_time)
                 
                 payload = payload_template.copy()
@@ -2275,8 +2265,6 @@ class RingFinder:
                 total_count = data.get('count', 0)
                 results = data.get('results', [])
                 
-                print(f"[SPANSH] Page {page_num}: {len(results)} bodies (total available: {total_count})")
-                
                 if not results:
                     break
                 
@@ -2284,16 +2272,11 @@ class RingFinder:
                 last_body_distance = results[-1].get('distance', 0) if results else 0
                 all_results.extend(results)
                 
-                print(f"[SPANSH] Page {page_num}: distance range {results[0].get('distance', 0):.1f} - {last_body_distance:.1f} LY")
-                
                 # Stop if we've gone beyond max_distance
                 if last_body_distance >= max_distance:
-                    print(f"[SPANSH] Reached max distance ({max_distance} LY), stopping pagination")
                     break
             
             results = all_results
-            print(f"[SPANSH] Total bodies fetched: {len(results)}")
-            print(f"[SPANSH] Ring Type Only mode active: {ring_type_only}")
             
             # Convert to user_db format
             hotspots = []
@@ -2317,7 +2300,6 @@ class RingFinder:
                     if ring_type_only:
                         # No material filtering - just add the ring
                         materials_found = ["No hotspot data"]
-                        print(f"[SPANSH DEBUG] Ring Type Only - added ring: {ring_name} (type: {ring_type})")
                     else:
                         # Filter by material if searching for specific mineral
                         materials_found = []
@@ -4822,9 +4804,16 @@ class RingFinder:
                     cargo_monitor = main_app.cargo_monitor
                     cargo_monitor._last_refreshed_rings = set()
             
+            # Force database-only for auto-search (don't query Spansh on system jumps)
+            saved_data_source = self.data_source_var.get()
+            self.data_source_var.set("database")
+            
             # Trigger search with current settings - no highlighting (just location change)
             if self.search_btn['state'] == 'normal':
                 self.search_hotspots()  # No highlight_body = no highlighting
+            
+            # Restore user's data source selection
+            self.data_source_var.set(saved_data_source)
                 
         except Exception as e:
             # Silent fail - let user search manually if auto-search fails
@@ -4903,7 +4892,13 @@ class RingFinder:
                 self.status_var.set(f"Auto-search: {current_system}")
                 self.system_var.set(current_system)
                 self.last_monitored_system = current_system
+                
+                # Force database-only for auto-search (don't query Spansh on startup)
+                saved_data_source = self.data_source_var.get()
+                self.data_source_var.set("database")
                 self.search_hotspots()
+                # Restore user's data source selection
+                self.data_source_var.set(saved_data_source)
             else:
                 self.status_var.set("Auto-search: No system detected")
                 
