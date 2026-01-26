@@ -210,6 +210,14 @@ class JournalParser:
         # Dictionary to store ring information from Scan events
         # Key: (SystemAddress, RingName), Value: {'ring_class': str, 'ls_distance': float}
         self.ring_info = {}
+        
+        # Cache for system reserve levels from Spansh (per system entry)
+        # Key: ring_name, Value: reserve_level string
+        self.system_reserve_levels = {}
+        
+        # Flag to track if we're in live monitoring mode (vs historical parsing)
+        # Only fetch from Spansh API during live monitoring
+        self.is_live_monitoring = False
     
     @classmethod
     def normalize_material_name(cls, material_name: str) -> str:
@@ -461,25 +469,94 @@ class JournalParser:
                     }
                     log.debug(f"Stored ring info: {ring_name} -> Class: {clean_ring_class}, LS: {ls_distance}, Mass: {ring_mass}")
                     
+                    # Get reserve level from cache if available
+                    reserve_level = self.system_reserve_levels.get(ring_name)
+                    
+                    # If not in cache, fetch from Spansh API for this specific ring (only during live monitoring)
+                    if not reserve_level and star_system and self.is_live_monitoring:
+                        log.info(f"Reserve level not in cache for {ring_name}, fetching from Spansh...")
+                        spansh_data = self._fetch_system_reserve_levels_from_spansh(star_system)
+                        self.system_reserve_levels.update(spansh_data)
+                        reserve_level = self.system_reserve_levels.get(ring_name)
+                    
                     # Update existing hotspot records that are missing this metadata
                     # This fixes the timing issue where SAASignalsFound may come before Scan
                     if star_system:
                         self._update_hotspots_with_ring_metadata(
                             star_system, ring_name, clean_ring_class, ls_distance,
-                            inner_radius, outer_radius, ring_mass
+                            inner_radius, outer_radius, ring_mass, reserve_level
+                        )
+                    # Update existing hotspot records that are missing this metadata
+                    # This fixes the timing issue where SAASignalsFound may come before Scan
+                    if star_system:
+                        self._update_hotspots_with_ring_metadata(
+                            star_system, ring_name, clean_ring_class, ls_distance,
+                            inner_radius, outer_radius, ring_mass, reserve_level
                         )
                     
         except Exception as e:
             log.error(f"Error processing Scan event: {e}")
     
+    def _fetch_system_reserve_levels_from_spansh(self, system_name: str) -> Dict[str, str]:
+        """Fetch reserve levels for ALL rings in a system from Spansh API
+        
+        Args:
+            system_name: Star system name
+            
+        Returns:
+            Dictionary mapping ring names to reserve levels
+            Example: {"Delkar 7 A Ring": "Pristine", "Delkar 7 B Ring": "Major"}
+        """
+        reserve_levels = {}
+        try:
+            import requests
+            
+            # Use Spansh bodies search API (same as Ring Finder)
+            payload = {
+                "filters": {
+                    "system_name": {"value": [system_name]},
+                    "rings": {"value": [True]}
+                },
+                "sort": [{"distance": {"order": "asc"}}],
+                "size": 50
+            }
+            
+            response = requests.post(
+                'https://spansh.co.uk/api/bodies/search',
+                json=payload,
+                headers={'Content-Type': 'application/json'},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                bodies = data.get('results', [])
+                log.debug(f"Spansh returned {len(bodies)} bodies for {system_name}")
+                
+                for body in bodies:
+                    reserve = body.get('reserve_level', '')
+                    if reserve:  # Only process if reserve level exists
+                        body_rings = body.get('rings', [])
+                        for ring in body_rings:
+                            ring_name = ring.get('name', '')
+                            if ring_name:
+                                reserve_levels[ring_name] = reserve
+                                log.info(f"Reserve level: {ring_name} -> {reserve}")
+        except Exception as e:
+            log.warning(f"Could not fetch reserve levels from Spansh for {system_name}: {e}")
+        return reserve_levels
+    
     def _update_hotspots_with_ring_metadata(self, system_name: str, ring_name: str, 
                                             ring_type: str, ls_distance: float,
                                             inner_radius: float, outer_radius: float,
-                                            ring_mass: float) -> None:
+                                            ring_mass: float, reserve_level: str = None) -> None:
         """Update existing hotspot records that are missing ring metadata
         
         This handles the case where SAASignalsFound event was processed before the
         Scan event, leaving hotspots with NULL ring_type and ls_distance.
+        
+        Args:
+            reserve_level: Optional reserve level (passed from system entry fetch)
         """
         try:
             # Extract body name from ring name (remove system prefix)
@@ -488,9 +565,9 @@ class JournalParser:
             if system_name and ring_name.lower().startswith(system_name.lower()):
                 body_name = ring_name[len(system_name):].strip()
             
-            # Calculate density if we have the data
+            # Calculate density if we have the data (but reserve_level takes priority)
             density = None
-            if ring_mass and inner_radius and outer_radius:
+            if ring_mass and inner_radius and outer_radius and not reserve_level:
                 from user_database import calculate_ring_density
                 density = calculate_ring_density(ring_mass, inner_radius, outer_radius)
             
@@ -503,7 +580,8 @@ class JournalParser:
                 inner_radius=inner_radius,
                 outer_radius=outer_radius,
                 ring_mass=ring_mass,
-                density=density
+                density=density,
+                reserve_level=reserve_level
             )
         except Exception as e:
             log.debug(f"Could not update hotspots with ring metadata: {e}")
@@ -701,6 +779,17 @@ class JournalParser:
                 coordinates=coordinates
             )
             
+            # Fetch reserve levels for all rings in this system from Spansh (only during live monitoring)
+            if self.is_live_monitoring:
+                reserve_levels = self._fetch_system_reserve_levels_from_spansh(system_name)
+                self.system_reserve_levels = reserve_levels
+                
+                # Bulk update existing database entries with reserve levels
+                if reserve_levels and self.user_db:
+                    updated_count = self.user_db.bulk_update_reserve_levels(system_name, reserve_levels)
+                    if updated_count > 0:
+                        log.info(f"[RESERVE] Bulk updated {updated_count} existing entries in {system_name}")
+            
             log.debug(f"Added visited system: {system_name}")
             return system_name
             
@@ -721,9 +810,23 @@ class JournalParser:
         Returns:
             System name of current location
         """
-        # Only return system name - do NOT add as visit
+        # Get system name
+        system_name = event.get('StarSystem', '')
+        
+        # Fetch reserve levels for all rings in this system from Spansh (only during live monitoring)
+        if system_name and self.is_live_monitoring:
+            reserve_levels = self._fetch_system_reserve_levels_from_spansh(system_name)
+            self.system_reserve_levels = reserve_levels
+            
+            # Bulk update existing database entries with reserve levels
+            if reserve_levels and self.user_db:
+                updated_count = self.user_db.bulk_update_reserve_levels(system_name, reserve_levels)
+                if updated_count > 0:
+                    log.info(f"[RESERVE] Bulk updated {updated_count} existing entries in {system_name}")
+        
+        # Return system name - do NOT add as visit
         # Location is just "where am I now", not "I arrived here"
-        return event.get('StarSystem', '')
+        return system_name
     
     def process_fsd_target(self, event: Dict[str, Any]) -> Optional[int]:
         """Process FSDTarget event to track jumps remaining in route

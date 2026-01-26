@@ -151,7 +151,13 @@
     "tooltip_res": "When checked, only shows rings with RES sites\n(Hazardous, High, Low - ignores distance limit)",
     "auto_switch_tooltip": "Automatically switch tabs based on game state:\n- Switch to Mining Session when dropping into a ring\n- Switch to Hotspots Finder when entering supercruise or jumping",
     "no_selection": "No row selected",
-    "select_mineral_first": "Select a specific mineral first (not 'All Minerals')"
+    "select_mineral_first": "Select a specific mineral first (not 'All Minerals')",
+    "column_visibility": "Column Visibility",
+    "reset_to_default": "Reset to Default",
+    "column_visibility": "Column Visibility",
+    "reset_to_default": "Reset to Default",
+    "column_visibility": "Column Visibility",
+    "reset_to_default": "Reset to Default"
   },
   "sidebar": {
     "ship_presets": "Ship Presets (VoiceAttack)",

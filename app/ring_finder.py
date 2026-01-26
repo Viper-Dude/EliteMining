@@ -109,7 +109,10 @@ class ToolTip:
 # Ring finder module - searches for ring compositions in Elite Dangerous systems
 
 
-class RingFinder:
+from column_visibility_helper import ColumnVisibilityMixin
+
+
+class RingFinder(ColumnVisibilityMixin):
     """Mining hotspot finder with EDDB API integration"""
     
     ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter (internal key)
@@ -500,7 +503,7 @@ class RingFinder:
         
         # Max Results filter - in sub-frame with fixed label width to align dropdowns
         ttk.Label(right_filters_frame_row2, text=t('ring_finder.max_results') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
-        self.max_results_var = tk.StringVar(value="30")
+        self.max_results_var = tk.StringVar(value="50")
         max_results_combo = ttk.Combobox(right_filters_frame_row2, textvariable=self.max_results_var, width=8, state="readonly")
         max_results_combo['values'] = ("10", "20", "30", "50", "100", t('common.all'))
         max_results_combo.pack(side="left", padx=(0, 10))
@@ -684,20 +687,24 @@ class RingFinder:
         columns = ("Distance", "LS", "System", "Visits", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Reserve", "Source")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
         
-        # Set column widths - similar to EDTOOLS layout
-        column_widths = {
+        # Track column visibility and default widths
+        self.column_default_widths = {
             "Distance": 60,
             "LS": 80,
             "System": 170,
             "Planet/Ring": 100,
             "Ring Type": 120,
-            "Hotspots": 150,  # Reduced from 200 to 150
+            "Hotspots": 150,
             "Overlap": 80,
             "RES Site": 80,
             "Visits": 60,
             "Reserve": 110,
             "Source": 70
         }
+        self.column_visible = {col: True for col in columns}  # All visible by default
+        
+        # Set column widths - similar to EDTOOLS layout
+        column_widths = self.column_default_widths
         
         # Map internal column names to localized display names
         column_display_names = {
@@ -720,6 +727,9 @@ class RingFinder:
             # Center-align Visits header, left-align all others
             header_anchor = "center" if col == "Visits" else "w"
             self.results_tree.heading(col, text=display_name, anchor=header_anchor, command=lambda c=col: self._sort_column(c, False))
+            
+            # Bind right-click on header to show column menu
+            # Note: This binds to the entire tree, we'll check if click is on header in handler
             
             # Configure columns - all left-aligned for consistency
             if col == "Distance":
@@ -745,6 +755,14 @@ class RingFinder:
             elif col == "Reserve":
                 # Reserve column - visible and showing reserve level
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
+        
+        # Setup column visibility using mixin
+        self.setup_column_visibility(
+            tree=self.results_tree,
+            columns=columns,
+            default_widths=self.column_default_widths,
+            config_key='ring_finder'
+        )
         
         # Load saved column widths from config
         try:
@@ -776,6 +794,9 @@ class RingFinder:
         self.results_tree.bind("<ButtonRelease-1>", save_ring_finder_widths)
         # Deselect when clicking empty space
         self.results_tree.bind("<Button-1>", self._deselect_on_empty_click)
+        
+        # Bind right-click on tree to show column visibility menu
+        # Note: This will be replaced by the context menu binding below - we'll handle both in _show_context_menu
         
         # Configure row tags for alternating colors (theme-aware)
         if current_theme == "elite_orange":
@@ -826,8 +847,12 @@ class RingFinder:
         # Create context menu for results
         self._create_context_menu()
         
-        # Bind right-click to show context menu
-        self.results_tree.bind("<Button-3>", self._show_context_menu)
+        # Register context menu handler with mixin (so it knows about it)
+        self._original_context_menu = self._show_context_menu
+        
+        # Bind right-click to show context menu (mixin will intercept and route appropriately)
+        # Note: Mixin already bound Button-3 in setup_column_visibility
+        # self.results_tree.bind("<Button-3>", self._show_context_menu)
     
     def _sort_column(self, col, reverse):
         """Sort treeview column"""
@@ -835,7 +860,7 @@ class RingFinder:
         data = [(self.results_tree.set(child, col), child) for child in self.results_tree.get_children('')]
         
         # Sort data - handle numeric columns specially
-        if col in ["Distance", "LS", "Reserve"]:
+        if col in ["Distance", "LS"]:
             # Numeric sort - handle N/A values
             def sort_key(item):
                 val = item[0]
@@ -846,6 +871,13 @@ class RingFinder:
                     return float(val.replace(',', ''))
                 except:
                     return float('inf') if not reverse else float('-inf')
+            data.sort(key=sort_key, reverse=reverse)
+        elif col == "Reserve":
+            # Reserve level sort - custom order
+            reserve_order = {"Pristine": 5, "Major": 4, "Common": 3, "Low": 2, "Depleted": 1, "-": 0, "No data": 0, "": 0}
+            def sort_key(item):
+                val = item[0]
+                return reserve_order.get(val, 0)
             data.sort(key=sort_key, reverse=reverse)
         elif col == "Hotspots":
             # Hotspots column - extract number from formats like "Plat (2)" or "LTD (3), Plat (2)"
@@ -1418,14 +1450,11 @@ class RingFinder:
                 except Exception:
                     self.specific_material_var.set(settings["specific_material"])
             if "distance" in settings:
-                self.distance_var.set(settings["distance"])
+                # Always use default 50 LY - ignore saved preference
+                pass
             if "max_results" in settings:
-                # Convert English "All" to localized version
-                saved_max = settings["max_results"]
-                if saved_max == "All":
-                    self.max_results_var.set(t('common.all'))
-                else:
-                    self.max_results_var.set(saved_max)
+                # Always use default 50 - ignore saved preference
+                pass
             if "min_hotspots" in settings:
                 self.min_hotspots_var.set(settings["min_hotspots"])
             if "data_source" in settings:
@@ -2807,7 +2836,7 @@ class RingFinder:
                     'distance': f"{distance:.1f}" if distance > 0 else "0.0",
                     'mass': "No data",  # User database doesn't store ring mass
                     'radius': "No data",  # User database doesn't store ring radius
-                    'density': '',  # Don't show old density data - Reserve level is only available from Spansh
+                    'density': hotspot.get('density', ''),  # Show reserve level from database (Pristine, Major, etc.)
                     'inner_radius': hotspot.get('inner_radius'),  # Include inner radius from database
                     'outer_radius': hotspot.get('outer_radius'),  # Include outer radius from database
                     'has_hotspots': True,
@@ -4287,18 +4316,24 @@ class RingFinder:
             visit_count = visit_data.get('visit_count', 0) if visit_data else 0
             visited_status = str(visit_count)
             
-            # Format density for display - use existing density column as fallback
+            # Format density for display - only show text reserve levels, not old numeric density
             density_formatted = "No data"
             
             # Try to use existing density value from database first
             density_value = hotspot.get("density")
             if density_value is not None and density_value != "No data":
                 try:
-                    # Format the existing density value
+                    # Check if it's numeric (old density data) - don't show it
                     if isinstance(density_value, (int, float)):
-                        density_formatted = f"{float(density_value):.6f}"
+                        density_formatted = "No data"  # Hide old numeric density
                     else:
-                        density_formatted = str(density_value)
+                        # Try to parse as float - if it parses, it's old numeric data
+                        try:
+                            float(density_value)
+                            density_formatted = "No data"  # Hide old numeric density
+                        except (ValueError, TypeError):
+                            # It's text (reserve level like "Pristine") - show it
+                            density_formatted = str(density_value)
                 except:
                     density_formatted = "No data"
             
@@ -4499,7 +4534,7 @@ class RingFinder:
     def _show_context_menu(self, event):
         """Show the context menu when right-clicking on results"""
         try:
-            # Select the item under cursor
+            # Click on row - show context menu
             item = self.results_tree.identify_row(event.y)
             if item:
                 self.results_tree.selection_set(item)
@@ -4518,7 +4553,8 @@ class RingFinder:
                 
                 self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
-            self.context_menu.grab_release()
+            if hasattr(self, 'context_menu'):
+                self.context_menu.grab_release()
     
     def _copy_system_name(self):
         """Copy the selected system name to clipboard"""
@@ -4582,6 +4618,19 @@ class RingFinder:
         values = self.results_tree.item(item, 'values')
         if not values or len(values) < 3:
             return
+        
+        # Get system name from the selected row
+    
+    def _find_sell_station_impl(self):
+        """Implementation of find sell station - gets system name and calls Commodity Market"""
+        selection = self.results_tree.selection()
+        if not selection:
+            return None
+        
+        item = selection[0]
+        values = self.results_tree.item(item, 'values')
+        if not values or len(values) < 3:
+            return None
         
         # Get system name from the selected row
         system_name = values[2]  # System is column index 2

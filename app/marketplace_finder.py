@@ -16,7 +16,10 @@ import os
 
 log = logging.getLogger("EliteMining.MarketplaceFinder")
 
-class MarketplaceFinder:
+from column_visibility_helper import ColumnVisibilityMixin
+
+
+class MarketplaceFinder(ColumnVisibilityMixin):
     """
     Finds commodity selling stations with price comparison
     Uses EDSM API for live market data

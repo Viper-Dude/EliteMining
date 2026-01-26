@@ -151,7 +151,9 @@
     "tooltip_res": "Wenn aktiviert, werden nur Ringe mit RES-Gebieten angezeigt\n(Hazardous, High, Low - ignoriert Entfernungslimit)",
     "auto_switch_tooltip": "Automatisch Tabs wechseln basierend auf Spielstatus:\n- Zu Bergbau-Sitzung wechseln beim Eintritt in einen Ring\n- Zu Hotspot-Finder wechseln bei Supercruise oder Sprung",
     "no_selection": "Keine Zeile ausgewählt",
-    "select_mineral_first": "Wähle zuerst ein spezifisches Mineral (nicht 'Alle Mineralien')"
+    "select_mineral_first": "Wähle zuerst ein spezifisches Mineral (nicht 'Alle Mineralien')",
+    "column_visibility": "Spaltensichtbarkeit",
+    "reset_to_default": "Auf Standard zurücksetzen"
   },
   "sidebar": {
     "ship_presets": "Schiff-Presets (VoiceAttack)",

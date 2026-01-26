@@ -1173,6 +1173,94 @@ class UserDatabase:
         
         return body_name
     
+    def bulk_update_reserve_levels(self, system_name: str, reserve_levels: Dict[str, str]) -> int:
+        """Bulk update reserve levels for all rings in a system
+        
+        Updates database entries with reserve levels from Spansh, but only if:
+        - Existing value is NULL/missing
+        - Existing value is numeric (old density data)
+        - Existing value differs from new reserve level (mismatch)
+        
+        Args:
+            system_name: Name of the star system
+            reserve_levels: Dict mapping ring_name -> reserve_level (e.g., "1 B Ring" -> "Pristine")
+            
+        Returns:
+            Number of entries updated
+        """
+        if not reserve_levels:
+            return 0
+        
+        updated_count = 0
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Get all hotspots for this system
+                cursor.execute('''
+                    SELECT DISTINCT body_name, density FROM hotspot_data
+                    WHERE system_name = ?
+                ''', (system_name,))
+                
+                all_entries = cursor.fetchall()
+                
+                if not all_entries:
+                    return 0
+                
+                log.info(f"[BULK RESERVE] Found {len(all_entries)} unique rings in {system_name}")
+                
+                for body_name, existing_density in all_entries:
+                    # Try to match this body_name with a reserve level
+                    # Body name in DB is "2 A Ring", reserve_levels keys are "Tiraon 2 A Ring"
+                    # So check if body_name is IN ring_name (not the other way around)
+                    matched_reserve = None
+                    
+                    for ring_name, reserve_level in reserve_levels.items():
+                        # Check if body_name is in ring_name (e.g., "2 A Ring" in "Tiraon 2 A Ring")
+                        if body_name.lower() in ring_name.lower():
+                            matched_reserve = reserve_level
+                            break
+                    
+                    if not matched_reserve:
+                        continue
+                    
+                    should_update = False
+                    
+                    if not existing_density:
+                        # No existing value - update
+                        should_update = True
+                        log.info(f"[BULK RESERVE] {system_name} - {body_name}: NULL -> {matched_reserve}")
+                    else:
+                        # Check if existing is numeric (old density)
+                        try:
+                            float(existing_density)
+                            should_update = True
+                            log.info(f"[BULK RESERVE] {system_name} - {body_name}: {existing_density} (numeric) -> {matched_reserve}")
+                        except (ValueError, TypeError):
+                            # It's text - check for mismatch
+                            if existing_density != matched_reserve:
+                                should_update = True
+                                log.info(f"[BULK RESERVE] {system_name} - {body_name}: {existing_density} -> {matched_reserve} (mismatch)")
+                    
+                    if should_update:
+                        cursor.execute('''
+                            UPDATE hotspot_data
+                            SET density = ?
+                            WHERE system_name = ? AND body_name = ?
+                        ''', (matched_reserve, system_name, body_name))
+                        updated_count += cursor.rowcount
+                
+                conn.commit()
+                
+                if updated_count > 0:
+                    log.info(f"[BULK RESERVE] Updated {updated_count} entries in {system_name}")
+                
+        except Exception as e:
+            log.error(f"[BULK RESERVE] Error updating reserve levels for {system_name}: {e}")
+        
+        return updated_count
+    
     def add_hotspot_data(self, system_name: str, body_name: str, material_name: str, 
                         hotspot_count: int, scan_date: str, system_address: Optional[int] = None,
                         body_id: Optional[int] = None, coordinates: Optional[Tuple[float, float, float]] = None,
@@ -1368,7 +1456,7 @@ class UserDatabase:
     def update_ring_metadata(self, system_name: str, body_name: str, ring_type: str = None,
                             ls_distance: float = None, inner_radius: float = None,
                             outer_radius: float = None, ring_mass: float = None,
-                            density: float = None) -> int:
+                            density: float = None, reserve_level: str = None) -> int:
         """Update ring metadata for hotspots that are missing it
         
         This is called when a Scan event provides ring data after SAASignalsFound
@@ -1382,7 +1470,8 @@ class UserDatabase:
             inner_radius: Inner radius in meters
             outer_radius: Outer radius in meters
             ring_mass: Ring mass in megatons
-            density: Calculated ring density
+            density: Calculated ring density (or reserve_level text from Spansh)
+            reserve_level: Reserve level text from Spansh (Pristine, Major, Common, Low, Depleted)
             
         Returns:
             Number of records updated
@@ -1391,20 +1480,100 @@ class UserDatabase:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 
-                # Only update records that are missing the metadata
+                # Check if existing density is old numeric data or reserve level text
+                # Old data: numeric like "10.00094414", Reserve data: text like "Pristine"
                 cursor.execute('''
-                    UPDATE hotspot_data
-                    SET ring_type = COALESCE(ring_type, ?),
-                        ls_distance = COALESCE(ls_distance, ?),
-                        inner_radius = COALESCE(inner_radius, ?),
-                        outer_radius = COALESCE(outer_radius, ?),
-                        ring_mass = COALESCE(ring_mass, ?),
-                        density = COALESCE(density, ?)
-                    WHERE system_name = ? 
-                      AND body_name = ?
-                      AND (ring_type IS NULL OR ls_distance IS NULL)
-                ''', (ring_type, ls_distance, inner_radius, outer_radius, ring_mass, density,
-                      system_name, body_name))
+                    SELECT density FROM hotspot_data
+                    WHERE system_name = ? AND body_name = ?
+                    LIMIT 1
+                ''', (system_name, body_name))
+                
+                existing_density = cursor.fetchone()
+                has_reserve_already = False
+                existing_reserve = None
+                
+                log.info(f"[RESERVE] Checking {system_name} - {body_name}")
+                log.info(f"[RESERVE] Existing density in DB: {existing_density[0] if existing_density and existing_density[0] else 'NULL'}")
+                log.info(f"[RESERVE] New reserve_level from Spansh: {reserve_level if reserve_level else 'None'}")
+                
+                if existing_density and existing_density[0]:
+                    # Check if existing value is reserve level (text) vs old density (number)
+                    try:
+                        float(existing_density[0])
+                        # It's a number - old density data, can be overwritten
+                        has_reserve_already = False
+                        log.info(f"[RESERVE] Existing value is NUMERIC (old density) - can overwrite")
+                    except (ValueError, TypeError):
+                        # It's text - already has reserve level
+                        has_reserve_already = True
+                        existing_reserve = existing_density[0]
+                        log.info(f"[RESERVE] Existing value is TEXT (reserve level) - checking for mismatch")
+                
+                # Update strategy:
+                # 1. If new reserve_level exists and (no old reserve OR mismatch) - update
+                # 2. If new reserve_level matches existing reserve - skip
+                # 3. If no reserve_level - only update if density is NULL
+                if reserve_level:
+                    if not has_reserve_already:
+                        # No existing reserve (NULL or numeric) - update
+                        log.info(f"[RESERVE] UPDATING density to: {reserve_level}")
+                        cursor.execute('''
+                            UPDATE hotspot_data
+                            SET ring_type = COALESCE(ring_type, ?),
+                                ls_distance = COALESCE(ls_distance, ?),
+                                inner_radius = COALESCE(inner_radius, ?),
+                                outer_radius = COALESCE(outer_radius, ?),
+                                ring_mass = COALESCE(ring_mass, ?),
+                                density = ?
+                            WHERE system_name = ? 
+                              AND body_name = ?
+                        ''', (ring_type, ls_distance, inner_radius, outer_radius, ring_mass, reserve_level,
+                              system_name, body_name))
+                    elif existing_reserve != reserve_level:
+                        # Has reserve but it's different - update with new data
+                        log.info(f"[RESERVE] MISMATCH - Updating from '{existing_reserve}' to '{reserve_level}'")
+                        cursor.execute('''
+                            UPDATE hotspot_data
+                            SET ring_type = COALESCE(ring_type, ?),
+                                ls_distance = COALESCE(ls_distance, ?),
+                                inner_radius = COALESCE(inner_radius, ?),
+                                outer_radius = COALESCE(outer_radius, ?),
+                                ring_mass = COALESCE(ring_mass, ?),
+                                density = ?
+                            WHERE system_name = ? 
+                              AND body_name = ?
+                        ''', (ring_type, ls_distance, inner_radius, outer_radius, ring_mass, reserve_level,
+                              system_name, body_name))
+                    else:
+                        # Has reserve and it matches - skip
+                        log.info(f"[RESERVE] SKIPPING update - reserve level matches ('{existing_reserve}')")
+                        cursor.execute('''
+                            UPDATE hotspot_data
+                            SET ring_type = COALESCE(ring_type, ?),
+                                ls_distance = COALESCE(ls_distance, ?),
+                                inner_radius = COALESCE(inner_radius, ?),
+                                outer_radius = COALESCE(outer_radius, ?),
+                                ring_mass = COALESCE(ring_mass, ?)
+                            WHERE system_name = ? 
+                              AND body_name = ?
+                        ''', (ring_type, ls_distance, inner_radius, outer_radius, ring_mass,
+                              system_name, body_name))
+                else:
+                    # No reserve level from Spansh - only update if density is NULL
+                    log.info(f"[RESERVE] No reserve from Spansh - using calculated density: {density}")
+                    cursor.execute('''
+                        UPDATE hotspot_data
+                        SET ring_type = COALESCE(ring_type, ?),
+                            ls_distance = COALESCE(ls_distance, ?),
+                            inner_radius = COALESCE(inner_radius, ?),
+                            outer_radius = COALESCE(outer_radius, ?),
+                            ring_mass = COALESCE(ring_mass, ?),
+                            density = COALESCE(density, ?)
+                        WHERE system_name = ? 
+                          AND body_name = ?
+                          AND (ring_type IS NULL OR ls_distance IS NULL OR density IS NULL)
+                    ''', (ring_type, ls_distance, inner_radius, outer_radius, ring_mass, density,
+                          system_name, body_name))
                 
                 updated = cursor.rowcount
                 conn.commit()

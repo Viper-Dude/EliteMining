@@ -8,7 +8,7 @@
 - New toggle "Enable Prospector Sound Effect" in VoiceAttack Controls tab (Mining Controls)
 
 ### Voiceattack Profile
-- Updated to v4.7.9 - Added commands for toggle sound effect when prospector sequence is ready for firing next prospector (included in the installer and zip file)
+- Updated to v4.7.9 - Added commands for "toggle sound effect" when prospector sequence is ready for firing next prospector (included in the installer and zip file)
 
 ## Notes!
 - If installer fails with errors, right-click the installer and select "Run as administrator"

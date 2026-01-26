@@ -401,7 +401,10 @@ CORE_ONLY = [
 ]
 
 # -------------------- Mining Analytics Panel --------------------
-class ProspectorPanel(ttk.Frame):
+from column_visibility_helper import ColumnVisibilityMixin
+
+
+class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
     def _ensure_comment_and_eng_cells(self, tree, session_lookup):
         """Ensure the comment emoji and engineering materials are placed in the correct named columns.
@@ -1850,6 +1853,14 @@ class ProspectorPanel(ttk.Frame):
         self.tree.column("content", width=180, minwidth=100, anchor="w", stretch=False)
         self.tree.column("time", width=80, minwidth=60, anchor="w", stretch=True)
         
+        # Setup column visibility for prospector reports
+        self.setup_column_visibility(
+            tree=self.tree,
+            columns=("materials", "content", "time"),
+            default_widths={"materials": 400, "content": 180, "time": 80},
+            config_key='prospector_report'
+        )
+        
         # Load saved column widths from config
         try:
             from config import load_prospector_report_column_widths
@@ -2007,6 +2018,14 @@ class ProspectorPanel(ttk.Frame):
         self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="w", stretch=False)
         self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="w", stretch=False)
         self.stats_tree.column("count", width=65, minwidth=50, anchor="w", stretch=True)
+        
+        # Setup column visibility for material analysis
+        self.setup_column_visibility(
+            tree=self.stats_tree,
+            columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"),
+            default_widths={"material": 135, "tons": 65, "tph": 65, "tons_per": 85, "avg_all": 95, "avg_pct": 130, "best_pct": 80, "latest_pct": 80, "count": 65},
+            config_key='mineral_analysis'
+        )
         
         # Load saved column widths from config
         try:
@@ -7304,6 +7323,14 @@ class ProspectorPanel(ttk.Frame):
         self.reports_tree_tab.column("comment", width=80, stretch=False, anchor="center")  # Wider to show header text
         self.reports_tree_tab.column("enhanced", width=100, stretch=False, anchor="center")
 
+        # Setup column visibility for reports tab
+        self.setup_column_visibility(
+            tree=self.reports_tree_tab,
+            columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"),
+            default_widths={"date": 105, "duration": 80, "session_type": 90, "ship": 250, "system": 230, "body": 125, "tons": 80, "tph": 60, "tons_per": 85, "materials": 80, "total_hits": 80, "asteroids": 80, "hit_rate": 90, "quality": 120, "cargo": 350, "prospects": 70, "eng_materials": 250, "comment": 80, "enhanced": 100},
+            config_key='reports_tab'
+        )
+
         # Load saved column widths from config
         try:
             from config import load_mining_analysis_column_widths
@@ -8025,8 +8052,12 @@ class ProspectorPanel(ttk.Frame):
             except Exception as e:
                 self._set_status(f"Error during deletion: {e}")
         
-        # Add right-click binding for context menu
-        self.reports_tree_tab.bind("<Button-3>", show_context_menu)
+        # Register context menu handler for this specific tree
+        if not hasattr(self, '_context_handlers'):
+            self._context_handlers = {}
+        self._context_handlers['reports_tab'] = show_context_menu
+        
+        # Note: Right-click binding handled by column visibility mixin
         
         # Add tooltip functionality for reports tab column headers and cells
         # This must be done AFTER all other bindings to avoid conflicts
@@ -11882,6 +11913,14 @@ class ProspectorPanel(ttk.Frame):
         self.bookmarks_tree.column("rating", width=70, stretch=False, anchor="center")
         self.bookmarks_tree.column("notes", width=50, stretch=False, anchor="center")  # Narrower for emoji
 
+        # Setup column visibility for bookmarks
+        self.setup_column_visibility(
+            tree=self.bookmarks_tree,
+            columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"),
+            default_widths={"last_mined": 100, "system": 180, "body": 120, "hotspot": 100, "materials": 200, "avg_yield": 80, "overlap": 80, "res_site": 80, "rating": 70, "notes": 50},
+            config_key='bookmarks'
+        )
+
         # Load saved column widths from config
         try:
             from config import load_bookmarks_column_widths
@@ -12667,8 +12706,12 @@ class ProspectorPanel(ttk.Frame):
         self.bookmark_context_menu.add_command(label=t('context_menu.edit_bookmark'), command=self._edit_bookmark_dialog)
         self.bookmark_context_menu.add_command(label=t('context_menu.delete_selected'), command=self._delete_bookmark)
         
-        # Bind right-click event
-        self.bookmarks_tree.bind("<Button-3>", self._show_bookmark_context_menu)
+        # Register context menu handler for bookmarks tree
+        if not hasattr(self, '_context_handlers'):
+            self._context_handlers = {}
+        self._context_handlers['bookmarks'] = self._show_bookmark_context_menu
+        
+        # Note: Right-click binding handled by column visibility mixin
 
     def _show_bookmark_context_menu(self, event) -> None:
         """Show context menu on right-click"""

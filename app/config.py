@@ -200,6 +200,28 @@ def save_ring_finder_column_widths(widths: Dict[str, int]) -> None:
     cfg["ring_finder_column_widths"] = widths
     _save_cfg(cfg)
 
+def load_ring_finder_column_visibility() -> Dict[str, bool]:
+    """Load Ring Finder table column visibility from config"""
+    cfg = _load_cfg()
+    return cfg.get("ring_finder_column_visibility", {})
+
+def save_ring_finder_column_visibility(visibility: Dict[str, bool]) -> None:
+    """Save Ring Finder table column visibility to config"""
+    cfg = _load_cfg()
+    cfg["ring_finder_column_visibility"] = visibility
+    _save_cfg(cfg)
+
+def load_column_visibility(table_key: str) -> Dict[str, bool]:
+    """Load column visibility for any table"""
+    cfg = _load_cfg()
+    return cfg.get(f"{table_key}_column_visibility", {})
+
+def save_column_visibility(table_key: str, visibility: Dict[str, bool]) -> None:
+    """Save column visibility for any table"""
+    cfg = _load_cfg()
+    cfg[f"{table_key}_column_visibility"] = visibility
+    _save_cfg(cfg)
+
 def load_commodity_market_column_widths() -> Dict[str, int]:
     """Load Commodity Market table column widths from config"""
     cfg = _load_cfg()

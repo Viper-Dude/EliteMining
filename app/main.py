@@ -439,7 +439,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.80"
+APP_VERSION = "v4.81"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1756,6 +1756,9 @@ class CargoMonitor:
         
         self.update_display()
         
+        # Enable live monitoring for Spansh API calls
+        self.journal_parser.is_live_monitoring = True
+        
         # Start periodic journal checking
         self.check_journal_updates()
     
@@ -2324,9 +2327,10 @@ cargo panel forces Elite to write detailed inventory data.
             # Sort items by quantity (highest first)
             sorted_items = sorted(self.cargo_items.items(), key=lambda x: x[1], reverse=True)
             
-            # Configure clickable limpet tag (color + hand cursor)
+            # Configure clickable limpet tag (theme-aware color + hand cursor)
+            limpet_color = "#ff8c00" if self.current_theme == "elite_orange" else "#e0e0e0"
             self.cargo_text.tag_configure("limpet_clickable", 
-                                         foreground="#ff8c00")
+                                         foreground=limpet_color)
             self.cargo_text.tag_bind("limpet_clickable", "<Button-1>", 
                                     lambda e: self.adjust_limpet_count())
             self.cargo_text.tag_bind("limpet_clickable", "<Enter>", 
@@ -4401,7 +4405,10 @@ from prospector_panel import ProspectorPanel
 
 # -------------------- Main GUI --------------------
 
-class App(tk.Tk):
+from column_visibility_helper import ColumnVisibilityMixin
+
+
+class App(tk.Tk, ColumnVisibilityMixin):
     def _set_dark_title_bar(self):
         """Placeholder - title bar uses default Windows styling (light/white)"""
         # Dark title bar was too black - keeping default Windows title bar
@@ -4916,6 +4923,38 @@ class App(tk.Tk):
             if hasattr(self.ring_finder, 'auto_search_var') and self.ring_finder.auto_search_var.get():
                 print("[STARTUP] Triggering ring finder auto-search...")
                 self.ring_finder._startup_auto_search(force=True)
+        
+        # Fetch reserve levels for current system (after ring finder search completes)
+        if hasattr(self, 'cargo_monitor') and self.cargo_monitor and self.cargo_monitor.current_system:
+            current_sys = self.cargo_monitor.current_system
+            print(f"[STARTUP] Fetching reserve levels for current system: {current_sys}")
+            
+            # Update status bar
+            if hasattr(self, 'ring_finder') and self.ring_finder:
+                self.ring_finder.status_var.set(f"Fetching reserve levels for {current_sys}...")
+            
+            try:
+                reserve_levels = self.cargo_monitor.journal_parser._fetch_system_reserve_levels_from_spansh(current_sys)
+                self.cargo_monitor.journal_parser.system_reserve_levels = reserve_levels
+                if reserve_levels:
+                    print(f"[STARTUP] Fetched {len(reserve_levels)} reserve levels")
+                    
+                    # Bulk update existing database entries with reserve levels
+                    if hasattr(self.cargo_monitor, 'user_db'):
+                        updated_count = self.cargo_monitor.user_db.bulk_update_reserve_levels(current_sys, reserve_levels)
+                        if updated_count > 0:
+                            print(f"[STARTUP] Updated {updated_count} database entries with reserve levels")
+                    
+                    if hasattr(self, 'ring_finder') and self.ring_finder:
+                        self.ring_finder.status_var.set(f"Fetched {len(reserve_levels)} reserve levels for {current_sys}")
+                else:
+                    print(f"[STARTUP] No reserve levels found for {current_sys}")
+                    if hasattr(self, 'ring_finder') and self.ring_finder:
+                        self.ring_finder.status_var.set(f"No reserve levels found for {current_sys}")
+            except Exception as e:
+                print(f"[STARTUP] Error fetching reserve levels: {e}")
+                if hasattr(self, 'ring_finder') and self.ring_finder:
+                    self.ring_finder.status_var.set(f"Error fetching reserve levels")
 
     def _setup_keyboard_shortcuts(self):
         """Setup keyboard shortcuts for the application"""
@@ -5275,9 +5314,9 @@ class App(tk.Tk):
             # Vertical list with better alignment - show ALL items
             sorted_items = sorted(cargo.cargo_items.items(), key=lambda x: x[1], reverse=True)
             
-            # Configure clickable limpet tag (color + hand cursor)
+            # Configure clickable limpet tag (theme-aware color + hand cursor)
             self.integrated_cargo_text.tag_configure("limpet_clickable", 
-                                                     foreground=self.theme_colors.get("accent", "#ff8c00"))
+                                                     foreground=self.theme_colors.get("fg", "#e0e0e0"))
             self.integrated_cargo_text.tag_bind("limpet_clickable", "<Button-1>", 
                                                 lambda e: self.cargo_monitor.adjust_limpet_count())
             self.integrated_cargo_text.tag_bind("limpet_clickable", "<Enter>", 
@@ -14441,6 +14480,14 @@ class App(tk.Tk):
         self.sysfinder_tree.column("population", width=100, minwidth=70, anchor="center")
         self.sysfinder_tree.column("economy", width=120, minwidth=80, anchor="center")
         
+        # Setup column visibility for system finder
+        self.setup_column_visibility(
+            tree=self.sysfinder_tree,
+            columns=columns,
+            default_widths={"system": 150, "distance": 70, "security": 80, "allegiance": 90, "state": 90, "population": 100, "economy": 120},
+            config_key='system_finder'
+        )
+        
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.sysfinder_tree.yview)
         self.sysfinder_tree.configure(yscrollcommand=v_scrollbar.set)
@@ -14462,8 +14509,11 @@ class App(tk.Tk):
         table_frame.grid_columnconfigure(0, weight=1)
         table_frame.grid_rowconfigure(0, weight=1)
         
-        # Bind right-click for context menu
-        self.sysfinder_tree.bind("<Button-3>", self._show_sysfinder_context_menu)
+        # Register context menu handler for system finder
+        if not hasattr(self, '_context_handlers'):
+            self._context_handlers = {}
+        self._context_handlers['system_finder'] = self._show_sysfinder_context_menu
+        # Note: Right-click binding handled by column visibility mixin
         
         # Store sort direction
         self._sysfinder_sort_reverse = {}
@@ -14936,6 +14986,14 @@ class App(tk.Tk):
         self.marketplace_tree.column("price", width=125, minwidth=80, anchor="w", stretch=False)
         self.marketplace_tree.column("updated", width=95, minwidth=70, anchor="w", stretch=True)
         
+        # Setup column visibility for mining commodities
+        self.setup_column_visibility(
+            tree=self.marketplace_tree,
+            columns=columns,
+            default_widths={"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70, "demand": 75, "price": 125, "updated": 95},
+            config_key='mining_commodities'
+        )
+        
         # Load saved column widths from config
         try:
             from config import load_commodity_market_column_widths
@@ -14990,7 +15048,11 @@ class App(tk.Tk):
         
         # Add right-click context menu
         self._create_marketplace_context_menu()
-        self.marketplace_tree.bind("<Button-3>", self._show_marketplace_context_menu)
+        # Register context menu handler for mining commodities
+        if not hasattr(self, '_context_handlers'):
+            self._context_handlers = {}
+        self._context_handlers['mining_commodities'] = self._show_marketplace_context_menu
+        # Note: Right-click binding handled by column visibility mixin
     
     def _get_column_title(self, col):
         """Get display title for column - dynamically changes based on buy/sell mode"""
@@ -16007,6 +16069,14 @@ class App(tk.Tk):
         self.trade_tree.column("price", width=125, minwidth=80, anchor="w", stretch=False)
         self.trade_tree.column("updated", width=95, minwidth=70, anchor="w", stretch=True)
         
+        # Setup column visibility for trade commodities
+        self.setup_column_visibility(
+            tree=self.trade_tree,
+            columns=columns,
+            default_widths={"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70, "demand": 75, "price": 125, "updated": 95},
+            config_key='trade_commodities'
+        )
+        
         # Load saved column widths from config
         try:
             from config import load_trade_commodities_column_widths
@@ -16059,7 +16129,11 @@ class App(tk.Tk):
         
         # Add right-click context menu
         self._create_trade_context_menu()
-        self.trade_tree.bind("<Button-3>", self._show_trade_context_menu)
+        # Register context menu handler for trade commodities
+        if not hasattr(self, '_context_handlers'):
+            self._context_handlers = {}
+        self._context_handlers['trade_commodities'] = self._show_trade_context_menu
+        # Note: Right-click binding handled by column visibility mixin
     
     def _sort_trade_column(self, col: str, is_numeric: bool):
         """Sort trade results table by column"""
@@ -18397,6 +18471,9 @@ Your keybinds will need to be reconfigured manually."""
                 # This is startup/refresh - NOT a visit
                 self.update_current_system(last_system, count_visit=False)
                 
+                # Note: Reserve levels will be fetched automatically when journal monitoring
+                # processes the Location event or when user scans a ring
+                
         except Exception:
             pass
     
@@ -18530,31 +18607,33 @@ Your keybinds will need to be reconfigured manually."""
 
 
 if __name__ == "__main__":
-    # Single instance check - prevent multiple instances from running
-    import win32event
-    import win32api
-    import winerror
+    # Single instance check - TEMPORARILY DISABLED FOR TESTING
+    # import win32event
+    # import win32api
+    # import winerror
     
-    mutex_name = "Global\\EliteMining_SingleInstance_Mutex"
-    mutex = None
+    # mutex_name = "Global\\EliteMining_SingleInstance_Mutex"
+    # mutex = None
     
-    try:
-        mutex = win32event.CreateMutex(None, False, mutex_name)
-        last_error = win32api.GetLastError()
-        
-        if last_error == winerror.ERROR_ALREADY_EXISTS:
-            # Another instance is already running
-            import tkinter.messagebox as messagebox
-            messagebox.showerror(
-                "EliteMining Already Running",
-                "EliteMining is already running.\n\n"
-                "Only one instance can run at a time to prevent duplicate announcements and conflicts.\n\n"
-                "Please close the other instance first."
-            )
-            sys.exit(0)
-    except Exception as e:
-        print(f"Warning: Could not create mutex for single instance check: {e}")
-        # Continue anyway - better to run than to fail completely
+    # try:
+    #     mutex = win32event.CreateMutex(None, False, mutex_name)
+    #     last_error = win32api.GetLastError()
+    #     
+    #     if last_error == winerror.ERROR_ALREADY_EXISTS:
+    #         # Another instance is already running
+    #         import tkinter.messagebox as messagebox
+    #         messagebox.showerror(
+    #             "EliteMining Already Running",
+    #             "EliteMining is already running.\n\n"
+    #             "Only one instance can run at a time to prevent duplicate announcements and conflicts.\n\n"
+    #             "Please close the other instance first."
+    #         )
+    #         sys.exit(0)
+    # except Exception as e:
+    #     print(f"Warning: Could not create mutex for single instance check: {e}")
+    #     # Continue anyway - better to run than to fail completely
+    
+    print("[DEBUG] Single instance check DISABLED for testing - multiple instances allowed")
     
     # Clean up any restart flag from previous run
     try:
