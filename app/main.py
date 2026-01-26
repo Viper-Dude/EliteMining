@@ -18515,6 +18515,45 @@ Your keybinds will need to be reconfigured manually."""
             pass
         return False
     
+    def _fetch_reserve_levels_for_system(self, system_name: str) -> None:
+        """Fetch reserve levels from Spansh API and update database for a system
+        
+        Called when entering a new system to ensure reserve level data is available.
+        Runs in background thread to avoid blocking UI.
+        """
+        import threading
+        
+        def fetch_worker():
+            try:
+                if not hasattr(self, 'cargo_monitor') or not self.cargo_monitor:
+                    return
+                    
+                jp = self.cargo_monitor.journal_parser
+                if not jp:
+                    return
+                
+                print(f"[RESERVE] Fetching reserve levels for {system_name}...")
+                reserve_levels = jp._fetch_system_reserve_levels_from_spansh(system_name)
+                jp.system_reserve_levels = reserve_levels
+                
+                if reserve_levels:
+                    print(f"[RESERVE] Fetched {len(reserve_levels)} reserve levels for {system_name}")
+                    
+                    # Bulk update existing database entries with reserve levels
+                    if hasattr(self.cargo_monitor, 'user_db') and self.cargo_monitor.user_db:
+                        updated_count = self.cargo_monitor.user_db.bulk_update_reserve_levels(system_name, reserve_levels)
+                        if updated_count > 0:
+                            print(f"[RESERVE] Updated {updated_count} database entries with reserve levels")
+                else:
+                    print(f"[RESERVE] No reserve levels found for {system_name}")
+                    
+            except Exception as e:
+                print(f"[RESERVE] Error fetching reserve levels: {e}")
+        
+        # Run in background thread to avoid blocking UI
+        thread = threading.Thread(target=fetch_worker, daemon=True)
+        thread.start()
+    
     def update_current_system(self, system_name: str, coords: Optional[tuple] = None, count_visit: bool = True, event_timestamp: Optional[str] = None) -> None:
         """Centralized method to update current system - notifies all interested components
         
@@ -18562,6 +18601,11 @@ Your keybinds will need to be reconfigured manually."""
         # IMPORTANT: Only run safety net when count_visit=True (means commander actually arrived)
         if is_different_system and count_visit:
             self.after(50, self._ensure_current_system_visited)
+        
+        # Fetch reserve levels from Spansh when entering a different system
+        # This updates the database with reserve data for any existing hotspot entries
+        if is_different_system and hasattr(self, 'cargo_monitor') and self.cargo_monitor:
+            self.after(100, lambda: self._fetch_reserve_levels_for_system(system_name))
         
         # Notify all components that use current system
         # 1. Update ring finder reference system

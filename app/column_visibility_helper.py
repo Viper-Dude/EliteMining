@@ -208,5 +208,22 @@ class ColumnVisibilityMixin:
                         visible[col] = vis
                         if not vis:
                             tree.column(col, width=0, minwidth=0, stretch=False)
+                
+                # Schedule a delayed re-application to handle cases where
+                # column widths are loaded after visibility setup
+                tree.after(100, lambda: self._cv_reapply_visibility(config_key))
         except Exception as e:
             print(f"[DEBUG] Could not load column visibility for {config_key}: {e}")
+    
+    def _cv_reapply_visibility(self, config_key):
+        """Re-apply visibility settings after initialization is complete"""
+        tree_data = self._cv_trees.get(config_key)
+        if not tree_data:
+            return
+        
+        tree = tree_data['tree']
+        visible = tree_data['visible']
+        
+        for col, vis in visible.items():
+            if not vis:
+                tree.column(col, width=0, minwidth=0, stretch=False)
