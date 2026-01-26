@@ -455,7 +455,7 @@ class RingFinder(ColumnVisibilityMixin):
         ttk.Label(right_filters_frame_row1, text=t('ring_finder.max_distance') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
         self.distance_var = tk.StringVar(value="50")
         self.distance_combo = ttk.Combobox(right_filters_frame_row1, textvariable=self.distance_var, width=8, state="readonly")
-        self.distance_combo['values'] = ("10", "50", "100", "150", "200", "300")
+        self.distance_combo['values'] = ("10", "50", "100", "150", "200")
         self.distance_combo.pack(side="left")
         
         # Overlaps Only checkbox - filters to show only overlap entries

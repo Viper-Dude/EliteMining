@@ -734,6 +734,20 @@ class JournalParser:
                     
                     log.debug(f"Added hotspot: {system_name} - {normalized_body_name} - {material_name} ({count})")
             
+            # Update reserve level from cache if available
+            if self.system_reserve_levels:
+                # Create dict with just this ring's reserve level
+                ring_reserve = {}
+                if normalized_body_name in self.system_reserve_levels:
+                    ring_reserve[normalized_body_name] = self.system_reserve_levels[normalized_body_name]
+                    log.debug(f"Updating reserve level for {normalized_body_name}: {ring_reserve[normalized_body_name]}")
+                elif body_name in self.system_reserve_levels:
+                    ring_reserve[normalized_body_name] = self.system_reserve_levels[body_name]
+                    log.debug(f"Updating reserve level for {normalized_body_name} (from {body_name}): {ring_reserve[normalized_body_name]}")
+                
+                if ring_reserve:
+                    self.user_db.bulk_update_reserve_levels(system_name, ring_reserve)
+            
             # Trigger callback ONCE after all hotspots are processed (not inside loop)
             # Pass True ONLY if at least one hotspot was NEW (not already in database)
             # Also pass normalized system/body names for highlighting

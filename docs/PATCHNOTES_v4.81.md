@@ -2,6 +2,8 @@
 **Release Date:** 2025-01-26
 
 ## New Features & Improvements
+
+### UI-Tables
 - Right-click table headers to show/hide columns for all tables
 
 ### Hotspot Finder
