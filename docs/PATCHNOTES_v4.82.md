@@ -1,26 +1,26 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2025-01-27
+**Release Date:** 2026-01-27
 
 ## New Features & Improvements
 
+### Hotspots Finder
+- **Reserve Level Filter:** New dropdown to filter rings by reserve level (Pristine, Major, Common, Low, Depleted)
+- **Save to Local Database:** Right-click context menu option to save Spansh results to your local database (renamed from "Save to Database")
+- **Update Reserve Level:** Right-click context menu option to fetch missing reserve data from Spansh for local entries
 
-### [Feature Category 1]
-- [Feature description 1]
-- [Feature description 2]
-- [Feature description 3]
-
-### [Feature Category 2]
-- [Feature description 1]
-- [Feature description 2]
+### Bug Fixes
+- Fixed "Metalic" typo in ring type column (now "Metallic")
+- Fixed duplicate grouping when using "Both" data source with "All Minerals"
+- Fixed reserve level display for entries from different sources
 
 ## Hotfix
 
-### [System/Component Name]
-- Fixed [issue description]
+### Hotspots Finder
+- Fixed missing Data Source radio buttons after adding Reserve filter
 
 
 ### Voiceattack Profile
-- No changes - latest version is v4.7.7 (included in the installer and zip file)
+- No changes - latest version is v4.7.9 (included in the installer and zip file)
 
 ### How to update to the latest profile
 - Backup and delete existing EliteMining profile

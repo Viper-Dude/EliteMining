@@ -420,6 +420,24 @@ class RingFinder(ColumnVisibilityMixin):
         self.material_combo.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         self.material_combo.bind('<<ComboboxSelected>>', self._on_ring_type_changed)
         
+        # Reserve filter (new row between Ring Type and Mineral)
+        ttk.Label(search_frame, text=t('ring_finder.reserve')).grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        self.reserve_var = tk.StringVar(value=t('ring_finder.all_reserves'))
+        self.reserve_combo = ttk.Combobox(search_frame, textvariable=self.reserve_var, width=15, state="readonly")
+        # Reserve options: All, Pristine, Major, Common, Low, Depleted
+        reserve_options = [
+            t('ring_finder.all_reserves'),
+            'Pristine',
+            'Major',
+            'Common',
+            'Low',
+            'Depleted'
+        ]
+        self.reserve_combo['values'] = tuple(reserve_options)
+        self.reserve_combo.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.reserve_combo.bind('<<ComboboxSelected>>', self._save_filter_settings)
+        ToolTip(self.reserve_combo, t('ring_finder.tooltip_reserve'))
+        
         # "Any Ring" checkbox - DISABLED (hidden) - searches Spansh for rings without requiring hotspot data
         self.any_ring_var = tk.BooleanVar(value=False)
         self.any_ring_cb = tk.Checkbutton(search_frame, text=t('ring_finder.any_ring'),
@@ -433,22 +451,31 @@ class RingFinder(ColumnVisibilityMixin):
         # ToolTip(self.any_ring_cb, t('ring_finder.any_ring_tooltip'))
         
         # Material filter (new - specific materials) - dynamically populated from database
-        ttk.Label(search_frame, text=t('ring_finder.mineral')).grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        ttk.Label(search_frame, text=t('ring_finder.mineral')).grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.specific_material_var = tk.StringVar(value=t('ring_finder.all_minerals'))
         self.specific_material_combo = ttk.Combobox(search_frame, textvariable=self.specific_material_var, width=22, state="readonly")
         
         # Get materials from database and sort alphabetically (localized display)
         available_materials = self._get_available_materials()
         self.specific_material_combo['values'] = available_materials
-        self.specific_material_combo.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.specific_material_combo.grid(row=3, column=1, sticky="w", padx=5, pady=5)
         
         # Add tooltips for the filters
         ToolTip(self.material_combo, t('ring_finder.tooltip_ring_type'))
         ToolTip(self.specific_material_combo, t('ring_finder.tooltip_mineral'))
         
-        # Create a container frame for row 3 that uses pack layout internally
-        row3_container = tk.Frame(search_frame, bg=_cb_bg)
-        row3_container.grid(row=3, column=0, columnspan=4, sticky="w", padx=5, pady=5)
+        # Configure grid weights to ensure all rows are visible
+        search_frame.grid_rowconfigure(0, weight=0)  # Reference System
+        search_frame.grid_rowconfigure(1, weight=0)  # Ring Type
+        search_frame.grid_rowconfigure(2, weight=0)  # Reserve
+        search_frame.grid_rowconfigure(3, weight=0)  # Mineral
+        search_frame.grid_rowconfigure(4, weight=0)  # Unvisited/Data Source container
+        
+        # Create a container frame for row 4 that uses pack layout internally
+        row3_container = tk.Frame(search_frame, bg=_cb_bg, height=40)
+        row3_container.grid(row=4, column=0, columnspan=4, sticky="ew", padx=5, pady=5)
+        # Don't use grid_propagate(False) - let it size naturally
+        print(f"[DEBUG] Created row3_container at row 4, bg={_cb_bg}")
         
         # Unvisited Only - label and checkbox - filter to show only systems with 0 visits
         # Label in theme color (orange for elite_orange theme, white for dark theme)
@@ -549,8 +576,9 @@ class RingFinder(ColumnVisibilityMixin):
         # NOW bind material selection to enable/disable min hotspots filter (after spinbox exists!)
         self.specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_changed)
         
-        # Data Source selection (row 3, next to checkbox) - Label and radio buttons in same row3_container
+        # Data Source selection (row 4) - Label and radio buttons in same row3_container
         ttk.Label(row3_container, text=t('ring_finder.data_source'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(160, 10))
+        print(f"[DEBUG] Added Data Source label to row3_container")
         
         # Frame for radio buttons
         source_frame = tk.Frame(row3_container, bg=_cb_bg)
@@ -621,7 +649,7 @@ class RingFinder(ColumnVisibilityMixin):
                             text=f"ℹ {t('ring_finder.search_help')}  |  {t('ring_finder.no_data_help')}",
                             fg="#cccccc", bg=_cb_bg, font=("Segoe UI", 8, "italic"), 
                             justify="left")
-        info_text.grid(row=4, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
+        info_text.grid(row=5, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
         
         # Results section with help text in header
         results_header = ttk.Frame(self.scrollable_frame)
@@ -629,7 +657,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         ttk.Label(results_header, text=t('ring_finder.search_results'), font=("Segoe UI", 9, "bold")).pack(side="left")
         ttk.Label(results_header, text=t('ring_finder.right_click_help'), 
-                 font=("Segoe UI", 8), foreground="#666666").pack(side="right", padx=(0, 5))
+                 font=("Segoe UI", 8), foreground="#666666").pack(side="left", padx=(10, 0))
         
         results_frame = ttk.Frame(self.scrollable_frame)
         results_frame.pack(fill="both", expand=True, padx=10, pady=(2, 2))
@@ -1429,7 +1457,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         return False
     
-    def _save_filter_settings(self):
+    def _save_filter_settings(self, event=None):
         """Save current filter settings to config"""
         try:
             from config import save_ring_finder_filters
@@ -4197,6 +4225,21 @@ class RingFinder(ColumnVisibilityMixin):
             hotspots = filtered_hotspots
             print(f"[FILTER] Unvisited Only: {len(hotspots)} systems with 0 visits")
         
+        # Filter by Reserve level if not "All"
+        reserve_filter = self.reserve_var.get()
+        if reserve_filter and reserve_filter != t('ring_finder.all_reserves'):
+            filtered_hotspots = []
+            for hotspot in hotspots:
+                # Check both 'reserve' and 'density' fields (density is used for reserve level)
+                reserve = hotspot.get('reserve', '') or hotspot.get('density', '')
+                
+                # Match specific reserve level (Pristine, Major, Common, Low, Depleted)
+                if reserve == reserve_filter:
+                    filtered_hotspots.append(hotspot)
+            
+            hotspots = filtered_hotspots
+            print(f"[FILTER] Reserve '{reserve_filter}': {len(hotspots)} results")
+        
         # Track current results to identify new entries
         current_results = set()
         for hotspot in hotspots:
@@ -4569,7 +4612,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.find_sell_station'), command=self._find_sell_station)
         self.context_menu.add_separator()
-        self.context_menu.add_command(label="Save to Database", command=self._save_to_database)
+        self.context_menu.add_command(label=t('context_menu.save_to_local_database'), command=self._save_to_database)
         self.context_menu.add_command(label=t('context_menu.update_reserve'), command=self._update_reserve_from_spansh)
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.edit_hotspots'), command=self._show_edit_hotspots_dialog)

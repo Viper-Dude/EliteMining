@@ -13931,8 +13931,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         results_header = tk.Frame(main_container, bg=_mkt_cb_bg)
         results_header.pack(fill="x", pady=(10, 0))
         
+        _results_fg = "#ff8c00" if _mkt_cb_theme == "elite_orange" else "#ffffff"
         tk.Label(results_header, text=t('marketplace.search_results'), 
-                bg=_mkt_cb_bg, fg="#ffffff", 
+                bg=_mkt_cb_bg, fg=_results_fg, 
                 font=("Segoe UI", 10, "bold")).pack(side="left")
         
         tk.Label(results_header, text="  •  " + t('marketplace.right_click_options'),
@@ -14171,8 +14172,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         results_header = tk.Frame(main_container, bg=_trade_cb_bg)
         results_header.pack(fill="x", pady=(10, 0))
         
+        _results_fg = "#ff8c00" if _trade_cb_theme == "elite_orange" else "#ffffff"
         tk.Label(results_header, text=t('marketplace.search_results'), 
-                bg=_trade_cb_bg, fg="#ffffff", 
+                bg=_trade_cb_bg, fg=_results_fg, 
                 font=("Segoe UI", 10, "bold")).pack(side="left")
         
         tk.Label(results_header, text="  •  " + t('marketplace.right_click_options'),
