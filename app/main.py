@@ -5340,6 +5340,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 # Use same symbol for all items for consistent alignment
                 icon = "●"  # Filled circle for all cargo
                 
+                # Configure tag for cargo items (10pt to match materials)
+                self.integrated_cargo_text.tag_configure("cargo_item", font=("Consolas", 10, "normal"))
+                
                 # Simple fixed format: icon + space + name + spaces + quantity
                 name_field = f"{display_name:<12}"[:12]  # 12 characters for name
                 quantity_text = f"{quantity:>4}t"
@@ -5349,9 +5352,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 # Mark start position for limpet lines (to make clickable)
                 if is_limpet:
                     start_pos = self.integrated_cargo_text.index(tk.END)
-                    self.integrated_cargo_text.insert(tk.END, line, "limpet_clickable")
+                    self.integrated_cargo_text.insert(tk.END, line, ("limpet_clickable", "cargo_item"))
                 else:
-                    self.integrated_cargo_text.insert(tk.END, line)
+                    self.integrated_cargo_text.insert(tk.END, line, "cargo_item")
                 
                 # Add newline for all but the last item
                 if i < len(sorted_items) - 1:
@@ -5362,10 +5365,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Separator width to match full cargo line including quantity
             sep_chars = 28
             self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
-            self.integrated_cargo_text.insert(tk.END, "\n" + t('mining_session.engineering_materials') + " 🔩\n")
+            
+            # Configure tag for section header (larger, bold)
+            self.integrated_cargo_text.tag_configure("section_header", font=("Consolas", 10, "bold"))
+            
+            # Insert header with tag
+            self.integrated_cargo_text.insert(tk.END, "\n")
+            self.integrated_cargo_text.insert(tk.END, t('mining_session.engineering_materials') + " 🔩", "section_header")
+            self.integrated_cargo_text.insert(tk.END, "\n")
             
             # Sort materials alphabetically
             sorted_materials = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
+            
+            # Configure tag for material items (10pt to match header size)
+            self.integrated_cargo_text.tag_configure("material_item", font=("Consolas", 10, "normal"))
             
             for i, (material_name, quantity) in enumerate(sorted_materials):
                 # Get grade for this material
@@ -5375,7 +5388,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 display_name = cargo.materials_localized_names.get(material_name, material_name)[:12]
                 grade_text = f"(G{grade})"
                 line = f"{display_name:<12} {grade_text} {quantity:>3}"
-                self.integrated_cargo_text.insert(tk.END, line)
+                self.integrated_cargo_text.insert(tk.END, line, "material_item")
                 
                 # Add newline for all but the last item
                 if i < len(sorted_materials) - 1:
