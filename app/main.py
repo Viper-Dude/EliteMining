@@ -439,7 +439,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.81"
+APP_VERSION = "v4.82"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -11820,16 +11820,46 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
             log.info(f"=== CONFIG MIGRATION CHECK END === {datetime.now().isoformat()}")
             
-            # NOTE: Database migrations disabled - visit counting is handled by
-            # the background journal scan (_background_journal_catchup) which runs silently
-            # self.after(500, self._run_database_migrations)
+            # Run database migrations
+            self.after(500, self._run_database_migrations)
                 
         except Exception as e:
             log.error(f"Config migration check failed: {e}", exc_info=True)
             # Continue startup even if migration fails
 
     def _run_database_migrations(self):
-        """Run any pending database migrations with progress dialog"""
+        """Run any pending database migrations"""
+        import logging
+        log = logging.getLogger("EliteMining.Migration")
+        
+        try:
+            # Import all migrations
+            from migrations.fix_metalic_typo import (
+                is_migration_needed as metalic_needed,
+                get_database_path,
+                run_migration as run_metalic_migration
+            )
+            
+            db_path = get_database_path()
+            
+            # Run Metalic typo fix migration (v4.82)
+            if metalic_needed(db_path):
+                log.info("[MIGRATION] Running 'Metalic' typo fix...")
+                success = run_metalic_migration(db_path)
+                if success:
+                    log.info("[MIGRATION] ✓ 'Metalic' typo fix completed")
+                    print("[MIGRATION v4.82] ✓ Fixed 'Metalic' → 'Metallic' typo in database")
+                else:
+                    log.warning("[MIGRATION] 'Metalic' typo fix failed")
+            else:
+                log.info("[MIGRATION] 'Metalic' typo fix not needed or already applied")
+            
+        except Exception as e:
+            log.error(f"Database migrations failed: {e}", exc_info=True)
+            # Continue startup even if migration fails
+
+    def _run_database_migrations_old(self):
+        """Run any pending database migrations with progress dialog (OLD - DISABLED)"""
         import logging
         log = logging.getLogger("EliteMining.Migration")
         

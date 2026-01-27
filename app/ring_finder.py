@@ -13,6 +13,7 @@ import threading
 import requests
 import time
 import zlib
+import datetime
 from typing import Dict, List, Optional, Tuple
 import math
 import re
@@ -20,6 +21,7 @@ from core.constants import MENU_COLORS
 from local_database import LocalSystemsDatabase
 from user_database import UserDatabase
 from edsm_integration import EDSMIntegration
+from ui.dialogs import centered_info_dialog
 # Localization
 try:
     from localization import t, get_ring_types, get_abbr, get_material, to_english
@@ -444,6 +446,28 @@ class RingFinder(ColumnVisibilityMixin):
         ToolTip(self.material_combo, t('ring_finder.tooltip_ring_type'))
         ToolTip(self.specific_material_combo, t('ring_finder.tooltip_mineral'))
         
+        # Create a container frame for row 3 that uses pack layout internally
+        row3_container = tk.Frame(search_frame, bg=_cb_bg)
+        row3_container.grid(row=3, column=0, columnspan=4, sticky="w", padx=5, pady=5)
+        
+        # Unvisited Only - label and checkbox - filter to show only systems with 0 visits
+        # Label in theme color (orange for elite_orange theme, white for dark theme)
+        if _cb_theme == "elite_orange":
+            unvisited_fg = "#FF8C00"  # Orange
+        else:
+            unvisited_fg = "#FFFFFF"  # White
+        
+        ttk.Label(row3_container, text=t('ring_finder.unvisited_only') + ":", foreground=unvisited_fg).pack(side="left")
+        self.unvisited_only_var = tk.BooleanVar(value=False)
+        self.unvisited_only_cb = tk.Checkbutton(row3_container, 
+                                                variable=self.unvisited_only_var,
+                                                command=self._save_filter_settings,
+                                                bg=_cb_bg,
+                                                activebackground="#2e2e2e",
+                                                selectcolor=_cb_select, relief="flat")
+        self.unvisited_only_cb.pack(side="left", padx=(5, 30))
+        ToolTip(self.unvisited_only_cb, t('ring_finder.tooltip_unvisited'))
+        
         # Create a sub-frame for right-side filters (row 1-2) that will pack tightly
         right_filters_frame_row1 = ttk.Frame(search_frame)
         right_filters_frame_row1.grid(row=1, column=2, columnspan=2, sticky="w", padx=(10, 0))
@@ -525,12 +549,12 @@ class RingFinder(ColumnVisibilityMixin):
         # NOW bind material selection to enable/disable min hotspots filter (after spinbox exists!)
         self.specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_changed)
         
-        # Data Source selection (row 3) - Radio buttons for Database/Spansh/Both
-        ttk.Label(search_frame, text=t('ring_finder.data_source'), font=("Segoe UI", 9, "bold")).grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        # Data Source selection (row 3, next to checkbox) - Label and radio buttons in same row3_container
+        ttk.Label(row3_container, text=t('ring_finder.data_source'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(160, 10))
         
         # Frame for radio buttons
-        source_frame = tk.Frame(search_frame, bg=_cb_bg)
-        source_frame.grid(row=3, column=1, columnspan=3, sticky="w", padx=5, pady=5)
+        source_frame = tk.Frame(row3_container, bg=_cb_bg)
+        source_frame.pack(side="left")
         
         self.data_source_var = tk.StringVar(value="database")  # Default: database (faster startup)
         
@@ -1422,7 +1446,8 @@ class RingFinder(ColumnVisibilityMixin):
                 "distance": self.distance_var.get(),
                 "max_results": max_results_value,
                 "min_hotspots": self.min_hotspots_var.get(),
-                "data_source": self.data_source_var.get()  # Save data source preference
+                "data_source": self.data_source_var.get(),  # Save data source preference
+                "unvisited_only": self.unvisited_only_var.get()  # Save unvisited filter
             }
             
             save_ring_finder_filters(settings)
@@ -1460,6 +1485,8 @@ class RingFinder(ColumnVisibilityMixin):
             if "data_source" in settings:
                 # Restore data source preference (default to "both" if not saved)
                 self.data_source_var.set(settings.get("data_source", "both"))
+            if "unvisited_only" in settings:
+                self.unvisited_only_var.set(settings.get("unvisited_only", False))
             
         except Exception:
             pass
@@ -2750,27 +2777,27 @@ class RingFinder(ColumnVisibilityMixin):
             return spansh_results
         else:  # both
             # Merge results from both sources
-            combined_results = []
-            seen_keys = set()  # Track system+body to avoid duplicates
+            # Don't deduplicate - show both Database and Spansh versions for comparison
+            combined_results = user_results + spansh_results
             
-            # Add user database results first (priority)
-            for result in user_results:
-                key = (result.get('systemName', '').lower(), result.get('bodyName', '').lower())
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    combined_results.append(result)
+            print(f"[SEARCH] Combined: {len(user_results)} from DB + {len(spansh_results)} from Spansh = {len(combined_results)} total")
             
-            # Add Spansh results (skip duplicates)
-            for result in spansh_results:
-                key = (result.get('systemName', '').lower(), result.get('bodyName', '').lower())
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    combined_results.append(result)
+            # Helper function to normalize body name (strip system prefix)
+            def normalize_body(body, system):
+                body_lower = body.lower()
+                system_lower = system.lower()
+                if body_lower.startswith(system_lower):
+                    return body_lower[len(system_lower):].strip()
+                return body_lower
             
-            print(f"[SEARCH] Combined: {len(user_results)} from DB + {len(spansh_results)} from Spansh = {len(combined_results)} total (after deduplication)")
-            
-            # Sort combined results by distance to ensure closest results regardless of source
-            combined_results.sort(key=lambda x: float(x.get('distance', 999999)))
+            # Sort combined results - group duplicates (same system+body) together
+            # This ensures Database and Spansh results for same ring appear consecutively
+            combined_results.sort(key=lambda x: (
+                float(x.get('distance', 999999)),  # Primary: distance (closest first)
+                x.get('systemName', '').lower(),   # Secondary: system name
+                normalize_body(x.get('bodyName', ''), x.get('systemName', '')),  # Tertiary: normalized body name
+                x.get('source', '').lower()        # Quaternary: source (database/spansh)
+            ))
             
             # Apply max_results limit to combined results
             if max_results and len(combined_results) > max_results:
@@ -2842,8 +2869,8 @@ class RingFinder(ColumnVisibilityMixin):
                     'has_hotspots': True,
                     'hotspot_data': hotspot,
                     'count': hotspot_count,
-                    'data_source': 'User Database (Confirmed)',
-                    'source': 'User Database'
+                    'data_source': 'Local (Confirmed)',
+                    'source': 'Local'
                 }
                 compatible_results.append(compatible_result)
             
@@ -4157,6 +4184,19 @@ class RingFinder(ColumnVisibilityMixin):
         
     def _update_results(self, hotspots: List[Dict]):
         """Update results treeview with hotspot data"""
+        # Filter for unvisited systems if checkbox is enabled
+        if self.unvisited_only_var.get():
+            filtered_hotspots = []
+            for hotspot in hotspots:
+                system_name = hotspot.get("systemName", hotspot.get("system", ""))
+                if system_name:
+                    visit_data = self.user_db.is_system_visited(system_name)
+                    visit_count = visit_data.get('visit_count', 0) if visit_data else 0
+                    if visit_count == 0:
+                        filtered_hotspots.append(hotspot)
+            hotspots = filtered_hotspots
+            print(f"[FILTER] Unvisited Only: {len(hotspots)} systems with 0 visits")
+        
         # Track current results to identify new entries
         current_results = set()
         for hotspot in hotspots:
@@ -4231,7 +4271,12 @@ class RingFinder(ColumnVisibilityMixin):
                 ),  # Green first, then top, then rest
                 float(x.get('distance', 999)),           # Then: Distance (closest first)
                 x.get('systemName', x.get('system', '')).lower(),  # Then: System name (alphabetical)
-                x.get('bodyName', x.get('ring', '')).lower()       # Then: Ring name (alphabetical)
+                # Normalize body name for grouping - strip system prefix if present
+                (lambda body, sys: body[len(sys):].strip().lower() if body.lower().startswith(sys.lower()) else body.lower())(
+                    x.get('bodyName', x.get('ring', '')), 
+                    x.get('systemName', x.get('system', ''))
+                ),  # Then: Ring name normalized (groups duplicates from different sources)
+                x.get('source', '').lower()                        # Then: Source (database/spansh) - keeps duplicates together
             ))
         except:
             pass
@@ -4392,13 +4437,13 @@ class RingFinder(ColumnVisibilityMixin):
             overlap_display = self._localize_hotspot_display(overlap_display)
             
             # Get source for this hotspot
-            source_display = hotspot.get('data_source', 'User DB')
+            source_display = hotspot.get('data_source', 'Local')
             if 'Spansh' in source_display:
                 source_display = "🌐 Spansh"
             elif 'EDTools' in source_display or 'Community' in source_display:
-                source_display = "🗄️ DB"
+                source_display = "🗄️ Local"
             else:
-                source_display = "🗄️ DB"  # Default to User DB
+                source_display = "🗄️ Local"  # Default to Local
             
             # Clean ring name - remove system prefix for Location column
             location_display = ring_name
@@ -4524,6 +4569,9 @@ class RingFinder(ColumnVisibilityMixin):
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.find_sell_station'), command=self._find_sell_station)
         self.context_menu.add_separator()
+        self.context_menu.add_command(label="Save to Database", command=self._save_to_database)
+        self.context_menu.add_command(label=t('context_menu.update_reserve'), command=self._update_reserve_from_spansh)
+        self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.edit_hotspots'), command=self._show_edit_hotspots_dialog)
         self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
         self.context_menu.add_command(label=t('context_menu.set_res'), command=self._show_res_dialog)
@@ -4537,21 +4585,99 @@ class RingFinder(ColumnVisibilityMixin):
             # Click on row - show context menu
             item = self.results_tree.identify_row(event.y)
             if item:
-                self.results_tree.selection_set(item)
-                self.results_tree.focus(item)
+                # Check if item is already in selection (multi-select scenario)
+                current_selection = self.results_tree.selection()
+                if item not in current_selection:
+                    # Single click on new item - select only this item
+                    self.results_tree.selection_set(item)
+                    self.results_tree.focus(item)
                 
-                # Enable/disable "Find Sell Station" based on mineral selection
-                mineral_display = self.specific_material_var.get()
-                mineral = self._to_english(mineral_display)
-                is_specific_mineral = not self._is_all_minerals(mineral)
+                # Get current selection count
+                selected_items = self.results_tree.selection()
+                selection_count = len(selected_items)
                 
-                # Menu item index for "Find Sell Station" is 6 (after copy_system, separator, inara, edsm, spansh, separator)
-                if is_specific_mineral:
-                    self.context_menu.entryconfig(6, state="normal")
+                # Check if any selected rows are from Spansh (check Source column)
+                has_spansh_rows = False
+                has_local_missing_reserve = False
+                has_local_with_reserve = False
+                systems_with_missing_reserve = set()
+                
+                for sel_item in selected_items:
+                    values = self.results_tree.item(sel_item, 'values')
+                    if values and len(values) > 10:
+                        source = values[10]  # Source column is index 10
+                        reserve = values[9] if len(values) > 9 else ""  # Reserve column is index 9
+                        system_name = values[2] if len(values) > 2 else ""  # System column
+                        
+                        if source and 'spansh' in str(source).lower():
+                            has_spansh_rows = True
+                        
+                        # Check for Local source
+                        if source and 'local' in str(source).lower():
+                            # "-" means Spansh was checked and has no data (don't try again)
+                            # "No data" means never checked (eligible for update)
+                            # "Pristine", etc. means has data (don't update)
+                            if reserve == 'No data' or (not reserve and reserve != '-'):
+                                has_local_missing_reserve = True
+                                if system_name:
+                                    systems_with_missing_reserve.add(system_name)
+                            else:
+                                has_local_with_reserve = True
+                
+                # Only enable update reserve if Local rows exist with missing reserve AND no Local rows have reserve
+                enable_update_reserve = has_local_missing_reserve and not has_local_with_reserve
+                
+                # Debug
+                if has_local_missing_reserve or has_local_with_reserve:
+                    print(f"[MENU DEBUG] missing={has_local_missing_reserve}, with_reserve={has_local_with_reserve}, enable={enable_update_reserve}")
+                
+                if selection_count > 1:
+                    # Multi-select mode - show applicable options
+                    if has_spansh_rows or enable_update_reserve:
+                        multi_menu = tk.Menu(self.parent, tearoff=0,
+                                           bg=self.context_menu.cget('bg'), 
+                                           fg=self.context_menu.cget('fg'),
+                                           activebackground=self.context_menu.cget('activebackground'), 
+                                           activeforeground=self.context_menu.cget('activeforeground'),
+                                           selectcolor=self.context_menu.cget('selectcolor'))
+                        
+                        if has_spansh_rows:
+                            multi_menu.add_command(label=f"Save {selection_count} Entries to Database", 
+                                                 command=self._save_to_database)
+                        
+                        if enable_update_reserve:
+                            system_count = len(systems_with_missing_reserve)
+                            multi_menu.add_command(label=f"Update Reserve Level ({system_count} system{'s' if system_count != 1 else ''})", 
+                                                 command=self._update_reserve_from_spansh)
+                        
+                        multi_menu.tk_popup(event.x_root, event.y_root)
+                        multi_menu.grab_release()
                 else:
-                    self.context_menu.entryconfig(6, state="disabled")
-                
-                self.context_menu.tk_popup(event.x_root, event.y_root)
+                    # Single select mode - show full menu
+                    # Enable/disable "Find Sell Station" based on mineral selection
+                    mineral_display = self.specific_material_var.get()
+                    mineral = self._to_english(mineral_display)
+                    is_specific_mineral = not self._is_all_minerals(mineral)
+                    
+                    # Menu item index for "Find Sell Station" is 6 (after copy_system, separator, inara, edsm, spansh, separator)
+                    if is_specific_mineral:
+                        self.context_menu.entryconfig(6, state="normal")
+                    else:
+                        self.context_menu.entryconfig(6, state="disabled")
+                    
+                    # Show/hide "Save to Database" option (index 8, after separator) based on Source column
+                    if has_spansh_rows:
+                        self.context_menu.entryconfig(8, state="normal")
+                    else:
+                        self.context_menu.entryconfig(8, state="disabled")
+                    
+                    # Show/hide "Update Reserve Level" option (index 9) based on Local source + missing reserve
+                    if enable_update_reserve:
+                        self.context_menu.entryconfig(9, state="normal")
+                    else:
+                        self.context_menu.entryconfig(9, state="disabled")
+                    
+                    self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             if hasattr(self, 'context_menu'):
                 self.context_menu.grab_release()
@@ -4688,6 +4814,406 @@ class RingFinder(ColumnVisibilityMixin):
                 self.status_var.set(f"Error: {e}")
         else:
             self.status_var.set("Error: Could not access main application")
+    
+    def _save_to_database(self):
+        """Save selected Spansh entries to local database"""
+        selection = self.results_tree.selection()
+        if not selection:
+            return
+        
+        # Filter selection to only include Spansh results (skip Local results)
+        spansh_items = []
+        local_items = []
+        for item in selection:
+            values = self.results_tree.item(item, 'values')
+            if values and len(values) > 10:
+                source = values[10]  # Source column is index 10
+                if source and 'spansh' in str(source).lower():
+                    spansh_items.append(item)
+                elif source and 'local' in str(source).lower():
+                    local_items.append(item)
+        
+        if not spansh_items:
+            message = t('ring_finder.no_spansh_results_selected')
+            if local_items:
+                message += f"\n\n{len(local_items)} local entries were skipped (already saved)."
+            centered_info_dialog(self.parent, t('ring_finder.save_failed_title'), 
+                               message, 
+                               message_type="warning")
+            return
+        
+        # Use filtered list for saving
+        selection = spansh_items
+        
+        saved_rows = 0  # Count of successfully saved rows
+        new_rows = 0  # Count of new entries
+        updated_rows = 0  # Count of updated entries
+        skipped_count = 0
+        error_count = 0
+        errors = []
+        total_materials = 0  # Count of individual material entries saved
+        
+        total = len(selection)
+        
+        # Show progress
+        self.status_var.set(f"Saving {total} entries to database...")
+        self.parent.update()
+        
+        for item in selection:
+            row_saved = False  # Track if this row was successfully saved
+            try:
+                values = self.results_tree.item(item, 'values')
+                if not values or len(values) < 11:
+                    skipped_count += 1
+                    errors.append("Missing data columns")
+                    continue
+                
+                # Extract data from row (column indices based on your tree structure)
+                distance = values[0]  # Distance
+                ls_distance = values[1]  # LS
+                system_name = values[2]  # System
+                visits = values[3]  # Visits
+                body_name = values[4]  # Location (body/ring name)
+                ring_type = values[5]  # Ring Type
+                hotspots_display = values[6]  # Hotspots (e.g., "Plat (2), Rhod (1)")
+                overlap_display = values[7]  # Overlap
+                res_display = values[8]  # RES
+                reserve_level = values[9]  # Reserve
+                source = values[10]  # Source
+                
+                # Validate critical fields
+                if not system_name or system_name == "No data":
+                    skipped_count += 1
+                    errors.append(f"Missing system name")
+                    continue
+                
+                if not body_name or body_name == "No data":
+                    skipped_count += 1
+                    errors.append(f"{system_name}: Missing body name")
+                    continue
+                
+                # Get coordinates - try multiple sources
+                coordinates = None
+                try:
+                    # First, try to get from the current_system_coords (reference system coords)
+                    # For Spansh results, we need to fetch coordinates for each system
+                    # Try galaxy database first
+                    system_info = self.systems_data.get(system_name.lower())
+                    if system_info and 'x' in system_info:
+                        coordinates = (system_info['x'], system_info['y'], system_info['z'])
+                    
+                    # If not in galaxy database, try visited systems
+                    if not coordinates:
+                        coordinates = self.user_db._get_coordinates_from_visited_systems(system_name)
+                    
+                    # If still no coordinates, try to fetch from EDSM
+                    if not coordinates:
+                        edsm_coords = self._get_system_coords_from_edsm(system_name)
+                        if edsm_coords and 'x' in edsm_coords:
+                            coordinates = (edsm_coords['x'], edsm_coords['y'], edsm_coords['z'])
+                except Exception as e:
+                    print(f"[SAVE] Error getting coordinates for {system_name}: {e}")
+                
+                if not coordinates:
+                    skipped_count += 1
+                    errors.append(f"{system_name}: Missing coordinates")
+                    continue
+                
+                # Parse hotspots display to extract materials and counts
+                # Format: "Plat (2), Rhod (1)" or just "Platinum"
+                materials_to_save = []
+                if hotspots_display and hotspots_display != "-" and hotspots_display != "No data":
+                    import re
+                    # Match patterns like "Plat (2)" or "Platinum"
+                    pattern = r'([A-Za-z\s\.]+)(?:\s*\((\d+)\))?'
+                    matches = re.findall(pattern, hotspots_display)
+                    for material_name, count_str in matches:
+                        material_name = material_name.strip()
+                        if material_name and material_name != ',':
+                            count = int(count_str) if count_str else 1
+                            materials_to_save.append((material_name, count))
+                
+                if not materials_to_save:
+                    skipped_count += 1
+                    errors.append(f"{system_name} {body_name}: No materials found")
+                    continue
+                
+                # Convert LS distance
+                ls_val = None
+                try:
+                    if ls_distance and ls_distance != "No data":
+                        ls_val = float(ls_distance.replace(',', ''))
+                except:
+                    pass
+                
+                # Clean up ring type
+                ring_type_clean = ring_type if ring_type and ring_type != "No data" else None
+                reserve_clean = reserve_level if reserve_level and reserve_level != "No data" else None
+                
+                # Track if any material in this row already existed
+                row_had_updates = False
+                row_had_new = False
+                
+                # Check reserve level once for the whole ring (not per material)
+                current_reserve = self.user_db.get_reserve_level(system_name, body_name) if reserve_clean else None
+                reserve_needs_update = reserve_clean and (not current_reserve or current_reserve != reserve_clean)
+                
+                # Save each material as a separate hotspot entry
+                for material_name, hotspot_count in materials_to_save:
+                    try:
+                        # Normalize material name (expand abbreviations)
+                        material_full = self._expand_material_abbreviation(material_name)
+                        
+                        # Check if entry already exists and if we need to update it
+                        existing_data = self.user_db.get_hotspot_data(system_name, body_name, material_full)
+                        
+                        needs_update = False
+                        if existing_data:
+                            # Check for mismatches or missing data (only update if NEW data is better/different)
+                            if existing_data.get('hotspot_count') != hotspot_count:
+                                needs_update = True
+                            # Only update coordinates if we have new ones AND they're missing or different
+                            elif coordinates and not existing_data.get('x_coord'):
+                                needs_update = True
+                            elif coordinates and existing_data.get('x_coord') and abs(existing_data.get('x_coord') - coordinates[0]) > 0.01:
+                                needs_update = True
+                            # Only update ring type if we have new data AND it's missing or different
+                            elif ring_type_clean and not existing_data.get('ring_type'):
+                                needs_update = True
+                            elif ring_type_clean and existing_data.get('ring_type') and existing_data.get('ring_type') != ring_type_clean:
+                                needs_update = True
+                            # Only update LS if we have new data AND it's missing or different (with tolerance)
+                            elif ls_val and not existing_data.get('ls_distance'):
+                                needs_update = True
+                            elif ls_val and existing_data.get('ls_distance') and abs(existing_data.get('ls_distance') - ls_val) > 1.0:
+                                needs_update = True
+                            # Use the pre-checked reserve level flag
+                            elif reserve_needs_update:
+                                needs_update = True
+                        else:
+                            # New entry
+                            needs_update = True
+                        
+                        if needs_update:
+                            self.user_db.add_hotspot_data(
+                                system_name=system_name,
+                                body_name=body_name,
+                                material_name=material_full,
+                                hotspot_count=hotspot_count,
+                                scan_date=datetime.datetime.utcnow().isoformat() + "Z",
+                                coordinates=coordinates,
+                                coord_source="galaxy_db",
+                                ring_type=ring_type_clean,
+                                ls_distance=ls_val
+                            )
+                            
+                            # Update reserve level if available
+                            if reserve_clean:
+                                self.user_db.bulk_update_reserve_levels(system_name, {body_name: reserve_clean})
+                            
+                            total_materials += 1
+                            row_saved = True  # Mark this row as successfully saved
+                            
+                            # Track new vs updated
+                            if existing_data:
+                                row_had_updates = True
+                            else:
+                                row_had_new = True
+                        # else: data is identical, skip silently
+                        
+                    except Exception as e:
+                        error_count += 1
+                        errors.append(f"{system_name} {body_name} {material_name}: {str(e)[:50]}")
+                
+                # If at least one material from this row was saved, count the row as saved
+                if row_saved:
+                    saved_rows += 1
+                    # Prioritize "new" if row had any new materials
+                    if row_had_new:
+                        new_rows += 1
+                    elif row_had_updates:
+                        updated_rows += 1
+                
+            except Exception as e:
+                error_count += 1
+                errors.append(f"Row error: {str(e)[:50]}")
+        
+        # Show results
+        if saved_rows > 0:
+            message = t('ring_finder.save_success').format(count=saved_rows)
+            
+            # Show breakdown of new vs updated
+            if new_rows > 0 and updated_rows > 0:
+                message += f" ({new_rows} " + t('ring_finder.new') + f", {updated_rows} " + t('ring_finder.updated') + ")"
+            elif updated_rows > 0:
+                message += f" ({updated_rows} " + t('ring_finder.updated') + ")"
+            elif new_rows > 0:
+                message += f" ({new_rows} " + t('ring_finder.new') + ")"
+            
+            if skipped_count > 0:
+                message += f"\n⚠ " + t('ring_finder.skipped').format(count=skipped_count)
+            if error_count > 0:
+                message += f"\n✗ " + t('ring_finder.errors').format(count=error_count)
+            
+            # Show detailed errors if any
+            if errors and len(errors) <= 10:
+                message += "\n\n" + t('ring_finder.error_details') + ":\n" + "\n".join(errors[:10])
+            elif errors:
+                message += f"\n\n" + t('ring_finder.showing_errors').format(count=len(errors)) + ":\n" + "\n".join(errors[:10])
+            
+            self.status_var.set(t('ring_finder.saved_to_db').format(count=saved_rows))
+            
+            # Update database info counter to reflect new entries
+            self._update_database_info()
+            
+            centered_info_dialog(self.parent, t('ring_finder.save_complete'), message)
+        elif saved_rows == 0 and skipped_count == 0 and error_count == 0:
+            # No updates needed - all entries already in database with same data
+            message = t('ring_finder.already_in_database')
+            self.status_var.set(t('ring_finder.already_in_database'))
+            centered_info_dialog(self.parent, t('ring_finder.save_complete'), message)
+        else:
+            error_msg = t('ring_finder.no_entries_saved')
+            if errors:
+                error_msg += "\n\n" + t('ring_finder.error_details') + ":\n" + "\n".join(errors[:10])
+            self.status_var.set(t('ring_finder.save_failed'))
+            centered_info_dialog(self.parent, t('ring_finder.save_failed_title'), error_msg, message_type="error")
+    
+    def _update_reserve_from_spansh(self):
+        """Update reserve levels for selected Local entries from Spansh"""
+        selection = self.results_tree.selection()
+        if not selection:
+            return
+        
+        # Collect unique systems from Local source with missing reserve
+        systems_to_update = set()
+        for item in selection:
+            values = self.results_tree.item(item, 'values')
+            if values and len(values) > 10:
+                source = values[10]  # Source column
+                reserve = values[8] if len(values) > 8 else ""  # Reserve column
+                system_name = values[2] if len(values) > 2 else ""  # System column
+                
+                # Only process Local source with missing reserve
+                if source and 'local' in str(source).lower():
+                    if not reserve or reserve in ['-', 'No data', '']:
+                        if system_name:
+                            systems_to_update.add(system_name)
+        
+        if not systems_to_update:
+            centered_info_dialog(self.parent, t('ring_finder.update_reserve_title'), 
+                               t('ring_finder.no_local_missing_reserve'))
+            return
+        
+        # Fetch reserve levels from Spansh for each system
+        updated_count = 0
+        systems_processed = 0
+        
+        for system_name in systems_to_update:
+            try:
+                # Fetch reserve levels from Spansh
+                reserve_data = self._fetch_reserve_levels_for_system(system_name)
+                
+                if reserve_data:
+                    # Update database with bulk_update_reserve_levels
+                    count = self.user_db.bulk_update_reserve_levels(system_name, reserve_data)
+                    updated_count += count
+                    systems_processed += 1
+                    
+            except Exception as e:
+                print(f"[RESERVE UPDATE] Error updating {system_name}: {e}")
+        
+        # Show results
+        if updated_count > 0:
+            message = t('ring_finder.reserve_update_success').format(
+                rings=updated_count, 
+                systems=systems_processed
+            )
+            self.status_var.set(f"Updated {updated_count} rings in {systems_processed} systems")
+            
+            # Show dialog
+            centered_info_dialog(self.parent, t('ring_finder.update_reserve_title'), message)
+            
+            # Refresh the current search to show updated data
+            print("[RESERVE UPDATE] Triggering search refresh...")
+            self.parent.after(100, lambda: self.search_hotspots(auto_refresh=True))
+        else:
+            message = t('ring_finder.reserve_update_none').format(systems=len(systems_to_update))
+            centered_info_dialog(self.parent, t('ring_finder.update_reserve_title'), message)
+    
+    def _fetch_reserve_levels_for_system(self, system_name: str) -> dict:
+        """Fetch reserve levels for all rings in a system from Spansh"""
+        try:
+            # Use the same API format as journal_parser
+            payload = {
+                "filters": {
+                    "system_name": {"value": [system_name]},
+                    "rings": {"value": [True]}
+                },
+                "sort": [{"distance": {"order": "asc"}}],
+                "size": 50
+            }
+            
+            response = requests.post(
+                'https://spansh.co.uk/api/bodies/search',
+                json=payload,
+                headers={'Content-Type': 'application/json'},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                bodies = data.get('results', [])
+                
+                print(f"[RESERVE UPDATE] Spansh returned {len(bodies)} bodies for {system_name}")
+                
+                reserve_levels = {}
+                for body in bodies:
+                    reserve = body.get('reserve_level', '')
+                    if reserve:  # Only process if reserve level exists
+                        body_rings = body.get('rings', [])
+                        for ring in body_rings:
+                            ring_name = ring.get('name', '')
+                            if ring_name:
+                                # Store with just the ring part (without system prefix)
+                                if ring_name.startswith(system_name):
+                                    ring_name = ring_name[len(system_name):].strip()
+                                
+                                print(f"[RESERVE UPDATE] Found: {ring_name} = {reserve}")
+                                reserve_levels[ring_name] = reserve
+                
+                print(f"[RESERVE UPDATE] Total reserve levels found: {len(reserve_levels)}")
+                return reserve_levels
+            else:
+                print(f"[RESERVE UPDATE] Spansh API returned status {response.status_code}")
+                return {}
+                
+        except Exception as e:
+            print(f"[RESERVE UPDATE] Error fetching from Spansh: {e}")
+            import traceback
+            traceback.print_exc()
+            return {}
+    
+    def _expand_material_abbreviation(self, abbrev: str) -> str:
+        """Expand material abbreviation to full name"""
+        # Common abbreviations used in display
+        abbrev_map = {
+            "Plat": "Platinum",
+            "Pain": "Painite",
+            "Rhod": "Rhodplumsite",
+            "Sere": "Serendibite",
+            "Mona": "Monazite",
+            "Musg": "Musgravite",
+            "Beni": "Benitoite",
+            "Gran": "Grandidierite",
+            "Alex": "Alexandrite",
+            "Brom": "Bromellite",
+            "LTD": "Low Temperature Diamonds",
+            "Opals": "Void Opals",
+            "Trit": "Tritium"
+        }
+        
+        return abbrev_map.get(abbrev, abbrev)
     
     def _copy_system_ring(self):
         """Copy the selected system + ring to clipboard"""

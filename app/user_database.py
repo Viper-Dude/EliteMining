@@ -1261,6 +1261,112 @@ class UserDatabase:
         
         return updated_count
     
+    def check_hotspot_exists(self, system_name: str, body_name: str, material_name: str) -> bool:
+        """Check if a hotspot entry already exists in the database
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the celestial body (ring)
+            material_name: Name of the material
+            
+        Returns:
+            bool: True if entry exists, False otherwise
+        """
+        try:
+            # Normalize body name to match stored format
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT COUNT(*) FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ? AND material_name = ?
+                ''', (system_name, body_name, material_name))
+                
+                count = cursor.fetchone()[0]
+                return count > 0
+        except Exception as e:
+            log.error(f"Error checking hotspot existence: {e}")
+            return False
+    
+    def get_hotspot_data(self, system_name: str, body_name: str, material_name: str) -> Optional[dict]:
+        """Get existing hotspot data for comparison
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the celestial body (ring)
+            material_name: Name of the material
+            
+        Returns:
+            dict with hotspot data or None if not found
+        """
+        try:
+            # Normalize body name to match stored format
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT hotspot_count, x_coord, y_coord, z_coord, ring_type, ls_distance
+                    FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ? AND material_name = ?
+                ''', (system_name, body_name, material_name))
+                
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        'hotspot_count': row[0],
+                        'x_coord': row[1],
+                        'y_coord': row[2],
+                        'z_coord': row[3],
+                        'ring_type': row[4],
+                        'ls_distance': row[5]
+                    }
+                return None
+        except Exception as e:
+            log.error(f"Error getting hotspot data: {e}")
+            return None
+    
+    def get_reserve_level(self, system_name: str, body_name: str) -> Optional[str]:
+        """Get reserve level for a ring
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the celestial body (ring)
+            
+        Returns:
+            Reserve level string or None
+        """
+        try:
+            # Normalize body name to match stored format
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Query density column in hotspot_data (where bulk_update_reserve_levels stores it)
+                cursor.execute('''
+                    SELECT density FROM hotspot_data
+                    WHERE system_name = ? AND body_name = ? AND density IS NOT NULL
+                    LIMIT 1
+                ''', (system_name, body_name))
+                
+                row = cursor.fetchone()
+                
+                if row and row[0]:
+                    # Check if it's a reserve level string (not numeric density)
+                    try:
+                        float(row[0])
+                        return None  # It's numeric density, not reserve level
+                    except (ValueError, TypeError):
+                        return row[0]  # It's a reserve level string (Pristine, Major, etc.)
+                
+                return None
+                
+        except Exception as e:
+            log.error(f"Error getting reserve level: {e}")
+            return None
+    
     def add_hotspot_data(self, system_name: str, body_name: str, material_name: str, 
                         hotspot_count: int, scan_date: str, system_address: Optional[int] = None,
                         body_id: Optional[int] = None, coordinates: Optional[Tuple[float, float, float]] = None,
