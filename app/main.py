@@ -2349,19 +2349,14 @@ cargo panel forces Elite to write detailed inventory data.
                 # Check if this is a limpet
                 is_limpet = "limpet" in item_name.lower()
                 
-                # Add type-specific icons (no space after - we'll add it in formatting)
-                icon = ""
-                if is_limpet:
-                    icon = "🤖"  # Robot for limpets
-                elif any(mineral in item_name.lower() for mineral in ['painite', 'diamond', 'opal', 'alexandrite', 'serendibite', 'benitoite']):
-                    icon = "💎"  # Diamond for precious materials
-                elif any(metal in item_name.lower() for metal in ['gold', 'silver', 'platinum', 'palladium', 'osmium']):
-                    icon = "🥇"  # Medal for metals
-                else:
-                    icon = "📦"  # Box for other cargo
+                # Use same symbol for all items for consistent alignment
+                icon = "●"  # Filled circle for all cargo
                 
-                # Single line format with proper alignment: Icon + Name + Quantity
-                line = f"{icon} {display_name:<12} {quantity:>5}t\n"
+                # Simple fixed format: icon + space + name + spaces + quantity
+                name_field = f"{display_name:<12}"[:12]  # 12 characters for name
+                quantity_text = f"{quantity:>4}t"
+                
+                line = f"{icon} {name_field} {quantity_text}\n"
                 
                 # Make limpet lines clickable
                 if is_limpet:
@@ -5206,8 +5201,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         parent_frame.columnconfigure(0, weight=1)
         parent_frame.rowconfigure(0, weight=1)
         
+        # Configure LabelFrame font to match Ship Presets title
+        style = ttk.Style()
+        style.configure("Cargo.TLabelframe.Label", font=("Segoe UI", 10, "bold"))
+        
         # Create a LabelFrame to provide visual border around cargo monitor
-        cargo_frame = ttk.LabelFrame(parent_frame, text="🚛 " + t('sidebar.cargo_monitor'), padding=6)
+        cargo_frame = ttk.LabelFrame(parent_frame, text="🚛 " + t('sidebar.cargo_monitor'), padding=6, style="Cargo.TLabelframe")
         cargo_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=(2, 0))  # sticky="nsew" - expand in all directions
         cargo_frame.columnconfigure(0, weight=1)
         cargo_frame.rowconfigure(1, weight=1)  # Content row expands
@@ -5338,22 +5337,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if is_limpet:
                     display_name = t('sidebar.limpet')
                 
-                # Simple icons with better spacing
-                if is_limpet:
-                    icon = "🤖"
-                elif any(m in item_name.lower() for m in ['painite', 'diamond', 'opal']):
-                    icon = "💎"
-                elif any(m in item_name.lower() for m in ['gold', 'silver', 'platinum', 'osmium', 'praseodymi']):
-                    icon = "🥇"
-                else:
-                    icon = "📦"
+                # Use same symbol for all items for consistent alignment
+                icon = "●"  # Filled circle for all cargo
                 
-                # Use precise character positioning with monospace font
-                # Format: Icon(2) + Space(1) + Name(12) + Quantity(right-aligned)
-                name_field = f"{display_name:<12}"[:12]  # Exactly 12 characters, truncated if needed
-                quantity_text = f"{quantity}t"
+                # Simple fixed format: icon + space + name + spaces + quantity
+                name_field = f"{display_name:<12}"[:12]  # 12 characters for name
+                quantity_text = f"{quantity:>4}t"
                 
-                line = f"{icon} {name_field} {quantity_text:>5}"
+                line = f"{icon} {name_field} {quantity_text}"
                 
                 # Mark start position for limpet lines (to make clickable)
                 if is_limpet:
@@ -5368,8 +5359,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Display Engineering Materials section
         if cargo.materials_collected:
-            # Fixed separator width to match cargo line: icon(2) + space(1) + name(12) + space(1) + qty(5) = 21 + extra padding
-            sep_chars = 24
+            # Separator width to match full cargo line including quantity
+            sep_chars = 28
             self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
             self.integrated_cargo_text.insert(tk.END, "\n" + t('mining_session.engineering_materials') + " 🔩\n")
             
@@ -5390,10 +5381,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if i < len(sorted_materials) - 1:
                     self.integrated_cargo_text.insert(tk.END, "\n")
         
-        
         # Add refinery note at the very bottom with proper spacing
-        # Fixed separator width to match cargo/engineering materials line
-        sep_chars = 24
+        # Separator width to match full cargo line including quantity
+        sep_chars = 28
         self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
         
         # Configure tag for small italic text - left aligned
@@ -12632,6 +12622,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Create themed dialog
         dialog = tk.Toplevel(self)
+        dialog.withdraw()  # Hide initially to prevent flicker on wrong monitor
         dialog.title(t('dialogs.session_active_title'))
         dialog.transient(self)
         dialog.grab_set()
@@ -12769,6 +12760,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         x = main_x + (main_width - dialog_width) // 2
         y = main_y + (main_height - dialog_height) // 2
         dialog.geometry(f"+{x}+{y}")
+        
+        # Show dialog now that it's centered
+        dialog.deiconify()
         
         # Focus yes button
         yes_btn.focus_set()
