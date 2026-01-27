@@ -112,10 +112,27 @@ def centered_yesno_dialog(parent, title, message):
 
 
 def centered_info_dialog(parent, title, message):
-    """Show an Info dialog centered over parent window with orange theme. Returns when OK pressed."""
+    """Show an Info dialog centered over parent window with theme-aware colors. Returns when OK pressed."""
+    from config import load_theme
+    
+    # Get theme colors
+    theme = load_theme()
+    if theme == "elite_orange":
+        bg_color = "#000000"
+        fg_color = "#ff8c00"
+        btn_bg = "#1a1a1a"
+        btn_fg = "#ff9900"
+    else:
+        bg_color = "#1e1e1e"
+        fg_color = "#569cd6"
+        btn_bg = "#2a3a4a"
+        btn_fg = "#e0e0e0"
+    
     dialog = tk.Toplevel(parent)
     dialog.withdraw()  # Prevent flicker while laying out
-    dialog.configure(bg="#1e1e1e")
+    dialog.configure(bg=bg_color)
+    
+    # Set app icon
     try:
         from app_utils import get_app_icon_path
         icon_path = get_app_icon_path()
@@ -125,28 +142,41 @@ def centered_info_dialog(parent, title, message):
             dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
     except Exception:
         pass
+    
     dialog.title(title)
     dialog.resizable(False, False)
+    dialog.transient(parent)
+    
+    # Message label
     label = tk.Label(dialog, text=message, padx=20, pady=20, 
-                    bg="#1e1e1e", fg="#ff9800", font=("Segoe UI", 10),
+                    bg=bg_color, fg=fg_color, font=("Segoe UI", 10),
                     justify="left", wraplength=500)
     label.pack()
-    btn_frame = tk.Frame(dialog, bg="#1e1e1e")
+    
+    # Button frame
+    btn_frame = tk.Frame(dialog, bg=bg_color)
     btn_frame.pack(pady=(0, 15))
+    
     def on_ok():
         dialog.destroy()
+    
     ok_btn = tk.Button(btn_frame, text=_t('common.ok'), width=10, command=on_ok,
-                      bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
-                      activebackground="#4a4a4a", activeforeground="#ffffff",
-                      cursor="hand2")
+                      bg=btn_bg, fg=btn_fg, font=("Segoe UI", 10),
+                      activebackground=btn_bg, activeforeground=btn_fg,
+                      cursor="hand2", relief="flat", bd=0)
     ok_btn.pack()
+    
+    # Update and center on parent
+    dialog.update_idletasks()
+    
     top_parent = parent.winfo_toplevel() if parent else None
     if top_parent:
         center_window(dialog, top_parent)
+    
     dialog.deiconify()  # Show centered
-    dialog.transient(parent)
     dialog.grab_set()
     dialog.attributes('-topmost', True)
     dialog.lift()
     dialog.focus_force()
     dialog.wait_window()
+

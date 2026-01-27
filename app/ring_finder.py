@@ -4885,6 +4885,13 @@ class RingFinder(ColumnVisibilityMixin):
                                message_type="warning")
             return
         
+        # Check if more than 50 Spansh rows selected
+        if len(spansh_items) > 50:
+            message = t('ring_finder.too_many_rows_selected', count=len(spansh_items))
+            centered_info_dialog(self.parent, t('ring_finder.save_limit_exceeded'), 
+                               message)
+            return
+        
         # Use filtered list for saving
         selection = spansh_items
         
