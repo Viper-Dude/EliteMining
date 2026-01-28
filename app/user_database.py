@@ -1261,6 +1261,33 @@ class UserDatabase:
         
         return updated_count
     
+    def check_ring_exists(self, system_name: str, body_name: str) -> bool:
+        """Check if any hotspot entry exists for a ring in the database
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the celestial body (ring)
+            
+        Returns:
+            bool: True if any entry exists for this ring, False otherwise
+        """
+        try:
+            # Normalize body name to match stored format
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT COUNT(*) FROM hotspot_data 
+                    WHERE system_name = ? AND body_name = ?
+                ''', (system_name, body_name))
+                
+                count = cursor.fetchone()[0]
+                return count > 0
+        except Exception as e:
+            log.error(f"Error checking ring existence: {e}")
+            return False
+    
     def check_hotspot_exists(self, system_name: str, body_name: str, material_name: str) -> bool:
         """Check if a hotspot entry already exists in the database
         

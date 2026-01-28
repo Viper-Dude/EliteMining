@@ -192,7 +192,7 @@ class JournalParser:
         'Осмий': 'Osmium',  # Russian
     }
     
-    def __init__(self, journal_dir: str, user_db: Optional[UserDatabase] = None, on_hotspot_added: Optional[callable] = None, on_game_start: Optional[callable] = None):
+    def __init__(self, journal_dir: str, user_db: Optional[UserDatabase] = None, on_hotspot_added: Optional[callable] = None, on_game_start: Optional[callable] = None, on_reserve_updated: Optional[callable] = None):
         """Initialize the journal parser
         
         Args:
@@ -200,11 +200,13 @@ class JournalParser:
             user_db: UserDatabase instance. If None, creates a new one.
             on_hotspot_added: Optional callback function called when a hotspot is added to database
             on_game_start: Optional callback function called when LoadGame event is detected
+            on_reserve_updated: Optional callback function called when reserve levels are updated
         """
         self.journal_dir = journal_dir
         self.user_db = user_db or UserDatabase()
         self.on_hotspot_added = on_hotspot_added
         self.on_game_start_callback = on_game_start
+        self.on_reserve_updated = on_reserve_updated
         
         # Regex pattern to identify ring bodies from their names
         self.ring_pattern = re.compile(r'.* [A-Z]+ Ring$', re.IGNORECASE)
@@ -839,6 +841,9 @@ class JournalParser:
                 updated_count = self.user_db.bulk_update_reserve_levels(system_name, reserve_levels)
                 if updated_count > 0:
                     log.info(f"[RESERVE] Bulk updated {updated_count} existing entries in {system_name}")
+                    # Notify UI to refresh if callback is set
+                    if self.on_reserve_updated:
+                        self.on_reserve_updated(system_name)
         
         # Return system name - do NOT add as visit
         # Location is just "where am I now", not "I arrived here"

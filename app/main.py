@@ -1397,8 +1397,8 @@ class CargoMonitor:
         self._update_in_progress = False  # Flag to skip background tasks when update is starting
         
         # Initialize JournalParser for proper Scan and SAASignalsFound processing
-        # Add callbacks: hotspot added + game start
-        self.journal_parser = JournalParser(self.journal_dir, self.user_db, self._on_hotspot_added, self._on_game_start)
+        # Add callbacks: hotspot added + game start + reserve updated
+        self.journal_parser = JournalParser(self.journal_dir, self.user_db, self._on_hotspot_added, self._on_game_start, self._on_reserve_updated)
         
         # Flag to track pending Ring Finder refreshes
         self._pending_ring_finder_refresh = False
@@ -1448,11 +1448,33 @@ class CargoMonitor:
                 # Update Ring Finder if it exists
                 if hasattr(self, 'ring_finder') and self.ring_finder:
                     self.ring_finder.ref_system_var.set(most_recent_system)
-                    
-                # Update status bar
-                self._set_status(f"Game started - Current system: {most_recent_system}")
-            else:
-                print("[GAME START] Could not determine current system")
+        except Exception as e:
+            print(f"[GAME START] Error handling LoadGame: {e}")
+    
+    def _on_reserve_updated(self, system_name: str):
+        """Callback triggered when reserve levels are updated in database
+        
+        Refreshes Ring Finder UI if it's showing results for the updated system
+        
+        Args:
+            system_name: System that had reserve levels updated
+        """
+        try:
+            # Check if Ring Finder is showing results and if it includes this system
+            if hasattr(self, 'ring_finder') and self.ring_finder:
+                # Refresh using cached data to update reserve column
+                if hasattr(self.ring_finder, '_search_cache') and self.ring_finder._search_cache:
+                    # Check if updated system is in current results
+                    system_in_results = any(
+                        h.get('system', '').lower() == system_name.lower() or 
+                        h.get('systemName', '').lower() == system_name.lower()
+                        for h in self.ring_finder._search_cache
+                    )
+                    if system_in_results:
+                        print(f"[RESERVE] Refreshing Ring Finder UI for {system_name}")
+                        self.ring_finder._update_results(self.ring_finder._search_cache)
+        except Exception as e:
+            print(f"[RESERVE] Error refreshing UI: {e}")
                 
         except Exception as e:
             print(f"[GAME START] Error refreshing location: {e}")

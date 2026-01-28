@@ -194,6 +194,9 @@ class RingFinder(ColumnVisibilityMixin):
         self.last_monitored_system = None
         self.status_json_path = None
         
+        # Cache for search results to avoid unnecessary API calls on refresh
+        self._search_cache = None
+        
         # Track previous search results for highlighting new entries
         self.previous_results = set()  # Set of (system_name, body_name) tuples
         self.highlight_timer = None  # Timer for fade-out
@@ -1376,6 +1379,10 @@ class RingFinder(ColumnVisibilityMixin):
                     return
                 # Load saved filter settings (uses .set() on tkinter variables)
                 self._load_filter_settings()
+                
+                # Update Ring Type Only checkbox state after loading settings
+                # (checkbox might be disabled if ring type was "All" during load)
+                self._on_ring_type_changed()
                 
                 # Add traces to save settings when they change
                 self.material_var.trace_add('write', lambda *args: self._save_filter_settings())
@@ -4212,6 +4219,9 @@ class RingFinder(ColumnVisibilityMixin):
         
     def _update_results(self, hotspots: List[Dict]):
         """Update results treeview with hotspot data"""
+        # Store results in cache for future use (e.g., refresh after save to database)
+        self._search_cache = hotspots
+        
         # Filter for unvisited systems if checkbox is enabled
         if self.unvisited_only_var.get():
             filtered_hotspots = []
@@ -4475,18 +4485,39 @@ class RingFinder(ColumnVisibilityMixin):
             # Get RES display for this ring (filtered by current material selection)
             res_display = self._get_res_display(system_name, ring_name, current_material_filter)
             
-            # Localize material names in hotspot display
+            # Abbreviate and localize material names in hotspot display
+            hotspot_count_display = self._abbreviate_material_for_display(hotspot_count_display)
             hotspot_count_display = self._localize_hotspot_display(hotspot_count_display)
+            overlap_display = self._abbreviate_material_for_display(overlap_display)
             overlap_display = self._localize_hotspot_display(overlap_display)
             
             # Get source for this hotspot
             source_display = hotspot.get('data_source', 'Local')
             if 'Spansh' in source_display:
-                source_display = "🌐 Spansh"
+                # Check if also exists in local database
+                db_body_name = ring_name
+                if db_body_name.lower().startswith(system_name.lower()):
+                    db_body_name = db_body_name[len(system_name):].strip()
+                    if db_body_name and db_body_name[0] in ['-', ' ']:
+                        db_body_name = db_body_name[1:].strip()
+                
+                # Check if any material from this ring exists in local DB
+                in_local_db = False
+                try:
+                    if hasattr(self, 'user_db') and self.user_db:
+                        # Check if system+body exists in local database
+                        in_local_db = self.user_db.check_ring_exists(system_name, db_body_name)
+                except Exception:
+                    pass
+                
+                if in_local_db:
+                    source_display = "🌐🗄️"  # Both Spansh and Local
+                else:
+                    source_display = "🌐"  # Spansh only
             elif 'EDTools' in source_display or 'Community' in source_display:
-                source_display = "🗄️ Local"
+                source_display = "🗄️"
             else:
-                source_display = "🗄️ Local"  # Default to Local
+                source_display = "🗄️"  # Default to Local
             
             # Clean ring name - remove system prefix for Location column
             location_display = ring_name
@@ -4652,11 +4683,13 @@ class RingFinder(ColumnVisibilityMixin):
                         reserve = values[9] if len(values) > 9 else ""  # Reserve column is index 9
                         system_name = values[2] if len(values) > 2 else ""  # System column
                         
-                        if source and 'spansh' in str(source).lower():
+                        # Check for Spansh source (🌐 emoji)
+                        if source and '🌐' in str(source):
                             has_spansh_rows = True
                         
-                        # Check for Local source
-                        if source and 'local' in str(source).lower():
+                        # Check for Local source (🗄️ emoji)
+                        if source and '🗄️' in str(source) and '🌐' not in str(source):
+                            # Local only (not Both)
                             # "-" means Spansh was checked and has no data (don't try again)
                             # "No data" means never checked (eligible for update)
                             # "Pristine", etc. means has data (don't update)
@@ -4866,16 +4899,18 @@ class RingFinder(ColumnVisibilityMixin):
         if not selection:
             return
         
-        # Filter selection to only include Spansh results (skip Local results)
+        # Filter selection to only include Spansh-only results (skip Local and Both results)
         spansh_items = []
         local_items = []
         for item in selection:
             values = self.results_tree.item(item, 'values')
             if values and len(values) > 10:
                 source = values[10]  # Source column is index 10
-                if source and 'spansh' in str(source).lower():
+                # Check for Spansh-only source (🌐 without 🗄️)
+                if source and '🌐' in str(source) and '🗄️' not in str(source):
                     spansh_items.append(item)
-                elif source and 'local' in str(source).lower():
+                # Local or Both (has 🗄️)
+                elif source and '🗄️' in str(source):
                     local_items.append(item)
         
         if not spansh_items:
@@ -5128,6 +5163,10 @@ class RingFinder(ColumnVisibilityMixin):
             self._update_database_info()
             
             centered_info_dialog(self.parent, t('ring_finder.save_complete'), message)
+            
+            # Refresh UI using cached data to update source emojis (🌐 → 🌐🗄️)
+            if self._search_cache:
+                self._update_results(self._search_cache)
         elif saved_rows == 0 and skipped_count == 0 and error_count == 0:
             # No updates needed - all entries already in database with same data
             message = t('ring_finder.already_in_database')
