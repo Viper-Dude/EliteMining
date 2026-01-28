@@ -77,7 +77,7 @@
     "use_current_system": "Aktuelles System",
     "search_results": "Suchergebnisse",
     "search_help": "Suche: Benutzerdatenbank (Ihre Scans) + Spansh | Beide: ~50 LJ | Tipp: Spezifisches Mineral | Reserve: nur Spansh",
-    "no_data_help": "Reserve-Level: nur Spansh",
+    "no_data_help": "Ringsuche: nur Spansh (Ringtyp auswählen zum Aktivieren)",
     "right_click_help": "Rechtsklick für Optionen (Spansh in lokaler Datenbank speichern, Reserve-Level aktualisieren, usw.)",
     "ring_type": "Ringtyp",
     "reserve": "Reserve",

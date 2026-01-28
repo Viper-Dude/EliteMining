@@ -77,7 +77,7 @@
     "use_current_system": "Use Current System",
     "search_results": "Search Results",
     "search_help": "Search: User database (your scans) + Spansh | Both: ~50 LY | Tip: Select specific mineral | Reserve: Spansh only",
-    "no_data_help": "Reserve level: Spansh only",
+    "no_data_help": "Ring Search: Spansh only (Select ring type to activate)",
     "right_click_help": "Right-click rows for options (Save Spansh to Local Database, Update Reserve Level, etc.)",
     "ring_type": "Ring Type",
     "reserve": "Reserve",
