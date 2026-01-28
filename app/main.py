@@ -1397,8 +1397,8 @@ class CargoMonitor:
         self._update_in_progress = False  # Flag to skip background tasks when update is starting
         
         # Initialize JournalParser for proper Scan and SAASignalsFound processing
-        # Add callback to notify Ring Finder when new hotspots are added
-        self.journal_parser = JournalParser(self.journal_dir, self.user_db, self._on_hotspot_added)
+        # Add callbacks: hotspot added + game start
+        self.journal_parser = JournalParser(self.journal_dir, self.user_db, self._on_hotspot_added, self._on_game_start)
         
         # Flag to track pending Ring Finder refreshes
         self._pending_ring_finder_refresh = False
@@ -1426,6 +1426,38 @@ class CargoMonitor:
         # Try to initialize cargo capacity from Status.json on startup
         self.refresh_ship_capacity()
         logging.basicConfig(filename="debug_log.txt", level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
+    
+    def _on_game_start(self):
+        """Callback triggered when LoadGame event is detected (game started)
+        
+        Forces a refresh of current location in case Location event was missed during startup
+        """
+        try:
+            print("[GAME START] LoadGame detected - refreshing current system...")
+            
+            # Re-read the most recent system from journal files
+            most_recent_system = self.journal_parser.get_most_recent_system()
+            
+            if most_recent_system:
+                print(f"[GAME START] Found current system: {most_recent_system}")
+                self.current_system = most_recent_system
+                
+                # Update UI displays
+                self._update_system_display()
+                
+                # Update Ring Finder if it exists
+                if hasattr(self, 'ring_finder') and self.ring_finder:
+                    self.ring_finder.ref_system_var.set(most_recent_system)
+                    
+                # Update status bar
+                self._set_status(f"Game started - Current system: {most_recent_system}")
+            else:
+                print("[GAME START] Could not determine current system")
+                
+        except Exception as e:
+            print(f"[GAME START] Error refreshing location: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _on_hotspot_added(self, is_new_discovery: bool = False, normalized_system: str = None, normalized_body: str = None):
         """Callback triggered when new hotspot data is added to database

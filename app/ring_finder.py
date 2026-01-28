@@ -4861,7 +4861,7 @@ class RingFinder(ColumnVisibilityMixin):
             self.status_var.set("Error: Could not access main application")
     
     def _save_to_database(self):
-        """Save selected Spansh entries to local database"""
+        """Save selected Spansh entries to local database - runs in background thread"""
         selection = self.results_tree.selection()
         if not selection:
             return
@@ -4883,8 +4883,7 @@ class RingFinder(ColumnVisibilityMixin):
             if local_items:
                 message += f"\n\n{len(local_items)} local entries were skipped (already saved)."
             centered_info_dialog(self.parent, t('ring_finder.save_failed_title'), 
-                               message, 
-                               message_type="warning")
+                               message)
             return
         
         # Check if more than 50 Spansh rows selected
@@ -4894,9 +4893,12 @@ class RingFinder(ColumnVisibilityMixin):
                                message)
             return
         
-        # Use filtered list for saving
-        selection = spansh_items
-        
+        # Run save operation in background thread
+        self.status_var.set(f"Saving {len(spansh_items)} entries to database...")
+        threading.Thread(target=self._save_to_database_worker, args=(spansh_items,), daemon=True).start()
+    
+    def _save_to_database_worker(self, spansh_items):
+        """Worker thread for saving to database"""
         saved_rows = 0  # Count of successfully saved rows
         new_rows = 0  # Count of new entries
         updated_rows = 0  # Count of updated entries
@@ -4905,11 +4907,7 @@ class RingFinder(ColumnVisibilityMixin):
         errors = []
         total_materials = 0  # Count of individual material entries saved
         
-        total = len(selection)
-        
-        # Show progress
-        self.status_var.set(f"Saving {total} entries to database...")
-        self.parent.update()
+        total = len(spansh_items)
         
         for item in selection:
             row_saved = False  # Track if this row was successfully saved
@@ -5090,6 +5088,11 @@ class RingFinder(ColumnVisibilityMixin):
                 error_count += 1
                 errors.append(f"Row error: {str(e)[:50]}")
         
+        # Update UI on main thread
+        self.parent.after(0, lambda: self._save_to_database_complete(saved_rows, new_rows, updated_rows, skipped_count, error_count, errors))
+    
+    def _save_to_database_complete(self, saved_rows, new_rows, updated_rows, skipped_count, error_count, errors):
+        """Handle completion of save to database (runs on main thread)"""
         # Show results
         if saved_rows > 0:
             message = t('ring_finder.save_success').format(count=saved_rows)
@@ -5132,7 +5135,7 @@ class RingFinder(ColumnVisibilityMixin):
             centered_info_dialog(self.parent, t('ring_finder.save_failed_title'), error_msg, message_type="error")
     
     def _update_reserve_from_spansh(self):
-        """Update reserve levels for selected Local entries from Spansh"""
+        """Update reserve levels for selected Local entries from Spansh - runs in background thread"""
         selection = self.results_tree.selection()
         if not selection:
             return
@@ -5157,6 +5160,12 @@ class RingFinder(ColumnVisibilityMixin):
                                t('ring_finder.no_local_missing_reserve'))
             return
         
+        # Run update in background thread
+        self.status_var.set(f"Updating reserve levels for {len(systems_to_update)} system(s)...")
+        threading.Thread(target=self._update_reserve_worker, args=(systems_to_update,), daemon=True).start()
+    
+    def _update_reserve_worker(self, systems_to_update):
+        """Worker thread for updating reserve levels"""
         # Fetch reserve levels from Spansh for each system
         updated_count = 0
         systems_processed = 0
@@ -5175,6 +5184,11 @@ class RingFinder(ColumnVisibilityMixin):
             except Exception as e:
                 print(f"[RESERVE UPDATE] Error updating {system_name}: {e}")
         
+        # Update UI on main thread
+        self.parent.after(0, lambda: self._update_reserve_complete(updated_count, systems_processed, len(systems_to_update)))
+    
+    def _update_reserve_complete(self, updated_count, systems_processed, total_systems):
+        """Handle completion of reserve update (runs on main thread)"""
         # Show results
         if updated_count > 0:
             message = t('ring_finder.reserve_update_success').format(
@@ -5190,7 +5204,7 @@ class RingFinder(ColumnVisibilityMixin):
             print("[RESERVE UPDATE] Triggering search refresh...")
             self.parent.after(100, lambda: self.search_hotspots(auto_refresh=True))
         else:
-            message = t('ring_finder.reserve_update_none').format(systems=len(systems_to_update))
+            message = t('ring_finder.reserve_update_none').format(systems=total_systems)
             centered_info_dialog(self.parent, t('ring_finder.update_reserve_title'), message)
     
     def _fetch_reserve_levels_for_system(self, system_name: str) -> dict:

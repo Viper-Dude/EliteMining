@@ -192,17 +192,19 @@ class JournalParser:
         'Осмий': 'Osmium',  # Russian
     }
     
-    def __init__(self, journal_dir: str, user_db: Optional[UserDatabase] = None, on_hotspot_added: Optional[callable] = None):
+    def __init__(self, journal_dir: str, user_db: Optional[UserDatabase] = None, on_hotspot_added: Optional[callable] = None, on_game_start: Optional[callable] = None):
         """Initialize the journal parser
         
         Args:
             journal_dir: Path to Elite Dangerous journal directory
             user_db: UserDatabase instance. If None, creates a new one.
             on_hotspot_added: Optional callback function called when a hotspot is added to database
+            on_game_start: Optional callback function called when LoadGame event is detected
         """
         self.journal_dir = journal_dir
         self.user_db = user_db or UserDatabase()
         self.on_hotspot_added = on_hotspot_added
+        self.on_game_start_callback = on_game_start
         
         # Regex pattern to identify ring bodies from their names
         self.ring_pattern = re.compile(r'.* [A-Z]+ Ring$', re.IGNORECASE)
@@ -894,7 +896,13 @@ class JournalParser:
                 
                 event_type = event.get('event', '')
                 
-                if event_type == 'FSDJump':
+                if event_type == 'LoadGame':
+                    # Game started - force re-read of current location
+                    print("[JOURNAL] LoadGame detected - refreshing current location")
+                    if self.on_game_start_callback:
+                        self.on_game_start_callback()
+                
+                elif event_type == 'FSDJump':
                     current_system = self.process_fsd_jump(event)
                     if current_system:
                         stats['systems_visited'] += 1
