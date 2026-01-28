@@ -4893,11 +4893,18 @@ class RingFinder(ColumnVisibilityMixin):
                                message)
             return
         
-        # Run save operation in background thread
-        self.status_var.set(f"Saving {len(spansh_items)} entries to database...")
-        threading.Thread(target=self._save_to_database_worker, args=(spansh_items,), daemon=True).start()
+        # Extract all data from treeview on main thread (Tkinter widgets can't be accessed from worker thread)
+        items_data = []
+        for item in spansh_items:
+            values = self.results_tree.item(item, 'values')
+            if values and len(values) >= 11:
+                items_data.append(values)
+        
+        # Run save operation in background thread with extracted data
+        self.status_var.set(f"Saving {len(items_data)} entries to database...")
+        threading.Thread(target=self._save_to_database_worker, args=(items_data,), daemon=True).start()
     
-    def _save_to_database_worker(self, spansh_items):
+    def _save_to_database_worker(self, items_data):
         """Worker thread for saving to database"""
         saved_rows = 0  # Count of successfully saved rows
         new_rows = 0  # Count of new entries
@@ -4907,12 +4914,11 @@ class RingFinder(ColumnVisibilityMixin):
         errors = []
         total_materials = 0  # Count of individual material entries saved
         
-        total = len(spansh_items)
+        total = len(items_data)
         
-        for item in selection:
+        for values in items_data:
             row_saved = False  # Track if this row was successfully saved
             try:
-                values = self.results_tree.item(item, 'values')
                 if not values or len(values) < 11:
                     skipped_count += 1
                     errors.append("Missing data columns")
