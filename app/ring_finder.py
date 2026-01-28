@@ -4709,7 +4709,9 @@ class RingFinder(ColumnVisibilityMixin):
                         self.context_menu.entryconfig(6, state="disabled")
                     
                     # Show/hide "Save to Database" option (index 8, after separator) based on Source column
-                    if has_spansh_rows:
+                    # Disable if Ring Search (Spansh) mode is active
+                    is_ring_search_mode = self.ring_type_only_var.get()
+                    if has_spansh_rows and not is_ring_search_mode:
                         self.context_menu.entryconfig(8, state="normal")
                     else:
                         self.context_menu.entryconfig(8, state="disabled")
