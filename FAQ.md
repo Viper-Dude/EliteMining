@@ -74,6 +74,17 @@ Saved firegroup and timer configurations for different ships. Create and switch 
 </details>
 
 <details>
+<summary><b>My ship preset doesn't load timers or toggles correctly after an update. What should I do?</b></summary>
+
+After major updates, existing ship presets may need to be re-saved to include new or renamed settings. To fix this:
+1. Load your preset from the Ship Presets list
+2. Verify all timers and toggles are set correctly (adjust if needed)
+3. Right-click the preset → Save to update the preset file
+
+This ensures your preset includes all current settings and works correctly with the latest version.
+</details>
+
+<details>
 <summary><b>Where are reports stored?</b></summary>
 
 Reports are saved to the `Reports/Mining Session/` folder inside the app installation folder.

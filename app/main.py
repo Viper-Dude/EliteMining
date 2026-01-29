@@ -157,13 +157,14 @@ class TextOverlay:
             
         if not self.overlay_window:
             self.create_overlay()
-            
+        
+        # Draw text BEFORE showing window to prevent flicker
         self._draw_text(message)
         
         # CRITICAL: Reposition window every time before showing (Windows can reset position)
         self._set_window_position()
         
-        # Show window
+        # Show window AFTER text is ready
         self.overlay_window.deiconify()
         
         # Cancel any existing timer
@@ -180,8 +181,11 @@ class TextOverlay:
             
         if not self.overlay_window:
             self.create_overlay()
-            
+        
+        # Draw text BEFORE showing window to prevent flicker
         self._draw_text(message)
+        
+        # Show window AFTER text is ready
         self.overlay_window.deiconify()
         
         # Cancel any existing timer - this message stays until manually hidden
@@ -9226,8 +9230,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.withdraw()  # Hide while setting up
         dialog.title(t('dialogs.new_ship_preset'))
         dialog.configure(bg="#1e1e1e")
-        dialog.geometry("450x240")
-        dialog.resizable(False, False)
+        dialog.geometry("550x280")
+        dialog.resizable(True, True)
+        dialog.minsize(450, 240)  # Minimum size
         dialog.transient(self)
         dialog.grab_set()
         
@@ -9499,8 +9504,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.withdraw()
         dialog.title(t('dialogs.edit_ship_preset'))
         dialog.configure(bg="#1e1e1e")
-        dialog.geometry("480x280")
-        dialog.resizable(False, False)
+        dialog.geometry("550x300")
+        dialog.resizable(True, True)
+        dialog.minsize(480, 280)
         dialog.transient(self)
         dialog.grab_set()
         
