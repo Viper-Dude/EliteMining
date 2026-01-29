@@ -439,7 +439,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.82"
+APP_VERSION = "v4.83"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -2783,6 +2783,10 @@ cargo panel forces Elite to write detailed inventory data.
                         if system_name:
                             self.current_system = system_name
                             location_found = True
+                            
+                            # Update Ring Finder reference system if it exists
+                            if hasattr(self, 'ring_finder') and self.ring_finder:
+                                self.ring_finder.ref_system_var.set(system_name)
                             
                             # NOTE: Do NOT update last_known_system here!
                             # Visit counting logic depends on comparing current system to last_known_system
@@ -8027,8 +8031,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Bind mousewheel to canvas - only when mouse is over canvas
         def _on_mousewheel_mc(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel_mc))
-        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+        
+        def _bind_canvas_scroll(e):
+            canvas.bind_all("<MouseWheel>", _on_mousewheel_mc)
+        
+        def _unbind_canvas_scroll(e):
+            canvas.unbind_all("<MouseWheel>")
+        
+        canvas.bind("<Enter>", _bind_canvas_scroll)
+        canvas.bind("<Leave>", _unbind_canvas_scroll)
+        
+        # Helper to prevent spinbox scroll from affecting canvas
+        def _block_canvas_scroll_on_spinbox(spinbox):
+            spinbox.bind("<Enter>", _unbind_canvas_scroll)
+            spinbox.bind("<Leave>", _bind_canvas_scroll)
 
         # Now build content in scrollable_frame instead of frame
         scrollable_frame.columnconfigure(0, weight=1)
@@ -8064,6 +8080,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Spinbox first
             sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[name])
             sp.pack(side="left")
+            _block_canvas_scroll_on_spinbox(sp)  # Prevent canvas scroll interference
             
             # Get localized timer name
             display_name = t(timer_translations.get(name, name)) if name in timer_translations else name
@@ -8150,6 +8167,37 @@ class App(tk.Tk, ColumnVisibilityMixin):
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
+            
+            # Add Laser Mining Extra Repeat Count control right after "Repeated Mining Cycles" toggle
+            if name == "Repeated Mining Cycles":
+                repeat_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                repeat_frame.grid(row=r, column=0, sticky="w", pady=2)
+                
+                # Indent to match dependent toggles
+                tk.Label(repeat_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                
+                # Spinbox for repeat count
+                self.laser_extra_repeat_var = tk.IntVar(value=1)
+                repeat_spinbox = ttk.Spinbox(repeat_frame, from_=1, to=10, width=5, 
+                                             textvariable=self.laser_extra_repeat_var,
+                                             command=self._save_laser_extra_repeat)
+                repeat_spinbox.pack(side="left", padx=(4, 6))
+                _block_canvas_scroll_on_spinbox(repeat_spinbox)  # Prevent canvas scroll interference
+                
+                # Label
+                repeat_label = tk.Label(repeat_frame, text=f"{t('voiceattack.laser_extra_repeat_label')} [1..10]",
+                                       bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                repeat_label.pack(side="left")
+                ToolTip(repeat_label, t('voiceattack.help_laser_extra_repeat'))
+                
+                # Status label
+                self.laser_extra_status_label = tk.Label(repeat_frame, text="", fg=_help_fg, bg=_toggle_bg,
+                                                          font=("Segoe UI", 8, "italic"))
+                self.laser_extra_status_label.pack(side="left", padx=(10, 0))
+                
+                # Load saved value
+                self._load_laser_extra_repeat()
+                r += 1
         
         # Initialize dependent toggle states
         self._update_prospector_dependencies()
@@ -8225,6 +8273,43 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 _atomic_write_text(jumps_file, str(jumps))
         except Exception as e:
             print(f"[ROUTE] Error writing jumpsleft: {e}")
+    
+    def _save_laser_extra_repeat(self) -> None:
+        """Save laser mining extra repeat count to txt file"""
+        try:
+            count = self.laser_extra_repeat_var.get()
+            txt_path = os.path.join(self.vars_dir, "laserminingextra_count.txt")
+            _atomic_write_text(txt_path, str(count))
+            
+            # Update status label
+            times_text = t('voiceattack.time') if count == 1 else t('voiceattack.times')
+            self.laser_extra_status_label.config(text=f"({t('voiceattack.will_run')} {count} {times_text})")
+            
+            print(f"[LASER EXTRA] Saved repeat count: {count}")
+        except Exception as e:
+            print(f"[LASER EXTRA] Error saving repeat count: {e}")
+    
+    def _load_laser_extra_repeat(self) -> None:
+        """Load laser mining extra repeat count from txt file"""
+        try:
+            txt_path = os.path.join(self.vars_dir, "laserminingextra_count.txt")
+            if os.path.exists(txt_path):
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    count = int(f.read().strip())
+                    self.laser_extra_repeat_var.set(count)
+                    print(f"[LASER EXTRA] Loaded repeat count: {count}")
+            else:
+                # Create default file with value 1
+                self._save_laser_extra_repeat()
+                print(f"[LASER EXTRA] Created default repeat count file: 1")
+            
+            # Update status label after loading
+            count = self.laser_extra_repeat_var.get()
+            times_text = t('voiceattack.time') if count == 1 else t('voiceattack.times')
+            self.laser_extra_status_label.config(text=f"({t('voiceattack.will_run')} {count} {times_text})")
+        except Exception as e:
+            print(f"[LASER EXTRA] Error loading repeat count: {e}")
+            self.laser_extra_repeat_var.set(1)  # Fallback to default
     
     def _initialize_va_variables(self) -> None:
         """Initialize VoiceAttack variables manager"""

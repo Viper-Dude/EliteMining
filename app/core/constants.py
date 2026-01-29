@@ -39,7 +39,7 @@ TOGGLES = {
     "Auto Honk": ("toggleHonk.txt", "Enable/disable automatic system honk on entering a new system."),
     "Cargo Scoop": ("cargoScoopToggle.txt", "Retracts the cargo scoop when laser mining is completed."),
     "Headtracker Docking Control": ("toggleHeadtracker.txt", "Enable/disable automatic headtracker docking control (toggles the F9 key)."),
-    "Laser Mining Extra": ("laserminingextraToggle.txt", "Adds a second period of laser mining after a pause (see Pause timer)."),
+    "Repeated Mining Cycles": ("laserminingextraToggle.txt", "Enables additional laser mining cycles."),
     # "Multi-Session Mode": ("multiSessionMode.txt", "Accumulate statistics across multiple cargo loads without resetting.")  # Removed - only available in Mining Analytics panel
     "Night Vision": ("nightvisionToggle.txt", "Automatically turn on night vision when starting or resetting mining sequence."),
     "FSD Jump Sequence": ("toggleSystem.txt", "After FSD jump: open/close system map, then auto-jump (not saved in ship presets)"),
@@ -53,9 +53,9 @@ TOGGLES = {
 }
 
 TIMERS = {
-    "Duration for firing mining lasers (first period)": ("delayLaserMining.txt", 1, 50, "Duration for firing mining lasers (first period)."),
-    "Pause between laser periods for weapon recharge/cooldown": ("delayPause.txt", 1, 50, "Pause between laser periods for weapon recharge/cooldown (when Laser Mining Extra is enabled)."),
-    "Duration for second laser period (If Laser Mining Extra is enabled)": ("delayLaserminingExtra.txt", 1, 50, "Duration for second laser period (when Laser Mining Extra is enabled)."),
+    "Duration for firing mining lasers (standard)": ("delayLaserMining.txt", 1, 50, "Duration for firing mining lasers (standard mining)."),
+    "Pause between mining cycles for weapon recharge/cooldown": ("delayPause.txt", 1, 50, "Pause between mining cycles for weapon recharge/cooldown (when Repeated Mining Cycles is enabled)."),
+    "Duration for additional laser periods (per cycle)": ("delayLaserminingExtra.txt", 1, 50, "Duration for additional laser periods (per cycle)."),
     "Delay before selecting prospector target after laser mining": ("delayTarget.txt", 1, 50, "Delay before selecting prospector target after laser mining."),
     "Delay before retracting cargo scoop after mining sequence": ("delayCargoscoop.txt", 1, 50, "Delay before retracting cargo scoop after mining sequence."),
     "Boost Interval (For Core Mining Boost sequense )": ("boostintervalValue.txt", 1, 30, "Interval between boosts when scanning for cores."),

@@ -63,6 +63,7 @@ All standalone features **plus** voice/hotkey automation:
 - Voice/hotkey mining sequences  
 - Automated collector & prospector deployment  
 - Smart targeting & laser management  
+- **Repeated mining cycles** – Configure automated multi-cycle mining (1-10 repeats)
 - Custom commands & presets
 - Ship presets
 - Includes [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) (bundled with installer)  
@@ -505,6 +506,13 @@ Control EliteMining with voice commands. These require VoiceAttack with the Elit
 
 ### Mining Sequences (Custom Keybinds)
 These commands trigger in-game actions. Configure your keybinds in the "Custom Keybinds for Mining Control" category.
+
+#### Repeated Mining Cycles
+Configure how many times the laser mining extra sequence runs:
+- Adjustable repeat count (1-10 cycles)
+- Set in VoiceAttack Controls → Mining Controls tab
+- Default: 1 cycle (standard mining)
+- Higher values: automated repeated mining without manual restart
 
 | Voice Command | Action |
 |---------------|--------|
