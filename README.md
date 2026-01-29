@@ -7,7 +7,7 @@
 
 ---
 
-<details>
+<details open>
 <summary>Table of Contents</summary>
 
 - [Features and Usage Options](#features-and-usage-options)
@@ -558,11 +558,9 @@ Configure how many times the laser mining extra sequence runs:
 | Stop mining | Stop and save session |
 | Cancel mining | Cancel without saving |
 
-### Ship & Announcement Presets
+### Announcement Presets
 | Voice Command | Action |
 |---------------|--------|
-| Load preset 1-6 | Load ship preset |
-| Save preset 1-6 | Save current config to preset |
 | Load announcement 1-6 | Load announcement preset |
 
 ### Settings
