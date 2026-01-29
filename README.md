@@ -73,7 +73,7 @@ All standalone features **plus** voice/hotkey automation:
 ---
 
 ## Requirements
-<details>
+<details open>
 <summary>Click to expand</summary>
 
 **Essential:**  
@@ -499,7 +499,7 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 ---
 
 ## VoiceAttack Commands
-<details>
+<details open>
 <summary>Click to expand</summary>
 
 Control EliteMining with voice commands. These require VoiceAttack with the EliteMining profile.
