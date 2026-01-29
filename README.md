@@ -13,6 +13,7 @@
 - [Features and Usage Options](#features-and-usage-options)
 - [Requirements](#requirements)
 - [Installation](#installation)
+- [VoiceAttack Controls](#voiceattack-controls)
 - [EliteMining App](#elitemining-app)
 - [Hotspot Finder](#hotspot-finder)
 - [Commodity Market](#commodity-market)
@@ -20,6 +21,7 @@
 - [Ring Mining Reference](#ring-mining-reference)
 - [Star Systems](#star-systems)
 - [Distance Calculator](#distance-calculator)
+- [Backup & Restore](#backup--restore)
 - [Getting Started](#getting-started)
 - [VoiceAttack Commands](#voiceattack-commands)
 - [Mining Presets](#mining-presets)
@@ -29,6 +31,7 @@
 - [In Development](#in-development)
 - [FAQ](#faq)
 - [Contact](#contact)
+- [Community & Resources](#community--resources)
 - [License](#license--third-party-notices)
 - [Credits](#credits)
 
@@ -165,7 +168,7 @@ Configure Elite Dangerous firegroups (A-H) and fire buttons (Primary/Secondary) 
 - **Weapons** – Defense firegroup configuration
 - **Sub-surface Displacement Missile** – Deposit extraction
 
-### Mining Controls
+### Mining Controls (VoiceAttack)
 
 Control mining sequence timing and automated behaviors:
 
