@@ -8794,6 +8794,28 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 else:
                     missing.append(fname)
 
+            # Laser Mining Extra Repeat Count
+            if hasattr(self, 'laser_extra_repeat_var'):
+                repeat_count_file = "laserminingextra_count"
+                raw = self._read_var_text(repeat_count_file)
+                if raw is not None:
+                    try:
+                        count = int(raw)
+                        # Clamp to valid range (1-10)
+                        count = max(1, min(10, count))
+                        self.laser_extra_repeat_var.set(count)
+                        # Update status label
+                        if hasattr(self, 'laser_extra_status_label'):
+                            times_text = t('voiceattack.time') if count == 1 else t('voiceattack.times')
+                            self.laser_extra_status_label.config(text=f"({t('voiceattack.will_run')} {count} {times_text})")
+                        found.append(f"{repeat_count_file}.txt")
+                        print(f"[IMPORT] Loaded laser extra repeat count: {count}")
+                    except Exception as e:
+                        missing.append(f"{repeat_count_file}.txt")
+                        print(f"[IMPORT] Error loading laser extra repeat count: {e}")
+                else:
+                    missing.append(f"{repeat_count_file}.txt")
+
             msg = f"Imported {len(found)} values"
             if missing:
                 msg += f"; {len(missing)} missing/invalid: {', '.join(missing[:3])}"
@@ -8850,6 +8872,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 val = max(lo, min(hi, raw))
                 self.timer_vars[name].set(val)
                 self._write_var_text(base, str(val))
+
+            # Laser Mining Extra Repeat Count
+            if hasattr(self, 'laser_extra_repeat_var'):
+                try:
+                    count = self.laser_extra_repeat_var.get()
+                    # Clamp to valid range (1-10)
+                    count = max(1, min(10, count))
+                    self._write_var_text("laserminingextra_count", str(count))
+                    print(f"[SAVE] Saved laser extra repeat count: {count}")
+                except Exception as e:
+                    print(f"[SAVE] Error saving laser extra repeat count: {e}")
 
             self._set_status("Settings saved to VoiceAttack Variables.")
         except Exception as e:
@@ -9059,7 +9092,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if k not in ("Core Asteroids", "Non-Core Asteroids"):
                 announcement_settings[k] = v.get()
         
-        return {
+        preset_data = {
             "Firegroups": {
                 t: {"fg": self.tool_fg[t].get(),
                     "btn": (self.tool_btn[t].get() if t in self.tool_btn else None)}
@@ -9069,6 +9102,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Announcements": announcement_settings,
             "Timers": {k: v.get() for k, v in self.timer_vars.items()},
         }
+        
+        # Add laser mining extra repeat count if available
+        if hasattr(self, 'laser_extra_repeat_var'):
+            preset_data["LaserExtraRepeatCount"] = self.laser_extra_repeat_var.get()
+        
+        return preset_data
 
     def _apply_mapping(self, data: Dict[str, Any]) -> None:
         for t, spec in data.get("Firegroups", {}).items():
@@ -9100,6 +9139,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
         for k, v in data.get("Timers", {}).items():
             if k in self.timer_vars:
                 self.timer_vars[k].set(int(v))
+        
+        # Load laser mining extra repeat count if available
+        if "LaserExtraRepeatCount" in data and hasattr(self, 'laser_extra_repeat_var'):
+            try:
+                count = int(data["LaserExtraRepeatCount"])
+                # Clamp to valid range (1-10)
+                count = max(1, min(10, count))
+                self.laser_extra_repeat_var.set(count)
+                # Update the status label
+                if hasattr(self, 'laser_extra_status_label'):
+                    times_text = t('voiceattack.time') if count == 1 else t('voiceattack.times')
+                    self.laser_extra_status_label.config(text=f"({t('voiceattack.will_run')} {count} {times_text})")
+                print(f"[PRESET] Loaded laser extra repeat count: {count}")
+            except Exception as e:
+                print(f"[PRESET] Error loading laser extra repeat count: {e}")
+        
         self._set_status("Preset loaded (not yet written to Variables).")
 
     def _ask_preset_name(self, initial: Optional[str] = None) -> Optional[str]:
