@@ -31,23 +31,26 @@
   },
   "Toggles": {
     "Auto Honk": 1,
-    "Cargo Scoop": 1,
+    "Cargo Scoop": 0,
     "Headtracker Docking Control": 1,
-    "Laser Mining Extra": 0,
+    "Repeated Mining Cycles": 1,
     "Night Vision": 0,
-    "FSD Jump Sequence": 0,
-    "Power Settings": 0,
-    "Prospector Sequence": 0,
+    "Power Settings": 1,
+    "Prospector Sequence": 1,
+    "Prospector Sound Effect": 1,
+    "Target Prospector": 0,
+    "Thrust Up": 1,
     "Pulse Wave Analyser": 0,
     "Target": 0
   },
   "Announcements": {},
   "Timers": {
-    "Duration for firing mining lasers (first period)": 26,
-    "Pause between laser periods for weapon recharge/cooldown": 8,
-    "Duration for second laser period (If Laser Mining Extra is enabled)": 11,
-    "Delay before selecting prospector target after laser mining": 9,
-    "Delay before retracting cargo scoop after mining sequence": 16,
-    "Boost Interval (For Core Mining Boost sequense )": 5
-  }
+    "Duration for firing mining lasers (standard)": 25,
+    "Pause between mining cycles for weapon recharge/cooldown": 8,
+    "Duration for additional laser periods (per cycle)": 8,
+    "Delay before selecting prospector target after laser mining": 8,
+    "Delay before retracting cargo scoop after mining sequence": 15,
+    "Boost Interval (For Core Mining Boost sequense )": 1
+  },
+  "LaserExtraRepeatCount": 3
 }
