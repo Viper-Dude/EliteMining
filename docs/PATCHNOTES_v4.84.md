@@ -4,7 +4,7 @@
 ## New Features & Improvements
 
 ### Hotspot Finder
-- Local databse- Added the option for manual set Reserve Level (right-click context menu)
+- Local database- Added option for manual set Reserve Level (right-click context menu)
 - Added "Reset Search Filters" button to quickly reset all search filters to defaults
 
 
