@@ -1409,18 +1409,31 @@ class UserDatabase:
             # Normalize body name to match stored format
             body_name = self._normalize_body_name(body_name, system_name)
             
+            log.info(f"[SET RESERVE] Setting reserve for {system_name} - {body_name} to {reserve_level}")
+            
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 
-                # Update density column in hotspot_data (where reserve levels are stored)
+                # Check if entries exist for this ring
                 cursor.execute('''
-                    UPDATE hotspot_data
-                    SET density = ?
+                    SELECT COUNT(*) FROM hotspot_data
                     WHERE system_name = ? AND body_name = ?
-                ''', (reserve_level, system_name, body_name))
+                ''', (system_name, body_name))
                 
-                # If no rows updated, try to insert a placeholder entry
-                if cursor.rowcount == 0 and reserve_level:
+                count = cursor.fetchone()[0]
+                log.info(f"[SET RESERVE] Found {count} entries for this ring")
+                
+                if count > 0:
+                    # Update existing entries
+                    cursor.execute('''
+                        UPDATE hotspot_data
+                        SET density = ?
+                        WHERE system_name = ? AND body_name = ?
+                    ''', (reserve_level, system_name, body_name))
+                    log.info(f"[SET RESERVE] Updated {cursor.rowcount} rows")
+                elif reserve_level:
+                    # No entries exist, create a placeholder
+                    log.info(f"[SET RESERVE] No entries found, creating placeholder")
                     from datetime import datetime
                     scan_date = datetime.now().strftime('%Y-%m-%d')
                     cursor.execute('''
@@ -1428,12 +1441,16 @@ class UserDatabase:
                         (system_name, body_name, material_name, hotspot_count, scan_date, density)
                         VALUES (?, ?, ?, 0, ?, ?)
                     ''', (system_name, body_name, 'Unknown', scan_date, reserve_level))
+                    log.info(f"[SET RESERVE] Inserted placeholder row")
                 
                 conn.commit()
+                log.info(f"[SET RESERVE] Changes committed successfully")
                 return True
                 
         except Exception as e:
             log.error(f"Error setting reserve level: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def add_hotspot_data(self, system_name: str, body_name: str, material_name: str, 

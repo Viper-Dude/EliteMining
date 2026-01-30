@@ -5204,11 +5204,11 @@ class RingFinder(ColumnVisibilityMixin):
             values = self.results_tree.item(item, 'values')
             if values and len(values) > 10:
                 source = values[10]  # Source column
-                reserve = values[8] if len(values) > 8 else ""  # Reserve column
+                reserve = values[9] if len(values) > 9 else ""  # Reserve column is index 9
                 system_name = values[2] if len(values) > 2 else ""  # System column
                 
-                # Only process Local source with missing reserve
-                if source and 'local' in str(source).lower():
+                # Only process Local source with missing reserve (🗄️ = local database)
+                if source and '🗄️' in str(source):
                     if not reserve or reserve in ['-', 'No data', '']:
                         if system_name:
                             systems_to_update.add(system_name)
