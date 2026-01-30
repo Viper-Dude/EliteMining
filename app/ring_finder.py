@@ -4649,6 +4649,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.context_menu.add_command(label=t('context_menu.edit_hotspots'), command=self._show_edit_hotspots_dialog)
         self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
         self.context_menu.add_command(label=t('context_menu.set_res'), command=self._show_res_dialog)
+        self.context_menu.add_command(label=t('context_menu.set_reserve'), command=self._show_reserve_dialog)
         self.context_menu.add_command(label=t('context_menu.edit_visits'), command=self._show_edit_visits_dialog)
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.bookmark_location'), command=self._bookmark_selected)
@@ -4674,6 +4675,7 @@ class RingFinder(ColumnVisibilityMixin):
                 has_spansh_rows = False
                 has_local_missing_reserve = False
                 has_local_with_reserve = False
+                has_local_only = False  # Track if any entries are local-only (for Set Reserve option)
                 systems_with_missing_reserve = set()
                 
                 for sel_item in selected_items:
@@ -4690,6 +4692,7 @@ class RingFinder(ColumnVisibilityMixin):
                         # Check for Local source (🗄️ emoji)
                         if source and '🗄️' in str(source) and '🌐' not in str(source):
                             # Local only (not Both)
+                            has_local_only = True
                             # "-" means Spansh was checked and has no data (don't try again)
                             # "No data" means never checked (eligible for update)
                             # "Pristine", etc. means has data (don't update)
@@ -4754,6 +4757,16 @@ class RingFinder(ColumnVisibilityMixin):
                         self.context_menu.entryconfig(9, state="normal")
                     else:
                         self.context_menu.entryconfig(9, state="disabled")
+                    
+                    # Enable/disable "Set Reserve" option (index 14) - only for local database entries
+                    if has_local_only:
+                        self.context_menu.entryconfig(14, state="normal")
+                    else:
+                        self.context_menu.entryconfig(14, state="disabled")
+                    
+                    # Note: Menu items after index 10 (separator):
+                    # 11: Edit Hotspots, 12: Set Overlap, 13: Set RES, 14: Set Reserve, 15: Edit Visits
+                    # 16: separator, 17: Bookmark Location
                     
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -6468,6 +6481,141 @@ class RingFinder(ColumnVisibilityMixin):
             import traceback
             traceback.print_exc()
             self.status_var.set(f"Error: {e}")
+    
+    def _show_reserve_dialog(self):
+        """Show dialog to set reserve level for selected ring"""
+        try:
+            selection = self.results_tree.selection()
+            if not selection:
+                self.status_var.set("No ring selected")
+                return
+            
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if not values or len(values) < 5:
+                self.status_var.set("Invalid selection")
+                return
+            
+            system_name = values[2]  # System column
+            ring_name = values[4]    # Ring column
+            
+            if not system_name or not ring_name:
+                self.status_var.set("Cannot set reserve: missing system or ring info")
+                return
+            
+            # Create dialog
+            dialog = tk.Toplevel(self.parent)
+            dialog.title(t('context_menu.set_reserve_title'))
+            dialog.resizable(False, False)
+            dialog.transient(self.parent.winfo_toplevel())
+            
+            # Set app icon
+            try:
+                from app_utils import get_app_icon_path
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+            
+            frame = ttk.Frame(dialog, padding=15)
+            frame.pack(fill="both", expand=True)
+            
+            # Header
+            ttk.Label(frame, text=t('context_menu.set_reserve_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
+            
+            # Reserve level selection
+            ttk.Label(frame, text=t('context_menu.reserve_level')).grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
+            reserve_var = tk.StringVar(value=t('context_menu.none'))
+            
+            reserve_frame = tk.Frame(frame, bg="#1e1e1e")
+            reserve_frame.grid(row=2, column=1, sticky="w", pady=5, columnspan=2)
+            
+            # Dark themed radio buttons
+            rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
+                        "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
+            
+            # Reserve options: Pristine, Major, Common, Low, Depleted, None (2x3 grid)
+            reserve_options = [
+                ("Pristine", "Pristine"),
+                ("Major", "Major"),
+                ("Common", "Common"),
+                ("Low", "Low"),
+                ("Depleted", "Depleted"),
+                (t('context_menu.none'), "None")
+            ]
+            
+            for i, (label, value) in enumerate(reserve_options):
+                row = i // 3
+                col = i % 3
+                tk.Radiobutton(reserve_frame, text=label, variable=reserve_var, value=value, **rb_style).grid(row=row, column=col, sticky="w", padx=(0, 10), pady=2)
+            
+            # Load current reserve value
+            current_reserve = self.user_db.get_reserve_level(system_name, ring_name)
+            if current_reserve:
+                reserve_var.set(current_reserve)
+            else:
+                reserve_var.set("None")
+            
+            # Buttons
+            button_frame = ttk.Frame(frame)
+            button_frame.grid(row=4, column=0, columnspan=3, pady=(15, 0))
+            
+            def save():
+                reserve_value = reserve_var.get()
+                tag_value = reserve_value if reserve_value != "None" else None
+                
+                success = self.user_db.set_reserve_level(system_name, ring_name, tag_value)
+                if success:
+                    if tag_value:
+                        self.status_var.set(f"Reserve level set: {tag_value}")
+                    else:
+                        self.status_var.set(f"Reserve level cleared")
+                    # Refresh the current row's reserve display
+                    self._refresh_row_reserve(item, system_name, ring_name)
+                else:
+                    self.status_var.set(f"Failed to save reserve level")
+                dialog.destroy()
+            
+            def cancel():
+                dialog.destroy()
+            
+            save_btn = tk.Button(button_frame, text=t('dialogs.save'), command=save,
+                                bg="#2a5a2a", fg="#ffffff", 
+                                activebackground="#3a6a3a", activeforeground="#ffffff",
+                                relief="solid", bd=1, cursor="hand2", 
+                                pady=6, padx=15, font=("Segoe UI", 9))
+            save_btn.pack(side="left", padx=(0, 8))
+            
+            cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
+                                  bg="#5a2a2a", fg="#ffffff", 
+                                  activebackground="#6a3a3a", activeforeground="#ffffff",
+                                  relief="solid", bd=1, cursor="hand2", 
+                                  pady=6, padx=15, font=("Segoe UI", 9))
+            cancel_btn.pack(side="left")
+            
+            # Center dialog
+            dialog.update_idletasks()
+            w = dialog.winfo_width()
+            h = dialog.winfo_height()
+            parent = self.parent.winfo_toplevel()
+            px = parent.winfo_x()
+            py = parent.winfo_y()
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            x = px + (pw // 2) - (w // 2)
+            y = py + (ph // 2) - (h // 2)
+            dialog.geometry(f"+{x}+{y}")
+            
+            dialog.grab_set()
+            dialog.focus_set()
+            
+        except Exception as e:
+            print(f"Error showing reserve dialog: {e}")
+            import traceback
+            traceback.print_exc()
+            self.status_var.set(f"Error: {e}")
 
     def _refresh_row_res(self, item_id: str, system_name: str, ring_name: str):
         """Refresh the RES column for a specific row"""
@@ -6480,4 +6628,21 @@ class RingFinder(ColumnVisibilityMixin):
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
             print(f"Error refreshing row RES: {e}")
+    
+    def _refresh_row_reserve(self, item_id: str, system_name: str, ring_name: str):
+        """Refresh Reserve display for a specific row after setting reserve level"""
+        try:
+            # Get updated reserve level from database
+            reserve_level = self.user_db.get_reserve_level(system_name, ring_name)
+            
+            # Format for display
+            reserve_display = reserve_level if reserve_level else "No data"
+            
+            # Get current values and update Reserve column (index 9)
+            values = list(self.results_tree.item(item_id, 'values'))
+            if len(values) >= 10:
+                values[9] = reserve_display
+                self.results_tree.item(item_id, values=values)
+        except Exception as e:
+            print(f"Error refreshing reserve display: {e}")
 

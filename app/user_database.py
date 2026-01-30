@@ -1394,6 +1394,48 @@ class UserDatabase:
             log.error(f"Error getting reserve level: {e}")
             return None
     
+    def set_reserve_level(self, system_name: str, body_name: str, reserve_level: Optional[str]) -> bool:
+        """Set reserve level for a ring
+        
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the celestial body (ring)
+            reserve_level: Reserve level ('Pristine', 'Major', 'Common', 'Low', 'Depleted') or None to clear
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Normalize body name to match stored format
+            body_name = self._normalize_body_name(body_name, system_name)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Update density column in hotspot_data (where reserve levels are stored)
+                cursor.execute('''
+                    UPDATE hotspot_data
+                    SET density = ?
+                    WHERE system_name = ? AND body_name = ?
+                ''', (reserve_level, system_name, body_name))
+                
+                # If no rows updated, try to insert a placeholder entry
+                if cursor.rowcount == 0 and reserve_level:
+                    from datetime import datetime
+                    scan_date = datetime.now().strftime('%Y-%m-%d')
+                    cursor.execute('''
+                        INSERT INTO hotspot_data 
+                        (system_name, body_name, material_name, hotspot_count, scan_date, density)
+                        VALUES (?, ?, ?, 0, ?, ?)
+                    ''', (system_name, body_name, 'Unknown', scan_date, reserve_level))
+                
+                conn.commit()
+                return True
+                
+        except Exception as e:
+            log.error(f"Error setting reserve level: {e}")
+            return False
+    
     def add_hotspot_data(self, system_name: str, body_name: str, material_name: str, 
                         hotspot_count: int, scan_date: str, system_address: Optional[int] = None,
                         body_id: Optional[int] = None, coordinates: Optional[Tuple[float, float, float]] = None,
