@@ -620,6 +620,19 @@ class RingFinder(ColumnVisibilityMixin):
         # Tooltips for data sources
         ToolTip(source_frame, t('ring_finder.data_source_tooltip'))
         
+        # Reset Filters button - placed to the right of Data Source (theme-aware colors)
+        reset_btn_fg = "#ff8c00" if _cb_theme == "elite_orange" else "#ffffff"  # Orange for orange theme, white for dark theme
+        reset_btn_active_fg = "#ffa500" if _cb_theme == "elite_orange" else "#ffffff"
+        
+        reset_btn = tk.Button(row3_container, text=t('ring_finder.reset_filters'), 
+                             command=self._reset_filters,
+                             bg="#3a3a3a", fg=reset_btn_fg, 
+                             activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
+                             relief="raised", bd=1, cursor="hand2", 
+                             padx=15, pady=4, font=("Segoe UI", 8, "normal"))
+        reset_btn.pack(side="left", padx=(110, 0))
+        ToolTip(reset_btn, t('ring_finder.reset_filters_tooltip'))
+        
         # Confirmed hotspots only checkbox - DISABLED FOR TESTING
         # try:
         #     self.confirmed_only_var = tk.BooleanVar(value=False)
@@ -1463,6 +1476,45 @@ class RingFinder(ColumnVisibilityMixin):
             print(f" DEBUG: Looking for abbreviations: {material_abbrevs.get(specific_material, [])} in: {hotspot_display}")
         
         return False
+    
+    def _reset_filters(self):
+        """Reset all filters to default values"""
+        # Ring Type
+        self.material_var.set(t('ring_finder.all'))
+        
+        # Reserve
+        self.reserve_var.set(t('ring_finder.all_reserves'))
+        
+        # Mineral
+        self.specific_material_var.set(t('ring_finder.all_minerals'))
+        
+        # Data Source - set to Local (database)
+        self.data_source_var.set("database")
+        
+        # Unvisited Only
+        if hasattr(self, 'unvisited_only_var'):
+            self.unvisited_only_var.set(False)
+        
+        # Overlaps Only
+        if hasattr(self, 'overlaps_only_var'):
+            self.overlaps_only_var.set(False)
+        
+        # RES Only
+        if hasattr(self, 'res_only_var'):
+            self.res_only_var.set(False)
+        
+        # Ring Search (Spansh)
+        if hasattr(self, 'ring_type_only_var'):
+            self.ring_type_only_var.set(False)
+            # Re-enable data source options if they were disabled
+            self.data_source_db_rb.config(state="normal")
+            self.data_source_both_rb.config(state="normal")
+        
+        # Save the reset state
+        self._save_filter_settings()
+        
+        # Update status
+        self.status_var.set(t('ring_finder.filters_reset'))
     
     def _save_filter_settings(self, event=None):
         """Save current filter settings to config"""

@@ -3,30 +3,13 @@
 
 ## New Features & Improvements
 
-
-### [Feature Category 1]
-- [Feature description 1]
-- [Feature description 2]
-- [Feature description 3]
-
-### [Feature Category 2]
-- [Feature description 1]
-- [Feature description 2]
-
-## Hotfix
-
-### [System/Component Name]
-- Fixed [issue description]
+### Hotspot Finder
+- Local databse- Added the option for manual set Reserve Level (right-click context menu)
+- Added "Reset Search Filters" button to quickly reset all search filters to defaults
 
 
 ### Voiceattack Profile
-- No changes - latest version is v4.7.7 (included in the installer and zip file)
+- No changes - latest version is v4.8.3 (included in the installer and zip file)
 
-### How to update to the latest profile
-- Backup and delete existing EliteMining profile
-
-
-## Notes!
-- If installer fails with errors, right-click the installer and select "Run as administrator"
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
