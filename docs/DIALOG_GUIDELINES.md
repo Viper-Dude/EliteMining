@@ -8,10 +8,11 @@ All popup dialogs and windows in EliteMining must be centered on the main applic
 ### 1. Create the Dialog
 ```python
 dialog = tk.Toplevel(self)
+dialog.withdraw()  # CRITICAL: Hide immediately to prevent blinking on wrong monitor
 dialog.title("Dialog Title")
 dialog.transient(self)  # Keep on top of parent
-dialog.grab_set()       # Make modal (optional, for blocking dialogs)
 dialog.resizable(False, False)  # Optional: prevent resizing
+# Note: Do NOT call grab_set() yet - wait until after centering and showing
 ```
 
 ### 2. Set the App Icon
@@ -54,11 +55,15 @@ main_frame.pack(fill="both", expand=True)
 tk.Label(main_frame, text="Content", bg=bg_color, fg=fg_color).pack()
 ```
 
-### 5. Center the Dialog (CRITICAL!)
+### 5. Center and Show the Dialog (CRITICAL!)
 ```python
 # IMPORTANT: Always call update_idletasks() before centering
 dialog.update_idletasks()
 self._center_dialog_on_parent(dialog)
+
+# CRITICAL: Show dialog AFTER centering to prevent blinking on wrong monitor
+dialog.deiconify()  # Show the dialog in its final position
+dialog.grab_set()   # Now grab focus (for modal dialogs)
 
 # Set focus
 dialog.focus_set()
@@ -79,11 +84,11 @@ def _show_example_dialog(self) -> None:
     
     # Create dialog
     dialog = tk.Toplevel(self)
+    dialog.withdraw()  # Hide immediately to prevent blinking on wrong monitor
     dialog.title("Example Dialog")
     dialog.configure(bg=bg)
     dialog.resizable(False, False)
     dialog.transient(self)
-    dialog.grab_set()
     
     # Set icon
     try:
@@ -106,6 +111,8 @@ def _show_example_dialog(self) -> None:
     # CRITICAL: Center on parent window
     dialog.update_idletasks()
     self._center_dialog_on_parent(dialog)
+    dialog.deiconify()  # Show dialog after centering to prevent blinking
+    dialog.grab_set()   # Grab focus after showing
     
     dialog.focus_set()
 ```
@@ -157,22 +164,63 @@ def _center_dialog_on_parent(self, dialog) -> None:
 - This causes dialogs to appear on wrong monitors
 - Always position relative to parent window without screen bounds checking
 
+## Multi-Monitor Dialog Blinking Prevention
+
+**Problem:** Dialogs briefly flash on the wrong monitor before appearing in the correct position.
+
+**Root Cause:** `tk.Toplevel()` creates dialogs visible by default, usually on the primary monitor. When you then center/position the dialog, it moves from the primary monitor to the correct monitor, causing a visible "blink" or "flash".
+
+**Solution:** The withdraw/deiconify pattern:
+
+```python
+# 1. Create and IMMEDIATELY hide the dialog
+dialog = tk.Toplevel(self)
+dialog.withdraw()  # Hide before it appears on screen
+
+# 2. Configure and build the dialog
+dialog.title("My Dialog")
+dialog.configure(bg=bg_color)
+# ... add all widgets ...
+
+# 3. Center the dialog (while still hidden)
+dialog.update_idletasks()
+self._center_dialog_on_parent(dialog)
+
+# 4. Show the dialog in its final position
+dialog.deiconify()  # Now it appears only once, in the correct location
+dialog.grab_set()   # Grab focus after showing
+```
+
+**Key Points:**
+- Call `withdraw()` immediately after creating the Toplevel
+- Build all widgets while the dialog is hidden
+- Center the dialog while hidden
+- Call `deiconify()` only after centering is complete
+- Call `grab_set()` after `deiconify()` to ensure proper focus
+
+This ensures the dialog appears instantly in the correct position without any visible movement or flashing.
+
 ## Common Mistakes to Avoid
 
-1. **Forgetting `update_idletasks()`** - Dialog dimensions will be 1x1 if you don't call this first
-2. **Centering before adding widgets** - Always add all widgets BEFORE centering
-3. **Using `winfo_width()` instead of `winfo_reqwidth()`** - Use `reqwidth` for initial sizing
-4. **Not using `transient(self)`** - Dialog may appear behind main window
-5. **Hardcoding colors** - Always use theme-aware colors from `load_theme()`
+1. **Forgetting `withdraw()`** - Dialog will blink on wrong monitor in multi-monitor setups
+2. **Calling `grab_set()` before `deiconify()`** - Can cause focus issues; always grab after showing
+3. **Forgetting `update_idletasks()`** - Dialog dimensions will be 1x1 if you don't call this first
+4. **Centering before adding widgets** - Always add all widgets BEFORE centering
+5. **Using `winfo_width()` instead of `winfo_reqwidth()`** - Use `reqwidth` for initial sizing
+6. **Not using `transient(self)`** - Dialog may appear behind main window
+7. **Hardcoding colors** - Always use theme-aware colors from `load_theme()`
 
 ## Checklist for New Dialogs
 
 - [ ] Create with `tk.Toplevel(self)`
+- [ ] **Immediately call `dialog.withdraw()` to prevent blinking**
 - [ ] Set `transient(self)` for proper window stacking
 - [ ] Set app icon with `get_app_icon_path()`
 - [ ] Use theme colors from `load_theme()`
 - [ ] Add all widgets before centering
 - [ ] Call `update_idletasks()` before centering
 - [ ] Call `self._center_dialog_on_parent(dialog)`
+- [ ] **Call `dialog.deiconify()` to show dialog after centering**
+- [ ] **Call `dialog.grab_set()` after deiconify (for modal dialogs)**
 - [ ] Set focus with `dialog.focus_set()`
 - [ ] Add localization keys to both `strings_en.json` and `strings_de.json`

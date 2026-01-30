@@ -269,6 +269,7 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
         btn_fg = "#e0e0e0"
     
     dialog = tk.Toplevel(parent)
+    dialog.withdraw()  # Hide immediately to prevent blinking on wrong monitor
     dialog.title(title)
     dialog.resizable(False, False)
     dialog.configure(bg=bg_color)
@@ -345,6 +346,7 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
         
         dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
     
+    dialog.deiconify()  # Show dialog after centering to prevent blinking
     dialog.grab_set()
     dialog.focus_set()
     ok_btn.focus_set()

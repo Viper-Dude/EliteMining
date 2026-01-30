@@ -6664,11 +6664,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Create dialog
             dialog = tk.Toplevel(self)
+            dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
             dialog.title(t('settings.rename_preset').format(num=num))
             dialog.configure(bg=bg)
             dialog.resizable(False, False)
             dialog.transient(self)
-            dialog.grab_set()
             
             # Set icon
             try:
@@ -6694,7 +6694,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                            bg="#2a2a2a", fg="#ffffff",
                            insertbackground="#ffffff")
             entry.pack(pady=5)
+            
+            # Center and show dialog
+            dialog.update_idletasks()
+            self._center_dialog_on_parent(dialog)
+            dialog.deiconify()  # Show dialog after centering
+            dialog.grab_set()  # Grab focus after showing
+            
             entry.select_range(0, tk.END)
+            entry.focus_set()
             
             def save_name():
                 new_name = name_var.get().strip()
@@ -8589,6 +8597,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Create dialog
             dialog = tk.Toplevel(self)
+            dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
             dialog.title(t('context_menu.edit_visits_title'))
             dialog.resizable(False, False)
             dialog.transient(self)
@@ -8689,6 +8698,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             x = px + (pw // 2) - (w // 2)
             y = py + (ph // 2) - (h // 2)
             dialog.geometry(f"+{x}+{y}")
+            dialog.deiconify()  # Show dialog after centering
             
             dialog.grab_set()
             count_entry.focus_set()
@@ -9160,12 +9170,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _ask_preset_name(self, initial: Optional[str] = None) -> Optional[str]:
         """Custom dark dialog for preset names"""
         dialog = tk.Toplevel(self)
+        dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
         dialog.title(t('dialogs.preset_name'))
         dialog.configure(bg="#2c3e50")
         dialog.geometry("400x150")
         dialog.resizable(False, False)
         dialog.transient(self)
-        dialog.grab_set()
         
         # Set app icon
         try:
@@ -9182,6 +9192,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
         y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
         dialog.geometry(f"+{x}+{y}")
+        dialog.deiconify()  # Show dialog after centering
+        dialog.grab_set()  # Grab focus after showing
         
         result = None
         
@@ -11447,12 +11459,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Create modal dialog
         dialog = tk.Toplevel(self)
+        dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
         dialog.title(t('dialogs.import_journal_question'))
         dialog.configure(bg="#2c3e50")
         dialog.geometry("550x350")  # Increased size to accommodate long paths
         dialog.resizable(False, False)
         dialog.transient(self)
-        dialog.grab_set()
         
         # Set app icon (consistent across app)
         set_window_icon(dialog)
@@ -11462,6 +11474,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
         y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
         dialog.geometry(f"+{x}+{y}")
+        dialog.deiconify()  # Show dialog after centering
+        dialog.grab_set()  # Grab focus after showing
         
         # Title label
         title_label = tk.Label(
@@ -12233,9 +12247,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Create custom centered dialog
         dialog = tk.Toplevel(self)
+        dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
         dialog.title(t('dialogs.theme_changed'))
         dialog.transient(self)
-        dialog.grab_set()
         dialog.resizable(False, False)
         
         # Set app icon
@@ -12288,6 +12302,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         main_height = self.winfo_height()
         
         x = main_x + (main_width - dialog_width) // 2
+        y = main_y + (main_height - dialog_height) // 2
+        dialog.geometry(f"+{x}+{y}")
+        dialog.deiconify()  # Show dialog after centering
+        dialog.grab_set()  # Grab focus after showing
+        
+        dialog.wait_window()
         y = main_y + (main_height - dialog_height) // 2
         dialog.geometry(f"+{x}+{y}")
     
@@ -12432,11 +12452,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Create dialog
         dialog = tk.Toplevel(self)
+        dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
         dialog.title(t('tabs.about'))
         dialog.configure(bg=_about_bg)
         dialog.resizable(False, False)
         dialog.transient(self)
-        dialog.grab_set()
         
         # Set icon
         try:
@@ -12582,6 +12602,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Center on parent - IMPORTANT: Always center dialogs on parent window!
         dialog.update_idletasks()
         self._center_dialog_on_parent(dialog)
+        dialog.deiconify()  # Show dialog after centering
+        dialog.grab_set()  # Grab focus after showing
         
         # Focus dialog
         dialog.focus_set()
@@ -13079,13 +13101,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Show backup dialog with options to select what to backup"""
         try:
             dialog = tk.Toplevel(self)
+            dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
             dialog.title(t('dialogs.backup_title'))
             dialog.geometry("450x600")
             dialog.resizable(True, True)
             dialog.minsize(450, 600)
             dialog.configure(bg="#1e1e1e")
             dialog.transient(self)
-            dialog.grab_set()
             
             # Set app icon if available
             try:
@@ -13103,6 +13125,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
             y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
             dialog.geometry(f"+{x}+{y}")
+            dialog.deiconify()  # Show dialog after centering
+            dialog.grab_set()  # Grab focus after showing
             
             # Title
             title_label = tk.Label(dialog, text="📦 " + t('dialogs.backup_title'), 
@@ -13513,13 +13537,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Show dialog to select what to restore from backup"""
         try:
             dialog = tk.Toplevel(self)
+            dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
             dialog.title(t('dialogs.restore_title'))
             dialog.geometry("450x680")
             dialog.resizable(True, True)
             dialog.minsize(450, 680)
             dialog.configure(bg="#1e1e1e")
             dialog.transient(self)
-            dialog.grab_set()
             
             # Set app icon if available
             try:
@@ -13537,6 +13561,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
             y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
             dialog.geometry(f"+{x}+{y}")
+            dialog.deiconify()  # Show dialog after centering
+            dialog.grab_set()  # Grab focus after showing
             
             # Title
             title_label = tk.Label(dialog, text=t('dialogs.restore_title'), 
