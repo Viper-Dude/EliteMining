@@ -7,7 +7,6 @@
 - Local database- Added option for manual set Reserve Level (right-click context menu)
 - Added "Reset Search Filters" button to quickly reset all search filters to defaults
 
-
 ### Voiceattack Profile
 - No changes - latest version is v4.8.3 (included in the installer and zip file)
 

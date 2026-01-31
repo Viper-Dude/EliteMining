@@ -6,7 +6,10 @@ Applies keybinds to VoiceAttack profile XML
 import xml.etree.ElementTree as ET
 import logging
 from typing import Dict
-from app.va_keybind_extractor import CommandKeybinds
+try:
+    from app.va_keybind_extractor import CommandKeybinds
+except ImportError:
+    from va_keybind_extractor import CommandKeybinds
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +68,9 @@ class VAKeybindApplier:
                 keybinds.joystick_shortcut,
                 keybinds.joystick_release,
                 keybinds.joystick_number,
-                keybinds.joystick_button
+                keybinds.joystick_button,
+                keybinds.joystick_number2,
+                keybinds.joystick_button2
             )
         
         # Apply mouse shortcut
@@ -103,7 +108,8 @@ class VAKeybindApplier:
         release_elem.text = "true" if release else "false"
     
     def set_joystick_shortcut(self, command: ET.Element, shortcut: str, release: bool = False,
-                               joystick_number: str = None, joystick_button: str = None):
+                               joystick_number: str = None, joystick_button: str = None,
+                               joystick_number2: str = None, joystick_button2: str = None):
         """Set joystick shortcut on command"""
         use_joystick = command.find("UseJoystick")
         if use_joystick is None:
@@ -115,7 +121,15 @@ class VAKeybindApplier:
             shortcut_elem = ET.SubElement(command, "JoystickValue")
         shortcut_elem.text = shortcut
         
-        # Set joystick number and button if provided
+        cmd_name = self.get_command_name(command)
+        
+        # Check if this is a compound keybind (has second button)
+        is_compound = joystick_button2 and joystick_button2 not in ('0', '-1', '')
+        
+        if is_compound:
+            logger.info(f"[COMPOUND KEYBIND] Applying compound keybind to '{cmd_name}': Joystick {joystick_number} Button {joystick_button} + Joystick {joystick_number2} Button {joystick_button2}")
+        
+        # Always set primary joystick number and button
         if joystick_number is not None:
             num_elem = command.find("joystickNumber")
             if num_elem is None:
@@ -127,6 +141,20 @@ class VAKeybindApplier:
             if btn_elem is None:
                 btn_elem = ET.SubElement(command, "joystickButton")
             btn_elem.text = joystick_button
+        
+        # Set secondary joystick number and button (for compound keybinds)
+        num2_elem = command.find("joystickNumber2")
+        if num2_elem is None:
+            num2_elem = ET.SubElement(command, "joystickNumber2")
+        num2_elem.text = joystick_number2 if joystick_number2 else "0"
+        
+        btn2_elem = command.find("joystickButton2")
+        if btn2_elem is None:
+            btn2_elem = ET.SubElement(command, "joystickButton2")
+        btn2_elem.text = joystick_button2 if joystick_button2 else "0"
+        
+        if not is_compound:
+            logger.debug(f"[SIMPLE KEYBIND] Applied simple keybind to '{cmd_name}': {shortcut}")
         
         release_elem = command.find("JoystickButtonsReleased")
         if release_elem is None:
@@ -155,8 +183,13 @@ class VAKeybindApplier:
         enabled_elem = command.find("Enabled")
         if enabled_elem is None:
             enabled_elem = ET.SubElement(command, "Enabled")
-        enabled_elem.text = "true" if enabled else "false"
-    
+        enabled_elem.text = "true" if enabled else "false"    
+    def get_command_name(self, command: ET.Element) -> str:
+        """Get command name from XML"""
+        cmd_name = command.find("CommandString")
+        if cmd_name is not None and cmd_name.text:
+            return cmd_name.text
+        return "Unknown"    
     def set_shortcut_options(self, command: ET.Element, keybinds: CommandKeybinds):
         """Set shortcut options on command using correct VoiceAttack element names"""
         # Boolean options

@@ -21,6 +21,8 @@ class CommandKeybinds:
     joystick_release: bool = False
     joystick_number: Optional[str] = None
     joystick_button: Optional[str] = None
+    joystick_number2: Optional[str] = None
+    joystick_button2: Optional[str] = None
     mouse_shortcut: Optional[str] = None
     mouse_release: bool = False
     enabled: bool = True
@@ -77,6 +79,8 @@ class VAKeybindExtractor:
                 joystick_release=self.get_joystick_release(command),
                 joystick_number=self.get_joystick_number(command),
                 joystick_button=self.get_joystick_button(command),
+                joystick_number2=self.get_joystick_number2(command),
+                joystick_button2=self.get_joystick_button2(command),
                 mouse_shortcut=self.extract_mouse_shortcut(command),
                 mouse_release=self.get_mouse_release(command),
                 enabled=self.is_command_enabled(command),
@@ -106,9 +110,11 @@ class VAKeybindExtractor:
             )
         
         # Filter to only commands with keybinds
+        # Include commands with keyboard, mouse, joystick shortcuts, or joystick button set
         keybinds_with_bindings = {
             name: kb for name, kb in keybinds.items()
-            if kb.keyboard_shortcut or kb.joystick_shortcut or kb.mouse_shortcut
+            if kb.keyboard_shortcut or kb.joystick_shortcut or kb.mouse_shortcut 
+            or (kb.joystick_button and kb.joystick_button not in ('0', '-1', ''))
         }
         
         logger.info(f"Extracted keybinds from {len(keybinds_with_bindings)} commands")
@@ -144,11 +150,18 @@ class VAKeybindExtractor:
     
     def extract_joystick_shortcut(self, command: ET.Element) -> Optional[str]:
         """Extract joystick button shortcut if present"""
-        enabled = command.find("UseJoystick")
-        if enabled is None or enabled.text.lower() != "true":
-            return None
+        # First, try to get the full JoystickValue (handles compound keybinds like "Button 31 + Button 8")
+        joystick_value = command.find("JoystickValue")
+        if joystick_value is not None and joystick_value.text and joystick_value.text.strip():
+            # Return the full joystick value string (may contain compound keybinds)
+            value = joystick_value.text
+            cmd_name = self.get_command_name(command)
+            if '+' in value:
+                logger.info(f"[COMPOUND KEYBIND] Extracted compound keybind for '{cmd_name}': {value}")
+            return value
         
-        # Get joystick number and button
+        # Fallback: construct from individual joystickNumber and joystickButton
+        # Note: Extract even if UseJoystick is false, as VA sometimes exports this way
         joystick_num = command.find("joystickNumber")
         joystick_btn = command.find("joystickButton")
         
@@ -156,7 +169,7 @@ class VAKeybindExtractor:
             num = joystick_num.text
             btn = joystick_btn.text
             
-            # Check if it's actually set (not -1 or 0)
+            # Check if it's actually set (not -1)
             if btn and btn != "-1":
                 # Format: "Joystick 1 Button 25"
                 return f"Joystick {num} Button {btn}"
@@ -223,6 +236,20 @@ class VAKeybindExtractor:
     def get_joystick_button(self, command: ET.Element) -> Optional[str]:
         """Get joystick button"""
         elem = command.find("joystickButton")
+        if elem is not None and elem.text:
+            return elem.text
+        return None
+
+    def get_joystick_number2(self, command: ET.Element) -> Optional[str]:
+        """Get second joystick number (for compound keybinds)"""
+        elem = command.find("joystickNumber2")
+        if elem is not None and elem.text:
+            return elem.text
+        return None
+    
+    def get_joystick_button2(self, command: ET.Element) -> Optional[str]:
+        """Get second joystick button (for compound keybinds)"""
+        elem = command.find("joystickButton2")
         if elem is not None and elem.text:
             return elem.text
         return None

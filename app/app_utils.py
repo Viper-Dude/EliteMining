@@ -5,6 +5,7 @@ Handles paths, icons, and other common functions for both development and instal
 
 import os
 import sys
+import logging
 import tkinter as tk
 from typing import Optional
 from typing import Any
@@ -375,10 +376,16 @@ def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> 
     result = {'value': False}
     def on_yes():
         result['value'] = True
-        dialog.destroy()
+        try:
+            dialog.destroy()
+        except:
+            pass
     def on_no():
         result['value'] = False
-        dialog.destroy()
+        try:
+            dialog.destroy()
+        except:
+            pass
     
     yes_btn = ttk.Button(btn_frame, text="Yes", width=10, command=on_yes)
     yes_btn.pack(side=tk.LEFT, padx=(0, 10))
@@ -390,30 +397,40 @@ def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> 
     dialog.bind("<Escape>", lambda e: on_no())
     
     # Center on parent window manually
-    dialog.update_idletasks()
-    dialog_width = dialog.winfo_reqwidth()
-    dialog_height = dialog.winfo_reqheight()
-    
-    if parent:
-        parent.update_idletasks()
-        parent_x = parent.winfo_rootx()
-        parent_y = parent.winfo_rooty()
-        parent_width = parent.winfo_width()
-        parent_height = parent.winfo_height()
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
-    else:
-        x = (dialog.winfo_screenwidth() - dialog_width) // 2
-        y = (dialog.winfo_screenheight() - dialog_height) // 2
-    
-    dialog.geometry(f"+{x}+{y}")
-    dialog.deiconify()
-    dialog.transient(parent)
-    dialog.grab_set()
-    dialog.attributes('-topmost', True)
-    dialog.lift()
-    yes_btn.focus_set()
-    dialog.wait_window()
+    try:
+        dialog.update_idletasks()
+        dialog_width = dialog.winfo_reqwidth()
+        dialog_height = dialog.winfo_reqheight()
+        
+        if parent:
+            parent.update_idletasks()
+            parent_x = parent.winfo_rootx()
+            parent_y = parent.winfo_rooty()
+            parent_width = parent.winfo_width()
+            parent_height = parent.winfo_height()
+            x = parent_x + (parent_width - dialog_width) // 2
+            y = parent_y + (parent_height - dialog_height) // 2
+        else:
+            x = (dialog.winfo_screenwidth() - dialog_width) // 2
+            y = (dialog.winfo_screenheight() - dialog_height) // 2
+        
+        dialog.geometry(f"+{x}+{y}")
+        dialog.deiconify()
+        dialog.transient(parent)
+        try:
+            dialog.grab_set()
+        except:
+            pass  # grab_set can fail if another grab is active
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        yes_btn.focus_set()
+        dialog.wait_window()
+    except Exception as e:
+        logging.error(f"[DIALOG] Error in centered_askyesno: {e}")
+        try:
+            dialog.destroy()
+        except:
+            pass
     return result['value']
 
 

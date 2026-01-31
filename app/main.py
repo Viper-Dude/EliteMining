@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.84"
+APP_VERSION = "v4.85"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -474,13 +474,32 @@ def _atomic_write_text(path: str, text: str) -> None:
         tmp_path = path + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(text)
-            # On Windows, replace is atomic for same-volume paths (Python 3.8+).
+        # On Windows, replace is atomic for same-volume paths (Python 3.8+).
         os.replace(tmp_path, path)
-    except Exception as e:
+    except PermissionError:
+        # File likely locked by VoiceAttack - direct write as fallback
         try:
-            # Best effort fallback (non‑atomic)
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
+        except Exception:
+            pass
+        # Clean up temp file if it exists
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+    except Exception as e:
+        try:
+            # Best effort fallback (non-atomic)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+        except Exception:
+            pass
+        # Clean up temp file if it exists
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
         except Exception:
             pass
         log.exception("Atomic write failed for %s: %s", path, e)
@@ -4947,7 +4966,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(3000, self._background_journal_catchup)
         
         # Check for VA profile updates AFTER everything is loaded and settled
-        self.after(5000, self._check_va_profile_update)
+        # Use longer delay to ensure UI is fully responsive
+        self.after(12000, self._check_va_profile_update)
+        
+        # Set flag after window is fully displayed
+        self._app_fully_loaded = False
+        def mark_loaded():
+            self._app_fully_loaded = True
+        self.after(5000, mark_loaded)
 
     def _cleanup_legacy_files(self):
         """Remove legacy files from older versions that are no longer used"""
@@ -8138,7 +8164,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Auto Deselect Target": "voiceattack.help_target",
         }
         
-        ttk.Label(toggles_header, text=t('voiceattack.toggles'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(toggles_header, text=t('voiceattack.advanced_controls'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
         tk.Label(toggles_header, text=t('voiceattack.tip_stop_commands'), 
                  fg=_toggle_tip_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).grid(row=0, column=1, sticky="")
         r += 1
@@ -8241,6 +8267,72 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 # Load saved value
                 self._load_laser_extra_repeat()
+                r += 1
+            
+            # Add Thrust Up timing controls right after "Thrust Up" toggle
+            if name == "Thrust Up":
+                # First spinbox: Scoop closed/retracted
+                thrust_closed_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                thrust_closed_frame.grid(row=r, column=0, sticky="w", pady=2)
+                
+                # Double-indent (under Thrust Up which is under Prospector Sequence)
+                tk.Label(thrust_closed_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                tk.Label(thrust_closed_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                
+                # Spinbox for thrust closed timing (1.0 to 5.0 with 0.1 increment)
+                self.thrust_closed_var = tk.DoubleVar(value=1.5)
+                thrust_closed_spinbox = ttk.Spinbox(thrust_closed_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
+                                                    textvariable=self.thrust_closed_var, format="%.1f",
+                                                    command=self._save_thrust_closed)
+                thrust_closed_spinbox.pack(side="left", padx=(4, 6))
+                _block_canvas_scroll_on_spinbox(thrust_closed_spinbox)
+                
+                # Add trace to save on any value change
+                self.thrust_closed_var.trace_add("write", lambda *args: self._save_thrust_closed())
+                
+                # Label
+                thrust_closed_label = tk.Label(thrust_closed_frame, text=f"{t('voiceattack.thrust_closed_label')} [1.0..5.0]",
+                                              bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                thrust_closed_label.pack(side="left")
+                
+                # Help text (grey, always visible)
+                tk.Label(thrust_closed_frame, text=t('voiceattack.help_thrust_closed'), 
+                        fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                
+                # Load saved value
+                self._load_thrust_closed()
+                r += 1
+                
+                # Second spinbox: Scoop open/deployed
+                thrust_open_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                thrust_open_frame.grid(row=r, column=0, sticky="w", pady=2)
+                
+                # Double-indent
+                tk.Label(thrust_open_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                tk.Label(thrust_open_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                
+                # Spinbox for thrust open timing (1.0 to 5.0 with 0.1 increment)
+                self.thrust_open_var = tk.DoubleVar(value=3.8)
+                thrust_open_spinbox = ttk.Spinbox(thrust_open_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
+                                                  textvariable=self.thrust_open_var, format="%.1f",
+                                                  command=self._save_thrust_open)
+                thrust_open_spinbox.pack(side="left", padx=(4, 6))
+                _block_canvas_scroll_on_spinbox(thrust_open_spinbox)
+                
+                # Add trace to save on any value change
+                self.thrust_open_var.trace_add("write", lambda *args: self._save_thrust_open())
+                
+                # Label
+                thrust_open_label = tk.Label(thrust_open_frame, text=f"{t('voiceattack.thrust_open_label')} [1.0..5.0]",
+                                            bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                thrust_open_label.pack(side="left")
+                
+                # Help text (grey, always visible)
+                tk.Label(thrust_open_frame, text=t('voiceattack.help_thrust_open'), 
+                        fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                
+                # Load saved value
+                self._load_thrust_open()
                 r += 1
         
         # Initialize dependent toggle states
@@ -8386,6 +8478,68 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[PROSPECTOR DELAY] Error loading delay: {e}")
             self.prospector_delay_var.set(4.4)  # Fallback to default
+    
+    def _save_thrust_closed(self) -> None:
+        """Save thrust closed timing to thrustScoopClosed.txt"""
+        try:
+            delay = self.thrust_closed_var.get()
+            txt_path = os.path.join(self.vars_dir, "thrustScoopClosed.txt")
+            # Always use period (.) as decimal separator for VoiceAttack compatibility
+            delay_str = f"{delay:.1f}".replace(',', '.')
+            _atomic_write_text(txt_path, delay_str)
+            print(f"[THRUST CLOSED] Saved timing: {delay_str} seconds")
+        except Exception as e:
+            print(f"[THRUST CLOSED] Error saving timing: {e}")
+    
+    def _load_thrust_closed(self) -> None:
+        """Load thrust closed timing from thrustScoopClosed.txt"""
+        try:
+            txt_path = os.path.join(self.vars_dir, "thrustScoopClosed.txt")
+            if os.path.exists(txt_path):
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    delay = float(f.read().strip())
+                    # Clamp to valid range
+                    delay = max(1.0, min(5.0, delay))
+                    self.thrust_closed_var.set(delay)
+                    print(f"[THRUST CLOSED] Loaded timing: {delay:.1f} seconds")
+            else:
+                # Create default file with value 1.5
+                self._save_thrust_closed()
+                print(f"[THRUST CLOSED] Created default timing file: 1.5 seconds")
+        except Exception as e:
+            print(f"[THRUST CLOSED] Error loading timing: {e}")
+            self.thrust_closed_var.set(1.5)  # Fallback to default
+    
+    def _save_thrust_open(self) -> None:
+        """Save thrust open timing to thrustScoopOpen.txt"""
+        try:
+            delay = self.thrust_open_var.get()
+            txt_path = os.path.join(self.vars_dir, "thrustScoopOpen.txt")
+            # Always use period (.) as decimal separator for VoiceAttack compatibility
+            delay_str = f"{delay:.1f}".replace(',', '.')
+            _atomic_write_text(txt_path, delay_str)
+            print(f"[THRUST OPEN] Saved timing: {delay_str} seconds")
+        except Exception as e:
+            print(f"[THRUST OPEN] Error saving timing: {e}")
+    
+    def _load_thrust_open(self) -> None:
+        """Load thrust open timing from thrustScoopOpen.txt"""
+        try:
+            txt_path = os.path.join(self.vars_dir, "thrustScoopOpen.txt")
+            if os.path.exists(txt_path):
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    delay = float(f.read().strip())
+                    # Clamp to valid range
+                    delay = max(1.0, min(5.0, delay))
+                    self.thrust_open_var.set(delay)
+                    print(f"[THRUST OPEN] Loaded timing: {delay:.1f} seconds")
+            else:
+                # Create default file with value 3.8
+                self._save_thrust_open()
+                print(f"[THRUST OPEN] Created default timing file: 3.8 seconds")
+        except Exception as e:
+            print(f"[THRUST OPEN] Error loading timing: {e}")
+            self.thrust_open_var.set(3.8)  # Fallback to default
     
     def _initialize_va_variables(self) -> None:
         """Initialize VoiceAttack variables manager"""
@@ -8890,6 +9044,60 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 else:
                     missing.append(f"{repeat_count_file}.txt")
 
+            # Prospector Delay
+            if hasattr(self, 'prospector_delay_var'):
+                prospector_delay_file = "delayprospector"
+                raw = self._read_var_text(prospector_delay_file)
+                if raw is not None:
+                    try:
+                        delay = float(raw)
+                        # Clamp to valid range (2.0-6.0)
+                        delay = max(2.0, min(6.0, delay))
+                        self.prospector_delay_var.set(delay)
+                        found.append(f"{prospector_delay_file}.txt")
+                        print(f"[IMPORT] Loaded prospector delay: {delay:.1f}s")
+                    except Exception as e:
+                        missing.append(f"{prospector_delay_file}.txt")
+                        print(f"[IMPORT] Error loading prospector delay: {e}")
+                else:
+                    missing.append(f"{prospector_delay_file}.txt")
+
+            # Thrust Closed Timing
+            if hasattr(self, 'thrust_closed_var'):
+                thrust_closed_file = "thrustScoopClosed"
+                raw = self._read_var_text(thrust_closed_file)
+                if raw is not None:
+                    try:
+                        delay = float(raw)
+                        # Clamp to valid range (1.0-5.0)
+                        delay = max(1.0, min(5.0, delay))
+                        self.thrust_closed_var.set(delay)
+                        found.append(f"{thrust_closed_file}.txt")
+                        print(f"[IMPORT] Loaded thrust closed: {delay:.1f}s")
+                    except Exception as e:
+                        missing.append(f"{thrust_closed_file}.txt")
+                        print(f"[IMPORT] Error loading thrust closed: {e}")
+                else:
+                    missing.append(f"{thrust_closed_file}.txt")
+
+            # Thrust Open Timing
+            if hasattr(self, 'thrust_open_var'):
+                thrust_open_file = "thrustScoopOpen"
+                raw = self._read_var_text(thrust_open_file)
+                if raw is not None:
+                    try:
+                        delay = float(raw)
+                        # Clamp to valid range (1.0-5.0)
+                        delay = max(1.0, min(5.0, delay))
+                        self.thrust_open_var.set(delay)
+                        found.append(f"{thrust_open_file}.txt")
+                        print(f"[IMPORT] Loaded thrust open: {delay:.1f}s")
+                    except Exception as e:
+                        missing.append(f"{thrust_open_file}.txt")
+                        print(f"[IMPORT] Error loading thrust open: {e}")
+                else:
+                    missing.append(f"{thrust_open_file}.txt")
+
             msg = f"Imported {len(found)} values"
             if missing:
                 msg += f"; {len(missing)} missing/invalid: {', '.join(missing[:3])}"
@@ -9181,6 +9389,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if hasattr(self, 'laser_extra_repeat_var'):
             preset_data["LaserExtraRepeatCount"] = self.laser_extra_repeat_var.get()
         
+        # Add prospector delay if available
+        if hasattr(self, 'prospector_delay_var'):
+            preset_data["ProspectorDelay"] = self.prospector_delay_var.get()
+        
+        # Add thrust timing values if available
+        if hasattr(self, 'thrust_closed_var'):
+            preset_data["ThrustClosed"] = self.thrust_closed_var.get()
+        if hasattr(self, 'thrust_open_var'):
+            preset_data["ThrustOpen"] = self.thrust_open_var.get()
+        
         return preset_data
 
     def _apply_mapping(self, data: Dict[str, Any]) -> None:
@@ -9228,6 +9446,42 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 print(f"[PRESET] Loaded laser extra repeat count: {count}")
             except Exception as e:
                 print(f"[PRESET] Error loading laser extra repeat count: {e}")
+        
+        # Load prospector delay if available
+        if "ProspectorDelay" in data and hasattr(self, 'prospector_delay_var'):
+            try:
+                delay = float(data["ProspectorDelay"])
+                # Clamp to valid range (2.0-6.0)
+                delay = max(2.0, min(6.0, delay))
+                self.prospector_delay_var.set(delay)
+                self._save_prospector_delay()
+                print(f"[PRESET] Loaded prospector delay: {delay:.1f}s")
+            except Exception as e:
+                print(f"[PRESET] Error loading prospector delay: {e}")
+        
+        # Load thrust closed timing if available
+        if "ThrustClosed" in data and hasattr(self, 'thrust_closed_var'):
+            try:
+                delay = float(data["ThrustClosed"])
+                # Clamp to valid range (1.0-5.0)
+                delay = max(1.0, min(5.0, delay))
+                self.thrust_closed_var.set(delay)
+                self._save_thrust_closed()
+                print(f"[PRESET] Loaded thrust closed timing: {delay:.1f}s")
+            except Exception as e:
+                print(f"[PRESET] Error loading thrust closed timing: {e}")
+        
+        # Load thrust open timing if available
+        if "ThrustOpen" in data and hasattr(self, 'thrust_open_var'):
+            try:
+                delay = float(data["ThrustOpen"])
+                # Clamp to valid range (1.0-5.0)
+                delay = max(1.0, min(5.0, delay))
+                self.thrust_open_var.set(delay)
+                self._save_thrust_open()
+                print(f"[PRESET] Loaded thrust open timing: {delay:.1f}s")
+            except Exception as e:
+                print(f"[PRESET] Error loading thrust open timing: {e}")
         
         self._set_status("Preset loaded (not yet written to Variables).")
 
@@ -17680,6 +17934,25 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _check_va_profile_update(self):
         """Check for VoiceAttack profile updates on startup"""
+        import threading
+        
+        def do_check():
+            result = self._check_va_profile_update_impl()
+            if result:
+                # Schedule dialog on main thread
+                version_info, profile_path = result
+                self.after(0, lambda: self._show_va_profile_update_dialog(
+                    version_info.get('current'), 
+                    version_info.get('new'), 
+                    profile_path
+                ))
+        
+        # Run check in background thread to avoid blocking UI
+        thread = threading.Thread(target=do_check, daemon=True)
+        thread.start()
+    
+    def _check_va_profile_update_impl(self):
+        """Implementation of VA profile update check - runs in background thread"""
         # DEBUG: Write to file for troubleshooting
         debug_file = None
         try:
@@ -17814,16 +18087,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             debug_log(f"Old profile version: {old_version}")
                             
                             if old_version != "unknown":
-                                # Show update dialog with old version
+                                # Return info to show update dialog
                                 debug_log(f"Upgrade from old profile: {old_version} -> {new_version}")
-                                self._show_va_profile_update_dialog(old_version, new_version, new_profile_path)
+                                return ({'current': old_version, 'new': new_version}, new_profile_path)
                             else:
                                 # Couldn't parse old version - show dialog anyway for existing users
                                 debug_log("Existing user (old profile, version unknown) - showing dialog")
-                                self._show_va_profile_update_dialog(None, new_version, new_profile_path)
+                                return ({'current': None, 'new': new_version}, new_profile_path)
                         except Exception as e:
                             debug_log(f"Error parsing old profile: {e} - showing dialog anyway")
-                            self._show_va_profile_update_dialog(None, new_version, new_profile_path)
+                            return ({'current': None, 'new': new_version}, new_profile_path)
                     else:
                         # No old profile - true first install (only new versioned profile exists)
                         debug_log("True first install - creating state file silently")
@@ -17831,7 +18104,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 elif installed_version != new_version:
                     # Version changed - show update dialog with keybind preservation
                     debug_log(f"Update available: {installed_version} -> {new_version}")
-                    self._show_va_profile_update_dialog(installed_version, new_version, new_profile_path)
+                    return ({'current': installed_version, 'new': new_version}, new_profile_path)
                 else:
                     debug_log(f"Profile up to date: {new_version}")
                     
@@ -17840,6 +18113,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
         except Exception as e:
             logging.error(f"[VA_PROFILE] Error checking for profile update: {e}")
+        
+        return None  # No update needed
     
     def _save_va_profile_state(self, state_file, version):
         """Save the installed VA profile version to state file"""
@@ -17853,15 +18128,45 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _show_va_profile_update_dialog(self, current_version, new_version, profile_path):
         """Show dialog for VA profile update with keybind preservation option"""
+        # Defer dialog to ensure UI is fully ready
+        def show_when_ready():
+            try:
+                # Check if app is fully loaded and window is mapped
+                if not getattr(self, '_app_fully_loaded', False) or not self.winfo_ismapped():
+                    # Not ready yet, try again later
+                    self.after(1000, show_when_ready)
+                    return
+                    
+                # Additional safety: make sure window is visible and has size
+                if self.winfo_width() < 100 or self.winfo_height() < 100:
+                    self.after(1000, show_when_ready)
+                    return
+                    
+                self._show_va_profile_update_dialog_impl(current_version, new_version, profile_path)
+            except Exception as e:
+                logging.error(f"[VA_PROFILE] Error showing dialog: {e}")
+        
+        self.after(2000, show_when_ready)
+    
+    def _show_va_profile_update_dialog_impl(self, current_version, new_version, profile_path):
+        """Implementation of VA profile update dialog"""
         try:
+            logging.info(f"[VA_PROFILE] Showing update dialog: {current_version} -> {new_version}")
+            
+            # Ensure window is fully ready - use multiple update calls
+            for _ in range(3):
+                self.update()
+                self.update_idletasks()
+            
             from app_utils import centered_askyesno, centered_message
             from path_utils import get_app_data_dir
             from tkinter import filedialog
             import json
             
             # Show update message with keybind preservation info
+            current_display = current_version if current_version else "Unknown"
             message = t("voiceattack.profile_update_message").format(
-                current=current_version,
+                current=current_display,
                 new=new_version
             )
             

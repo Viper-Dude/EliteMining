@@ -593,7 +593,7 @@ Configure how many times the laser mining extra sequence runs:
 - Pre-configured firegroups, timers, and toggles for HAZ mining.  
 
 ### Customization  
-- Create presets for different ships  
+- Create and manage ship presets via the **EliteMining App UI**
 - Adjust firegroups/timers on-the-fly  
 - Modify via built-in commands  
 
