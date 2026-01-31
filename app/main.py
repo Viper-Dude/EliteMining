@@ -8180,6 +8180,38 @@ class App(tk.Tk, ColumnVisibilityMixin):
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
+            # Add Prospector Delay control right after "Prospector Sequence" toggle
+            if name == "Prospector Sequence":
+                prospector_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                prospector_frame.grid(row=r, column=0, sticky="w", pady=2)
+                
+                # Indent to match dependent toggles
+                tk.Label(prospector_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                
+                # Spinbox for prospector delay (2.0 to 6.0 with 0.1 increment)
+                self.prospector_delay_var = tk.DoubleVar(value=4.4)
+                prospector_spinbox = ttk.Spinbox(prospector_frame, from_=2.0, to=6.0, increment=0.1, width=6, 
+                                                 textvariable=self.prospector_delay_var, format="%.1f",
+                                                 command=self._save_prospector_delay)
+                prospector_spinbox.pack(side="left", padx=(4, 6))
+                _block_canvas_scroll_on_spinbox(prospector_spinbox)  # Prevent canvas scroll interference
+                
+                # Add trace to save on any value change (including manual typing)
+                self.prospector_delay_var.trace_add("write", lambda *args: self._save_prospector_delay())
+                
+                # Label
+                prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [2.0..6.0]",
+                                           bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                prospector_label.pack(side="left")
+                
+                # Help text (grey, always visible)
+                tk.Label(prospector_frame, text=t('voiceattack.help_prospector_delay_short'), 
+                        fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                
+                # Load saved value
+                self._load_prospector_delay()
+                r += 1
+            
             # Add Laser Mining Extra Repeat Count control right after "Repeated Mining Cycles" toggle
             if name == "Repeated Mining Cycles":
                 repeat_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
@@ -8322,6 +8354,38 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[LASER EXTRA] Error loading repeat count: {e}")
             self.laser_extra_repeat_var.set(1)  # Fallback to default
+    
+    def _save_prospector_delay(self) -> None:
+        """Save prospector delay to delayprospector.txt"""
+        try:
+            delay = self.prospector_delay_var.get()
+            txt_path = os.path.join(self.vars_dir, "delayprospector.txt")
+            # Always use period (.) as decimal separator for VoiceAttack compatibility
+            delay_str = f"{delay:.1f}".replace(',', '.')
+            _atomic_write_text(txt_path, delay_str)
+            
+            print(f"[PROSPECTOR DELAY] Saved delay: {delay_str} seconds")
+        except Exception as e:
+            print(f"[PROSPECTOR DELAY] Error saving delay: {e}")
+    
+    def _load_prospector_delay(self) -> None:
+        """Load prospector delay from delayprospector.txt"""
+        try:
+            txt_path = os.path.join(self.vars_dir, "delayprospector.txt")
+            if os.path.exists(txt_path):
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    delay = float(f.read().strip())
+                    # Clamp to valid range
+                    delay = max(2.0, min(6.0, delay))
+                    self.prospector_delay_var.set(delay)
+                    print(f"[PROSPECTOR DELAY] Loaded delay: {delay:.1f} seconds")
+            else:
+                # Create default file with value 4.4
+                self._save_prospector_delay()
+                print(f"[PROSPECTOR DELAY] Created default delay file: 4.4 seconds")
+        except Exception as e:
+            print(f"[PROSPECTOR DELAY] Error loading delay: {e}")
+            self.prospector_delay_var.set(4.4)  # Fallback to default
     
     def _initialize_va_variables(self) -> None:
         """Initialize VoiceAttack variables manager"""
