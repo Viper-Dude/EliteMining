@@ -8135,7 +8135,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Target Prospector": "voiceattack.help_target_prospector",
             "Thrust Up": "voiceattack.help_thrust_up",
             "Pulse Wave Analyser": "voiceattack.help_pulse_wave",
-            "Target": "voiceattack.help_target",
+            "Auto Deselect Target": "voiceattack.help_target",
         }
         
         ttk.Label(toggles_header, text=t('voiceattack.toggles'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
@@ -8155,7 +8155,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if indent > 0:
                 tk.Label(rowf, text="", bg=_toggle_bg, width=2).pack(side="left")
             
-            checkbox = tk.Checkbutton(rowf, text=f"{t('voiceattack.enable')} {name}", variable=self.toggle_vars[name], 
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=("Segoe UI", 9), 
