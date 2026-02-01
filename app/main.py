@@ -8150,11 +8150,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Now build content in scrollable_frame instead of frame
         scrollable_frame.columnconfigure(0, weight=1)
         
+        # Theme-aware colors
+        _toggle_bg = "#000000" if self.current_theme == "elite_orange" else "#1e1e1e"
+        _toggle_fg = "#ff8c00" if self.current_theme == "elite_orange" else "#ffffff"
+        _toggle_tip_fg = "#ffa500"
+        _help_fg = "#888888" if self.current_theme == "elite_orange" else "gray"
+        
         # Timer name translation mapping (English key -> translation key)
         timer_translations = {
-            "Duration for firing mining lasers (first period)": "voiceattack.timer_laser_first",
-            "Pause between laser periods for weapon recharge/cooldown": "voiceattack.timer_pause",
-            "Duration for second laser period (If Laser Mining Extra is enabled)": "voiceattack.timer_laser_extra",
+            "Duration for firing mining lasers (standard)": "voiceattack.timer_laser_first",
+            "Pause between mining cycles for weapon recharge/cooldown": "voiceattack.timer_pause",
+            "Duration for additional laser periods (per cycle)": "voiceattack.timer_laser_extra",
             "Delay before selecting prospector target after laser mining": "voiceattack.timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.timer_cargoscoop",
             "Boost Interval (For Core Mining Boost sequense )": "voiceattack.timer_boost",
@@ -8162,64 +8168,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Timer help text translation mapping
         timer_help_translations = {
-            "Duration for firing mining lasers (first period)": "voiceattack.help_timer_laser_first",
-            "Pause between laser periods for weapon recharge/cooldown": "voiceattack.help_timer_pause",
-            "Duration for second laser period (If Laser Mining Extra is enabled)": "voiceattack.help_timer_laser_extra",
+            "Duration for firing mining lasers (standard)": "voiceattack.help_timer_laser_first",
+            "Pause between mining cycles for weapon recharge/cooldown": "voiceattack.help_timer_pause",
+            "Duration for additional laser periods (per cycle)": "voiceattack.help_timer_laser_extra",
             "Delay before selecting prospector target after laser mining": "voiceattack.help_timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.help_timer_cargoscoop",
             "Boost Interval (For Core Mining Boost sequense )": "voiceattack.help_timer_boost",
         }
-        
-        # Timers section
-        ttk.Label(scrollable_frame, text=t('voiceattack.timers'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
-        r = 1
-        for name, spec in TIMERS.items():
-            # Skip cargo scoop timer - it's shown under the Cargo Scoop toggle in Advanced Controls
-            if name == "Delay before retracting cargo scoop after mining sequence":
-                continue
-            
-            _fname, lo, hi, helptext = spec
-            rowf = ttk.Frame(scrollable_frame)
-            rowf.grid(row=r, column=0, sticky="w", pady=2)
-            
-            # Spinbox first
-            sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[name])
-            sp.pack(side="left")
-            _block_canvas_scroll_on_spinbox(sp)  # Prevent canvas scroll interference
-            
-            # Get localized timer name
-            display_name = t(timer_translations.get(name, name)) if name in timer_translations else name
-            
-            # Label second with tooltip
-            label = ttk.Label(rowf, text=f"{display_name} [{lo}..{hi}] {t('voiceattack.seconds')}")
-            label.pack(side="left", padx=(6, 0))
-            
-            # Add tooltip with localized help text
-            localized_help = t(timer_help_translations.get(name, name)) if name in timer_help_translations else helptext
-            ToolTip(label, localized_help)
-            
-            r += 1
-        
-        # Add some spacing between sections
-        ttk.Separator(scrollable_frame, orient='horizontal').grid(row=r, column=0, sticky="ew", pady=(20, 10))
-        r += 1
-        
-        # Toggles section with tip on same row
-        toggles_header = ttk.Frame(scrollable_frame)
-        toggles_header.grid(row=r, column=0, sticky="ew", pady=(0, 8))
-        toggles_header.columnconfigure(1, weight=1)  # Make middle column expand
-        
-        # Theme-aware colors for toggles
-        _toggle_bg = "#000000" if self.current_theme == "elite_orange" else "#1e1e1e"
-        _toggle_fg = "#ff8c00" if self.current_theme == "elite_orange" else "#ffffff"
-        _toggle_tip_fg = "#ffa500"
         
         # Toggle help text translation mapping
         toggle_help_translations = {
             "Auto Honk": "voiceattack.help_auto_honk",
             "Cargo Scoop": "voiceattack.help_cargo_scoop",
             "Headtracker Docking Control": "voiceattack.help_headtracker",
-            "Laser Mining Extra": "voiceattack.help_laser_extra",
+            "Repeated Mining Cycles": "voiceattack.help_laser_extra",
             "Night Vision": "voiceattack.help_night_vision",
             "FSD Jump Sequence": "voiceattack.help_fsd_jump",
             "Power Settings": "voiceattack.help_power",
@@ -8231,22 +8193,34 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Auto Deselect Target": "voiceattack.help_target",
         }
         
-        ttk.Label(toggles_header, text=t('voiceattack.advanced_controls'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
-        tk.Label(toggles_header, text=t('voiceattack.tip_stop_commands'), 
-                 fg=_toggle_tip_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).grid(row=0, column=1, sticky="")
-        r += 1
-        
         # Store checkbox widgets for dependent toggles
         self.toggle_checkboxes = {}
         
-        for name, (_fname, helptext) in TOGGLES.items():
+        r = 0
+        
+        # ============================================================
+        # CONTROLS SECTION (simple toggles without sub-items)
+        # ============================================================
+        controls_header = ttk.Frame(scrollable_frame)
+        controls_header.grid(row=r, column=0, sticky="ew")
+        controls_header.columnconfigure(1, weight=1)
+        
+        ttk.Label(controls_header, text=t('voiceattack.timers'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
+        tk.Label(controls_header, text=t('voiceattack.tip_stop_commands'), 
+                 fg=_toggle_tip_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).grid(row=0, column=1, sticky="")
+        r += 1
+        
+        # Controls toggles: Auto Honk, Headtracker, Night Vision, FSD Jump
+        controls_toggles = ["Auto Honk", "Headtracker Docking Control", 
+                           "Night Vision", "FSD Jump Sequence"]
+        
+        for name in controls_toggles:
+            if name not in TOGGLES:
+                continue
+            _fname, helptext = TOGGLES[name]
+            
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
-            
-            # Indent dependent toggles
-            indent = 20 if name in ["Prospector Sound Effect", "Target Prospector", "Thrust Up"] else 0
-            if indent > 0:
-                tk.Label(rowf, text="", bg=_toggle_bg, width=2).pack(side="left")
             
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
@@ -8255,137 +8229,357 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             
-            # Store checkbox reference for dependency control
             self.toggle_checkboxes[name] = checkbox
             
-            # Add callback for Prospector Sequence to control dependent toggles
-            if name == "Prospector Sequence":
-                self.toggle_vars[name].trace_add("write", lambda *args: self._update_prospector_dependencies())
-            
-            # Get localized help text
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
-            
-            # Add tooltip to checkbox
             ToolTip(checkbox, display_help)
             
-            _help_fg = "#888888" if self.current_theme == "elite_orange" else "gray"
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
+        
+        # ============================================================
+        # CORE MINING SUB-SECTION
+        # ============================================================
+        ttk.Label(scrollable_frame, text=t('voiceattack.section_core_mining'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(15, 2))
+        r += 1
+        
+        # Boost Interval timer
+        boost_timer_name = "Boost Interval (For Core Mining Boost sequense )"
+        if boost_timer_name in TIMERS:
+            _fname, lo, hi, helptext = TIMERS[boost_timer_name]
+            
+            rowf = ttk.Frame(scrollable_frame)
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[boost_timer_name])
+            sp.pack(side="left")
+            _block_canvas_scroll_on_spinbox(sp)
+            
+            display_name = t(timer_translations.get(boost_timer_name, boost_timer_name))
+            label = ttk.Label(rowf, text=f"{display_name} [{lo}..{hi}] {t('voiceattack.seconds')}")
+            label.pack(side="left", padx=(6, 0))
+            
+            localized_help = t(timer_help_translations.get(boost_timer_name, boost_timer_name))
+            ToolTip(label, localized_help)
+            r += 1
+        
+        # ============================================================
+        # LASER MINING SUB-SECTION
+        # ============================================================
+        ttk.Label(scrollable_frame, text=t('voiceattack.section_laser_mining'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(10, 2))
+        r += 1
+        
+        # Laser mining timers
+        laser_timers = [
+            "Duration for firing mining lasers (standard)",
+            "Duration for additional laser periods (per cycle)",
+            "Pause between mining cycles for weapon recharge/cooldown",
+        ]
+        
+        for name in laser_timers:
+            if name not in TIMERS:
+                continue
+            _fname, lo, hi, helptext = TIMERS[name]
+            
+            rowf = ttk.Frame(scrollable_frame)
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[name])
+            sp.pack(side="left")
+            _block_canvas_scroll_on_spinbox(sp)
+            
+            display_name = t(timer_translations.get(name, name)) if name in timer_translations else name
+            label = ttk.Label(rowf, text=f"{display_name} [{lo}..{hi}] {t('voiceattack.seconds')}")
+            label.pack(side="left", padx=(6, 0))
+            
+            localized_help = t(timer_help_translations.get(name, name)) if name in timer_help_translations else helptext
+            ToolTip(label, localized_help)
+            r += 1
+        
+        # Repeated Mining Cycles toggle with repeat count
+        if "Repeated Mining Cycles" in TOGGLES:
+            name = "Repeated Mining Cycles"
+            _fname, helptext = TOGGLES[name]
+            
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
+                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+            self.toggle_checkboxes[name] = checkbox
+            
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+            
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
-            # Add Cargo Scoop Delay control right after "Cargo Scoop" toggle
-            if name == "Cargo Scoop":
-                cargoscoop_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
-                cargoscoop_frame.grid(row=r, column=0, sticky="w", pady=2)
-                
-                # Indent to align with toggle
-                tk.Label(cargoscoop_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
-                
-                # Get timer spec for range values
-                cargoscoop_timer_name = "Delay before retracting cargo scoop after mining sequence"
-                cargoscoop_spec = TIMERS.get(cargoscoop_timer_name)
-                if cargoscoop_spec:
-                    _fname, lo, hi, _helptext = cargoscoop_spec
-                    
-                    # Spinbox using existing timer var - auto-save on change
-                    cargoscoop_spinbox = ttk.Spinbox(cargoscoop_frame, from_=lo, to=hi, width=5, 
-                                                     textvariable=self.timer_vars[cargoscoop_timer_name],
-                                                     command=lambda: self._save_cargoscoop_delay(cargoscoop_timer_name, _fname, lo, hi))
-                    cargoscoop_spinbox.pack(side="left", padx=(4, 6))
-                    _block_canvas_scroll_on_spinbox(cargoscoop_spinbox)
-                    
-                    # Add trace to save on any value change (including manual typing)
-                    self.timer_vars[cargoscoop_timer_name].trace_add("write", 
-                        lambda *args: self._save_cargoscoop_delay(cargoscoop_timer_name, _fname, lo, hi))
-                    
-                    # Label
-                    cargoscoop_display_name = t(timer_translations.get(cargoscoop_timer_name, cargoscoop_timer_name))
-                    cargoscoop_label = tk.Label(cargoscoop_frame, text=f"{cargoscoop_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
-                                               bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
-                    cargoscoop_label.pack(side="left")
-                    
-                    # Tooltip
-                    cargoscoop_help = t(timer_help_translations.get(cargoscoop_timer_name, cargoscoop_timer_name))
-                    ToolTip(cargoscoop_label, cargoscoop_help)
-                r += 1
+            # Repeat count spinbox (indented)
+            repeat_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            repeat_frame.grid(row=r, column=0, sticky="w", pady=2)
+            tk.Label(repeat_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
             
-            # Add Prospector Delay control right after "Prospector Sequence" toggle
-            if name == "Prospector Sequence":
-                prospector_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
-                prospector_frame.grid(row=r, column=0, sticky="w", pady=2)
+            self.laser_extra_repeat_var = tk.IntVar(value=1)
+            repeat_spinbox = ttk.Spinbox(repeat_frame, from_=1, to=10, width=5, 
+                                         textvariable=self.laser_extra_repeat_var,
+                                         command=self._save_laser_extra_repeat)
+            repeat_spinbox.pack(side="left", padx=(4, 6))
+            _block_canvas_scroll_on_spinbox(repeat_spinbox)
+            
+            self.laser_extra_repeat_var.trace_add("write", lambda *args: self._save_laser_extra_repeat())
+            
+            repeat_label = tk.Label(repeat_frame, text=f"{t('voiceattack.laser_extra_repeat_label')} [1..10]",
+                                   bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+            repeat_label.pack(side="left")
+            ToolTip(repeat_label, t('voiceattack.help_laser_extra_repeat'))
+            
+            self.laser_extra_status_label = tk.Label(repeat_frame, text="", fg=_help_fg, bg=_toggle_bg,
+                                                      font=("Segoe UI", 8, "italic"))
+            self.laser_extra_status_label.pack(side="left", padx=(10, 0))
+            self._load_laser_extra_repeat()
+            r += 1
+        
+        # Pulse Wave Analyser toggle (at end of Laser Mining section)
+        if "Pulse Wave Analyser" in TOGGLES:
+            name = "Pulse Wave Analyser"
+            _fname, helptext = TOGGLES[name]
+            
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
+                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+            self.toggle_checkboxes[name] = checkbox
+            
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+            
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
+        
+        # Auto Deselect Target toggle
+        if "Auto Deselect Target" in TOGGLES:
+            name = "Auto Deselect Target"
+            _fname, helptext = TOGGLES[name]
+            
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
+                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+            self.toggle_checkboxes[name] = checkbox
+            
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+            
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
+        
+        # Cargo Scoop toggle
+        if "Cargo Scoop" in TOGGLES:
+            name = "Cargo Scoop"
+            _fname, helptext = TOGGLES[name]
+            
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
+                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+            self.toggle_checkboxes[name] = checkbox
+            
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+            
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
+            
+            # Cargo scoop delay spinbox (indented)
+            cargoscoop_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            cargoscoop_frame.grid(row=r, column=0, sticky="w", pady=2)
+            tk.Label(cargoscoop_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+            
+            cargoscoop_timer_name = "Delay before retracting cargo scoop after mining sequence"
+            cargoscoop_spec = TIMERS.get(cargoscoop_timer_name)
+            if cargoscoop_spec:
+                _fname, lo, hi, _helptext = cargoscoop_spec
                 
-                # Indent to match dependent toggles
-                tk.Label(prospector_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                cargoscoop_spinbox = ttk.Spinbox(cargoscoop_frame, from_=lo, to=hi, width=5, 
+                                                 textvariable=self.timer_vars[cargoscoop_timer_name],
+                                                 command=lambda: self._save_cargoscoop_delay(cargoscoop_timer_name, _fname, lo, hi))
+                cargoscoop_spinbox.pack(side="left", padx=(4, 6))
+                _block_canvas_scroll_on_spinbox(cargoscoop_spinbox)
                 
-                # Spinbox for prospector delay (2.0 to 6.0 with 0.1 increment)
-                self.prospector_delay_var = tk.DoubleVar(value=4.4)
-                prospector_spinbox = ttk.Spinbox(prospector_frame, from_=2.0, to=6.0, increment=0.1, width=6, 
-                                                 textvariable=self.prospector_delay_var, format="%.1f",
-                                                 command=self._save_prospector_delay)
-                prospector_spinbox.pack(side="left", padx=(4, 6))
-                _block_canvas_scroll_on_spinbox(prospector_spinbox)  # Prevent canvas scroll interference
+                self.timer_vars[cargoscoop_timer_name].trace_add("write", 
+                    lambda *args: self._save_cargoscoop_delay(cargoscoop_timer_name, _fname, lo, hi))
                 
-                # Add trace to save on any value change (including manual typing)
-                self.prospector_delay_var.trace_add("write", lambda *args: self._save_prospector_delay())
-                
-                # Label
-                prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [2.0..6.0]",
+                cargoscoop_display_name = t(timer_translations.get(cargoscoop_timer_name, cargoscoop_timer_name))
+                cargoscoop_label = tk.Label(cargoscoop_frame, text=f"{cargoscoop_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
                                            bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
-                prospector_label.pack(side="left")
+                cargoscoop_label.pack(side="left")
                 
-                # Help text (grey, always visible)
-                tk.Label(prospector_frame, text=t('voiceattack.help_prospector_delay_short'), 
-                        fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
-                
-                # Load saved value
-                self._load_prospector_delay()
-                r += 1
+                cargoscoop_help = t(timer_help_translations.get(cargoscoop_timer_name, cargoscoop_timer_name))
+                ToolTip(cargoscoop_label, cargoscoop_help)
+            r += 1
+        
+        # Power Settings toggle
+        if "Power Settings" in TOGGLES:
+            name = "Power Settings"
+            _fname, helptext = TOGGLES[name]
             
-            # Add Laser Mining Extra Repeat Count control right after "Repeated Mining Cycles" toggle
-            if name == "Repeated Mining Cycles":
-                repeat_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
-                repeat_frame.grid(row=r, column=0, sticky="w", pady=2)
-                
-                # Indent to match dependent toggles
-                tk.Label(repeat_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
-                
-                # Spinbox for repeat count
-                self.laser_extra_repeat_var = tk.IntVar(value=1)
-                repeat_spinbox = ttk.Spinbox(repeat_frame, from_=1, to=10, width=5, 
-                                             textvariable=self.laser_extra_repeat_var,
-                                             command=self._save_laser_extra_repeat)
-                repeat_spinbox.pack(side="left", padx=(4, 6))
-                _block_canvas_scroll_on_spinbox(repeat_spinbox)  # Prevent canvas scroll interference
-                
-                # Add trace to save on any value change (including manual typing)
-                self.laser_extra_repeat_var.trace_add("write", lambda *args: self._save_laser_extra_repeat())
-                
-                # Label
-                repeat_label = tk.Label(repeat_frame, text=f"{t('voiceattack.laser_extra_repeat_label')} [1..10]",
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
+                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+            self.toggle_checkboxes[name] = checkbox
+            
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+            
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
+        
+        # ============================================================
+        # PROSPECTOR SUB-SECTION
+        # ============================================================
+        ttk.Label(scrollable_frame, text=t('voiceattack.section_prospector'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(10, 2))
+        r += 1
+        
+        # Prospector Sequence toggle
+        if "Prospector Sequence" in TOGGLES:
+            name = "Prospector Sequence"
+            _fname, helptext = TOGGLES[name]
+            
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
+                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+            self.toggle_checkboxes[name] = checkbox
+            
+            self.toggle_vars[name].trace_add("write", lambda *args: self._update_prospector_dependencies())
+            
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+            
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
+            
+            # Prospector cooldown time (indented)
+            prospector_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            prospector_frame.grid(row=r, column=0, sticky="w", pady=2)
+            tk.Label(prospector_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+            
+            self.prospector_delay_var = tk.DoubleVar(value=4.4)
+            prospector_spinbox = ttk.Spinbox(prospector_frame, from_=2.0, to=6.0, increment=0.1, width=6, 
+                                             textvariable=self.prospector_delay_var, format="%.1f",
+                                             command=self._save_prospector_delay)
+            prospector_spinbox.pack(side="left", padx=(4, 6))
+            _block_canvas_scroll_on_spinbox(prospector_spinbox)
+            
+            self.prospector_delay_var.trace_add("write", lambda *args: self._save_prospector_delay())
+            
+            prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [2.0..6.0]",
                                        bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
-                repeat_label.pack(side="left")
-                ToolTip(repeat_label, t('voiceattack.help_laser_extra_repeat'))
-                
-                # Status label
-                self.laser_extra_status_label = tk.Label(repeat_frame, text="", fg=_help_fg, bg=_toggle_bg,
-                                                          font=("Segoe UI", 8, "italic"))
-                self.laser_extra_status_label.pack(side="left", padx=(10, 0))
-                
-                # Load saved value
-                self._load_laser_extra_repeat()
-                r += 1
+            prospector_label.pack(side="left")
             
-            # Add Thrust Up timing controls right after "Thrust Up" toggle
+            tk.Label(prospector_frame, text=t('voiceattack.help_prospector_delay_short'), 
+                    fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            
+            self._load_prospector_delay()
+            r += 1
+            
+            # Delay before selecting prospector target (indented)
+            target_timer_name = "Delay before selecting prospector target after laser mining"
+            if target_timer_name in TIMERS:
+                target_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                target_frame.grid(row=r, column=0, sticky="w", pady=2)
+                tk.Label(target_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                
+                _fname, lo, hi, helptext = TIMERS[target_timer_name]
+                
+                target_spinbox = ttk.Spinbox(target_frame, from_=lo, to=hi, width=5, 
+                                             textvariable=self.timer_vars[target_timer_name])
+                target_spinbox.pack(side="left", padx=(4, 6))
+                _block_canvas_scroll_on_spinbox(target_spinbox)
+                
+                target_display_name = t(timer_translations.get(target_timer_name, target_timer_name))
+                target_label = tk.Label(target_frame, text=f"{target_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
+                                       bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                target_label.pack(side="left")
+                
+                target_help = t(timer_help_translations.get(target_timer_name, target_timer_name))
+                ToolTip(target_label, target_help)
+                r += 1
+        
+        # Prospector dependent toggles: Prospector Sound Effect, Thrust Up (depend on Prospector Sequence)
+        prospector_dependent_toggles = ["Prospector Sound Effect", "Thrust Up"]
+        
+        for name in prospector_dependent_toggles:
+            if name not in TOGGLES:
+                continue
+            _fname, helptext = TOGGLES[name]
+            
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            # Indent dependent toggles
+            tk.Label(rowf, text="", bg=_toggle_bg, width=2).pack(side="left")
+            
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
+                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+            self.toggle_checkboxes[name] = checkbox
+            
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+            
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
+            
+            # Thrust Up timing controls
             if name == "Thrust Up":
-                # First spinbox: Scoop closed/retracted
+                # Scoop closed/retracted
                 thrust_closed_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
                 thrust_closed_frame.grid(row=r, column=0, sticky="w", pady=2)
-                
-                # Double-indent (under Thrust Up which is under Prospector Sequence)
                 tk.Label(thrust_closed_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 tk.Label(thrust_closed_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 
-                # Spinbox for thrust closed timing (1.0 to 5.0 with 0.1 increment)
                 self.thrust_closed_var = tk.DoubleVar(value=1.5)
                 thrust_closed_spinbox = ttk.Spinbox(thrust_closed_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
                                                     textvariable=self.thrust_closed_var, format="%.1f",
@@ -8393,31 +8587,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 thrust_closed_spinbox.pack(side="left", padx=(4, 6))
                 _block_canvas_scroll_on_spinbox(thrust_closed_spinbox)
                 
-                # Add trace to save on any value change
                 self.thrust_closed_var.trace_add("write", lambda *args: self._save_thrust_closed())
                 
-                # Label
                 thrust_closed_label = tk.Label(thrust_closed_frame, text=f"{t('voiceattack.thrust_closed_label')} [1.0..5.0]",
                                               bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
                 thrust_closed_label.pack(side="left")
                 
-                # Help text (grey, always visible)
                 tk.Label(thrust_closed_frame, text=t('voiceattack.help_thrust_closed'), 
                         fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
                 
-                # Load saved value
                 self._load_thrust_closed()
                 r += 1
                 
-                # Second spinbox: Scoop open/deployed
+                # Scoop open/deployed
                 thrust_open_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
                 thrust_open_frame.grid(row=r, column=0, sticky="w", pady=2)
-                
-                # Double-indent
                 tk.Label(thrust_open_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 tk.Label(thrust_open_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 
-                # Spinbox for thrust open timing (1.0 to 5.0 with 0.1 increment)
                 self.thrust_open_var = tk.DoubleVar(value=3.8)
                 thrust_open_spinbox = ttk.Spinbox(thrust_open_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
                                                   textvariable=self.thrust_open_var, format="%.1f",
@@ -8425,21 +8612,40 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 thrust_open_spinbox.pack(side="left", padx=(4, 6))
                 _block_canvas_scroll_on_spinbox(thrust_open_spinbox)
                 
-                # Add trace to save on any value change
                 self.thrust_open_var.trace_add("write", lambda *args: self._save_thrust_open())
                 
-                # Label
                 thrust_open_label = tk.Label(thrust_open_frame, text=f"{t('voiceattack.thrust_open_label')} [1.0..5.0]",
                                             bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
                 thrust_open_label.pack(side="left")
                 
-                # Help text (grey, always visible)
                 tk.Label(thrust_open_frame, text=t('voiceattack.help_thrust_open'), 
                         fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
                 
-                # Load saved value
                 self._load_thrust_open()
                 r += 1
+        
+        # Target Prospector (independent toggle, not dependent on Prospector Sequence)
+        if "Target Prospector" in TOGGLES:
+            name = "Target Prospector"
+            _fname, helptext = TOGGLES[name]
+            
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
+                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+            self.toggle_checkboxes[name] = checkbox
+            
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+            
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
         
         # Initialize dependent toggle states
         self._update_prospector_dependencies()
@@ -8454,7 +8660,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             master_enabled = self.toggle_vars["Prospector Sequence"].get() == 1
             
             # Update dependent checkboxes
-            for dependent in ["Prospector Sound Effect", "Target Prospector", "Thrust Up"]:
+            for dependent in ["Prospector Sound Effect", "Thrust Up"]:
                 if dependent in self.toggle_checkboxes:
                     checkbox = self.toggle_checkboxes[dependent]
                     if master_enabled:
