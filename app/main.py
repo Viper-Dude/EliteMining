@@ -8252,9 +8252,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame)
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[boost_timer_name])
+            # Create closure with captured values for auto-save
+            def make_save_boost(tn, fn, l, h):
+                return lambda: self._save_timer(tn, fn, l, h)
+            def make_trace_boost(tn, fn, l, h):
+                return lambda *args: self._save_timer(tn, fn, l, h)
+            
+            sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[boost_timer_name],
+                            command=make_save_boost(boost_timer_name, _fname, lo, hi))
             sp.pack(side="left")
             _block_canvas_scroll_on_spinbox(sp)
+            
+            self.timer_vars[boost_timer_name].trace_add("write", make_trace_boost(boost_timer_name, _fname, lo, hi))
             
             display_name = t(timer_translations.get(boost_timer_name, boost_timer_name))
             label = ttk.Label(rowf, text=f"{display_name} [{lo}..{hi}] {t('voiceattack.seconds')}")
@@ -8285,9 +8294,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame)
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[name])
+            # Create closure with captured values for auto-save
+            def make_save_laser(tn, fn, l, h):
+                return lambda: self._save_timer(tn, fn, l, h)
+            def make_trace_laser(tn, fn, l, h):
+                return lambda *args: self._save_timer(tn, fn, l, h)
+            
+            sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[name],
+                            command=make_save_laser(name, _fname, lo, hi))
             sp.pack(side="left")
             _block_canvas_scroll_on_spinbox(sp)
+            
+            self.timer_vars[name].trace_add("write", make_trace_laser(name, _fname, lo, hi))
             
             display_name = t(timer_translations.get(name, name)) if name in timer_translations else name
             label = ttk.Label(rowf, text=f"{display_name} [{lo}..{hi}] {t('voiceattack.seconds')}")
@@ -8424,14 +8442,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if cargoscoop_spec:
                 _fname, lo, hi, _helptext = cargoscoop_spec
                 
+                # Create closure with captured values
+                def make_save_cargoscoop(tn, fn, l, h):
+                    return lambda: self._save_cargoscoop_delay(tn, fn, l, h)
+                
+                def make_trace_cargoscoop(tn, fn, l, h):
+                    return lambda *args: self._save_cargoscoop_delay(tn, fn, l, h)
+                
                 cargoscoop_spinbox = ttk.Spinbox(cargoscoop_frame, from_=lo, to=hi, width=5, 
                                                  textvariable=self.timer_vars[cargoscoop_timer_name],
-                                                 command=lambda: self._save_cargoscoop_delay(cargoscoop_timer_name, _fname, lo, hi))
+                                                 command=make_save_cargoscoop(cargoscoop_timer_name, _fname, lo, hi))
                 cargoscoop_spinbox.pack(side="left", padx=(4, 6))
                 _block_canvas_scroll_on_spinbox(cargoscoop_spinbox)
                 
                 self.timer_vars[cargoscoop_timer_name].trace_add("write", 
-                    lambda *args: self._save_cargoscoop_delay(cargoscoop_timer_name, _fname, lo, hi))
+                    make_trace_cargoscoop(cargoscoop_timer_name, _fname, lo, hi))
                 
                 cargoscoop_display_name = t(timer_translations.get(cargoscoop_timer_name, cargoscoop_timer_name))
                 cargoscoop_label = tk.Label(cargoscoop_frame, text=f"{cargoscoop_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
@@ -8529,10 +8554,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 _fname, lo, hi, helptext = TIMERS[target_timer_name]
                 
+                # Create closure with captured values for auto-save
+                def make_save_target(tn, fn, l, h):
+                    return lambda: self._save_timer(tn, fn, l, h)
+                def make_trace_target(tn, fn, l, h):
+                    return lambda *args: self._save_timer(tn, fn, l, h)
+                
                 target_spinbox = ttk.Spinbox(target_frame, from_=lo, to=hi, width=5, 
-                                             textvariable=self.timer_vars[target_timer_name])
+                                             textvariable=self.timer_vars[target_timer_name],
+                                             command=make_save_target(target_timer_name, _fname, lo, hi))
                 target_spinbox.pack(side="left", padx=(4, 6))
                 _block_canvas_scroll_on_spinbox(target_spinbox)
+                
+                self.timer_vars[target_timer_name].trace_add("write", make_trace_target(target_timer_name, _fname, lo, hi))
                 
                 target_display_name = t(timer_translations.get(target_timer_name, target_timer_name))
                 target_label = tk.Label(target_frame, text=f"{target_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
@@ -8790,6 +8824,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[PROSPECTOR DELAY] Error loading delay: {e}")
             self.prospector_delay_var.set(4.4)  # Fallback to default
+    
+    def _save_timer(self, timer_name: str, filename: str, lo: int, hi: int) -> None:
+        """Save any timer to file immediately on change"""
+        try:
+            delay = self.timer_vars[timer_name].get()
+            # Clamp to valid range
+            delay = max(lo, min(hi, delay))
+            self.timer_vars[timer_name].set(delay)
+            
+            # Write to file
+            base = os.path.splitext(filename)[0]
+            self._write_var_text(base, str(delay))
+            print(f"[TIMER] Auto-saved {timer_name}: {delay} seconds")
+        except Exception as e:
+            print(f"[TIMER] Error auto-saving {timer_name}: {e}")
     
     def _save_cargoscoop_delay(self, timer_name: str, filename: str, lo: int, hi: int) -> None:
         """Save cargo scoop delay to file immediately on change"""
