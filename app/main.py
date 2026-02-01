@@ -40,7 +40,7 @@ from logging_setup import setup_logging
 log_file = setup_logging()  # Only activates when running as packaged executable
 if log_file:
     try:
-        print(f"✓ Logging enabled: {log_file}")
+        print(f"[OK] Logging enabled: {log_file}")
     except UnicodeEncodeError:
         print(f"Logging enabled: {log_file}")
 
@@ -1588,7 +1588,7 @@ class CargoMonitor:
                         if hasattr(main_app.ring_finder, 'edsm'):
                             stats = main_app.ring_finder.edsm.fill_missing_metadata_for_systems_direct([self.current_system])
                             if stats.get('materials_updated', 0) > 0:
-                                print(f"✓ EDSM immediate fallback: Updated {stats['rings_updated']} rings, {stats['materials_updated']} materials")
+                                print(f"[OK] EDSM immediate fallback: Updated {stats['rings_updated']} rings, {stats['materials_updated']} materials")
                             else:
                                 print(f"ℹ EDSM immediate fallback: No updates needed for {self.current_system}")
                     except Exception as e:
@@ -3615,7 +3615,7 @@ cargo panel forces Elite to write detailed inventory data.
                                 text=f"🔍 Ring scan: {material_name} ({count}) in {body_name}"
                             )
                     
-                    print(f"✓ SAASignalsFound processed successfully")
+                    print(f"[OK] SAASignalsFound processed successfully")
                     
                 except Exception as saa_err:
                     print(f"Warning: Failed to process SAASignalsFound event: {saa_err}")
@@ -4842,6 +4842,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.toggle_vars: Dict[str, tk.IntVar] = {name: tk.IntVar(value=0) for name in TOGGLES}
         self.timer_vars: Dict[str, tk.IntVar] = {name: tk.IntVar(value=0) for name in TIMERS}
         
+        # Additional mining control variables (initialized once, not recreated in _build_timers_tab)
+        self.laser_extra_repeat_var = tk.IntVar(value=1)
+        self.prospector_delay_var = tk.DoubleVar(value=4.4)
+        self.thrust_closed_var = tk.DoubleVar(value=1.5)
+        self.thrust_open_var = tk.DoubleVar(value=3.0)
+        
         # Announcement toggles (moved from TOGGLES to Text Overlay section)
         self.announcement_vars: Dict[str, tk.IntVar] = {name: tk.IntVar(value=0) for name in ANNOUNCEMENT_TOGGLES}
         
@@ -5022,7 +5028,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Full journal scan runs first (only call once!)
         # Ring finder auto-search will be triggered AFTER journal scan completes
-        self.after(3000, self._background_journal_catchup)
+        self.after(5000, self._background_journal_catchup)
         
         # Check for VA profile updates AFTER everything is loaded and settled
         # Use longer delay to ensure UI is fully responsive
@@ -5295,16 +5301,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         sb = ttk.Label(self, textvariable=self.status, relief=tk.SUNKEN, anchor="w")
         sb.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 6))
 
-        # Import existing values
+        # Import existing values from VoiceAttack profile
         self.after(100, self._import_all_from_txt)
         # Set up tracing AFTER loading from .txt files
         self.after(200, self._setup_announcement_tracing)
-
-        # Ensure focus is on a neutral button to prevent initial Entry highlights
-        try:
-            self.after(300, lambda: self.import_btn.focus_set())
-        except Exception:
-            pass
 
         # Clear selection on ring finder and distance calculator entries after UI stabilized
         try:
@@ -8046,8 +8046,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         def _on_mousewheel_mc(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        # Bind mousewheel to canvas and all child widgets
+        # Bind mousewheel to canvas and all child widgets (except spinboxes)
         def _bind_mousewheel_recursive(widget):
+            # Skip spinboxes - they have their own scroll handlers
+            if isinstance(widget, tk.Spinbox):
+                return
             widget.bind("<MouseWheel>", _on_mousewheel_mc)
             for child in widget.winfo_children():
                 _bind_mousewheel_recursive(child)
@@ -8302,16 +8305,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
             repeat_frame.grid(row=r, column=0, sticky="w", pady=2)
             tk.Label(repeat_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
             
-            self.laser_extra_repeat_var = tk.IntVar(value=1)
+            # Use existing variable (initialized in __init__)
+            # NOTE: Don't set up trace until AFTER import runs, to avoid overwriting saved values
             repeat_spinbox = tk.Spinbox(repeat_frame, from_=1, to=10, width=5, 
                                          textvariable=self.laser_extra_repeat_var,
-                                         command=self._save_laser_extra_repeat,
                                          bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
                                          insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                                          relief="solid", bd=0, highlightthickness=1,
                                          highlightbackground="#ffffff", highlightcolor="#ffffff",
                                          font=("Segoe UI", 9))
             repeat_spinbox.pack(side="left", padx=(4, 6))
+            
+            # Store spinbox for later trace setup
+            self._laser_extra_spinbox = repeat_spinbox
+            
             # Add mouse wheel support
             def on_repeat_scroll(event, var=self.laser_extra_repeat_var):
                 try:
@@ -8321,12 +8328,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     else:
                         new_val = max(current - 1, 1)
                     var.set(new_val)
+                    self._save_laser_extra_repeat()  # Save on scroll
                 except:
                     pass
                 return "break"
             repeat_spinbox.bind("<MouseWheel>", on_repeat_scroll)
             
-            self.laser_extra_repeat_var.trace_add("write", lambda *args: self._save_laser_extra_repeat())
+            # Spinbox command for button clicks
+            repeat_spinbox.config(command=self._save_laser_extra_repeat)
             
             repeat_label = tk.Label(repeat_frame, text=f"{t('voiceattack.laser_extra_repeat_label')} [1..10]",
                                    bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
@@ -8336,7 +8345,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.laser_extra_status_label = tk.Label(repeat_frame, text="", fg=_help_fg, bg=_toggle_bg,
                                                       font=("Segoe UI", 8, "italic"))
             self.laser_extra_status_label.pack(side="left", padx=(10, 0))
-            self._load_laser_extra_repeat()
+            # NOTE: Values loaded by _import_all_from_txt at startup, not here
             r += 1
         
         # Pulse Wave Analyser toggle (at end of Laser Mining section)
@@ -8524,7 +8533,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             prospector_frame.grid(row=r, column=0, sticky="w", pady=2)
             tk.Label(prospector_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
             
-            self.prospector_delay_var = tk.DoubleVar(value=4.4)
+            # Use existing variable (initialized in __init__)
+            # NOTE: Don't set up trace during build - import will load values first
             prospector_spinbox = tk.Spinbox(prospector_frame, from_=2.0, to=6.0, increment=0.1, width=5, 
                                              textvariable=self.prospector_delay_var, format="%.1f",
                                              command=self._save_prospector_delay,
@@ -8534,7 +8544,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                              highlightbackground="#ffffff", highlightcolor="#ffffff",
                                              font=("Segoe UI", 9))
             prospector_spinbox.pack(side="left", padx=(4, 6))
-            # Add mouse wheel support
+            # Add mouse wheel support - explicitly save on scroll
             def on_prospector_scroll(event, var=self.prospector_delay_var):
                 try:
                     current = float(var.get())
@@ -8543,12 +8553,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     else:
                         new_val = max(current - 0.1, 2.0)
                     var.set(round(new_val, 1))
+                    self._save_prospector_delay()  # Save on scroll
                 except:
                     pass
                 return "break"
             prospector_spinbox.bind("<MouseWheel>", on_prospector_scroll)
-            
-            self.prospector_delay_var.trace_add("write", lambda *args: self._save_prospector_delay())
             
             prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [2.0..6.0]",
                                        bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
@@ -8557,7 +8566,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             tk.Label(prospector_frame, text=t('voiceattack.help_prospector_delay_short'), 
                     fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             
-            self._load_prospector_delay()
+            # NOTE: Values loaded by _import_all_from_txt at startup
             r += 1
             
             # Delay before selecting prospector target (indented)
@@ -8651,7 +8660,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tk.Label(thrust_closed_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 tk.Label(thrust_closed_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 
-                self.thrust_closed_var = tk.DoubleVar(value=1.5)
+                # Use existing variable (initialized in __init__)
+                # NOTE: Don't set up trace during build - import will load values first
                 thrust_closed_spinbox = tk.Spinbox(thrust_closed_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
                                                     textvariable=self.thrust_closed_var, format="%.1f",
                                                     command=self._save_thrust_closed,
@@ -8661,7 +8671,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                                     highlightbackground="#ffffff", highlightcolor="#ffffff",
                                                     font=("Segoe UI", 9))
                 thrust_closed_spinbox.pack(side="left", padx=(4, 6))
-                # Add mouse wheel support
+                # Add mouse wheel support - explicitly save on scroll
                 def on_thrust_closed_scroll(event, var=self.thrust_closed_var):
                     try:
                         current = float(var.get())
@@ -8670,12 +8680,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         else:
                             new_val = max(current - 0.1, 1.0)
                         var.set(round(new_val, 1))
+                        self._save_thrust_closed()  # Save on scroll
                     except:
                         pass
                     return "break"
                 thrust_closed_spinbox.bind("<MouseWheel>", on_thrust_closed_scroll)
-                
-                self.thrust_closed_var.trace_add("write", lambda *args: self._save_thrust_closed())
                 
                 thrust_closed_label = tk.Label(thrust_closed_frame, text=f"{t('voiceattack.thrust_closed_label')} [1.0..5.0]",
                                               bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
@@ -8684,7 +8693,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tk.Label(thrust_closed_frame, text=t('voiceattack.help_thrust_closed'), 
                         fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
                 
-                self._load_thrust_closed()
+                # NOTE: Values loaded by _import_all_from_txt at startup
                 r += 1
                 
                 # Scoop open/deployed
@@ -8693,7 +8702,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tk.Label(thrust_open_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 tk.Label(thrust_open_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 
-                self.thrust_open_var = tk.DoubleVar(value=3.8)
+                # Use existing variable (initialized in __init__)
+                # NOTE: Don't set up trace during build - import will load values first
                 thrust_open_spinbox = tk.Spinbox(thrust_open_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
                                                   textvariable=self.thrust_open_var, format="%.1f",
                                                   command=self._save_thrust_open,
@@ -8703,7 +8713,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                                   highlightbackground="#ffffff", highlightcolor="#ffffff",
                                                   font=("Segoe UI", 9))
                 thrust_open_spinbox.pack(side="left", padx=(4, 6))
-                # Add mouse wheel support
+                # Add mouse wheel support - explicitly save on scroll
                 def on_thrust_open_scroll(event, var=self.thrust_open_var):
                     try:
                         current = float(var.get())
@@ -8712,12 +8722,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         else:
                             new_val = max(current - 0.1, 1.0)
                         var.set(round(new_val, 1))
+                        self._save_thrust_open()  # Save on scroll
                     except:
                         pass
                     return "break"
                 thrust_open_spinbox.bind("<MouseWheel>", on_thrust_open_scroll)
-                
-                self.thrust_open_var.trace_add("write", lambda *args: self._save_thrust_open())
                 
                 thrust_open_label = tk.Label(thrust_open_frame, text=f"{t('voiceattack.thrust_open_label')} [1.0..5.0]",
                                             bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
@@ -8726,7 +8735,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tk.Label(thrust_open_frame, text=t('voiceattack.help_thrust_open'), 
                         fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
                 
-                self._load_thrust_open()
+                # NOTE: Values loaded by _import_all_from_txt at startup
                 r += 1
         
         # Target Prospector (independent toggle, not dependent on Prospector Sequence)
@@ -8753,8 +8762,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
         
-        # Initialize dependent toggle states
-        self._update_prospector_dependencies()
+        # Initialize dependent toggle states AFTER import has a chance to load values
+        # Import runs at 100ms, so we delay this to 150ms
+        self.after(150, self._update_prospector_dependencies)
 
     def _update_prospector_dependencies(self):
         """Enable/disable dependent toggles based on Prospector Sequence state"""
@@ -8773,8 +8783,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         checkbox.configure(state="normal")
                     else:
                         checkbox.configure(state="disabled")
-                        # Also uncheck them when disabled
-                        self.toggle_vars[dependent].set(0)
+                        # NOTE: Don't uncheck/reset values - preserve user's setting
+                        # They just can't be changed while Prospector Sequence is off
         except Exception as e:
             print(f"Error updating prospector dependencies: {e}")
 
@@ -8833,6 +8843,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             count = self.laser_extra_repeat_var.get()
             txt_path = os.path.join(self.vars_dir, "laserminingextra_count.txt")
+            print(f"[SAVE DEBUG] Writing laser_extra to: {txt_path}")
             _atomic_write_text(txt_path, str(count))
             
             # Update status label
@@ -8847,6 +8858,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Load laser mining extra repeat count from txt file"""
         try:
             txt_path = os.path.join(self.vars_dir, "laserminingextra_count.txt")
+            print(f"[LOAD DEBUG] Reading laser_extra from: {txt_path}")
             if os.path.exists(txt_path):
                 with open(txt_path, 'r', encoding='utf-8') as f:
                     count = int(f.read().strip())
@@ -9427,6 +9439,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"Error showing edit visits dialog: {e}")
 
     def _import_all_from_txt(self) -> None:
+        """Import all VoiceAttack settings from Variables folder on startup"""
+        print("[STARTUP] Importing VoiceAttack settings from Variables folder...")
+        print(f"[STARTUP] Variables path: {self.vars_dir}")
         found: List[str] = []
         missing: List[str] = []
         try:
@@ -9523,7 +9538,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Laser Mining Extra Repeat Count
             if hasattr(self, 'laser_extra_repeat_var'):
                 repeat_count_file = "laserminingextra_count"
+                print(f"[IMPORT DEBUG] vars_dir = {self.vars_dir}")
                 raw = self._read_var_text(repeat_count_file)
+                print(f"[IMPORT DEBUG] Read {repeat_count_file}: '{raw}'")
                 if raw is not None:
                     try:
                         count = int(raw)
@@ -9596,17 +9613,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 else:
                     missing.append(f"{thrust_open_file}.txt")
 
-            msg = f"Imported {len(found)} values"
+            msg = f"Imported {len(found)} VoiceAttack values"
             if missing:
-                msg += f"; {len(missing)} missing/invalid: {', '.join(missing[:3])}"
-                if len(missing) > 3:
-                    msg += f" +{len(missing)-3} more"
-            self._set_status(msg)
+                msg += f"; {len(missing)} missing/invalid"
+            self._set_status(msg, 5000)  # Show for 5 seconds
             
-            # Also print to console for debugging
+            # Print import summary to console prominently
+            print(f"")
+            print(f"========== VOICEATTACK IMPORT COMPLETE ==========")
+            print(f"[STARTUP] Imported {len(found)} values from Variables folder")
             if missing:
-                print(f"Missing/invalid files: {missing}")
+                print(f"[STARTUP] Missing files: {missing}")
         except Exception as e:
+            print(f"[STARTUP] Import failed with error: {e}")
+            import traceback
+            traceback.print_exc()
             messagebox.showerror("Import failed", str(e))
 
     def _save_all_to_txt(self) -> None:
@@ -9981,7 +10002,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception as e:
                 print(f"[PRESET] Error loading thrust open timing: {e}")
         
-        self._set_status("Preset loaded (not yet written to Variables).")
+        # IMPORTANT: Save all loaded values to Variables folder immediately
+        self._save_all_to_txt()
+        self._set_status("Preset loaded and saved to Variables.")
 
     def _ask_preset_name(self, initial: Optional[str] = None) -> Optional[str]:
         """Custom dark dialog for preset names"""
@@ -13022,7 +13045,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 success = run_metalic_migration(db_path)
                 if success:
                     log.info("[MIGRATION] ✓ 'Metalic' typo fix completed")
-                    print("[MIGRATION v4.82] ✓ Fixed 'Metalic' → 'Metallic' typo in database")
+                    print("[MIGRATION v4.82] Fixed 'Metalic' -> 'Metallic' typo in database")
                 else:
                     log.warning("[MIGRATION] 'Metalic' typo fix failed")
             else:
@@ -19481,7 +19504,7 @@ Your keybinds will need to be reconfigured manually."""
             msg = t('dialogs.scan_complete', visits=visits_added, hotspots=hotspots_added)
             progress_callback(total, msg)
         
-        print(f"[FIRST INSTALL] ✓ Scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
+        print(f"[FIRST INSTALL] Scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
         log.info(f"First install scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
         
         # Mark full scan as complete using JSON file
@@ -19718,7 +19741,7 @@ Your keybinds will need to be reconfigured manually."""
         # Clear catchup scan flag
         self.cargo_monitor._catchup_scan_in_progress = False
         
-        print(f"[JOURNAL] ✓ Scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
+        print(f"[JOURNAL] Scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
         log.info(f"Journal scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
         
         # Show completion in status bar
