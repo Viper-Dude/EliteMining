@@ -416,14 +416,32 @@ def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> 
         
         dialog.geometry(f"+{x}+{y}")
         dialog.deiconify()
-        dialog.transient(parent)
+        
+        # Don't use transient - it can cause dialog to hide behind parent
+        # dialog.transient(parent)
+        
+        # Set topmost BEFORE grab_set to ensure visibility
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
         try:
             dialog.grab_set()
         except:
             pass  # grab_set can fail if another grab is active
-        dialog.attributes('-topmost', True)
-        dialog.lift()
+        
         yes_btn.focus_set()
+        
+        # Keep dialog on top during wait
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
+        
         dialog.wait_window()
     except Exception as e:
         logging.error(f"[DIALOG] Error in centered_askyesno: {e}")

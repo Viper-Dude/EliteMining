@@ -14,6 +14,8 @@
 
 ### Bug Fixes & Improvements
 - **Fixed:** Keybind preservation now correctly handles compound keybinds (multiple buttons combined with `+`)
+- **Fixed:** Profile update dialog no longer hides behind main window
+- **Fixed:** Thrust Up timing now uses correct settings for cargo scoop retracted/deployed
 
 ### Voiceattack Profile
 - Updated to v4.8.5 (included in installer)

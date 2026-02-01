@@ -109,12 +109,28 @@ class VAKeybindExtractor:
                 use_variable_mouse_shortcut=self.get_bool_option(command, "UseVariableMouseShortcut"),
             )
         
-        # Filter to only commands with keybinds
-        # Include commands with keyboard, mouse, joystick shortcuts, or joystick button set
+        # Filter to only commands with actual keybinds
+        # Include commands with keyboard, mouse, or joystick shortcuts
+        # Exclude joystick 0 button 0 (means no keybind set)
+        def has_real_keybind(kb):
+            if kb.keyboard_shortcut or kb.mouse_shortcut:
+                return True
+            if kb.joystick_shortcut:
+                # Exclude "Joystick 0 Button 0" which means no keybind
+                if kb.joystick_shortcut == "Joystick 0 Button 0":
+                    return False
+                return True
+            # Also include if joystick_button is set to a real value
+            if kb.joystick_button and kb.joystick_button not in ('0', '-1', ''):
+                return True
+            # Button 0 on joystick 1+ is valid
+            if kb.joystick_button == '0' and kb.joystick_number and kb.joystick_number != '0':
+                return True
+            return False
+        
         keybinds_with_bindings = {
             name: kb for name, kb in keybinds.items()
-            if kb.keyboard_shortcut or kb.joystick_shortcut or kb.mouse_shortcut 
-            or (kb.joystick_button and kb.joystick_button not in ('0', '-1', ''))
+            if has_real_keybind(kb)
         }
         
         logger.info(f"Extracted keybinds from {len(keybinds_with_bindings)} commands")
@@ -169,9 +185,13 @@ class VAKeybindExtractor:
             num = joystick_num.text
             btn = joystick_btn.text
             
-            # Check if it's actually set (not -1)
-            if btn and btn != "-1":
+            # Check if it's actually set (not -1 or 0)
+            # Button 0 with joystick 0 means no keybind set
+            if btn and btn not in ("-1", "0"):
                 # Format: "Joystick 1 Button 25"
+                return f"Joystick {num} Button {btn}"
+            elif btn == "0" and num and num != "0":
+                # Button 0 on joystick 1+ is valid (some HOTAS have button 0)
                 return f"Joystick {num} Button {btn}"
         
         return None
