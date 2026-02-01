@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.86"
+APP_VERSION = "v4.87"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4870,6 +4870,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._load_auto_scan_preference()
         self.auto_scan_journals.trace('w', self._on_auto_scan_toggle)
         
+        # Auto-search hotspots after FSD jump (syncs with ring_finder)
+        self.auto_search_enabled = tk.BooleanVar(value=False)
+        self._load_auto_search_preference()
+        
         # Auto-switch tabs on ring entry/exit
         self.auto_switch_tabs = tk.IntVar(value=1)  # Default enabled
         self._load_auto_switch_tabs_preference()
@@ -5992,12 +5996,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if cfg["fg"] is not None:
                 cb = ttk.Combobox(frame, values=FIREGROUPS, width=6, textvariable=self.tool_fg[tool], state="readonly")
                 cb.grid(row=row, column=1, sticky="w")
+                # Auto-save on change
+                self.tool_fg[tool].trace_add("write", lambda *args, t=tool: self._save_firegroup(t))
+                # Clear selection
+                cb.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
             else:
                 ttk.Label(frame, text="—").grid(row=row, column=1, sticky="w")
 
             if cfg["btn"] is not None:
                 tk.Radiobutton(frame, text=t('voiceattack.primary'), value=1, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), padx=4, pady=2, anchor="w").grid(row=row, column=2, sticky="w")
                 tk.Radiobutton(frame, text=t('voiceattack.secondary'), value=2, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), padx=4, pady=2, anchor="w").grid(row=row, column=3, sticky="w")
+                # Auto-save on change
+                self.tool_btn[tool].trace_add("write", lambda *args, t=tool: self._save_fire_button(t))
             else:
                 ttk.Label(frame, text="—").grid(row=row, column=2, sticky="w")
                 ttk.Label(frame, text="—").grid(row=row, column=3, sticky="w")
@@ -6314,10 +6324,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 thr = ttk.Frame(main_controls)
                 thr.pack(side="left")
                 ttk.Label(thr, text=t('settings.announce_at')).pack(side="left")
-                sp = ttk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
+                # Use theme-aware colors for spinbox
+                _ann_spinbox_fg = "#ff8c00" if self.current_theme == "elite_orange" else "#ffffff"
+                sp = tk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
                                  textvariable=self.prospector_panel.threshold, 
-                                 command=self.prospector_panel._save_threshold_value)
+                                 command=self.prospector_panel._save_threshold_value,
+                                 bg="#1e1e1e", fg=_ann_spinbox_fg, buttonbackground="#2d2d2d",
+                                 insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
+                                 relief="solid", bd=0, highlightthickness=1,
+                                 highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                 font=("Segoe UI", 9))
                 sp.pack(side="left", padx=(6, 4))
+                # Add mouse wheel support
+                def on_ann_threshold_scroll(event, var=self.prospector_panel.threshold):
+                    try:
+                        current = float(var.get())
+                        if event.delta > 0:
+                            new_val = min(current + 0.5, 100.0)
+                        else:
+                            new_val = max(current - 0.5, 0.0)
+                        var.set(round(new_val, 1))
+                    except:
+                        pass
+                    return "break"
+                sp.bind("<MouseWheel>", on_ann_threshold_scroll)
                 ToolTip(sp, t('tooltips.announcement_threshold'))
                 
                 set_all_btn = tk.Button(thr, text=t('settings.set_all'), command=self._ann_set_all_threshold,
@@ -6409,16 +6439,42 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         v = self.prospector_panel.min_pct_map.get(mat, 0.0)
                         self._ann_minpct_vars[mat] = tk.DoubleVar(value=v)
                         
-                        self._ann_minpct_spin[mat] = ttk.Spinbox(
+                        self._ann_minpct_spin[mat] = tk.Spinbox(
                             self.ann_mat_tree,
                             from_=0.0,
                             to=100.0,
                             increment=0.5,
-                            width=4,
+                            width=5,
                             textvariable=self._ann_minpct_vars[mat],
-                            command=_on_ann_minpct_change_factory(mat)
+                            command=_on_ann_minpct_change_factory(mat),
+                            bg="#1e1e1e", fg=_ann_spinbox_fg, buttonbackground="#2d2d2d",
+                            insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
+                            relief="solid", bd=0, highlightthickness=1,
+                            highlightbackground="#ffffff", highlightcolor="#ffffff",
+                            font=("Segoe UI", 9)
                         )
+                        # Add mouse wheel support
+                        def on_ann_minpct_scroll(event, v=self._ann_minpct_vars[mat]):
+                            try:
+                                current = float(v.get())
+                                if event.delta > 0:
+                                    new_val = min(current + 0.5, 100.0)
+                                else:
+                                    new_val = max(current - 0.5, 0.0)
+                                v.set(round(new_val, 1))
+                            except:
+                                pass
+                            return "break"
+                        self._ann_minpct_spin[mat].bind("<MouseWheel>", on_ann_minpct_scroll)
                     row_idx += 1
+
+                # Click on treeview (not on spinbox) to clear spinbox focus
+                def _clear_spinbox_focus(event):
+                    # Check if click is not on a spinbox
+                    widget = event.widget.winfo_containing(event.x_root, event.y_root)
+                    if not isinstance(widget, tk.Spinbox):
+                        frame.focus_set()
+                self.ann_mat_tree.bind("<Button-1>", _clear_spinbox_focus, add='+')
 
                 # Add double-click handler to toggle announcement
                 def _ann_toggle_announce(event):
@@ -6848,18 +6904,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Bind mousewheel to canvas - only when mouse is over canvas
+        # Bind mousewheel to canvas for scrolling
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        def _bind_canvas_scroll(e):
-            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        # Bind mousewheel to canvas and all child widgets
+        def _bind_mousewheel_recursive(widget):
+            widget.bind("<MouseWheel>", _on_mousewheel)
+            for child in widget.winfo_children():
+                _bind_mousewheel_recursive(child)
         
-        def _unbind_canvas_scroll(e):
-            canvas.unbind_all("<MouseWheel>")
+        # Bind to canvas and scrollable_frame initially
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
         
-        canvas.bind("<Enter>", _bind_canvas_scroll)
-        canvas.bind("<Leave>", _unbind_canvas_scroll)
+        # Rebind to all children after content is built
+        def _bind_all_children():
+            _bind_mousewheel_recursive(scrollable_frame)
+        frame.after(100, _bind_all_children)
 
         # Now build content in scrollable_frame instead of frame
         scrollable_frame.columnconfigure(0, weight=1)
@@ -7080,7 +7142,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.transparency_scale = tk.Scale(transparency_frame, from_=10, to=100, orient="horizontal", 
                                          variable=self.text_overlay_transparency, bg=_gs_bg, fg=_slider_fg, 
                                          activebackground=_slider_active, highlightthickness=0, length=120,
-                                         troughcolor=_slider_trough, font=("Segoe UI", 8),
+                                         troughcolor=_slider_trough, font=("Segoe UI", 9),
                                          sliderrelief="flat", sliderlength=20)
         self.transparency_scale.pack(side="left", padx=(8, 0))
         tk.Label(transparency_frame, text="%", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
@@ -7175,7 +7237,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         self.size_combo = ttk.Combobox(size_frame, textvariable=self._size_display_var, 
                                       values=size_display_names, 
-                                      state="readonly", width=12, font=("Segoe UI", 8))
+                                      state="readonly", width=12, font=("Segoe UI", 9))
         self.size_combo.pack(side="left", padx=(8, 0))
         
         # Sync display var to internal var
@@ -7197,7 +7259,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.duration_scale = tk.Scale(duration_frame, from_=5, to=30, orient="horizontal", 
                                      variable=self.text_overlay_duration, bg=_gs_bg, fg=_slider_fg, 
                                      activebackground=_slider_active, highlightthickness=0, length=140,
-                                     troughcolor=_slider_trough, font=("Segoe UI", 8),
+                                     troughcolor=_slider_trough, font=("Segoe UI", 9),
                                      sliderrelief="flat", sliderlength=20)
         self.duration_scale.pack(side="left", padx=(8, 0))
         tk.Label(duration_frame, text=t('settings.seconds'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
@@ -7267,7 +7329,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.voice_choice = tk.StringVar(value="")
             
         self.voice_combo = ttk.Combobox(voice_frame, textvariable=self.voice_choice, 
-                                       state="readonly", width=35, font=("Segoe UI", 8),
+                                       state="readonly", width=35, font=("Segoe UI", 9),
                                        values=voice_values)
         self.voice_combo.pack(side="left")
         
@@ -7310,7 +7372,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         vol_slider = tk.Scale(vol_frame, from_=0, to=100, orient="horizontal", 
                              variable=self.voice_volume, bg=_gs_bg, fg=_slider_fg,
                              activebackground=_slider_active, highlightthickness=0, 
-                             troughcolor=_slider_trough, font=("Segoe UI", 8),
+                             troughcolor=_slider_trough, font=("Segoe UI", 9),
                              command=_on_volume_change, length=200,
                              sliderrelief="flat", sliderlength=20)
         vol_slider.pack(side="left", padx=(8, 0))
@@ -7450,14 +7512,43 @@ class App(tk.Tk, ColumnVisibilityMixin):
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
-        # Auto-switch tabs on ring entry/exit checkbox
-        tk.Checkbutton(scrollable_frame, text="Auto-switch Tabs on Ring Entry/Exit", variable=self.auto_switch_tabs, 
+        # ========== AUTOMATION SECTION ==========
+        ttk.Label(scrollable_frame, text=t('settings.automation_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        r += 1
+        
+        # Add separator line
+        separator_automation = tk.Frame(scrollable_frame, height=1, bg="#444444")
+        separator_automation.grid(row=r, column=0, sticky="ew", pady=(0, 8))
+        r += 1
+        
+        # Auto-search hotspots after FSD jump checkbox
+        def _on_auto_search_toggle():
+            enabled = self.auto_search_enabled.get()
+            # Sync with ring_finder
+            if hasattr(self, 'ring_finder') and self.ring_finder and hasattr(self.ring_finder, 'auto_search_var'):
+                self.ring_finder.auto_search_var.set(enabled)
+                self.ring_finder._save_auto_search_state()
+            self._set_status(f"Auto-search hotspots {'enabled' if enabled else 'disabled'}")
+        
+        tk.Checkbutton(scrollable_frame, text=t('settings.auto_search_hotspots'), variable=self.auto_search_enabled, 
+                      command=_on_auto_search_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
-        tk.Label(scrollable_frame, text="Automatically switch to Mining Session tab when dropping into a ring, and to Hotspots Finder when entering supercruise or jumping to another system", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text=t('settings.auto_search_hotspots_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+        
+        # Auto-switch tabs checkbox
+        tk.Checkbutton(scrollable_frame, text=t('settings.auto_switch_tabs'), variable=self.auto_switch_tabs, 
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
+                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+        r += 1
+        tk.Label(scrollable_frame, text=t('settings.auto_switch_tabs_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -7552,143 +7643,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         #          wraplength=760, justify="left", fg="gray", bg=_gs_bg,
         #          font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         # r += 1
-
-        # ========== API UPLOAD SECTION ==========
-        r += 1
-        ttk.Label(scrollable_frame, text=t('settings.api_upload_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
-        r += 1
-        
-        # Add separator line
-        separator_api = tk.Frame(scrollable_frame, height=1, bg="#444444")
-        separator_api.grid(row=r, column=0, sticky="ew", pady=(0, 8))
-        r += 1
-        
-        # COMING SOON notice
-        coming_soon_frame = tk.Frame(scrollable_frame, bg="#3a3a00", relief="solid", bd=1)
-        coming_soon_frame.grid(row=r, column=0, sticky="ew", pady=(0, 10))
-        tk.Label(coming_soon_frame, text="🚧 " + t('settings.api_coming_soon'), 
-                bg="#3a3a00", fg="#ffff00", font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=10, pady=(8, 4))
-        tk.Label(coming_soon_frame, text=t('settings.api_coming_soon_desc1'), 
-                bg="#3a3a00", fg="#ffffff", font=("Segoe UI", 8)).pack(anchor="w", padx=10)
-        tk.Label(coming_soon_frame, text=t('settings.api_coming_soon_desc2'), 
-                bg="#3a3a00", fg="#ffffff", font=("Segoe UI", 8)).pack(anchor="w", padx=10)
-        tk.Label(coming_soon_frame, text=t('settings.api_coming_soon_desc3'), 
-                bg="#3a3a00", fg="#ffffff", font=("Segoe UI", 8)).pack(anchor="w", padx=10, pady=(0, 8))
-        r += 1
-        
-        # API Upload enable/disable with consent message (DISABLED FOR NOW)
-        api_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        api_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        
-        # Initialize API variables
-        if not hasattr(self, 'api_upload_enabled'):
-            from config import load_api_upload_settings
-            api_settings = load_api_upload_settings()
-            # Force disabled for this release
-            self.api_upload_enabled = tk.IntVar(value=0)
-            self.api_endpoint_url = tk.StringVar(value=api_settings["endpoint_url"])
-            self.api_key = tk.StringVar(value=api_settings["api_key"])
-            self.api_cmdr_name = tk.StringVar(value=api_settings["cmdr_name"])
-        
-        api_check = tk.Checkbutton(api_frame, text=t('settings.api_enable_upload'), 
-                                   variable=self.api_upload_enabled,
-                                   command=self._on_api_upload_toggle,
-                                   bg=_gs_bg, fg="#888888", selectcolor="#1e1e1e", 
-                                   activebackground="#1e1e1e", activeforeground="#888888", 
-                                   highlightthickness=0, bd=0, font=("Segoe UI", 9), 
-                                   padx=4, pady=2, anchor="w", state="disabled")
-        api_check.pack(anchor="w")
-        r += 1
-        
-        # Consent message
-        consent_frame = tk.Frame(scrollable_frame, bg="#2a2a2a", relief="solid", bd=1)
-        consent_frame.grid(row=r, column=0, sticky="ew", pady=(4, 8), padx=(20, 0))
-        tk.Label(consent_frame, text="ℹ️ " + t('settings.api_consent_title'), 
-                bg="#2a2a2a", fg="#ffcc00", font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=8, pady=(6, 2))
-        tk.Label(consent_frame, text="  • " + t('settings.api_consent_sessions'), 
-                bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8)
-        tk.Label(consent_frame, text="  • " + t('settings.api_consent_hotspots'), 
-                bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8)
-        tk.Label(consent_frame, text="  • " + t('settings.api_consent_materials'), 
-                bg="#2a2a2a", fg="#cccccc", font=("Segoe UI", 8)).pack(anchor="w", padx=8, pady=(0, 6))
-        r += 1
-        
-        # CMDR Name (DISABLED)
-        cmdr_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        cmdr_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        tk.Label(cmdr_frame, text=t('settings.api_cmdr_name'), bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
-        cmdr_entry = tk.Entry(cmdr_frame, textvariable=self.api_cmdr_name, 
-                             bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=30, state="disabled")
-        cmdr_entry.pack(side="left", padx=(8, 0))
-        r += 1
-        
-        # API Endpoint URL (DISABLED)
-        endpoint_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        endpoint_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        tk.Label(endpoint_frame, text=t('settings.api_endpoint'), bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
-        endpoint_entry = tk.Entry(endpoint_frame, textvariable=self.api_endpoint_url, 
-                                 bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=50, state="disabled")
-        endpoint_entry.pack(side="left", padx=(8, 0))
-        r += 1
-        
-        # API Key (DISABLED)
-        apikey_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        apikey_frame.grid(row=r, column=0, sticky="w", pady=(4, 8))
-        tk.Label(apikey_frame, text=t('settings.api_key'), bg=_gs_bg, fg="#888888", font=("Segoe UI", 9)).pack(side="left")
-        apikey_entry = tk.Entry(apikey_frame, textvariable=self.api_key, 
-                               bg="#2d2d2d", fg="#888888", font=("Segoe UI", 9), width=50, show="*", state="disabled")
-        apikey_entry.pack(side="left", padx=(8, 0))
-        
-        # Show/hide API key button (DISABLED)
-        def _toggle_api_key_visibility():
-            return  # Disabled
-        
-        show_btn = tk.Button(apikey_frame, text="👁️", command=_toggle_api_key_visibility,
-                            bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
-                            activeforeground="#888888", relief="ridge", bd=1, 
-                            font=("Segoe UI", 8), cursor="hand2", width=3, state="disabled")
-        show_btn.pack(side="left", padx=(4, 0))
-        r += 1
-        
-        # Buttons frame
-        api_buttons_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        api_buttons_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        
-        # Test Connection button (DISABLED)
-        test_btn = tk.Button(api_buttons_frame, text=t('settings.api_test_connection'), command=self._test_api_connection,
-                            bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
-                            activeforeground="#888888", relief="ridge", bd=1, padx=10, pady=3,
-                            font=("Segoe UI", 8, "normal"), cursor="hand2", state="disabled")
-        test_btn.pack(side="left", padx=(0, 8))
-        ToolTip(test_btn, t('tooltips.test_upload'))
-        
-        # Save Settings button (DISABLED)
-        save_api_btn = tk.Button(api_buttons_frame, text=t('settings.api_save_settings'), command=self._save_api_settings,
-                                bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
-                                activeforeground="#888888", relief="ridge", bd=1, padx=10, pady=3,
-                                font=("Segoe UI", 8, "normal"), cursor="hand2", state="disabled")
-        save_api_btn.pack(side="left", padx=(0, 8))
-        
-        # Bulk Upload button (DISABLED)
-        bulk_upload_btn = tk.Button(api_buttons_frame, text=t('settings.api_bulk_upload'), command=self._bulk_upload_api_data,
-                                    bg="#2a2a2a", fg="#888888", activebackground="#3a3a3a",
-                                    activeforeground="#888888", relief="ridge", bd=1, padx=10, pady=3,
-                                    font=("Segoe UI", 8, "normal"), cursor="hand2", state="disabled")
-        bulk_upload_btn.pack(side="left")
-        ToolTip(bulk_upload_btn, t('tooltips.bulk_upload'))
-        r += 1
-        
-        # Status label
-        self.api_status_label = tk.Label(scrollable_frame, text="", 
-                                         bg=_gs_bg, fg="gray", font=("Segoe UI", 8))
-        self.api_status_label.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        self._update_api_status()
-        r += 1
-        
-        tk.Label(scrollable_frame, text=t('settings.api_desc'), 
-                wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
-        r += 1
 
         # ========== BACKUP & RESTORE SECTION ==========
         ttk.Label(scrollable_frame, text=t('settings.backup_restore_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
@@ -7942,47 +7896,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Configure row tags for alternating colors (theme-aware)
         self._configure_preset_list_row_colors()
         
-        # Import/Apply buttons at the bottom of presets pane
-        preset_buttons_frame = ttk.Frame(presets_pane)
-        preset_buttons_frame.grid(row=3, column=0, columnspan=2, sticky="s", pady=(6, 4))
-        
-        import_btn = tk.Button(
-            preset_buttons_frame, 
-            text="⬇ " + t('common.import'), 
-            command=self._import_all_from_txt,
-            bg="#3a3a3a",
-            fg="#e0e0e0", 
-            activebackground="#4a4a4a", 
-            activeforeground="#ffffff",
-            relief="ridge",
-            bd=1,                   
-            padx=8,                
-            pady=2,
-            font=("Segoe UI", 8, "normal"),  
-            cursor="hand2"
-        )
-        import_btn.grid(row=0, column=0, padx=(0, 4))
-        self.import_btn = import_btn
-        ToolTip(import_btn, t('tooltips.import_va'))
-        
-        apply_btn = tk.Button(
-            preset_buttons_frame, 
-            text="⬆ " + t('common.apply'), 
-            command=self._save_all_to_txt,
-            bg="#2a4a2a",
-            fg="#e0e0e0", 
-            activebackground="#3a5a3a", 
-            activeforeground="#ffffff",
-            relief="ridge",
-            bd=1,                   
-            padx=8,                
-            pady=2,
-            font=("Segoe UI", 8, "normal"),  
-            cursor="hand2"
-        )
-        apply_btn.grid(row=0, column=1, padx=(4, 0))
-        ToolTip(apply_btn, t('tooltips.apply_va'))
-
         # Get theme-aware menu colors
         from core.constants import get_menu_colors
         menu_colors = get_menu_colors(self.current_theme)
@@ -8222,6 +8135,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
+            # Create closure for auto-save
+            def make_toggle_trace(toggle_name):
+                return lambda *args: self._save_toggle(toggle_name)
+            
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
@@ -8230,6 +8147,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox.pack(side="left")
             
             self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", make_toggle_trace(name))
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
@@ -8258,10 +8176,29 @@ class App(tk.Tk, ColumnVisibilityMixin):
             def make_trace_boost(tn, fn, l, h):
                 return lambda *args: self._save_timer(tn, fn, l, h)
             
-            sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[boost_timer_name],
-                            command=make_save_boost(boost_timer_name, _fname, lo, hi))
+            sp = tk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[boost_timer_name],
+                            command=make_save_boost(boost_timer_name, _fname, lo, hi),
+                            bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                            insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                            relief="solid", bd=0, highlightthickness=1,
+                            highlightbackground="#ffffff", highlightcolor="#ffffff",
+                            font=("Segoe UI", 9))
             sp.pack(side="left")
-            _block_canvas_scroll_on_spinbox(sp)
+            # Add mouse wheel support for tk.Spinbox
+            def on_boost_scroll(event, spinbox=sp, var=self.timer_vars[boost_timer_name], lo_val=lo, hi_val=hi):
+                try:
+                    current = int(var.get())
+                    if event.delta > 0:
+                        new_val = min(current + 1, hi_val)
+                    else:
+                        new_val = max(current - 1, lo_val)
+                    var.set(new_val)
+                except:
+                    pass
+                return "break"
+            sp.bind("<MouseWheel>", on_boost_scroll)
+            sp.bind("<Enter>", _unbind_canvas_scroll)
+            sp.bind("<Leave>", _bind_canvas_scroll)
             
             self.timer_vars[boost_timer_name].trace_add("write", make_trace_boost(boost_timer_name, _fname, lo, hi))
             
@@ -8300,10 +8237,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
             def make_trace_laser(tn, fn, l, h):
                 return lambda *args: self._save_timer(tn, fn, l, h)
             
-            sp = ttk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[name],
-                            command=make_save_laser(name, _fname, lo, hi))
+            # Use tk.Spinbox instead of ttk.Spinbox to test selection behavior
+            sp = tk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[name],
+                            command=make_save_laser(name, _fname, lo, hi),
+                            bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                            insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                            relief="solid", bd=0, highlightthickness=1,
+                            highlightbackground="#ffffff", highlightcolor="#ffffff",
+                            font=("Segoe UI", 9))
             sp.pack(side="left")
-            _block_canvas_scroll_on_spinbox(sp)
+            # Add mouse wheel support for tk.Spinbox
+            def on_spinbox_scroll(event, spinbox=sp, var=self.timer_vars[name], lo_val=lo, hi_val=hi):
+                try:
+                    current = int(var.get())
+                    if event.delta > 0:
+                        new_val = min(current + 1, hi_val)
+                    else:
+                        new_val = max(current - 1, lo_val)
+                    var.set(new_val)
+                except:
+                    pass
+                return "break"
+            sp.bind("<MouseWheel>", on_spinbox_scroll)
+            sp.bind("<Enter>", _unbind_canvas_scroll)
+            sp.bind("<Leave>", _bind_canvas_scroll)
             
             self.timer_vars[name].trace_add("write", make_trace_laser(name, _fname, lo, hi))
             
@@ -8330,6 +8287,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
@@ -8344,11 +8302,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
             tk.Label(repeat_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
             
             self.laser_extra_repeat_var = tk.IntVar(value=1)
-            repeat_spinbox = ttk.Spinbox(repeat_frame, from_=1, to=10, width=5, 
+            repeat_spinbox = tk.Spinbox(repeat_frame, from_=1, to=10, width=5, 
                                          textvariable=self.laser_extra_repeat_var,
-                                         command=self._save_laser_extra_repeat)
+                                         command=self._save_laser_extra_repeat,
+                                         bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                         insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                         relief="solid", bd=0, highlightthickness=1,
+                                         highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                         font=("Segoe UI", 9))
             repeat_spinbox.pack(side="left", padx=(4, 6))
-            _block_canvas_scroll_on_spinbox(repeat_spinbox)
+            # Add mouse wheel support
+            def on_repeat_scroll(event, var=self.laser_extra_repeat_var):
+                try:
+                    current = int(var.get())
+                    if event.delta > 0:
+                        new_val = min(current + 1, 10)
+                    else:
+                        new_val = max(current - 1, 1)
+                    var.set(new_val)
+                except:
+                    pass
+                return "break"
+            repeat_spinbox.bind("<MouseWheel>", on_repeat_scroll)
+            repeat_spinbox.bind("<Enter>", _unbind_canvas_scroll)
+            repeat_spinbox.bind("<Leave>", _bind_canvas_scroll)
             
             self.laser_extra_repeat_var.trace_add("write", lambda *args: self._save_laser_extra_repeat())
             
@@ -8378,6 +8355,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
@@ -8401,6 +8379,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
@@ -8424,6 +8403,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
@@ -8449,11 +8429,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 def make_trace_cargoscoop(tn, fn, l, h):
                     return lambda *args: self._save_cargoscoop_delay(tn, fn, l, h)
                 
-                cargoscoop_spinbox = ttk.Spinbox(cargoscoop_frame, from_=lo, to=hi, width=5, 
+                cargoscoop_spinbox = tk.Spinbox(cargoscoop_frame, from_=lo, to=hi, width=5, 
                                                  textvariable=self.timer_vars[cargoscoop_timer_name],
-                                                 command=make_save_cargoscoop(cargoscoop_timer_name, _fname, lo, hi))
+                                                 command=make_save_cargoscoop(cargoscoop_timer_name, _fname, lo, hi),
+                                                 bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                                 insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                                 relief="solid", bd=0, highlightthickness=1,
+                                                 highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                                 font=("Segoe UI", 9))
                 cargoscoop_spinbox.pack(side="left", padx=(4, 6))
-                _block_canvas_scroll_on_spinbox(cargoscoop_spinbox)
+                # Add mouse wheel support
+                def on_cargoscoop_scroll(event, var=self.timer_vars[cargoscoop_timer_name], lo_val=lo, hi_val=hi):
+                    try:
+                        current = int(var.get())
+                        if event.delta > 0:
+                            new_val = min(current + 1, hi_val)
+                        else:
+                            new_val = max(current - 1, lo_val)
+                        var.set(new_val)
+                    except:
+                        pass
+                    return "break"
+                cargoscoop_spinbox.bind("<MouseWheel>", on_cargoscoop_scroll)
+                cargoscoop_spinbox.bind("<Enter>", _unbind_canvas_scroll)
+                cargoscoop_spinbox.bind("<Leave>", _bind_canvas_scroll)
                 
                 self.timer_vars[cargoscoop_timer_name].trace_add("write", 
                     make_trace_cargoscoop(cargoscoop_timer_name, _fname, lo, hi))
@@ -8482,6 +8481,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
@@ -8513,6 +8513,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.toggle_checkboxes[name] = checkbox
             
             self.toggle_vars[name].trace_add("write", lambda *args: self._update_prospector_dependencies())
+            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
@@ -8527,11 +8528,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
             tk.Label(prospector_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
             
             self.prospector_delay_var = tk.DoubleVar(value=4.4)
-            prospector_spinbox = ttk.Spinbox(prospector_frame, from_=2.0, to=6.0, increment=0.1, width=6, 
+            prospector_spinbox = tk.Spinbox(prospector_frame, from_=2.0, to=6.0, increment=0.1, width=6, 
                                              textvariable=self.prospector_delay_var, format="%.1f",
-                                             command=self._save_prospector_delay)
+                                             command=self._save_prospector_delay,
+                                             bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                             insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                             relief="solid", bd=0, highlightthickness=1,
+                                             highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                             font=("Segoe UI", 9))
             prospector_spinbox.pack(side="left", padx=(4, 6))
-            _block_canvas_scroll_on_spinbox(prospector_spinbox)
+            # Add mouse wheel support
+            def on_prospector_scroll(event, var=self.prospector_delay_var):
+                try:
+                    current = float(var.get())
+                    if event.delta > 0:
+                        new_val = min(current + 0.1, 6.0)
+                    else:
+                        new_val = max(current - 0.1, 2.0)
+                    var.set(round(new_val, 1))
+                except:
+                    pass
+                return "break"
+            prospector_spinbox.bind("<MouseWheel>", on_prospector_scroll)
+            prospector_spinbox.bind("<Enter>", _unbind_canvas_scroll)
+            prospector_spinbox.bind("<Leave>", _bind_canvas_scroll)
             
             self.prospector_delay_var.trace_add("write", lambda *args: self._save_prospector_delay())
             
@@ -8560,11 +8580,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 def make_trace_target(tn, fn, l, h):
                     return lambda *args: self._save_timer(tn, fn, l, h)
                 
-                target_spinbox = ttk.Spinbox(target_frame, from_=lo, to=hi, width=5, 
+                target_spinbox = tk.Spinbox(target_frame, from_=lo, to=hi, width=5, 
                                              textvariable=self.timer_vars[target_timer_name],
-                                             command=make_save_target(target_timer_name, _fname, lo, hi))
+                                             command=make_save_target(target_timer_name, _fname, lo, hi),
+                                             bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                             insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                             relief="solid", bd=0, highlightthickness=1,
+                                             highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                             font=("Segoe UI", 9))
                 target_spinbox.pack(side="left", padx=(4, 6))
-                _block_canvas_scroll_on_spinbox(target_spinbox)
+                # Add mouse wheel support
+                def on_target_scroll(event, var=self.timer_vars[target_timer_name], lo_val=lo, hi_val=hi):
+                    try:
+                        current = int(var.get())
+                        if event.delta > 0:
+                            new_val = min(current + 1, hi_val)
+                        else:
+                            new_val = max(current - 1, lo_val)
+                        var.set(new_val)
+                    except:
+                        pass
+                    return "break"
+                target_spinbox.bind("<MouseWheel>", on_target_scroll)
+                target_spinbox.bind("<Enter>", _unbind_canvas_scroll)
+                target_spinbox.bind("<Leave>", _bind_canvas_scroll)
                 
                 self.timer_vars[target_timer_name].trace_add("write", make_trace_target(target_timer_name, _fname, lo, hi))
                 
@@ -8591,6 +8630,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Indent dependent toggles
             tk.Label(rowf, text="", bg=_toggle_bg, width=2).pack(side="left")
             
+            # Create closure for auto-save
+            def make_dependent_trace(toggle_name):
+                return lambda *args: self._save_toggle(toggle_name)
+            
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
@@ -8598,6 +8641,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", make_dependent_trace(name))
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
@@ -8615,11 +8659,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tk.Label(thrust_closed_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 
                 self.thrust_closed_var = tk.DoubleVar(value=1.5)
-                thrust_closed_spinbox = ttk.Spinbox(thrust_closed_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
+                thrust_closed_spinbox = tk.Spinbox(thrust_closed_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
                                                     textvariable=self.thrust_closed_var, format="%.1f",
-                                                    command=self._save_thrust_closed)
+                                                    command=self._save_thrust_closed,
+                                                    bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                                    insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                                    relief="solid", bd=0, highlightthickness=1,
+                                                    highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                                    font=("Segoe UI", 9))
                 thrust_closed_spinbox.pack(side="left", padx=(4, 6))
-                _block_canvas_scroll_on_spinbox(thrust_closed_spinbox)
+                # Add mouse wheel support
+                def on_thrust_closed_scroll(event, var=self.thrust_closed_var):
+                    try:
+                        current = float(var.get())
+                        if event.delta > 0:
+                            new_val = min(current + 0.1, 5.0)
+                        else:
+                            new_val = max(current - 0.1, 1.0)
+                        var.set(round(new_val, 1))
+                    except:
+                        pass
+                    return "break"
+                thrust_closed_spinbox.bind("<MouseWheel>", on_thrust_closed_scroll)
+                thrust_closed_spinbox.bind("<Enter>", _unbind_canvas_scroll)
+                thrust_closed_spinbox.bind("<Leave>", _bind_canvas_scroll)
                 
                 self.thrust_closed_var.trace_add("write", lambda *args: self._save_thrust_closed())
                 
@@ -8640,11 +8703,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tk.Label(thrust_open_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 
                 self.thrust_open_var = tk.DoubleVar(value=3.8)
-                thrust_open_spinbox = ttk.Spinbox(thrust_open_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
+                thrust_open_spinbox = tk.Spinbox(thrust_open_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
                                                   textvariable=self.thrust_open_var, format="%.1f",
-                                                  command=self._save_thrust_open)
+                                                  command=self._save_thrust_open,
+                                                  bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                                  insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                                  relief="solid", bd=0, highlightthickness=1,
+                                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                                  font=("Segoe UI", 9))
                 thrust_open_spinbox.pack(side="left", padx=(4, 6))
-                _block_canvas_scroll_on_spinbox(thrust_open_spinbox)
+                # Add mouse wheel support
+                def on_thrust_open_scroll(event, var=self.thrust_open_var):
+                    try:
+                        current = float(var.get())
+                        if event.delta > 0:
+                            new_val = min(current + 0.1, 5.0)
+                        else:
+                            new_val = max(current - 0.1, 1.0)
+                        var.set(round(new_val, 1))
+                    except:
+                        pass
+                    return "break"
+                thrust_open_spinbox.bind("<MouseWheel>", on_thrust_open_scroll)
+                thrust_open_spinbox.bind("<Enter>", _unbind_canvas_scroll)
+                thrust_open_spinbox.bind("<Leave>", _bind_canvas_scroll)
                 
                 self.thrust_open_var.trace_add("write", lambda *args: self._save_thrust_open())
                 
@@ -8673,6 +8755,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
@@ -8824,6 +8907,56 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[PROSPECTOR DELAY] Error loading delay: {e}")
             self.prospector_delay_var.set(4.4)  # Fallback to default
+    
+    def _save_toggle(self, toggle_name: str) -> None:
+        """Save a toggle to file immediately on change"""
+        try:
+            if toggle_name not in TOGGLES:
+                return
+            fname, _help = TOGGLES[toggle_name]
+            base = os.path.splitext(fname)[0]
+            
+            if toggle_name == "Auto Honk":
+                val = "enabled" if self.toggle_vars[toggle_name].get() else "disabled"
+                self._write_var_text(base, val)
+            elif toggle_name == "Headtracker Docking Control":
+                self._write_var_text(base, "1" if self.toggle_vars[toggle_name].get() else "0")
+            else:
+                self._write_var_text(base, str(self.toggle_vars[toggle_name].get()))
+            
+            print(f"[TOGGLE] Auto-saved {toggle_name}: {self.toggle_vars[toggle_name].get()}")
+        except Exception as e:
+            print(f"[TOGGLE] Error auto-saving {toggle_name}: {e}")
+    
+    def _save_firegroup(self, tool: str) -> None:
+        """Save a firegroup assignment to file immediately on change"""
+        try:
+            cfg = VA_VARS.get(tool)
+            if not cfg or cfg["fg"] is None:
+                return
+            
+            fg_name = cfg["fg"]
+            letter = self.tool_fg[tool].get()
+            if letter:
+                self._write_var_text(fg_name, NATO.get(letter, letter))
+                print(f"[FIREGROUP] Auto-saved {tool}: {letter}")
+        except Exception as e:
+            print(f"[FIREGROUP] Error auto-saving {tool}: {e}")
+    
+    def _save_fire_button(self, tool: str) -> None:
+        """Save a fire button assignment to file immediately on change"""
+        try:
+            cfg = VA_VARS.get(tool)
+            if not cfg or cfg["btn"] is None:
+                return
+            
+            btn_name = cfg["btn"]
+            v = self.tool_btn[tool].get()
+            if v in (1, 2):
+                self._write_var_text(btn_name, "primary" if v == 1 else "secondary")
+                print(f"[FIRE BUTTON] Auto-saved {tool}: {'primary' if v == 1 else 'secondary'}")
+        except Exception as e:
+            print(f"[FIRE BUTTON] Error auto-saving {tool}: {e}")
     
     def _save_timer(self, timer_name: str, filename: str, lo: int, hi: int) -> None:
         """Save any timer to file immediately on change"""
@@ -10643,7 +10776,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                   insertbackground="#ffffff")
         system_a_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         system_a_entry.bind("<Return>", lambda e: self._calculate_distances())
-        system_a_entry.bind("<FocusOut>", lambda e: self._save_distance_systems())
+        system_a_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
         
         use_current_btn = tk.Button(calc_frame, text=t('distance_calculator.use_current'), command=self._distance_use_current_system,
                                    bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
@@ -10661,7 +10794,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                   insertbackground="#ffffff")
         system_b_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         system_b_entry.bind("<Return>", lambda e: self._calculate_distances())
-        system_b_entry.bind("<FocusOut>", lambda e: self._save_distance_systems())
+        system_b_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
         
         # Quick buttons for System B
         buttons_frame = tk.Frame(calc_frame, bg="#1e1e1e")
@@ -11837,6 +11970,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         enabled = bool(self.auto_scan_journals.get())
         self._save_auto_scan_preference()
         self._set_status(f"Auto-scan on startup {'enabled' if enabled else 'disabled'}")
+    
+    def _load_auto_search_preference(self) -> None:
+        """Load auto-search hotspots preference from Variables folder (syncs with ring_finder)"""
+        try:
+            import os
+            vars_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Variables")
+            auto_search_file = os.path.join(vars_dir, "autoSearch.txt")
+            if os.path.exists(auto_search_file):
+                with open(auto_search_file, 'r') as f:
+                    content = f.read().strip()
+                    self.auto_search_enabled.set(content == "1")
+                    print(f"Loaded auto-search preference: {content == '1'}")
+                    return
+        except Exception as e:
+            pass
+        self.auto_search_enabled.set(False)
+        print(f"Loaded auto-search preference: False (default)")
     
     def _load_auto_switch_tabs_preference(self) -> None:
         """Load auto-switch tabs preference from config"""
@@ -14912,6 +15062,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.marketplace_ref_entry = ttk.Entry(row1_frame, textvariable=self.marketplace_reference_system, width=30)
         self.marketplace_ref_entry.pack(side="left", padx=(0, 5))
         self.marketplace_ref_entry.bind("<Return>", lambda e: self._search_marketplace())
+        self.marketplace_ref_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
         
         self.marketplace_use_current_btn = tk.Button(row1_frame, text=t('marketplace.use_current'), 
                                     command=self._use_current_system_marketplace,
@@ -14952,6 +15103,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         commodity_combo.pack(side="left")
         commodity_combo.bind("<Return>", lambda e: self._search_marketplace())
         commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
+        commodity_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         
         # Row 2: All filters (aligned with Row 1)
         row2_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
@@ -14982,6 +15134,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 values=[self._station_type_map[k] for k in self._station_type_order],
                                 state="readonly", width=12)
         station_combo.pack(side="left", padx=(0, 15))
+        station_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(station_combo, t('tooltips.station_type_filter'))
         
         def on_station_type_change(*args):
@@ -15021,6 +15174,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                      state="readonly", width=20)
         self.marketplace_order_combo.pack(side="left", padx=(29, 0))  # Adjust first number to move dropdown
         self.marketplace_order_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
+        self.marketplace_order_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(self.marketplace_order_combo, t('tooltips.sort_by'))
         
         # Row 3: Search button and Max Age
@@ -15055,6 +15209,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 state="readonly", width=10)
         age_combo.pack(side="left", padx=(17, 0))  # Add left padding here
         age_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
+        age_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(age_combo, t('tooltips.max_age'))
         
         # EDTools button hidden (keep for future reference)
@@ -15173,6 +15328,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.trade_ref_entry = ttk.Entry(row1_frame, textvariable=self.trade_reference_system, width=30)
         self.trade_ref_entry.pack(side="left", padx=(0, 5))
         self.trade_ref_entry.bind("<Return>", lambda e: self._search_trade_market())
+        self.trade_ref_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
         
         self.trade_use_current_btn = tk.Button(row1_frame, text=t('marketplace.use_current'), 
                                     command=self._use_current_system_trade,
@@ -15192,6 +15348,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                      values=self._trade_categories, state="readonly", width=18)
         category_combo.pack(side="left", padx=(0, 15))
         category_combo.bind("<<ComboboxSelected>>", self._on_trade_category_changed)
+        category_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         
         # Commodity dropdown (populated based on category)
         ttk.Label(row1_frame, text=t('marketplace.commodity')).pack(side="left", padx=(0, 8))
@@ -15201,6 +15358,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.trade_commodity_combo.pack(side="left")
         self.trade_commodity_combo.bind("<Return>", lambda e: self._search_trade_market())
         self.trade_commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_trade_preferences())
+        self.trade_commodity_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         
         # Populate initial commodity list
         self._update_trade_commodity_list()
@@ -15233,6 +15391,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 values=[self._trade_station_type_map[k] for k in self._trade_station_type_order],
                                 state="readonly", width=12)
         station_combo.pack(side="left", padx=(0, 15))
+        station_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(station_combo, t('tooltips.station_type_filter'))
         
         def on_trade_station_type_change(*args):
@@ -15271,6 +15430,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                      state="readonly", width=18)
         self.trade_order_combo.pack(side="left", padx=(11, 0))
         self.trade_order_combo.bind("<<ComboboxSelected>>", lambda e: self._save_trade_preferences())
+        self.trade_order_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(self.trade_order_combo, t('tooltips.sort_by'))
         
         # Row 3: Search button and Max Age
@@ -15302,6 +15462,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 state="readonly", width=10)
         age_combo.pack(side="left", padx=(12, 0))
         age_combo.bind("<<ComboboxSelected>>", lambda e: self._save_trade_preferences())
+        age_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(age_combo, t('tooltips.max_age'))
         
         # Results section

@@ -2397,9 +2397,31 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         thr = ttk.Frame(main_controls)
         thr.pack(side="left")
         ttk.Label(thr, text="Announce at ≥").pack(side="left")
-        sp = ttk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
-                         textvariable=self.threshold, command=self._save_threshold_value)
+        # Get theme for spinbox styling
+        from config import load_theme
+        _ann_theme = load_theme()
+        _ann_spinbox_fg = "#ff8c00" if _ann_theme == "elite_orange" else "#ffffff"
+        sp = tk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
+                         textvariable=self.threshold, command=self._save_threshold_value,
+                         bg="#1e1e1e", fg=_ann_spinbox_fg, buttonbackground="#2d2d2d",
+                         insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
+                         relief="solid", bd=0, highlightthickness=1,
+                         highlightbackground="#ffffff", highlightcolor="#ffffff",
+                         font=("Segoe UI", 9))
         sp.pack(side="left", padx=(6, 4))
+        # Add mouse wheel support
+        def on_threshold_scroll(event, var=self.threshold):
+            try:
+                current = float(var.get())
+                if event.delta > 0:
+                    new_val = min(current + 0.5, 100.0)
+                else:
+                    new_val = max(current - 0.5, 0.0)
+                var.set(round(new_val, 1))
+            except:
+                pass
+            return "break"
+        sp.bind("<MouseWheel>", on_threshold_scroll)
         self.ToolTip(sp, t('tooltips.announcement_threshold'))
         
         set_all_btn = tk.Button(thr, text="Set all", command=self._set_all_min_pct,
@@ -2441,7 +2463,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 self.mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""))
 
         # create one Spinbox per row and place it over the "minpct" cell
-        self._minpct_spin: dict[str, ttk.Spinbox] = {}
+        self._minpct_spin: dict[str, tk.Spinbox] = {}
         self._minpct_vars: dict[str, tk.DoubleVar] = {} # This is the new line
 
         def _on_minpct_change_factory(material: str):
@@ -2464,12 +2486,30 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             start_val = self.min_pct_map.get(mat, 20.0)
             var = tk.DoubleVar(value=float(start_val))
             self._minpct_vars[mat] = var
-            spn = ttk.Spinbox(ann, from_=0.0, to=100.0, increment=0.5, width=6, textvariable=var,
-                              command=_on_minpct_change_factory(mat))
+            spn = tk.Spinbox(ann, from_=0.0, to=100.0, increment=0.5, width=6, textvariable=var,
+                              command=_on_minpct_change_factory(mat),
+                              bg="#1e1e1e", fg=_ann_spinbox_fg, buttonbackground="#2d2d2d",
+                              insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
+                              relief="solid", bd=0, highlightthickness=1,
+                              highlightbackground="#ffffff", highlightcolor="#ffffff",
+                              font=("Segoe UI", 9))
 
             # also update on Return/FocusOut
             spn.bind("<Return>", lambda e, m=mat: _on_minpct_change_factory(m)())
             spn.bind("<FocusOut>", lambda e, m=mat: _on_minpct_change_factory(m)())
+            # Add mouse wheel support
+            def on_minpct_scroll(event, v=var):
+                try:
+                    current = float(v.get())
+                    if event.delta > 0:
+                        new_val = min(current + 0.5, 100.0)
+                    else:
+                        new_val = max(current - 0.5, 0.0)
+                    v.set(round(new_val, 1))
+                except:
+                    pass
+                return "break"
+            spn.bind("<MouseWheel>", on_minpct_scroll)
             self._minpct_spin[mat] = spn
 
         # position spinboxes to match visible rows
@@ -7347,6 +7387,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                         values=filter_display_values, 
                                         state="readonly", width=32)
         date_filter_combo.pack(side="left", padx=(0, 5))
+        date_filter_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         
         # Add hint text for right-click options
         ttk.Label(filter_frame, text=t('reports.right_click_options'), foreground="gray").pack(side="right", padx=(10, 0))
@@ -12013,6 +12054,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                    state="readonly", width=28)
         filter_combo.pack(side="left", padx=(0, 10))
         filter_combo.bind("<<ComboboxSelected>>", self._on_bookmark_filter_changed)
+        filter_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         
         # Search box
         ttk.Label(filter_frame, text=t('bookmarks.search')).pack(side="left", padx=(10, 5))
@@ -12020,6 +12062,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         search_entry = ttk.Entry(filter_frame, textvariable=self.bookmark_search_var, width=20)
         search_entry.pack(side="left", padx=(0, 5))
         search_entry.bind("<KeyRelease>", self._on_bookmark_search_changed)
+        search_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
         
         self.ToolTip(filter_combo, t('tooltips.bookmark_filter'))
         self.ToolTip(search_entry, t('tooltips.bookmark_search'))

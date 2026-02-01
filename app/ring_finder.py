@@ -419,6 +419,8 @@ class RingFinder(ColumnVisibilityMixin):
         self.material_combo['values'] = tuple(self._ring_type_map[k] for k in self._ring_type_order)
         self.material_combo.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         self.material_combo.bind('<<ComboboxSelected>>', self._on_ring_type_changed)
+        # Clear selection after choosing to avoid persistent highlight
+        self.material_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         
         # Reserve filter (new row between Ring Type and Mineral)
         ttk.Label(search_frame, text=t('ring_finder.reserve')).grid(row=2, column=0, sticky="w", padx=5, pady=5)
@@ -436,6 +438,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.reserve_combo['values'] = tuple(reserve_options)
         self.reserve_combo.grid(row=2, column=1, sticky="w", padx=5, pady=5)
         self.reserve_combo.bind('<<ComboboxSelected>>', self._save_filter_settings)
+        self.reserve_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         ToolTip(self.reserve_combo, t('ring_finder.tooltip_reserve'))
         
         # "Any Ring" checkbox - DISABLED (hidden) - searches Spansh for rings without requiring hotspot data
@@ -508,6 +511,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.distance_combo = ttk.Combobox(right_filters_frame_row1, textvariable=self.distance_var, width=8, state="readonly")
         self.distance_combo['values'] = ("10", "50", "100", "150", "200")
         self.distance_combo.pack(side="left")
+        self.distance_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         
         # Overlaps Only checkbox - filters to show only overlap entries
         self.overlaps_only_var = tk.BooleanVar(value=False)
@@ -558,23 +562,48 @@ class RingFinder(ColumnVisibilityMixin):
         max_results_combo = ttk.Combobox(right_filters_frame_row2, textvariable=self.max_results_var, width=8, state="readonly")
         max_results_combo['values'] = ("10", "20", "30", "50", "100", t('common.all'))
         max_results_combo.pack(side="left", padx=(0, 10))
+        max_results_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         
         # Min Hotspots filter (only active for specific materials) - in sub-frame
         ttk.Label(right_filters_frame_row2, text=t('ring_finder.min_hotspots') + ":", width=12, anchor="e").pack(side="left", padx=(0, 5))
         self.min_hotspots_var = tk.IntVar(value=1)  # Changed to IntVar for spinbox
-        self.min_hotspots_spinbox = ttk.Spinbox(right_filters_frame_row2, 
+        # Determine spinbox text color based on theme
+        _spinbox_fg = "#ff8c00" if _cb_theme == "elite_orange" else "#ffffff"
+        self.min_hotspots_spinbox = tk.Spinbox(right_filters_frame_row2, 
                                                  textvariable=self.min_hotspots_var, 
                                                  from_=1, 
                                                  to=20, 
                                                  width=6,
                                                  state="disabled",  # Start disabled (greyed out)
                                                  wrap=False,
-                                                 command=lambda: None)  # Enable arrow clicks
+                                                 command=lambda: None,
+                                                 bg="#1e1e1e", fg=_spinbox_fg, buttonbackground="#2d2d2d",
+                                                 insertbackground=_spinbox_fg, selectbackground="#4a6a8a",
+                                                 disabledbackground="#1e1e1e", disabledforeground="#666666",
+                                                 relief="solid", bd=0, highlightthickness=1,
+                                                 highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                                 font=("Segoe UI", 9))
         self.min_hotspots_spinbox.pack(side="left")
+        # Add mouse wheel support
+        def on_min_hotspots_scroll(event):
+            if str(self.min_hotspots_spinbox.cget('state')) == 'disabled':
+                return
+            try:
+                current = int(self.min_hotspots_var.get())
+                if event.delta > 0:
+                    new_val = min(current + 1, 20)
+                else:
+                    new_val = max(current - 1, 1)
+                self.min_hotspots_var.set(new_val)
+            except:
+                pass
+            return "break"
+        self.min_hotspots_spinbox.bind("<MouseWheel>", on_min_hotspots_scroll)
         ToolTip(self.min_hotspots_spinbox, t('tooltips.min_hotspots'))
         
         # NOW bind material selection to enable/disable min hotspots filter (after spinbox exists!)
         self.specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_changed)
+        self.specific_material_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         
         # Data Source selection (row 4) - Label and radio buttons in same row3_container
         ttk.Label(row3_container, text=t('ring_finder.data_source'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(160, 10))
@@ -5649,12 +5678,17 @@ class RingFinder(ColumnVisibilityMixin):
         return False  # Default to disabled
 
     def _save_auto_search_state(self):
-        """Save auto-search enabled state to Variables folder"""
+        """Save auto-search enabled state to Variables folder and sync with main app"""
         try:
             os.makedirs(self.vars_dir, exist_ok=True)
             auto_search_file = os.path.join(self.vars_dir, "autoSearch.txt")
             with open(auto_search_file, 'w') as f:
                 f.write("1" if self.auto_search_var.get() else "0")
+            # Sync with main app if available
+            if self.prospector_panel and hasattr(self.prospector_panel, 'main_app'):
+                main_app = self.prospector_panel.main_app
+                if main_app and hasattr(main_app, 'auto_search_enabled'):
+                    main_app.auto_search_enabled.set(self.auto_search_var.get())
         except Exception as e:
             pass
 
