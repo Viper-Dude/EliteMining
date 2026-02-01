@@ -8525,7 +8525,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             tk.Label(prospector_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
             
             self.prospector_delay_var = tk.DoubleVar(value=4.4)
-            prospector_spinbox = tk.Spinbox(prospector_frame, from_=2.0, to=6.0, increment=0.1, width=6, 
+            prospector_spinbox = tk.Spinbox(prospector_frame, from_=2.0, to=6.0, increment=0.1, width=5, 
                                              textvariable=self.prospector_delay_var, format="%.1f",
                                              command=self._save_prospector_delay,
                                              bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
