@@ -8042,23 +8042,28 @@ class App(tk.Tk, ColumnVisibilityMixin):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Bind mousewheel to canvas - only when mouse is over canvas
+        # Bind mousewheel to canvas for scrolling
         def _on_mousewheel_mc(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        def _bind_canvas_scroll(e):
-            canvas.bind_all("<MouseWheel>", _on_mousewheel_mc)
+        # Bind mousewheel to canvas and all child widgets
+        def _bind_mousewheel_recursive(widget):
+            widget.bind("<MouseWheel>", _on_mousewheel_mc)
+            for child in widget.winfo_children():
+                _bind_mousewheel_recursive(child)
         
-        def _unbind_canvas_scroll(e):
-            canvas.unbind_all("<MouseWheel>")
+        # Bind to canvas and scrollable_frame initially
+        canvas.bind("<MouseWheel>", _on_mousewheel_mc)
+        scrollable_frame.bind("<MouseWheel>", _on_mousewheel_mc)
         
-        canvas.bind("<Enter>", _bind_canvas_scroll)
-        canvas.bind("<Leave>", _unbind_canvas_scroll)
+        # Rebind to all children after content is built
+        def _bind_all_children():
+            _bind_mousewheel_recursive(scrollable_frame)
+        frame.after(100, _bind_all_children)
         
-        # Helper to prevent spinbox scroll from affecting canvas
+        # Helper to prevent spinbox scroll from affecting canvas (kept for compatibility)
         def _block_canvas_scroll_on_spinbox(spinbox):
-            spinbox.bind("<Enter>", _unbind_canvas_scroll)
-            spinbox.bind("<Leave>", _bind_canvas_scroll)
+            pass  # No longer needed with recursive binding
 
         # Now build content in scrollable_frame instead of frame
         scrollable_frame.columnconfigure(0, weight=1)
@@ -8197,8 +8202,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     pass
                 return "break"
             sp.bind("<MouseWheel>", on_boost_scroll)
-            sp.bind("<Enter>", _unbind_canvas_scroll)
-            sp.bind("<Leave>", _bind_canvas_scroll)
             
             self.timer_vars[boost_timer_name].trace_add("write", make_trace_boost(boost_timer_name, _fname, lo, hi))
             
@@ -8259,8 +8262,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     pass
                 return "break"
             sp.bind("<MouseWheel>", on_spinbox_scroll)
-            sp.bind("<Enter>", _unbind_canvas_scroll)
-            sp.bind("<Leave>", _bind_canvas_scroll)
             
             self.timer_vars[name].trace_add("write", make_trace_laser(name, _fname, lo, hi))
             
@@ -8324,8 +8325,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     pass
                 return "break"
             repeat_spinbox.bind("<MouseWheel>", on_repeat_scroll)
-            repeat_spinbox.bind("<Enter>", _unbind_canvas_scroll)
-            repeat_spinbox.bind("<Leave>", _bind_canvas_scroll)
             
             self.laser_extra_repeat_var.trace_add("write", lambda *args: self._save_laser_extra_repeat())
             
@@ -8451,8 +8450,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         pass
                     return "break"
                 cargoscoop_spinbox.bind("<MouseWheel>", on_cargoscoop_scroll)
-                cargoscoop_spinbox.bind("<Enter>", _unbind_canvas_scroll)
-                cargoscoop_spinbox.bind("<Leave>", _bind_canvas_scroll)
                 
                 self.timer_vars[cargoscoop_timer_name].trace_add("write", 
                     make_trace_cargoscoop(cargoscoop_timer_name, _fname, lo, hi))
@@ -8550,8 +8547,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     pass
                 return "break"
             prospector_spinbox.bind("<MouseWheel>", on_prospector_scroll)
-            prospector_spinbox.bind("<Enter>", _unbind_canvas_scroll)
-            prospector_spinbox.bind("<Leave>", _bind_canvas_scroll)
             
             self.prospector_delay_var.trace_add("write", lambda *args: self._save_prospector_delay())
             
@@ -8602,8 +8597,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         pass
                     return "break"
                 target_spinbox.bind("<MouseWheel>", on_target_scroll)
-                target_spinbox.bind("<Enter>", _unbind_canvas_scroll)
-                target_spinbox.bind("<Leave>", _bind_canvas_scroll)
                 
                 self.timer_vars[target_timer_name].trace_add("write", make_trace_target(target_timer_name, _fname, lo, hi))
                 
@@ -8681,8 +8674,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         pass
                     return "break"
                 thrust_closed_spinbox.bind("<MouseWheel>", on_thrust_closed_scroll)
-                thrust_closed_spinbox.bind("<Enter>", _unbind_canvas_scroll)
-                thrust_closed_spinbox.bind("<Leave>", _bind_canvas_scroll)
                 
                 self.thrust_closed_var.trace_add("write", lambda *args: self._save_thrust_closed())
                 
@@ -8725,8 +8716,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         pass
                     return "break"
                 thrust_open_spinbox.bind("<MouseWheel>", on_thrust_open_scroll)
-                thrust_open_spinbox.bind("<Enter>", _unbind_canvas_scroll)
-                thrust_open_spinbox.bind("<Leave>", _bind_canvas_scroll)
                 
                 self.thrust_open_var.trace_add("write", lambda *args: self._save_thrust_open())
                 

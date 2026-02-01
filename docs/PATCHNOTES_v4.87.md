@@ -5,11 +5,11 @@
 
 ### General UI Improvements
 - Enhanced Settings interface with better spinbox controls, improved scrolling, and organizing
+- Revised some help/tip text
 
 ### UI Improvements - VoiceAttack Controls Tab
 - Reorganized Controls tab into clear sections (General, Core Mining, Laser Mining, Prospector)
 - Auto-save: All settings now apply immediately - removed Apply and Import buttons
-- Revised some help/tip text
 
 ### Voiceattack Profile
 - No changes - latest version is v4.8.6 (included in the installer and zip file)
