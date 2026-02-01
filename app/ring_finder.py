@@ -391,10 +391,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.auto_search_cb.pack(side="left")
         
         # Tooltip for auto-search
-        ToolTip(self.auto_search_cb, 
-               "Automatically search for hotspots when arriving in a new system.\n"
-               "Uses your last search settings (ring type, mineral, distance).\n"
-               "Updates reference system from game status.")
+        ToolTip(self.auto_search_cb, t('ring_finder.auto_search_tooltip'))
         
         # Auto-switch tabs checkbox (synced with main app settings)
         self.auto_switch_tabs_var = tk.BooleanVar(value=False)
@@ -1899,7 +1896,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         return abbreviations.get(res_tag, res_tag)
     
-    def search_hotspots(self, auto_refresh=False, highlight_body=None, highlight_system=None, highlight_bodies=None):
+    def search_hotspots(self, auto_refresh=False, highlight_body=None, highlight_system=None, highlight_bodies=None, force_database=False):
         """Search for mining hotspots using reference system as center point
         
         Args:
@@ -1908,7 +1905,10 @@ class RingFinder(ColumnVisibilityMixin):
             highlight_system: Specific system name for the body (e.g., 'Synuefe XR-H d11-45')
                            Only this exact system+ring will be highlighted green. None = no highlighting.
             highlight_bodies: List of (system, body) tuples to highlight (for multiple rapid scans)
+            force_database: If True, only search local database (ignore user's data source setting)
         """
+        # Store force_database flag for use in search
+        self._force_database = force_database
         # If this is an auto-refresh (has highlight info), clear cache first to get fresh data
         if highlight_body and highlight_system:
             if hasattr(self, 'local_db') and hasattr(self.local_db, 'clear_cache'):
@@ -2815,8 +2815,13 @@ class RingFinder(ColumnVisibilityMixin):
     def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None) -> List[Dict]:
         """Get hotspot data based on user's data source selection"""
         
-        # Get user's data source preference
-        data_source = self.data_source_var.get()
+        # Get user's data source preference (or force database for auto-search)
+        if getattr(self, '_force_database', False):
+            data_source = "database"
+            self._force_database = False  # Reset flag after use
+            print(f"[SEARCH] Auto-search: forcing database only")
+        else:
+            data_source = self.data_source_var.get()
         print(f"[SEARCH] Data source selected: {data_source}")
         
         user_results = []
@@ -5623,16 +5628,9 @@ class RingFinder(ColumnVisibilityMixin):
                     cargo_monitor = main_app.cargo_monitor
                     cargo_monitor._last_refreshed_rings = set()
             
-            # Force database-only for auto-search (don't query Spansh on system jumps)
-            saved_data_source = self.data_source_var.get()
-            self.data_source_var.set("database")
-            
-            # Trigger search with current settings - no highlighting (just location change)
+            # Trigger search with database only (don't query Spansh on auto-search)
             if self.search_btn['state'] == 'normal':
-                self.search_hotspots()  # No highlight_body = no highlighting
-            
-            # Restore user's data source selection
-            self.data_source_var.set(saved_data_source)
+                self.search_hotspots(force_database=True)
                 
         except Exception as e:
             # Silent fail - let user search manually if auto-search fails

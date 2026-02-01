@@ -4493,6 +4493,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def __init__(self) -> None:
         try:
             super().__init__()
+            
+            # Prevent window from stealing focus on startup (important for gaming)
+            # Window starts hidden and is shown later without grabbing focus
+            self.withdraw()
 
             # Check and migrate config if needed on startup
             self._check_config_migration()
@@ -6793,10 +6797,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Bind mousewheel to canvas
+        # Bind mousewheel to canvas - only when mouse is over canvas
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        def _bind_canvas_scroll(e):
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        def _unbind_canvas_scroll(e):
+            canvas.unbind_all("<MouseWheel>")
+        
+        canvas.bind("<Enter>", _bind_canvas_scroll)
+        canvas.bind("<Leave>", _unbind_canvas_scroll)
 
         # Now build content in scrollable_frame instead of frame
         scrollable_frame.columnconfigure(0, weight=1)
@@ -8361,7 +8373,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"Error updating prospector dependencies: {e}")
 
     # ---------- Status helper ----------
-    def _set_status(self, msg: str, clear_after: int = 5000) -> None:
+    def _set_status(self, msg: str, clear_after: int = 8000) -> None:
         try:
             self.status.set(msg)
             if clear_after:
@@ -12248,8 +12260,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if zoomed:
                     self.state("zoomed")
                     
-                # Show window after geometry is set
+                # Show window after geometry is set - without stealing focus
                 self.deiconify()
+                # Prevent focus stealing from game
+                self.attributes('-topmost', False)
             except Exception:
                 # If saved geometry fails, center on screen with default size
                 self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}")
@@ -12271,12 +12285,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             y = (screen_height - DEFAULT_HEIGHT) // 2
             self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}+{x}+{y}")
             
-            # Show window after geometry is set
+            # Show window after geometry is set - without stealing focus
             self.deiconify()
+            self.attributes('-topmost', False)
         
-        # After window shown, ensure no input selection remains and focus a neutral button
+        # After window shown, clear text selections (but don't focus - would steal from game)
         try:
-            self.after(150, lambda: self.import_btn.focus_set() if hasattr(self, 'import_btn') else None)
             self.after(150, lambda: (self.ring_finder.system_entry.selection_clear() if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_entry') else None))
             self.after(150, lambda: (self.sysfinder_ref_entry.selection_clear() if hasattr(self, 'sysfinder_ref_entry') else None))
             self.after(150, lambda: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None))
