@@ -89,8 +89,8 @@ def centered_yesno_dialog(parent, title, message):
     
     # Get parent's actual position and size
     parent.update_idletasks()
-    parent_x = parent.winfo_rootx()
-    parent_y = parent.winfo_rooty()
+    parent_x = parent.winfo_x()
+    parent_y = parent.winfo_y()
     parent_width = parent.winfo_width()
     parent_height = parent.winfo_height()
     
@@ -101,12 +101,27 @@ def centered_yesno_dialog(parent, title, message):
     dialog.geometry(f"+{x}+{y}")
     dialog.deiconify()  # Show centered immediately
     
-    # Now set modal behavior
-    dialog.transient(parent)
-    dialog.grab_set()
+    # Set modal behavior - don't use transient to prevent hiding behind parent
+    # dialog.transient(parent)
     dialog.attributes('-topmost', True)
     dialog.lift()
+    dialog.focus_force()
+    try:
+        dialog.grab_set()
+    except:
+        pass  # grab_set can fail if another grab is active
     yes_btn.focus_set()
+    
+    # Keep dialog on top during wait
+    def keep_on_top():
+        try:
+            if dialog.winfo_exists():
+                dialog.lift()
+                dialog.after(100, keep_on_top)
+        except:
+            pass
+    dialog.after(100, keep_on_top)
+    
     dialog.wait_window()
     return result['value']
 
@@ -145,7 +160,8 @@ def centered_info_dialog(parent, title, message):
     
     dialog.title(title)
     dialog.resizable(False, False)
-    dialog.transient(parent)
+    # Don't use transient to prevent hiding behind parent
+    # dialog.transient(parent)
     
     # Message label
     label = tk.Label(dialog, text=message, padx=20, pady=20, 
@@ -174,9 +190,23 @@ def centered_info_dialog(parent, title, message):
         center_window(dialog, top_parent)
     
     dialog.deiconify()  # Show centered
-    dialog.grab_set()
     dialog.attributes('-topmost', True)
     dialog.lift()
     dialog.focus_force()
+    try:
+        dialog.grab_set()
+    except:
+        pass  # grab_set can fail if another grab is active
+    
+    # Keep dialog on top during wait
+    def keep_on_top():
+        try:
+            if dialog.winfo_exists():
+                dialog.lift()
+                dialog.after(100, keep_on_top)
+        except:
+            pass
+    dialog.after(100, keep_on_top)
+    
     dialog.wait_window()
 

@@ -274,7 +274,8 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
     dialog.title(title)
     dialog.resizable(False, False)
     dialog.configure(bg=bg_color)
-    dialog.transient(parent)
+    # Don't use transient - it can cause dialog to hide behind parent
+    # dialog.transient(parent)
     
     # Set icon (following DIALOG_GUIDELINES.md)
     try:
@@ -348,9 +349,25 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
         dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
     
     dialog.deiconify()  # Show dialog after centering to prevent blinking
-    dialog.grab_set()
-    dialog.focus_set()
+    dialog.attributes('-topmost', True)
+    dialog.lift()
+    dialog.focus_force()
+    try:
+        dialog.grab_set()
+    except:
+        pass
     ok_btn.focus_set()
+    
+    # Keep dialog on top during wait
+    def keep_on_top():
+        try:
+            if dialog.winfo_exists():
+                dialog.lift()
+                dialog.after(100, keep_on_top)
+        except:
+            pass
+    dialog.after(100, keep_on_top)
+    
     dialog.wait_window()
 
 

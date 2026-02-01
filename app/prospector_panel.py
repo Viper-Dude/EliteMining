@@ -519,8 +519,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         dialog.geometry("350x200")
         dialog.configure(bg=bg_color)
         dialog.resizable(False, False)
-        dialog.transient(self.winfo_toplevel())
-        dialog.grab_set()
+        # dialog.transient(self.winfo_toplevel())  # Disabled - causes focus issues
+        try:
+            dialog.grab_set()
+        except:
+            pass
         
         # Set app icon
         try:
@@ -540,6 +543,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         x = parent.winfo_x() + (parent.winfo_width() - 350) // 2
         y = parent.winfo_y() + (parent.winfo_height() - 240) // 2
         dialog.geometry(f"350x240+{x}+{y}")
+        
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
         
         # Main frame
         main_frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
@@ -619,6 +627,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Bind Enter and Escape
         entry.bind("<Return>", lambda e: on_ok())
         dialog.bind("<Escape>", lambda e: on_cancel())
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
         
         # Wait for dialog
         dialog.wait_window()
@@ -1296,8 +1314,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             label.pack()
             center_window(dialog, main_parent)
             tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-            dialog.transient(main_parent)
-            dialog.grab_set()
+            # dialog.transient(main_parent)  # Disabled - causes focus issues
+            
+            # Force dialog to stay on top and have focus
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            
+            try:
+                dialog.grab_set()
+            except:
+                pass
+            
+            # Keep dialog on top while open
+            def keep_on_top():
+                try:
+                    if dialog.winfo_exists():
+                        dialog.lift()
+                        dialog.after(100, keep_on_top)
+                except:
+                    pass
+            dialog.after(100, keep_on_top)
+            
             dialog.wait_window()
             return
         self.announce_map = data.get('announce_map', {}).copy()
@@ -1369,8 +1407,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             label.pack()
             center_window(dialog, main_parent)
             tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-            dialog.transient(main_parent)
-            dialog.grab_set()
+            # dialog.transient(main_parent)  # Disabled - causes focus issues
+            
+            # Force dialog to stay on top and have focus
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            
+            try:
+                dialog.grab_set()
+            except:
+                pass
+            
+            # Keep dialog on top while open
+            def keep_on_top():
+                try:
+                    if dialog.winfo_exists():
+                        dialog.lift()
+                        dialog.after(100, keep_on_top)
+                except:
+                    pass
+            dialog.after(100, keep_on_top)
+            
             dialog.wait_window()
             return
         
@@ -1574,8 +1632,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             label.pack()
             center_window(dialog, main_parent)
             tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-            dialog.transient(main_parent)
-            dialog.grab_set()
+            # dialog.transient(main_parent)  # Disabled - causes focus issues
+            
+            # Force dialog to stay on top and have focus
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            
+            try:
+                dialog.grab_set()
+            except:
+                pass
+            
+            # Keep dialog on top while open
+            def keep_on_top():
+                try:
+                    if dialog.winfo_exists():
+                        dialog.lift()
+                        dialog.after(100, keep_on_top)
+                except:
+                    pass
+            dialog.after(100, keep_on_top)
+            
             dialog.wait_window()
     
     def _clear_cache_and_refresh(self):
@@ -1606,8 +1684,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             label.pack()
             center_window(dialog, main_parent)
             tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-            dialog.transient(main_parent)
-            dialog.grab_set()
+            # dialog.transient(main_parent)  # Disabled - causes focus issues
+            
+            # Force dialog to stay on top and have focus
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            
+            try:
+                dialog.grab_set()
+            except:
+                pass
+            
+            # Keep dialog on top while open
+            def keep_on_top():
+                try:
+                    if dialog.winfo_exists():
+                        dialog.lift()
+                        dialog.after(100, keep_on_top)
+                except:
+                    pass
+            dialog.after(100, keep_on_top)
+            
             dialog.wait_window()
     
     def _validate_ui_csv_consistency(self):
@@ -3789,8 +3887,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             center_window(dialog, main_parent)
                             dialog.deiconify()  # Show centered immediately
                             tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-                            dialog.transient(main_parent)
-                            dialog.grab_set()
+                            # dialog.transient(main_parent)  # Disabled - causes focus issues
+                            
+                            # Force dialog to stay on top and have focus
+                            dialog.attributes('-topmost', True)
+                            dialog.lift()
+                            dialog.focus_force()
+                            
+                            try:
+                                dialog.grab_set()
+                            except:
+                                pass
+                            
+                            # Keep dialog on top while open
+                            def keep_on_top():
+                                try:
+                                    if dialog.winfo_exists():
+                                        dialog.lift()
+                                        dialog.after(100, keep_on_top)
+                                except:
+                                    pass
+                            dialog.after(100, keep_on_top)
+                            
                             dialog.wait_window()
                         
                     except Exception as e:
@@ -3807,8 +3925,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         center_window(dialog, main_parent)
                         dialog.deiconify()  # Show centered immediately
                         tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-                        dialog.transient(main_parent)
-                        dialog.grab_set()
+                        # dialog.transient(main_parent)  # Disabled - causes focus issues
+                        
+                        # Force dialog to stay on top and have focus
+                        dialog.attributes('-topmost', True)
+                        dialog.lift()
+                        dialog.focus_force()
+                        
+                        try:
+                            dialog.grab_set()
+                        except:
+                            pass
+                        
+                        # Keep dialog on top while open
+                        def keep_on_top():
+                            try:
+                                if dialog.winfo_exists():
+                                    dialog.lift()
+                                    dialog.after(100, keep_on_top)
+                            except:
+                                pass
+                        dialog.after(100, keep_on_top)
+                        
                         dialog.wait_window()
                 
                 # Bring reports window back to front after completion
@@ -4116,8 +4254,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 label.pack()
                 center_window(dialog, main_parent)
                 tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-                dialog.transient(main_parent)
-                dialog.grab_set()
+                # dialog.transient(main_parent)  # Disabled - causes focus issues
+                
+                # Force dialog to stay on top and have focus
+                dialog.attributes('-topmost', True)
+                dialog.lift()
+                dialog.focus_force()
+                
+                try:
+                    dialog.grab_set()
+                except:
+                    pass
+                
+                # Keep dialog on top while open
+                def keep_on_top():
+                    try:
+                        if dialog.winfo_exists():
+                            dialog.lift()
+                            dialog.after(100, keep_on_top)
+                    except:
+                        pass
+                dialog.after(100, keep_on_top)
+                
                 dialog.wait_window()
                 parent_window.destroy()
                 return
@@ -4152,8 +4310,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             label.pack()
             center_window(dialog, main_parent)
             tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-            dialog.transient(main_parent)
-            dialog.grab_set()
+            # dialog.transient(main_parent)  # Disabled - causes focus issues
+            
+            # Force dialog to stay on top and have focus
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            
+            try:
+                dialog.grab_set()
+            except:
+                pass
+            
+            # Keep dialog on top while open
+            def keep_on_top():
+                try:
+                    if dialog.winfo_exists():
+                        dialog.lift()
+                        dialog.after(100, keep_on_top)
+                except:
+                    pass
+            dialog.after(100, keep_on_top)
+            
             dialog.wait_window()
             self._set_status(f"CSV rebuild failed: {e}")
 
@@ -4528,8 +4706,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 btn = tk.Button(dialog, text="OK", command=dialog.destroy)
                 btn.pack(pady=10)
                 center_window(dialog, main_parent)
-                dialog.transient(main_parent)
-                dialog.grab_set()
+                # dialog.transient(main_parent)  # Disabled - causes focus issues
+                
+                # Force dialog to stay on top and have focus
+                dialog.attributes('-topmost', True)
+                dialog.lift()
+                dialog.focus_force()
+                
+                try:
+                    dialog.grab_set()
+                except:
+                    pass
+                
+                # Keep dialog on top while open
+                def keep_on_top():
+                    try:
+                        if dialog.winfo_exists():
+                            dialog.lift()
+                            dialog.after(100, keep_on_top)
+                    except:
+                        pass
+                dialog.after(100, keep_on_top)
+                
                 dialog.wait_window()
             else:
                 self._set_status("Export cancelled by user.")
@@ -4549,8 +4747,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             btn = tk.Button(dialog, text="OK", command=dialog.destroy)
             btn.pack(pady=10)
             center_window(dialog, main_parent)
-            dialog.transient(main_parent)
-            dialog.grab_set()
+            # dialog.transient(main_parent)  # Disabled - causes focus issues
+            
+            # Force dialog to stay on top and have focus
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            
+            try:
+                dialog.grab_set()
+            except:
+                pass
+            
+            # Keep dialog on top while open
+            def keep_on_top():
+                try:
+                    if dialog.winfo_exists():
+                        dialog.lift()
+                        dialog.after(100, keep_on_top)
+                except:
+                    pass
+            dialog.after(100, keep_on_top)
+            
             dialog.wait_window()
         finally:
             # Clear export-in-progress flag
@@ -10478,12 +10696,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             yes_btn_bg = "#2a4a2a"
             yes_btn_active = "#3a5a3a"
         
-        # Create toplevel window
-        dialog = tk.Toplevel(self.winfo_toplevel())
+        # Create toplevel window - use main_app as parent to ensure correct monitor
+        parent_window = self.main_app if self.main_app else self.winfo_toplevel()
+        dialog = tk.Toplevel(parent_window)
+        dialog.withdraw()  # CRITICAL: Hide immediately to prevent blinking on wrong monitor
         dialog.title(t('tooltips.cargo_full_title'))
         dialog.configure(bg=bg_color)
         dialog.resizable(False, False)
-        dialog.transient(self.winfo_toplevel())
+        # Don't use transient - it can cause dialog to hide behind parent
+        # dialog.transient(self.winfo_toplevel())
         
         # Set app icon
         try:
@@ -10576,11 +10797,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 dialog_height = 250
             
             try:
-                parent = self.winfo_toplevel()
-                parent_x = parent.winfo_x()
-                parent_y = parent.winfo_y()
-                parent_width = parent.winfo_width()
-                parent_height = parent.winfo_height()
+                # Use parent_window for centering (same as toplevel parent)
+                parent_x = parent_window.winfo_x()
+                parent_y = parent_window.winfo_y()
+                parent_width = parent_window.winfo_width()
+                parent_height = parent_window.winfo_height()
                 
                 x = parent_x + (parent_width - dialog_width) // 2
                 y = parent_y + (parent_height - dialog_height) // 2
@@ -10593,9 +10814,27 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 y = (screen_height - dialog_height) // 2
                 dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         
+        # Show dialog after centering (prevents blinking on wrong monitor)
+        dialog.deiconify()
+        
         # Set focus and modal behavior
-        dialog.grab_set()
-        dialog.focus_set()
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except:
+            pass  # grab_set can fail if another grab is active
+        
+        # Keep dialog on top during wait
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
 
     def _edit_comment_popup(self, event):
         """Edit Body or Comment column in reports popup window"""
@@ -11265,14 +11504,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         from tkinter import ttk
         import os
         
-        main_parent = self.winfo_toplevel()
-        dialog = tk.Toplevel(main_parent)
+        # Use main_app as parent to ensure dialog appears on correct monitor
+        parent_window = self.main_app if self.main_app else self.winfo_toplevel()
+        dialog = tk.Toplevel(parent_window)
+        dialog.withdraw()  # Hide immediately to prevent blinking on wrong monitor
         dialog.title(title)
         dialog.geometry("400x150")
         dialog.resizable(False, False)
         dialog.configure(bg="#2d2d2d")
-        from main import center_window
-        center_window(dialog, main_parent)
         
         # Set app icon
         try:
@@ -11284,22 +11523,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except:
             pass  # Continue without icon if there's an issue
         
-        # Center dialog on parent window
-        # Use main app window if available, otherwise fall back to winfo_toplevel
-        parent = self.main_app if self.main_app is not None else self.winfo_toplevel()
-        dialog.transient(parent)
-        dialog.grab_set()
-        
         # Position dialog centered on parent window
-        # Force both windows to update their geometry info
-        parent.update_idletasks()
+        parent_window.update_idletasks()
         dialog.update_idletasks()
         
         # Get parent window geometry
-        parent_x = parent.winfo_x()
-        parent_y = parent.winfo_y()
-        parent_width = parent.winfo_width()
-        parent_height = parent.winfo_height()
+        parent_x = parent_window.winfo_x()
+        parent_y = parent_window.winfo_y()
+        parent_width = parent_window.winfo_width()
+        parent_height = parent_window.winfo_height()
         
         # Get dialog dimensions
         dialog_width = 400  # Fixed from geometry setting
@@ -11308,12 +11540,19 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Calculate center position
         x = parent_x + (parent_width - dialog_width) // 2
         y = parent_y + (parent_height - dialog_height) // 2
-        
-        # Ensure dialog stays on screen
-        x = max(0, x)
         y = max(0, y)
         
         dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        
+        # Show dialog after centering, then set focus
+        dialog.deiconify()
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except:
+            pass
         
         result = [None]  # Use list to store result for closure
         
@@ -11368,6 +11607,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         dialog.bind('<Return>', on_enter)
         dialog.bind('<Escape>', on_escape)
         entry_field.bind('<Return>', on_enter)
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
         
         # Wait for dialog to close
         dialog.wait_window()
@@ -11426,8 +11675,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             if self.main_app and hasattr(self.main_app, 'cargo_monitor') and not is_multi_session:
                 from main import centered_yesno_dialog
+                # Use main_app as parent to ensure dialog appears on correct monitor
+                parent_window = self.main_app if self.main_app else self.winfo_toplevel()
                 add_refinery = centered_yesno_dialog(
-                    self.winfo_toplevel(),
+                    parent_window,
                     t('dialogs.refinery_materials_title'),
                     t('dialogs.refinery_materials_question')
                 )
@@ -11437,7 +11688,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         # Import here to avoid circular import
                         from main import RefineryDialog
                         dialog = RefineryDialog(
-                            parent=self.winfo_toplevel(),
+                            parent=parent_window,
                             cargo_monitor=self.main_app.cargo_monitor,
                             current_cargo_items=self.main_app.cargo_monitor.cargo_items.copy()
                         )
@@ -11473,7 +11724,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 cargo_session_data = self.main_app.cargo_monitor.end_session_tracking()
                 
             # Ask if user wants to add a comment
-            main_parent = self.winfo_toplevel()
+            # Use main_app as parent to ensure dialog appears on correct monitor
+            main_parent = self.main_app if self.main_app else self.winfo_toplevel()
             add_comment = centered_yesno_dialog(
                 main_parent,
                 t('dialogs.session_comment_title'),

@@ -10,7 +10,8 @@ All popup dialogs and windows in EliteMining must be centered on the main applic
 dialog = tk.Toplevel(self)
 dialog.withdraw()  # CRITICAL: Hide immediately to prevent blinking on wrong monitor
 dialog.title("Dialog Title")
-dialog.transient(self)  # Keep on top of parent
+# NOTE: Do NOT use transient() - it can cause dialog to hide behind parent on multi-monitor setups
+# dialog.transient(self)  # DEPRECATED - causes freeze issues
 dialog.resizable(False, False)  # Optional: prevent resizing
 # Note: Do NOT call grab_set() yet - wait until after centering and showing
 ```
@@ -63,10 +64,28 @@ self._center_dialog_on_parent(dialog)
 
 # CRITICAL: Show dialog AFTER centering to prevent blinking on wrong monitor
 dialog.deiconify()  # Show the dialog in its final position
-dialog.grab_set()   # Now grab focus (for modal dialogs)
 
-# Set focus
-dialog.focus_set()
+# Keep dialog visible and on top (prevents freeze on multi-monitor)
+dialog.attributes('-topmost', True)
+dialog.lift()
+dialog.focus_force()
+
+try:
+    dialog.grab_set()   # Grab focus (for modal dialogs)
+except:
+    pass  # grab_set can fail if another grab is active
+
+# Keep dialog on top during wait (CRITICAL for multi-monitor setups)
+def keep_on_top():
+    try:
+        if dialog.winfo_exists():
+            dialog.lift()
+            dialog.after(100, keep_on_top)
+    except:
+        pass
+dialog.after(100, keep_on_top)
+
+dialog.wait_window()  # Wait for dialog to close
 ```
 
 ## Complete Example
@@ -207,20 +226,45 @@ This ensures the dialog appears instantly in the correct position without any vi
 3. **Forgetting `update_idletasks()`** - Dialog dimensions will be 1x1 if you don't call this first
 4. **Centering before adding widgets** - Always add all widgets BEFORE centering
 5. **Using `winfo_width()` instead of `winfo_reqwidth()`** - Use `reqwidth` for initial sizing
-6. **Not using `transient(self)`** - Dialog may appear behind main window
+6. **Using `transient(self)`** - Can cause dialog to hide behind parent on multi-monitor setups, leading to app freeze
 7. **Hardcoding colors** - Always use theme-aware colors from `load_theme()`
+8. **Missing `keep_on_top()` loop** - Dialog may hide behind parent, causing freeze
+
+## Why Dialogs Can Freeze the App
+
+When a modal dialog with `wait_window()` hides behind the main window:
+
+1. **`wait_window()` is blocking** - It waits for the dialog to be destroyed
+2. **User can't see or click the hidden dialog** - No way to close it
+3. **`grab_set()` captures all input** - Clicks on main window are captured but can't be processed
+4. **Main thread is blocked** - Entire app becomes unresponsive
+
+**Solution:** Use the `keep_on_top()` pattern:
+```python
+def keep_on_top():
+    try:
+        if dialog.winfo_exists():
+            dialog.lift()
+            dialog.after(100, keep_on_top)
+    except:
+        pass
+dialog.after(100, keep_on_top)
+```
+
+This ensures the dialog stays visible even if the user clicks on the main window.
 
 ## Checklist for New Dialogs
 
 - [ ] Create with `tk.Toplevel(self)`
 - [ ] **Immediately call `dialog.withdraw()` to prevent blinking**
-- [ ] Set `transient(self)` for proper window stacking
+- [ ] **Do NOT use `transient(self)`** - causes hiding issues on multi-monitor
 - [ ] Set app icon with `get_app_icon_path()`
 - [ ] Use theme colors from `load_theme()`
 - [ ] Add all widgets before centering
 - [ ] Call `update_idletasks()` before centering
 - [ ] Call `self._center_dialog_on_parent(dialog)`
 - [ ] **Call `dialog.deiconify()` to show dialog after centering**
-- [ ] **Call `dialog.grab_set()` after deiconify (for modal dialogs)**
-- [ ] Set focus with `dialog.focus_set()`
+- [ ] Set `dialog.attributes('-topmost', True)` and `dialog.lift()`
+- [ ] **Add `keep_on_top()` loop to prevent freeze**
+- [ ] **Call `dialog.grab_set()` in try/except after deiconify**
 - [ ] Add localization keys to both `strings_en.json` and `strings_de.json`

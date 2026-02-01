@@ -646,11 +646,25 @@ class RefineryDialog:
         self._create_ui()
         # Now show dialog centered and make it modal
         self.dialog.deiconify()
-        self.dialog.transient(parent)
-        self.dialog.grab_set()
+        # Don't use transient - it can cause dialog to hide behind parent
+        # self.dialog.transient(parent)
         self.dialog.attributes('-topmost', True)
         self.dialog.lift()
         self.dialog.focus_force()
+        try:
+            self.dialog.grab_set()
+        except:
+            pass
+        
+        # Keep dialog on top during wait
+        def keep_on_top():
+            try:
+                if self.dialog.winfo_exists():
+                    self.dialog.lift()
+                    self.dialog.after(100, keep_on_top)
+            except:
+                pass
+        self.dialog.after(100, keep_on_top)
         
     def _create_ui(self):
         """Create the refinery dialog UI"""
@@ -947,8 +961,7 @@ class RefineryDialog:
         edit_dialog.geometry("400x200")
         edit_dialog.configure(bg="#1e1e1e")
         edit_dialog.resizable(False, False)
-        edit_dialog.transient(self.dialog)
-        edit_dialog.grab_set()
+        # edit_dialog.transient(self.dialog)  # Disabled - causes focus issues
         
         # Set app icon using the same method as main app
         try:
@@ -976,6 +989,16 @@ class RefineryDialog:
         y = parent_y + (parent_height - dialog_height) // 2
         
         edit_dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        
+        # Force dialog to stay on top and have focus
+        edit_dialog.attributes('-topmost', True)
+        edit_dialog.lift()
+        edit_dialog.focus_force()
+        
+        try:
+            edit_dialog.grab_set()
+        except:
+            pass
         
         # Create UI with dark theme
         main_frame = tk.Frame(edit_dialog, bg="#1e1e1e", padx=20, pady=20)
@@ -1053,6 +1076,16 @@ class RefineryDialog:
         # Bind Enter key to OK and Escape to Cancel
         edit_dialog.bind('<Return>', lambda e: ok_clicked())
         edit_dialog.bind('<Escape>', lambda e: cancel_clicked())
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if edit_dialog.winfo_exists():
+                    edit_dialog.lift()
+                    edit_dialog.after(100, keep_on_top)
+            except:
+                pass
+        edit_dialog.after(100, keep_on_top)
         
         # Wait for dialog to close and return result
         edit_dialog.wait_window()
@@ -4104,8 +4137,11 @@ cargo panel forces Elite to write detailed inventory data.
             dialog.title(t('dialogs.adjust_limpets_title'))
             dialog.configure(bg=bg_color)
             dialog.resizable(False, False)
-            dialog.transient(parent)
-            dialog.grab_set()
+            # dialog.transient(parent)  # Disabled - causes focus issues
+            try:
+                dialog.grab_set()
+            except:
+                pass
             
             # Set app icon
             try:
@@ -4185,6 +4221,21 @@ cargo panel forces Elite to write detailed inventory data.
             else:
                 # Fallback centering
                 dialog.geometry(f"+{parent.winfo_x() + 100}+{parent.winfo_y() + 100}" if parent else "")
+            
+            # Force dialog to stay on top and have focus
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            
+            # Keep dialog on top while open
+            def keep_on_top():
+                try:
+                    if dialog.winfo_exists():
+                        dialog.lift()
+                        dialog.after(100, keep_on_top)
+                except:
+                    pass
+            dialog.after(100, keep_on_top)
             
             # Wait for dialog to close
             dialog.wait_window()
@@ -9505,7 +9556,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.configure(bg="#2c3e50")
         dialog.geometry("400x150")
         dialog.resizable(False, False)
-        dialog.transient(self)
+        # dialog.transient(self)  # Disabled - causes focus issues
         
         # Set app icon
         try:
@@ -9523,7 +9574,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
         dialog.geometry(f"+{x}+{y}")
         dialog.deiconify()  # Show dialog after centering
-        dialog.grab_set()  # Grab focus after showing
+        
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
+        try:
+            dialog.grab_set()  # Grab focus after showing
+        except:
+            pass
         
         result = None
         
@@ -9567,6 +9627,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         entry.bind('<Return>', lambda e: on_ok())
         
         entry.focus_set()
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
+        
         dialog.wait_window()
         return result if result else None
 
@@ -9630,8 +9701,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.geometry("550x280")
         dialog.resizable(True, True)
         dialog.minsize(450, 240)  # Minimum size
-        dialog.transient(self)
-        dialog.grab_set()
+        # dialog.transient(self)  # Disabled - causes focus issues
+        try:
+            dialog.grab_set()
+        except:
+            pass
         
         # Theme-aware accent color
         if self.current_theme == "elite_orange":
@@ -9764,7 +9838,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Show dialog
         dialog.deiconify()
+        
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
         name_entry.focus_set()
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
+        
         dialog.wait_window()
         return result if result else None
 
@@ -9904,8 +9995,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.geometry("550x300")
         dialog.resizable(True, True)
         dialog.minsize(480, 280)
-        dialog.transient(self)
-        dialog.grab_set()
+        # dialog.transient(self)  # Disabled - causes focus issues
+        try:
+            dialog.grab_set()
+        except:
+            pass
         
         # Theme-aware accent color
         if self.current_theme == "elite_orange":
@@ -10052,7 +10146,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.bind('<Escape>', lambda e: on_cancel())
         
         dialog.deiconify()
+        
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
         name_entry.focus_set()
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
+        
         dialog.wait_window()
         return result
 
@@ -11080,8 +11191,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.configure(bg="#1e1e1e")
         dialog.geometry("480x280")
         dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
+        # dialog.transient(self)  # Disabled - causes focus issues
+        try:
+            dialog.grab_set()
+        except:
+            pass
         
         # Theme-aware accent color
         if self.current_theme == "elite_orange":
@@ -11228,7 +11342,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.bind('<Escape>', lambda e: on_cancel())
         
         dialog.deiconify()
+        
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
         name_entry.focus_set()
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
+        
         dialog.wait_window()
         return result
 
@@ -11794,7 +11925,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.configure(bg="#2c3e50")
         dialog.geometry("550x350")  # Increased size to accommodate long paths
         dialog.resizable(False, False)
-        dialog.transient(self)
+        # dialog.transient(self)  # Disabled - causes focus issues
         
         # Set app icon (consistent across app)
         set_window_icon(dialog)
@@ -11805,7 +11936,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
         dialog.geometry(f"+{x}+{y}")
         dialog.deiconify()  # Show dialog after centering
-        dialog.grab_set()  # Grab focus after showing
+        
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
+        try:
+            dialog.grab_set()  # Grab focus after showing
+        except:
+            pass
         
         # Title label
         title_label = tk.Label(
@@ -11899,6 +12039,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Bind Escape key to skip
         dialog.bind('<Escape>', lambda e: on_skip())
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
         
         # Wait for user response
         dialog.wait_window()
@@ -12260,10 +12410,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if zoomed:
                     self.state("zoomed")
                     
-                # Show window after geometry is set - without stealing focus
-                self.deiconify()
-                # Prevent focus stealing from game
+                # Show window after geometry is set - without stealing focus from game
                 self.attributes('-topmost', False)
+                self.deiconify()
+                
+                # On Windows, try to show without activating (prevent focus steal)
+                try:
+                    import ctypes
+                    hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+                    SW_SHOWNOACTIVATE = 4
+                    ctypes.windll.user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
+                except:
+                    pass
             except Exception:
                 # If saved geometry fails, center on screen with default size
                 self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}")
@@ -12273,7 +12431,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 x = (screen_width - DEFAULT_WIDTH) // 2
                 y = (screen_height - DEFAULT_HEIGHT) // 2
                 self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}+{x}+{y}")
+                self.attributes('-topmost', False)
                 self.deiconify()
+                try:
+                    import ctypes
+                    hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+                    SW_SHOWNOACTIVATE = 4
+                    ctypes.windll.user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
+                except:
+                    pass
         else:
             print(f"[DEBUG] No saved geometry, using defaults")
             # No saved geometry, center on screen with default size
@@ -12286,8 +12452,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.geometry(f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}+{x}+{y}")
             
             # Show window after geometry is set - without stealing focus
-            self.deiconify()
             self.attributes('-topmost', False)
+            self.deiconify()
+            try:
+                import ctypes
+                hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+                SW_SHOWNOACTIVATE = 4
+                ctypes.windll.user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
+            except:
+                pass
         
         # After window shown, clear text selections (but don't focus - would steal from game)
         try:
@@ -12581,7 +12754,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog = tk.Toplevel(self)
         dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
         dialog.title(t('dialogs.theme_changed'))
-        dialog.transient(self)
+        # dialog.transient(self)  # Disabled - causes focus issues
         dialog.resizable(False, False)
         
         # Set app icon
@@ -12637,11 +12810,28 @@ class App(tk.Tk, ColumnVisibilityMixin):
         y = main_y + (main_height - dialog_height) // 2
         dialog.geometry(f"+{x}+{y}")
         dialog.deiconify()  # Show dialog after centering
-        dialog.grab_set()  # Grab focus after showing
+        
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
+        try:
+            dialog.grab_set()  # Grab focus after showing
+        except:
+            pass
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
         
         dialog.wait_window()
-        y = main_y + (main_height - dialog_height) // 2
-        dialog.geometry(f"+{x}+{y}")
     
     def _create_language_flags(self, parent_frame) -> None:
         """Create a single language flag button that shows dropdown on click"""
@@ -13060,7 +13250,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.title(t('settings.restart_required'))
         dialog.resizable(False, False)
         dialog.configure(bg=bg_color)
-        dialog.transient(self)
+        # dialog.transient(self)  # Disabled - causes focus issues
         
         try:
             icon_path = get_app_icon_path()
@@ -13124,8 +13314,29 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.geometry(f"+{x}+{y}")
         
         dialog.deiconify()
-        dialog.grab_set()
+        
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
+        try:
+            dialog.grab_set()
+        except:
+            pass
+        
         ok_btn.focus_set()
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
+        
         dialog.wait_window()
 
     def _restart_app(self) -> None:
@@ -13191,8 +13402,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog = tk.Toplevel(self)
         dialog.withdraw()  # Hide initially to prevent flicker on wrong monitor
         dialog.title(t('dialogs.session_active_title'))
-        dialog.transient(self)
-        dialog.grab_set()
+        # dialog.transient(self)  # Disabled - causes focus issues
+        try:
+            dialog.grab_set()
+        except:
+            pass
         dialog.resizable(False, False)
         
         # Set app icon
@@ -13331,8 +13545,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Show dialog now that it's centered
         dialog.deiconify()
         
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
         # Focus yes button
         yes_btn.focus_set()
+        
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
         
         # Wait for dialog to close
         dialog.wait_window()
@@ -13439,7 +13668,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.resizable(True, True)
             dialog.minsize(450, 600)
             dialog.configure(bg="#1e1e1e")
-            dialog.transient(self)
+            # dialog.transient(self)  # Disabled - causes focus issues
             
             # Set app icon if available
             try:
@@ -13600,6 +13829,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Bind escape key
             dialog.bind('<Escape>', lambda e: on_cancel())
+            
+            # Keep dialog on top while open
+            def keep_on_top():
+                try:
+                    if dialog.winfo_exists():
+                        dialog.lift()
+                        dialog.after(100, keep_on_top)
+                except:
+                    pass
+            dialog.after(100, keep_on_top)
             
             dialog.wait_window()
             
@@ -13875,7 +14114,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.resizable(True, True)
             dialog.minsize(450, 680)
             dialog.configure(bg="#1e1e1e")
-            dialog.transient(self)
+            # dialog.transient(self)  # Disabled - causes focus issues
             
             # Set app icon if available
             try:
@@ -13894,7 +14133,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
             dialog.geometry(f"+{x}+{y}")
             dialog.deiconify()  # Show dialog after centering
-            dialog.grab_set()  # Grab focus after showing
+            
+            # Force dialog to stay on top and have focus
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            
+            try:
+                dialog.grab_set()  # Grab focus after showing
+            except:
+                pass
             
             # Title
             title_label = tk.Label(dialog, text=t('dialogs.restore_title'), 
@@ -14095,6 +14343,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Bind escape key
             dialog.bind('<Escape>', lambda e: on_cancel())
+            
+            # Keep dialog on top while open
+            def keep_on_top():
+                try:
+                    if dialog.winfo_exists():
+                        dialog.lift()
+                        dialog.after(100, keep_on_top)
+                except:
+                    pass
+            dialog.after(100, keep_on_top)
             
             dialog.wait_window()
             
