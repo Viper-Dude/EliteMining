@@ -8174,6 +8174,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ttk.Label(scrollable_frame, text=t('voiceattack.timers'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
         r = 1
         for name, spec in TIMERS.items():
+            # Skip cargo scoop timer - it's shown under the Cargo Scoop toggle in Advanced Controls
+            if name == "Delay before retracting cargo scoop after mining sequence":
+                continue
+            
             _fname, lo, hi, helptext = spec
             rowf = ttk.Frame(scrollable_frame)
             rowf.grid(row=r, column=0, sticky="w", pady=2)
@@ -8269,6 +8273,42 @@ class App(tk.Tk, ColumnVisibilityMixin):
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
+            # Add Cargo Scoop Delay control right after "Cargo Scoop" toggle
+            if name == "Cargo Scoop":
+                cargoscoop_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                cargoscoop_frame.grid(row=r, column=0, sticky="w", pady=2)
+                
+                # Indent to align with toggle
+                tk.Label(cargoscoop_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                
+                # Get timer spec for range values
+                cargoscoop_timer_name = "Delay before retracting cargo scoop after mining sequence"
+                cargoscoop_spec = TIMERS.get(cargoscoop_timer_name)
+                if cargoscoop_spec:
+                    _fname, lo, hi, _helptext = cargoscoop_spec
+                    
+                    # Spinbox using existing timer var - auto-save on change
+                    cargoscoop_spinbox = ttk.Spinbox(cargoscoop_frame, from_=lo, to=hi, width=5, 
+                                                     textvariable=self.timer_vars[cargoscoop_timer_name],
+                                                     command=lambda: self._save_cargoscoop_delay(cargoscoop_timer_name, _fname, lo, hi))
+                    cargoscoop_spinbox.pack(side="left", padx=(4, 6))
+                    _block_canvas_scroll_on_spinbox(cargoscoop_spinbox)
+                    
+                    # Add trace to save on any value change (including manual typing)
+                    self.timer_vars[cargoscoop_timer_name].trace_add("write", 
+                        lambda *args: self._save_cargoscoop_delay(cargoscoop_timer_name, _fname, lo, hi))
+                    
+                    # Label
+                    cargoscoop_display_name = t(timer_translations.get(cargoscoop_timer_name, cargoscoop_timer_name))
+                    cargoscoop_label = tk.Label(cargoscoop_frame, text=f"{cargoscoop_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
+                                               bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                    cargoscoop_label.pack(side="left")
+                    
+                    # Tooltip
+                    cargoscoop_help = t(timer_help_translations.get(cargoscoop_timer_name, cargoscoop_timer_name))
+                    ToolTip(cargoscoop_label, cargoscoop_help)
+                r += 1
+            
             # Add Prospector Delay control right after "Prospector Sequence" toggle
             if name == "Prospector Sequence":
                 prospector_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
@@ -8316,6 +8356,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                              command=self._save_laser_extra_repeat)
                 repeat_spinbox.pack(side="left", padx=(4, 6))
                 _block_canvas_scroll_on_spinbox(repeat_spinbox)  # Prevent canvas scroll interference
+                
+                # Add trace to save on any value change (including manual typing)
+                self.laser_extra_repeat_var.trace_add("write", lambda *args: self._save_laser_extra_repeat())
                 
                 # Label
                 repeat_label = tk.Label(repeat_frame, text=f"{t('voiceattack.laser_extra_repeat_label')} [1..10]",
@@ -8541,6 +8584,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[PROSPECTOR DELAY] Error loading delay: {e}")
             self.prospector_delay_var.set(4.4)  # Fallback to default
+    
+    def _save_cargoscoop_delay(self, timer_name: str, filename: str, lo: int, hi: int) -> None:
+        """Save cargo scoop delay to file immediately on change"""
+        try:
+            delay = self.timer_vars[timer_name].get()
+            # Clamp to valid range
+            delay = max(lo, min(hi, delay))
+            self.timer_vars[timer_name].set(delay)
+            
+            # Write to file
+            base = os.path.splitext(filename)[0]
+            self._write_var_text(base, str(delay))
+            print(f"[CARGO SCOOP DELAY] Auto-saved: {delay} seconds")
+        except Exception as e:
+            print(f"[CARGO SCOOP DELAY] Error auto-saving: {e}")
     
     def _save_thrust_closed(self) -> None:
         """Save thrust closed timing to thrustScoopClosed.txt"""
