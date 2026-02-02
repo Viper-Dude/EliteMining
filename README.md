@@ -58,7 +58,7 @@ Full-featured mining companion with GUI controls:
 - **Overlaps** – Find and tag double/triple hotspot overlaps for maximum yield  
 - **RES Sites** – Locate Resource Extraction Sites (Hazardous, High, Low)  
 - **Commodity Market** – Find the best sell prices for your mined commodities with real-time market data and distance calculations  
-- **Mining Missions** – Track active mining missions and find hotspots or selling stations directly from mission requirements  
+- **Mining Missions** – Track active mining missions and find hotspots directly from mission requirements  
 - **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports
 
 ### With VoiceAttack Integration (Optional)
@@ -276,12 +276,11 @@ Perfect for planning your mining runs and finding the most profitable stations t
 
 ## Mining Missions
 
-Track your active mining missions and quickly find hotspots or selling stations for mission commodities.
+Track your active mining missions and quickly find hotspots matching mission requirements.
 
 ### Key Features
 - **Mission Tracking** – View all active mining missions with commodity requirements and progress
 - **Find Hotspots** – Search for hotspots directly from mission commodity requirements
-- **Find Selling Stations** – Locate nearby stations to deliver mission commodities
 - **Auto-Import** – Missions automatically imported from Elite Dangerous journals
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_missions.png" width="600"><br>  
