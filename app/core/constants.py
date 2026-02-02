@@ -55,7 +55,7 @@ TOGGLES = {
 TIMERS = {
     "Duration for firing mining lasers (standard)": ("delayLaserMining.txt", 1, 50, "Duration for firing mining lasers (standard mining)."),
     "Pause between mining cycles for weapon recharge/cooldown": ("delayPause.txt", 1, 50, "Pause between mining cycles for weapon recharge/cooldown (when Repeated Mining Cycles is enabled)."),
-    "Duration for additional laser periods (per cycle)": ("delayLaserminingExtra.txt", 1, 50, "Duration for additional laser periods (per cycle)."),
+    "Duration for repeated mining cycles (per cycle)": ("delayLaserminingExtra.txt", 1, 50, "Duration for repeated mining cycles (per cycle)."),
     "Delay before targeting the prospector after launching": ("delayTarget.txt", 1, 50, "Delay before targeting the prospector after launching."),
     "Delay before retracting cargo scoop after mining sequence": ("delayCargoscoop.txt", 1, 50, "Delay before retracting cargo scoop after mining sequence."),
     "Boost Interval (For Core Mining Boost sequense )": ("boostintervalValue.txt", 1, 30, "Interval between boosts when scanning for cores."),

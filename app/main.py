@@ -5625,7 +5625,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._watched_files.add("laserminingextra_count.txt")
         self._watched_files.add("delayprospector.txt")
         self._watched_files.add("thrustscoopopen.txt")
-        self._watched_files.add("thrustscopclosed.txt")
+        self._watched_files.add("thrustscoopclosed.txt")
         
         # Get initial file timestamps
         self._update_vars_timestamps()
@@ -8164,7 +8164,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         timer_translations = {
             "Duration for firing mining lasers (standard)": "voiceattack.timer_laser_first",
             "Pause between mining cycles for weapon recharge/cooldown": "voiceattack.timer_pause",
-            "Duration for additional laser periods (per cycle)": "voiceattack.timer_laser_extra",
+            "Duration for repeated mining cycles (per cycle)": "voiceattack.timer_laser_extra",
             "Delay before targeting the prospector after launching": "voiceattack.timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.timer_cargoscoop",
             "Boost Interval (For Core Mining Boost sequense )": "voiceattack.timer_boost",
@@ -8174,7 +8174,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         timer_help_translations = {
             "Duration for firing mining lasers (standard)": "voiceattack.help_timer_laser_first",
             "Pause between mining cycles for weapon recharge/cooldown": "voiceattack.help_timer_pause",
-            "Duration for additional laser periods (per cycle)": "voiceattack.help_timer_laser_extra",
+            "Duration for repeated mining cycles (per cycle)": "voiceattack.help_timer_laser_extra",
             "Delay before targeting the prospector after launching": "voiceattack.help_timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.help_timer_cargoscoop",
             "Boost Interval (For Core Mining Boost sequense )": "voiceattack.help_timer_boost",
@@ -8308,7 +8308,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Laser mining timers
         laser_timers = [
             "Duration for firing mining lasers (standard)",
-            "Duration for additional laser periods (per cycle)",
+            "Duration for repeated mining cycles (per cycle)",
             "Pause between mining cycles for weapon recharge/cooldown",
         ]
         
@@ -10071,6 +10071,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Migrate old timer key to new key
             if k == "Delay before selecting prospector target after laser mining":
                 k = "Delay before targeting the prospector after launching"
+            if k == "Duration for additional laser periods (per cycle)":
+                k = "Duration for repeated mining cycles (per cycle)"
             if k in self.timer_vars:
                 self.timer_vars[k].set(int(v))
         

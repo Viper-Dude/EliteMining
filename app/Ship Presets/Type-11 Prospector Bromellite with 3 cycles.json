@@ -47,7 +47,7 @@
   "Timers": {
     "Duration for firing mining lasers (standard)": 25,
     "Pause between mining cycles for weapon recharge/cooldown": 8,
-    "Duration for additional laser periods (per cycle)": 8,
+    "Duration for repeated mining cycles (per cycle)": 8,
     "Delay before targeting the prospector after launching": 8,
     "Delay before retracting cargo scoop after mining sequence": 15,
     "Boost Interval (For Core Mining Boost sequense )": 1
