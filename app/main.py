@@ -5334,6 +5334,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Start VoiceAttack command watcher (delay to ensure all components are ready)
         self.after(2000, self._start_va_command_watcher)
+        
+        # Start Variables folder watcher for live VA sync (after import completes)
+        self.after(3000, self._start_variables_watcher)
 
     def _create_integrated_cargo_monitor(self, parent_frame):
         """
@@ -5598,6 +5601,86 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Schedule next update
         self.after(2000, self._periodic_integrated_cargo_update)  # Every 2 seconds
+    
+    # =========================================================================
+    # VoiceAttack Variables Folder Watcher
+    # =========================================================================
+    def _start_variables_watcher(self):
+        """Start watching the Variables folder for changes made by VoiceAttack"""
+        self._vars_watcher_running = True
+        self._vars_last_check = {}
+        
+        # Build list of files to watch from TIMERS, TOGGLES, etc.
+        self._watched_files = set()
+        for name, (fname, _, _, _) in TIMERS.items():
+            self._watched_files.add(fname.lower())
+        for name, (fname, _) in TOGGLES.items():
+            self._watched_files.add(fname.lower())
+        for tool, cfg in VA_VARS.items():
+            if cfg["fg"]:
+                self._watched_files.add(cfg["fg"].lower() + ".txt")
+            if cfg["btn"]:
+                self._watched_files.add(cfg["btn"].lower() + ".txt")
+        # Add extra files
+        self._watched_files.add("laserminingextra_count.txt")
+        self._watched_files.add("delayprospector.txt")
+        self._watched_files.add("thrustscoopopen.txt")
+        self._watched_files.add("thrustscopclosed.txt")
+        
+        # Get initial file timestamps
+        self._update_vars_timestamps()
+        
+        # Start periodic check
+        self._check_variables_changes()
+        print(f"[VARS WATCHER] Watching {len(self._watched_files)} files in: {self.vars_dir}")
+    
+    def _update_vars_timestamps(self):
+        """Update cached timestamps for watched files"""
+        try:
+            for fname in os.listdir(self.vars_dir):
+                if fname.lower() in self._watched_files:
+                    fpath = os.path.join(self.vars_dir, fname)
+                    try:
+                        self._vars_last_check[fname.lower()] = os.path.getmtime(fpath)
+                    except:
+                        pass
+        except Exception as e:
+            pass
+    
+    def _check_variables_changes(self):
+        """Check for file changes in Variables folder"""
+        if not getattr(self, '_vars_watcher_running', False):
+            return
+        
+        try:
+            changes_detected = False
+            for fname in os.listdir(self.vars_dir):
+                if fname.lower() in self._watched_files:
+                    fpath = os.path.join(self.vars_dir, fname)
+                    try:
+                        mtime = os.path.getmtime(fpath)
+                        last_mtime = self._vars_last_check.get(fname.lower(), 0)
+                        if mtime > last_mtime:
+                            changes_detected = True
+                            self._vars_last_check[fname.lower()] = mtime
+                    except:
+                        pass
+            
+            if changes_detected:
+                # Debounce - wait 200ms before importing
+                if hasattr(self, '_vars_import_scheduled'):
+                    self.after_cancel(self._vars_import_scheduled)
+                self._vars_import_scheduled = self.after(200, self._on_variables_changed)
+        except Exception as e:
+            pass
+        
+        # Schedule next check (every 500ms)
+        self.after(500, self._check_variables_changes)
+    
+    def _on_variables_changed(self):
+        """Handle changes detected in Variables folder"""
+        print("[VARS WATCHER] Changes detected - refreshing values from VoiceAttack")
+        self._import_all_from_txt()
     
     # =========================================================================
     # VoiceAttack Command Watcher
@@ -8840,6 +8923,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _save_laser_extra_repeat(self) -> None:
         """Save laser mining extra repeat count to txt file"""
+        # Skip save during import to prevent feedback loop
+        if getattr(self, '_importing', False):
+            return
         try:
             count = self.laser_extra_repeat_var.get()
             txt_path = os.path.join(self.vars_dir, "laserminingextra_count.txt")
@@ -8879,6 +8965,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _save_prospector_delay(self) -> None:
         """Save prospector delay to delayprospector.txt"""
+        # Skip save during import to prevent feedback loop
+        if getattr(self, '_importing', False):
+            return
         try:
             delay = self.prospector_delay_var.get()
             txt_path = os.path.join(self.vars_dir, "delayprospector.txt")
@@ -8911,6 +9000,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _save_toggle(self, toggle_name: str) -> None:
         """Save a toggle to file immediately on change"""
+        # Skip save during import to prevent feedback loop
+        if getattr(self, '_importing', False):
+            return
         try:
             if toggle_name not in TOGGLES:
                 return
@@ -8931,6 +9023,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _save_firegroup(self, tool: str) -> None:
         """Save a firegroup assignment to file immediately on change"""
+        # Skip save during import to prevent feedback loop
+        if getattr(self, '_importing', False):
+            return
         try:
             cfg = VA_VARS.get(tool)
             if not cfg or cfg["fg"] is None:
@@ -8946,6 +9041,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _save_fire_button(self, tool: str) -> None:
         """Save a fire button assignment to file immediately on change"""
+        # Skip save during import to prevent feedback loop
+        if getattr(self, '_importing', False):
+            return
         try:
             cfg = VA_VARS.get(tool)
             if not cfg or cfg["btn"] is None:
@@ -8961,6 +9059,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _save_timer(self, timer_name: str, filename: str, lo: int, hi: int) -> None:
         """Save any timer to file immediately on change"""
+        # Skip save during import to prevent feedback loop
+        if getattr(self, '_importing', False):
+            return
         try:
             delay = self.timer_vars[timer_name].get()
             # Clamp to valid range
@@ -8976,6 +9077,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _save_cargoscoop_delay(self, timer_name: str, filename: str, lo: int, hi: int) -> None:
         """Save cargo scoop delay to file immediately on change"""
+        # Skip save during import to prevent feedback loop
+        if getattr(self, '_importing', False):
+            return
         try:
             delay = self.timer_vars[timer_name].get()
             # Clamp to valid range
@@ -8991,6 +9095,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _save_thrust_closed(self) -> None:
         """Save thrust closed timing to thrustScoopClosed.txt"""
+        # Skip save during import to prevent feedback loop
+        if getattr(self, '_importing', False):
+            return
         try:
             delay = self.thrust_closed_var.get()
             txt_path = os.path.join(self.vars_dir, "thrustScoopClosed.txt")
@@ -9022,6 +9129,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _save_thrust_open(self) -> None:
         """Save thrust open timing to thrustScoopOpen.txt"""
+        # Skip save during import to prevent feedback loop
+        if getattr(self, '_importing', False):
+            return
         try:
             delay = self.thrust_open_var.get()
             txt_path = os.path.join(self.vars_dir, "thrustScoopOpen.txt")
@@ -9442,6 +9552,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Import all VoiceAttack settings from Variables folder on startup"""
         print("[STARTUP] Importing VoiceAttack settings from Variables folder...")
         print(f"[STARTUP] Variables path: {self.vars_dir}")
+        
+        # Set flag to prevent auto-save during import
+        self._importing = True
+        
         found: List[str] = []
         missing: List[str] = []
         try:
@@ -9629,6 +9743,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             import traceback
             traceback.print_exc()
             messagebox.showerror("Import failed", str(e))
+        finally:
+            # Clear import flag
+            self._importing = False
 
     def _save_all_to_txt(self) -> None:
         try:

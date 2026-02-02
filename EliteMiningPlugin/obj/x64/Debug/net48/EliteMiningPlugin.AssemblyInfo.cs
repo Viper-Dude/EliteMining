@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EliteMiningPlugin")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7ec7db141838b0b7b27e65a96b402c1b7e499e0f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7271655c6377464d02d0438224db8ac6624f3412")]
 [assembly: System.Reflection.AssemblyProductAttribute("EliteMiningPlugin")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EliteMiningPlugin")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
