@@ -8165,7 +8165,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Duration for firing mining lasers (standard)": "voiceattack.timer_laser_first",
             "Pause between mining cycles for weapon recharge/cooldown": "voiceattack.timer_pause",
             "Duration for additional laser periods (per cycle)": "voiceattack.timer_laser_extra",
-            "Delay before selecting prospector target after laser mining": "voiceattack.timer_target",
+            "Delay before targeting the prospector after launching": "voiceattack.timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.timer_cargoscoop",
             "Boost Interval (For Core Mining Boost sequense )": "voiceattack.timer_boost",
         }
@@ -8175,7 +8175,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Duration for firing mining lasers (standard)": "voiceattack.help_timer_laser_first",
             "Pause between mining cycles for weapon recharge/cooldown": "voiceattack.help_timer_pause",
             "Duration for additional laser periods (per cycle)": "voiceattack.help_timer_laser_extra",
-            "Delay before selecting prospector target after laser mining": "voiceattack.help_timer_target",
+            "Delay before targeting the prospector after launching": "voiceattack.help_timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.help_timer_cargoscoop",
             "Boost Interval (For Core Mining Boost sequense )": "voiceattack.help_timer_boost",
         }
@@ -8194,7 +8194,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Target Prospector": "voiceattack.help_target_prospector",
             "Thrust Up": "voiceattack.help_thrust_up",
             "Pulse Wave Analyser": "voiceattack.help_pulse_wave",
-            "Auto Deselect Target": "voiceattack.help_target",
+            "Auto Deselect Prospector": "voiceattack.help_auto_deselect_prospector",
         }
         
         # Store checkbox widgets for dependent toggles
@@ -8455,30 +8455,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
         
-        # Auto Deselect Target toggle
-        if "Auto Deselect Target" in TOGGLES:
-            name = "Auto Deselect Target"
-            _fname, helptext = TOGGLES[name]
-            
-            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
-            rowf.grid(row=r, column=0, sticky="w", pady=2)
-            
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
-                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
-                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
-                                    padx=4, pady=2, anchor="w")
-            checkbox.pack(side="left")
-            self.toggle_checkboxes[name] = checkbox
-            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
-            
-            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
-            ToolTip(checkbox, display_help)
-            
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
-            r += 1
-        
         # Cargo Scoop toggle
         if "Cargo Scoop" in TOGGLES:
             name = "Cargo Scoop"
@@ -8651,55 +8627,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # NOTE: Values loaded by _import_all_from_txt at startup
             r += 1
-            
-            # Delay before selecting prospector target (indented)
-            target_timer_name = "Delay before selecting prospector target after laser mining"
-            if target_timer_name in TIMERS:
-                target_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
-                target_frame.grid(row=r, column=0, sticky="w", pady=2)
-                tk.Label(target_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
-                
-                _fname, lo, hi, helptext = TIMERS[target_timer_name]
-                
-                # Create closure with captured values for auto-save
-                def make_save_target(tn, fn, l, h):
-                    return lambda: self._save_timer(tn, fn, l, h)
-                def make_trace_target(tn, fn, l, h):
-                    return lambda *args: self._save_timer(tn, fn, l, h)
-                
-                target_spinbox = tk.Spinbox(target_frame, from_=lo, to=hi, width=5, 
-                                             textvariable=self.timer_vars[target_timer_name],
-                                             command=make_save_target(target_timer_name, _fname, lo, hi),
-                                             bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                             insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                             relief="solid", bd=0, highlightthickness=1,
-                                             highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                             font=("Segoe UI", 9))
-                target_spinbox.pack(side="left", padx=(4, 6))
-                # Add mouse wheel support
-                def on_target_scroll(event, var=self.timer_vars[target_timer_name], lo_val=lo, hi_val=hi):
-                    try:
-                        current = int(var.get())
-                        if event.delta > 0:
-                            new_val = min(current + 1, hi_val)
-                        else:
-                            new_val = max(current - 1, lo_val)
-                        var.set(new_val)
-                    except:
-                        pass
-                    return "break"
-                target_spinbox.bind("<MouseWheel>", on_target_scroll)
-                
-                self.timer_vars[target_timer_name].trace_add("write", make_trace_target(target_timer_name, _fname, lo, hi))
-                
-                target_display_name = t(timer_translations.get(target_timer_name, target_timer_name))
-                target_label = tk.Label(target_frame, text=f"{target_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
-                                       bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
-                target_label.pack(side="left")
-                
-                target_help = t(timer_help_translations.get(target_timer_name, target_timer_name))
-                ToolTip(target_label, target_help)
-                r += 1
         
         # Prospector dependent toggles: Prospector Sound Effect, Thrust Up (depend on Prospector Sequence)
         prospector_dependent_toggles = ["Prospector Sound Effect", "Thrust Up"]
@@ -8824,6 +8751,79 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Target Prospector (independent toggle, not dependent on Prospector Sequence)
         if "Target Prospector" in TOGGLES:
             name = "Target Prospector"
+            _fname, helptext = TOGGLES[name]
+            
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+            
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
+                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+            self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
+            
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+            
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
+            
+            # Delay before targeting the prospector after launching (indented under Target Prospector)
+            target_timer_name = "Delay before targeting the prospector after launching"
+            if target_timer_name in TIMERS:
+                target_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                target_frame.grid(row=r, column=0, sticky="w", pady=2)
+                tk.Label(target_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                
+                _tfname, lo, hi, thelptext = TIMERS[target_timer_name]
+                
+                # Create closure with captured values for auto-save
+                def make_save_target(tn, fn, l, h):
+                    return lambda: self._save_timer(tn, fn, l, h)
+                def make_trace_target(tn, fn, l, h):
+                    return lambda *args: self._save_timer(tn, fn, l, h)
+                
+                target_spinbox = tk.Spinbox(target_frame, from_=lo, to=hi, width=5, 
+                                             textvariable=self.timer_vars[target_timer_name],
+                                             command=make_save_target(target_timer_name, _tfname, lo, hi),
+                                             bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                             insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                             relief="solid", bd=0, highlightthickness=1,
+                                             highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                             font=("Segoe UI", 9))
+                target_spinbox.pack(side="left", padx=(4, 6))
+                # Add mouse wheel support
+                def on_target_scroll(event, var=self.timer_vars[target_timer_name], lo_val=lo, hi_val=hi):
+                    try:
+                        current = int(var.get())
+                        if event.delta > 0:
+                            new_val = min(current + 1, hi_val)
+                        else:
+                            new_val = max(current - 1, lo_val)
+                        var.set(new_val)
+                    except:
+                        pass
+                    return "break"
+                target_spinbox.bind("<MouseWheel>", on_target_scroll)
+                
+                self.timer_vars[target_timer_name].trace_add("write", make_trace_target(target_timer_name, _tfname, lo, hi))
+                
+                target_display_name = t(timer_translations.get(target_timer_name, target_timer_name))
+                target_label = tk.Label(target_frame, text=f"{target_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
+                                       bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                target_label.pack(side="left")
+                
+                target_help = t(timer_help_translations.get(target_timer_name, target_timer_name))
+                ToolTip(target_label, target_help)
+                r += 1
+        
+        # Auto Deselect Prospector toggle (placed in Prospector section)
+        if "Auto Deselect Prospector" in TOGGLES:
+            name = "Auto Deselect Prospector"
             _fname, helptext = TOGGLES[name]
             
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
@@ -10046,6 +10046,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if t in self.tool_btn and isinstance(btn, int) and btn in (1, 2):
                 self.tool_btn[t].set(btn)
         for k, v in data.get("Toggles", {}).items():
+            # Migrate old toggle keys to new keys
+            if k == "Target" or k == "Auto Deselect Target":
+                k = "Auto Deselect Prospector"
             # Skip FSD Jump Sequence - it's not saved in presets
             if k in self.toggle_vars and k != "FSD Jump Sequence":
                 self.toggle_vars[k].set(int(v))
@@ -10065,6 +10068,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.announcement_vars[k].set(0)
         
         for k, v in data.get("Timers", {}).items():
+            # Migrate old timer key to new key
+            if k == "Delay before selecting prospector target after laser mining":
+                k = "Delay before targeting the prospector after launching"
             if k in self.timer_vars:
                 self.timer_vars[k].set(int(v))
         

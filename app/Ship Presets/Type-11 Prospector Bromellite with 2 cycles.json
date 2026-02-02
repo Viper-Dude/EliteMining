@@ -41,14 +41,14 @@
     "Target Prospector": 0,
     "Thrust Up": 1,
     "Pulse Wave Analyser": 0,
-    "Target": 0
+    "Auto Deselect Prospector": 0
   },
   "Announcements": {},
   "Timers": {
     "Duration for firing mining lasers (standard)": 25,
     "Pause between mining cycles for weapon recharge/cooldown": 10,
     "Duration for additional laser periods (per cycle)": 12,
-    "Delay before selecting prospector target after laser mining": 8,
+    "Delay before targeting the prospector after launching": 8,
     "Delay before retracting cargo scoop after mining sequence": 15,
     "Boost Interval (For Core Mining Boost sequense )": 1
   },

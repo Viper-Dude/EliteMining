@@ -49,14 +49,14 @@ TOGGLES = {
     "Target Prospector": ("prospectorTarget.txt", "Automatically target the prospector after launching it."),
     "Thrust Up": ("thrustUp.txt", "Apply upward thrust when firing a prospector. Adjust timing in ((Thrust Up)) command in VA Called Commands - Misc category."),
     "Pulse Wave Analyser": ("Pulsewavetoggle.txt", "Switch back to the Pulse Wave Analyser firegroup when laser mining is completed."),
-    "Auto Deselect Target": ("targetToggle.txt", "Deselect prospector when laser mining is completed."),
+    "Auto Deselect Prospector": ("targetToggle.txt", "Deselect prospector when laser mining is completed."),
 }
 
 TIMERS = {
     "Duration for firing mining lasers (standard)": ("delayLaserMining.txt", 1, 50, "Duration for firing mining lasers (standard mining)."),
     "Pause between mining cycles for weapon recharge/cooldown": ("delayPause.txt", 1, 50, "Pause between mining cycles for weapon recharge/cooldown (when Repeated Mining Cycles is enabled)."),
     "Duration for additional laser periods (per cycle)": ("delayLaserminingExtra.txt", 1, 50, "Duration for additional laser periods (per cycle)."),
-    "Delay before selecting prospector target after laser mining": ("delayTarget.txt", 1, 50, "Delay before selecting prospector target after laser mining."),
+    "Delay before targeting the prospector after launching": ("delayTarget.txt", 1, 50, "Delay before targeting the prospector after launching."),
     "Delay before retracting cargo scoop after mining sequence": ("delayCargoscoop.txt", 1, 50, "Delay before retracting cargo scoop after mining sequence."),
     "Boost Interval (For Core Mining Boost sequense )": ("boostintervalValue.txt", 1, 30, "Interval between boosts when scanning for cores."),
 }
