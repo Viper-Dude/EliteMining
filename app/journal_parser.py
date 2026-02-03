@@ -223,6 +223,36 @@ class JournalParser:
         # Only fetch from Spansh API during live monitoring
         self.is_live_monitoring = False
     
+    @staticmethod
+    def normalize_reserve_level(reserve_level: str) -> str:
+        """Normalize reserve level from journal format to display format
+        
+        Args:
+            reserve_level: Raw reserve level from journal (e.g., "PristineResources")
+            
+        Returns:
+            Normalized reserve level (e.g., "Pristine")
+        """
+        if not reserve_level:
+            return None
+        
+        # Map journal values to display values
+        reserve_map = {
+            'PristineResources': 'Pristine',
+            'MajorResources': 'Major',
+            'CommonResources': 'Common',
+            'LowResources': 'Low',
+            'DepletedResources': 'Depleted',
+            # Also handle already-normalized values
+            'Pristine': 'Pristine',
+            'Major': 'Major',
+            'Common': 'Common',
+            'Low': 'Low',
+            'Depleted': 'Depleted'
+        }
+        
+        return reserve_map.get(reserve_level, reserve_level)
+    
     @classmethod
     def normalize_material_name(cls, material_name: str) -> str:
         """Normalize material name to canonical form
@@ -443,6 +473,12 @@ class JournalParser:
             ls_distance = event.get('DistanceFromArrivalLS')
             star_system = event.get('StarSystem')  # System name from event
             
+            # ReserveLevel is on the parent body, not in Rings array
+            # Values: PristineResources, MajorResources, etc. - normalize to Pristine, Major, etc.
+            journal_reserve_level = event.get('ReserveLevel')
+            if journal_reserve_level:
+                journal_reserve_level = self.normalize_reserve_level(journal_reserve_level)
+            
             if not system_address or body_id is None:
                 return
             
@@ -473,23 +509,25 @@ class JournalParser:
                     }
                     log.debug(f"Stored ring info: {ring_name} -> Class: {clean_ring_class}, LS: {ls_distance}, Mass: {ring_mass}")
                     
-                    # Get reserve level from cache if available
-                    reserve_level = self.system_reserve_levels.get(ring_name)
+                    # Use ReserveLevel from journal (parent body field) - this is the authoritative source
+                    # ReserveLevel applies to all rings on the body (same reserve for A Ring, B Ring, etc.)
+                    reserve_level = journal_reserve_level
                     
-                    # If not in cache, fetch from Spansh API for this specific ring (only during live monitoring)
-                    if not reserve_level and star_system and self.is_live_monitoring:
-                        log.info(f"Reserve level not in cache for {ring_name}, fetching from Spansh...")
-                        spansh_data = self._fetch_system_reserve_levels_from_spansh(star_system)
-                        self.system_reserve_levels.update(spansh_data)
+                    if reserve_level:
+                        log.info(f"Got reserve level from journal for {ring_name}: {reserve_level}")
+                        # Cache it for other rings on the same body
+                        self.system_reserve_levels[ring_name] = reserve_level
+                    else:
+                        # Check cache first (might have been set by another ring on same body)
                         reserve_level = self.system_reserve_levels.get(ring_name)
+                        
+                        # Only fall back to Spansh if not in journal AND not in cache AND live monitoring
+                        if not reserve_level and star_system and self.is_live_monitoring:
+                            log.info(f"Reserve level not in journal or cache for {ring_name}, fetching from Spansh...")
+                            spansh_data = self._fetch_system_reserve_levels_from_spansh(star_system)
+                            self.system_reserve_levels.update(spansh_data)
+                            reserve_level = self.system_reserve_levels.get(ring_name)
                     
-                    # Update existing hotspot records that are missing this metadata
-                    # This fixes the timing issue where SAASignalsFound may come before Scan
-                    if star_system:
-                        self._update_hotspots_with_ring_metadata(
-                            star_system, ring_name, clean_ring_class, ls_distance,
-                            inner_radius, outer_radius, ring_mass, reserve_level
-                        )
                     # Update existing hotspot records that are missing this metadata
                     # This fixes the timing issue where SAASignalsFound may come before Scan
                     if star_system:
@@ -569,12 +607,6 @@ class JournalParser:
             if system_name and ring_name.lower().startswith(system_name.lower()):
                 body_name = ring_name[len(system_name):].strip()
             
-            # Calculate density if we have the data (but reserve_level takes priority)
-            density = None
-            if ring_mass and inner_radius and outer_radius and not reserve_level:
-                from user_database import calculate_ring_density
-                density = calculate_ring_density(ring_mass, inner_radius, outer_radius)
-            
             # Update hotspots for this ring that are missing metadata
             self.user_db.update_ring_metadata(
                 system_name=system_name,
@@ -584,7 +616,6 @@ class JournalParser:
                 inner_radius=inner_radius,
                 outer_radius=outer_radius,
                 ring_mass=ring_mass,
-                density=density,
                 reserve_level=reserve_level
             )
         except Exception as e:
@@ -732,8 +763,7 @@ class JournalParser:
                         ls_distance=ls_distance,
                         inner_radius=inner_radius,
                         outer_radius=outer_radius,
-                        ring_mass=ring_mass,
-                        density=density
+                        ring_mass=ring_mass
                     )
                     
                     log.debug(f"Added hotspot: {system_name} - {normalized_body_name} - {material_name} ({count})")

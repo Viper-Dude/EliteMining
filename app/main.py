@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.87"
+APP_VERSION = "v4.8.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -19795,16 +19795,16 @@ Your keybinds will need to be reconfigured manually."""
                                 try:
                                     self.cargo_monitor.journal_parser.process_scan(event)
                                     hotspots_added += 1
-                                except:
-                                    pass
+                                except Exception as e:
+                                    log.error(f"Error processing Scan event: {e}")
                             
                             # Process SAASignalsFound for hotspots
                             elif event_type == 'SAASignalsFound':
                                 try:
                                     self.cargo_monitor.journal_parser.process_saa_signals_found(event, current_system)
                                     hotspots_added += 1
-                                except:
-                                    pass
+                                except Exception as e:
+                                    log.error(f"Error processing SAASignalsFound event: {e}")
                             
                             # Process mining missions
                             elif event_type == 'MissionAccepted':

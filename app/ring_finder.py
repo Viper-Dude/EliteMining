@@ -38,6 +38,64 @@ except Exception:
     def to_english(name):
         return name
 
+def translate_reserve_level(reserve_level) -> str:
+    """Translate reserve level to localized display text
+    
+    Args:
+        reserve_level: English reserve level from database (Pristine, Major, etc.)
+        
+    Returns:
+        Localized reserve level text, or empty string for invalid values
+    """
+    if not reserve_level:
+        return ''
+    
+    # Convert to string if needed
+    reserve_level = str(reserve_level)
+    
+    # Map to translation keys - only valid reserve levels
+    reserve_key_map = {
+        'Pristine': 'reserve_pristine',
+        'Major': 'reserve_major',
+        'Common': 'reserve_common',
+        'Low': 'reserve_low',
+        'Depleted': 'reserve_depleted'
+    }
+    
+    key = reserve_key_map.get(reserve_level)
+    if key:
+        return t(f'ring_finder.{key}')  # Use ring_finder prefix
+    
+    # If not a valid reserve level (e.g., old density data), return empty
+    return ''
+
+def translate_ring_type(ring_type: str) -> str:
+    """Translate ring type to localized display text
+    
+    Args:
+        ring_type: English ring type from database (Metallic, Rocky, Icy, Metal Rich)
+        
+    Returns:
+        Localized ring type text
+    """
+    if not ring_type or ring_type == "No data":
+        return ring_type
+    
+    # Map to translation keys
+    ring_key_map = {
+        'Metallic': 'metallic',
+        'Rocky': 'rocky',
+        'Icy': 'icy',
+        'Metal Rich': 'metal_rich'
+    }
+    
+    key = ring_key_map.get(ring_type)
+    if key:
+        return t(f'ring_finder.{key}')
+    
+    # Fallback to original value
+    return ring_type
+
 # ToolTip class for showing helpful information
 class ToolTip:
     tooltips_enabled = True
@@ -426,14 +484,14 @@ class RingFinder(ColumnVisibilityMixin):
         ttk.Label(search_frame, text=t('ring_finder.reserve')).grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.reserve_var = tk.StringVar(value=t('ring_finder.all_reserves'))
         self.reserve_combo = ttk.Combobox(search_frame, textvariable=self.reserve_var, width=15, state="readonly")
-        # Reserve options: All, Pristine, Major, Common, Low, Depleted
+        # Reserve options: All, Pristine, Major, Common, Low, Depleted (all localized)
         reserve_options = [
             t('ring_finder.all_reserves'),
-            'Pristine',
-            'Major',
-            'Common',
-            'Low',
-            'Depleted'
+            t('ring_finder.reserve_pristine'),
+            t('ring_finder.reserve_major'),
+            t('ring_finder.reserve_common'),
+            t('ring_finder.reserve_low'),
+            t('ring_finder.reserve_depleted')
         ]
         self.reserve_combo['values'] = tuple(reserve_options)
         self.reserve_combo.grid(row=2, column=1, sticky="w", padx=5, pady=5)
@@ -543,7 +601,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Ring Type Only checkbox - searches for ring types regardless of hotspot data (Spansh only)
         self.ring_type_only_var = tk.BooleanVar(value=False)
-        self.ring_type_only_cb = tk.Checkbutton(right_filters_frame_row1, text="Ring Search (Spansh)",
+        self.ring_type_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.ring_search_spansh'),
                                                  variable=self.ring_type_only_var,
                                                  command=self._on_ring_type_only_changed,
                                                  bg=_cb_bg, fg="#e0e0e0",
@@ -551,7 +609,7 @@ class RingFinder(ColumnVisibilityMixin):
                                                  selectcolor=_cb_select, relief="flat",
                                                  font=("Segoe UI", 9))
         self.ring_type_only_cb.pack(side="left", padx=(8, 0))
-        ToolTip(self.ring_type_only_cb, "Search for ring type only (ignores hotspot data)\nUseful for finding nearest ring of a specific type")
+        ToolTip(self.ring_type_only_cb, t('ring_finder.ring_search_spansh_tooltip'))
         
         # Initialize Ring Type Only state based on current ring type selection
         self._on_ring_type_changed()
@@ -812,7 +870,7 @@ class RingFinder(ColumnVisibilityMixin):
             "Overlap": t('ring_finder.col_overlap'),
             "RES Site": t('ring_finder.col_res'),
             "Reserve": t('ring_finder.col_reserve'),
-            "Source": "Source"
+            "Source": t('ring_finder.col_source')
         }
         
         for col in columns:
@@ -1630,14 +1688,14 @@ class RingFinder(ColumnVisibilityMixin):
                 if self._is_all_minerals(specific_material):
                     cursor.execute('''
                         SELECT system_name, body_name, material_name, overlap_tag,
-                               ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
+                               ring_type, ls_distance, reserve_level, x_coord, y_coord, z_coord, hotspot_count
                         FROM hotspot_data 
                         WHERE overlap_tag IS NOT NULL
                     ''')
                 else:
                     cursor.execute('''
                         SELECT system_name, body_name, material_name, overlap_tag,
-                               ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
+                               ring_type, ls_distance, reserve_level, x_coord, y_coord, z_coord, hotspot_count
                         FROM hotspot_data 
                         WHERE overlap_tag IS NOT NULL AND material_name = ?
                     ''', (specific_material,))
@@ -1645,7 +1703,7 @@ class RingFinder(ColumnVisibilityMixin):
                 rows = cursor.fetchall()
             
             for row in rows:
-                system_name, body_name, material_name, overlap_tag, ring_type, ls_distance, density, x, y, z, hotspot_count = row
+                system_name, body_name, material_name, overlap_tag, ring_type, ls_distance, reserve_level, x, y, z, hotspot_count = row
                 
                 # Skip if we've already added this ring (avoid duplicates when multiple materials have overlaps)
                 ring_key = (system_name, body_name)
@@ -1704,10 +1762,10 @@ class RingFinder(ColumnVisibilityMixin):
                     'type': hotspots_display,  # Use formatted hotspots display
                     'count': hotspot_count or 0,
                     'distance': distance,
-                    'ring_type': ring_type or "No data",
+                    'ring_type': translate_ring_type(ring_type) if ring_type else "No data",
                     'ls': ls_display,  # Display uses 'ls' key
                     'ls_distance': ls_distance,  # Keep raw value for EDSM compatibility
-                    'density': '',  # Don't show old density data - reserve level is for Spansh only
+                    'reserve': translate_reserve_level(reserve_level) if reserve_level else '',  # Translate reserve level
                     'data_source': 'Overlap Database',
                     'overlap_tag': overlap_tag
                 })
@@ -1800,14 +1858,14 @@ class RingFinder(ColumnVisibilityMixin):
                 if self._is_all_minerals(specific_material):
                     cursor.execute('''
                         SELECT system_name, body_name, material_name, res_tag, overlap_tag,
-                               ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
+                               ring_type, ls_distance, reserve_level, x_coord, y_coord, z_coord, hotspot_count
                         FROM hotspot_data 
                         WHERE res_tag IS NOT NULL
                     ''')
                 else:
                     cursor.execute('''
                         SELECT system_name, body_name, material_name, res_tag, overlap_tag,
-                               ring_type, ls_distance, density, x_coord, y_coord, z_coord, hotspot_count
+                               ring_type, ls_distance, reserve_level, x_coord, y_coord, z_coord, hotspot_count
                         FROM hotspot_data 
                         WHERE res_tag IS NOT NULL AND material_name = ?
                     ''', (specific_material,))
@@ -1815,7 +1873,7 @@ class RingFinder(ColumnVisibilityMixin):
                 rows = cursor.fetchall()
             
             for row in rows:
-                system_name, body_name, material_name, res_tag, overlap_tag, ring_type, ls_distance, density, x, y, z, hotspot_count = row
+                system_name, body_name, material_name, res_tag, overlap_tag, ring_type, ls_distance, reserve_level, x, y, z, hotspot_count = row
                 
                 # Skip if we've already added this ring (avoid duplicates when multiple materials have RES)
                 ring_key = (system_name, body_name)
@@ -1877,10 +1935,10 @@ class RingFinder(ColumnVisibilityMixin):
                     'type': hotspots_display,  # Use formatted hotspots display
                     'count': hotspot_count or 0,
                     'distance': distance,
-                    'ring_type': ring_type or "No data",
+                    'ring_type': translate_ring_type(ring_type) if ring_type else "No data",
                     'ls': ls_display,
                     'ls_distance': ls_distance,
-                    'density': '',  # Don't show old density data - reserve level is for Spansh only
+                    'reserve': translate_reserve_level(reserve_level) if reserve_level else '',  # Translate reserve level
                     'data_source': 'RES Database',
                     'overlap_tag': overlap_tag,
                     'res_tag': res_display
@@ -2260,7 +2318,7 @@ class RingFinder(ColumnVisibilityMixin):
                 
                 # Query updated metadata for this specific hotspot
                 cursor.execute("""
-                    SELECT ring_type, ls_distance, inner_radius, outer_radius, ring_mass, density
+                    SELECT ring_type, ls_distance, inner_radius, outer_radius, ring_mass, reserve_level
                     FROM hotspot_data
                     WHERE system_name = ? AND body_name = ? AND material_name = ?
                     LIMIT 1
@@ -2288,7 +2346,7 @@ class RingFinder(ColumnVisibilityMixin):
                     hotspot['inner_radius'] = row[2] if row[2] else hotspot.get('inner_radius')
                     hotspot['outer_radius'] = row[3] if row[3] else hotspot.get('outer_radius')
                     hotspot['ring_mass'] = row[4] if row[4] else hotspot.get('ring_mass')
-                    hotspot['density'] = row[5] if row[5] else hotspot.get('density')
+                    hotspot['reserve'] = row[5] if row[5] else hotspot.get('reserve')
                     
                     # Check if anything actually changed
                     if (old_ring_type != hotspot.get('ring_type')) or (old_ls_distance != hotspot.get('ls_distance')):
@@ -2550,10 +2608,10 @@ class RingFinder(ColumnVisibilityMixin):
                         'distance': f"{distance_ly:.1f}" if distance_ly > 0 else "0.0",  # String format
                         'coords': reference_coords,
                         'data_source': 'Spansh',
-                        'ring_type': ring_type,
-                        'ls': ls_display,  # Formatted string with commas
-                        'ls_distance': distance_ls,  # Raw value
-                        'density': reserve_level if reserve_level else '-',  # Use reserve_level from Spansh, or dash if not available
+                        'ring_type': translate_ring_type(ring_type),
+                        'ls': ls_display,  # Formatted LS distance
+                        'ls_distance': distance_ls,  # Raw LS value
+                        'reserve': translate_reserve_level(reserve_level) if reserve_level else '-',  # Translate reserve level
                         'inner_radius': None,
                         'outer_radius': None,
                         'source': 'Spansh',
@@ -2717,14 +2775,13 @@ class RingFinder(ColumnVisibilityMixin):
                         'system': system_name,
                         'body': body_name,
                         'ring': ring_name,
-                        'ring_type': ring_type_actual,
-                        'distance': round(distance, 2),
+                        'ring_type': translate_ring_type(ring_type_actual),
                         'ls_distance': round(ls_distance, 2) if ls_distance else None,
                         'material': hotspot_info if hotspot_info else t('ring_finder.no_hotspot_data'),
                         'count': hotspot_count if hotspot_count else 0,
                         'overlap': '',
                         'res_site': '',
-                        'density': '',
+                        'reserve': '',
                         'source': 'spansh',
                         'data_source': 'spansh'
                     }
@@ -2826,12 +2883,12 @@ class RingFinder(ColumnVisibilityMixin):
                 'body': body_name,
                 'bodyName': ring_name,  # Use ring_name as bodyName for display
                 'ring': ring_name,
-                'ring_type': ring_type,
+                'ring_type': translate_ring_type(ring_type),
                 'type': hotspot_display,  # This populates Hotspots column
                 'ls': ls_display,
                 'ls_distance': ls_distance,
                 'distance': f"{distance:.1f}" if distance > 0 else "0.0",
-                'density': "No data",
+                'reserve': "No data",
                 'has_hotspots': hotspot_count > 0,
                 'count': hotspot_count,
                 'data_source': 'Spansh',
@@ -2984,7 +3041,7 @@ class RingFinder(ColumnVisibilityMixin):
                     'distance': f"{distance:.1f}" if distance > 0 else "0.0",
                     'mass': "No data",  # User database doesn't store ring mass
                     'radius': "No data",  # User database doesn't store ring radius
-                    'density': hotspot.get('density', ''),  # Show reserve level from database (Pristine, Major, etc.)
+                    'reserve': hotspot.get('reserve', ''),  # Reserve level from database (Pristine, Major, etc.)
                     'inner_radius': hotspot.get('inner_radius'),  # Include inner radius from database
                     'outer_radius': hotspot.get('outer_radius'),  # Include outer radius from database
                     'has_hotspots': True,
@@ -3217,7 +3274,7 @@ class RingFinder(ColumnVisibilityMixin):
                                 'system': system_name,
                                 'body': body_name,
                                 'ring': clean_ring_name,
-                                'ring_type': ring_type,
+                                'ring_type': translate_ring_type(ring_type),
                                 'ls': str(int(distance_ls)) if distance_ls > 0 else "No data",
                                 'distance': f"{distance:.1f}" if distance > 0 else "0.0",
                                 'mass': mass_display,
@@ -3661,14 +3718,14 @@ class RingFinder(ColumnVisibilityMixin):
                         SELECT h.system_name, h.body_name, h.material_name, h.hotspot_count,
                                COALESCE(h.ring_type, m.ring_type) as ring_type,
                                COALESCE(h.ls_distance, m.ls_distance) as ls_distance,
-                               COALESCE(h.density, m.density) as density,
+                               COALESCE(h.reserve_level, m.reserve_level) as reserve_level,
                                COALESCE(h.inner_radius, m.inner_radius) as inner_radius,
                                COALESCE(h.outer_radius, m.outer_radius) as outer_radius
                         FROM hotspot_data h
                         LEFT JOIN (
                             SELECT system_name, body_name,
                                    MAX(ring_type) as ring_type, MAX(ls_distance) as ls_distance,
-                                   MAX(density) as density, MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
+                                   MAX(reserve_level) as reserve_level, MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
                             FROM hotspot_data
                             WHERE ring_type IS NOT NULL OR ls_distance IS NOT NULL
                             GROUP BY system_name, body_name
@@ -3680,14 +3737,14 @@ class RingFinder(ColumnVisibilityMixin):
                         SELECT h.system_name, h.body_name, h.material_name, h.hotspot_count,
                                COALESCE(h.ring_type, m.ring_type) as ring_type,
                                COALESCE(h.ls_distance, m.ls_distance) as ls_distance,
-                               COALESCE(h.density, m.density) as density,
+                               COALESCE(h.reserve_level, m.reserve_level) as reserve_level,
                                COALESCE(h.inner_radius, m.inner_radius) as inner_radius,
                                COALESCE(h.outer_radius, m.outer_radius) as outer_radius
                         FROM hotspot_data h
                         LEFT JOIN (
                             SELECT system_name, body_name,
                                    MAX(ring_type) as ring_type, MAX(ls_distance) as ls_distance,
-                                   MAX(density) as density, MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
+                                   MAX(reserve_level) as reserve_level, MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
                             FROM hotspot_data
                             WHERE ring_type IS NOT NULL OR ls_distance IS NOT NULL
                             GROUP BY system_name, body_name
@@ -3703,10 +3760,10 @@ class RingFinder(ColumnVisibilityMixin):
                 if results:
                     print(f" DEBUG: First result sample:")
                     for i, row in enumerate(results[:3]):
-                        print(f"   Row {i}: system={row[0]}, body={row[1]}, material={row[2]}, count={row[3]}, ring_type={row[4]}, ls={row[5]}, density={row[6]}")
+                        print(f"   Row {i}: system={row[0]}, body={row[1]}, material={row[2]}, count={row[3]}, ring_type={row[4]}, ls={row[5]}, reserve_level={row[6]}")
                 
                 # Process each hotspot result
-                for system_name, body_name, material_name, hotspot_count, ring_type_db, ls_distance, density, inner_radius, outer_radius in results:
+                for system_name, body_name, material_name, hotspot_count, ring_type_db, ls_distance, reserve_level, inner_radius, outer_radius in results:
                     try:
                         # Try to get coordinates for distance, but don't fail if unavailable
                         distance = 999.9  # Default for unknown distance
@@ -3732,9 +3789,9 @@ class RingFinder(ColumnVisibilityMixin):
                             'coords': system_coords,
                             'data_source': 'EDTools.cc Community Data',
                             'ring_mass': 0,  # Default values for compatibility
-                            'ring_type': ring_type_db if ring_type_db else 'No data',  # Use ring_type from database
+                            'ring_type': translate_ring_type(ring_type_db) if ring_type_db else 'No data',  # Translate ring type
                             'ls_distance': ls_distance,  # Include LS distance from database
-                            'density': density,  # Include density from database
+                            'reserve': translate_reserve_level(reserve_level) if reserve_level else '',  # Translate reserve level
                             'inner_radius': inner_radius,  # Include inner radius from database
                             'outer_radius': outer_radius,  # Include outer radius from database
                             'debug_id': 'SECTION_1'  # Track which section created this entry
@@ -3868,7 +3925,7 @@ class RingFinder(ColumnVisibilityMixin):
                                        GROUP_CONCAT(material_name || ' (' || hotspot_count || ')', ', ') as material_name,
                                        1 as hotspot_count,
                                        MAX(x_coord) as x_coord, MAX(y_coord) as y_coord, MAX(z_coord) as z_coord, MAX(coord_source) as coord_source, 
-                                       MAX(ls_distance) as ls_distance, MAX(density) as density, MAX(ring_type) as ring_type, 
+                                       MAX(ls_distance) as ls_distance, MAX(reserve_level) as reserve_level, MAX(ring_type) as ring_type, 
                                        MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
                                 FROM hotspot_data
                                 WHERE system_name IN ({placeholders})
@@ -3880,7 +3937,7 @@ class RingFinder(ColumnVisibilityMixin):
                             # Show only rings WITH this specific material - filter by material in SQL for efficiency
                             query = f'''
                                 SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
-                                       x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type, inner_radius, outer_radius
+                                       x_coord, y_coord, z_coord, coord_source, ls_distance, reserve_level, ring_type, inner_radius, outer_radius
                                 FROM hotspot_data
                                 WHERE system_name IN ({placeholders}) AND material_name = ?
                                 ORDER BY 
@@ -3903,7 +3960,7 @@ class RingFinder(ColumnVisibilityMixin):
                                    GROUP_CONCAT(material_name || ' (' || hotspot_count || ')', ', ') as material_name,
                                    1 as hotspot_count,
                                    MAX(x_coord) as x_coord, MAX(y_coord) as y_coord, MAX(z_coord) as z_coord, MAX(coord_source) as coord_source, 
-                                   MAX(ls_distance) as ls_distance, MAX(density) as density, MAX(ring_type) as ring_type, 
+                                   MAX(ls_distance) as ls_distance, MAX(reserve_level) as reserve_level, MAX(ring_type) as ring_type, 
                                    MAX(inner_radius) as inner_radius, MAX(outer_radius) as outer_radius
                             FROM hotspot_data
                             WHERE system_name LIKE ? OR system_name = ?
@@ -3916,7 +3973,7 @@ class RingFinder(ColumnVisibilityMixin):
                         # Show only rings WITH this specific material - filter by material in SQL
                         direct_search_query = '''
                             SELECT DISTINCT system_name, body_name, material_name, hotspot_count,
-                                   x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type, inner_radius, outer_radius
+                                   x_coord, y_coord, z_coord, coord_source, ls_distance, reserve_level, ring_type, inner_radius, outer_radius
                             FROM hotspot_data
                             WHERE (system_name LIKE ? OR system_name = ?) AND material_name = ?
                             ORDER BY 
@@ -3942,7 +3999,7 @@ class RingFinder(ColumnVisibilityMixin):
                 processed_count = 0
                 max_process_limit = 10000  # Hard limit to prevent infinite processing
                 
-                for system_name, body_name, material_name, hotspot_count, x_coord, y_coord, z_coord, coord_source, ls_distance, density, ring_type_db, inner_radius, outer_radius in results:
+                for system_name, body_name, material_name, hotspot_count, x_coord, y_coord, z_coord, coord_source, ls_distance, reserve_level, ring_type_db, inner_radius, outer_radius in results:
                     try:
                         # Safety: Stop processing if we've hit the limit
                         processed_count += 1
@@ -4054,9 +4111,9 @@ class RingFinder(ColumnVisibilityMixin):
                             'coords': {'x': x_coord, 'y': y_coord, 'z': z_coord} if x_coord is not None else None,
                             'data_source': source_label,
                             'ring_mass': 0,
-                            'ring_type': ring_type,  # Use ring_type from database
+                            'ring_type': translate_ring_type(ring_type),  # Translate ring type
                             'ls_distance': ls_distance,  # Include LS distance from database
-                            'density': density,  # Include density from database
+                            'reserve': translate_reserve_level(reserve_level) if reserve_level else '',  # Translate reserve level
                             'inner_radius': inner_radius,  # Include inner radius from database
                             'outer_radius': outer_radius,  # Include outer radius from database
                             'debug_id': 'SECTION_2'  # Track which section created this entry
@@ -4326,8 +4383,8 @@ class RingFinder(ColumnVisibilityMixin):
         if reserve_filter and reserve_filter != t('ring_finder.all_reserves'):
             filtered_hotspots = []
             for hotspot in hotspots:
-                # Check both 'reserve' and 'density' fields (density is used for reserve level)
-                reserve = hotspot.get('reserve', '') or hotspot.get('density', '')
+                # Get reserve level from hotspot data
+                reserve = hotspot.get('reserve', '')
                 
                 # Match specific reserve level (Pristine, Major, Common, Low, Depleted)
                 if reserve == reserve_filter:
@@ -4500,26 +4557,13 @@ class RingFinder(ColumnVisibilityMixin):
             visit_count = visit_data.get('visit_count', 0) if visit_data else 0
             visited_status = str(visit_count)
             
-            # Format density for display - only show text reserve levels, not old numeric density
-            density_formatted = "No data"
+            # Format reserve level for display
+            reserve_formatted = "No data"
             
-            # Try to use existing density value from database first
-            density_value = hotspot.get("density")
-            if density_value is not None and density_value != "No data":
-                try:
-                    # Check if it's numeric (old density data) - don't show it
-                    if isinstance(density_value, (int, float)):
-                        density_formatted = "No data"  # Hide old numeric density
-                    else:
-                        # Try to parse as float - if it parses, it's old numeric data
-                        try:
-                            float(density_value)
-                            density_formatted = "No data"  # Hide old numeric density
-                        except (ValueError, TypeError):
-                            # It's text (reserve level like "Pristine") - show it
-                            density_formatted = str(density_value)
-                except:
-                    density_formatted = "No data"
+            # Get reserve level from hotspot data
+            reserve_value = hotspot.get("reserve", "")
+            if reserve_value and reserve_value not in ("No data", ""):
+                reserve_formatted = str(reserve_value)
             
             # Debug: Check what's actually going to UI and identify source
             ui_ring_type = hotspot.get("ring_type", "No data")
@@ -4624,7 +4668,7 @@ class RingFinder(ColumnVisibilityMixin):
                 hotspot_count_display,
                 overlap_display,
                 res_display,
-                density_formatted,
+                reserve_formatted,
                 source_display
             ), tags=tags)
             
