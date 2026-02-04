@@ -195,7 +195,7 @@
     "update_reserve_title": "Reserve-Level aktualisieren",
     "no_local_missing_reserve": "Keine lokalen Einträge mit fehlenden Reserve-Leveln ausgewählt.",
     "reserve_update_success": "✓ Reserve-Level für {rings} Ringe in {systems} System(en) aktualisiert.\n\nAlle Ringe in diesen Systemen wurden aktualisiert.",
-    "reserve_update_none": "Keine Reserve-Level auf Spansh für {systems} System(e) gefunden.\n\nSysteme haben möglicherweise keine Ringe oder Spansh hat keine Daten."
+    "reserve_update_none": "Keine Reserve-Level auf Spansh für {systems} System(e) gefunden.\n\nBesuche und scanne den Ring zum Aktualisieren."
   },
   "sidebar": {
     "ship_presets": "Schiff-Presets (VoiceAttack)",

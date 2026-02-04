@@ -199,7 +199,7 @@
     "update_reserve_title": "Update Reserve Levels",
     "no_local_missing_reserve": "No local entries with missing reserve levels selected.",
     "reserve_update_success": "✓ Updated reserve levels for {rings} rings in {systems} system(s).\n\nAll rings in those systems have been updated.",
-    "reserve_update_none": "No reserve levels found on Spansh for {systems} system(s).\n\nSystems may not have rings or Spansh has no data."
+    "reserve_update_none": "No reserve levels found on Spansh for {systems} system(s).\n\nVisit and scan the ring to update."
   },
   "sidebar": {
     "ship_presets": "Ship Presets (VoiceAttack)",

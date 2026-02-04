@@ -4861,7 +4861,7 @@ class RingFinder(ColumnVisibilityMixin):
                             values = self.results_tree.item(sel_item, 'values')
                             if values and len(values) > 10:
                                 source = values[10]  # Source column
-                                hotspots_col = values[5] if len(values) > 5 else ""  # Hotspots column
+                                hotspots_col = values[6] if len(values) > 6 else ""  # Hotspots column is index 6
                                 if source and '🌐' in str(source):
                                     # In ring search mode, only count rows with hotspot data
                                     if not is_ring_search_mode or (hotspots_col and hotspots_col != "-" and hotspots_col.strip() != ""):
@@ -4905,8 +4905,8 @@ class RingFinder(ColumnVisibilityMixin):
                     has_hotspot_data = False
                     if has_spansh_rows and selected_items:
                         values = self.results_tree.item(selected_items[0], 'values')
-                        if values and len(values) > 5:
-                            hotspots_col = values[5]  # Hotspots column is index 5
+                        if values and len(values) > 6:
+                            hotspots_col = values[6]  # Hotspots column is index 6
                             # Has data if not "-" or empty
                             has_hotspot_data = hotspots_col and hotspots_col != "-" and hotspots_col.strip() != ""
                     
