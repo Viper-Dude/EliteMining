@@ -47,6 +47,21 @@ If you prefer to do it manually:
 Set Controls in Elite Dangerous to a saved Custom preset. This creates `Custom.binds` required by EliteVA.
 </details>
 
+<details>
+<summary><b>VoiceAttack commands aren't working. What should I check?</b></summary>
+
+Ensure VoiceAttack has plugin support enabled:
+1. Open **VoiceAttack → Options → General**
+2. Enable **"Enable Plugin Support"**
+3. Open **Plugin Manager**
+4. Verify these plugins are checked:
+   - ✓ EliteMining Plugin
+   - ✓ EliteAPI (EliteVA.dll)
+5. Restart VoiceAttack
+
+Without both plugins enabled, mining automation and game integration won't work.
+</details>
+
 ## Features
 
 <details>

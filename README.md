@@ -13,6 +13,7 @@
 - [Features and Usage Options](#features-and-usage-options)
 - [Requirements](#requirements)
 - [Installation](#installation)
+  - [Enable VoiceAttack Plugins](#enable-voiceattack-plugins)
 - [VoiceAttack Controls](#voiceattack-controls)
 - [EliteMining App](#elitemining-app)
 - [Hotspot Finder](#hotspot-finder)
@@ -120,6 +121,22 @@ The installer bundles the **EliteVA plugin**. No separate download required.
 1. Open VoiceAttack → Profile → Import Profile  
 2. Select **EliteMining v4.76-Profile.vap** (versioned format)  
 3. Configure your mining hotkeys in the **"Custom Keybinds for Mining Control"** category
+
+### Enable VoiceAttack Plugins
+VoiceAttack must have plugin support enabled and both EliteMining and EliteAPI plugins activated:
+
+1. Open **VoiceAttack → Options → General**
+2. Enable **"Enable Plugin Support"** checkbox
+3. Click **"Plugin Manager"**
+4. Enable these plugins:
+   - ✓ **EliteMining Plugin v1.0.0**
+   - ✓ **EliteAPI (v4 EliteVA.dll)**
+5. Click **OK** and **restart VoiceAttack** for changes to take effect
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack-plugin-manager.png" width="600"><br>  
+*Enable both EliteMining and EliteAPI plugins in VoiceAttack*
+
+**Note:** Plugin changes require a VoiceAttack restart.
 
 **Note (v4.76+):** Keybind preservation is now automatic! When updating, EliteMining will prompt you to export your profile and automatically merge your keybinds into the new version.
 
