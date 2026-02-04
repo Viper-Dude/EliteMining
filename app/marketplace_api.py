@@ -101,7 +101,7 @@ class MarketplaceAPI:
         return commodity_lower.replace(" ", "")
     
     @staticmethod
-    def search_buyers(commodity: str, reference_system: str, max_distance: Optional[int] = None, max_days_ago: float = 2) -> List[Dict]:
+    def search_buyers(commodity: str, reference_system: str, max_distance: Optional[int] = None, max_days_ago: float = 2, exclude_carriers: bool = False) -> List[Dict]:
         """
         Search for stations buying a commodity near a reference system (for SELLING to them)
         
@@ -110,6 +110,7 @@ class MarketplaceAPI:
             reference_system: Reference system name
             max_distance: Maximum distance in light years (None for unlimited)
             max_days_ago: Maximum age of data in days (default 2)
+            exclude_carriers: Whether to exclude Fleet Carriers from results
             
         Returns:
             List of station data dictionaries with keys:
@@ -134,6 +135,10 @@ class MarketplaceAPI:
                 "maxDaysAgo": max_days_ago,
                 "maxDistance": 500  # API maximum is 500 LY
             }
+            
+            # Add fleet carrier filter if requested
+            if exclude_carriers:
+                params["fleetCarriers"] = False
             
             # Call API for nearby systems with fallback
             print(f"[EDDATA API] URL: {url}")
@@ -339,7 +344,7 @@ class MarketplaceAPI:
                 if data:
                     print(f"[EDDATA API GALAXY] Sample result keys: {list(data[0].keys())}")
                     print(f"[EDDATA API GALAXY] First result sample: {data[0]}")
-                return data[:100]  # Return top 100
+                return data  # Return all results for local filtering
             else:
                 print(f"[EDDATA API GALAXY] Unexpected response type: {type(data)}")
                 return []
@@ -393,7 +398,7 @@ class MarketplaceAPI:
                 if data:
                     print(f"[EDDATA API GALAXY SELLERS] Sample result keys: {list(data[0].keys())}")
                     print(f"[EDDATA API GALAXY SELLERS] First result sample: {data[0]}")
-                return data[:100]  # Return top 100
+                return data  # Return all results for local filtering
             else:
                 print(f"[EDDATA API GALAXY SELLERS] Unexpected response type: {type(data)}")
                 return []

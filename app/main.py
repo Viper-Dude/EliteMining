@@ -16933,17 +16933,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         The API only supports maxDaysAgo (integer days), so for hour-based filters
         we need to filter the results locally using the updatedAt timestamp.
+        
+        NOTE: Filter values are set to include results that DISPLAY as that time.
+        e.g., "1 hour" filter includes results showing "1h" (60-119 min old)
         """
         from datetime import datetime, timezone, timedelta
         
-        # Map age string to hours
+        # Map age string to hours (values include the displayed hour range)
         age_hours_map = {
             "Any": None,       # No filtering
-            "1 hour": 1,
-            "8 hours": 8,
-            "16 hours": 16,
-            "1 day": 24,
-            "2 days": 48
+            "1 hour": 2,       # Include results showing "1h" (60-119 min)
+            "8 hours": 9,      # Include results showing "8h" (480-539 min)
+            "16 hours": 17,    # Include results showing "16h"
+            "1 day": 25,       # Include results showing "1d" (24h)
+            "2 days": 49       # Include results showing "2d" (48h)
         }
         
         max_hours = age_hours_map.get(max_age_str)
@@ -17793,38 +17796,45 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.update()
             
             # Call appropriate API based on search mode and buy/sell mode
+            # Always request 30 days from API, filter by max_age locally for accurate hour-level filtering
+            api_days = 30
+            
             if search_mode == "galaxy_wide":
                 # Galaxy-wide search
                 if is_buy_mode:
-                    results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
+                    results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, api_days, exclude_carriers)
                 else:
-                    results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
+                    results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, api_days, exclude_carriers)
             else:
                 # Near system search (within 500 LY)
                 reference_system = self.marketplace_reference_system.get().strip()
                 if is_buy_mode:
-                    results = MarketplaceAPI.search_sellers(commodity, reference_system, None, max_days_ago, exclude_carriers)
+                    results = MarketplaceAPI.search_sellers(commodity, reference_system, None, api_days, exclude_carriers)
                 else:
-                    results = MarketplaceAPI.search_buyers(commodity, reference_system, None, max_days_ago)
+                    results = MarketplaceAPI.search_buyers(commodity, reference_system, None, api_days, exclude_carriers)
             
             # Apply filters
-            exclude_carriers = self.marketplace_exclude_carriers.get()
             station_type_filter = self._station_type_rev_map.get(self.marketplace_station_type.get(), self.marketplace_station_type.get())
             
             # Track original count before filtering for better error messages
             original_count = len(results)
+            print(f"[MARKETPLACE FILTER] Starting with {original_count} results from API")
             
             # Filter out stations with 0 demand/stock (belt and suspenders - API should handle this via minVolume but add safety check)
             if is_buy_mode:
                 # Buy mode (exports endpoint): filter out stations with 0 stock
-                results = [r for r in results if r.get('stock', 0) > 0]
+                # NOTE: exports endpoint has buyPrice as the actual selling price, sellPrice may be 0
+                results = [r for r in results if r.get('stock', 0) > 0 and (r.get('buyPrice', 0) > 0 or r.get('sellPrice', 0) > 0)]
+                print(f"[MARKETPLACE FILTER] After stock/price filter: {len(results)}")
             else:
                 # Sell mode (imports endpoint): filter out stations with 0 demand
                 results = [r for r in results if r.get('demand', 0) > 0]
+                print(f"[MARKETPLACE FILTER] After demand filter: {len(results)}")
             
             # Filter by Fleet Carriers (applies to both buy and sell modes)
             if exclude_carriers and station_type_filter != "Fleet Carrier":
                 results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
+                print(f"[MARKETPLACE FILTER] After carrier filter: {len(results)}")
             
             # Filter by Station Type (Surface/Orbital/Carrier/MegaShip/Stronghold)
             # NOTE: Stations with null stationType (Unknown) are only shown when filter is "All"
@@ -17850,16 +17860,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 # Stronghold Carriers - use substring match
                 results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
             
+            if station_type_filter != "All":
+                print(f"[MARKETPLACE FILTER] After station type filter ({station_type_filter}): {len(results)}")
+            
             # Filter by Landing Pad Size (Large only if checked)
             large_pad_only = self.marketplace_large_pad_only.get()
             
             if large_pad_only:
                 # Only show stations with Large pads (maxLandingPadSize == 3)
                 results = [r for r in results if r.get('maxLandingPadSize') == 3]
+                print(f"[MARKETPLACE FILTER] After large pad filter: {len(results)}")
             
             # Filter by Max Age (local filtering for hour-based options since API only supports days)
             # This provides accurate hour-level filtering that the API cannot do
+            count_before_age = len(results)
             results = self._filter_results_by_age(results, max_age_str)
+            print(f"[MARKETPLACE FILTER] After age filter ({max_age_str}): {len(results)} (was {count_before_age})")
             
             if results:
                 # Sort results based on "Order by" selection
@@ -17871,14 +17887,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 elif "Best price" in order_by:
                     # Sort by price - depends on buy/sell mode
                     if is_buy_mode:
-                        # Buy mode: lowest sellPrice first (cheapest to buy from)
-                        results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 999999), reverse=False)
+                        # Buy mode: lowest buyPrice first (cheapest to buy from)
+                        # NOTE: exports endpoint has actual price in buyPrice field
+                        results_sorted = sorted(results, key=lambda x: x.get('buyPrice', 999999), reverse=False)
                     else:
                         # Sell mode: highest sellPrice first (best price to sell to)
                         results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
                 elif "supply" in order_by or "demand" in order_by:
-                    # Sort by supply/demand (highest first)
-                    results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
+                    # Sort by supply/demand (highest first) - depends on buy/sell mode
+                    if is_buy_mode:
+                        # Buy mode: sort by stock (supply available)
+                        results_sorted = sorted(results, key=lambda x: x.get('stock', 0), reverse=True)
+                    else:
+                        # Sell mode: sort by demand
+                        results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
                 elif "Last update" in order_by:
                     # Sort by most recent update (newest first)
                     results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
