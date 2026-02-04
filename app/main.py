@@ -6676,7 +6676,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     preset_btn = tk.Button(btns, text=custom_name,
                                          bg="#4a4a2a", fg="#ffffff",
                                          activebackground="#5a5a3a", activeforeground="#ffffff",
-                                         relief="solid", bd=1,
+                                         relief="raised", bd=1,
                                          width=13, font=("Segoe UI", 9), cursor="hand2", pady=3,
                                          highlightbackground="#2a2a1a", highlightcolor="#2a2a1a")
                     preset_btn.pack(side="left", padx=(8, 0))
@@ -6699,7 +6699,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     
                     # Fix button state after clicks (prevent stuck sunken appearance)
                     preset_btn.bind("<ButtonRelease-1>", lambda e: e.widget.config(relief="raised"))
+                    preset_btn.bind("<ButtonRelease-2>", lambda e: e.widget.config(relief="raised"))
                     preset_btn.bind("<ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
+                    preset_btn.bind("<Control-ButtonRelease-1>", lambda e: e.widget.config(relief="raised"))
+                    preset_btn.bind("<Control-ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
                     
                     # Add tooltip
                     ToolTip(preset_btn, f"Left-click: Load | Right-click: Save | Ctrl+Click: Rename")
@@ -6787,6 +6790,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cfg['announce_preset_1'] = preset_data
                 self.prospector_panel._save_cfg(cfg)
                 self._set_status("Saved Preset 1.")
+                
+                # Visual feedback - flash button green
+                if hasattr(self, 'preset_buttons') and 1 in self.preset_buttons:
+                    btn = self.preset_buttons[1]
+                    orig_bg = btn.cget('bg')
+                    btn.config(bg="#2a5a2a")
+                    self.after(200, lambda: btn.config(bg=orig_bg))
             except Exception as e:
                 print(f"Error saving preset 1: {e}")
 
@@ -6846,6 +6856,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cfg[f'announce_preset_{num}'] = preset_data
                 self.prospector_panel._save_cfg(cfg)
                 self._set_status(f"Saved Preset {num}.")
+                
+                # Visual feedback - flash button green
+                if hasattr(self, 'preset_buttons') and num in self.preset_buttons:
+                    btn = self.preset_buttons[num]
+                    orig_bg = btn.cget('bg')
+                    btn.config(bg="#2a5a2a")
+                    self.after(200, lambda: btn.config(bg=orig_bg))
             except Exception as e:
                 print(f"Error saving preset {num}: {e}")
 
@@ -6964,9 +6981,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     cfg['preset_names'][str(num)] = new_name
                     self.prospector_panel._save_cfg(cfg)
                     
-                    # Update button text
+                    # Update button text and reset relief state
                     if hasattr(self, 'preset_buttons') and num in self.preset_buttons:
-                        self.preset_buttons[num].config(text=new_name)
+                        self.preset_buttons[num].config(text=new_name, relief="raised")
                     
                     self._set_status(t('settings.preset_renamed').format(num=num, name=new_name))
                 dialog.destroy()
