@@ -2570,10 +2570,20 @@ class RingFinder(ColumnVisibilityMixin):
                     if ring_type_english != 'All' and ring_type != ring_type_english:
                         continue
                     
-                    # In "Ring Type Only" mode, skip signal filtering
+                    # In "Ring Type Only" mode, skip signal filtering but still show available hotspots
                     if ring_type_only:
-                        # No material filtering - just add the ring
-                        materials_found = ["No hotspot data"]
+                        # Show hotspot data if available, otherwise "No hotspot data"
+                        if signals:
+                            materials_found = []
+                            for sig in signals:
+                                sig_name = sig.get('name', '')
+                                sig_count = sig.get('count', 0)
+                                if sig_name:
+                                    materials_found.append(f"{sig_name} ({sig_count})")
+                            if not materials_found:
+                                materials_found = ["-"]
+                        else:
+                            materials_found = ["-"]
                     else:
                         # Filter by material if searching for specific mineral
                         materials_found = []
@@ -4842,7 +4852,22 @@ class RingFinder(ColumnVisibilityMixin):
                 
                 if selection_count > 1:
                     # Multi-select mode - show applicable options
-                    if has_spansh_rows or enable_update_reserve:
+                    # Check if any selected rows have hotspot data for ring search mode
+                    is_ring_search_mode = self.ring_type_only_var.get()
+                    spansh_rows_with_hotspots = 0
+                    
+                    if has_spansh_rows:
+                        for sel_item in selected_items:
+                            values = self.results_tree.item(sel_item, 'values')
+                            if values and len(values) > 10:
+                                source = values[10]  # Source column
+                                hotspots_col = values[5] if len(values) > 5 else ""  # Hotspots column
+                                if source and '🌐' in str(source):
+                                    # In ring search mode, only count rows with hotspot data
+                                    if not is_ring_search_mode or (hotspots_col and hotspots_col != "-" and hotspots_col.strip() != ""):
+                                        spansh_rows_with_hotspots += 1
+                    
+                    if spansh_rows_with_hotspots > 0 or enable_update_reserve:
                         multi_menu = tk.Menu(self.parent, tearoff=0,
                                            bg=self.context_menu.cget('bg'), 
                                            fg=self.context_menu.cget('fg'),
@@ -4850,8 +4875,8 @@ class RingFinder(ColumnVisibilityMixin):
                                            activeforeground=self.context_menu.cget('activeforeground'),
                                            selectcolor=self.context_menu.cget('selectcolor'))
                         
-                        if has_spansh_rows:
-                            multi_menu.add_command(label=f"Save {selection_count} Entries to Database", 
+                        if spansh_rows_with_hotspots > 0:
+                            multi_menu.add_command(label=f"Save {spansh_rows_with_hotspots} Entries to Database", 
                                                  command=self._save_to_database)
                         
                         if enable_update_reserve:
@@ -4875,9 +4900,18 @@ class RingFinder(ColumnVisibilityMixin):
                         self.context_menu.entryconfig(6, state="disabled")
                     
                     # Show/hide "Save to Database" option (index 8, after separator) based on Source column
-                    # Disable if Ring Search (Spansh) mode is active
+                    # Allow save in Ring Search mode if row has hotspot data
                     is_ring_search_mode = self.ring_type_only_var.get()
-                    if has_spansh_rows and not is_ring_search_mode:
+                    has_hotspot_data = False
+                    if has_spansh_rows and selected_items:
+                        values = self.results_tree.item(selected_items[0], 'values')
+                        if values and len(values) > 5:
+                            hotspots_col = values[5]  # Hotspots column is index 5
+                            # Has data if not "-" or empty
+                            has_hotspot_data = hotspots_col and hotspots_col != "-" and hotspots_col.strip() != ""
+                    
+                    # Enable if Spansh rows AND (not ring search mode OR has hotspot data)
+                    if has_spansh_rows and (not is_ring_search_mode or has_hotspot_data):
                         self.context_menu.entryconfig(8, state="normal")
                     else:
                         self.context_menu.entryconfig(8, state="disabled")
@@ -5083,11 +5117,16 @@ class RingFinder(ColumnVisibilityMixin):
                     local_items.append(item)
         
         if not spansh_items:
-            message = t('ring_finder.no_spansh_results_selected')
+            # No new Spansh items to save - check if they're already saved
             if local_items:
-                message += f"\n\n{len(local_items)} local entries were skipped (already saved)."
-            centered_info_dialog(self.parent, t('ring_finder.save_failed_title'), 
-                               message)
+                # User selected rows that are already in database
+                message = t('ring_finder.already_in_database')
+                message += f"\n\n{len(local_items)} " + t('ring_finder.entries_skipped_already_saved')
+                centered_info_dialog(self.parent, t('ring_finder.already_saved_title'), message)
+            else:
+                # No Spansh results at all
+                message = t('ring_finder.no_spansh_results_selected')
+                centered_info_dialog(self.parent, t('ring_finder.save_failed_title'), message)
             return
         
         # Check if more than 50 Spansh rows selected
