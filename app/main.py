@@ -6508,11 +6508,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     def _on_change():
                         try:
                             v = float(self._ann_minpct_vars[material].get())
-                            v = max(0.0, min(100.0, v))
+                            v = round(max(0.0, min(100.0, v)), 1)
+                            self._ann_minpct_vars[material].set(v)  # Update UI with validated value
                             self.prospector_panel.min_pct_map[material] = v
                             self.prospector_panel._save_min_pct_map()
                         except ValueError:
-                            pass
+                            # Reset to current saved value on invalid input
+                            self._ann_minpct_vars[material].set(self.prospector_panel.min_pct_map.get(material, 0.0))
                     return _on_change
 
                 # Populate with materials and create spinboxes
@@ -6547,18 +6549,36 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             font=("Segoe UI", 9)
                         )
                         # Add mouse wheel support
-                        def on_ann_minpct_scroll(event, v=self._ann_minpct_vars[mat]):
+                        def on_ann_minpct_scroll(event, v=self._ann_minpct_vars[mat], m=mat):
                             try:
                                 current = float(v.get())
                                 if event.delta > 0:
                                     new_val = min(current + 0.5, 100.0)
                                 else:
                                     new_val = max(current - 0.5, 0.0)
-                                v.set(round(new_val, 1))
+                                new_val = round(new_val, 1)
+                                v.set(new_val)
+                                # Save after wheel scroll
+                                self.prospector_panel.min_pct_map[m] = new_val
+                                self.prospector_panel._save_min_pct_map()
                             except:
                                 pass
                             return "break"
                         self._ann_minpct_spin[mat].bind("<MouseWheel>", on_ann_minpct_scroll)
+                        
+                        # Add bindings to save on manual entry (Return, FocusOut)
+                        def on_ann_minpct_manual(event, m=mat, v=self._ann_minpct_vars[mat]):
+                            try:
+                                val = float(v.get())
+                                val = round(max(0.0, min(100.0, val)), 1)
+                                v.set(val)  # Update UI with validated value
+                                self.prospector_panel.min_pct_map[m] = val
+                                self.prospector_panel._save_min_pct_map()
+                            except ValueError:
+                                # Reset to current saved value on invalid input
+                                v.set(self.prospector_panel.min_pct_map.get(m, 0.0))
+                        self._ann_minpct_spin[mat].bind("<Return>", on_ann_minpct_manual)
+                        self._ann_minpct_spin[mat].bind("<FocusOut>", on_ann_minpct_manual)
                     row_idx += 1
 
                 # Click on treeview (not on spinbox) to clear spinbox focus
