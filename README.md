@@ -133,7 +133,7 @@ VoiceAttack must have plugin support enabled and both EliteMining and EliteAPI p
    - ✓ **EliteAPI (v4 EliteVA.dll)**
 5. Click **OK** and **restart VoiceAttack** for changes to take effect
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack-plugin-manager.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_plugin.png" width="600"><br>  
 *Enable both EliteMining and EliteAPI plugins in VoiceAttack*
 
 **Note:** Plugin changes require a VoiceAttack restart.
