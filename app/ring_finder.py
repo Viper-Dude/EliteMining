@@ -4966,7 +4966,8 @@ class RingFinder(ColumnVisibilityMixin):
         if not values or len(values) < 3:
             return
         
-        # Get system name from the selected row
+        # Call the implementation
+        self._find_sell_station_impl()
     
     def _find_sell_station_impl(self):
         """Implementation of find sell station - gets system name and calls Commodity Market"""
