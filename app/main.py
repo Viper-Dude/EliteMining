@@ -12089,10 +12089,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         enabled = bool(self.stay_on_top.get())
         try:
             self.wm_attributes("-topmost", enabled)
-            # Force window to update and become visible to Windows tools
+            # Bring window to front without stealing focus (doesn't work perfectly with all apps)
             if enabled:
                 self.lift()
-                self.focus_force()
+                # Don't use focus_force() - it steals focus from the game
             self._save_stay_on_top_preference()
             self._set_status(f"Stay on top {'enabled' if enabled else 'disabled'}")
         except Exception as e:
