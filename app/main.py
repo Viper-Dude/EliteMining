@@ -5166,6 +5166,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 # Clear selection from System Finder entry if it exists
                 if hasattr(self, 'sysfinder_ref_entry'):
                     self.sysfinder_ref_entry.selection_clear()
+                
+                # Sync Settings tab with ring_finder state when Settings tab is selected
+                current_tab = self.notebook.index(self.notebook.select())
+                settings_tab_index = 7  # Settings is typically index 7
+                if current_tab == settings_tab_index:
+                    # Sync auto-search checkbox with ring_finder
+                    if hasattr(self, 'ring_finder') and self.ring_finder and hasattr(self.ring_finder, 'auto_search_var'):
+                        ring_finder_state = self.ring_finder.auto_search_var.get()
+                        if self.auto_search_enabled.get() != ring_finder_state:
+                            self.auto_search_enabled.set(ring_finder_state)
             except Exception:
                 pass
         self.notebook.bind('<<NotebookTabChanged>>', _clear_entry_focus)

@@ -5024,6 +5024,31 @@ class RingFinder(ColumnVisibilityMixin):
                     localized_8h = main_app._age_map.get('8 hours', '8 hours')
                     main_app.marketplace_max_age.set(localized_8h)
                 
+                # Set sort by highest price for selling
+                if hasattr(main_app, 'marketplace_sort_column') and hasattr(main_app, 'marketplace_sort_reverse'):
+                    main_app.marketplace_sort_column = 'Price'
+                    main_app.marketplace_sort_reverse = True  # Reverse sort for highest price first
+                
+                # Set the sort dropdown to "Best price (highest)"
+                if hasattr(main_app, 'marketplace_order_by') and hasattr(main_app, '_sort_options_map'):
+                    # Get localized value for "Best price (highest)"
+                    localized_highest = main_app._sort_options_map.get("Best price (highest)", "Best price (highest)")
+                    main_app.marketplace_order_by.set(localized_highest)
+                
+                # Set station filter to "All"
+                if hasattr(main_app, 'marketplace_station_type') and hasattr(main_app, '_station_type_map'):
+                    # Get localized value for "All"
+                    localized_all = main_app._station_type_map.get('All', 'All')
+                    main_app.marketplace_station_type.set(localized_all)
+                
+                # Uncheck "Exclude Carriers"
+                if hasattr(main_app, 'marketplace_exclude_carriers'):
+                    main_app.marketplace_exclude_carriers.set(False)
+                
+                # Uncheck "Large Pads"
+                if hasattr(main_app, 'marketplace_large_pads'):
+                    main_app.marketplace_large_pads.set(False)
+                
                 # Trigger search after a short delay to let UI update
                 main_app.after(100, main_app._search_marketplace)
                 
