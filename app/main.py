@@ -6697,7 +6697,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     preset_btn.bind("<Control-Button-1>", lambda e, num=i: self._rename_preset(num))
                     preset_btn.bind("<Control-Button-3>", lambda e, num=i: self._rename_preset(num))
                     
-                    # Fix button state after right-click
+                    # Fix button state after clicks (prevent stuck sunken appearance)
+                    preset_btn.bind("<ButtonRelease-1>", lambda e: e.widget.config(relief="raised"))
                     preset_btn.bind("<ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
                     
                     # Add tooltip
