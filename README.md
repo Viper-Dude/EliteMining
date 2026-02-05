@@ -150,6 +150,26 @@ EliteMining now automatically detects when a new VoiceAttack profile is availabl
 
 **Manual method:** You can also export your profile beforehand (Profile → Export Profile, save as XML format) and use it during the merge process.
 
+### Adding Custom Commands
+
+**Recommended:** Create a separate profile for your custom commands instead of editing the EliteMining profile directly.
+
+1. In VoiceAttack, create a new profile (e.g., "My Custom Commands")
+2. Add your custom commands to this profile
+3. Open the EliteMining profile → **Profile Options** → **Include Commands from Other Profiles**
+4. Select your custom profile from the list
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_profile_options.png" width="600"><br>  
+*Include custom profiles to add your own commands without modifying EliteMining*
+
+**Benefits:**
+- Your custom commands won't be overwritten during EliteMining updates
+- Easy to enable/disable your customizations
+- Clean separation between EliteMining and personal commands
+- Keybind merger won't affect your custom profile
+
+**Note:** Commands in EliteMining profile take priority over included profiles if names conflict.
+
 [Back to Top](#top)
 
 ---
