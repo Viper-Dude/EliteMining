@@ -50,9 +50,9 @@ app/EliteVA/Variables/
 credentials.json
 discord_secrets.py
 
-# VoiceAttack profile
+# VoiceAttack profiles - ignore .vap files except in Voiceattack Profile folder
 *.vap
-!EliteMining-Profile.vap
+!Voiceattack Profile/*.vap
 
 # Installer output
 Output/
