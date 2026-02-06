@@ -5068,10 +5068,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _trigger_ring_auto_search(self):
         """Trigger ring finder auto-search at startup if enabled"""
-        if hasattr(self, 'ring_finder') and self.ring_finder:
-            if hasattr(self.ring_finder, 'auto_search_var') and self.ring_finder.auto_search_var.get():
-                print("[STARTUP] Triggering ring finder auto-search...")
-                self.ring_finder._startup_auto_search(force=True)
+        # DISABLED: Don't auto-search at startup (still auto-searches on FSD jumps/ring scans when enabled)
+        # if hasattr(self, 'ring_finder') and self.ring_finder:
+        #     if hasattr(self.ring_finder, 'auto_search_var') and self.ring_finder.auto_search_var.get():
+        #         print("[STARTUP] Triggering ring finder auto-search...")
+        #         self.ring_finder._startup_auto_search(force=True)
+        pass
         
         # Fetch reserve levels for current system (after ring finder search completes)
         if hasattr(self, 'cargo_monitor') and self.cargo_monitor and self.cargo_monitor.current_system:
@@ -12085,11 +12087,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         cfg = _load_cfg()
         enabled = cfg.get("stay_on_top", False)  # Default to disabled
         self.stay_on_top.set(1 if enabled else 0)
-        # Apply the setting immediately
+        # Don't apply immediately - will be applied after window is fully created
+        # (See _apply_stay_on_top_after_init called in main())
+    
+    def _apply_stay_on_top_after_init(self) -> None:
+        """Apply stay-on-top setting after window is fully initialized"""
         try:
+            enabled = bool(self.stay_on_top.get())
             self.wm_attributes("-topmost", enabled)
-        except Exception:
-            pass
+            if enabled:
+                print("[STAY ON TOP] Applied at startup: enabled")
+        except Exception as e:
+            print(f"[STAY ON TOP] Failed to apply at startup: {e}")
 
     def _save_stay_on_top_preference(self) -> None:
         """Save stay on top state to config"""
@@ -20284,6 +20293,8 @@ if __name__ == "__main__":
         app.after(100, app._restore_window_geometry)
         # Force dark title bar after window is fully created
         app.after(200, app._set_dark_title_bar)
+        # Apply stay-on-top setting after window is fully initialized (fixes issue where it doesn't take effect on startup)
+        app.after(250, app._apply_stay_on_top_after_init)
         app.mainloop()
     except Exception as e:
         # Show error dialog with full traceback
