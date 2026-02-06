@@ -89,12 +89,21 @@ All standalone features **plus** voice/hotkey automation:
 - **[VoiceAttack](https://voiceattack.com/)** – Paid version  
 - **Microphone** for voice commands  
 
-### Keybind Requirement for EliteVA  
-EliteVA requires the `Custom.binds` file:  
 
-1. Open **Elite Dangerous → Options → Controls**  
-2. Set preset to **Custom**  
-3. Save — this creates/updates `Custom.binds`  
+### Keybind Requirement for EliteVA
+
+EliteVA requires a custom keybinds file (such as `Custom.binds`, `Custom.*.binds`, or an HCS `Custom.*.*.binds` file):
+
+- If you already use a custom keybinds file (for example, from HCS VoicePacks or your own setup), you’re all set—no changes needed.
+- If you don’t have a custom keybinds file yet:
+  1. Open **Elite Dangerous → Options → Controls**
+  2. Set preset to **Custom**
+  3. For each controller you want to use (keyboard, mouse, joystick, HOTAS, gamepad), make sure to assign at least one key or button in each of the four controller sections (Keyboard, Mouse, Joystick, Gamepad).  
+     - This ensures Elite Dangerous saves your bindings for all devices.
+  4. Click **Save** — this will create or update your `Custom.binds` file (or a similarly named custom file).
+
+**Tip:**  
+If you use multiple controllers, always check that each one is recognized and has at least one binding set before saving. This prevents missing controls in your custom binds file.
 
 ### Custom Keybinds for Mining Control  
 VoiceAttack profile includes a dedicated **"Custom Keybinds for Mining Control"** category. Configure your mining hotkeys here instead of searching through the entire profile.
