@@ -81,6 +81,7 @@ All standalone features **plus** voice/hotkey automation:
 <summary>Click to expand</summary>
 
 **Essential:**  
+- **Windows 10/11** (64-bit)
 - **Elite Dangerous** (PC version)  
 
 **For VoiceAttack Integration:**  
@@ -729,3 +730,7 @@ For complete license terms, see the [LICENSE](LICENSE) file in the repository.
 For detailed answers to common questions, see our [FAQ page](FAQ.md).
 
 [Back to Top](#top)
+
+---
+
+**Disclaimer:** This project is not affiliated with, endorsed by, or associated with Frontier Developments plc. All trademarks and copyrights are the property of their respective owners.
