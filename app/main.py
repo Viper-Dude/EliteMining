@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.8.8"
+APP_VERSION = "v4.8.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4736,7 +4736,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         fieldbackground=dark_bg,
                         foreground=dark_fg,
                         borderwidth=0,
-                        font=("Segoe UI", 9))
+                        font=("Segoe UI", 9),
+                        rowheight=25)  # Fixed row height for consistent display across DPI settings
         style.map("Treeview",
                    background=[("selected", selection_bg)],
                    foreground=[("selected", selection_fg)])
@@ -6477,7 +6478,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                background=ann_bg,
                                fieldbackground=ann_bg,
                                foreground=ann_fg,
-                               font=("Segoe UI", 9))
+                               font=("Segoe UI", 9),
+                               rowheight=28)  # Fixed row height for consistent spinbox placement across DPI settings
                 style.configure("Announcements.Treeview.Heading",
                                foreground=ann_fg,
                                font=("Segoe UI", 9, "bold"))
