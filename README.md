@@ -649,12 +649,13 @@ Configure how many times the laser mining extra sequence runs:
 
 ---
 
+
+
 ## Known Limitations
 - **Only works with in-game keybinds (HOTAS setup manual)**
-- **There may be conflicts with HCS VoicePack commands, but these can be easily adjusted manually in the EliteMining Profile within VoiceAttack.**
 - **Works with EDCopilot**
 
-> **Note:** VoiceAttack startup warnings about EliteVA plugin bindings are normal due to recent Elite Dangerous changes and can be safely ignored - they don't impact EliteMining voice commands.
+> **Note:** VoiceAttack startup warnings about EliteVA plugin bindings are normal due to recent Elite Dangerous changes and can be safely ignored – they don't impact EliteMining voice commands.
 
 [Back to Top](#top)
 
