@@ -269,6 +269,9 @@ class RingFinder(ColumnVisibilityMixin):
         # Setup status monitoring AFTER UI is created (auto_search_var exists)
         self._setup_status_monitoring()
         
+        # Pre-warm Spansh API connection to make first search faster
+        self._warmup_spansh_connection()
+        
         # Load initial data in background
         threading.Thread(target=self._preload_data, daemon=True).start()
         
@@ -716,6 +719,15 @@ class RingFinder(ColumnVisibilityMixin):
                              padx=15, pady=4, font=("Segoe UI", 8, "normal"))
         reset_btn.pack(side="left", padx=(110, 0))
         ToolTip(reset_btn, t('ring_finder.reset_filters_tooltip'))
+        
+        # Spansh API status indicator (pack on right side with more spacing)
+        self.spansh_status_label = tk.Label(row3_container, text="⚫ Spansh: checking...", 
+                                          font=("Segoe UI", 8), fg="#888888", bg=_cb_bg)
+        self.spansh_status_label.pack(side="right", padx=(50, 0))
+        ToolTip(self.spansh_status_label, "Spansh API status - checks connectivity to spansh.co.uk")
+        
+        # Start Spansh status check after a short delay
+        self.parent.after(1000, self._check_spansh_status)
         
         # Confirmed hotspots only checkbox - DISABLED FOR TESTING
         # try:
@@ -1328,6 +1340,55 @@ class RingFinder(ColumnVisibilityMixin):
                     self.parent.after(0, lambda msg=error_msg: self.status_var.set(f"Error loading database: {msg}") if self.parent.winfo_exists() else None)
             except:
                 pass  # Window already destroyed
+    
+    def _warmup_spansh_connection(self):
+        """Pre-establish connection to Spansh API to make first search faster"""
+        def warmup():
+            try:
+                import requests
+                # Make a minimal request to establish connection
+                # Use system name search endpoint (lightweight)
+                url = 'https://spansh.co.uk/api/systems/field_values/system_names'
+                requests.get(url, params={'q': 'Sol'}, timeout=5)
+                print("[SPANSH] Connection pre-warmed successfully")
+            except Exception as e:
+                # Silently fail - this is just optimization
+                print(f"[SPANSH] Warmup failed (non-critical): {e}")
+        
+        # Run in background thread so it doesn't block UI
+        threading.Thread(target=warmup, daemon=True).start()
+    
+    def _check_spansh_status(self):
+        """Check Spansh API status in background and update indicator"""
+        def _background_check():
+            import requests
+            try:
+                # Test Spansh API with a minimal request
+                url = 'https://spansh.co.uk/api/systems/field_values/system_names'
+                response = requests.get(url, params={'q': 'Sol'}, timeout=10)
+                
+                if response.status_code == 200:
+                    self.parent.after(0, lambda: self._update_spansh_status("online"))
+                else:
+                    self.parent.after(0, lambda: self._update_spansh_status("offline"))
+                
+            except Exception as e:
+                print(f"[SPANSH STATUS] Check failed: {e}")
+                self.parent.after(0, lambda: self._update_spansh_status("offline"))
+        
+        threading.Thread(target=_background_check, daemon=True).start()
+    
+    def _update_spansh_status(self, status: str):
+        """Update Spansh status label - called on UI thread"""
+        if status == "online":
+            status_text = "🟢 Spansh: Online"
+            status_color = "#00ff00"
+        else:
+            status_text = "🔴 Spansh: Offline"
+            status_color = "#ff4444"
+        
+        if hasattr(self, 'spansh_status_label'):
+            self.spansh_status_label.config(text=status_text, fg=status_color)
     
             
     def _update_sol_distance(self, system_name: str):
@@ -2381,7 +2442,7 @@ class RingFinder(ColumnVisibilityMixin):
             params = {'q': candidate}
             headers = {'User-Agent': 'EliteMining/4.79', 'Accept': 'application/json'}
             
-            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response = requests.get(url, params=params, headers=headers, timeout=30)
             if response.status_code != 200:
                 return None
             
@@ -2578,7 +2639,8 @@ class RingFinder(ColumnVisibilityMixin):
                             for sig in signals:
                                 sig_name = sig.get('name', '')
                                 sig_count = sig.get('count', 0)
-                                if sig_name:
+                                # Filter out invalid signal names (e.g., "signals")
+                                if sig_name and self._is_valid_mining_material(sig_name):
                                     materials_found.append(f"{sig_name} ({sig_count})")
                             if not materials_found:
                                 materials_found = ["-"]
@@ -2590,6 +2652,10 @@ class RingFinder(ColumnVisibilityMixin):
                         for sig in signals:
                             sig_name = sig.get('name', '')
                             sig_count = sig.get('count', 0)
+                            
+                            # Filter out invalid signal names (e.g., "signals")
+                            if not sig_name or not self._is_valid_mining_material(sig_name):
+                                continue
                             
                             if not self._is_all_minerals(specific_material):
                                 if sig_name == specific_material:
@@ -2638,15 +2704,22 @@ class RingFinder(ColumnVisibilityMixin):
                 print(f"[SPANSH] Limiting results from {len(hotspots)} to {max_results}")
                 hotspots = hotspots[:max_results]
             
+            # Update status: Spansh search succeeded
+            self.parent.after(0, lambda: self._update_spansh_status("online"))
+            
             return hotspots
             
         except requests.exceptions.Timeout:
             print("[SPANSH] Request timed out")
             self.parent.after(0, lambda: self.status_var.set("Spansh search timed out"))
+            # Update status: Spansh is offline/timing out
+            self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except requests.exceptions.RequestException as e:
             print(f"[SPANSH] API error: {e}")
             self.parent.after(0, lambda: self.status_var.set("Spansh API error"))
+            # Update status: Spansh has errors
+            self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except Exception as e:
             print(f"[SPANSH] Unexpected error: {e}")
@@ -2806,15 +2879,23 @@ class RingFinder(ColumnVisibilityMixin):
             print(f"[SPANSH] {len(bodies)} bodies checked, {bodies_with_rings} have rings, {skipped_no_rings} without rings")
             print(f"[SPANSH] Found {len(results)} {ring_type} rings (skipped {skipped_type} wrong type, {skipped_dup} duplicates)")
             print(f"[SPANSH] Returning first {max_results} results")
+            
+            # Update status: Spansh search succeeded
+            self.parent.after(0, lambda: self._update_spansh_status("online"))
+            
             return results[:max_results]
             
         except requests.exceptions.Timeout:
             print("[SPANSH] Request timed out")
             self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_timeout')))
+            # Update status: Spansh is offline/timing out
+            self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except requests.exceptions.RequestException as e:
             print(f"[SPANSH] API error: {e}")
             self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_error')))
+            # Update status: Spansh has errors
+            self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except Exception as e:
             print(f"[SPANSH] Unexpected error: {e}")
@@ -3074,6 +3155,25 @@ class RingFinder(ColumnVisibilityMixin):
             
         except Exception:
             return []
+    
+    def _is_valid_mining_material(self, material_name: str) -> bool:
+        """Check if a material name is a valid mining hotspot material"""
+        if not material_name:
+            return False
+        
+        material_lower = material_name.lower().strip()
+        
+        # Valid mining materials (based on Elite Dangerous hotspot data)
+        valid_materials = {
+            'alexandrite', 'benitoite', 'bromellite', 'grandidierite',
+            'low temperature diamonds', 'lowtemperaturediamond', 'ltd',
+            'monazite', 'musgravite', 'opal', 'opals', 'void opals',
+            'painite', 'platinum', 'rhodplumsite', 'serendibite', 'tritium',
+            # Legacy materials
+            'palladium', 'osmium', 'gold'
+        }
+        
+        return material_lower in valid_materials
     
     def _material_matches(self, target_material: str, hotspot_material: str) -> bool:
         """Check if hotspot material matches target material, handling abbreviations and display names"""
@@ -3530,7 +3630,7 @@ class RingFinder(ColumnVisibilityMixin):
                         if api_key:
                             params["apiKey"] = api_key
                         
-                        response = requests.get(url, params=params, timeout=10)
+                        response = requests.get(url, params=params, timeout=30)
                         if response.status_code == 200:
                             systems = response.json()
                             if isinstance(systems, list):
@@ -5477,7 +5577,7 @@ class RingFinder(ColumnVisibilityMixin):
                 'https://spansh.co.uk/api/bodies/search',
                 json=payload,
                 headers={'Content-Type': 'application/json'},
-                timeout=10
+                timeout=30
             )
             
             if response.status_code == 200:
