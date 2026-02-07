@@ -262,6 +262,9 @@ class RingFinder(ColumnVisibilityMixin):
         # Cache for search results to avoid unnecessary API calls on refresh
         self._search_cache = None
         
+        # Search generation counter for cancellation (incremented each new search)
+        self._search_generation = 0
+        
         # Track previous search results for highlighting new entries
         self.previous_results = set()  # Set of (system_name, body_name) tuples
         self.highlight_timer = None  # Timer for fade-out
@@ -2132,9 +2135,6 @@ class RingFinder(ColumnVisibilityMixin):
         # Update Sol distance for reference system
         self._update_sol_distance(reference_system)
         
-        # Update Sol distance for reference system
-        self._update_sol_distance(reference_system)
-        
         # Map localized UI selections back to English identifiers for queries
         material_filter_local = self.material_var.get()
         material_filter = self._ring_type_rev_map.get(material_filter_local, material_filter_local)
@@ -2184,9 +2184,9 @@ class RingFinder(ColumnVisibilityMixin):
         # Try exact match from cached systems data (fast lookup)
         self.current_system_coords = self.systems_data.get(reference_system.lower())
         if not self.current_system_coords:
-            # Try partial match (case insensitive)
+            # Try case-insensitive exact match
             for sys_name, sys_coords in self.systems_data.items():
-                if reference_system.lower() in sys_name.lower():
+                if reference_system.lower() == sys_name.lower():
                     self.current_system_coords = sys_coords
                     break
 
@@ -2211,17 +2211,27 @@ class RingFinder(ColumnVisibilityMixin):
         # Check if Any Ring mode is enabled
         any_ring_mode = self.any_ring_var.get()
         
+        # Capture Tkinter vars in main thread (Tkinter is not thread-safe)
+        overlaps_only = self.overlaps_only_var.get()
+        res_only = self.res_only_var.get()
+        data_source = self.data_source_var.get()
+        ring_type_only = hasattr(self, 'ring_type_only_var') and self.ring_type_only_var.get()
+        
         # For Any Ring mode, use a large fixed distance (dropdown is disabled)
         # Some regions of space have limited ring data, so use large radius
         if any_ring_mode:
             max_distance = 1000.0  # Fixed 1000 LY for Any Ring mode (covers sparse regions)
 
+        # Increment search generation to cancel any in-flight searches
+        self._search_generation += 1
+        current_generation = self._search_generation
+
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
-                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, any_ring_mode),
+                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, any_ring_mode, overlaps_only, res_only, data_source, ring_type_only, current_generation),
                         daemon=True).start()
         
-    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, any_ring_mode: bool = False):
+    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, any_ring_mode: bool = False, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0):
         """Background worker for hotspot search"""
         try:
             # Wait for database to be ready (with timeout)
@@ -2232,6 +2242,11 @@ class RingFinder(ColumnVisibilityMixin):
             
             if not self.db_ready:
                 print("⚠ Database not ready, search may return incomplete results")
+            
+            # Check if this search was superseded by a newer one
+            if search_generation != self._search_generation:
+                print(f"[SEARCH] Search gen {search_generation} cancelled (current: {self._search_generation})")
+                return
             
             # Check if window still exists before accessing tkinter vars
             if not self.parent.winfo_exists():
@@ -2280,8 +2295,7 @@ class RingFinder(ColumnVisibilityMixin):
                 hotspots = self._convert_spansh_to_hotspots(spansh_rings, reference_coords)
                 print(f" DEBUG: Any Ring mode - converted to {len(hotspots)} hotspot entries")
             # Overlaps Only mode: Show only overlap entries (only works with database)
-            elif self.overlaps_only_var.get():
-                data_source = self.data_source_var.get()
+            elif overlaps_only:
                 if data_source == "spansh":
                     # Can't filter by overlaps on Spansh - no overlap data
                     self.parent.after(0, lambda: self.status_var.set(t('ring_finder.overlaps_requires_db')))
@@ -2290,8 +2304,7 @@ class RingFinder(ColumnVisibilityMixin):
                     hotspots = self._get_all_overlaps_for_search(reference_system, reference_coords, specific_material)
                     print(f" DEBUG: Overlaps Only mode - found {len(hotspots)} overlap locations")
             # RES Only mode: Show only RES site entries (only works with database)
-            elif self.res_only_var.get():
-                data_source = self.data_source_var.get()
+            elif res_only:
                 if data_source == "spansh":
                     # Can't filter by RES on Spansh - no RES data
                     self.parent.after(0, lambda: self.status_var.set(t('ring_finder.res_requires_db')))
@@ -2300,10 +2313,10 @@ class RingFinder(ColumnVisibilityMixin):
                     hotspots = self._get_all_res_for_search(reference_system, reference_coords, specific_material)
                     print(f" DEBUG: RES Only mode - found {len(hotspots)} RES locations")
             else:
-                hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results)
+                hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results, data_source=data_source, ring_type_only_active=ring_type_only)
             
             # Apply min hotspots filter if needed (skip for overlaps/RES only mode)
-            if min_hotspots > 1 and not self._is_all_minerals(specific_material) and not self.overlaps_only_var.get() and not self.res_only_var.get():
+            if min_hotspots > 1 and not self._is_all_minerals(specific_material) and not overlaps_only and not res_only:
                 original_count = len(hotspots)
                 hotspots = [h for h in hotspots if h.get('count', 1) >= min_hotspots]
                 filtered_count = len(hotspots)
@@ -2311,8 +2324,14 @@ class RingFinder(ColumnVisibilityMixin):
                     print(f" DEBUG: Min hotspots filter ({min_hotspots}+): {original_count} -> {filtered_count} results")
             
             # Apply max_results limit AFTER min_hotspots filtering (count unique rings, not rows)
+            # This is the ONLY place max_results limiting should happen
             if max_results:
                 hotspots = self._limit_results_by_unique_rings(hotspots, max_results)
+            
+            # Check if this search was superseded before updating UI
+            if search_generation != self._search_generation:
+                print(f"[SEARCH] Search gen {search_generation} cancelled before display (current: {self._search_generation})")
+                return
             
             # EDSM FALLBACK: Smart throttling to prevent hanging
             # Small searches: Query all systems
@@ -2598,9 +2617,11 @@ class RingFinder(ColumnVisibilityMixin):
                 # Don't add ring_signals filter - we want ALL rings of the type
                 pass
             else:
-                # Normal mode - only add ring_signals filter if searching for SPECIFIC material
+                # Normal mode - add ring_signals filter for specific material searches
+                # For "All Minerals", don't add ring_signals filter (Spansh requires a name field)
+                # Client-side filtering will handle removing bodies without valid signals
                 if not self._is_all_minerals(specific_material):
-                    # Specific material selected
+                    # Specific material selected - filter for that material
                     filters['ring_signals'] = [{
                         'comparison': '<=>', 
                         'count': [1, 9999],
@@ -2683,18 +2704,10 @@ class RingFinder(ColumnVisibilityMixin):
                 
                 print(f"[SPANSH PAGINATION] Page {page_num}: Distance range {results[0].get('distance', 0):.1f} - {last_body_distance:.1f} LY")
                 
-                # Stop if we've gone beyond max_distance (priority check)
+                # Stop if we've gone beyond max_distance
                 if last_body_distance >= max_distance:
                     print(f"[SPANSH PAGINATION] Reached max distance ({max_distance} LY) at page {page_num}, stopping")
                     break
-                
-                # Stop early only if we have enough bodies AND covered significant distance (75%+)
-                # This prevents premature stopping in dense regions near the reference system
-                if max_results and len(all_results) >= max_results * 3:
-                    distance_coverage = (last_body_distance / max_distance) * 100
-                    if distance_coverage >= 75:
-                        print(f"[SPANSH PAGINATION] Have {len(all_results)} bodies at {distance_coverage:.0f}% distance coverage, stopping early")
-                        break
             
             results = all_results
             
@@ -2814,10 +2827,6 @@ class RingFinder(ColumnVisibilityMixin):
                     hotspots.append(hotspot_entry)
             
             print(f"[SPANSH] Converted {len(hotspots)} rings to hotspot format")
-            
-            # Apply max_results limit if specified (count unique rings, not rows)
-            if max_results:
-                hotspots = self._limit_results_by_unique_rings(hotspots, max_results)
             
             # Update status: Spansh search succeeded
             self.parent.after(0, lambda: self._update_spansh_status("online"))
@@ -2968,18 +2977,33 @@ class RingFinder(ColumnVisibilityMixin):
                         if len(signal_parts) > 3:
                             hotspot_info += f" +{len(signal_parts)-3}"
                     
+                    # Format LS distance for display
+                    ls_display = "No data"
+                    if ls_distance and ls_distance > 0:
+                        try:
+                            ls_display = f"{int(float(ls_distance)):,}"
+                        except (ValueError, TypeError):
+                            ls_display = "No data"
+                    
+                    # Extract reserve level from body data
+                    reserve_level = body.get('reserve_level', '')
+                    
                     # Format as hotspot result
                     result = {
                         'system': system_name,
+                        'systemName': system_name,
                         'body': body_name,
+                        'bodyName': ring_name,
                         'ring': ring_name,
                         'ring_type': translate_ring_type(ring_type_actual),
+                        'distance': f"{distance:.1f}" if distance > 0 else "0.0",
+                        'ls': ls_display,
                         'ls_distance': round(ls_distance, 2) if ls_distance else None,
                         'material': hotspot_info if hotspot_info else t('ring_finder.no_hotspot_data'),
                         'count': hotspot_count if hotspot_count else 0,
                         'overlap': '',
                         'res_site': '',
-                        'reserve': '',
+                        'reserve': translate_reserve_level(reserve_level) if reserve_level else '-',
                         'source': 'spansh',
                         'data_source': 'spansh'
                     }
@@ -2987,19 +3011,18 @@ class RingFinder(ColumnVisibilityMixin):
                     
                     # Don't break early - collect all results, limit at the end
             
-            # Sort by distance
-            results.sort(key=lambda x: x.get('distance', 9999))
+            # Sort by distance (use float conversion since distance is stored as string)
+            results.sort(key=lambda x: float(x.get('distance', '9999')))
             
             bodies_with_rings = len(bodies) - skipped_no_rings
             print(f"[SPANSH] {len(bodies)} bodies checked, {bodies_with_rings} have rings, {skipped_no_rings} without rings")
             print(f"[SPANSH] Found {len(results)} {ring_type} rings (skipped {skipped_type} wrong type, {skipped_dup} duplicates)")
-            print(f"[SPANSH] Returning first {max_results} results")
+            print(f"[SPANSH] Found {len(results)} results")
             
             # Update status: Spansh search succeeded
             self.parent.after(0, lambda: self._update_spansh_status("online"))
             
-            # Limit by unique rings, not rows
-            return self._limit_results_by_unique_rings(results, max_results)
+            return results
             
         except requests.exceptions.Timeout:
             print("[SPANSH] Request timed out")
@@ -3105,11 +3128,8 @@ class RingFinder(ColumnVisibilityMixin):
         
         return results
 
-    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None) -> List[Dict]:
+    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None, data_source: str = None, ring_type_only_active: bool = False) -> List[Dict]:
         """Get hotspot data based on user's data source selection"""
-        
-        # Check if Ring Search (Spansh) mode is active
-        ring_type_only_active = hasattr(self, 'ring_type_only_var') and self.ring_type_only_var.get()
         
         # Get user's data source preference (or force database for auto-search)
         if getattr(self, '_force_database', False):
@@ -3120,7 +3140,8 @@ class RingFinder(ColumnVisibilityMixin):
             # Force Spansh-only when Ring Search mode is enabled
             data_source = "spansh"
             print(f"[SEARCH] Ring Search mode: forcing Spansh only")
-        else:
+        elif data_source is None:
+            # Fallback to reading Tkinter var (for legacy callers)
             data_source = self.data_source_var.get()
         print(f"[SEARCH] Data source selected: {data_source}")
         
@@ -3197,9 +3218,7 @@ class RingFinder(ColumnVisibilityMixin):
                 x.get('source', '').lower()        # Quaternary: source (database/spansh)
             ))
             
-            # Apply max_results limit to combined results (count unique rings, not rows)
-            if max_results:
-                combined_results = self._limit_results_by_unique_rings(combined_results, max_results)
+            # Don't apply max_results here - it's applied in _search_worker after all filtering
             
             return combined_results
     
@@ -3281,7 +3300,10 @@ class RingFinder(ColumnVisibilityMixin):
             
             return compatible_results
             
-        except Exception:
+        except Exception as e:
+            print(f"[SEARCH] Database search error: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def _is_valid_mining_material(self, material_name: str) -> bool:
