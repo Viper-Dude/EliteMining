@@ -6454,7 +6454,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 ToolTip(set_all_btn, t('tooltips.set_all_threshold'))
                 ttk.Label(thr, text="%").pack(side="left")
 
-                # Materials section label
+                # Materials section label - fixed position to always stay visible
                 ttk.Label(frame, text=t('settings.select_minerals'),
                           font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(0, 2))
 
@@ -6463,7 +6463,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 materials_frame.grid(row=3, column=0, sticky="nsew", pady=(0, 10))
                 materials_frame.columnconfigure(0, weight=1)
                 materials_frame.rowconfigure(0, weight=1)
-                frame.rowconfigure(3, weight=1)
+                
+                # Make rows 0-2 fixed height (don't shrink), only row 3 is expandable
+                frame.rowconfigure(0, weight=0, minsize=40)  # Top controls row
+                frame.rowconfigure(1, weight=0, minsize=40)  # Main controls row  
+                frame.rowconfigure(2, weight=0, minsize=30)  # Label row - always visible
+                frame.rowconfigure(3, weight=1)  # Tree row - expandable
 
                 # Configure Announcements Treeview style to match other tables
                 style = ttk.Style()
