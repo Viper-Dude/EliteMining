@@ -262,6 +262,10 @@ class RingFinder(ColumnVisibilityMixin):
         # Cache for search results to avoid unnecessary API calls on refresh
         self._search_cache = None
         
+        # Cache for Spansh results to reuse on refresh after save
+        self._cached_spansh_results = None
+        self._use_cached_spansh = False  # Flag to use cached Spansh instead of API call
+        
         # Search generation counter for cancellation (incremented each new search)
         self._search_generation = 0
         
@@ -287,6 +291,37 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Note: Auto-search is triggered from main.py at startup
         # Journal scan will refresh results when it completes
+    
+    def _sort_hotspots_display(self, hotspot_text: str) -> str:
+        """Sort hotspot display string by count (descending), then alphabetically
+        
+        Args:
+            hotspot_text: String like "Sere (1), Beni (2), Mona (3), Musg (2)"
+            
+        Returns:
+            Sorted string like "Mona (3), Beni (2), Musg (2), Sere (1)"
+        """
+        if not hotspot_text or hotspot_text == "-":
+            return hotspot_text
+        
+        try:
+            # Split by comma
+            materials = [m.strip() for m in hotspot_text.split(',')]
+            
+            # Sort by count (descending), then alphabetically
+            def sort_key(m):
+                try:
+                    # Extract count from "Material (X)" format
+                    count = int(m.split('(')[1].rstrip(')'))
+                    name = m.split(' (')[0]
+                    return (-count, name)  # Negative count for descending order
+                except:
+                    return (0, m)  # Fallback
+            
+            materials.sort(key=sort_key)
+            return ', '.join(materials)
+        except:
+            return hotspot_text  # Return original if parsing fails
         
     def _abbreviate_material_for_display(self, hotspot_text: str) -> str:
         """Abbreviate material names in hotspot display text for Ring Finder column
@@ -2754,6 +2789,9 @@ class RingFinder(ColumnVisibilityMixin):
                                         from material_utils import abbreviate_material
                                         abbrev = abbreviate_material(material)
                                         materials_found.append(f"{abbrev} ({count})")
+                                # Sort materials by count (descending), then alphabetically
+                                # This ensures consistent ordering: highest count first, then alphabetical
+                                materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
                                 found_in_local_db = True
                                 print(f"[RING SEARCH] Found {len(materials_found)} hotspots in local DB for {system_name} {db_ring_name}")
                         except Exception as e:
@@ -2767,6 +2805,8 @@ class RingFinder(ColumnVisibilityMixin):
                                 # Filter out invalid signal names (e.g., "signals")
                                 if sig_name and self._is_valid_mining_material(sig_name):
                                     materials_found.append(f"{sig_name} ({sig_count})")
+                            # Sort materials by count (descending), then alphabetically
+                            materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
                         
                         # If still nothing, show "-"
                         if not materials_found:
@@ -2787,6 +2827,10 @@ class RingFinder(ColumnVisibilityMixin):
                                     materials_found.append(f"{sig_name} ({sig_count})")
                             else:
                                 materials_found.append(f"{sig_name} ({sig_count})")
+                        
+                        # Sort materials by count (descending), then alphabetically
+                        if materials_found and materials_found != ["-"]:
+                            materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
                         
                         # Skip rings without matching materials (normal mode only)
                         if not materials_found:
@@ -3171,23 +3215,31 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Query Spansh if selected
         if data_source in ["spansh", "both"]:
-            try:
-                print(f"[SEARCH] Calling Spansh API...")
-                # Pass "Ring Type Only" mode state to Spansh search (already determined at top of function)
-                spansh_results = self._search_spansh_with_filters(
-                    reference_system, 
-                    material_filter, 
-                    specific_material, 
-                    max_distance, 
-                    spansh_limit,  # Use spansh_limit (2x for Both mode, or max_results for spansh-only)
-                    self.current_system_coords,
-                    ring_type_only=ring_type_only_active
-                )
-                print(f"[SEARCH] Spansh returned {len(spansh_results)} results")
-            except Exception as e:
-                print(f"[SEARCH] Spansh query failed: {e}")
-                import traceback
-                traceback.print_exc()
+            # Check if we should use cached Spansh results (e.g., after save to database)
+            if getattr(self, '_use_cached_spansh', False) and getattr(self, '_cached_spansh_results', None):
+                spansh_results = self._cached_spansh_results
+                print(f"[SEARCH] Using cached Spansh results: {len(spansh_results)} entries")
+                self._use_cached_spansh = False  # Reset flag after use
+            else:
+                try:
+                    print(f"[SEARCH] Calling Spansh API...")
+                    # Pass "Ring Type Only" mode state to Spansh search (already determined at top of function)
+                    spansh_results = self._search_spansh_with_filters(
+                        reference_system, 
+                        material_filter, 
+                        specific_material, 
+                        max_distance, 
+                        spansh_limit,  # Use spansh_limit (2x for Both mode, or max_results for spansh-only)
+                        self.current_system_coords,
+                        ring_type_only=ring_type_only_active
+                    )
+                    print(f"[SEARCH] Spansh returned {len(spansh_results)} results")
+                    # Cache the Spansh results for potential reuse
+                    self._cached_spansh_results = spansh_results
+                except Exception as e:
+                    print(f"[SEARCH] Spansh query failed: {e}")
+                    import traceback
+                    traceback.print_exc()
         
         # Return based on selection
         if data_source == "database":
@@ -4346,9 +4398,11 @@ class RingFinder(ColumnVisibilityMixin):
                         # Include this system in results
                         source_label = f"EDTools.cc ({coord_source})" if coord_source else "EDTools.cc Community Data"
                         
-                        # Abbreviate material names ONLY for "All Minerals" view
+                        # Sort and abbreviate material names ONLY for "All Minerals" view
                         if self._is_all_minerals(specific_material):
-                            display_material_name = self._abbreviate_material_for_display(material_name)
+                            # First sort the hotspots string, then abbreviate
+                            sorted_material_name = self._sort_hotspots_display(material_name)
+                            display_material_name = self._abbreviate_material_for_display(sorted_material_name)
                         else:
                             display_material_name = material_name
                         
@@ -4875,9 +4929,11 @@ class RingFinder(ColumnVisibilityMixin):
             # Get RES display for this ring (filtered by current material selection)
             res_display = self._get_res_display(system_name, ring_name, current_material_filter)
             
-            # Abbreviate and localize material names in hotspot display
+            # Sort, abbreviate and localize material names in hotspot display
+            hotspot_count_display = self._sort_hotspots_display(hotspot_count_display)
             hotspot_count_display = self._abbreviate_material_for_display(hotspot_count_display)
             hotspot_count_display = self._localize_hotspot_display(hotspot_count_display)
+            overlap_display = self._sort_hotspots_display(overlap_display)
             overlap_display = self._abbreviate_material_for_display(overlap_display)
             overlap_display = self._localize_hotspot_display(overlap_display)
             
@@ -5352,24 +5408,33 @@ class RingFinder(ColumnVisibilityMixin):
         if not selection:
             return
         
-        # Filter selection to only include Spansh-only results (skip Local and Both results)
+        # Classify selected items by source type
         spansh_items = []
         local_items = []
+        both_items = []  # Items that exist in both (🗄️ + 🌐)
         for item in selection:
             values = self.results_tree.item(item, 'values')
             if values and len(values) > 10:
-                source = values[10]  # Source column is index 10
-                # Check for Spansh-only source (🌐 without 🗄️)
-                if source and '🌐' in str(source) and '🗄️' not in str(source):
+                source = str(values[10])  # Source column is index 10
+                has_spansh = '🌐' in source
+                has_local = '🗄️' in source
+                
+                if has_spansh and has_local:
+                    # "Both" source - might have updated data from Spansh
+                    both_items.append(item)
+                elif has_spansh:
+                    # Spansh-only - new entry
                     spansh_items.append(item)
-                # Local or Both (has 🗄️)
-                elif source and '🗄️' in str(source):
+                elif has_local:
+                    # Local-only - already saved, but could still need updates
                     local_items.append(item)
         
-        if not spansh_items:
-            # No new Spansh items to save - check if they're already saved
+        # Combine Spansh-only and Both items for processing (both may need saving/updating)
+        items_to_process = spansh_items + both_items
+        
+        if not items_to_process:
             if local_items:
-                # User selected rows that are already in database
+                # All selected rows are local-only (no Spansh data to merge)
                 message = t('ring_finder.already_in_database')
                 message += f"\n\n{len(local_items)} " + t('ring_finder.entries_skipped_already_saved')
                 centered_info_dialog(self.parent, t('ring_finder.already_saved_title'), message)
@@ -5379,16 +5444,16 @@ class RingFinder(ColumnVisibilityMixin):
                 centered_info_dialog(self.parent, t('ring_finder.save_failed_title'), message)
             return
         
-        # Check if more than 50 Spansh rows selected
-        if len(spansh_items) > 50:
-            message = t('ring_finder.too_many_rows_selected', count=len(spansh_items))
+        # Check if more than 50 items selected for processing
+        if len(items_to_process) > 50:
+            message = t('ring_finder.too_many_rows_selected', count=len(items_to_process))
             centered_info_dialog(self.parent, t('ring_finder.save_limit_exceeded'), 
                                message)
             return
         
         # Extract all data from treeview on main thread (Tkinter widgets can't be accessed from worker thread)
         items_data = []
-        for item in spansh_items:
+        for item in items_to_process:
             values = self.results_tree.item(item, 'values')
             if values and len(values) >= 11:
                 items_data.append(values)
@@ -5518,8 +5583,9 @@ class RingFinder(ColumnVisibilityMixin):
                         
                         needs_update = False
                         if existing_data:
-                            # Check for mismatches or missing data (only update if NEW data is better/different)
-                            if existing_data.get('hotspot_count') != hotspot_count:
+                            # ONLY update hotspot_count if NEW count is HIGHER (don't downgrade)
+                            existing_count = existing_data.get('hotspot_count', 0)
+                            if hotspot_count > existing_count:
                                 needs_update = True
                             # Only update coordinates if we have new ones AND they're missing or different
                             elif coordinates and not existing_data.get('x_coord'):
@@ -5622,9 +5688,15 @@ class RingFinder(ColumnVisibilityMixin):
             
             centered_info_dialog(self.parent, t('ring_finder.save_complete'), message)
             
-            # Refresh UI using cached data to update source emojis (🌐 → 🌐🗄️)
-            if self._search_cache:
-                self._update_results(self._search_cache)
+            # Clear local database cache to ensure fresh data on next search
+            if hasattr(self, 'local_db') and hasattr(self.local_db, 'clear_cache'):
+                self.local_db.clear_cache()
+            
+            # Trigger a fresh search to show updated data
+            # Use cached Spansh results to avoid redundant API calls
+            if self.search_btn['state'] == 'normal':
+                self._use_cached_spansh = True  # Reuse cached Spansh results
+                self.search_hotspots()
         elif saved_rows == 0 and skipped_count == 0 and error_count == 0:
             # No updates needed - all entries already in database with same data
             message = t('ring_finder.already_in_database')

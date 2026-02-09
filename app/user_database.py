@@ -1970,6 +1970,9 @@ class UserDatabase:
             count = hotspot['hotspot_count']
             formatted.append(f"{material} ({count})")
         
+        # Sort by count (descending), then alphabetically for consistency
+        formatted.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
+        
         return ", ".join(formatted)
     
     def add_visited_system(self, system_name: str, visit_date: str, 
