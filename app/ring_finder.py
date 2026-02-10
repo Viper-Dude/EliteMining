@@ -2801,7 +2801,7 @@ class RingFinder(ColumnVisibilityMixin):
                         if not materials_found and signals:
                             for sig in signals:
                                 sig_name = sig.get('name', '')
-                                sig_count = sig.get('count', 0)
+                                sig_count = max(sig.get('count', 0), 1)  # At least 1 if signal exists
                                 # Filter out invalid signal names (e.g., "signals")
                                 if sig_name and self._is_valid_mining_material(sig_name):
                                     materials_found.append(f"{sig_name} ({sig_count})")
@@ -2816,7 +2816,7 @@ class RingFinder(ColumnVisibilityMixin):
                         materials_found = []
                         for sig in signals:
                             sig_name = sig.get('name', '')
-                            sig_count = sig.get('count', 0)
+                            sig_count = max(sig.get('count', 0), 1)  # At least 1 if signal exists
                             
                             # Filter out invalid signal names (e.g., "signals")
                             if not sig_name or not self._is_valid_mining_material(sig_name):
@@ -5544,7 +5544,8 @@ class RingFinder(ColumnVisibilityMixin):
                     for material_name, count_str in matches:
                         material_name = material_name.strip()
                         if material_name and material_name != ',':
-                            count = int(count_str) if count_str else 1
+                            # Ensure count is at least 1 - if hotspot exists, count should be >= 1
+                            count = max(int(count_str), 1) if count_str else 1
                             materials_to_save.append((material_name, count))
                 
                 if not materials_to_save:

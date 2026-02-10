@@ -182,6 +182,17 @@ class UserDatabase:
                 self._set_migration_version('add_reserve_level_column', 1)
             else:
                 log.info("[Migration] Reserve level column already added")
+            
+            # v4.8.10: Fix hotspot_count=0 entries created by bugs in earlier versions
+            # - Delete placeholder "Unknown" material entries with count=0
+            # - Update any remaining count=0 entries to count=1 (if hotspot exists, count >= 1)
+            if self._get_migration_version('fix_zero_hotspot_count') < 1:
+                log.info("[Migration] Fixing hotspot_count=0 entries...")
+                print("[MIGRATION] Fixing hotspot_count=0 entries...")
+                self._fix_zero_hotspot_count_entries()
+                self._set_migration_version('fix_zero_hotspot_count', 1)
+            else:
+                log.info("[Migration] Zero hotspot count fix already applied")
                 
         except Exception as e:
             print(f"[MIGRATION ERROR] {e}")
@@ -1054,6 +1065,64 @@ class UserDatabase:
             log.warning(f"[Migration v4.8.8] Could not rename density column: {e}")
             import traceback
             log.error(traceback.format_exc())
+    
+    def _fix_zero_hotspot_count_entries(self) -> None:
+        """Migration v4.8.10: Fix hotspot_count=0 entries
+        
+        These entries were created by bugs in earlier versions:
+        - set_reserve_level() created placeholder entries with count=0
+        - Spansh signals with missing count defaulted to 0
+        
+        Fix strategy:
+        1. Delete placeholder "Unknown" material entries with count=0
+        2. Update remaining count=0 entries to count=1 (a hotspot exists, so count >= 1)
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Count entries before migration
+                cursor.execute('SELECT COUNT(*) FROM hotspot_data WHERE hotspot_count = 0')
+                zero_count = cursor.fetchone()[0]
+                
+                if zero_count == 0:
+                    print("[MIGRATION v4.8.10] No hotspot_count=0 entries found - database is clean")
+                    log.info("[Migration v4.8.10] No hotspot_count=0 entries found")
+                    return
+                
+                print(f"[MIGRATION v4.8.10] Found {zero_count} entries with hotspot_count=0")
+                log.info(f"[Migration v4.8.10] Found {zero_count} entries with hotspot_count=0")
+                
+                # Step 1: Delete placeholder "Unknown" material entries with count=0
+                cursor.execute('''
+                    DELETE FROM hotspot_data 
+                    WHERE material_name = 'Unknown' AND hotspot_count = 0
+                ''')
+                deleted_unknown = cursor.rowcount
+                if deleted_unknown > 0:
+                    print(f"[MIGRATION v4.8.10] Deleted {deleted_unknown} placeholder 'Unknown' entries")
+                    log.info(f"[Migration v4.8.10] Deleted {deleted_unknown} placeholder 'Unknown' entries")
+                
+                # Step 2: Update remaining count=0 entries to count=1
+                cursor.execute('''
+                    UPDATE hotspot_data 
+                    SET hotspot_count = 1 
+                    WHERE hotspot_count = 0
+                ''')
+                updated_count = cursor.rowcount
+                if updated_count > 0:
+                    print(f"[MIGRATION v4.8.10] Updated {updated_count} entries from count=0 to count=1")
+                    log.info(f"[Migration v4.8.10] Updated {updated_count} entries from count=0 to count=1")
+                
+                conn.commit()
+                print(f"[MIGRATION v4.8.10] ✅ Fixed {deleted_unknown + updated_count} hotspot_count=0 entries")
+                log.info(f"[Migration v4.8.10] Fixed {deleted_unknown + updated_count} entries total")
+                
+        except Exception as e:
+            print(f"[MIGRATION v4.8.10] Warning: Could not fix zero hotspot count entries: {e}")
+            log.warning(f"[Migration v4.8.10] Could not fix zero hotspot count entries: {e}")
+            import traceback
+            log.error(traceback.format_exc())
         
     def _create_tables(self) -> None:
         """Create database tables if they don't exist"""
@@ -1469,17 +1538,11 @@ class UserDatabase:
                         WHERE system_name = ? AND body_name = ?
                     ''', (reserve_level, system_name, body_name))
                     log.info(f"[SET RESERVE] Updated {cursor.rowcount} rows")
-                elif reserve_level:
-                    # No entries exist, create a placeholder
-                    log.info(f"[SET RESERVE] No entries found, creating placeholder")
-                    from datetime import datetime
-                    scan_date = datetime.now().strftime('%Y-%m-%d')
-                    cursor.execute('''
-                        INSERT INTO hotspot_data 
-                        (system_name, body_name, material_name, hotspot_count, scan_date, reserve_level)
-                        VALUES (?, ?, ?, 0, ?, ?)
-                    ''', (system_name, body_name, 'Unknown', scan_date, reserve_level))
-                    log.info(f"[SET RESERVE] Inserted placeholder row")
+                else:
+                    # No entries exist - don't create placeholder entries with count=0
+                    # This avoids polluting the database with fake hotspot data
+                    log.warning(f"[SET RESERVE] No hotspot entries found for {system_name} - {body_name}, cannot set reserve level")
+                    return False
                 
                 conn.commit()
                 log.info(f"[SET RESERVE] Changes committed successfully")
