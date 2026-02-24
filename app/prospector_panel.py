@@ -7337,63 +7337,121 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         main_frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(0, weight=0)  # Date filter
-        main_frame.rowconfigure(1, weight=1)  # Treeview
-        main_frame.rowconfigure(2, weight=0)  # Horizontal scrollbar
-        main_frame.rowconfigure(3, weight=0)  # Buttons
+        main_frame.rowconfigure(1, weight=0)  # Separator
+        main_frame.rowconfigure(2, weight=1)  # Treeview
+        main_frame.rowconfigure(3, weight=0)  # Horizontal scrollbar
+        main_frame.rowconfigure(4, weight=0)  # Buttons
 
-        # Date filter frame
+        # Filter frame with 3 independent dropdowns: Time, Performance, Source
         filter_frame = ttk.Frame(main_frame)
         filter_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
         
-        ttk.Label(filter_frame, text=t('reports.filter')).pack(side="left", padx=(0, 5))
-        
-        # Build localized filter options with internal keys for filter logic
-        self._filter_options = [
-            ("all_sessions", t('reports.all_sessions')),
+        # --- TIME filter ---
+        self._time_filter_options = [
+            ("all_time", t('reports.all_time')),
             ("last_1_day", t('reports.last_1_day')),
             ("last_2_days", t('reports.last_2_days')),
             ("last_3_days", t('reports.last_3_days')),
             ("last_7_days", t('reports.last_7_days')),
             ("last_30_days", t('reports.last_30_days')),
             ("last_90_days", t('reports.last_90_days')),
+        ]
+        self._time_display_to_key = {display: key for key, display in self._time_filter_options}
+        time_display_values = [display for key, display in self._time_filter_options]
+        
+        ttk.Label(filter_frame, text=t('reports.time_label')).pack(side="left", padx=(0, 3))
+        initial_time = t('reports.all_time')
+        try:
+            from config import _load_cfg
+            saved_time_key = _load_cfg().get('reports_time_filter_key')
+            if saved_time_key:
+                for key, display in self._time_filter_options:
+                    if key == saved_time_key:
+                        initial_time = display
+                        break
+        except Exception:
+            pass
+        self._time_filter_var = tk.StringVar(value=initial_time)
+        time_combo = ttk.Combobox(filter_frame, textvariable=self._time_filter_var,
+                                  values=time_display_values, state="readonly", width=14)
+        time_combo.pack(side="left", padx=(0, 10))
+        time_combo.bind("<<ComboboxSelected>>", self._on_filter_changed)
+        
+        # --- PERFORMANCE filter ---
+        self._perf_filter_options = [
+            ("all", t('reports.all')),
             ("high_yield", t('reports.high_yield')),
             ("medium_yield", t('reports.medium_yield')),
             ("low_yield", t('reports.low_yield')),
             ("high_hit_rate", t('reports.high_hit_rate')),
             ("medium_hit_rate", t('reports.medium_hit_rate')),
             ("low_hit_rate", t('reports.low_hit_rate')),
-            ("platinum_sessions", t('reports.platinum_sessions')),
-            ("high_value_materials", t('reports.high_value_materials')),
-            ("common_materials", t('reports.common_materials')),
+            ("fifty_plus_tons", t('reports.fifty_plus_tons')),
+            ("core_mining", t('reports.core_mining')),
         ]
-        self._filter_display_to_key = {display: key for key, display in self._filter_options}
-        filter_display_values = [display for key, display in self._filter_options]
-
-        # Restore last used report filter (persisted as internal key in config)
-        initial_filter_display = t('reports.all_sessions')
+        self._perf_display_to_key = {display: key for key, display in self._perf_filter_options}
+        perf_display_values = [display for key, display in self._perf_filter_options]
+        
+        ttk.Label(filter_frame, text=t('reports.performance_label')).pack(side="left", padx=(0, 3))
+        initial_perf = t('reports.all')
         try:
             from config import _load_cfg
-            saved_key = _load_cfg().get('reports_date_filter_key')
-            if saved_key:
-                for key, display in self._filter_options:
-                    if key == saved_key:
-                        initial_filter_display = display
+            saved_perf_key = _load_cfg().get('reports_perf_filter_key')
+            if saved_perf_key:
+                for key, display in self._perf_filter_options:
+                    if key == saved_perf_key:
+                        initial_perf = display
                         break
         except Exception:
             pass
-
-        self.date_filter_var = tk.StringVar(value=initial_filter_display)
-        date_filter_combo = ttk.Combobox(filter_frame, textvariable=self.date_filter_var, 
-                                        values=filter_display_values, 
-                                        state="readonly", width=32)
-        date_filter_combo.pack(side="left", padx=(0, 5))
-        date_filter_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
+        self._perf_filter_var = tk.StringVar(value=initial_perf)
+        perf_combo = ttk.Combobox(filter_frame, textvariable=self._perf_filter_var,
+                                  values=perf_display_values, state="readonly", width=22)
+        perf_combo.pack(side="left", padx=(0, 10))
+        perf_combo.bind("<<ComboboxSelected>>", self._on_filter_changed)
+        
+        # --- SOURCE filter ---
+        self._source_filter_options = [
+            ("all", t('reports.all')),
+            ("platinum_sessions", t('reports.platinum_sessions')),
+            ("high_value_materials", t('reports.high_value_materials')),
+            ("common_materials", t('reports.common_materials')),
+            ("with_engineering_mats", t('reports.with_engineering_mats')),
+            ("by_system", t('reports.by_system')),
+            ("by_ship", t('reports.by_ship')),
+        ]
+        self._source_display_to_key = {display: key for key, display in self._source_filter_options}
+        source_display_values = [display for key, display in self._source_filter_options]
+        
+        ttk.Label(filter_frame, text=t('reports.source_label')).pack(side="left", padx=(0, 3))
+        initial_source = t('reports.all')
+        try:
+            from config import _load_cfg
+            saved_source_key = _load_cfg().get('reports_source_filter_key')
+            if saved_source_key:
+                for key, display in self._source_filter_options:
+                    if key == saved_source_key:
+                        initial_source = display
+                        break
+        except Exception:
+            pass
+        self._source_filter_var = tk.StringVar(value=initial_source)
+        source_combo = ttk.Combobox(filter_frame, textvariable=self._source_filter_var,
+                                    values=source_display_values, state="readonly", width=22)
+        source_combo.pack(side="left", padx=(0, 5))
+        source_combo.bind("<<ComboboxSelected>>", self._on_filter_changed)
+        
+        # Dynamic sub-dropdown for By System / By Ship (hidden by default)
+        self._sub_filter_var = tk.StringVar()
+        self._sub_filter_combo = ttk.Combobox(filter_frame, textvariable=self._sub_filter_var,
+                                               state="readonly", width=22)
+        self._sub_filter_combo.bind("<<ComboboxSelected>>", self._on_sub_filter_changed)
         
         # Add hint text for right-click options
         ttk.Label(filter_frame, text=t('reports.right_click_options'), foreground="gray").pack(side="right", padx=(10, 0))
-        date_filter_combo.bind("<<ComboboxSelected>>", self._on_date_filter_changed)
-        
-        self.ToolTip(date_filter_combo, t('tooltips.date_filter'))
+
+        # Spacing between filter and table
+        ttk.Frame(main_frame, height=6).grid(row=1, column=0, columnspan=2)
 
         # Configure Reports tab Treeview style (theme-aware)
         from config import load_theme
@@ -7448,7 +7506,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Create wrapper frame for bordered table
         tree_frame_reports = ttk.Frame(main_frame, relief="solid", borderwidth=1)
-        tree_frame_reports.grid(row=1, column=0, sticky="nsew")
+        tree_frame_reports.grid(row=2, column=0, sticky="nsew")
         tree_frame_reports.grid_columnconfigure(0, weight=1)
         tree_frame_reports.grid_rowconfigure(0, weight=1)
 
@@ -7633,7 +7691,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Add horizontal scrollbar
         h_scrollbar = ttk.Scrollbar(main_frame, orient="horizontal", command=self.reports_tree_tab.xview)
-        h_scrollbar.grid(row=2, column=0, sticky="ew")
+        h_scrollbar.grid(row=3, column=0, sticky="ew")
         self.reports_tree_tab.configure(xscrollcommand=h_scrollbar.set)
 
         # Word wrap toggle variable for reports tab
@@ -7641,7 +7699,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Add buttons at the bottom
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=3, column=0, columnspan=2, pady=(8, 0), sticky="ew")
+        button_frame.grid(row=4, column=0, columnspan=2, pady=(8, 0), sticky="ew")
         
         # CSV file path for button commands
         csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
@@ -8504,18 +8562,102 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except Exception as e:
             print(f"Mineral tooltip error: {e}")
 
-    def _on_date_filter_changed(self, event=None) -> None:
-        """Handle date filter dropdown change"""
-        # Persist last used filter as internal key (stable across localization)
+    def _on_filter_changed(self, event=None) -> None:
+        """Handle any of the 3 filter dropdowns changing"""
+        if event and hasattr(event, 'widget'):
+            event.widget.selection_clear()
+        
+        # Persist all 3 filter selections
         try:
             from config import update_config_value
-            filter_display = self.date_filter_var.get() if hasattr(self, 'date_filter_var') else ''
-            filter_key = getattr(self, '_filter_display_to_key', {}).get(filter_display)
-            if filter_key:
-                update_config_value('reports_date_filter_key', filter_key)
+            time_display = self._time_filter_var.get() if hasattr(self, '_time_filter_var') else ''
+            time_key = getattr(self, '_time_display_to_key', {}).get(time_display)
+            if time_key:
+                update_config_value('reports_time_filter_key', time_key)
+            
+            perf_display = self._perf_filter_var.get() if hasattr(self, '_perf_filter_var') else ''
+            perf_key = getattr(self, '_perf_display_to_key', {}).get(perf_display)
+            if perf_key:
+                update_config_value('reports_perf_filter_key', perf_key)
+            
+            source_display = self._source_filter_var.get() if hasattr(self, '_source_filter_var') else ''
+            source_key = getattr(self, '_source_display_to_key', {}).get(source_display)
+            if source_key:
+                update_config_value('reports_source_filter_key', source_key)
         except Exception:
             pass
+        
+        # Show/hide dynamic sub-filter for By System / By Ship
+        source_display = self._source_filter_var.get() if hasattr(self, '_source_filter_var') else ''
+        source_key = getattr(self, '_source_display_to_key', {}).get(source_display, '')
+        
+        if source_key == 'by_system':
+            systems = self._get_unique_systems_from_csv()
+            self._sub_filter_combo.configure(values=systems)
+            if systems:
+                self._sub_filter_var.set(systems[0])
+            self._sub_filter_combo.pack(side="left", padx=(5, 0))
+        elif source_key == 'by_ship':
+            ships = self._get_unique_ships_from_csv()
+            self._sub_filter_combo.configure(values=ships)
+            if ships:
+                self._sub_filter_var.set(ships[0])
+            self._sub_filter_combo.pack(side="left", padx=(5, 0))
+        else:
+            self._sub_filter_combo.pack_forget()
+            self._sub_filter_var.set('')
+        
         self._refresh_reports_tab()
+
+    def _on_date_filter_changed(self, event=None) -> None:
+        """Legacy compatibility — redirects to new combined filter handler"""
+        self._on_filter_changed(event)
+
+    def _on_sub_filter_changed(self, event=None) -> None:
+        """Handle sub-filter dropdown change (By System / By Ship value selection)"""
+        if event and hasattr(event, 'widget'):
+            event.widget.selection_clear()
+        self._refresh_reports_tab()
+
+    def _get_unique_systems_from_csv(self) -> list:
+        """Get sorted list of unique systems from session CSV"""
+        systems = set()
+        try:
+            import csv
+            csv_path = self._get_csv_path()
+            if os.path.exists(csv_path):
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        system = row.get('system', '').strip()
+                        if system and system != 'Unknown':
+                            systems.add(system)
+        except Exception:
+            pass
+        return sorted(systems)
+
+    def _get_unique_ships_from_csv(self) -> list:
+        """Get sorted list of unique ships from session text files"""
+        ships = set()
+        try:
+            import csv
+            csv_path = self._get_csv_path()
+            if os.path.exists(csv_path):
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        ship_name, _ = self._get_ship_name_from_session(
+                            row.get('system', ''), row.get('body', ''), row.get('timestamp_utc', ''))
+                        if ship_name and ship_name != 'Unknown Ship':
+                            # Extract just the ship type (after " - ") for cleaner filtering
+                            if ' - ' in ship_name:
+                                ship_type = ship_name.split(' - ', 1)[1].strip()
+                                ships.add(ship_type)
+                            else:
+                                ships.add(ship_name)
+        except Exception:
+            pass
+        return sorted(ships)
 
     def _edit_comment_inline(self, item, event) -> None:
         """Edit comment inline for a report item"""
@@ -8916,145 +9058,126 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Sort by timestamp (newest first) by default
             sessions_data.sort(key=lambda x: x['timestamp_raw'], reverse=True)
             
-            # Apply date filter if set
-            # Convert display value to internal key for filter logic
-            filter_display = self.date_filter_var.get() if hasattr(self, 'date_filter_var') else ""
-            filter_key = self._filter_display_to_key.get(filter_display, "all_sessions") if hasattr(self, '_filter_display_to_key') else "all_sessions"
+            # Pre-resolve ship names for By Ship filtering
+            for session in sessions_data:
+                if '_ship_display' not in session:
+                    ship_name, file_path = self._get_ship_name_from_session(
+                        session.get('system', ''), session.get('body', ''), session.get('timestamp_raw', ''))
+                    session['_ship_display'] = ship_name or ''
+                    session['_ship_file_path'] = file_path or ''
             
-            if filter_key != "all_sessions":
-                from datetime import datetime, timedelta
-                now = datetime.now()
-                
-                if filter_key == "last_1_day":
-                    cutoff = now - timedelta(days=1)
-                elif filter_key == "last_2_days":
-                    cutoff = now - timedelta(days=2)
-                elif filter_key == "last_3_days":
-                    cutoff = now - timedelta(days=3)
-                elif filter_key == "last_7_days":
-                    cutoff = now - timedelta(days=7)
-                elif filter_key == "last_30_days":
-                    cutoff = now - timedelta(days=30)
-                elif filter_key == "last_90_days":
-                    cutoff = now - timedelta(days=90)
-                else:
-                    cutoff = None
-                
-                if cutoff:
-                    filtered_sessions = []
+            # Apply 3 independent filters (Time, Performance, Source) — they stack
+            from datetime import datetime, timedelta
+            
+            # --- TIME filter ---
+            time_display = self._time_filter_var.get() if hasattr(self, '_time_filter_var') else ''
+            time_key = getattr(self, '_time_display_to_key', {}).get(time_display, 'all_time')
+            
+            if time_key != 'all_time':
+                time_cutoffs = {
+                    'last_1_day': 1, 'last_2_days': 2, 'last_3_days': 3,
+                    'last_7_days': 7, 'last_30_days': 30, 'last_90_days': 90
+                }
+                days = time_cutoffs.get(time_key)
+                if days:
+                    now = datetime.now()
+                    cutoff = now - timedelta(days=days)
+                    filtered = []
                     for session in sessions_data:
                         try:
-                            # Parse timestamp from CSV
                             if session['timestamp_raw'].endswith('Z'):
                                 session_time = datetime.fromisoformat(session['timestamp_raw'].replace('Z', '+00:00'))
                                 session_time = session_time.replace(tzinfo=dt.timezone.utc).astimezone()
                             else:
                                 session_time = datetime.fromisoformat(session['timestamp_raw'])
-                            
                             if session_time >= cutoff:
-                                filtered_sessions.append(session)
+                                filtered.append(session)
                         except:
-                            # Keep sessions with unparseable dates
-                            filtered_sessions.append(session)
-                    
-                    sessions_data = filtered_sessions
+                            filtered.append(session)
+                    sessions_data = filtered
             
-            # Apply additional filters (yield, hit rate, materials)
-            if filter_key:
-                # Yield-based filters
-                if filter_key == "high_yield":
-                    filtered_sessions = []
-                    for session in sessions_data:
-                        try:
-                            tph_val = float(session['tph']) if session['tph'] != '—' and session['tph'] != '0.0' else 0
+            # --- PERFORMANCE filter ---
+            perf_display = self._perf_filter_var.get() if hasattr(self, '_perf_filter_var') else ''
+            perf_key = getattr(self, '_perf_display_to_key', {}).get(perf_display, 'all')
+            
+            if perf_key != 'all':
+                filtered = []
+                for session in sessions_data:
+                    try:
+                        if perf_key == 'high_yield':
+                            tph_val = float(session['tph']) if session['tph'] not in ('—', '0.0') else 0
                             if tph_val > 350:
-                                filtered_sessions.append(session)
-                        except:
-                            continue
-                    sessions_data = filtered_sessions
-                    
-                elif filter_key == "medium_yield":
-                    filtered_sessions = []
-                    for session in sessions_data:
-                        try:
-                            tph_val = float(session['tph']) if session['tph'] != '—' and session['tph'] != '0.0' else 0
+                                filtered.append(session)
+                        elif perf_key == 'medium_yield':
+                            tph_val = float(session['tph']) if session['tph'] not in ('—', '0.0') else 0
                             if 250 <= tph_val <= 350:
-                                filtered_sessions.append(session)
-                        except:
-                            continue
-                    sessions_data = filtered_sessions
-                    
-                elif filter_key == "low_yield":
-                    filtered_sessions = []
-                    for session in sessions_data:
-                        try:
-                            tph_val = float(session['tph']) if session['tph'] != '—' and session['tph'] != '0.0' else 0
+                                filtered.append(session)
+                        elif perf_key == 'low_yield':
+                            tph_val = float(session['tph']) if session['tph'] not in ('—', '0.0') else 0
                             if 100 <= tph_val < 250:
-                                filtered_sessions.append(session)
-                        except:
-                            continue
-                    sessions_data = filtered_sessions
-                
-                # Hit rate filters
-                elif filter_key == "high_hit_rate":
-                    filtered_sessions = []
-                    for session in sessions_data:
-                        try:
-                            hit_rate_val = float(session['hit_rate']) if session['hit_rate'] != '—' else 0
-                            if hit_rate_val > 40:
-                                filtered_sessions.append(session)
-                        except:
-                            continue
-                    sessions_data = filtered_sessions
-                    
-                elif filter_key == "medium_hit_rate":
-                    filtered_sessions = []
-                    for session in sessions_data:
-                        try:
-                            hit_rate_val = float(session['hit_rate']) if session['hit_rate'] != '—' else 0
-                            if 20 <= hit_rate_val <= 40:
-                                filtered_sessions.append(session)
-                        except:
-                            continue
-                    sessions_data = filtered_sessions
-                    
-                elif filter_key == "low_hit_rate":
-                    filtered_sessions = []
-                    for session in sessions_data:
-                        try:
-                            hit_rate_val = float(session['hit_rate']) if session['hit_rate'] != '—' else 0
-                            if 0 < hit_rate_val < 20:  # Exclude 0 values (likely missing data)
-                                filtered_sessions.append(session)
-                        except:
-                            continue
-                    sessions_data = filtered_sessions
-                
-                # Material-based filters
-                elif filter_key == "platinum_sessions":
-                    filtered_sessions = []
-                    for session in sessions_data:
+                                filtered.append(session)
+                        elif perf_key == 'high_hit_rate':
+                            hit_val = float(session['hit_rate']) if session['hit_rate'] != '—' else 0
+                            if hit_val > 40:
+                                filtered.append(session)
+                        elif perf_key == 'medium_hit_rate':
+                            hit_val = float(session['hit_rate']) if session['hit_rate'] != '—' else 0
+                            if 20 <= hit_val <= 40:
+                                filtered.append(session)
+                        elif perf_key == 'low_hit_rate':
+                            hit_val = float(session['hit_rate']) if session['hit_rate'] != '—' else 0
+                            if 0 < hit_val < 20:
+                                filtered.append(session)
+                        elif perf_key == 'fifty_plus_tons':
+                            tons_val = float(session['tons']) if session['tons'] not in ('—', '0.0') else 0
+                            if tons_val >= 50:
+                                filtered.append(session)
+                        elif perf_key == 'core_mining':
+                            core_mats = ['alexandrite', 'benitoite', 'grandidierite', 'monazite', 'musgravite',
+                                        'rhodplumsite', 'serendibite', 'taaffeite', 'void opals']
+                            cargo_data = session.get('cargo', '').lower()
+                            if any(m in cargo_data for m in core_mats):
+                                filtered.append(session)
+                    except:
+                        continue
+                sessions_data = filtered
+            
+            # --- SOURCE filter ---
+            source_display = self._source_filter_var.get() if hasattr(self, '_source_filter_var') else ''
+            source_key = getattr(self, '_source_display_to_key', {}).get(source_display, 'all')
+            
+            if source_key != 'all':
+                filtered = []
+                for session in sessions_data:
+                    try:
                         cargo_data = session.get('cargo', '').lower()
-                        if 'platinum' in cargo_data:
-                            filtered_sessions.append(session)
-                    sessions_data = filtered_sessions
-                    
-                elif filter_key == "high_value_materials":
-                    high_value_materials = ['platinum', 'osmium', 'painite', 'rhodplumsite', 'benitoite', 'monazite', 'musgravite']
-                    filtered_sessions = []
-                    for session in sessions_data:
-                        cargo_data = session.get('cargo', '').lower()
-                        if any(material in cargo_data for material in high_value_materials):
-                            filtered_sessions.append(session)
-                    sessions_data = filtered_sessions
-                    
-                elif filter_key == "common_materials":
-                    common_materials = ['bertrandite', 'indite', 'gallite', 'lepidolite', 'lithium', 'bauxite', 'cobalt', 'samarium']
-                    filtered_sessions = []
-                    for session in sessions_data:
-                        cargo_data = session.get('cargo', '').lower()
-                        if any(material in cargo_data for material in common_materials):
-                            filtered_sessions.append(session)
-                    sessions_data = filtered_sessions
+                        
+                        if source_key == 'platinum_sessions':
+                            if 'platinum' in cargo_data:
+                                filtered.append(session)
+                        elif source_key == 'high_value_materials':
+                            hv = ['platinum', 'osmium', 'painite', 'rhodplumsite', 'benitoite', 'monazite', 'musgravite']
+                            if any(m in cargo_data for m in hv):
+                                filtered.append(session)
+                        elif source_key == 'common_materials':
+                            cm = ['bertrandite', 'indite', 'gallite', 'lepidolite', 'lithium', 'bauxite', 'cobalt', 'samarium']
+                            if any(m in cargo_data for m in cm):
+                                filtered.append(session)
+                        elif source_key == 'with_engineering_mats':
+                            eng_data = session.get('engineering_materials', '').strip()
+                            if eng_data and eng_data != '—':
+                                filtered.append(session)
+                        elif source_key == 'by_system':
+                            selected = self._sub_filter_var.get() if hasattr(self, '_sub_filter_var') else ''
+                            if selected and session.get('system', '').strip().lower() == selected.lower():
+                                filtered.append(session)
+                        elif source_key == 'by_ship':
+                            selected = self._sub_filter_var.get() if hasattr(self, '_sub_filter_var') else ''
+                            if selected and selected.lower() in session.get('_ship_display', '').lower():
+                                filtered.append(session)
+                    except:
+                        continue
+                sessions_data = filtered
             
             # Populate treeview and store session data for tooltips
             self.reports_tab_session_lookup = {}  # Store for tooltip access  
@@ -9087,12 +9210,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     except Exception as e:
                         eng_materials_display = eng_materials_raw  # Fallback to raw string
                 
-                # Get ship name and file path from miningSessionSummary.txt
-                ship_name, file_path = self._get_ship_name_from_session(
-                    session['system'],
-                    session['body'],
-                    session['timestamp_raw']
-                )
+                # Get ship name and file path (pre-resolved during filtering)
+                ship_name = session.get('_ship_display', '')
+                file_path = session.get('_ship_file_path', '')
+                if not ship_name and not file_path:
+                    ship_name, file_path = self._get_ship_name_from_session(
+                        session['system'],
+                        session['body'],
+                        session['timestamp_raw']
+                    )
                 
                 # Extract session type from TXT file (or use existing field if available)
                 session['file_path'] = file_path  # Store for later use

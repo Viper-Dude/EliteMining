@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.8.9"
+APP_VERSION = "v4.9.0"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1394,6 +1394,7 @@ class CargoMonitor:
             "empire_courier": "Imperial Courier",
             "hauler": "Hauler",
             "sidewinder": "Sidewinder",
+            "smallcombat01_nx": "Kestrel Mk II",
             "viper": "Viper Mk III",
             "viper_mkiv": "Viper Mk IV",
             
@@ -2863,8 +2864,9 @@ cargo panel forces Elite to write detailed inventory data.
                         scans_processed += 1
                         continue
                     
-                    # Stop scanning if we found cargo and location (but continue processing scans)
-                    if cargo_found and location_found and scans_processed >= max_scans:
+                    # Stop scanning once cargo and location are found
+                    # (Scan events are handled by background journal catchup thread)
+                    if cargo_found and location_found:
                         break
                 except json.JSONDecodeError:
                     continue  # Skip invalid JSON lines
@@ -9905,7 +9907,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Fer-de-Lance",
             "Hauler",
             "Imperial Clipper", "Imperial Courier", "Imperial Cutter", "Imperial Eagle",
-            "Keelback",
+            "Keelback", "Kestrel Mk II",
             "Krait Mk II", "Krait Phantom",
             "Mamba", "Mandalay",
             "Orca",
@@ -10313,6 +10315,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Imperial Cutter",
             "Imperial Eagle",
             "Keelback",
+            "Kestrel Mk II",
             "Krait Mk II",
             "Krait Phantom",
             "Mamba",
@@ -10341,7 +10344,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.geometry("550x280")
         dialog.resizable(True, True)
         dialog.minsize(450, 240)  # Minimum size
-        # dialog.transient(self)  # Disabled - causes focus issues
+        dialog.transient(self)  # Keep dialog in front of main window
         try:
             dialog.grab_set()
         except:
@@ -10479,22 +10482,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Show dialog
         dialog.deiconify()
         
-        # Force dialog to stay on top and have focus
-        dialog.attributes('-topmost', True)
+        # Force dialog to have focus (no -topmost or lift loop — they hide combobox dropdown)
         dialog.lift()
         dialog.focus_force()
         
         name_entry.focus_set()
-        
-        # Keep dialog on top while open
-        def keep_on_top():
-            try:
-                if dialog.winfo_exists():
-                    dialog.lift()
-                    dialog.after(100, keep_on_top)
-            except:
-                pass
-        dialog.after(100, keep_on_top)
         
         dialog.wait_window()
         return result if result else None
@@ -10519,16 +10511,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
         return None
 
     def _save_as_new(self) -> None:
-        # Detect current ship folder selection
+        # Detect current ship from cargo monitor (active ship in game)
         current_ship = None
-        selection = self.preset_list.selection()
-        if selection:
-            selected_item = selection[0]
-            parent = self.preset_list.parent(selected_item)
-            if parent:  # Item is inside a folder
-                folder_text = self.preset_list.item(parent, "text")
-                if folder_text.startswith("📁 "):
-                    current_ship = folder_text[2:].strip()
+        if hasattr(self, 'cargo_monitor') and self.cargo_monitor and self.cargo_monitor.ship_type:
+            current_ship = self.cargo_monitor.ship_type
+        
+        # Fallback: use selected folder in preset list
+        if not current_ship:
+            selection = self.preset_list.selection()
+            if selection:
+                selected_item = selection[0]
+                parent = self.preset_list.parent(selected_item)
+                if parent:  # Item is inside a folder
+                    folder_text = self.preset_list.item(parent, "text")
+                    if folder_text.startswith("📁 "):
+                        current_ship = folder_text[2:].strip()
         
         name = self._ask_new_preset_name(preselect_ship=current_ship)
         if not name:
