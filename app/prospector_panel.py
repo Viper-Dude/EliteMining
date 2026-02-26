@@ -7415,7 +7415,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             ("all", t('reports.all')),
             ("platinum_sessions", t('reports.platinum_sessions')),
             ("high_value_materials", t('reports.high_value_materials')),
-            ("common_materials", t('reports.common_materials')),
             ("with_engineering_mats", t('reports.with_engineering_mats')),
             ("by_system", t('reports.by_system')),
             ("by_ship", t('reports.by_ship')),
@@ -9135,7 +9134,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         elif perf_key == 'core_mining':
                             core_mats = ['alexandrite', 'benitoite', 'grandidierite', 'monazite', 'musgravite',
                                         'rhodplumsite', 'serendibite', 'taaffeite', 'void opals']
-                            cargo_data = session.get('cargo', '').lower()
+                            cargo_data = session.get('cargo_raw', session.get('cargo', '')).lower()
                             if any(m in cargo_data for m in core_mats):
                                 filtered.append(session)
                     except:
@@ -9150,7 +9149,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 filtered = []
                 for session in sessions_data:
                     try:
-                        cargo_data = session.get('cargo', '').lower()
+                        cargo_data = session.get('cargo_raw', session.get('cargo', '')).lower()
                         
                         if source_key == 'platinum_sessions':
                             if 'platinum' in cargo_data:
@@ -9158,10 +9157,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         elif source_key == 'high_value_materials':
                             hv = ['platinum', 'osmium', 'painite', 'rhodplumsite', 'benitoite', 'monazite', 'musgravite']
                             if any(m in cargo_data for m in hv):
-                                filtered.append(session)
-                        elif source_key == 'common_materials':
-                            cm = ['bertrandite', 'indite', 'gallite', 'lepidolite', 'lithium', 'bauxite', 'cobalt', 'samarium']
-                            if any(m in cargo_data for m in cm):
                                 filtered.append(session)
                         elif source_key == 'with_engineering_mats':
                             eng_data = session.get('engineering_materials', '').strip()
