@@ -11583,6 +11583,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.after(0, lambda: self._update_edsm_status("offline"))
         
         threading.Thread(target=_background_check, daemon=True).start()
+        # Re-check every 5 minutes so status stays current
+        self.after(300_000, self._check_edsm_status)
     
     def _update_edsm_status(self, status: str):
         """Update EDSM status label - called on UI thread"""
