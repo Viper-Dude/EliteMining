@@ -7337,10 +7337,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         main_frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(0, weight=0)  # Date filter
-        main_frame.rowconfigure(1, weight=0)  # Separator
-        main_frame.rowconfigure(2, weight=1)  # Treeview
-        main_frame.rowconfigure(3, weight=0)  # Horizontal scrollbar
-        main_frame.rowconfigure(4, weight=0)  # Buttons
+        main_frame.rowconfigure(1, weight=0)  # Hint text
+        main_frame.rowconfigure(2, weight=0)  # Separator
+        main_frame.rowconfigure(3, weight=1)  # Treeview
+        main_frame.rowconfigure(4, weight=0)  # Horizontal scrollbar
+        main_frame.rowconfigure(5, weight=0)  # Buttons
 
         # Filter frame with 3 independent dropdowns: Time, Performance, Source
         filter_frame = ttk.Frame(main_frame)
@@ -7413,12 +7414,24 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # --- SOURCE filter ---
         self._source_filter_options = [
             ("all", t('reports.all')),
-            ("platinum_sessions", t('reports.platinum_sessions')),
+            ("by_commodity", t('reports.by_commodity')),
             ("high_value_materials", t('reports.high_value_materials')),
             ("with_engineering_mats", t('reports.with_engineering_mats')),
             ("by_system", t('reports.by_system')),
             ("by_ship", t('reports.by_ship')),
         ]
+        # All minable commodities for the By Commodity sub-filter (English keys)
+        self._mining_commodities_english = [
+            'Alexandrite', 'Bauxite', 'Benitoite', 'Bertrandite', 'Bromellite',
+            'Coltan', 'Gallite', 'Gold', 'Grandidierite', 'Indite',
+            'Lepidolite', 'Low Temperature Diamonds', 'Monazite', 'Musgravite',
+            'Osmium', 'Painite', 'Palladium', 'Platinum', 'Rhodplumsite',
+            'Rutile', 'Serendibite', 'Silver', 'Tritium', 'Uraninite', 'Void Opals',
+        ]
+        # Localized display names for dropdown
+        self._mining_commodities_display = [get_material(m) for m in self._mining_commodities_english]
+        # Reverse map: localized display name → English key
+        self._commodity_display_to_english = {get_material(m): m for m in self._mining_commodities_english}
         self._source_display_to_key = {display: key for key, display in self._source_filter_options}
         source_display_values = [display for key, display in self._source_filter_options]
         
@@ -7436,21 +7449,25 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             pass
         self._source_filter_var = tk.StringVar(value=initial_source)
         source_combo = ttk.Combobox(filter_frame, textvariable=self._source_filter_var,
-                                    values=source_display_values, state="readonly", width=22)
+                                    values=source_display_values, state="readonly", width=28)
         source_combo.pack(side="left", padx=(0, 5))
         source_combo.bind("<<ComboboxSelected>>", self._on_filter_changed)
+        self.ToolTip(source_combo, t('reports.tooltip_source_filter'))
         
         # Dynamic sub-dropdown for By System / By Ship (hidden by default)
         self._sub_filter_var = tk.StringVar()
         self._sub_filter_combo = ttk.Combobox(filter_frame, textvariable=self._sub_filter_var,
-                                               state="readonly", width=22)
+                                               state="readonly", width=32)
         self._sub_filter_combo.bind("<<ComboboxSelected>>", self._on_sub_filter_changed)
+        self.ToolTip(self._sub_filter_combo, t('reports.tooltip_sub_filter'))
         
-        # Add hint text for right-click options
-        ttk.Label(filter_frame, text=t('reports.right_click_options'), foreground="gray").pack(side="right", padx=(10, 0))
+        # Hint text on a new line below filters
+        hint_frame = ttk.Frame(main_frame)
+        hint_frame.grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 2))
+        ttk.Label(hint_frame, text=t('reports.right_click_options'), foreground="gray").pack(side="left")
 
         # Spacing between filter and table
-        ttk.Frame(main_frame, height=6).grid(row=1, column=0, columnspan=2)
+        ttk.Frame(main_frame, height=6).grid(row=2, column=0, columnspan=2)
 
         # Configure Reports tab Treeview style (theme-aware)
         from config import load_theme
@@ -7505,7 +7522,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Create wrapper frame for bordered table
         tree_frame_reports = ttk.Frame(main_frame, relief="solid", borderwidth=1)
-        tree_frame_reports.grid(row=2, column=0, sticky="nsew")
+        tree_frame_reports.grid(row=3, column=0, sticky="nsew")
         tree_frame_reports.grid_columnconfigure(0, weight=1)
         tree_frame_reports.grid_rowconfigure(0, weight=1)
 
@@ -7690,7 +7707,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Add horizontal scrollbar
         h_scrollbar = ttk.Scrollbar(main_frame, orient="horizontal", command=self.reports_tree_tab.xview)
-        h_scrollbar.grid(row=3, column=0, sticky="ew")
+        h_scrollbar.grid(row=4, column=0, sticky="ew")
         self.reports_tree_tab.configure(xscrollcommand=h_scrollbar.set)
 
         # Word wrap toggle variable for reports tab
@@ -7698,7 +7715,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Add buttons at the bottom
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=(8, 0), sticky="ew")
+        button_frame.grid(row=5, column=0, columnspan=2, pady=(8, 0), sticky="ew")
         
         # CSV file path for button commands
         csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
@@ -8590,7 +8607,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         source_display = self._source_filter_var.get() if hasattr(self, '_source_filter_var') else ''
         source_key = getattr(self, '_source_display_to_key', {}).get(source_display, '')
         
-        if source_key == 'by_system':
+        if source_key == 'by_commodity':
+            commodities = getattr(self, '_mining_commodities_display', [])
+            self._sub_filter_combo.configure(values=commodities)
+            if commodities:
+                self._sub_filter_var.set(commodities[0])
+            self._sub_filter_combo.pack(side="left", padx=(5, 0))
+        elif source_key == 'by_system':
             systems = self._get_unique_systems_from_csv()
             self._sub_filter_combo.configure(values=systems)
             if systems:
@@ -9151,8 +9174,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     try:
                         cargo_data = session.get('cargo_raw', session.get('cargo', '')).lower()
                         
-                        if source_key == 'platinum_sessions':
-                            if 'platinum' in cargo_data:
+                        if source_key == 'by_commodity':
+                            selected_display = self._sub_filter_var.get() if hasattr(self, '_sub_filter_var') else ''
+                            # Convert localized name back to English for cargo matching
+                            selected = getattr(self, '_commodity_display_to_english', {}).get(selected_display, selected_display)
+                            if selected and selected.lower() in cargo_data:
                                 filtered.append(session)
                         elif source_key == 'high_value_materials':
                             hv = ['platinum', 'osmium', 'painite', 'rhodplumsite', 'benitoite', 'monazite', 'musgravite']
