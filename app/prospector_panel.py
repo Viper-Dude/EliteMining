@@ -7362,16 +7362,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         ttk.Label(filter_frame, text=t('reports.time_label')).pack(side="left", padx=(0, 3))
         initial_time = t('reports.all_time')
-        try:
-            from config import _load_cfg
-            saved_time_key = _load_cfg().get('reports_time_filter_key')
-            if saved_time_key:
-                for key, display in self._time_filter_options:
-                    if key == saved_time_key:
-                        initial_time = display
-                        break
-        except Exception:
-            pass
         self._time_filter_var = tk.StringVar(value=initial_time)
         time_combo = ttk.Combobox(filter_frame, textvariable=self._time_filter_var,
                                   values=time_display_values, state="readonly", width=14)
@@ -7395,16 +7385,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         ttk.Label(filter_frame, text=t('reports.performance_label')).pack(side="left", padx=(0, 3))
         initial_perf = t('reports.all')
-        try:
-            from config import _load_cfg
-            saved_perf_key = _load_cfg().get('reports_perf_filter_key')
-            if saved_perf_key:
-                for key, display in self._perf_filter_options:
-                    if key == saved_perf_key:
-                        initial_perf = display
-                        break
-        except Exception:
-            pass
         self._perf_filter_var = tk.StringVar(value=initial_perf)
         perf_combo = ttk.Combobox(filter_frame, textvariable=self._perf_filter_var,
                                   values=perf_display_values, state="readonly", width=22)
@@ -7437,16 +7417,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         ttk.Label(filter_frame, text=t('reports.source_label')).pack(side="left", padx=(0, 3))
         initial_source = t('reports.all')
-        try:
-            from config import _load_cfg
-            saved_source_key = _load_cfg().get('reports_source_filter_key')
-            if saved_source_key:
-                for key, display in self._source_filter_options:
-                    if key == saved_source_key:
-                        initial_source = display
-                        break
-        except Exception:
-            pass
         self._source_filter_var = tk.StringVar(value=initial_source)
         source_combo = ttk.Combobox(filter_frame, textvariable=self._source_filter_var,
                                     values=source_display_values, state="readonly", width=28)
