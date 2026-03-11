@@ -893,7 +893,7 @@ class RingFinder(ColumnVisibilityMixin):
                      arrowcolor=[('readonly', '#ff8c00')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Visits", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Reserve", "Source")
+        columns = ("Distance", "LS", "System", "Sol Dist", "Visits", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Reserve", "Source")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
         
         # Track column visibility and default widths
@@ -901,6 +901,7 @@ class RingFinder(ColumnVisibilityMixin):
             "Distance": 60,
             "LS": 80,
             "System": 170,
+            "Sol Dist": 70,
             "Planet/Ring": 100,
             "Ring Type": 120,
             "Hotspots": 150,
@@ -920,6 +921,7 @@ class RingFinder(ColumnVisibilityMixin):
             "Distance": t('ring_finder.col_dist'),
             "LS": t('ring_finder.col_ls'),
             "System": t('ring_finder.col_system'),
+            "Sol Dist": t('ring_finder.col_sol_dist'),
             "Visits": t('ring_finder.col_visits'),
             "Planet/Ring": t('ring_finder.col_location'),
             "Ring Type": t('ring_finder.col_type'),
@@ -959,6 +961,8 @@ class RingFinder(ColumnVisibilityMixin):
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
             elif col == "LS":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
+            elif col == "Sol Dist":
+                self.results_tree.column(col, width=column_widths[col], minwidth=50, anchor="w", stretch=False)
             elif col == "Source":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Reserve":
@@ -1071,11 +1075,11 @@ class RingFinder(ColumnVisibilityMixin):
         data = [(self.results_tree.set(child, col), child) for child in self.results_tree.get_children('')]
         
         # Sort data - handle numeric columns specially
-        if col in ["Distance", "LS"]:
+        if col in ["Distance", "LS", "Sol Dist"]:
             # Numeric sort - handle N/A values
             def sort_key(item):
                 val = item[0]
-                if val == "No data" or val == "":
+                if val == "No data" or val == "" or val == "-":
                     return float('inf') if not reverse else float('-inf')
                 # Remove commas and convert to float
                 try:
@@ -3249,6 +3253,7 @@ class RingFinder(ColumnVisibilityMixin):
         else:  # both
             # Merge results from both sources
             # Don't deduplicate - show both Database and Spansh versions for comparison
+            # Users can visually distinguish sources by row color (orange=local, cyan=Spansh)
             combined_results = user_results + spansh_results
             
             print(f"[SEARCH] Combined: {len(user_results)} from DB + {len(spansh_results)} from Spansh = {len(combined_results)} total")
@@ -3269,8 +3274,6 @@ class RingFinder(ColumnVisibilityMixin):
                 normalize_body(x.get('bodyName', ''), x.get('systemName', '')),  # Tertiary: normalized body name
                 x.get('source', '').lower()        # Quaternary: source (database/spansh)
             ))
-            
-            # Don't apply max_results here - it's applied in _search_worker after all filtering
             
             return combined_results
     
@@ -4974,10 +4977,65 @@ class RingFinder(ColumnVisibilityMixin):
                 if location_display and location_display[0] in ['-', ' ']:
                     location_display = location_display[1:].strip()
             
+            # Calculate distance to Sol from coords (Sol = 0,0,0)
+            sol_dist_display = "-"
+            coords = hotspot.get('coords')
+            if coords and isinstance(coords, dict) and 'x' in coords:
+                # Verify these are actual system coords, not reference coords
+                # For Spansh entries, coords may be reference_coords (player position)
+                # so check if system_name matches the reference system
+                ref_system = self.system_var.get().strip()
+                is_reference_coords = (system_name.lower() == ref_system.lower())
+                if is_reference_coords:
+                    # These coords ARE for this system
+                    try:
+                        sol_dist = math.sqrt(coords['x']**2 + coords['y']**2 + coords['z']**2)
+                        sol_dist_display = f"{sol_dist:.1f}"
+                    except (TypeError, ValueError):
+                        pass
+                else:
+                    # For non-reference systems, check if coords differ from current_system_coords
+                    # If they match reference coords, we need to look up the actual system coords
+                    ref_coords = self.current_system_coords
+                    coords_match_ref = (ref_coords and 
+                                       abs(coords.get('x', 0) - ref_coords.get('x', 1)) < 0.01 and
+                                       abs(coords.get('y', 0) - ref_coords.get('y', 1)) < 0.01 and
+                                       abs(coords.get('z', 0) - ref_coords.get('z', 1)) < 0.01)
+                    if not coords_match_ref:
+                        # These are the actual system coords
+                        try:
+                            sol_dist = math.sqrt(coords['x']**2 + coords['y']**2 + coords['z']**2)
+                            sol_dist_display = f"{sol_dist:.1f}"
+                        except (TypeError, ValueError):
+                            pass
+                    else:
+                        # coords are reference coords, look up actual system coords
+                        actual_coords = self.systems_data.get(system_name.lower())
+                        if not actual_coords:
+                            actual_coords = self._get_system_coords_from_galaxy_db(system_name)
+                        if actual_coords and 'x' in actual_coords:
+                            try:
+                                sol_dist = math.sqrt(actual_coords['x']**2 + actual_coords['y']**2 + actual_coords['z']**2)
+                                sol_dist_display = f"{sol_dist:.1f}"
+                            except (TypeError, ValueError):
+                                pass
+            else:
+                # No coords in hotspot, try galaxy DB lookup
+                actual_coords = self.systems_data.get(system_name.lower())
+                if not actual_coords:
+                    actual_coords = self._get_system_coords_from_galaxy_db(system_name)
+                if actual_coords and 'x' in actual_coords:
+                    try:
+                        sol_dist = math.sqrt(actual_coords['x']**2 + actual_coords['y']**2 + actual_coords['z']**2)
+                        sol_dist_display = f"{sol_dist:.1f}"
+                    except (TypeError, ValueError):
+                        pass
+
             item_id = self.results_tree.insert("", "end", values=(
                 hotspot.get('distance', 'No data'),
                 ls_val,
                 system_name,
+                sol_dist_display,
                 visited_status,
                 location_display,  # Use cleaned ring name
                 ring_type_val,
@@ -5126,9 +5184,9 @@ class RingFinder(ColumnVisibilityMixin):
                 
                 for sel_item in selected_items:
                     values = self.results_tree.item(sel_item, 'values')
-                    if values and len(values) > 10:
-                        source = values[10]  # Source column is index 10
-                        reserve = values[9] if len(values) > 9 else ""  # Reserve column is index 9
+                    if values and len(values) > 11:
+                        source = values[11]  # Source column is index 11
+                        reserve = values[10] if len(values) > 10 else ""  # Reserve column is index 10
                         system_name = values[2] if len(values) > 2 else ""  # System column
                         
                         # Check for Spansh source (🌐 emoji)
@@ -5165,9 +5223,9 @@ class RingFinder(ColumnVisibilityMixin):
                     if has_spansh_rows:
                         for sel_item in selected_items:
                             values = self.results_tree.item(sel_item, 'values')
-                            if values and len(values) > 10:
-                                source = values[10]  # Source column
-                                hotspots_col = values[6] if len(values) > 6 else ""  # Hotspots column is index 6
+                            if values and len(values) > 11:
+                                source = values[11]  # Source column
+                                hotspots_col = values[7] if len(values) > 7 else ""  # Hotspots column is index 7
                                 if source and '🌐' in str(source):
                                     # In ring search mode, only count rows with hotspot data
                                     if not is_ring_search_mode or (hotspots_col and hotspots_col != "-" and hotspots_col.strip() != ""):
@@ -5211,8 +5269,8 @@ class RingFinder(ColumnVisibilityMixin):
                     has_hotspot_data = False
                     if has_spansh_rows and selected_items:
                         values = self.results_tree.item(selected_items[0], 'values')
-                        if values and len(values) > 6:
-                            hotspots_col = values[6]  # Hotspots column is index 6
+                        if values and len(values) > 7:
+                            hotspots_col = values[7]  # Hotspots column is index 7
                             # Has data if not "-" or empty
                             has_hotspot_data = hotspots_col and hotspots_col != "-" and hotspots_col.strip() != ""
                     
@@ -5415,7 +5473,7 @@ class RingFinder(ColumnVisibilityMixin):
         for item in selection:
             values = self.results_tree.item(item, 'values')
             if values and len(values) > 10:
-                source = str(values[10])  # Source column is index 10
+                source = str(values[11])  # Source column is index 11
                 has_spansh = '🌐' in source
                 has_local = '🗄️' in source
                 
@@ -5477,7 +5535,7 @@ class RingFinder(ColumnVisibilityMixin):
         for values in items_data:
             row_saved = False  # Track if this row was successfully saved
             try:
-                if not values or len(values) < 11:
+                if not values or len(values) < 12:
                     skipped_count += 1
                     errors.append("Missing data columns")
                     continue
@@ -5486,14 +5544,14 @@ class RingFinder(ColumnVisibilityMixin):
                 distance = values[0]  # Distance
                 ls_distance = values[1]  # LS
                 system_name = values[2]  # System
-                visits = values[3]  # Visits
-                body_name = values[4]  # Location (body/ring name)
-                ring_type = values[5]  # Ring Type
-                hotspots_display = values[6]  # Hotspots (e.g., "Plat (2), Rhod (1)")
-                overlap_display = values[7]  # Overlap
-                res_display = values[8]  # RES
-                reserve_level = values[9]  # Reserve
-                source = values[10]  # Source
+                visits = values[4]  # Visits
+                body_name = values[5]  # Location (body/ring name)
+                ring_type = values[6]  # Ring Type
+                hotspots_display = values[7]  # Hotspots (e.g., "Plat (2), Rhod (1)")
+                overlap_display = values[8]  # Overlap
+                res_display = values[9]  # RES
+                reserve_level = values[10]  # Reserve
+                source = values[11]  # Source
                 
                 # Validate critical fields
                 if not system_name or system_name == "No data":
@@ -5720,9 +5778,9 @@ class RingFinder(ColumnVisibilityMixin):
         systems_to_update = set()
         for item in selection:
             values = self.results_tree.item(item, 'values')
-            if values and len(values) > 10:
-                source = values[10]  # Source column
-                reserve = values[9] if len(values) > 9 else ""  # Reserve column is index 9
+            if values and len(values) > 11:
+                source = values[11]  # Source column
+                reserve = values[10] if len(values) > 10 else ""  # Reserve column is index 10
                 system_name = values[2] if len(values) > 2 else ""  # System column
                 
                 # Only process Local source with missing reserve (🗄️ = local database)
@@ -5865,7 +5923,7 @@ class RingFinder(ColumnVisibilityMixin):
             values = self.results_tree.item(item, 'values')
             if values and len(values) > 4:
                 system_name = values[2]  # System is column index 2
-                ring_name = values[4]    # Ring is column index 4
+                ring_name = values[5]    # Ring is column index 5
                 combined = f"{system_name} - {ring_name}"
                 self.parent.clipboard_clear()
                 self.parent.clipboard_append(combined)
@@ -5906,11 +5964,11 @@ class RingFinder(ColumnVisibilityMixin):
 
             # Extract data from columns: Distance, LS, System, Visited, Ring, Ring Type, Hotspots, Overlap, RES Site, Density
             system_name = values[2]  # System column
-            ring_name = values[4]    # Ring column
-            ring_type = values[5] if len(values) > 5 else ""  # Ring Type column
-            hotspots = values[6] if len(values) > 6 else ""   # Hotspots column
-            overlap_display = values[7] if len(values) > 7 else ""  # Overlap column
-            res_display = values[8] if len(values) > 8 else ""  # RES Site column
+            ring_name = values[5]    # Ring column
+            ring_type = values[6] if len(values) > 6 else ""  # Ring Type column
+            hotspots = values[7] if len(values) > 7 else ""   # Hotspots column
+            overlap_display = values[8] if len(values) > 8 else ""  # Overlap column
+            res_display = values[9] if len(values) > 9 else ""  # RES Site column
 
             if not system_name or system_name in ["Unknown", ""]:
                 self.status_var.set("Cannot bookmark location with unknown system")
@@ -6317,7 +6375,7 @@ class RingFinder(ColumnVisibilityMixin):
                 return
             
             system_name = values[2]  # System column
-            ring_name = values[4]    # Ring column
+            ring_name = values[5]    # Ring column
             
             if not system_name or not ring_name:
                 self.status_var.set(t('ring_finder.missing_info'))
@@ -6434,8 +6492,8 @@ class RingFinder(ColumnVisibilityMixin):
         try:
             hotspots_display = self._get_ring_hotspots_display(system_name, ring_name)
             values = list(self.results_tree.item(item, 'values'))
-            if len(values) > 6:
-                values[6] = hotspots_display  # Hotspots column
+            if len(values) > 7:
+                values[7] = hotspots_display  # Hotspots column
                 self.results_tree.item(item, values=values)
         except Exception as e:
             print(f"Error refreshing row hotspots: {e}")
@@ -6580,10 +6638,10 @@ class RingFinder(ColumnVisibilityMixin):
             # Get formatted visit status
             visit_status = self.user_db.format_visited_status(system_name)
             
-            # Update the row - Visit Status is column index 1
+            # Update the row - Visit Status is column index 4
             values = list(self.results_tree.item(item, 'values'))
-            if len(values) > 1:
-                values[1] = visit_status
+            if len(values) > 4:
+                values[4] = visit_status
                 self.results_tree.item(item, values=values)
             
             # Also refresh the main app status bar if this is the current system
@@ -6619,10 +6677,10 @@ class RingFinder(ColumnVisibilityMixin):
                 self.status_var.set("Invalid selection")
                 return
             
-            # Extract data from columns: Distance, LS, System, Visited, Ring, Ring Type, Hotspots, Overlap, Density
+            # Extract data from columns: Distance, LS, System, Sol Dist, Visited, Ring, Ring Type, Hotspots, Overlap, Density
             system_name = values[2]  # System column
-            ring_name = values[4]    # Ring column
-            hotspots_str = values[6] # Hotspots column - contains materials like "Plat(3), Pain(2)"
+            ring_name = values[5]    # Ring column
+            hotspots_str = values[7] # Hotspots column - contains materials like "Plat(3), Pain(2)"
             
             if not system_name or not ring_name:
                 self.status_var.set("Cannot tag: missing system or ring info")
@@ -6795,10 +6853,10 @@ class RingFinder(ColumnVisibilityMixin):
         """Refresh the overlap column for a specific row"""
         try:
             overlap_display = self._get_overlap_display(system_name, ring_name)
-            # Get current values and update overlap column (index 7)
+            # Get current values and update overlap column (index 8)
             values = list(self.results_tree.item(item_id, 'values'))
-            if len(values) >= 8:
-                values[7] = overlap_display
+            if len(values) >= 9:
+                values[8] = overlap_display
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
             print(f"Error refreshing row overlap: {e}")
@@ -6817,10 +6875,10 @@ class RingFinder(ColumnVisibilityMixin):
                 self.status_var.set("Invalid selection")
                 return
             
-            # Extract data from columns: Distance, LS, System, Visited, Ring, Ring Type, Hotspots, Overlap, RES, Density
+            # Extract data from columns: Distance, LS, System, Sol Dist, Visited, Ring, Ring Type, Hotspots, Overlap, RES, Density
             system_name = values[2]  # System column
-            ring_name = values[4]    # Ring column
-            hotspots_str = values[6] # Hotspots column - contains materials like "Plat(3), Pain(2)"
+            ring_name = values[5]    # Ring column
+            hotspots_str = values[7] # Hotspots column - contains materials like "Plat(3), Pain(2)"
             
             if not system_name or not ring_name:
                 self.status_var.set("Cannot add RES: missing system or ring info")
@@ -7013,7 +7071,7 @@ class RingFinder(ColumnVisibilityMixin):
                 return
             
             system_name = values[2]  # System column
-            ring_name = values[4]    # Ring column
+            ring_name = values[5]    # Ring column
             
             if not system_name or not ring_name:
                 self.status_var.set("Cannot set reserve: missing system or ring info")
@@ -7137,10 +7195,10 @@ class RingFinder(ColumnVisibilityMixin):
         """Refresh the RES column for a specific row"""
         try:
             res_display = self._get_res_display(system_name, ring_name)
-            # Get current values and update RES column (index 8)
+            # Get current values and update RES column (index 9)
             values = list(self.results_tree.item(item_id, 'values'))
-            if len(values) >= 9:
-                values[8] = res_display
+            if len(values) >= 10:
+                values[9] = res_display
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
             print(f"Error refreshing row RES: {e}")
@@ -7154,10 +7212,10 @@ class RingFinder(ColumnVisibilityMixin):
             # Format for display
             reserve_display = reserve_level if reserve_level else "No data"
             
-            # Get current values and update Reserve column (index 9)
+            # Get current values and update Reserve column (index 10)
             values = list(self.results_tree.item(item_id, 'values'))
-            if len(values) >= 10:
-                values[9] = reserve_display
+            if len(values) >= 11:
+                values[10] = reserve_display
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
             print(f"Error refreshing reserve display: {e}")
