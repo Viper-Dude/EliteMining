@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.9.2"
+APP_VERSION = "v4.9.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -611,33 +611,29 @@ class RefineryDialog:
         else:
             dialog_width = 750  # Default width for many materials
         
+        # Calculate dynamic height based on material count
+        base_height = 750
+        if material_count > 2:
+            extra_rows = (material_count - 2 + 1) // 2  # Round up
+            dialog_height = min(950, base_height + (extra_rows * 60))
+        else:
+            dialog_height = base_height
+        
         if parent:
             parent.update_idletasks()
-            # Get parent window position and size
-            parent_x = parent.winfo_rootx()
-            parent_y = parent.winfo_rooty()
+            # Use winfo_x/winfo_y for correct multi-monitor positioning
+            parent_x = parent.winfo_x()
+            parent_y = parent.winfo_y()
             parent_width = parent.winfo_width()
             parent_height = parent.winfo_height()
             
-            # Calculate dynamic height based on material count
-            base_height = 750
-            if material_count > 2:
-                # Add 60px for each row of materials (2 materials per row)
-                extra_rows = (material_count - 2 + 1) // 2  # Round up
-                dialog_height = min(950, base_height + (extra_rows * 60))
-            else:
-                dialog_height = base_height
-            
             x = parent_x + (parent_width - dialog_width) // 2
             y = parent_y + (parent_height - dialog_height) // 2
+            
+            # Ensure dialog stays on screen (clamp to visible area)
+            x = max(0, x)
+            y = max(0, y)
         else:
-            # Fallback to screen center
-            base_height = 750
-            if material_count > 2:
-                extra_rows = (material_count - 2 + 1) // 2
-                dialog_height = min(950, base_height + (extra_rows * 60))
-            else:
-                dialog_height = base_height
             x = (self.dialog.winfo_screenwidth() // 2) - (dialog_width // 2)
             y = (self.dialog.winfo_screenheight() // 2) - (dialog_height // 2)
         
@@ -646,25 +642,13 @@ class RefineryDialog:
         self._create_ui()
         # Now show dialog centered and make it modal
         self.dialog.deiconify()
-        # Don't use transient - it can cause dialog to hide behind parent
-        # self.dialog.transient(parent)
-        self.dialog.attributes('-topmost', True)
+        self.dialog.transient(parent)
         self.dialog.lift()
         self.dialog.focus_force()
         try:
             self.dialog.grab_set()
         except:
             pass
-        
-        # Keep dialog on top during wait
-        def keep_on_top():
-            try:
-                if self.dialog.winfo_exists():
-                    self.dialog.lift()
-                    self.dialog.after(100, keep_on_top)
-            except:
-                pass
-        self.dialog.after(100, keep_on_top)
         
     def _create_ui(self):
         """Create the refinery dialog UI"""
@@ -961,7 +945,7 @@ class RefineryDialog:
         edit_dialog.geometry("400x200")
         edit_dialog.configure(bg="#1e1e1e")
         edit_dialog.resizable(False, False)
-        # edit_dialog.transient(self.dialog)  # Disabled - causes focus issues
+        edit_dialog.transient(self.dialog)
         
         # Set app icon using the same method as main app
         try:
@@ -973,7 +957,7 @@ class RefineryDialog:
         except:
             pass  # Silently handle icon loading errors
         
-        # Position near parent dialog (not on distant monitor)
+        # Position near parent dialog
         self.dialog.update_idletasks()
         edit_dialog.update_idletasks()
         
@@ -988,10 +972,13 @@ class RefineryDialog:
         x = parent_x + (parent_width - dialog_width) // 2
         y = parent_y + (parent_height - dialog_height) // 2
         
+        # Ensure on screen
+        x = max(0, x)
+        y = max(0, y)
+        
         edit_dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         
         # Force dialog to stay on top and have focus
-        edit_dialog.attributes('-topmost', True)
         edit_dialog.lift()
         edit_dialog.focus_force()
         
@@ -1076,16 +1063,6 @@ class RefineryDialog:
         # Bind Enter key to OK and Escape to Cancel
         edit_dialog.bind('<Return>', lambda e: ok_clicked())
         edit_dialog.bind('<Escape>', lambda e: cancel_clicked())
-        
-        # Keep dialog on top while open
-        def keep_on_top():
-            try:
-                if edit_dialog.winfo_exists():
-                    edit_dialog.lift()
-                    edit_dialog.after(100, keep_on_top)
-            except:
-                pass
-        edit_dialog.after(100, keep_on_top)
         
         # Wait for dialog to close and return result
         edit_dialog.wait_window()
