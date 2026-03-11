@@ -893,7 +893,7 @@ class RingFinder(ColumnVisibilityMixin):
                      arrowcolor=[('readonly', '#ff8c00')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Sol Dist", "Visits", "Planet/Ring", "Ring Type", "Hotspots", "Overlap", "RES Site", "Reserve", "Source")
+        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Hotspots", "Overlap", "RES Site", "Reserve", "Source")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
         
         # Track column visibility and default widths
@@ -5035,9 +5035,9 @@ class RingFinder(ColumnVisibilityMixin):
                 hotspot.get('distance', 'No data'),
                 ls_val,
                 system_name,
+                location_display,  # Use cleaned ring name
                 sol_dist_display,
                 visited_status,
-                location_display,  # Use cleaned ring name
                 ring_type_val,
                 hotspot_count_display,
                 overlap_display,
@@ -5544,8 +5544,8 @@ class RingFinder(ColumnVisibilityMixin):
                 distance = values[0]  # Distance
                 ls_distance = values[1]  # LS
                 system_name = values[2]  # System
-                visits = values[4]  # Visits
-                body_name = values[5]  # Location (body/ring name)
+                body_name = values[3]  # Location (body/ring name)
+                visits = values[5]  # Visits
                 ring_type = values[6]  # Ring Type
                 hotspots_display = values[7]  # Hotspots (e.g., "Plat (2), Rhod (1)")
                 overlap_display = values[8]  # Overlap
@@ -5923,7 +5923,7 @@ class RingFinder(ColumnVisibilityMixin):
             values = self.results_tree.item(item, 'values')
             if values and len(values) > 4:
                 system_name = values[2]  # System is column index 2
-                ring_name = values[5]    # Ring is column index 5
+                ring_name = values[3]    # Ring is column index 3
                 combined = f"{system_name} - {ring_name}"
                 self.parent.clipboard_clear()
                 self.parent.clipboard_append(combined)
@@ -5964,7 +5964,7 @@ class RingFinder(ColumnVisibilityMixin):
 
             # Extract data from columns: Distance, LS, System, Visited, Ring, Ring Type, Hotspots, Overlap, RES Site, Density
             system_name = values[2]  # System column
-            ring_name = values[5]    # Ring column
+            ring_name = values[3]    # Ring column
             ring_type = values[6] if len(values) > 6 else ""  # Ring Type column
             hotspots = values[7] if len(values) > 7 else ""   # Hotspots column
             overlap_display = values[8] if len(values) > 8 else ""  # Overlap column
@@ -6375,7 +6375,7 @@ class RingFinder(ColumnVisibilityMixin):
                 return
             
             system_name = values[2]  # System column
-            ring_name = values[5]    # Ring column
+            ring_name = values[3]    # Ring column
             
             if not system_name or not ring_name:
                 self.status_var.set(t('ring_finder.missing_info'))
@@ -6638,10 +6638,10 @@ class RingFinder(ColumnVisibilityMixin):
             # Get formatted visit status
             visit_status = self.user_db.format_visited_status(system_name)
             
-            # Update the row - Visit Status is column index 4
+            # Update the row - Visit Status is column index 5
             values = list(self.results_tree.item(item, 'values'))
-            if len(values) > 4:
-                values[4] = visit_status
+            if len(values) > 5:
+                values[5] = visit_status
                 self.results_tree.item(item, values=values)
             
             # Also refresh the main app status bar if this is the current system
@@ -6679,7 +6679,7 @@ class RingFinder(ColumnVisibilityMixin):
             
             # Extract data from columns: Distance, LS, System, Sol Dist, Visited, Ring, Ring Type, Hotspots, Overlap, Density
             system_name = values[2]  # System column
-            ring_name = values[5]    # Ring column
+            ring_name = values[3]    # Ring column
             hotspots_str = values[7] # Hotspots column - contains materials like "Plat(3), Pain(2)"
             
             if not system_name or not ring_name:
@@ -6877,7 +6877,7 @@ class RingFinder(ColumnVisibilityMixin):
             
             # Extract data from columns: Distance, LS, System, Sol Dist, Visited, Ring, Ring Type, Hotspots, Overlap, RES, Density
             system_name = values[2]  # System column
-            ring_name = values[5]    # Ring column
+            ring_name = values[3]    # Ring column
             hotspots_str = values[7] # Hotspots column - contains materials like "Plat(3), Pain(2)"
             
             if not system_name or not ring_name:
@@ -7071,7 +7071,7 @@ class RingFinder(ColumnVisibilityMixin):
                 return
             
             system_name = values[2]  # System column
-            ring_name = values[5]    # Ring column
+            ring_name = values[3]    # Ring column
             
             if not system_name or not ring_name:
                 self.status_var.set("Cannot set reserve: missing system or ring info")

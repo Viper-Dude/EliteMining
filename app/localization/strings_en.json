@@ -701,7 +701,7 @@
     "delete": "Delete",
     "set_overlap": "Set Overlap...",
     "set_res": "Set RES Site...",
-    "set_reserve": "Set Reserve Level...",
+    "set_reserve": "Edit Reserve Level...",
     "edit_hotspots": "Edit Hotspots...",
     "edit_visits": "Edit Visits...",
     "edit_visits_title": "Edit Visit Count",
