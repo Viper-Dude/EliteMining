@@ -934,6 +934,7 @@
     "voiceattack_profile": "VoiceAttack Profile",
     "user_database": "User Database (Hotspots)",
     "journal_files": "Journal Files",
+    "configuration": "Configuration (config.json)",
     "create_backup": "Backup",
     "no_selection": "No Selection",
     "no_selection_msg": "Please select at least one item to backup.",

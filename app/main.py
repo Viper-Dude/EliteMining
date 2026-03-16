@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.9.3"
+APP_VERSION = "v4.9.4"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -14308,7 +14308,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.resizable(True, True)
             dialog.minsize(450, 600)
             dialog.configure(bg="#1e1e1e")
-            # dialog.transient(self)  # Disabled - causes focus issues
             
             # Set app icon if available
             try:
@@ -14321,13 +14320,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception:
                 pass
             
-            # Center on parent
+            # Center on parent, then make transient so it stays on top of main window
             dialog.update_idletasks()
             x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
             y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
             dialog.geometry(f"+{x}+{y}")
-            dialog.deiconify()  # Show dialog after centering
-            dialog.grab_set()  # Grab focus after showing
+            dialog.transient(self)
+            dialog.deiconify()
+            dialog.grab_set()
             
             # Title
             title_label = tk.Label(dialog, text="📦 " + t('dialogs.backup_title'), 
@@ -14352,6 +14352,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             backup_va_profile = tk.IntVar(value=0)
             backup_userdb = tk.IntVar(value=0)
             backup_journals = tk.IntVar(value=0)
+            backup_config = tk.IntVar(value=0)
             backup_all = tk.IntVar(value=0)
             
             def on_all_change():
@@ -14363,6 +14364,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 backup_va_profile.set(new_value)
                 backup_userdb.set(new_value)
                 backup_journals.set(new_value)
+                backup_config.set(new_value)
             
             # All checkbox
             all_cb = tk.Checkbutton(options_frame, text="📂 " + t('dialogs.backup_everything'),
@@ -14434,6 +14436,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                         font=("Segoe UI", 10))
             journals_cb.pack(anchor="w", pady=2)
             
+            config_cb = tk.Checkbutton(options_frame, text="🔧 " + t('dialogs.configuration'),
+                                      variable=backup_config,
+                                      bg="#1e1e1e", fg="#ffffff",
+                                      selectcolor="#2a2a2a",
+                                      activebackground="#2a2a2a",
+                                      activeforeground="#ffffff",
+                                      font=("Segoe UI", 10))
+            config_cb.pack(anchor="w", pady=2)
+            
             # Buttons frame
             btn_frame = tk.Frame(dialog, bg="#1e1e1e")
             btn_frame.pack(pady=20)
@@ -14446,13 +14457,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 include_va_profile = backup_va_profile.get() or backup_all.get()
                 include_userdb = backup_userdb.get() or backup_all.get()
                 include_journals = backup_journals.get() or backup_all.get()
+                include_config = backup_config.get() or backup_all.get()
                 
-                if not (include_presets or include_reports or include_bookmarks or include_va_profile or include_userdb or include_journals):
+                if not (include_presets or include_reports or include_bookmarks or include_va_profile or include_userdb or include_journals or include_config):
                     messagebox.showwarning(t('dialogs.no_selection'), t('dialogs.no_selection_msg'))
                     return
                 
                 dialog.destroy()
-                self._create_backup(include_presets, include_reports, include_bookmarks, include_va_profile, include_userdb, include_journals)
+                self._create_backup(include_presets, include_reports, include_bookmarks, include_va_profile, include_userdb, include_journals, include_config)
             
             def on_cancel():
                 dialog.destroy()
@@ -14470,22 +14482,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Bind escape key
             dialog.bind('<Escape>', lambda e: on_cancel())
             
-            # Keep dialog on top while open
-            def keep_on_top():
-                try:
-                    if dialog.winfo_exists():
-                        dialog.lift()
-                        dialog.after(100, keep_on_top)
-                except:
-                    pass
-            dialog.after(100, keep_on_top)
-            
             dialog.wait_window()
             
         except Exception as e:
             messagebox.showerror("Backup Dialog Error", f"Failed to show backup dialog: {str(e)}")
 
-    def _create_backup(self, include_presets: bool, include_reports: bool, include_bookmarks: bool, include_va_profile: bool, include_userdb: bool = False, include_journals: bool = False) -> None:
+    def _create_backup(self, include_presets: bool, include_reports: bool, include_bookmarks: bool, include_va_profile: bool, include_userdb: bool = False, include_journals: bool = False, include_config: bool = False) -> None:
         """Create backup zip file with selected data"""
         try:
             # Ask for backup location
@@ -14505,8 +14507,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 parts.append("UserDB")
             if include_journals:
                 parts.append("Journals")
+            if include_config:
+                parts.append("Config")
             
-            if len(parts) == 6:
+            if len(parts) == 7:
                 content_desc = "Full"
             else:
                 content_desc = "_".join(parts)
@@ -14675,6 +14679,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                              "Journal folder is not configured in Interface Options.\n\n"
                                              "Please set your journal folder first, then try again.")
                 
+                # Add configuration file
+                if include_config:
+                    from app.config import CONFIG_FILE
+                    if os.path.exists(CONFIG_FILE):
+                        zipf.write(CONFIG_FILE, "config.json")
+                
                 # Add manifest file with backup info
                 manifest = {
                     "backup_date": dt.datetime.now().isoformat(),
@@ -14685,7 +14695,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         "mining_bookmarks": include_bookmarks,
                         "va_profile": include_va_profile,
                         "user_database": include_userdb,
-                        "journal_files": include_journals
+                        "journal_files": include_journals,
+                        "configuration": include_config
                     }
                 }
                 zipf.writestr("backup_manifest.json", json.dumps(manifest, indent=2))
@@ -14728,12 +14739,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     has_va_profile = any(f.endswith("-Profile.vap") or f == "EliteMining-Profile.vap" for f in file_list)
                     has_userdb = "data/user_data.db" in file_list
                     has_journals = any(f.startswith("Journals/") and f.endswith(".log") for f in file_list)
+                    has_config = "config.json" in file_list
                     
-                    if not (has_presets or has_reports or has_bookmarks or has_va_profile or has_userdb or has_journals):
+                    if not (has_presets or has_reports or has_bookmarks or has_va_profile or has_userdb or has_journals or has_config):
                         messagebox.showerror(t('dialogs.invalid_backup'), t('dialogs.invalid_backup_msg'))
                         return
                     
-                    self._show_restore_options_dialog(backup_path, has_presets, has_reports, has_bookmarks, has_va_profile, has_userdb, has_journals, manifest)
+                    self._show_restore_options_dialog(backup_path, has_presets, has_reports, has_bookmarks, has_va_profile, has_userdb, has_journals, manifest, has_config)
                     
             except zipfile.BadZipFile:
                 messagebox.showerror(t('dialogs.invalid_file'), t('dialogs.invalid_zip_msg'))
@@ -14744,17 +14756,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             messagebox.showerror("Restore Dialog Error", f"Failed to show restore dialog: {str(e)}")
 
     def _show_restore_options_dialog(self, backup_path: str, has_presets: bool, has_reports: bool, 
-                                   has_bookmarks: bool, has_va_profile: bool, has_userdb: bool = False, has_journals: bool = False, manifest: Optional[Dict] = None) -> None:
+                                   has_bookmarks: bool, has_va_profile: bool, has_userdb: bool = False, has_journals: bool = False, manifest: Optional[Dict] = None, has_config: bool = False) -> None:
         """Show dialog to select what to restore from backup"""
         try:
             dialog = tk.Toplevel(self)
             dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
             dialog.title(t('dialogs.restore_title'))
-            dialog.geometry("450x680")
+            dialog.geometry("450x750")
             dialog.resizable(True, True)
-            dialog.minsize(450, 680)
+            dialog.minsize(450, 750)
             dialog.configure(bg="#1e1e1e")
-            # dialog.transient(self)  # Disabled - causes focus issues
             
             # Set app icon if available
             try:
@@ -14767,22 +14778,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception:
                 pass
             
-            # Center on parent
+            # Center on parent, then make transient so it stays on top of main window
             dialog.update_idletasks()
             x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
             y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
             dialog.geometry(f"+{x}+{y}")
-            dialog.deiconify()  # Show dialog after centering
-            
-            # Force dialog to stay on top and have focus
-            dialog.attributes('-topmost', True)
-            dialog.lift()
-            dialog.focus_force()
-            
-            try:
-                dialog.grab_set()  # Grab focus after showing
-            except:
-                pass
+            dialog.transient(self)
+            dialog.deiconify()
+            dialog.grab_set()
             
             # Title
             title_label = tk.Label(dialog, text=t('dialogs.restore_title'), 
@@ -14820,6 +14823,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             restore_va_profile = tk.IntVar(value=0)
             restore_userdb = tk.IntVar(value=0)
             restore_journals = tk.IntVar(value=0)
+            restore_config = tk.IntVar(value=0)
             restore_all = tk.IntVar(value=0)
             
             def on_restore_all_change():
@@ -14837,6 +14841,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     restore_userdb.set(new_value)
                 if has_journals:
                     restore_journals.set(new_value)
+                if has_config:
+                    restore_config.set(new_value)
             
             # Restore Everything checkbox
             all_cb = tk.Checkbutton(options_frame, text=t('dialogs.restore_everything'),
@@ -14914,6 +14920,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                            font=("Segoe UI", 10))
                 journals_cb.pack(anchor="w", pady=2)
             
+            if has_config:
+                config_cb = tk.Checkbutton(options_frame, text=t('dialogs.configuration'),
+                                          variable=restore_config,
+                                          bg="#1e1e1e", fg="#ffffff",
+                                          selectcolor="#2a2a2a",
+                                          activebackground="#2a2a2a",
+                                          activeforeground="#ffffff",
+                                          font=("Segoe UI", 10))
+                config_cb.pack(anchor="w", pady=2)
+            
             # Warning label
             warning_label = tk.Label(dialog, 
                                    text=t('dialogs.restore_warning'),
@@ -14947,6 +14963,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     restore_any = True
                 if has_journals and restore_journals.get():
                     restore_any = True
+                if has_config and restore_config.get():
+                    restore_any = True
                 
                 if not restore_any:
                     messagebox.showwarning(t('dialogs.no_selection'), t('dialogs.no_selection_msg'))
@@ -14966,7 +14984,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                         restore_bookmarks.get() if has_bookmarks else False,
                                         restore_va_profile.get() if has_va_profile else False,
                                         restore_userdb.get() if has_userdb else False,
-                                        restore_journals.get() if has_journals else False)
+                                        restore_journals.get() if has_journals else False,
+                                        restore_config.get() if has_config else False)
             
             def on_cancel():
                 dialog.destroy()
@@ -14984,23 +15003,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Bind escape key
             dialog.bind('<Escape>', lambda e: on_cancel())
             
-            # Keep dialog on top while open
-            def keep_on_top():
-                try:
-                    if dialog.winfo_exists():
-                        dialog.lift()
-                        dialog.after(100, keep_on_top)
-                except:
-                    pass
-            dialog.after(100, keep_on_top)
-            
             dialog.wait_window()
             
         except Exception as e:
             messagebox.showerror("Restore Options Error", f"Failed to show restore options: {str(e)}")
 
     def _restore_from_backup(self, backup_path: str, restore_presets: bool, 
-                           restore_reports: bool, restore_bookmarks: bool, restore_va_profile: bool, restore_userdb: bool = False, restore_journals: bool = False) -> None:
+                           restore_reports: bool, restore_bookmarks: bool, restore_va_profile: bool, restore_userdb: bool = False, restore_journals: bool = False, restore_config: bool = False) -> None:
         """Restore selected items from backup zip file"""
         try:
             app_data_dir = self._get_app_data_dir()
@@ -15045,6 +15054,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     with open(target_path, 'wb') as f:
                         f.write(zipf.read("mining_bookmarks.json"))
                     restored_items.append("Mining Bookmarks")
+                    # Refresh bookmarks display
+                    if hasattr(self, 'prospector_panel') and self.prospector_panel:
+                        self.prospector_panel._load_bookmarks()
+                        self.prospector_panel._refresh_bookmarks()
                 
                 # Restore VoiceAttack profile
                 if restore_va_profile and "EliteMining-Profile.vap" in zipf.namelist():
@@ -15103,6 +15116,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 journal_count += 1
                             
                             restored_items.append(f"Journal Files ({journal_count} files)")
+                
+                # Restore configuration
+                if restore_config and "config.json" in zipf.namelist():
+                    from app.config import CONFIG_FILE
+                    config_dir = os.path.dirname(CONFIG_FILE)
+                    os.makedirs(config_dir, exist_ok=True)
+                    with open(CONFIG_FILE, 'wb') as f:
+                        f.write(zipf.read("config.json"))
+                    restored_items.append("Configuration")
             
             if restored_items:
                 items_text = ", ".join(restored_items)

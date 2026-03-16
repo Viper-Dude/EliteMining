@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.9.2
+AppVersion=v4.9.4
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -73,7 +73,7 @@ Source: "Variables\*"; DestDir: "{app}\Variables"; Flags: recursesubdirs createa
 ; v4.7.6+: Update profile only if newer - app detects version changes and prompts user
 ; Profile filename includes version for clarity (EliteMining v4.76-Profile.vap)
 ; v4.7.8+: Use profile from Voiceattack Profile folder instead of root
-Source: "Voiceattack Profile\EliteMining v*-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninstall; Check: IsVADetected
+Source: "Voiceattack Profile\EliteMining v*-Profile.vap"; DestDir: "{app}"; Flags: uninsneveruninstall; Tasks: installvaprofile
 ; v4.1.5+: Never overwrite config.json - preserves user settings
 ; NOTE: Use template file to avoid including developer's personal paths
 Source: "app\config.json.template"; DestDir: "{app}"; DestName: "config.json"; Flags: onlyifdoesntexist
@@ -87,6 +87,9 @@ Source: "NOTICE"; DestDir: "{app}"
 [Tasks]
 ; Offer optional desktop icon
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"
+; VoiceAttack integration options (only shown if VA detected)
+Name: "installeliteva"; Description: "Install EliteVA v5.0.7 (VoiceAttack plugin)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
+Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected; Flags: unchecked
 
 [Icons]
 ; Start Menu shortcut
@@ -122,8 +125,8 @@ UninstalledAll=EliteMining has been successfully uninstalled.%n%nNOTE: Some file
 [Code]
 var
   VADetected: Boolean;
-  InstallEliteAPI: Boolean;
   InstallPlugin: Boolean;
+  ProfileNeedsUpdate: Boolean;
   VABasePath: String;  { Store VoiceAttack base path for EliteAPI checking }
   ExistingEliteAPIPath: String;  { Store actual path where EliteAPI.dll was found }
   VersionFile: String;  { Path to EliteAPI_Version.txt }
@@ -147,7 +150,7 @@ end;
 
 function ShouldInstallEliteAPI: Boolean;
 begin
-  Result := InstallEliteAPI;
+  Result := IsVADetected and WizardIsTaskSelected('installeliteva');
 end;
 
 function ShouldInstallPlugin: Boolean;
@@ -155,16 +158,6 @@ begin
   Result := InstallPlugin and IsVADetected;
 end;
 
-function IsVoiceAttackRunning: Boolean;
-var
-  ResultCode: Integer;
-  FindHandle: HWND;
-begin
-  { Check if VoiceAttack window is open using FindWindowByClassName }
-  { VoiceAttack's main window class is typically "WindowsForms10.Window" but we can also check by title }
-  FindHandle := FindWindowByWindowName('VoiceAttack');
-  Result := (FindHandle <> 0);
-end;
 
 function GetEliteAPIDestDir(Param: String): String;
 begin
@@ -376,14 +369,14 @@ end;
 
 procedure InitializeWizard;
 var
-  MsgResult: Integer;
-  FolderName: String;
+  InstalledProfileVersion: String;
+  FindRec: TFindRec;
+  ProfileFilename: String;
+  BundledProfileVersion: String;
 begin
-  { Installer automatically appends \EliteMining to base directory }
-  
-  { Default: Install EliteAPI if VoiceAttack is detected }
-  InstallEliteAPI := VADetected;
   ExistingEliteAPIPath := '';
+  ProfileNeedsUpdate := False;
+  BundledProfileVersion := '4.8.9';
   
   { Default: Install plugin if VoiceAttack detected }
   InstallPlugin := VADetected;
@@ -435,34 +428,13 @@ begin
   
   Log('InstallPlugin: ' + BoolToStr(InstallPlugin));
   
-  { If plugin needs updating and VoiceAttack is running, warn user }
-  if InstallPlugin and VADetected and IsVoiceAttackRunning then
-  begin
-    MsgResult := MsgBox(
-      '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
-      'EliteMining plugin DLL needs to be updated.' + #13#10 +
-      'VoiceAttack must be CLOSED before updating the plugin.' + #13#10 +
-      'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
-      'Please close VoiceAttack now and click OK to continue.' + #13#10 +
-      'Click Cancel to exit the installer.',
-      mbError, MB_OKCANCEL);
-    
-    if MsgResult = IDCANCEL then
-    begin
-      WizardForm.Close;
-      Exit;
-    end;
-  end;
-  
-  { If VoiceAttack detected, search for existing EliteAPI installation }
+  { Search for existing EliteAPI installation for path detection }
   if VADetected and (VABasePath <> '') then
   begin
     Log('Searching for EliteAPI in: ' + VABasePath);
-    { Search for EliteAPI.dll or EliteVA.dll in VoiceAttack directory }
     ExistingEliteAPIPath := FindEliteAPIInDirectory(VABasePath);
     Log('ExistingEliteAPIPath: ' + ExistingEliteAPIPath);
     
-    { Check version of existing installation }
     if ExistingEliteAPIPath <> '' then
     begin
       VersionFile := ExistingEliteAPIPath + '\EliteAPI_Version.txt';
@@ -472,138 +444,76 @@ begin
         begin
           ExistingVersion := Trim(ExistingVersion);
           Log('Existing EliteAPI version: ' + ExistingVersion);
-          
-          { If already v5.0.7, skip - no need to update }
-          if ExistingVersion = '5.0.7' then
-          begin
-            Log('EliteAPI v5.0.7 already installed - skipping EliteAPI update');
-            InstallEliteAPI := False;
-            { Skip to end - no dialog needed }
-          end
-          else
-          begin
-            { Older version - ask about update, but first check if VoiceAttack is running }
-            if IsVoiceAttackRunning then
-            begin
-              MsgResult := MsgBox(
-                '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
-                'VoiceAttack must be CLOSED before installing EliteMining.' + #13#10 +
-                'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
-                'Please close VoiceAttack now and click OK to continue.' + #13#10 +
-                'Click Cancel to exit the installer.',
-                mbError, MB_OKCANCEL);
-              
-              if MsgResult = IDCANCEL then
-              begin
-                WizardForm.Close;
-                Exit;
-              end;
-            end;
-            
-            FolderName := ExtractFileName(ExistingEliteAPIPath);
-            
-            MsgResult := MsgBox(
-              'EliteAPI v' + ExistingVersion + ' found in: ' + FolderName + #13#10 +
-              'Path: ' + ExistingEliteAPIPath + #13#10 + #13#10 +
-              'Update to v5.0.7 (RECOMMENDED)?'  + #13#10 + #13#10 +
-              'YES:' + #13#10 +
-              '  ✔ Latest features & bug fixes' + #13#10 +
-              '  ✔ Full VoiceAttack support' + #13#10 +
-              '  • Existing files replaced' + #13#10 + #13#10 +
-              'NO:' + #13#10 +
-              '  ⚠️ Voice commands may fail' + #13#10 +
-              '  • Only if you have custom mods' + #13#10 + #13#10 +
-              'ⓘ EliteAPI by Somfic | Only one EliteAPI/EliteVA installation allowed',
-              mbConfirmation, MB_YESNO);
-              
-            if MsgResult = IDYES then
-              InstallEliteAPI := True
-            else
-              InstallEliteAPI := False;
-          end;
-        end;  { End of if LoadStringFromFile }
+        end;
       end
       else
-      begin
-        { No version file - old installation, ask about update, but first check if VoiceAttack is running }
-        if IsVoiceAttackRunning then
+        Log('No version file found - old EliteAPI installation');
+    end
+    else
+      Log('No existing EliteAPI installation found');
+  end;
+  
+  { Check if bundled VA profile is newer than installed profile }
+  if VADetected and (VABasePath <> '') then
+  begin
+    InstalledProfileVersion := '';
+    
+    { Look for existing profile in install directory }
+    if FindFirst(VABasePath + '\Apps\EliteMining\EliteMining v*-Profile.vap', FindRec) then
+    begin
+      try
+        ProfileFilename := FindRec.Name;
+        { Skip Dev profiles }
+        if Pos('Dev', ProfileFilename) = 0 then
         begin
-          MsgResult := MsgBox(
-            '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
-            'VoiceAttack must be CLOSED before installing EliteMining.' + #13#10 +
-            'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
-            'Please close VoiceAttack now and click OK to continue.' + #13#10 +
-            'Click Cancel to exit the installer.',
-            mbError, MB_OKCANCEL);
-          
-          if MsgResult = IDCANCEL then
+          { Extract version between 'v' and '-Profile.vap' }
+          if Pos('v', ProfileFilename) > 0 then
           begin
-            WizardForm.Close;
-            Exit;
+            InstalledProfileVersion := Copy(ProfileFilename, Pos('v', ProfileFilename) + 1, Length(ProfileFilename));
+            InstalledProfileVersion := Copy(InstalledProfileVersion, 1, Pos('-Profile.vap', InstalledProfileVersion) - 1);
+            Log('Installed profile version: ' + InstalledProfileVersion);
           end;
         end;
-        
-        FolderName := ExtractFileName(ExistingEliteAPIPath);
-        Log('No version file found - old EliteAPI installation');
-        
-        MsgResult := MsgBox(
-          'EliteAPI found in: ' + FolderName + #13#10 +
-          'Path: ' + ExistingEliteAPIPath + #13#10 + #13#10 +
-          'Update to v5.0.7 (RECOMMENDED)?'  + #13#10 + #13#10 +
-          'YES:' + #13#10 +
-          '  ✔ Latest features & bug fixes' + #13#10 +
-          '  ✔ Full VoiceAttack support' + #13#10 +
-          '  • Existing files replaced' + #13#10 + #13#10 +
-          'NO:' + #13#10 +
-          '  ⚠️ Voice commands may fail' + #13#10 +
-          '  • Only if you have custom mods' + #13#10 + #13#10 +
-          'ⓘ EliteAPI by Somfic | Only one EliteAPI/EliteVA installation allowed',
-          mbConfirmation, MB_YESNO);
-          
-        if MsgResult = IDYES then
-          InstallEliteAPI := True
-        else
-          InstallEliteAPI := False;
+      finally
+        FindClose(FindRec);
       end;
+    end;
+    
+    if InstalledProfileVersion = '' then
+    begin
+      Log('No existing profile found - fresh install, profile update needed');
+      ProfileNeedsUpdate := True;
+    end
+    else if InstalledProfileVersion <> BundledProfileVersion then
+    begin
+      Log('Profile update available: ' + InstalledProfileVersion + ' -> ' + BundledProfileVersion);
+      ProfileNeedsUpdate := True;
     end
     else
     begin
-      { No existing installation - ask about fresh INSTALL }
-      { Check if VoiceAttack is running before installing EliteAPI }
-      if IsVoiceAttackRunning then
+      Log('Profile is up to date: ' + InstalledProfileVersion);
+      ProfileNeedsUpdate := False;
+    end;
+  end;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+var
+  I: Integer;
+begin
+  { Toggle task checkboxes based on version detection }
+  if CurPageID = wpSelectTasks then
+  begin
+    for I := 0 to WizardForm.TasksList.Items.Count - 1 do
+    begin
+      if Pos('VoiceAttack profile', WizardForm.TasksList.ItemCaption[I]) > 0 then
       begin
-        MsgResult := MsgBox(
-          '⚠️ WARNING: VoiceAttack is currently running!' + #13#10 + #13#10 +
-          'VoiceAttack must be CLOSED before installing EliteMining.' + #13#10 +
-          'Files cannot be updated while VoiceAttack is using them.' + #13#10 + #13#10 +
-          'Please close VoiceAttack now and click OK to continue.' + #13#10 +
-          'Click Cancel to exit the installer.',
-          mbError, MB_OKCANCEL);
-        
-        if MsgResult = IDCANCEL then
-        begin
-          WizardForm.Close;
-          Exit;
-        end;
+        WizardForm.TasksList.Checked[I] := ProfileNeedsUpdate;
       end;
-      
-      MsgResult := MsgBox(
-        'VoiceAttack detected!' + #13#10 +
-        'EliteAPI v5.0.7 not found.' + #13#10 + #13#10 +
-        'Install EliteAPI (RECOMMENDED)?' + #13#10 + #13#10 +
-        'YES:' + #13#10 +
-        '  ✔ Enables voice commands' + #13#10 +
-        '  ✔ Full mining automation' + #13#10 +
-        '  ✔ Real-time game integration' + #13#10 + #13#10 +
-        'NO:' + #13#10 +
-        '  ⚠️ No voice automation' + #13#10 + #13#10 +
-        'ⓘ EliteAPI by Somfic | Only one EliteAPI/EliteVA installation allowed',
-        mbConfirmation, MB_YESNO);
-        
-      if MsgResult = IDYES then
-        InstallEliteAPI := True
-      else
-        InstallEliteAPI := False;
+      if Pos('EliteVA', WizardForm.TasksList.ItemCaption[I]) > 0 then
+      begin
+        WizardForm.TasksList.Checked[I] := InstallPlugin;
+      end;
     end;
   end;
 end;
@@ -758,8 +668,13 @@ begin
     { Validate if user selected a VoiceAttack folder }
     if FileExists(ParentPath + '\VoiceAttack.exe') then
     begin
-      { Valid VoiceAttack installation - update detection flag }
+      { Valid VoiceAttack installation - update detection }
       VADetected := True;
+      VABasePath := ParentPath;
+      Log('VA re-detected via browse: ' + VABasePath);
+      { Re-detect EliteAPI path }
+      ExistingEliteAPIPath := FindEliteAPIInDirectory(VABasePath);
+      Log('EliteAPI re-detection: ' + ExistingEliteAPIPath);
     end
     else if (Pos('VoiceAttack', SelectedPath) > 0) and (Pos('\Apps\EliteMining', SelectedPath) > 0) then
     begin

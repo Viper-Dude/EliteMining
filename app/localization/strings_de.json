@@ -939,6 +939,7 @@
     "voiceattack_profile": "VoiceAttack-Profil",
     "user_database": "Benutzer-Datenbank (Hotspots)",
     "journal_files": "Journal-Dateien",
+    "configuration": "Konfiguration (config.json)",
     "create_backup": "Sichern",
     "cancel": "Abbrechen",
     "no_selection": "Keine Auswahl",
