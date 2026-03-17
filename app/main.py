@@ -5012,7 +5012,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Check for VA profile updates AFTER everything is loaded and settled
         # Use longer delay to ensure UI is fully responsive
-        self.after(12000, self._check_va_profile_update)
+        # Only run in installed (frozen) mode - skip during dev/VS Code runs
+        if getattr(sys, 'frozen', False):
+            self.after(12000, self._check_va_profile_update)
         
         # Set flag after window is fully displayed
         self._app_fully_loaded = False
