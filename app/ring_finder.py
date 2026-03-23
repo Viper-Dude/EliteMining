@@ -1704,6 +1704,10 @@ class RingFinder(ColumnVisibilityMixin):
         if hasattr(self, 'res_only_var'):
             self.res_only_var.set(False)
         
+        # Min Hotspots
+        if hasattr(self, 'min_hotspots_var'):
+            self.min_hotspots_var.set(1)
+        
         # Ring Search (Spansh)
         if hasattr(self, 'ring_type_only_var'):
             self.ring_type_only_var.set(False)
