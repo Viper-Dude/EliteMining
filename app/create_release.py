@@ -40,26 +40,14 @@ class ReleaseBuilder:
             if cwd:
                 print(f"Working directory: {cwd}")
             
-            # For batch files with pause, we need to send Enter to continue
-            if command.endswith('.bat'):
-                result = subprocess.run(
-                    command,
-                    cwd=cwd,
-                    shell=shell,
-                    input='\n',  # Send Enter key to bypass pause
-                    capture_output=True,
-                    text=True,
-                    timeout=300  # 5 minute timeout
-                )
-            else:
-                result = subprocess.run(
-                    command,
-                    cwd=cwd,
-                    shell=shell,
-                    capture_output=True,
-                    text=True,
-                    timeout=300  # 5 minute timeout
-                )
+            result = subprocess.run(
+                command,
+                cwd=cwd,
+                shell=shell,
+                capture_output=True,
+                text=True,
+                timeout=600  # 10 minute timeout
+            )
             
             if result.stdout:
                 print("STDOUT:", result.stdout)
@@ -98,20 +86,26 @@ class ReleaseBuilder:
         return True
     
     def run_build_script(self):
-        """Execute the build batch file or PyInstaller directly"""
+        """Execute PyInstaller build (cleans build/dist dirs first)"""
         self.print_step(2, "Building Executable")
         
-        if self.build_bat.exists():
-            print(f"Executing: {self.build_bat}")
-            return self.run_command(str(self.build_bat), cwd=str(self.project_root))
-        else:
-            print("Running PyInstaller directly from spec file")
+        # Clean previous build artifacts (same as batch file)
+        for d in [self.project_root / "build", self.project_root / "dist"]:
+            if d.exists():
+                import shutil
+                print(f"Cleaning: {d}")
+                shutil.rmtree(d, ignore_errors=True)
+        
+        spec_file = self.project_root / "Configurator.spec"
+        if not spec_file.exists():
             spec_file = self.script_dir / "Configurator.spec"
-            if spec_file.exists():
-                return self.run_command(f"pyinstaller --clean --noupx {spec_file}", cwd=str(self.project_root))
-            else:
-                print("❌ No spec file found")
-                return False
+        
+        if spec_file.exists():
+            print(f"Running PyInstaller with spec: {spec_file}")
+            return self.run_command(f"python -m PyInstaller --clean \"{spec_file}\"", cwd=str(self.project_root))
+        else:
+            print("❌ No spec file found")
+            return False
     
     def create_zip_package(self):
         """Create a ZIP package with the executable and necessary files"""
