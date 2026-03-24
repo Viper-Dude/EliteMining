@@ -1708,6 +1708,14 @@ class RingFinder(ColumnVisibilityMixin):
         if hasattr(self, 'min_hotspots_var'):
             self.min_hotspots_var.set(1)
         
+        # Max Distance
+        if hasattr(self, 'distance_var'):
+            self.distance_var.set("50")
+
+        # Max Results
+        if hasattr(self, 'max_results_var'):
+            self.max_results_var.set("50")
+
         # Ring Search (Spansh)
         if hasattr(self, 'ring_type_only_var'):
             self.ring_type_only_var.set(False)
