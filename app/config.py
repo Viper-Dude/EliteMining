@@ -170,7 +170,13 @@ def save_ring_finder_filters(filters: Dict[str, Any]) -> None:
 def load_mining_analysis_column_widths() -> Dict[str, int]:
     """Load Mining Analysis table column widths from config"""
     cfg = _load_cfg()
-    return cfg.get("mining_analysis_column_widths", {})
+    defaults = {
+        "date": 146, "duration": 106, "session_type": 90, "ship": 267,
+        "system": 203, "body": 125, "tons": 80, "tph": 60, "tons_per": 85,
+        "asteroids": 80, "materials": 80, "hit_rate": 90, "quality": 120,
+        "cargo": 350, "prospects": 70, "eng_materials": 250, "comment": 80, "enhanced": 100
+    }
+    return cfg.get("mining_analysis_column_widths", defaults)
 
 def save_mining_analysis_column_widths(widths: Dict[str, int]) -> None:
     """Save Mining Analysis table column widths to config"""
@@ -181,7 +187,12 @@ def save_mining_analysis_column_widths(widths: Dict[str, int]) -> None:
 def load_bookmarks_column_widths() -> Dict[str, int]:
     """Load Mining Bookmarks table column widths from config"""
     cfg = _load_cfg()
-    return cfg.get("bookmarks_column_widths", {})
+    defaults = {
+        "last_mined": 100, "system": 256, "body": 120, "hotspot": 100,
+        "materials": 200, "avg_yield": 80, "overlap": 80,
+        "res_site": 80, "rating": 70, "notes": 105
+    }
+    return cfg.get("bookmarks_column_widths", defaults)
 
 def save_bookmarks_column_widths(widths: Dict[str, int]) -> None:
     """Save Mining Bookmarks table column widths to config"""
@@ -192,7 +203,12 @@ def save_bookmarks_column_widths(widths: Dict[str, int]) -> None:
 def load_ring_finder_column_widths() -> Dict[str, int]:
     """Load Ring Finder table column widths from config"""
     cfg = _load_cfg()
-    return cfg.get("ring_finder_column_widths", {})
+    defaults = {
+        "Distance": 83, "LS": 96, "System": 188, "Planet/Ring": 122,
+        "Sol Dist": 110, "Visits": 75, "Ring Type": 178, "Hotspots": 392,
+        "Overlap": 80, "RES Site": 80, "Reserve": 110, "Source": 70
+    }
+    return cfg.get("ring_finder_column_widths", defaults)
 
 def save_ring_finder_column_widths(widths: Dict[str, int]) -> None:
     """Save Ring Finder table column widths to config"""
@@ -225,7 +241,11 @@ def save_column_visibility(table_key: str, visibility: Dict[str, bool]) -> None:
 def load_commodity_market_column_widths() -> Dict[str, int]:
     """Load Commodity Market table column widths from config"""
     cfg = _load_cfg()
-    return cfg.get("commodity_market_column_widths", {})
+    defaults = {
+        "location": 308, "type": 149, "pad": 62, "distance": 116,
+        "ls": 116, "demand": 128, "price": 132, "updated": 94
+    }
+    return cfg.get("commodity_market_column_widths", defaults)
 
 def save_commodity_market_column_widths(widths: Dict[str, int]) -> None:
     """Save Commodity Market table column widths to config"""
@@ -247,7 +267,8 @@ def save_trade_commodities_column_widths(widths: Dict[str, int]) -> None:
 def load_prospector_report_column_widths() -> Dict[str, int]:
     """Load Prospector Report table column widths from config"""
     cfg = _load_cfg()
-    return cfg.get("prospector_report_column_widths", {})
+    defaults = {"materials": 650, "content": 432, "time": 102}
+    return cfg.get("prospector_report_column_widths", defaults)
 
 def save_prospector_report_column_widths(widths: Dict[str, int]) -> None:
     """Save Prospector Report table column widths to config"""
@@ -258,7 +279,11 @@ def save_prospector_report_column_widths(widths: Dict[str, int]) -> None:
 def load_mineral_analysis_column_widths() -> Dict[str, int]:
     """Load Mineral Analysis table column widths from config"""
     cfg = _load_cfg()
-    return cfg.get("mineral_analysis_column_widths", {})
+    defaults = {
+        "material": 268, "tons": 89, "tph": 90, "tons_per": 85,
+        "avg_all": 150, "avg_pct": 141, "best_pct": 107, "latest_pct": 124, "count": 91
+    }
+    return cfg.get("mineral_analysis_column_widths", defaults)
 
 def save_mineral_analysis_column_widths(widths: Dict[str, int]) -> None:
     """Save Mineral Analysis table column widths to config"""
