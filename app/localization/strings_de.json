@@ -121,7 +121,7 @@
     "spansh_error": "Spansh API-Fehler - versuchen Sie es später erneut",
     "no_hotspot_data": "Keine Hotspot-Daten",
     "auto_search": "Auto-Suche",
-    "auto_search_tooltip": "Sucht automatisch nach Hotspots bei Ankunft in einem neuen System.\nVerwendet Ihre letzten Sucheinstellungen (Ringtyp, Mineral, Entfernung).\nAktualisiert Referenzsystem aus Spielstatus.\n(Verwendet nur lokale Datenbank - schnell, keine API-Aufrufe)",
+    "auto_search_tooltip": "Aktualisiert Ergebnisse automatisch bei Ankunft in einem neuen System oder beim Scannen eines Rings.\nVerwendet Ihre letzten Sucheinstellungen (Ringtyp, Mineral, Entfernung).\n(Nur lokale Datenbank - schnell, keine API-Aufrufe)",
     "auto_switch_tabs": "Auto-Tab-Wechsel",
     "search": "Suchen",
     "searching": "⏳ Suche nach Ringen...",
