@@ -893,7 +893,7 @@ class RingFinder(ColumnVisibilityMixin):
                      arrowcolor=[('readonly', '#ff8c00')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Reserve", "Ring Type", "Hotspots", "Overlap", "RES Site", "Source")
+        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "Source")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
         
         # Track column visibility and default widths
@@ -5050,8 +5050,8 @@ class RingFinder(ColumnVisibilityMixin):
                 location_display,  # Use cleaned ring name
                 sol_dist_display,
                 visited_status,
-                reserve_formatted,
                 ring_type_val,
+                reserve_formatted,
                 hotspot_count_display,
                 overlap_display,
                 res_display,
@@ -5198,7 +5198,7 @@ class RingFinder(ColumnVisibilityMixin):
                     values = self.results_tree.item(sel_item, 'values')
                     if values and len(values) > 11:
                         source = values[11]  # Source column is index 11
-                        reserve = values[6] if len(values) > 6 else ""  # Reserve column is index 6
+                        reserve = values[7] if len(values) > 7 else ""  # Reserve column is index 7
                         system_name = values[2] if len(values) > 2 else ""  # System column
                         
                         # Check for Spansh source (🌐 emoji)
@@ -5558,11 +5558,11 @@ class RingFinder(ColumnVisibilityMixin):
                 system_name = values[2]  # System
                 body_name = values[3]  # Location (body/ring name)
                 visits = values[5]  # Visits
-                ring_type = values[7]  # Ring Type
+                ring_type = values[6]  # Ring Type
                 hotspots_display = values[8]  # Hotspots (e.g., "Plat (2), Rhod (1)")
                 overlap_display = values[9]  # Overlap
                 res_display = values[10]  # RES
-                reserve_level = values[6]  # Reserve
+                reserve_level = values[7]  # Reserve
                 source = values[11]  # Source
                 
                 # Validate critical fields
@@ -5792,7 +5792,7 @@ class RingFinder(ColumnVisibilityMixin):
             values = self.results_tree.item(item, 'values')
             if values and len(values) > 11:
                 source = values[11]  # Source column
-                reserve = values[6] if len(values) > 6 else ""  # Reserve column is index 6
+                reserve = values[7] if len(values) > 7 else ""  # Reserve column is index 7
                 system_name = values[2] if len(values) > 2 else ""  # System column
                 
                 # Only process Local source with missing reserve (🗄️ = local database)
@@ -5977,7 +5977,7 @@ class RingFinder(ColumnVisibilityMixin):
             # Extract data from columns: Distance, LS, System, Visited, Ring, Ring Type, Hotspots, Overlap, RES Site, Density
             system_name = values[2]  # System column
             ring_name = values[3]    # Ring column
-            ring_type = values[7] if len(values) > 7 else ""  # Ring Type column
+            ring_type = values[6] if len(values) > 6 else ""  # Ring Type column
             hotspots = values[8] if len(values) > 8 else ""   # Hotspots column
             overlap_display = values[9] if len(values) > 9 else ""  # Overlap column
             res_display = values[10] if len(values) > 10 else ""  # RES Site column
@@ -7224,10 +7224,10 @@ class RingFinder(ColumnVisibilityMixin):
             # Format for display
             reserve_display = reserve_level if reserve_level else "No data"
             
-            # Get current values and update Reserve column (index 6)
+            # Get current values and update Reserve column (index 7)
             values = list(self.results_tree.item(item_id, 'values'))
-            if len(values) >= 7:
-                values[6] = reserve_display
+            if len(values) >= 8:
+                values[7] = reserve_display
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
             print(f"Error refreshing reserve display: {e}")
