@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.9.4
+AppVersion=v4.9.5
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -372,11 +372,14 @@ var
   InstalledProfileVersion: String;
   FindRec: TFindRec;
   ProfileFilename: String;
+  ProfileVersion: String;
   BundledProfileVersion: String;
+  StateFilePath: String;
+  StateContent: AnsiString;
 begin
   ExistingEliteAPIPath := '';
   ProfileNeedsUpdate := False;
-  BundledProfileVersion := '4.8.9';
+  BundledProfileVersion := '4.9.5';
   
   { Default: Install plugin if VoiceAttack detected }
   InstallPlugin := VADetected;
@@ -458,24 +461,50 @@ begin
   begin
     InstalledProfileVersion := '';
     
-    { Look for existing profile in install directory }
-    if FindFirst(VABasePath + '\Apps\EliteMining\EliteMining v*-Profile.vap', FindRec) then
+    { Iterate all matching profiles and keep the highest version found }
+    if FindFirst(VABasePath + '\Apps\EliteMining\EliteMining*v*-Profile.vap', FindRec) then
     begin
       try
-        ProfileFilename := FindRec.Name;
-        { Skip Dev profiles }
-        if Pos('Dev', ProfileFilename) = 0 then
-        begin
-          { Extract version between 'v' and '-Profile.vap' }
+        repeat
+          ProfileFilename := FindRec.Name;
+          { Extract version between last 'v' and '-Profile.vap' }
           if Pos('v', ProfileFilename) > 0 then
           begin
-            InstalledProfileVersion := Copy(ProfileFilename, Pos('v', ProfileFilename) + 1, Length(ProfileFilename));
-            InstalledProfileVersion := Copy(InstalledProfileVersion, 1, Pos('-Profile.vap', InstalledProfileVersion) - 1);
-            Log('Installed profile version: ' + InstalledProfileVersion);
+            ProfileVersion := Copy(ProfileFilename, Pos('v', ProfileFilename) + 1, Length(ProfileFilename));
+            ProfileVersion := Copy(ProfileVersion, 1, Pos('-Profile.vap', ProfileVersion) - 1);
+            Log('Found profile: ' + ProfileFilename + ' -> version: ' + ProfileVersion);
+            { Keep highest version (simple string compare works for x.y.z format) }
+            if ProfileVersion > InstalledProfileVersion then
+              InstalledProfileVersion := ProfileVersion;
           end;
-        end;
+        until not FindNext(FindRec);
       finally
         FindClose(FindRec);
+      end;
+    end;
+    Log('Best installed profile version from .vap files: ' + InstalledProfileVersion);
+    
+    { Fallback: check va_profile_state.json if no .vap file found }
+    if InstalledProfileVersion = '' then
+    begin
+      StateFilePath := VABasePath + '\Apps\EliteMining\app\va_profile_state.json';
+      if FileExists(StateFilePath) then
+      begin
+        if LoadStringFromFile(StateFilePath, StateContent) then
+        begin
+          // Parse version from JSON: "installed_version": "4.9.5"
+          if Pos('"installed_version"', StateContent) > 0 then
+          begin
+            ProfileVersion := Copy(StateContent, Pos('"installed_version"', StateContent), Length(StateContent));
+            { Skip to the value after the colon and opening quote }
+            ProfileVersion := Copy(ProfileVersion, Pos(':', ProfileVersion) + 1, Length(ProfileVersion));
+            ProfileVersion := Trim(ProfileVersion);
+            if (Length(ProfileVersion) > 0) and (ProfileVersion[1] = '"') then
+              ProfileVersion := Copy(ProfileVersion, 2, Pos('"', Copy(ProfileVersion, 2, Length(ProfileVersion))) - 1);
+            Log('Found profile version from va_profile_state.json: ' + ProfileVersion);
+            InstalledProfileVersion := ProfileVersion;
+          end;
+        end;
       end;
     end;
     
