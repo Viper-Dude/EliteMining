@@ -3353,7 +3353,8 @@ class RingFinder(ColumnVisibilityMixin):
                     'hotspot_data': hotspot,
                     'count': hotspot_count,
                     'data_source': 'Local (Confirmed)',
-                    'source': 'Local'
+                    'source': 'Local',
+                    'coords': hotspot.get('coords')
                 }
                 compatible_results.append(compatible_result)
             
