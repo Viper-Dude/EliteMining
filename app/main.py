@@ -2412,8 +2412,8 @@ cargo panel forces Elite to write detailed inventory data.
                 self.cargo_text.insert(tk.END, "2. Open your cargo hold (4 key)\n") 
                 self.cargo_text.insert(tk.END, "3. Click 'Force Update' button")
         else:
-            # Sort items by quantity (highest first)
-            sorted_items = sorted(self.cargo_items.items(), key=lambda x: x[1], reverse=True)
+            # Sort items by quantity (highest first), limpets always last
+            sorted_items = sorted(self.cargo_items.items(), key=lambda x: (x[0].lower() != 'limpet', -x[1]))
             
             # Configure clickable limpet tag (theme-aware color + hand cursor)
             limpet_color = "#ff8c00" if self.current_theme == "elite_orange" else "#e0e0e0"
@@ -5455,7 +5455,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.integrated_cargo_text.insert(tk.END, f"📦 {t('sidebar.empty_cargo')}\n⛏️ {t('sidebar.start_mining')}")
         else:
             # Vertical list with better alignment - show ALL items
-            sorted_items = sorted(cargo.cargo_items.items(), key=lambda x: x[1], reverse=True)
+            sorted_items = sorted(cargo.cargo_items.items(), key=lambda x: (x[0].lower() != 'limpet', -x[1]))
             
             # Configure clickable limpet tag (theme-aware color + hand cursor)
             self.integrated_cargo_text.tag_configure("limpet_clickable", 
