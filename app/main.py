@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.9.4"
+APP_VERSION = "v4.9.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -20301,6 +20301,9 @@ if __name__ == "__main__":
         # Apply stay-on-top setting after window is fully initialized (fixes issue where it doesn't take effect on startup)
         app.after(250, app._apply_stay_on_top_after_init)
         app.mainloop()
+    except KeyboardInterrupt:
+        # Graceful exit on Ctrl+C or stale terminal interrupt signal
+        sys.exit(0)
     except Exception as e:
         # Show error dialog with full traceback
         import traceback

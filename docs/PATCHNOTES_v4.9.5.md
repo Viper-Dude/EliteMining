@@ -11,7 +11,7 @@
 
 
 ### VoiceAttack Profile — Updated to v4.9.5
-- "Clear and Jump" command now enables Supercruise instead of FSD Jump when the target system is obscured
+- "Clear and Jump" command now enables Supercruise instead if  FSD Jump target system is obscured
 - General adjustments and optimisations
 
 

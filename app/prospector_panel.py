@@ -515,15 +515,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Create dialog window
         dialog = tk.Toplevel(self)
+        dialog.withdraw()  # Hide immediately to prevent blinking on wrong monitor
         dialog.title("Edit Hits Count")
-        dialog.geometry("350x200")
         dialog.configure(bg=bg_color)
         dialog.resizable(False, False)
-        # dialog.transient(self.winfo_toplevel())  # Disabled - causes focus issues
-        try:
-            dialog.grab_set()
-        except:
-            pass
         
         # Set app icon
         try:
@@ -531,23 +526,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             icon_path = get_app_icon_path()
             if icon_path and icon_path.endswith('.ico'):
                 dialog.iconbitmap(icon_path)
-            elif icon_path:
-                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
         except:
             pass
-        
-        # Position dialog centered on main window
-        self.update_idletasks()
-        dialog.update_idletasks()
-        parent = self.winfo_toplevel()
-        x = parent.winfo_x() + (parent.winfo_width() - 350) // 2
-        y = parent.winfo_y() + (parent.winfo_height() - 240) // 2
-        dialog.geometry(f"350x240+{x}+{y}")
-        
-        # Force dialog to stay on top and have focus
-        dialog.attributes('-topmost', True)
-        dialog.lift()
-        dialog.focus_force()
         
         # Main frame
         main_frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
@@ -627,6 +607,21 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Bind Enter and Escape
         entry.bind("<Return>", lambda e: on_ok())
         dialog.bind("<Escape>", lambda e: on_cancel())
+        
+        # Center on parent, then show
+        dialog.update_idletasks()
+        main_parent = self.winfo_toplevel()
+        main_parent._center_dialog_on_parent(dialog)
+        dialog.deiconify()
+        
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        
+        try:
+            dialog.grab_set()
+        except:
+            pass
         
         # Keep dialog on top while open
         def keep_on_top():
