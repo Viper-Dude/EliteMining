@@ -641,8 +641,10 @@ class RefineryDialog:
         
         self._create_ui()
         # Now show dialog centered and make it modal
-        self.dialog.deiconify()
+        # Keep topmost permanently so it stays above main app's always-on-top window
         self.dialog.transient(parent)
+        self.dialog.attributes('-topmost', True)
+        self.dialog.deiconify()
         self.dialog.lift()
         self.dialog.focus_force()
         try:
