@@ -2770,6 +2770,11 @@ class RingFinder(ColumnVisibilityMixin):
                 distance_ly = body.get('distance', 0)
                 distance_ls = body.get('distance_to_arrival', 0)
                 reserve_level = body.get('reserve_level', '')  # Extract reserve level from Spansh
+                # Extract actual system coordinates provided by Spansh API
+                sys_x = body.get('system_x')
+                sys_y = body.get('system_y')
+                sys_z = body.get('system_z')
+                body_coords = {'x': sys_x, 'y': sys_y, 'z': sys_z} if sys_x is not None else reference_coords
                 
                 rings = body.get('rings', [])
                 for ring in rings:
@@ -2871,7 +2876,7 @@ class RingFinder(ColumnVisibilityMixin):
                         'type': ', '.join(materials_found),
                         'count': sum(int(m.split('(')[1].rstrip(')')) for m in materials_found if '(' in m),
                         'distance': f"{distance_ly:.1f}" if distance_ly > 0 else "0.0",  # String format
-                        'coords': reference_coords,
+                        'coords': body_coords,
                         'data_source': entry_source,
                         'ring_type': translate_ring_type(ring_type),
                         'ls': ls_display,  # Formatted LS distance
@@ -2993,6 +2998,11 @@ class RingFinder(ColumnVisibilityMixin):
                 distance = body.get('distance', 0)
                 ls_distance = body.get('distance_to_arrival', 0)
                 rings = body.get('rings', [])
+                # Extract actual system coordinates provided by Spansh API
+                sys_x = body.get('system_x')
+                sys_y = body.get('system_y')
+                sys_z = body.get('system_z')
+                body_coords = {'x': sys_x, 'y': sys_y, 'z': sys_z} if sys_x is not None else None
                 
                 # Skip bodies beyond max distance (client-side filter)
                 if distance > max_distance:
@@ -3065,7 +3075,8 @@ class RingFinder(ColumnVisibilityMixin):
                         'res_site': '',
                         'reserve': translate_reserve_level(reserve_level) if reserve_level else '-',
                         'source': 'spansh',
-                        'data_source': 'spansh'
+                        'data_source': 'spansh',
+                        'coords': body_coords
                     }
                     results.append(result)
                     
