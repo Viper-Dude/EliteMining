@@ -15893,6 +15893,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_ref_val_state = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_state.pack(side="left")
         
+        # Row 3: Spansh API status indicator
+        row3_container = tk.Frame(ref_info_frame, bg=sf_bg)
+        row3_container.pack(anchor="center")
+        
+        self.sysfinder_spansh_status_label = tk.Label(
+            row3_container, text="⚫ Spansh: checking...",
+            font=("Segoe UI", 8), fg="#888888", bg=sf_bg
+        )
+        self.sysfinder_spansh_status_label.pack(side="left", pady=(4, 0))
+        
         # Add trace to update info when reference system changes (with debounce)
         self._sysfinder_ref_update_pending = None
         def on_ref_system_change(*args):
@@ -15936,6 +15946,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Auto-populate current system after a delay
         self.after(2000, self._populate_sysfinder_system)
+        
+        # Start Spansh status check
+        self.after(1000, self._check_sysfinder_spansh_status)
         
         # Remove focus from entry field (prevent highlight on tab switch)
         # Focus the frame instead of the entry
@@ -16247,7 +16260,37 @@ class App(tk.Tk, ColumnVisibilityMixin):
         import threading
         thread = threading.Thread(target=fetch_info, daemon=True)
         thread.start()
-    
+
+    def _check_sysfinder_spansh_status(self):
+        """Check Spansh API status in background and update indicator"""
+        def _background_check():
+            import requests
+            try:
+                url = 'https://spansh.co.uk/api/systems/field_values/system_names'
+                response = requests.get(url, params={'q': 'Sol'}, timeout=10)
+                if response.status_code == 200:
+                    self.after(0, lambda: self._update_sysfinder_spansh_status("online"))
+                else:
+                    self.after(0, lambda: self._update_sysfinder_spansh_status("offline"))
+            except Exception as e:
+                print(f"[SYSFINDER SPANSH STATUS] Check failed: {e}")
+                self.after(0, lambda: self._update_sysfinder_spansh_status("offline"))
+
+        import threading
+        threading.Thread(target=_background_check, daemon=True).start()
+
+    def _update_sysfinder_spansh_status(self, status: str):
+        """Update Spansh status label in system finder - called on UI thread"""
+        if status == "online":
+            status_text = "🟢 Spansh: Online"
+            status_color = "#00ff00"
+        else:
+            status_text = "🔴 Spansh: Offline"
+            status_color = "#ff4444"
+
+        if hasattr(self, 'sysfinder_spansh_status_label'):
+            self.sysfinder_spansh_status_label.config(text=status_text, fg=status_color)
+
     def _search_systems(self):
         """Search for systems matching criteria"""
         reference = self.sysfinder_reference_system.get().strip()
