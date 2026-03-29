@@ -1719,9 +1719,7 @@ class RingFinder(ColumnVisibilityMixin):
         # Ring Search (Spansh)
         if hasattr(self, 'ring_type_only_var'):
             self.ring_type_only_var.set(False)
-            # Re-enable data source options if they were disabled
-            self.data_source_db_rb.config(state="normal")
-            self.data_source_both_rb.config(state="normal")
+            self._on_ring_type_only_changed()
         
         # Save the reset state
         self._save_filter_settings()
