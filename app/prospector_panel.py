@@ -2088,35 +2088,39 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_mineral.grid(row=0, column=0, sticky="ew")
         
         # Statistics tree for live percentage yields
-        self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"), 
+        self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "all_hits", "quality_rate"), 
                            show="headings", height=7, style="MineralAnalysis.Treeview")
         self.stats_tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.stats_tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
         self.stats_tree.heading("material", text=t('mining_session.mineral_thr'), anchor="w")
-        self.stats_tree.heading("tons", text=t('mining_session.tons'), anchor="w")
-        self.stats_tree.heading("tph", text=t('mining_session.tph'), anchor="w")
-        self.stats_tree.heading("tons_per", text=t('mining_session.t_ast'), anchor="w")
-        self.stats_tree.heading("avg_all", text=t('mining_session.avg_all'), anchor="w")
-        self.stats_tree.heading("avg_pct", text=t('mining_session.avg_thr'), anchor="w")
-        self.stats_tree.heading("best_pct", text=t('mining_session.best_pct'), anchor="w")
-        self.stats_tree.heading("latest_pct", text=t('mining_session.latest_pct'), anchor="w")
-        self.stats_tree.heading("count", text=t('mining_session.hits'), anchor="w")
+        self.stats_tree.heading("tons", text=t('mining_session.tons'), anchor="center")
+        self.stats_tree.heading("tph", text=t('mining_session.tph'), anchor="center")
+        self.stats_tree.heading("tons_per", text=t('mining_session.t_ast'), anchor="center")
+        self.stats_tree.heading("avg_all", text=t('mining_session.avg_all'), anchor="center")
+        self.stats_tree.heading("avg_pct", text=t('mining_session.avg_thr'), anchor="center")
+        self.stats_tree.heading("best_pct", text=t('mining_session.best_pct'), anchor="center")
+        self.stats_tree.heading("latest_pct", text=t('mining_session.latest_pct'), anchor="center")
+        self.stats_tree.heading("count", text=t('mining_session.hits'), anchor="center")
+        self.stats_tree.heading("all_hits", text=t('mining_session.all_hits'), anchor="center")
+        self.stats_tree.heading("quality_rate", text=t('mining_session.quality_rate'), anchor="center")
         
         self.stats_tree.column("material", width=135, minwidth=110, anchor="w", stretch=False)
-        self.stats_tree.column("tons", width=65, minwidth=50, anchor="w", stretch=False)
-        self.stats_tree.column("tph", width=65, minwidth=50, anchor="w", stretch=False)
-        self.stats_tree.column("tons_per", width=85, minwidth=60, anchor="w", stretch=False)
-        self.stats_tree.column("avg_all", width=95, minwidth=70, anchor="w", stretch=False)
-        self.stats_tree.column("avg_pct", width=130, minwidth=100, anchor="w", stretch=False)
-        self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="w", stretch=False)
-        self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="w", stretch=False)
-        self.stats_tree.column("count", width=65, minwidth=50, anchor="w", stretch=True)
+        self.stats_tree.column("tons", width=65, minwidth=50, anchor="center", stretch=False)
+        self.stats_tree.column("tph", width=65, minwidth=50, anchor="center", stretch=False)
+        self.stats_tree.column("tons_per", width=85, minwidth=60, anchor="center", stretch=False)
+        self.stats_tree.column("avg_all", width=95, minwidth=70, anchor="center", stretch=False)
+        self.stats_tree.column("avg_pct", width=130, minwidth=100, anchor="center", stretch=False)
+        self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="center", stretch=False)
+        self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="center", stretch=False)
+        self.stats_tree.column("count", width=80, minwidth=60, anchor="center", stretch=False)
+        self.stats_tree.column("all_hits", width=70, minwidth=50, anchor="center", stretch=False)
+        self.stats_tree.column("quality_rate", width=80, minwidth=60, anchor="center", stretch=True)
         
         # Setup column visibility for material analysis
         self.setup_column_visibility(
             tree=self.stats_tree,
-            columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"),
-            default_widths={"material": 135, "tons": 65, "tph": 65, "tons_per": 85, "avg_all": 95, "avg_pct": 130, "best_pct": 80, "latest_pct": 80, "count": 65},
+            columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "all_hits", "quality_rate"),
+            default_widths={"material": 135, "tons": 65, "tph": 65, "tons_per": 85, "avg_all": 95, "avg_pct": 130, "best_pct": 80, "latest_pct": 80, "count": 65, "all_hits": 70, "quality_rate": 80},
             config_key='mineral_analysis'
         )
         
@@ -2138,7 +2142,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             try:
                 from config import save_mineral_analysis_column_widths
                 widths = {}
-                for col in ["material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count"]:
+                for col in ["material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "all_hits", "quality_rate"]:
                     try:
                         widths[col] = self.stats_tree.column(col, "width")
                     except:
@@ -8520,7 +8524,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     "#6": t('tooltips.mineral_avg_thr'),
                     "#7": t('tooltips.mineral_best'),
                     "#8": t('tooltips.mineral_current'),
-                    "#9": t('tooltips.mineral_hits')
+                    "#9": t('tooltips.mineral_hits'),
+                    "#10": t('tooltips.mineral_all_hits'),
+                    "#11": t('tooltips.mineral_quality_rate')
                 }
                 
                 tooltip_text = column_tooltips.get(column)
@@ -10223,6 +10229,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 time_parts = elapsed_str.split(":")
                 elapsed_hours = int(time_parts[0]) + int(time_parts[1])/60 + int(time_parts[2])/3600
             
+            # Get total asteroids prospected for ratio display
+            total_asteroids = self.session_analytics.get_total_asteroids()
+            
             # Track which materials have been displayed
             displayed_materials = set()
             row_index = 0
@@ -10303,9 +10312,20 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     tons_per_str = "—" if hits_count <= 0 else (f"{tons_per_val:.1f}" if tons_per_val is not None else "—")
                     
+                    # Calculate all hits and quality rate
+                    all_hits_count = material_stats_all.get_find_count() if material_stats_all else 0
+                    all_hits_str = f"{all_hits_count}/{total_asteroids}" if total_asteroids > 0 else str(all_hits_count)
+                    if all_hits_count > 0 and hits_count > 0:
+                        quality_rate_val = (hits_count / all_hits_count) * 100
+                        quality_rate_str = f"{hits_count}/{all_hits_count} ({quality_rate_val:.0f}%)"
+                    elif all_hits_count > 0:
+                        quality_rate_str = f"0/{all_hits_count} (0%)"
+                    else:
+                        quality_rate_str = "—"
+                    
                     tag = "evenrow" if row_index % 2 == 0 else "oddrow"
                     self.stats_tree.insert("", "end", values=(
-                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits
+                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits, all_hits_str, quality_rate_str
                     ), tags=(tag,))
                     row_index += 1
             
@@ -10369,9 +10389,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     quality_hits = "0"
                     tons_per_str = "—"
                     
+                    # Calculate all hits for below-threshold materials
+                    all_hits_count = material_stats_all.get_find_count() if material_stats_all else 0
+                    all_hits_str = f"{all_hits_count}/{total_asteroids}" if total_asteroids > 0 else str(all_hits_count)
+                    quality_rate_str = "—"
+                    
                     tag = "evenrow" if row_index % 2 == 0 else "oddrow"
                     self.stats_tree.insert("", "end", values=(
-                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits
+                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits, all_hits_str, quality_rate_str
                     ), tags=(tag,))
                     row_index += 1
             

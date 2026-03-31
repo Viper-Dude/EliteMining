@@ -281,7 +281,8 @@ def load_mineral_analysis_column_widths() -> Dict[str, int]:
     cfg = _load_cfg()
     defaults = {
         "material": 268, "tons": 89, "tph": 90, "tons_per": 85,
-        "avg_all": 150, "avg_pct": 141, "best_pct": 107, "latest_pct": 124, "count": 91
+        "avg_all": 150, "avg_pct": 141, "best_pct": 107, "latest_pct": 124, "count": 91,
+        "all_hits": 70, "quality_rate": 80
     }
     return cfg.get("mineral_analysis_column_widths", defaults)
 

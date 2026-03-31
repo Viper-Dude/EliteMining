@@ -301,7 +301,9 @@
     "avg_thr": "Avg % (≥Thr)",
     "best_pct": "Best %",
     "latest_pct": "Latest %",
-    "hits": "Hits",
+    "hits": "Hits (≥Thr)",
+    "all_hits": "All Hits",
+    "quality_rate": "Hit Rate",
     "double_click_hint": "💡 Double-click Hits to correct accidental double prospects"
   },
   "graphs": {
@@ -1178,6 +1180,8 @@
     "mineral_best": "Highest % found this session for this material",
     "mineral_current": "Most recent prospector scan result for this material",
     "mineral_hits": "Number of hits that met your threshold\n(quality finds that triggered announcements)",
+    "mineral_all_hits": "Asteroids with this mineral (any %) / Total asteroids scanned\nExample: 4/11 = found in 4 out of 11 asteroids",
+    "mineral_quality_rate": "Above-threshold hits / All asteroids with this mineral\nExample: 2/4 (50%) = 2 of 4 asteroids met your threshold",
     
     "chart_refresh": "Manually refresh charts with latest mining data",
     "chart_auto_refresh": "Automatically update charts as new data arrives",
