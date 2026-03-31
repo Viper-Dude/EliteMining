@@ -4,7 +4,7 @@
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
 
 <p align="center">
-  <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/EliteMining_Main_logo.png" alt="EliteMining Logo" width="600">
+  <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/EliteMining_Main_logo.png" alt="EliteMining Logo" width="100%">
 </p>
 
 **EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 61,000+ mining locations plus Spansh API integration for galaxy-wide ring search, overlaps, and RES sites as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
