@@ -655,26 +655,29 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             stats = self.session_analytics.material_stats.get(material_name)
             stats_all = self.session_analytics.material_stats_all.get(material_name)
             
-            if stats or stats_all:
-                # Add dummy finds to increase the count
-                from datetime import datetime
-                adds_needed = new_count - old_count
-                
-                # Get a reasonable percentage to use (from existing finds or default)
-                avg_pct = 15.0  # Default
-                if stats and stats.finds:
-                    avg_pct = sum(f.percentage for f in stats.finds) / len(stats.finds)
-                elif stats_all and stats_all.finds:
-                    avg_pct = sum(f.percentage for f in stats_all.finds) / len(stats_all.finds)
-                
-                for _ in range(adds_needed):
-                    if stats:
-                        stats.add_find(avg_pct, datetime.now())
-                    if stats_all:
-                        stats_all.add_find(avg_pct, datetime.now())
-                
-                return True
-            return False
+            # Create stats entry if it doesn't exist yet
+            from mining_statistics import MaterialStatistics
+            from datetime import datetime
+            
+            if not stats:
+                stats = MaterialStatistics(material_name)
+                self.session_analytics.material_stats[material_name] = stats
+            
+            adds_needed = new_count - old_count
+            
+            # Get a reasonable percentage to use (from existing finds or default)
+            avg_pct = 15.0  # Default
+            if stats.finds:
+                avg_pct = sum(f.percentage for f in stats.finds) / len(stats.finds)
+            elif stats_all and stats_all.finds:
+                avg_pct = sum(f.percentage for f in stats_all.finds) / len(stats_all.finds)
+            
+            for _ in range(adds_needed):
+                stats.add_find(avg_pct, datetime.now())
+                if stats_all:
+                    stats_all.add_find(avg_pct, datetime.now())
+            
+            return True
         return True  # No change needed
     
     def _reverse_abbreviate_material(self, display_name: str) -> str:
@@ -2014,18 +2017,31 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         material_pane.columnconfigure(0, weight=1)
         material_pane.rowconfigure(1, weight=1)
         
-        # Restore saved sash position after a short delay (to ensure window is rendered)
-        def restore_sash_position():
+        # Restore saved sash position once the widget is mapped and visible
+        def restore_sash_position(event=None, retries=5):
             try:
                 from config import load_prospector_tables_sash_position
                 saved_pos = load_prospector_tables_sash_position()
-                if saved_pos is not None:
+                if saved_pos is not None and saved_pos > 0:
+                    self.tables_paned.update_idletasks()
                     self.tables_paned.sashpos(0, saved_pos)
-                    print(f"[DEBUG] Restored prospector tables sash position: {saved_pos}")
+                    actual = self.tables_paned.sashpos(0)
+                    if abs(actual - saved_pos) > 10 and retries > 0:
+                        self.after(500, lambda: restore_sash_position(retries=retries - 1))
+                    else:
+                        print(f"[DEBUG] Restored sash position: {actual} (target: {saved_pos})")
             except Exception as e:
-                print(f"[DEBUG] Could not restore prospector tables sash position: {e}")
+                if retries > 0:
+                    self.after(500, lambda: restore_sash_position(retries=retries - 1))
+                else:
+                    print(f"[DEBUG] Could not restore sash position: {e}")
         
-        self.after(100, restore_sash_position)
+        # Bind to <Map> event so restore happens when widget becomes visible
+        def on_paned_map(event):
+            self.tables_paned.unbind("<Map>")
+            self.after(500, restore_sash_position)
+        
+        self.tables_paned.bind("<Map>", on_paned_map)
         
         # Save sash position when it changes
         def save_sash_position(event=None):
@@ -2085,7 +2101,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Create wrapper frame for bordered table
         tree_frame_mineral = ttk.Frame(stats_frame, relief="solid", borderwidth=1)
-        tree_frame_mineral.grid(row=0, column=0, sticky="ew")
+        tree_frame_mineral.grid(row=0, column=0, sticky="nsew")
         
         # Statistics tree for live percentage yields
         self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "all_hits", "quality_rate"), 
@@ -10333,6 +10349,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             for material_name, material_tons in live_materials.items():
                 if material_name not in displayed_materials and material_tons > 0:
                     # This material was mined but never announced (below threshold)
+                    displayed_materials.add(material_name)
                     display_name = self._abbreviate_material_for_stats(material_name)
                     
                     # Check if material has both core (0.0%) and non-core (>0%) finds (hybrid)

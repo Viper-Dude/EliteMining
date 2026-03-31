@@ -304,7 +304,7 @@
     "hits": "Hits (≥Thr)",
     "all_hits": "All Hits",
     "quality_rate": "Hit Rate",
-    "double_click_hint": "💡 Double-click Hits to correct accidental double prospects"
+    "double_click_hint": "💡 Double-click Hits (≥Thr) to correct accidental double prospects"
   },
   "graphs": {
     "refresh": "Refresh",

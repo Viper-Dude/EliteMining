@@ -300,7 +300,7 @@
     "hits": "Treffer (≥Thr)",
     "all_hits": "Alle Treffer",
     "quality_rate": "Trefferquote",
-    "double_click_hint": "💡 Doppelklick auf Treffer um versehentliche Doppel-Prospektionen zu korrigieren"
+    "double_click_hint": "💡 Doppelklick auf Treffer (≥Thr) um versehentliche Doppel-Prospektionen zu korrigieren"
   },
   "graphs": {
     "refresh": "Aktualisieren",
