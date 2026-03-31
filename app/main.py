@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.9.6"
+APP_VERSION = "v4.9.7"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -20339,12 +20339,81 @@ if __name__ == "__main__":
     
     try:
         app = App()
-        # Restore geometry after all widgets are created
-        app.after(100, app._restore_window_geometry)
+        # App.__init__ calls self.withdraw() — window is hidden at default OS position.
+        # Do NOT touch app geometry before the splash is done; any geometry() call on a
+        # withdrawn window can still cause Windows to briefly render/flash it.
+
+        # Read saved geometry from config to position the splash correctly.
+        _saved_geom = load_window_geometry()
+        _geom_str = _saved_geom.get("geometry", "")
+        _app_x, _app_y, _app_w, _app_h = 0, 0, 1350, 780
+        if _geom_str:
+            import re as _re
+            _gm = _re.match(r'(\d+)x(\d+)\+(-?\d+)\+(-?\d+)', _geom_str)
+            if _gm:
+                _app_w, _app_h, _app_x, _app_y = int(_gm.group(1)), int(_gm.group(2)), int(_gm.group(3)), int(_gm.group(4))
+
+        # --- Splash screen (Toplevel on hidden main window - avoids dual Tk() issue) ---
+        splash = None
+        try:
+            from PIL import Image, ImageTk
+            splash = tk.Toplevel(app)
+            splash.overrideredirect(True)
+            splash.attributes('-topmost', True)
+            # In dev: app_dir = .../app/ which contains Images/
+            # When frozen: app_dir = .../Configurator/ — images are at ../app/Images/
+            if getattr(sys, 'frozen', False):
+                _splash_img_path = os.path.join(os.path.dirname(app_dir), "app", "Images", "EliteMining_Main_logo.png")
+            else:
+                _splash_img_path = os.path.join(app_dir, "Images", "EliteMining_Main_logo.png")
+            _pil_img = Image.open(_splash_img_path)
+            _orig_w, _orig_h = _pil_img.size
+            # Scale so width fits within 900px, preserving exact aspect ratio
+            _max_w = min(900, _app_w)
+            _scale = _max_w / _orig_w
+            _sw = _max_w
+            _sh = int(_orig_h * _scale)
+            _pil_img = _pil_img.resize((_sw, _sh), Image.LANCZOS)
+            _splash_photo = ImageTk.PhotoImage(_pil_img)
+            # Center splash over the saved app window position
+            _sx = _app_x + (_app_w - _sw) // 2
+            _sy = _app_y + (_app_h - _sh) // 2
+            splash.configure(bg="#000000")
+            splash.geometry(f"{_sw}x{_sh}+{_sx}+{_sy}")
+            tk.Label(splash, image=_splash_photo, bd=0, bg="#000000").pack()
+            splash.update()
+        except Exception as _e:
+            print(f"[SPLASH] Could not load splash image: {_e}")
+            if splash:
+                try:
+                    splash.destroy()
+                except Exception:
+                    pass
+            splash = None
+
         # Force dark title bar after window is fully created
         app.after(200, app._set_dark_title_bar)
-        # Apply stay-on-top setting after window is fully initialized (fixes issue where it doesn't take effect on startup)
+        # Apply stay-on-top setting after window is fully initialized
         app.after(250, app._apply_stay_on_top_after_init)
+
+        # Splash: dismiss after 3 seconds, then restore geometry and reveal main window
+        _SPLASH_DURATION = 3000  # milliseconds
+
+        def _dismiss_splash():
+            if splash:
+                try:
+                    splash.destroy()
+                except Exception:
+                    pass
+            # Restore geometry NOW (just before showing) to avoid any pre-splash flash
+            app._restore_window_geometry()
+            app.lift()
+
+        if splash:
+            app.after(_SPLASH_DURATION, _dismiss_splash)
+        else:
+            app._restore_window_geometry()
+
         app.mainloop()
     except KeyboardInterrupt:
         # Graceful exit on Ctrl+C or stale terminal interrupt signal
