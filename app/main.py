@@ -8118,6 +8118,42 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception:
                 pass
         paned_window.bind("<ButtonRelease-1>", _on_sidebar_sash_moved)
+
+    def _reinitialize_sash_positions(self):
+        """Re-apply saved sash positions after window geometry is fully restored.
+        Called after splash screen dismissal when the initial sash setup may have
+        timed out due to the window being withdrawn."""
+        try:
+            self.update_idletasks()
+            # --- Main horizontal sash (content | sidebar) ---
+            total_width = self.winfo_width()
+            if total_width > 400 and hasattr(self, 'main_paned'):
+                from config import load_main_sash_position
+                saved_pos = load_main_sash_position()
+                min_content_width = 600
+                min_sidebar_width = 200
+                if (saved_pos is not None and
+                    saved_pos >= min_content_width and
+                    saved_pos <= total_width - min_sidebar_width):
+                    self.main_paned.sashpos(0, saved_pos)
+                self._sash_initialized = True
+
+            # --- Sidebar vertical sash (presets | cargo) ---
+            if hasattr(self, 'sidebar_paned'):
+                paned = self.sidebar_paned
+                total_height = paned.winfo_height()
+                if total_height > 100:
+                    from config import load_sidebar_sash_position
+                    saved_pos = load_sidebar_sash_position()
+                    min_presets_height = 150
+                    min_cargo_height = 120
+                    if (saved_pos is not None and
+                        saved_pos >= min_presets_height and
+                        saved_pos <= total_height - min_cargo_height):
+                        paned.sashpos(0, saved_pos)
+                    self._sidebar_sash_initialized = True
+        except Exception as e:
+            print(f"Error reinitializing sash positions: {e}")
         
     def _refresh_voice_list(self):
         """Refresh the TTS voice dropdown list"""
@@ -20408,6 +20444,11 @@ if __name__ == "__main__":
             # Restore geometry NOW (just before showing) to avoid any pre-splash flash
             app._restore_window_geometry()
             app.lift()
+            # Re-trigger sash initialization — the initial attempt during the splash
+            # timed out because the window had no real geometry yet
+            app._sash_initialized = False
+            app._sidebar_sash_initialized = False
+            app.after(300, app._reinitialize_sash_positions)
 
         if splash:
             app.after(_SPLASH_DURATION, _dismiss_splash)
