@@ -10400,6 +10400,69 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     ), tags=(tag,))
                     row_index += 1
             
+            # Third, show selected minerals detected in asteroids but not yet displayed
+            # (detected at any % but below threshold and no cargo)
+            if hasattr(self.session_analytics, 'material_stats_all'):
+                for material_name, mat_stats in self.session_analytics.material_stats_all.items():
+                    if material_name in displayed_materials:
+                        continue
+                    if not mat_stats or mat_stats.get_find_count() <= 0:
+                        continue
+                    # Only show if this mineral is selected in the announcement panel
+                    is_selected = self.announce_map.get(material_name, False)
+                    if not is_selected:
+                        continue
+                    
+                    displayed_materials.add(material_name)
+                    display_name = self._abbreviate_material_for_stats(material_name)
+                    
+                    # Determine display format
+                    has_core_finds = False
+                    has_noncore_finds = False
+                    if hasattr(mat_stats, 'finds'):
+                        for find in mat_stats.finds:
+                            if find.percentage == 0.0:
+                                has_core_finds = True
+                            elif find.percentage > 0.0:
+                                has_noncore_finds = True
+                    
+                    if material_name in CORE_ONLY:
+                        material_display = f"{display_name} (Core)"
+                    elif has_core_finds and has_noncore_finds:
+                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
+                        material_display = f"{display_name} (Core, {threshold:.1f}%)"
+                    elif has_core_finds:
+                        material_display = f"{display_name} (Core)"
+                    else:
+                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
+                        material_display = f"{display_name} ({threshold:.1f}%)"
+                    
+                    # Show prospector stats from all finds
+                    avg_all = mat_stats.get_average_percentage()
+                    avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
+                    best = mat_stats.get_best_percentage()
+                    best_pct = f"{best:.1f}%" if best and best > 0 else "0.0%"
+                    latest = mat_stats.get_latest_percentage()
+                    latest_pct = f"{latest:.1f}%" if latest and latest > 0 else "0.0%"
+                    
+                    # No cargo, no above-threshold hits
+                    tons_str = "—"
+                    tph_str = "—"
+                    tons_per_str = "—"
+                    avg_pct = "—"
+                    quality_hits = "0"
+                    
+                    # All hits and quality rate
+                    all_hits_count = mat_stats.get_find_count()
+                    all_hits_str = f"{all_hits_count}/{total_asteroids}" if total_asteroids > 0 else str(all_hits_count)
+                    quality_rate_str = "—"
+                    
+                    tag = "evenrow" if row_index % 2 == 0 else "oddrow"
+                    self.stats_tree.insert("", "end", values=(
+                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits, all_hits_str, quality_rate_str
+                    ), tags=(tag,))
+                    row_index += 1
+            
             # Update session summary with live tracking
             total_asteroids = self.session_analytics.get_total_asteroids()
             tracked_materials = len(summary_data) if summary_data else 0

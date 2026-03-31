@@ -6,8 +6,13 @@
 ### App
 - Added splash screen on startup displaying the EliteMining logo
 
-### VoiceAttack
-- General adjustments and improvements
+### Mining & Session Tab — Mineral Analysis
+- Added **All Hits** column: shows how many asteroids contained a mineral at any % out of total prospected (e.g. `4/11`)
+- Added **Hit Rate** column: shows above-threshold hits vs all appearances (e.g. `2/4 (50%)`)
+- Renamed **Hits** column to **Hits (≥Thr)** to clarify it tracks above-threshold finds
+- Centered all column values except the mineral name column
+- Selected minerals now appear in the table as soon as they are detected in any asteroid, even if below threshold — giving immediate visibility into ring composition via the All Hits column
+- Updated tooltips with clear examples for new columns
 
 ### VoiceAttack Profile — Updated to v4.9.7
 -  General adjustments and improvements
