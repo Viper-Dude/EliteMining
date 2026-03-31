@@ -9,7 +9,7 @@ from datetime import datetime
 
 # === CHANGE VERSION AND DATE HERE ===
 NEW_VERSION = "4.9.7"
-NEW_BUILD_DATE = "2025-03-30"  # Format: YYYY-MM-DD (leave empty for today's date)
+NEW_BUILD_DATE = "2025-03-31"  # Format: YYYY-MM-DD (leave empty for today's date)
 # ====================================
 
 def main():
