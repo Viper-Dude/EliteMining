@@ -14631,6 +14631,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if os.path.exists(bookmarks_file):
                         zipf.write(bookmarks_file, "mining_bookmarks.json")
                         print(f"BACKUP DEBUG: Bookmarks file backed up successfully")
+                        # Also back up BookmarkScreenshots folder
+                        from path_utils import get_bookmark_screenshots_dir
+                        ss_root = get_bookmark_screenshots_dir()
+                        if os.path.exists(ss_root):
+                            for dirpath, dirnames, filenames in os.walk(ss_root):
+                                for filename in filenames:
+                                    full_path = os.path.join(dirpath, filename)
+                                    arcname = os.path.join("BookmarkScreenshots",
+                                                           os.path.relpath(full_path, ss_root))
+                                    zipf.write(full_path, arcname)
+                            print(f"BACKUP DEBUG: BookmarkScreenshots folder backed up")
                     else:
                         print(f"BACKUP DEBUG: Bookmarks file NOT FOUND!")
                         # List what's actually in app_data_dir
@@ -15094,6 +15105,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     with open(target_path, 'wb') as f:
                         f.write(zipf.read("mining_bookmarks.json"))
                     restored_items.append("Mining Bookmarks")
+                    # Restore BookmarkScreenshots folder
+                    from path_utils import get_bookmark_screenshots_dir
+                    ss_root = get_bookmark_screenshots_dir()
+                    ss_entries = [n for n in zipf.namelist() if n.startswith("BookmarkScreenshots/")]
+                    for entry in ss_entries:
+                        rel = entry[len("BookmarkScreenshots/"):]
+                        if not rel:
+                            continue
+                        dest = os.path.join(ss_root, rel)
+                        os.makedirs(os.path.dirname(dest), exist_ok=True)
+                        with open(dest, 'wb') as f:
+                            f.write(zipf.read(entry))
                     # Refresh bookmarks display
                     if hasattr(self, 'prospector_panel') and self.prospector_panel:
                         self.prospector_panel._load_bookmarks()

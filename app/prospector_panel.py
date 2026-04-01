@@ -12365,7 +12365,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.bookmarks_tree.heading("overlap", text=t('bookmarks.overlap'), anchor="w")
         self.bookmarks_tree.heading("res_site", text=t('bookmarks.res_site'), anchor="w")
         self.bookmarks_tree.heading("rating", text=t('bookmarks.rating'), anchor="center")
-        self.bookmarks_tree.heading("notes", text=t('bookmarks.notes'), anchor="w")
+        self.bookmarks_tree.heading("notes", text=t('bookmarks.notes'), anchor="center")
         
         # Add tooltip to avg_yield column header (hover over the column header itself)
         # Create an invisible label over the column header area for tooltip
@@ -12425,13 +12425,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.bookmarks_tree.column("overlap", width=80, stretch=False, anchor="w")
         self.bookmarks_tree.column("res_site", width=80, stretch=False, anchor="w")
         self.bookmarks_tree.column("rating", width=70, stretch=False, anchor="center")
-        self.bookmarks_tree.column("notes", width=50, stretch=False, anchor="center")  # Narrower for emoji
+        self.bookmarks_tree.column("notes", width=60, stretch=False, anchor="center")
 
         # Setup column visibility for bookmarks
         self.setup_column_visibility(
             tree=self.bookmarks_tree,
             columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"),
-            default_widths={"last_mined": 100, "system": 180, "body": 120, "hotspot": 100, "materials": 200, "avg_yield": 80, "overlap": 80, "res_site": 80, "rating": 70, "notes": 50},
+            default_widths={"last_mined": 100, "system": 180, "body": 120, "hotspot": 100, "materials": 200, "avg_yield": 80, "overlap": 80, "res_site": 80, "rating": 70, "notes": 60},
             config_key='bookmarks'
         )
 
@@ -12665,7 +12665,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             # Add to tree
             notes = bookmark.get('notes', '')
-            notes_display = '💬' if notes.strip() else ''  # Show emoji if notes exist
+            # Combined notes + screenshots indicator is computed below after rating
             
             # Format overlap display as "Material Type" (e.g., "Plat 2x")
             target_material = bookmark.get('target_material', '')
@@ -12697,6 +12697,19 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 rating = 0
             rating_display = '★' * rating if rating > 0 else ''
             
+            # Combined notes + screenshots indicator
+            has_notes = bool(notes.strip())
+            screenshots = bookmark.get('screenshots', [])
+            has_screenshots = bool(screenshots)
+            if has_notes and has_screenshots:
+                notes_display = '💬📷'
+            elif has_notes:
+                notes_display = '💬'
+            elif has_screenshots:
+                notes_display = '📷'
+            else:
+                notes_display = ''
+
             tag = "evenrow" if row_index % 2 == 0 else "oddrow"
             self.bookmarks_tree.insert("", "end", values=(
                 bookmark.get('last_mined', ''),
@@ -12930,7 +12943,182 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         notes_text.grid(row=12, column=1, sticky="w", pady=(0, 10))
         if bookmark_data:
             notes_text.insert("1.0", bookmark_data.get('notes', ''))
-        
+
+        # ---- Screenshots section ----
+        # screenshots_state: list of dicts with keys: filename, path, is_pending_add
+        #   is_pending_add=True  -> not yet copied (src path), copy on Save
+        #   is_pending_add=False -> already in AppData (appdata path)
+        # pending_remove: list of appdata paths to delete on Save
+        screenshots_state = []
+        pending_remove = []
+
+        existing_screenshots = bookmark_data.get('screenshots', []) if bookmark_data else []
+
+        def _screenshots_appdata_dir():
+            """Compute appdata screenshots folder for current system/body."""
+            from path_utils import get_bookmark_screenshots_dir
+            import re
+            sys_name = system_var.get().strip() or 'unknown'
+            body_name = body_var.get().strip() or 'unknown'
+            folder_name = re.sub(r'[\\/:*?"<>|]', '_', f"{sys_name}_{body_name}")
+            folder = os.path.join(get_bookmark_screenshots_dir(), folder_name)
+            os.makedirs(folder, exist_ok=True)
+            return folder
+
+        def _build_existing_screenshot_state():
+            """Populate screenshots_state from existing bookmark data."""
+            from path_utils import get_bookmark_screenshots_dir
+            import re
+            for fname in existing_screenshots:
+                # Try to find the file in any subfolder of BookmarkScreenshots
+                # First try current system/body folder
+                appdata_path = os.path.join(_screenshots_appdata_dir(), fname)
+                if not os.path.exists(appdata_path):
+                    # Search all subfolders
+                    root = get_bookmark_screenshots_dir()
+                    for sub in os.listdir(root):
+                        candidate = os.path.join(root, sub, fname)
+                        if os.path.exists(candidate):
+                            appdata_path = candidate
+                            break
+                screenshots_state.append({'filename': fname, 'path': appdata_path, 'is_pending_add': False})
+
+        _build_existing_screenshot_state()
+
+        ttk.Label(frame, text=t('bookmarks.screenshots_label')).grid(row=13, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
+        ss_outer = ttk.Frame(frame)
+        ss_outer.grid(row=13, column=1, sticky="w", pady=(0, 5))
+
+        # Listbox + scrollbar
+        ss_list_frame = ttk.Frame(ss_outer)
+        ss_list_frame.pack(side="top", fill="x")
+        ss_listbox = tk.Listbox(ss_list_frame, width=36, height=4,
+                               bg="#1e1e1e", fg="#e0e0e0", selectbackground="#0078d7",
+                               selectforeground="#ffffff", relief="solid", bd=1,
+                               font=("Segoe UI", 9))
+        ss_listbox.pack(side="left", fill="x", expand=True)
+        ss_scrollbar = ttk.Scrollbar(ss_list_frame, orient="vertical", command=ss_listbox.yview)
+        ss_scrollbar.pack(side="right", fill="y")
+        ss_listbox.configure(yscrollcommand=ss_scrollbar.set)
+
+        def _refresh_ss_listbox():
+            ss_listbox.delete(0, "end")
+            for entry in screenshots_state:
+                prefix = "⏳ " if entry['is_pending_add'] else "📷 "
+                ss_listbox.insert("end", prefix + entry['filename'])
+
+        _refresh_ss_listbox()
+
+        ss_btn_frame = ttk.Frame(ss_outer)
+        ss_btn_frame.pack(side="top", fill="x", pady=(4, 0))
+
+        def _ss_add():
+            from tkinter import filedialog
+            src = filedialog.askopenfilename(
+                title="Select Screenshot",
+                filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif")],
+                parent=dialog
+            )
+            if not src:
+                return
+            fname = os.path.basename(src)
+            # Avoid duplicate filenames in current state
+            existing_names = [e['filename'] for e in screenshots_state]
+            base, ext = os.path.splitext(fname)
+            counter = 1
+            while fname in existing_names:
+                fname = f"{base}_{counter}{ext}"
+                counter += 1
+            screenshots_state.append({'filename': fname, 'path': src, 'is_pending_add': True})
+            _refresh_ss_listbox()
+
+        def _ss_view():
+            sel = ss_listbox.curselection()
+            if not sel:
+                return
+            entry = screenshots_state[sel[0]]
+            path = entry['path']
+            if os.path.exists(path):
+                os.startfile(path)
+            else:
+                from main import centered_info_dialog
+                centered_info_dialog(dialog, t('dialogs.warning'),
+                                     t('bookmarks.screenshot_file_not_found') + f"\n{path}")
+
+        def _ss_open_location():
+            sel = ss_listbox.curselection()
+            if not sel:
+                return
+            entry = screenshots_state[sel[0]]
+            path = entry['path']
+            if os.path.exists(path):
+                import subprocess
+                subprocess.Popen(f'explorer /select,"{path}"')
+            else:
+                from main import centered_info_dialog
+                centered_info_dialog(dialog, t('dialogs.warning'),
+                                     t('bookmarks.screenshot_file_not_found') + f"\n{path}")
+
+        def _ss_remove():
+            sel = ss_listbox.curselection()
+            if not sel:
+                return
+            entry = screenshots_state[sel[0]]
+            from main import centered_yesno_dialog
+            if not centered_yesno_dialog(dialog, t('dialogs.confirm_delete'),
+                                         t('bookmarks.remove_screenshot_confirm')):
+                return
+            if not entry['is_pending_add']:
+                # Queue for deletion from AppData on Save
+                pending_remove.append(entry['path'])
+            screenshots_state.pop(sel[0])
+            _refresh_ss_listbox()
+
+        # Right-click context menu on listbox (theme-aware)
+        from config import load_theme as _load_theme_ss
+        _ss_theme = _load_theme_ss()
+        if _ss_theme == "elite_orange":
+            _ss_menu_bg = "#1e1e1e"; _ss_menu_fg = "#ff8c00"
+            _ss_menu_active_bg = "#ff6600"; _ss_menu_active_fg = "#000000"
+        else:
+            _ss_menu_bg = "#2d2d2d"; _ss_menu_fg = "#ffffff"
+            _ss_menu_active_bg = "#404040"; _ss_menu_active_fg = "#ffffff"
+
+        ss_context_menu = tk.Menu(dialog, tearoff=0,
+                                  bg=_ss_menu_bg, fg=_ss_menu_fg,
+                                  activebackground=_ss_menu_active_bg,
+                                  activeforeground=_ss_menu_active_fg)
+        ss_context_menu.add_command(label=t('bookmarks.view_screenshot'), command=_ss_view)
+        ss_context_menu.add_command(label=t('bookmarks.open_file_location'), command=_ss_open_location)
+        ss_context_menu.add_separator()
+        ss_context_menu.add_command(label=t('bookmarks.remove_screenshot'), command=_ss_remove)
+
+        def _ss_right_click(event):
+            idx = ss_listbox.nearest(event.y)
+            if idx >= 0:
+                ss_listbox.selection_clear(0, "end")
+                ss_listbox.selection_set(idx)
+            try:
+                ss_context_menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                ss_context_menu.grab_release()
+
+        ss_listbox.bind("<Button-3>", _ss_right_click)
+
+        tk.Button(ss_btn_frame, text=t('bookmarks.add_screenshot'), command=_ss_add,
+                  bg="#2a4a2a", fg="#ffffff", activebackground="#3a5a3a", activeforeground="#ffffff",
+                  relief="solid", bd=1, cursor="hand2", pady=2, padx=8,
+                  font=("Segoe UI", 8)).pack(side="left", padx=(0, 5))
+        tk.Button(ss_btn_frame, text=t('bookmarks.view_screenshot'), command=_ss_view,
+                  bg="#2a2a4a", fg="#ffffff", activebackground="#3a3a5a", activeforeground="#ffffff",
+                  relief="solid", bd=1, cursor="hand2", pady=2, padx=8,
+                  font=("Segoe UI", 8)).pack(side="left", padx=(0, 5))
+        tk.Button(ss_btn_frame, text=t('bookmarks.remove_screenshot'), command=_ss_remove,
+                  bg="#4a2a2a", fg="#ffffff", activebackground="#5a3a3a", activeforeground="#ffffff",
+                  relief="solid", bd=1, cursor="hand2", pady=2, padx=8,
+                  font=("Segoe UI", 8)).pack(side="left")
+        # ---- End screenshots section ----
+
         # Pre-load overlap/RES from database if editing existing bookmark with system/body
         def load_from_database():
             """Load overlap and RES values from database for current system/body/material"""
@@ -12978,7 +13166,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Buttons
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=13, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=14, column=0, columnspan=2, pady=(10, 0))
         
         def save_bookmark():
             system = system_var.get().strip()
@@ -13018,8 +13206,32 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 'notes': notes_text.get("1.0", "end-1c").strip(),
                 'date_added': bookmark_data.get('date_added', dt.datetime.now().strftime('%Y-%m-%d')) if bookmark_data else dt.datetime.now().strftime('%Y-%m-%d')
             }
-            
-            # Debug: Print what we're saving
+
+            # Handle screenshots: copy pending additions, delete queued removals
+            import shutil
+            dest_folder = _screenshots_appdata_dir()
+            for entry in screenshots_state:
+                if entry['is_pending_add']:
+                    try:
+                        dest_path = os.path.join(dest_folder, entry['filename'])
+                        shutil.copy2(entry['path'], dest_path)
+                        entry['path'] = dest_path
+                        entry['is_pending_add'] = False
+                    except Exception as e:
+                        print(f"[SCREENSHOT] Failed to copy {entry['path']}: {e}")
+            for remove_path in pending_remove:
+                try:
+                    if os.path.exists(remove_path):
+                        os.remove(remove_path)
+                        # Remove the parent subfolder if it is now empty
+                        parent = os.path.dirname(remove_path)
+                        if os.path.isdir(parent) and not os.listdir(parent):
+                            os.rmdir(parent)
+                except Exception as e:
+                    print(f"[SCREENSHOT] Failed to delete {remove_path}: {e}")
+            pending_remove.clear()
+            bookmark['screenshots'] = [e['filename'] for e in screenshots_state]
+
             print(f"[BOOKMARK SAVE DEBUG] last_mined value: '{last_mined_var.get()}'")
             print(f"[BOOKMARK SAVE DEBUG] Full bookmark: {bookmark}")
             
@@ -13155,6 +13367,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             for i in range(len(self.bookmarks_data) - 1, -1, -1):
                 bookmark = self.bookmarks_data[i]
                 if bookmark.get('system') == system and bookmark.get('body') == body:
+                    # Delete associated screenshot files
+                    try:
+                        import re, shutil
+                        from path_utils import get_bookmark_screenshots_dir
+                        folder_name = re.sub(r'[\\/:*?"<>|]', '_', f"{system}_{body}")
+                        ss_folder = os.path.join(get_bookmark_screenshots_dir(), folder_name)
+                        if os.path.exists(ss_folder):
+                            shutil.rmtree(ss_folder)
+                    except Exception as e:
+                        print(f"[SCREENSHOT] Failed to remove screenshot folder for {system}/{body}: {e}")
                     del self.bookmarks_data[i]
                     break
         

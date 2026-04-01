@@ -97,6 +97,16 @@ def get_bookmarks_file():
     """
     return os.path.join(get_app_data_dir(), "mining_bookmarks.json")
 
+def get_bookmark_screenshots_dir():
+    """
+    Get root directory for bookmark screenshots (user data).
+    Structure: <app_data>/BookmarkScreenshots/<sanitized_system_body>/
+    Protected by backup/restore system.
+    """
+    screenshots_dir = os.path.join(get_app_data_dir(), "BookmarkScreenshots")
+    os.makedirs(screenshots_dir, exist_ok=True)
+    return screenshots_dir
+
 def get_images_dir():
     """
     Get images directory for app assets (logos, icons, etc.)
