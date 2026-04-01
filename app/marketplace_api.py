@@ -1,18 +1,24 @@
 """
-Marketplace API for commodity price lookups using EDData API
+Marketplace API for commodity price lookups using EDData + Ardent Insight APIs.
+
+Both APIs are queried in parallel. Results are merged by marketId, keeping the
+record with the newer updatedAt timestamp so the freshest price always wins.
 """
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional
 
 
 class MarketplaceAPI:
-    """EDData API integration for commodity market data (with Ardent fallback)"""
-    
-    # Primary and fallback API URLs
-    # NOTE: EDData is primary, Ardent is fallback for redundancy
-    PRIMARY_URL = "https://api.eddata.dev/v2"
-    FALLBACK_URL = "https://api.ardent-insight.com/v2"
-    BASE_URL = PRIMARY_URL  # Active URL (will switch on failure)
+    """Dual-API market data: EDData + Ardent Insight, merged by freshness."""
+
+    EDDATA_URL  = "https://api.eddata.dev/v2"
+    ARDENT_URL  = "https://api.ardent-insight.com/v2"
+
+    # Keep BASE_URL for any legacy callers; _fetch_both() ignores it
+    PRIMARY_URL  = EDDATA_URL
+    FALLBACK_URL = ARDENT_URL
+    BASE_URL     = PRIMARY_URL
     
     # Map EliteMining commodity names to EDData API names
     COMMODITY_NAME_MAP = {
@@ -43,42 +49,72 @@ class MarketplaceAPI:
     
     @staticmethod
     def _make_api_request(url: str, params: dict, timeout: int = 10) -> requests.Response:
+        """Single GET request (kept for compatibility). Raises on failure."""
+        response = requests.get(url, params=params, timeout=timeout)
+        response.raise_for_status()
+        return response
+
+    @staticmethod
+    def _fetch_both(path: str, params: dict, timeout: int = 10) -> List[Dict]:
         """
-        Make API request with automatic fallback to alternate API
-        
-        Args:
-            url: Full URL to request
-            params: Query parameters
-            timeout: Request timeout in seconds
-            
-        Returns:
-            Response object
-            
-        Raises:
-            requests.exceptions.RequestException: If both APIs fail
+        Fetch *path* from both EDData and Ardent in parallel, return the raw
+        combined list.  Each item keeps its source URL so _merge_by_freshness
+        can log it if needed.  If one API fails, the other's results are still
+        returned.
         """
-        try:
-            # Try primary API
-            response = requests.get(url, params=params, timeout=timeout)
-            response.raise_for_status()
-            return response
-        except requests.exceptions.RequestException as e:
-            # If primary fails, try fallback
-            if MarketplaceAPI.BASE_URL == MarketplaceAPI.PRIMARY_URL:
-                print(f"[API] Primary API failed, trying fallback: {e}")
-                fallback_url = url.replace(MarketplaceAPI.PRIMARY_URL, MarketplaceAPI.FALLBACK_URL)
-                try:
-                    response = requests.get(fallback_url, params=params, timeout=timeout)
-                    response.raise_for_status()
-                    print(f"[API] Fallback API succeeded")
-                    # Switch to fallback for future requests
-                    MarketplaceAPI.BASE_URL = MarketplaceAPI.FALLBACK_URL
-                    return response
-                except requests.exceptions.RequestException as fallback_error:
-                    print(f"[API] Fallback API also failed: {fallback_error}")
-                    raise e  # Raise original error
-            else:
-                raise
+        def _get(base: str) -> List[Dict]:
+            try:
+                url = f"{base}{path}"
+                r = requests.get(url, params=params, timeout=timeout)
+                r.raise_for_status()
+                data = r.json()
+                if isinstance(data, list):
+                    return data
+                if isinstance(data, dict) and "results" in data:
+                    return data["results"]
+                return []
+            except Exception as e:
+                print(f"[DUAL-API] {base} failed: {e}")
+                return []
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            fut_eddata  = pool.submit(_get, MarketplaceAPI.EDDATA_URL)
+            fut_ardent  = pool.submit(_get, MarketplaceAPI.ARDENT_URL)
+            eddata_rows = fut_eddata.result()
+            ardent_rows = fut_ardent.result()
+
+        print(f"[DUAL-API] EDData={len(eddata_rows)}  Ardent={len(ardent_rows)}")
+        return eddata_rows + ardent_rows
+
+    @staticmethod
+    def _merge_by_freshness(rows: List[Dict]) -> List[Dict]:
+        """
+        Deduplicate by marketId, keeping the record with the newer updatedAt.
+        Records without marketId are kept as-is (e.g. some on-foot settlements).
+        """
+        from datetime import datetime
+
+        def _ts(row: Dict) -> datetime:
+            raw = row.get("updatedAt") or ""
+            try:
+                return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except Exception:
+                return datetime.min
+
+        best: Dict[int, Dict] = {}
+        no_id: List[Dict] = []
+
+        for row in rows:
+            mid = row.get("marketId")
+            if mid is None:
+                no_id.append(row)
+                continue
+            if mid not in best or _ts(row) > _ts(best[mid]):
+                best[mid] = row
+
+        merged = list(best.values()) + no_id
+        print(f"[DUAL-API] After merge: {len(merged)} unique results")
+        return merged
     
     @staticmethod
     def normalize_commodity_name(commodity: str) -> str:
@@ -125,73 +161,32 @@ class MarketplaceAPI:
             commodity_normalized = MarketplaceAPI.normalize_commodity_name(commodity)
             commodity_encoded = urllib.parse.quote(commodity_normalized)
             system_encoded = urllib.parse.quote(reference_system)
-            
-            # Build URL - uses "imports" endpoint (places that BUY/import the commodity)
-            url = f"{MarketplaceAPI.BASE_URL}/system/name/{system_encoded}/commodity/name/{commodity_encoded}/nearby/imports"
-            
-            # Build query parameters - use API maximum distance for best results
-            params = {
+
+            # --- Nearby imports (both APIs in parallel) ---
+            nearby_path = f"/system/name/{system_encoded}/commodity/name/{commodity_encoded}/nearby/imports"
+            nearby_params = {
                 "minVolume": 1,
                 "maxDaysAgo": max_days_ago,
-                "maxDistance": 500  # API maximum is 500 LY
+                "maxDistance": 500,
             }
-            
-            # Add fleet carrier filter if requested
             if exclude_carriers:
-                params["fleetCarriers"] = False
-            
-            # Call API for nearby systems with fallback
-            print(f"[EDDATA API] URL: {url}")
-            print(f"[EDDATA API] Params: {params}")
-            response = MarketplaceAPI._make_api_request(url, params, timeout=10)
-            print(f"[EDDATA API] Status: {response.status_code}")
-            
-            data = response.json()
-            results = []
-            
-            # API returns a list directly, not a dict with 'results'
-            if isinstance(data, list):
-                print(f"[EDDATA API] Found {len(data)} nearby results")
-                results = data
-            elif isinstance(data, dict) and "results" in data:
-                print(f"[EDDATA API] Found {len(data['results'])} results in dict")
-                results = data["results"]
-            else:
-                print(f"[EDDATA API] Unexpected response type: {type(data)}")
-                results = []
-            
-            # ALSO query local system imports (nearby endpoint excludes reference system)
-            local_url = f"{MarketplaceAPI.BASE_URL}/system/name/{system_encoded}/commodities/imports"
-            local_params = {
-                "minVolume": 1,
-                "maxDaysAgo": max_days_ago
-            }
-            
-            print(f"[EDDATA API LOCAL] URL: {local_url}")
-            print(f"[EDDATA API LOCAL] Params: {local_params}")
-            try:
-                local_response = MarketplaceAPI._make_api_request(local_url, local_params, timeout=10)
-                print(f"[EDDATA API LOCAL] Status: {local_response.status_code}")
-            except:
-                local_response = None
-            
-            if local_response and local_response.status_code == 200:
-                local_data = local_response.json()
-                if isinstance(local_data, list):
-                    # Filter for the specific commodity (use normalized name)
-                    commodity_imports = [r for r in local_data if r.get('commodityName', '').lower() == commodity_normalized]
-                    print(f"[EDDATA API LOCAL] Found {len(commodity_imports)} local results for {commodity}")
-                    
-                    # Add distance=0 for local results and merge
-                    for imp in commodity_imports:
-                        imp['distance'] = 0
-                    results.extend(commodity_imports)
-                    print(f"[EDDATA API] Total after merging: {len(results)} results")
-            
-            if results and len(results) > 0:
-                print(f"[EDDATA API] Sample result keys: {list(results[0].keys())}")
-                print(f"[EDDATA API] First result sample: {results[0]}")
-            
+                nearby_params["fleetCarriers"] = False
+
+            print(f"[BUYERS] nearby path: {nearby_path} params: {nearby_params}")
+            nearby_rows = MarketplaceAPI._fetch_both(nearby_path, nearby_params)
+
+            # --- Local system imports (both APIs in parallel) ---
+            local_path = f"/system/name/{system_encoded}/commodities/imports"
+            local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
+
+            print(f"[BUYERS] local path: {local_path}")
+            local_rows_raw = MarketplaceAPI._fetch_both(local_path, local_params)
+            local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
+            for r in local_rows:
+                r["distance"] = 0
+
+            print(f"[BUYERS] nearby={len(nearby_rows)} local={len(local_rows)}")
+            results = MarketplaceAPI._merge_by_freshness(nearby_rows + local_rows)
             return results
             
         except requests.exceptions.RequestException as e:
@@ -220,78 +215,39 @@ class MarketplaceAPI:
             - updated
         """
         try:
-            # Normalize and URL encode commodity and system names
             import urllib.parse
             commodity_normalized = MarketplaceAPI.normalize_commodity_name(commodity)
             commodity_encoded = urllib.parse.quote(commodity_normalized)
             system_encoded = urllib.parse.quote(reference_system)
-            
-            # Build URL - uses "exports" endpoint (places that SELL/export the commodity)
-            url = f"{MarketplaceAPI.BASE_URL}/system/name/{system_encoded}/commodity/name/{commodity_encoded}/nearby/exports"
-            
-            # Build query parameters - use API maximum distance for best results
-            params = {
-                "minVolume": 1,  # Only show stations with stock > 0 (per EDData API docs)
-                "maxDaysAgo": max_days_ago,
-                "maxDistance": 500,  # API maximum is 500 LY
-                "fleetCarriers": None if not exclude_carriers else False  # Let API filter carriers
-            }
-            
-            # Call API for nearby systems with fallback
-            print(f"[EDDATA API SELLERS] URL: {url}")
-            print(f"[EDDATA API SELLERS] Params: {params}")
-            response = MarketplaceAPI._make_api_request(url, params, timeout=10)
-            print(f"[EDDATA API SELLERS] Status: {response.status_code}")
-            
-            data = response.json()
-            results = []
-            
-            # API returns a list directly, not a dict with 'results'
-            if isinstance(data, list):
-                print(f"[EDDATA API SELLERS] Found {len(data)} nearby results")
-                results = data
-            elif isinstance(data, dict) and "results" in data:
-                print(f"[EDDATA API SELLERS] Found {len(data['results'])} results in dict")
-                results = data["results"]
-            else:
-                print(f"[EDDATA API SELLERS] Unexpected response type: {type(data)}")
-                results = []
-            
-            # ALSO query local system exports (nearby endpoint excludes reference system)
-            local_url = f"{MarketplaceAPI.BASE_URL}/system/name/{system_encoded}/commodities/exports"
-            local_params = {
+
+            # --- Nearby exports (both APIs in parallel) ---
+            nearby_path = f"/system/name/{system_encoded}/commodity/name/{commodity_encoded}/nearby/exports"
+            nearby_params = {
                 "minVolume": 1,
-                "maxDaysAgo": max_days_ago
+                "maxDaysAgo": max_days_ago,
+                "maxDistance": 500,
             }
-            
-            print(f"[EDDATA API SELLERS LOCAL] URL: {local_url}")
-            print(f"[EDDATA API SELLERS LOCAL] Params: {local_params}")
-            try:
-                local_response = MarketplaceAPI._make_api_request(local_url, local_params, timeout=10)
-                print(f"[EDDATA API SELLERS LOCAL] Status: {local_response.status_code}")
-            except:
-                local_response = None
-            
-            if local_response and local_response.status_code == 200:
-                local_data = local_response.json()
-                if isinstance(local_data, list):
-                    # Filter for the specific commodity (use normalized name)
-                    commodity_exports = [r for r in local_data if r.get('commodityName', '').lower() == commodity_normalized]
-                    print(f"[EDDATA API SELLERS LOCAL] Found {len(commodity_exports)} local results for {commodity}")
-                    
-                    # Add distance=0 and fix price field for local results
-                    # NOTE: Local /commodities/exports endpoint has sellPrice=0 and actual price in buyPrice
-                    for export in commodity_exports:
-                        export['distance'] = 0
-                        if export.get('sellPrice', 0) == 0 and export.get('buyPrice', 0) > 0:
-                            export['sellPrice'] = export['buyPrice']  # Fix backwards field naming
-                    results.extend(commodity_exports)
-                    print(f"[EDDATA API SELLERS] Total after merging: {len(results)} results")
-            
-            if results and len(results) > 0:
-                print(f"[EDDATA API SELLERS] Sample result keys: {list(results[0].keys())}")
-                print(f"[EDDATA API SELLERS] First result sample: {results[0]}")
-            
+            if exclude_carriers:
+                nearby_params["fleetCarriers"] = False
+
+            print(f"[SELLERS] nearby path: {nearby_path} params: {nearby_params}")
+            nearby_rows = MarketplaceAPI._fetch_both(nearby_path, nearby_params)
+
+            # --- Local system exports (both APIs in parallel) ---
+            local_path = f"/system/name/{system_encoded}/commodities/exports"
+            local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
+
+            print(f"[SELLERS] local path: {local_path}")
+            local_rows_raw = MarketplaceAPI._fetch_both(local_path, local_params)
+            local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
+            for r in local_rows:
+                r["distance"] = 0
+                # Local exports endpoint has buyPrice as the actual price
+                if r.get("sellPrice", 0) == 0 and r.get("buyPrice", 0) > 0:
+                    r["sellPrice"] = r["buyPrice"]
+
+            print(f"[SELLERS] nearby={len(nearby_rows)} local={len(local_rows)}")
+            results = MarketplaceAPI._merge_by_freshness(nearby_rows + local_rows)
             return results
             
         except requests.exceptions.RequestException as e:
@@ -315,39 +271,19 @@ class MarketplaceAPI:
             List of station data dictionaries sorted by highest price
         """
         try:
-            # Normalize and URL encode commodity name
             import urllib.parse
             commodity_normalized = MarketplaceAPI.normalize_commodity_name(commodity)
             commodity_encoded = urllib.parse.quote(commodity_normalized)
-            
-            # Use galaxy-wide imports endpoint (no system reference needed)
-            url = f"{MarketplaceAPI.BASE_URL}/commodity/name/{commodity_encoded}/imports"
-            
-            # Build query parameters for top results
-            params = {
-                "minVolume": 1,
-                "maxDaysAgo": max_days_ago,
-                "fleetCarriers": None if not exclude_carriers else False  # Let API filter carriers
-            }
-            
-            # Call API with fallback
-            print(f"[EDDATA API GALAXY] URL: {url}")
-            print(f"[EDDATA API GALAXY] Params: {params}")
-            response = MarketplaceAPI._make_api_request(url, params, timeout=10)
-            print(f"[EDDATA API GALAXY] Status: {response.status_code}")
-            
-            data = response.json()
-            
-            # API returns a list directly
-            if isinstance(data, list):
-                print(f"[EDDATA API GALAXY] Found {len(data)} results")
-                if data:
-                    print(f"[EDDATA API GALAXY] Sample result keys: {list(data[0].keys())}")
-                    print(f"[EDDATA API GALAXY] First result sample: {data[0]}")
-                return data  # Return all results for local filtering
-            else:
-                print(f"[EDDATA API GALAXY] Unexpected response type: {type(data)}")
-                return []
+
+            path = f"/commodity/name/{commodity_encoded}/imports"
+            params: dict = {"minVolume": 1, "maxDaysAgo": max_days_ago}
+            if exclude_carriers:
+                params["fleetCarriers"] = False
+
+            print(f"[GALAXY BUYERS] path: {path} params: {params}")
+            rows = MarketplaceAPI._fetch_both(path, params)
+            results = MarketplaceAPI._merge_by_freshness(rows)
+            return results
             
         except requests.exceptions.RequestException as e:
             print(f"[EDDATA API GALAXY] Request error: {e}")
@@ -369,39 +305,19 @@ class MarketplaceAPI:
             List of station data dictionaries sorted by lowest price
         """
         try:
-            # Normalize and URL encode commodity name
             import urllib.parse
             commodity_normalized = MarketplaceAPI.normalize_commodity_name(commodity)
             commodity_encoded = urllib.parse.quote(commodity_normalized)
-            
-            # Use galaxy-wide exports endpoint (no system reference needed)
-            url = f"{MarketplaceAPI.BASE_URL}/commodity/name/{commodity_encoded}/exports"
-            
-            # Build query parameters for top results
-            params = {
-                "minVolume": 1,  # Only show stations with stock > 0 (per EDData API docs)
-                "maxDaysAgo": max_days_ago,
-                "fleetCarriers": None if not exclude_carriers else False  # Let API filter carriers
-            }
-            
-            # Call API with fallback
-            print(f"[EDDATA API GALAXY SELLERS] URL: {url}")
-            print(f"[EDDATA API GALAXY SELLERS] Params: {params}")
-            response = MarketplaceAPI._make_api_request(url, params, timeout=10)
-            print(f"[EDDATA API GALAXY SELLERS] Status: {response.status_code}")
-            
-            data = response.json()
-            
-            # API returns a list directly
-            if isinstance(data, list):
-                print(f"[EDDATA API GALAXY SELLERS] Found {len(data)} results")
-                if data:
-                    print(f"[EDDATA API GALAXY SELLERS] Sample result keys: {list(data[0].keys())}")
-                    print(f"[EDDATA API GALAXY SELLERS] First result sample: {data[0]}")
-                return data  # Return all results for local filtering
-            else:
-                print(f"[EDDATA API GALAXY SELLERS] Unexpected response type: {type(data)}")
-                return []
+
+            path = f"/commodity/name/{commodity_encoded}/exports"
+            params: dict = {"minVolume": 1, "maxDaysAgo": max_days_ago}
+            if exclude_carriers:
+                params["fleetCarriers"] = False
+
+            print(f"[GALAXY SELLERS] path: {path} params: {params}")
+            rows = MarketplaceAPI._fetch_both(path, params)
+            results = MarketplaceAPI._merge_by_freshness(rows)
+            return results
             
         except requests.exceptions.RequestException as e:
             print(f"[EDDATA API GALAXY SELLERS] Request error: {e}")
