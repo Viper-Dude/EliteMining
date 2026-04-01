@@ -20399,9 +20399,9 @@ if __name__ == "__main__":
             # In dev: app_dir = .../app/ which contains Images/
             # When frozen: app_dir = .../Configurator/ — images are at ../app/Images/
             if getattr(sys, 'frozen', False):
-                _splash_img_path = os.path.join(os.path.dirname(app_dir), "app", "Images", "EliteMining_Main_logo.png")
+                _splash_img_path = os.path.join(os.path.dirname(app_dir), "app", "Images", "EliteMining_Main_logo497.png")
             else:
-                _splash_img_path = os.path.join(app_dir, "Images", "EliteMining_Main_logo.png")
+                _splash_img_path = os.path.join(app_dir, "Images", "EliteMining_Main_logo497.png")
             _pil_img = Image.open(_splash_img_path)
             _orig_w, _orig_h = _pil_img.size
             # Scale so width fits within 900px, preserving exact aspect ratio

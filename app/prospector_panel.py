@@ -815,6 +815,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.session_body = tk.StringVar(value="")
         self.session_mining_body = ""  # Preserved mining location (won't be overwritten by docking events)
         self.session_elapsed = tk.StringVar(value="00:00:00")
+        self.live_tph_var = tk.StringVar(value="")
         self.session_totals: Dict[str, float] = {}
         
         # Auto-start session on first prospector
@@ -9501,7 +9502,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             live_tph = live_tons / hours
                 except:
                     pass
-            
             if total_asteroids > 0 or live_tons > 0:
                 if live_tons > 0:
                     summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
@@ -10715,6 +10715,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.session_paused_seconds = 0.0
         self.session_totals = {}
         self.session_elapsed.set("00:00:00")
+        self.live_tph_var.set("")
         self.session_screenshots = []  # Initialize screenshots list for this session
         self.session_yield_data = {}  # Track yield data during session {material: [percentages]}
         self.session_location_captured_from_mining = False  # Flag to update location on first material collected
@@ -12177,6 +12178,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.session_paused_seconds = 0.0
         self.session_totals = {}
         self.session_elapsed.set("00:00:00")
+        self.live_tph_var.set("")
 
         # Reset button states
         self.start_btn.config(state="normal")
