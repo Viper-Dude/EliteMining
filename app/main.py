@@ -6673,16 +6673,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 preset_names = cfg.get('preset_names', {})
                 
                 # Add preset buttons
+                _preset_is_orange = hasattr(self, 'current_theme') and self.current_theme == "elite_orange"
+                _preset_btn_bg = "#4a4a2a" if _preset_is_orange else "#3a3a3a"
+                _preset_btn_hover = "#5a5a3a" if _preset_is_orange else "#4a4a4a"
+                _preset_btn_hl = "#2a2a1a" if _preset_is_orange else "#2a2a2a"
                 for i in range(1, 7):  # Preset 1 to 6
                     # Get custom name or use default
                     custom_name = preset_names.get(str(i), f"Preset {i}")
                     
                     preset_btn = tk.Button(btns, text=custom_name,
-                                         bg="#4a4a2a", fg="#ffffff",
-                                         activebackground="#5a5a3a", activeforeground="#ffffff",
+                                         bg=_preset_btn_bg, fg="#ffffff",
+                                         activebackground=_preset_btn_hover, activeforeground="#ffffff",
                                          relief="raised", bd=1,
                                          width=13, font=("Segoe UI", 9), cursor="hand2", pady=3,
-                                         highlightbackground="#2a2a1a", highlightcolor="#2a2a1a")
+                                         highlightbackground=_preset_btn_hl, highlightcolor=_preset_btn_hl)
                     preset_btn.pack(side="left", padx=(8, 0))
                     
                     # Store button reference
@@ -6801,23 +6805,36 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         is_modified = self._ann_is_preset_modified()
         
+        # Theme-aware colors
+        is_orange = hasattr(self, 'current_theme') and self.current_theme == "elite_orange"
+        if is_orange:
+            active_bg = "#5a3a0a"
+            active_hover = "#6a4a1a"
+            inactive_bg = "#4a4a2a"
+            inactive_hover = "#5a5a3a"
+        else:
+            active_bg = "#2a4a6a"
+            active_hover = "#3a5a7a"
+            inactive_bg = "#3a3a3a"
+            inactive_hover = "#4a4a4a"
+        
         for i, btn in self.preset_buttons.items():
             base_name = preset_names.get(str(i), f"Preset {i}")
             
             if i == self._active_preset_num:
-                # Active preset — orange highlight
+                # Active preset — highlighted
                 if is_modified:
-                    btn.config(text=f"{base_name} *", bg="#5a3a0a", 
-                              activebackground="#6a4a1a",
+                    btn.config(text=f"{base_name} *", bg=active_bg, 
+                              activebackground=active_hover,
                               relief="raised")
                 else:
-                    btn.config(text=base_name, bg="#5a3a0a", 
-                              activebackground="#6a4a1a",
+                    btn.config(text=base_name, bg=active_bg, 
+                              activebackground=active_hover,
                               relief="raised")
             else:
                 # Inactive preset — default style
-                btn.config(text=base_name, bg="#4a4a2a", 
-                          activebackground="#5a5a3a",
+                btn.config(text=base_name, bg=inactive_bg, 
+                          activebackground=inactive_hover,
                           relief="raised")
 
     def _ann_check_modified(self):
