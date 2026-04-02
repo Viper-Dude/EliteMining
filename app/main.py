@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.9.7"
+APP_VERSION = "v4.9.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -6346,6 +6346,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Build the Announcements settings tab with full material functionality"""
         frame.columnconfigure(0, weight=1)
         frame.rowconfigure(2, weight=1)
+        
+        # Active preset tracking
+        self._active_preset_num = None
+        self._active_preset_snapshot = None  # Snapshot of settings when preset was loaded
 
         # Basic announcement controls
         ttk.Label(frame, text=t('settings.announcement_settings'), font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
@@ -6405,9 +6409,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 ttk.Label(thr, text=t('settings.announce_at')).pack(side="left")
                 # Use theme-aware colors for spinbox
                 _ann_spinbox_fg = "#ff8c00" if self.current_theme == "elite_orange" else "#ffffff"
+                def _ann_threshold_changed():
+                    self.prospector_panel._save_threshold_value()
+                    self._ann_check_modified()
                 sp = tk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
                                  textvariable=self.prospector_panel.threshold, 
-                                 command=self.prospector_panel._save_threshold_value,
+                                 command=_ann_threshold_changed,
                                  bg="#1e1e1e", fg=_ann_spinbox_fg, buttonbackground="#2d2d2d",
                                  insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
                                  relief="solid", bd=0, highlightthickness=1,
@@ -6425,6 +6432,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         var.set(round(new_val, 1))
                     except:
                         pass
+                    self._ann_check_modified()
                     return "break"
                 sp.bind("<MouseWheel>", on_ann_threshold_scroll)
                 ToolTip(sp, t('tooltips.announcement_threshold'))
@@ -6504,6 +6512,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             self._ann_minpct_vars[material].set(v)  # Update UI with validated value
                             self.prospector_panel.min_pct_map[material] = v
                             self.prospector_panel._save_min_pct_map()
+                            self._ann_check_modified()
                         except ValueError:
                             # Reset to current saved value on invalid input
                             self._ann_minpct_vars[material].set(self.prospector_panel.min_pct_map.get(material, 0.0))
@@ -6553,6 +6562,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 # Save after wheel scroll
                                 self.prospector_panel.min_pct_map[m] = new_val
                                 self.prospector_panel._save_min_pct_map()
+                                self._ann_check_modified()
                             except:
                                 pass
                             return "break"
@@ -6566,6 +6576,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 v.set(val)  # Update UI with validated value
                                 self.prospector_panel.min_pct_map[m] = val
                                 self.prospector_panel._save_min_pct_map()
+                                self._ann_check_modified()
                             except ValueError:
                                 # Reset to current saved value on invalid input
                                 v.set(self.prospector_panel.min_pct_map.get(m, 0.0))
@@ -6599,6 +6610,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 current = self.ann_mat_tree.item(item, "values")
                                 self.ann_mat_tree.item(item, values=(flag, current[1], current[2]))
                                 print(f"Toggled {item}: {current_state} → {new_state}")
+                                self._ann_check_modified()
                             except Exception as e:
                                 print(f"Error toggling {item}: {e}")
 
@@ -6690,14 +6702,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     preset_btn.bind("<Control-Button-3>", lambda e, num=i: self._rename_preset(num))
                     
                     # Fix button state after clicks (prevent stuck sunken appearance)
-                    preset_btn.bind("<ButtonRelease-1>", lambda e: e.widget.config(relief="raised"))
-                    preset_btn.bind("<ButtonRelease-2>", lambda e: e.widget.config(relief="raised"))
-                    preset_btn.bind("<ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
-                    preset_btn.bind("<Control-ButtonRelease-1>", lambda e: e.widget.config(relief="raised"))
-                    preset_btn.bind("<Control-ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
+                    preset_btn.bind("<ButtonRelease-1>", lambda e: self._ann_update_preset_buttons())
+                    preset_btn.bind("<ButtonRelease-2>", lambda e: self._ann_update_preset_buttons())
+                    preset_btn.bind("<ButtonRelease-3>", lambda e: self._ann_update_preset_buttons())
+                    preset_btn.bind("<Control-ButtonRelease-1>", lambda e: self._ann_update_preset_buttons())
+                    preset_btn.bind("<Control-ButtonRelease-3>", lambda e: self._ann_update_preset_buttons())
                     
                     # Add tooltip
                     ToolTip(preset_btn, f"Left-click: Load | Right-click: Save | Ctrl+Click: Rename")
+                
+                # Restore active preset indicator from config
+                try:
+                    active_num = cfg.get('active_preset_num')
+                    if active_num is not None:
+                        self._active_preset_num = active_num
+                        self._active_preset_snapshot = self._ann_get_current_snapshot()
+                        self._ann_update_preset_buttons()
+                except Exception:
+                    pass
                 
             except ImportError:
                 # Fallback if imports fail
@@ -6708,6 +6730,100 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ttk.Label(frame, text="Announcement settings will be available after the Mining Session initializes.\nPlease restart the application if this persists.", 
                      font=("Segoe UI", 10), foreground="orange").grid(row=1, column=0, sticky="w", padx=20, pady=20)
 
+    def _ann_get_current_snapshot(self):
+        """Get a snapshot of current announcement settings for comparison"""
+        if not hasattr(self, 'prospector_panel') or not self.prospector_panel:
+            return None
+        try:
+            snapshot = {
+                'announce_map': self.prospector_panel.announce_map.copy(),
+                'min_pct_map': {k: round(v, 1) for k, v in self.prospector_panel.min_pct_map.items()},
+                'announce_threshold': round(self.prospector_panel.threshold.get(), 1),
+            }
+            if hasattr(self, 'announcement_vars') and self.announcement_vars:
+                if "Core Asteroids" in self.announcement_vars:
+                    snapshot['Core Asteroids'] = self.announcement_vars["Core Asteroids"].get()
+                if "Non-Core Asteroids" in self.announcement_vars:
+                    snapshot['Non-Core Asteroids'] = self.announcement_vars["Non-Core Asteroids"].get()
+            return snapshot
+        except Exception:
+            return None
+
+    def _ann_is_preset_modified(self):
+        """Check if current settings differ from the loaded preset snapshot"""
+        if self._active_preset_num is None or self._active_preset_snapshot is None:
+            return False
+        current = self._ann_get_current_snapshot()
+        if current is None:
+            return False
+        return current != self._active_preset_snapshot
+
+    def _ann_set_active_preset(self, num):
+        """Set the active preset and take a snapshot"""
+        self._active_preset_num = num
+        self._active_preset_snapshot = self._ann_get_current_snapshot()
+        # Save to config
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                cfg = self.prospector_panel._load_cfg()
+                cfg['active_preset_num'] = num
+                self.prospector_panel._save_cfg(cfg)
+            except Exception:
+                pass
+        self._ann_update_preset_buttons()
+
+    def _ann_clear_active_preset(self):
+        """Clear active preset tracking"""
+        self._active_preset_num = None
+        self._active_preset_snapshot = None
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                cfg = self.prospector_panel._load_cfg()
+                cfg.pop('active_preset_num', None)
+                self.prospector_panel._save_cfg(cfg)
+            except Exception:
+                pass
+        self._ann_update_preset_buttons()
+
+    def _ann_update_preset_buttons(self):
+        """Update all preset button visuals based on active state"""
+        if not hasattr(self, 'preset_buttons'):
+            return
+        
+        cfg = {}
+        preset_names = {}
+        if hasattr(self, 'prospector_panel') and self.prospector_panel:
+            try:
+                cfg = self.prospector_panel._load_cfg()
+                preset_names = cfg.get('preset_names', {})
+            except Exception:
+                pass
+        
+        is_modified = self._ann_is_preset_modified()
+        
+        for i, btn in self.preset_buttons.items():
+            base_name = preset_names.get(str(i), f"Preset {i}")
+            
+            if i == self._active_preset_num:
+                # Active preset — orange highlight
+                if is_modified:
+                    btn.config(text=f"{base_name} *", bg="#5a3a0a", 
+                              activebackground="#6a4a1a",
+                              relief="raised")
+                else:
+                    btn.config(text=base_name, bg="#5a3a0a", 
+                              activebackground="#6a4a1a",
+                              relief="raised")
+            else:
+                # Inactive preset — default style
+                btn.config(text=base_name, bg="#4a4a2a", 
+                          activebackground="#5a5a3a",
+                          relief="raised")
+
+    def _ann_check_modified(self):
+        """Check if preset was modified and update button visuals"""
+        self._ann_update_preset_buttons()
+
     def _ann_select_all(self):
         """Enable announcements for all materials"""
         if hasattr(self, 'prospector_panel') and self.prospector_panel:
@@ -6717,6 +6833,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.prospector_panel.announce_map[mat] = True
                 self.prospector_panel._save_announce_map()
                 self._ann_update_display()
+                self._ann_check_modified()
             except Exception as e:
                 print(f"Error in _ann_select_all: {e}")
     
@@ -6729,6 +6846,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.prospector_panel.announce_map[mat] = False
                 self.prospector_panel._save_announce_map()
                 self._ann_update_display()
+                self._ann_check_modified()
             except Exception as e:
                 print(f"Error in _ann_unselect_all: {e}")
     
@@ -6745,6 +6863,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         if hasattr(self, '_ann_minpct_vars') and mat in self._ann_minpct_vars:
                             self._ann_minpct_vars[mat].set(threshold_val)
                 self.prospector_panel._save_min_pct_map()
+                self._ann_check_modified()
             except Exception as e:
                 print(f"Error in _ann_set_all_threshold: {e}")
             
@@ -6781,14 +6900,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 cfg['announce_preset_1'] = preset_data
                 self.prospector_panel._save_cfg(cfg)
+                self._ann_set_active_preset(1)
                 self._set_status("Saved Preset 1.")
                 
-                # Visual feedback - flash button green
+                # Visual feedback - flash button green then restore active style
                 if hasattr(self, 'preset_buttons') and 1 in self.preset_buttons:
                     btn = self.preset_buttons[1]
-                    orig_bg = btn.cget('bg')
                     btn.config(bg="#2a5a2a")
-                    self.after(200, lambda: btn.config(bg=orig_bg))
+                    self.after(300, self._ann_update_preset_buttons)
             except Exception as e:
                 print(f"Error saving preset 1: {e}")
 
@@ -6823,6 +6942,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.prospector_panel._save_announce_map()
                 self.prospector_panel._save_min_pct_map()
                 self._ann_update_display()
+                self._ann_set_active_preset(1)
                 self._set_status("Loaded Preset 1.")
             except Exception as e:
                 print(f"Error loading preset 1: {e}")
@@ -6847,14 +6967,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 cfg[f'announce_preset_{num}'] = preset_data
                 self.prospector_panel._save_cfg(cfg)
+                self._ann_set_active_preset(num)
                 self._set_status(f"Saved Preset {num}.")
                 
-                # Visual feedback - flash button green
+                # Visual feedback - flash button green then restore active style
                 if hasattr(self, 'preset_buttons') and num in self.preset_buttons:
                     btn = self.preset_buttons[num]
-                    orig_bg = btn.cget('bg')
                     btn.config(bg="#2a5a2a")
-                    self.after(200, lambda: btn.config(bg=orig_bg))
+                    self.after(300, self._ann_update_preset_buttons)
             except Exception as e:
                 print(f"Error saving preset {num}: {e}")
 
@@ -6901,6 +7021,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.prospector_panel._save_announce_map()
                 self.prospector_panel._save_min_pct_map()
                 self._ann_update_display()
+                self._ann_set_active_preset(num)
                 self._set_status(f"Loaded Preset {num}.")
             except Exception as e:
                 print(f"Error loading preset {num}: {e}")
@@ -6973,9 +7094,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     cfg['preset_names'][str(num)] = new_name
                     self.prospector_panel._save_cfg(cfg)
                     
-                    # Update button text and reset relief state
-                    if hasattr(self, 'preset_buttons') and num in self.preset_buttons:
-                        self.preset_buttons[num].config(text=new_name, relief="raised")
+                    # Update button text with proper active styling
+                    self._ann_update_preset_buttons()
                     
                     self._set_status(t('settings.preset_renamed').format(num=num, name=new_name))
                 dialog.destroy()
@@ -20422,9 +20542,9 @@ if __name__ == "__main__":
             # In dev: app_dir = .../app/ which contains Images/
             # When frozen: app_dir = .../Configurator/ — images are at ../app/Images/
             if getattr(sys, 'frozen', False):
-                _splash_img_path = os.path.join(os.path.dirname(app_dir), "app", "Images", "EliteMining_Main_logo497.png")
+                _splash_img_path = os.path.join(os.path.dirname(app_dir), "app", "Images", "EliteMining_Main_logo498.png")
             else:
-                _splash_img_path = os.path.join(app_dir, "Images", "EliteMining_Main_logo497.png")
+                _splash_img_path = os.path.join(app_dir, "Images", "EliteMining_Main_logo498.png")
             _pil_img = Image.open(_splash_img_path)
             _orig_w, _orig_h = _pil_img.size
             # Scale so width fits within 900px, preserving exact aspect ratio

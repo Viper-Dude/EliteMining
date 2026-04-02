@@ -1,0 +1,52 @@
+{
+  "Firegroups": {
+    "Mining lasers/MVR:": {
+      "fg": "C",
+      "btn": 1
+    },
+    "Discovery scanner:": {
+      "fg": "A",
+      "btn": 2
+    },
+    "Prospector limpet:": {
+      "fg": "C",
+      "btn": 2
+    },
+    "Pulse wave analyser:": {
+      "fg": "B",
+      "btn": 1
+    },
+    "Seismic charge launcher:": {
+      "fg": "D",
+      "btn": null
+    },
+    "Weapons:": {
+      "fg": "E",
+      "btn": null
+    },
+    "Sub-surface displacement missile:": {
+      "fg": "F",
+      "btn": null
+    }
+  },
+  "Toggles": {
+    "Auto Honk": 1,
+    "Cargo Scoop": 1,
+    "Headtracker Docking Control": 1,
+    "Laser Mining Extra": 1,
+    "Night Vision": 0,
+    "Power Settings": 0,
+    "Prospector Sequence": 1,
+    "Pulse Wave Analyser": 0,
+    "Target": 0
+  },
+  "Announcements": {},
+  "Timers": {
+    "Duration for firing mining lasers (first period)": 14,
+    "Pause between laser periods for weapon recharge/cooldown": 13,
+    "Duration for second laser period (If Laser Mining Extra is enabled)": 16,
+    "Delay before selecting prospector target after laser mining": 8,
+    "Delay before retracting cargo scoop after mining sequence": 17,
+    "Boost Interval (For Core Mining Boost sequense )": 1
+  }
+}
