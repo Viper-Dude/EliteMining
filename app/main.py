@@ -20589,8 +20589,6 @@ if __name__ == "__main__":
 
         # Force dark title bar after window is fully created
         app.after(200, app._set_dark_title_bar)
-        # Apply stay-on-top setting after window is fully initialized
-        app.after(250, app._apply_stay_on_top_after_init)
 
         # Splash: dismiss after 3 seconds, then restore geometry and reveal main window
         _SPLASH_DURATION = 3000  # milliseconds
@@ -20609,11 +20607,14 @@ if __name__ == "__main__":
             app._sash_initialized = False
             app._sidebar_sash_initialized = False
             app.after(300, app._reinitialize_sash_positions)
+            # Apply stay-on-top AFTER splash is gone and window is fully visible
+            app.after(500, app._apply_stay_on_top_after_init)
 
         if splash:
             app.after(_SPLASH_DURATION, _dismiss_splash)
         else:
             app._restore_window_geometry()
+            app.after(500, app._apply_stay_on_top_after_init)
 
         app.mainloop()
     except KeyboardInterrupt:
