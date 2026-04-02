@@ -1481,13 +1481,35 @@ class RingFinder(ColumnVisibilityMixin):
             if current_system:
                 self.current_system_var.set(current_system)
                 self._update_sol_distance(current_system)
-                self.status_var.set(t('ring_finder.current_system').format(system=current_system))
                 # Check if coordinates exist in cache
                 coords = self.systems_data.get(current_system.lower())
                 if not coords:
-                    self.status_var.set(t('ring_finder.coords_not_available').format(system=current_system))
-                else:
+                    # Try StarPos from startup journal scan
+                    star_pos = getattr(self.prospector_panel, 'last_system_star_pos', None) if self.prospector_panel else None
+                    if star_pos and len(star_pos) == 3:
+                        coords = {'x': star_pos[0], 'y': star_pos[1], 'z': star_pos[2]}
+                        self.systems_data[current_system.lower()] = coords
+                        print(f"[AUTO-DETECT] Cached coords from journal StarPos: {star_pos}")
+                if not coords:
+                    # Try galaxy database
+                    coords = self._get_system_coords_from_galaxy_db(current_system)
+                    if coords:
+                        self.systems_data[current_system.lower()] = coords
+                        print(f"[AUTO-DETECT] Cached coords from galaxy DB for '{current_system}'")
+                if not coords:
+                    # Try visited systems
+                    try:
+                        visited_coords = self.user_db._get_coordinates_from_visited_systems(current_system)
+                        if visited_coords:
+                            coords = {'x': visited_coords[0], 'y': visited_coords[1], 'z': visited_coords[2]}
+                            self.systems_data[current_system.lower()] = coords
+                            print(f"[AUTO-DETECT] Cached coords from visited systems for '{current_system}'")
+                    except Exception:
+                        pass
+                if coords:
                     self.status_var.set(t('ring_finder.current_system').format(system=current_system))
+                else:
+                    self.status_var.set(t('ring_finder.coords_not_available').format(system=current_system))
                 return
             
             # Fallback: read directly from Status.json
@@ -1502,15 +1524,23 @@ class RingFinder(ColumnVisibilityMixin):
                         self.current_system_var.set(system_name)
                         coords = self.systems_data.get(system_name.lower())
                         if not coords:
-                            # EDSM disabled - only use galaxy database for coordinates  
-                            # coords = self._get_system_coords_from_edsm(system_name)
+                            # Try galaxy database
+                            coords = self._get_system_coords_from_galaxy_db(system_name)
                             if coords:
                                 self.systems_data[system_name.lower()] = coords
-                                self.status_var.set(t('ring_finder.current_system').format(system=system_name))
-                            else:
-                                self.status_var.set(t('ring_finder.coords_not_available').format(system=system_name))
-                        else:
+                        if not coords:
+                            # Try visited systems
+                            try:
+                                visited_coords = self.user_db._get_coordinates_from_visited_systems(system_name)
+                                if visited_coords:
+                                    coords = {'x': visited_coords[0], 'y': visited_coords[1], 'z': visited_coords[2]}
+                                    self.systems_data[system_name.lower()] = coords
+                            except Exception:
+                                pass
+                        if coords:
                             self.status_var.set(t('ring_finder.current_system').format(system=system_name))
+                        else:
+                            self.status_var.set(t('ring_finder.coords_not_available').format(system=system_name))
                         return
             
             # Last resort: check latest journal file
@@ -6142,10 +6172,15 @@ class RingFinder(ColumnVisibilityMixin):
             # ONLY trigger on FSDJump (jump events), NOT on Scan/SAASignalsFound!
             if event_type == "FSDJump":
                 current_system = event.get("StarSystem")
+                star_pos = event.get("StarPos")
                 print(f"[AUTO-SEARCH] FSDJump detected: {current_system}")
                 if current_system and current_system != self.last_monitored_system:
                     print(f"[AUTO-SEARCH] ✓ NEW SYSTEM: {current_system} (was: {self.last_monitored_system})")
                     self.last_monitored_system = current_system
+                    # Cache coordinates from FSDJump event so search_hotspots finds them immediately
+                    if star_pos and len(star_pos) == 3:
+                        self.systems_data[current_system.lower()] = {'x': star_pos[0], 'y': star_pos[1], 'z': star_pos[2]}
+                        print(f"[AUTO-SEARCH] Cached coords from FSDJump: {star_pos}")
                     # Schedule auto-search in main thread
                     self.parent.after(1000, lambda: self._auto_search_new_system(current_system))
                 else:
@@ -6255,6 +6290,12 @@ class RingFinder(ColumnVisibilityMixin):
                 self.status_var.set(f"Auto-search: {current_system}")
                 self.system_var.set(current_system)
                 self.last_monitored_system = current_system
+                
+                # Cache coordinates from startup journal scan (StarPos) if available
+                star_pos = getattr(self.prospector_panel, 'last_system_star_pos', None) if self.prospector_panel else None
+                if star_pos and len(star_pos) == 3:
+                    self.systems_data[current_system.lower()] = {'x': star_pos[0], 'y': star_pos[1], 'z': star_pos[2]}
+                    print(f"[RING FINDER] Cached startup coords from journal StarPos: {star_pos}")
                 
                 # Force database-only for auto-search (don't query Spansh on startup)
                 saved_data_source = self.data_source_var.get()

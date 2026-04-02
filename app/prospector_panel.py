@@ -1194,7 +1194,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                     latest_event = {
                                         'system': system,
                                         'body': body_name,
-                                        'body_type': body_type
+                                        'body_type': body_type,
+                                        'star_pos': entry.get('StarPos')
                                     }
                             except Exception:
                                 # Fallback: just use first system event if timestamp parsing fails
@@ -1202,7 +1203,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                     latest_event = {
                                         'system': system,
                                         'body': entry.get("Body", ""),
-                                        'body_type': entry.get("BodyType", "")
+                                        'body_type': entry.get("BodyType", ""),
+                                        'star_pos': entry.get('StarPos')
                                     }
                         else:
                             # No timestamp, use if we haven't found anything
@@ -1210,7 +1212,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                 latest_event = {
                                     'system': system,
                                     'body': entry.get("Body", ""),
-                                    'body_type': entry.get("BodyType", "")
+                                    'body_type': entry.get("BodyType", ""),
+                                    'star_pos': entry.get('StarPos')
                                 }
                             
                 except (json.JSONDecodeError, KeyError):
@@ -1219,6 +1222,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # If we found system/body, save them (UI widgets don't exist yet)
             if latest_event:
                 self.last_system = latest_event['system']
+                self.last_system_star_pos = latest_event.get('star_pos')
                 body_name = latest_event['body']
                 body_type = latest_event['body_type']
                 

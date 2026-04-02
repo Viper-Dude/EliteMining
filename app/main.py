@@ -5051,12 +5051,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _trigger_ring_auto_search(self):
         """Trigger ring finder auto-search at startup if enabled"""
-        # DISABLED: Don't auto-search at startup (still auto-searches on FSD jumps/ring scans when enabled)
-        # if hasattr(self, 'ring_finder') and self.ring_finder:
-        #     if hasattr(self.ring_finder, 'auto_search_var') and self.ring_finder.auto_search_var.get():
-        #         print("[STARTUP] Triggering ring finder auto-search...")
-        #         self.ring_finder._startup_auto_search(force=True)
-        pass
+        if hasattr(self, 'ring_finder') and self.ring_finder:
+            if hasattr(self.ring_finder, 'auto_search_var') and self.ring_finder.auto_search_var.get():
+                print("[STARTUP] Triggering ring finder auto-search...")
+                self.ring_finder._startup_auto_search(force=True)
         
         # Fetch reserve levels for current system (after ring finder search completes)
         if hasattr(self, 'cargo_monitor') and self.cargo_monitor and self.cargo_monitor.current_system:
