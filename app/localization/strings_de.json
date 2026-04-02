@@ -1195,7 +1195,7 @@
     "mineral_best": "Höchster % in dieser Sitzung für dieses Material",
     "mineral_current": "Letztes Prospektor-Scanergebnis für dieses Material",
     "mineral_hits": "Anzahl der Treffer, die Ihren Schwellenwert erreicht haben\n(Qualitätsfunde, die Ankündigungen ausgelöst haben)",
-    "mineral_all_hits": "Asteroiden mit diesem Mineral (beliebig %) / Gesamt gescannte Asteroiden\nBeispiel: 4/11 = in 4 von 11 Asteroiden gefunden",
+    "mineral_all_hits": "Asteroiden mit diesem Mineral (beliebig %) / Gesamt gescannte Asteroiden (Fundrate %)\nBeispiel: 4/11 (36%) = in 4 von 11 Asteroiden gefunden (36% Fundrate)\nHöherer % = besserer Hotspot für dieses Mineral",
     "mineral_quality_rate": "Treffer über Schwellenwert / Alle Asteroiden mit diesem Mineral\nBeispiel: 2/4 (50%) = 2 von 4 Asteroiden erreichten den Schwellenwert",
     
     "chart_refresh": "Diagramme manuell mit neuesten Bergbaudaten aktualisieren",

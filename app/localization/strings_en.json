@@ -1188,7 +1188,7 @@
     "mineral_best": "Highest % found this session for this material",
     "mineral_current": "Most recent prospector scan result for this material",
     "mineral_hits": "Number of hits that met your threshold\n(quality finds that triggered announcements)",
-    "mineral_all_hits": "Asteroids with this mineral (any %) / Total asteroids scanned\nExample: 4/11 = found in 4 out of 11 asteroids",
+    "mineral_all_hits": "Asteroids with this mineral (any %) / Total asteroids scanned (find rate %)\nExample: 4/11 (36%) = found in 4 out of 11 asteroids (36% find rate)\nHigher % = better hotspot for this mineral",
     "mineral_quality_rate": "Above-threshold hits / All asteroids with this mineral\nExample: 2/4 (50%) = 2 of 4 asteroids met your threshold",
     
     "chart_refresh": "Manually refresh charts with latest mining data",

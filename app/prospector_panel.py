@@ -2130,7 +2130,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("count", width=80, minwidth=60, anchor="center", stretch=False)
-        self.stats_tree.column("all_hits", width=70, minwidth=50, anchor="center", stretch=False)
+        self.stats_tree.column("all_hits", width=95, minwidth=70, anchor="center", stretch=False)
         self.stats_tree.column("quality_rate", width=80, minwidth=60, anchor="center", stretch=True)
         
         # Setup column visibility for material analysis
@@ -10330,7 +10330,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     # Calculate all hits and quality rate
                     all_hits_count = material_stats_all.get_find_count() if material_stats_all else 0
-                    all_hits_str = f"{all_hits_count}/{total_asteroids}" if total_asteroids > 0 else str(all_hits_count)
+                    if total_asteroids > 0 and all_hits_count > 0:
+                        find_rate_pct = (all_hits_count / total_asteroids) * 100
+                        all_hits_str = f"{all_hits_count}/{total_asteroids} ({find_rate_pct:.0f}%)"
+                    elif total_asteroids > 0:
+                        all_hits_str = f"0/{total_asteroids} (0%)"
+                    else:
+                        all_hits_str = str(all_hits_count)
                     if all_hits_count > 0 and hits_count > 0:
                         quality_rate_val = (hits_count / all_hits_count) * 100
                         quality_rate_str = f"{hits_count}/{all_hits_count} ({quality_rate_val:.0f}%)"
@@ -10408,7 +10414,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     # Calculate all hits for below-threshold materials
                     all_hits_count = material_stats_all.get_find_count() if material_stats_all else 0
-                    all_hits_str = f"{all_hits_count}/{total_asteroids}" if total_asteroids > 0 else str(all_hits_count)
+                    if total_asteroids > 0 and all_hits_count > 0:
+                        find_rate_pct = (all_hits_count / total_asteroids) * 100
+                        all_hits_str = f"{all_hits_count}/{total_asteroids} ({find_rate_pct:.0f}%)"
+                    elif total_asteroids > 0:
+                        all_hits_str = f"0/{total_asteroids} (0%)"
+                    else:
+                        all_hits_str = str(all_hits_count)
                     quality_rate_str = "—"
                     
                     tag = "evenrow" if row_index % 2 == 0 else "oddrow"
@@ -10471,7 +10483,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     # All hits and quality rate
                     all_hits_count = mat_stats.get_find_count()
-                    all_hits_str = f"{all_hits_count}/{total_asteroids}" if total_asteroids > 0 else str(all_hits_count)
+                    if total_asteroids > 0 and all_hits_count > 0:
+                        find_rate_pct = (all_hits_count / total_asteroids) * 100
+                        all_hits_str = f"{all_hits_count}/{total_asteroids} ({find_rate_pct:.0f}%)"
+                    elif total_asteroids > 0:
+                        all_hits_str = f"0/{total_asteroids} (0%)"
+                    else:
+                        all_hits_str = str(all_hits_count)
                     quality_rate_str = "—"
                     
                     tag = "evenrow" if row_index % 2 == 0 else "oddrow"
