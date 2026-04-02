@@ -1097,7 +1097,7 @@
     "use_fc": "Fill with your Fleet Carrier location",
     "calculate_distance": "Calculate distances between systems (or press Enter)",
     "edsm_status": "EDSM API status indicator\n🟢 Online: API responding normally\n🟡 Slow: API responding with errors\n🔴 Offline: API not responding",
-    "eddata_status": "EDDATA API status indicator\n🟢 Online: Primary API (EDData) responding\n🟡 Fallback: Using Ardent API (EDData offline)\n🔴 Offline: Both APIs not responding",
+    "eddata_status": "Market API status indicator\n🟢 Online (EDData): Primary API responding\n🟡 Online (Ardent): Using fallback API — EDData is down\n🔴 Offline: Both EDData and Ardent APIs not responding",
     
     "change_language": "Click to change language",
     "about": "Click for app info, links, and credits",

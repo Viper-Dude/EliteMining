@@ -11792,13 +11792,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         status_color = ""
         
         if status == "online":
-            status_text = "🟢 EDDATA: Online"
+            status_text = "🟢 Market API: Online (EDData)"
             status_color = "#00ff00"
         elif status == "error":
-            status_text = "🟡 EDDATA: Fallback"
+            status_text = "🟡 Market API: Online (Ardent)"
             status_color = "#ffaa00"
         else:
-            status_text = "🔴 EDDATA: Offline"
+            status_text = "🔴 Market API: Offline"
             status_color = "#ff4444"
         
         # Update both commodity tab status labels
@@ -15589,7 +15589,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         search_btn.pack(side="left")
         
         # EDDATA API status indicator (pack FIRST on right side to claim far right position)
-        self.eddata_mining_status_label = tk.Label(row3_frame, text="⚫ EDDATA: checking...", 
+        self.eddata_mining_status_label = tk.Label(row3_frame, text="⚫ Market API: checking...", 
                                           font=("Segoe UI", 8), fg="#888888", bg=_mkt_cb_bg)
         self.eddata_mining_status_label.pack(side="right", padx=(0, 10))
         ToolTip(self.eddata_mining_status_label, t('tooltips.eddata_status'))
@@ -15845,7 +15845,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         search_btn.pack(side="left")
         
         # EDDATA API status indicator (pack FIRST on right side to claim far right position)
-        self.eddata_trade_status_label = tk.Label(row3_frame, text="⚫ EDDATA: checking...", 
+        self.eddata_trade_status_label = tk.Label(row3_frame, text="⚫ Market API: checking...", 
                                           font=("Segoe UI", 8), fg="#888888", bg=_trade_cb_bg)
         self.eddata_trade_status_label.pack(side="right", padx=(0, 10))
         ToolTip(self.eddata_trade_status_label, t('tooltips.eddata_status'))
