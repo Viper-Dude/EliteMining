@@ -14,7 +14,7 @@ RestartApplications=no
 ; VA profile update notice — shown before install as a reminder to keep the profile option ticked.
 ; ENABLE  when this release includes a new VA profile:   remove the leading semicolon below
 ; DISABLE when no VA profile update in this release:     add a semicolon at the start of the line below
-InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
+;InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
 ; Close running EliteMining and VoiceAttack processes
 CloseApplicationsFilter=*.exe,VoiceAttack.exe,VoiceAttackEngine.exe
 
