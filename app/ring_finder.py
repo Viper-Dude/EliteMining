@@ -5826,6 +5826,12 @@ class RingFinder(ColumnVisibilityMixin):
         if not selection:
             return
         
+        # Cap at 50 rows to avoid API spam
+        if len(selection) > 50:
+            centered_info_dialog(self.parent, t('ring_finder.save_limit_exceeded'),
+                               t('ring_finder.too_many_systems_for_reserve', count=len(selection)))
+            return
+        
         # Collect unique systems from Local source with missing reserve
         systems_to_update = set()
         for item in selection:

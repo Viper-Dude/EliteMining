@@ -193,6 +193,7 @@
     "no_spansh_results_selected": "Keine Spansh-Ergebnisse ausgewählt. Nur Spansh-Daten können in Datenbank gespeichert werden.",
     "save_limit_exceeded": "Auswahllimit überschritten",
     "too_many_rows_selected": "Sie haben {count} Spansh-Zeilen ausgewählt. Um API-Überlastung zu verhindern, wählen Sie bitte maximal 50 Zeilen gleichzeitig aus.",
+    "too_many_systems_for_reserve": "Sie haben {count} Zeilen ausgewählt. Um API-Überlastung zu verhindern, wählen Sie bitte maximal 50 Zeilen gleichzeitig aus.",
     "update_reserve_title": "Reserve-Level aktualisieren",
     "no_local_missing_reserve": "Keine lokalen Einträge mit fehlenden Reserve-Leveln ausgewählt.",
     "reserve_update_success": "✓ Reserve-Level für {rings} Ringe in {systems} System(en) aktualisiert.\n\nAlle Ringe in diesen Systemen wurden aktualisiert.",
