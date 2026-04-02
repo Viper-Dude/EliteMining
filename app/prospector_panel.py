@@ -2131,7 +2131,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("count", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("all_hits", width=95, minwidth=70, anchor="center", stretch=False)
-        self.stats_tree.column("quality_rate", width=80, minwidth=60, anchor="center", stretch=True)
+        self.stats_tree.column("quality_rate", width=100, minwidth=80, anchor="center", stretch=True)
         
         # Setup column visibility for material analysis
         self.setup_column_visibility(

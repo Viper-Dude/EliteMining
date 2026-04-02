@@ -303,7 +303,7 @@
     "latest_pct": "Latest %",
     "hits": "Hits (≥Thr)",
     "all_hits": "All Hits",
-    "quality_rate": "Hit Rate",
+    "quality_rate": "Hit Rate (≥Thr)",
     "double_click_hint": "💡 Double-click Hits (≥Thr) to correct accidental double prospects"
   },
   "graphs": {

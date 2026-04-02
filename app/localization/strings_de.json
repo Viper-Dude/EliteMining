@@ -299,7 +299,7 @@
     "latest_pct": "Aktuell %",
     "hits": "Treffer (≥Thr)",
     "all_hits": "Alle Treffer",
-    "quality_rate": "Trefferquote",
+    "quality_rate": "Trefferquote (≥Thr)",
     "double_click_hint": "💡 Doppelklick auf Treffer (≥Thr) um versehentliche Doppel-Prospektionen zu korrigieren"
   },
   "graphs": {
