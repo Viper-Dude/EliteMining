@@ -5003,7 +5003,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(500, self._initialize_va_variables)
         
         # Check for updates after UI is ready (automatic check once per day)
-        self.after(1000, self._check_for_updates_startup)  # Check after 1 second
+        self.after(4000, self._check_for_updates_startup)  # Check after splash is dismissed (splash=3s)
         
         # Early distance calculation using cached data (before journal scan)
         self.after(2000, self._update_home_fc_distances)

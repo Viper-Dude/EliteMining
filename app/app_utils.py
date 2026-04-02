@@ -421,8 +421,8 @@ def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> 
         
         if parent:
             parent.update_idletasks()
-            parent_x = parent.winfo_rootx()
-            parent_y = parent.winfo_rooty()
+            parent_x = parent.winfo_x()
+            parent_y = parent.winfo_y()
             parent_width = parent.winfo_width()
             parent_height = parent.winfo_height()
             x = parent_x + (parent_width - dialog_width) // 2
