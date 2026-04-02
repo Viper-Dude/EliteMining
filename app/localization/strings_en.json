@@ -464,7 +464,8 @@
     "no_results_to_export": "No results to export",
     "export_success": "✓ Exported {count} results to {path}",
     "export_failed": "❌ Export failed: {error}",
-    "cache_not_needed": "ℹ Cache not needed (using external sites)"
+    "cache_not_needed": "ℹ Cache not needed (using external sites)",
+    "fc_docking_note": "⚠ Fleet Carriers: Verify docking access (System Map or Inara)"
   },
   "distance_calculator": {
     "configuration": "Configuration",

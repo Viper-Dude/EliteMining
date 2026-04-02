@@ -460,7 +460,8 @@
     "no_results_to_export": "Keine Ergebnisse zum Exportieren",
     "export_success": "✓ {count} Ergebnisse exportiert nach {path}",
     "export_failed": "❌ Export fehlgeschlagen: {error}",
-    "cache_not_needed": "ℹ Cache nicht benötigt (externe Seiten werden verwendet)"
+    "cache_not_needed": "ℹ Cache nicht benötigt (externe Seiten werden verwendet)",
+    "fc_docking_note": "⚠ Flottenträger: Andockzugang prüfen (Sternenkarte oder Inara)"
   },
   "distance_calculator": {
     "configuration": "Konfiguration",

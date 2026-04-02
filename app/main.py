@@ -15627,6 +15627,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Label(results_header, text="  •  " + t('marketplace.right_click_options'),
                 bg=_mkt_cb_bg, fg="#888888",
                 font=("Segoe UI", 8)).pack(side="left")
+
+        tk.Label(results_header, text="  •  " + t('marketplace.fc_docking_note'),
+                bg=_mkt_cb_bg, fg="#888888",
+                font=("Segoe UI", 8)).pack(side="left")
         
         # Status label (moved to header, right side)
         self.marketplace_total_label = tk.Label(results_header, text=t('marketplace.enter_system_commodity'),
@@ -15638,7 +15642,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Create results table
         self._create_marketplace_results_table(results_frame)
-        
+
         # Add tooltips
         ToolTip(self.marketplace_ref_entry, t('tooltips.reference_system'))
         ToolTip(self.marketplace_use_current_btn, t('tooltips.use_current_market'))
@@ -15874,6 +15878,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Label(results_header, text="  •  " + t('marketplace.right_click_options'),
                 bg=_trade_cb_bg, fg="#888888",
                 font=("Segoe UI", 8)).pack(side="left")
+
+        tk.Label(results_header, text="  •  " + t('marketplace.fc_docking_note'),
+                bg=_trade_cb_bg, fg="#888888",
+                font=("Segoe UI", 8)).pack(side="left")
         
         # Status label
         self.trade_total_label = tk.Label(results_header, text=t('marketplace.enter_system_commodity'),
@@ -15885,7 +15893,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Create results table
         self._create_trade_results_table(results_frame)
-        
+
         # Add tooltips
         ToolTip(self.trade_ref_entry, t('tooltips.reference_system'))
         ToolTip(self.trade_use_current_btn, t('tooltips.use_current_market'))
