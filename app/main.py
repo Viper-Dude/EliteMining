@@ -20570,8 +20570,8 @@ if __name__ == "__main__":
                 _splash_img_path = os.path.join(app_dir, "Images", "EliteMining_Main_logo498.png")
             _pil_img = Image.open(_splash_img_path)
             _orig_w, _orig_h = _pil_img.size
-            # Scale so width fits within 900px, preserving exact aspect ratio
-            _max_w = min(900, _app_w)
+            # Scale so width fits within 1200px, preserving exact aspect ratio
+            _max_w = min(1200, _app_w)
             _scale = _max_w / _orig_w
             _sw = _max_w
             _sh = int(_orig_h * _scale)

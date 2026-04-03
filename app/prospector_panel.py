@@ -7407,7 +7407,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         initial_perf = t('reports.all')
         self._perf_filter_var = tk.StringVar(value=initial_perf)
         perf_combo = ttk.Combobox(filter_frame, textvariable=self._perf_filter_var,
-                                  values=perf_display_values, state="readonly", width=22)
+                                  values=perf_display_values, state="readonly", width=28)
         perf_combo.pack(side="left", padx=(0, 10))
         perf_combo.bind("<<ComboboxSelected>>", self._on_filter_changed)
         
@@ -8602,19 +8602,19 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if source_key == 'by_commodity':
             commodities = getattr(self, '_mining_commodities_display', [])
             self._sub_filter_combo.configure(values=commodities)
-            if commodities:
+            if commodities and self._sub_filter_var.get() not in commodities:
                 self._sub_filter_var.set(commodities[0])
             self._sub_filter_combo.pack(side="left", padx=(5, 0))
         elif source_key == 'by_system':
             systems = self._get_unique_systems_from_csv()
             self._sub_filter_combo.configure(values=systems)
-            if systems:
+            if systems and self._sub_filter_var.get() not in systems:
                 self._sub_filter_var.set(systems[0])
             self._sub_filter_combo.pack(side="left", padx=(5, 0))
         elif source_key == 'by_ship':
             ships = self._get_unique_ships_from_csv()
             self._sub_filter_combo.configure(values=ships)
-            if ships:
+            if ships and self._sub_filter_var.get() not in ships:
                 self._sub_filter_var.set(ships[0])
             self._sub_filter_combo.pack(side="left", padx=(5, 0))
         else:
@@ -9120,15 +9120,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     try:
                         if perf_key == 'high_yield':
                             tph_val = float(session['tph']) if session['tph'] not in ('—', '0.0') else 0
-                            if tph_val > 350:
+                            if tph_val >= 1000:
                                 filtered.append(session)
                         elif perf_key == 'medium_yield':
                             tph_val = float(session['tph']) if session['tph'] not in ('—', '0.0') else 0
-                            if 250 <= tph_val <= 350:
+                            if 500 <= tph_val < 1000:
                                 filtered.append(session)
                         elif perf_key == 'low_yield':
                             tph_val = float(session['tph']) if session['tph'] not in ('—', '0.0') else 0
-                            if 100 <= tph_val < 250:
+                            if 100 <= tph_val < 500:
                                 filtered.append(session)
                         elif perf_key == 'high_hit_rate':
                             hit_val = float(session['hit_rate']) if session['hit_rate'] != '—' else 0
