@@ -9154,7 +9154,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                 filtered.append(session)
                         elif perf_key == 'core_mining':
                             core_mats = ['alexandrite', 'benitoite', 'grandidierite', 'monazite', 'musgravite',
-                                        'rhodplumsite', 'serendibite', 'taaffeite', 'void opals']
+                                        'rhodplumsite', 'serendibite', 'taaffeite', 'void opals', 'low temperature diamonds']
                             cargo_data = session.get('cargo_raw', session.get('cargo', '')).lower()
                             if any(m in cargo_data for m in core_mats):
                                 filtered.append(session)
@@ -9177,23 +9177,38 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             # Convert localized name back to English for cargo matching
                             selected = getattr(self, '_commodity_display_to_english', {}).get(selected_display, selected_display)
                             if selected:
-                                # Match only sessions where selected commodity is the PRIMARY (highest tonnage) material
                                 cargo_raw = session.get('cargo_raw', '')
-                                primary_material = ''
-                                primary_tons = -1.0
-                                if cargo_raw and cargo_raw != '—':
-                                    import re as _re
-                                    for part in cargo_raw.split(';'):
-                                        part = part.strip()
-                                        m = _re.match(r'^([A-Za-z\s]+):\s*([\d.]+)t', part)
-                                        if m:
-                                            mat_name = m.group(1).strip()
-                                            mat_tons = float(m.group(2))
-                                            if mat_tons > primary_tons:
-                                                primary_tons = mat_tons
-                                                primary_material = mat_name
-                                if primary_material.lower() == selected.lower():
-                                    filtered.append(session)
+                                _core_minerals = {'alexandrite', 'benitoite', 'grandidierite', 'monazite',
+                                                  'musgravite', 'rhodplumsite', 'serendibite', 'taaffeite',
+                                                  'void opals', 'low temperature diamonds'}
+                                _is_core = selected.lower() in _core_minerals
+                                if _is_core:
+                                    # Core minerals are rarely the primary by tonnage — use presence check
+                                    # Also handle "LTD" abbreviation for Low Temperature Diamonds
+                                    _sel_lower = selected.lower()
+                                    _cargo_lower = cargo_raw.lower()
+                                    _match = _sel_lower in _cargo_lower
+                                    if not _match and _sel_lower == 'low temperature diamonds':
+                                        _match = 'ltd' in _cargo_lower or 'low temp' in _cargo_lower
+                                    if _match:
+                                        filtered.append(session)
+                                else:
+                                    # For regular minerals, match only sessions where it is the PRIMARY (highest tonnage) material
+                                    primary_material = ''
+                                    primary_tons = -1.0
+                                    if cargo_raw and cargo_raw != '—':
+                                        import re as _re
+                                        for part in cargo_raw.split(';'):
+                                            part = part.strip()
+                                            m = _re.match(r'^([A-Za-z\s]+):\s*([\d.]+)t', part)
+                                            if m:
+                                                mat_name = m.group(1).strip()
+                                                mat_tons = float(m.group(2))
+                                                if mat_tons > primary_tons:
+                                                    primary_tons = mat_tons
+                                                    primary_material = mat_name
+                                    if primary_material.lower() == selected.lower():
+                                        filtered.append(session)
                         elif source_key == 'high_value_materials':
                             hv = ['platinum', 'osmium', 'painite', 'rhodplumsite', 'benitoite', 'monazite', 'musgravite']
                             if any(m in cargo_data for m in hv):
@@ -9376,7 +9391,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 elif perf_key == 'core_mining' and cargo_display and cargo_display != '—':
                     try:
                         core_mats = ['alexandrite', 'benitoite', 'grandidierite', 'monazite', 'musgravite',
-                                     'rhodplumsite', 'serendibite', 'taaffeite', 'void opal']
+                                     'rhodplumsite', 'serendibite', 'taaffeite', 'void opal', 'low temp', 'ltd']
                         sep = '\n' if '\n' in cargo_display else '; '
                         parts = [p for p in cargo_display.replace('\n', '; ').split('; ') if p.strip()]
                         primary = [p for p in parts if any(p.lower().startswith(m[:4]) for m in core_mats)]
