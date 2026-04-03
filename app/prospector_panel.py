@@ -7555,7 +7555,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 
                 # Smart sorting based on column type  
                 numeric_cols = {"tons", "tph", "tons_per", "hit_rate", "quality", "materials", "asteroids", "prospects", "total_hits"}
-                if col in numeric_cols:
+                if col == 'cargo':
+                    # Sort by tonnage of the first (primary) material listed in the cargo column
+                    import re as _re
+                    def first_material_tons(x):
+                        try:
+                            # Matches "Material: 220.0t" or "Material 220.0t [...]"
+                            m = _re.search(r'([\d.]+)t', str(x))
+                            return float(m.group(1)) if m else 0.0
+                        except:
+                            return 0.0
+                    items.sort(key=lambda x: first_material_tons(x[0]), reverse=reverse)
+                elif col in numeric_cols:
                     # Numeric sorting - handle "—", empty values, and percentages
                     def safe_float(x):
                         try:
@@ -9170,8 +9181,24 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             selected_display = self._sub_filter_var.get() if hasattr(self, '_sub_filter_var') else ''
                             # Convert localized name back to English for cargo matching
                             selected = getattr(self, '_commodity_display_to_english', {}).get(selected_display, selected_display)
-                            if selected and selected.lower() in cargo_data:
-                                filtered.append(session)
+                            if selected:
+                                # Match only sessions where selected commodity is the PRIMARY (highest tonnage) material
+                                cargo_raw = session.get('cargo_raw', '')
+                                primary_material = ''
+                                primary_tons = -1.0
+                                if cargo_raw and cargo_raw != '—':
+                                    import re as _re
+                                    for part in cargo_raw.split(';'):
+                                        part = part.strip()
+                                        m = _re.match(r'^([A-Za-z\s]+):\s*([\d.]+)t', part)
+                                        if m:
+                                            mat_name = m.group(1).strip()
+                                            mat_tons = float(m.group(2))
+                                            if mat_tons > primary_tons:
+                                                primary_tons = mat_tons
+                                                primary_material = mat_name
+                                if primary_material.lower() == selected.lower():
+                                    filtered.append(session)
                         elif source_key == 'high_value_materials':
                             hv = ['platinum', 'osmium', 'painite', 'rhodplumsite', 'benitoite', 'monazite', 'musgravite']
                             if any(m in cargo_data for m in hv):
@@ -9337,6 +9364,20 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         tons_per_session_display = session.get('tons_per', '—')
 
                 # Build values list dynamically from the tab tree's columns to avoid ordering mismatches
+                # If filtering by commodity, reorder cargo display so selected mineral appears first
+                cargo_display = session.get('cargo', '')
+                if source_key == 'by_commodity' and cargo_display and cargo_display != '—':
+                    try:
+                        selected_display = self._sub_filter_var.get() if hasattr(self, '_sub_filter_var') else ''
+                        selected_en = getattr(self, '_commodity_display_to_english', {}).get(selected_display, selected_display).lower()
+                        sep = '\n' if '\n' in cargo_display else '; '
+                        parts = [p for p in cargo_display.replace('\n', '; ').split('; ') if p.strip()]
+                        primary = [p for p in parts if p.lower().startswith(selected_en[:4])]
+                        others = [p for p in parts if not p.lower().startswith(selected_en[:4])]
+                        if primary:
+                            cargo_display = sep.join(primary + others)
+                    except Exception:
+                        pass
                 cols = list(self.reports_tree_tab["columns"])
                 vals = []
                 for col in cols:
@@ -9375,7 +9416,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     elif col == 'quality':
                         vals.append(session.get('quality', ''))
                     elif col == 'cargo':
-                        vals.append(session.get('cargo', ''))
+                        vals.append(cargo_display)
                     elif col in ('prospects', 'prospectors'):
                         vals.append(session.get('prospects', session.get('prospectors', '—')))
                     elif col == 'eng_materials':
