@@ -7397,7 +7397,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             ("high_hit_rate", t('reports.high_hit_rate')),
             ("medium_hit_rate", t('reports.medium_hit_rate')),
             ("low_hit_rate", t('reports.low_hit_rate')),
-            ("fifty_plus_tons", t('reports.fifty_plus_tons')),
             ("core_mining", t('reports.core_mining')),
         ]
         self._perf_display_to_key = {display: key for key, display in self._perf_filter_options}
@@ -7556,16 +7555,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 # Smart sorting based on column type  
                 numeric_cols = {"tons", "tph", "tons_per", "hit_rate", "quality", "materials", "asteroids", "prospects", "total_hits"}
                 if col == 'cargo':
-                    # Sort by tonnage of the first (primary) material listed in the cargo column
+                    # Sort by T/hr of the first (primary) material listed in the cargo column
                     import re as _re
-                    def first_material_tons(x):
+                    def first_material_tph(x):
                         try:
-                            # Matches "Material: 220.0t" or "Material 220.0t [...]"
-                            m = _re.search(r'([\d.]+)t', str(x))
+                            # Matches "[961.5 t/hr]" or "(961.5 t/hr)"
+                            m = _re.search(r'[\[\(]([\d.]+)\s*t/hr[\]\)]', str(x), _re.IGNORECASE)
                             return float(m.group(1)) if m else 0.0
                         except:
                             return 0.0
-                    items.sort(key=lambda x: first_material_tons(x[0]), reverse=reverse)
+                    items.sort(key=lambda x: first_material_tph(x[0]), reverse=reverse)
                 elif col in numeric_cols:
                     # Numeric sorting - handle "—", empty values, and percentages
                     def safe_float(x):
@@ -9153,10 +9152,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             hit_val = float(session['hit_rate']) if session['hit_rate'] != '—' else 0
                             if 0 < hit_val < 20:
                                 filtered.append(session)
-                        elif perf_key == 'fifty_plus_tons':
-                            tons_val = float(session['tons']) if session['tons'] not in ('—', '0.0') else 0
-                            if tons_val >= 50:
-                                filtered.append(session)
                         elif perf_key == 'core_mining':
                             core_mats = ['alexandrite', 'benitoite', 'grandidierite', 'monazite', 'musgravite',
                                         'rhodplumsite', 'serendibite', 'taaffeite', 'void opals']
@@ -9364,7 +9359,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         tons_per_session_display = session.get('tons_per', '—')
 
                 # Build values list dynamically from the tab tree's columns to avoid ordering mismatches
-                # If filtering by commodity, reorder cargo display so selected mineral appears first
+                # If filtering by commodity or core mining, reorder cargo display so selected mineral appears first
                 cargo_display = session.get('cargo', '')
                 if source_key == 'by_commodity' and cargo_display and cargo_display != '—':
                     try:
@@ -9374,6 +9369,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         parts = [p for p in cargo_display.replace('\n', '; ').split('; ') if p.strip()]
                         primary = [p for p in parts if p.lower().startswith(selected_en[:4])]
                         others = [p for p in parts if not p.lower().startswith(selected_en[:4])]
+                        if primary:
+                            cargo_display = sep.join(primary + others)
+                    except Exception:
+                        pass
+                elif perf_key == 'core_mining' and cargo_display and cargo_display != '—':
+                    try:
+                        core_mats = ['alexandrite', 'benitoite', 'grandidierite', 'monazite', 'musgravite',
+                                     'rhodplumsite', 'serendibite', 'taaffeite', 'void opal']
+                        sep = '\n' if '\n' in cargo_display else '; '
+                        parts = [p for p in cargo_display.replace('\n', '; ').split('; ') if p.strip()]
+                        primary = [p for p in parts if any(p.lower().startswith(m[:4]) for m in core_mats)]
+                        others = [p for p in parts if not any(p.lower().startswith(m[:4]) for m in core_mats)]
                         if primary:
                             cargo_display = sep.join(primary + others)
                     except Exception:
