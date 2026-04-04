@@ -445,7 +445,8 @@ class RingFinder(ColumnVisibilityMixin):
         self.system_entry.bind('<Return>', lambda e: self.search_hotspots())
         self.system_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         # Clear selection only on focus out to prevent unwanted text selection
-        self.system_entry.bind('<FocusOut>', lambda e: self.system_entry.selection_clear())
+        self.system_entry.bind('<FocusOut>', lambda e: (self.system_entry.selection_clear(), self._save_filter_settings()))
+        self.system_entry.bind('<Return>', lambda e: self._save_filter_settings())
         
         # For compatibility, current_system_var points to the same system_var
         self.current_system_var = self.system_var
@@ -738,15 +739,15 @@ class RingFinder(ColumnVisibilityMixin):
         rb_style_spansh["fg"] = "#00CED1"  # Cyan color for Spansh
         
         self.data_source_db_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_database'), variable=self.data_source_var, 
-                      value="database", command=self._save_filter_settings, **rb_style_db)
+                      value="database", command=self._on_data_source_changed, **rb_style_db)
         self.data_source_db_rb.pack(side="left", padx=(0, 15))
         
         self.data_source_spansh_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_spansh'), variable=self.data_source_var, 
-                      value="spansh", command=self._save_filter_settings, **rb_style_spansh)
+                      value="spansh", command=self._on_data_source_changed, **rb_style_spansh)
         self.data_source_spansh_rb.pack(side="left", padx=(0, 15))
         
         self.data_source_both_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_both'), variable=self.data_source_var, 
-                      value="both", command=self._save_filter_settings, **rb_style)
+                      value="both", command=self._on_data_source_changed, **rb_style)
         self.data_source_both_rb.pack(side="left")
         
         # Tooltips for data sources
@@ -1331,6 +1332,21 @@ class RingFinder(ColumnVisibilityMixin):
         
         return display_name
     
+    def _on_data_source_changed(self):
+        """Handle data source radio button change - disable Overlaps/RES for non-database sources"""
+        source = self.data_source_var.get()
+        if source in ("spansh", "both"):
+            # Untick and disable - only applicable for local database
+            self.overlaps_only_var.set(False)
+            self.res_only_var.set(False)
+            self.overlaps_only_cb.configure(state="disabled")
+            self.res_only_cb.configure(state="disabled")
+        else:
+            # Re-enable for database
+            self.overlaps_only_cb.configure(state="normal")
+            self.res_only_cb.configure(state="normal")
+        self._save_filter_settings()
+
     def _on_overlaps_only_changed(self):
         """Handle Overlaps Only checkbox change - disable RES Only if enabled"""
         if self.overlaps_only_var.get():
@@ -1721,6 +1737,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Data Source - set to Local (database)
         self.data_source_var.set("database")
+        self._on_data_source_changed()
         
         # Unvisited Only
         if hasattr(self, 'unvisited_only_var'):
@@ -1788,7 +1805,8 @@ class RingFinder(ColumnVisibilityMixin):
                 "min_hotspots": self.min_hotspots_var.get(),
                 "data_source": self.data_source_var.get(),  # Save data source preference
                 "unvisited_only": self.unvisited_only_var.get(),  # Save unvisited filter
-                "reserve": reserve_english  # Save reserve filter
+                "reserve": reserve_english,  # Save reserve filter
+                "reference_system": self.system_var.get()  # Save last reference system
             }
             
             save_ring_finder_filters(settings)
@@ -1826,6 +1844,7 @@ class RingFinder(ColumnVisibilityMixin):
             if "data_source" in settings:
                 # Restore data source preference (default to "both" if not saved)
                 self.data_source_var.set(settings.get("data_source", "both"))
+                self._on_data_source_changed()
             if "unvisited_only" in settings:
                 self.unvisited_only_var.set(settings.get("unvisited_only", False))
             if "reserve" in settings:
@@ -1840,6 +1859,10 @@ class RingFinder(ColumnVisibilityMixin):
                 }
                 reserve_localized = reserve_map_to_localized.get(settings["reserve"], t('ring_finder.all_reserves'))
                 self.reserve_var.set(reserve_localized)
+            # Restore last reference system only if journal hasn't already set one
+            if "reference_system" in settings and settings["reference_system"]:
+                if not self.system_var.get():
+                    self.system_var.set(settings["reference_system"])
             
         except Exception:
             pass
@@ -1936,7 +1959,9 @@ class RingFinder(ColumnVisibilityMixin):
                         pass
                 
                 # Get ALL hotspots for this ring and format them for display
-                hotspots_display = self._get_ring_hotspots_display(system_name, body_name)
+                # If a specific material is selected, filter hotspot display to that material only
+                mat_filter = specific_material if not self._is_all_minerals(specific_material) else None
+                hotspots_display = self._get_ring_hotspots_display(system_name, body_name, material_filter=mat_filter)
                 
                 overlaps.append({
                     'systemName': system_name,
@@ -1969,12 +1994,13 @@ class RingFinder(ColumnVisibilityMixin):
             print(f"Error getting overlaps for search: {e}")
             return []
     
-    def _get_ring_hotspots_display(self, system_name: str, body_name: str) -> str:
+    def _get_ring_hotspots_display(self, system_name: str, body_name: str, material_filter: str = None) -> str:
         """Get formatted hotspots display for a ring (e.g., 'Plat (3), Pain (2)')
         
         Args:
             system_name: Star system name
             body_name: Ring body name
+            material_filter: Optional - only show this specific material in output
             
         Returns:
             Formatted string of all hotspots in the ring
@@ -1998,6 +2024,9 @@ class RingFinder(ColumnVisibilityMixin):
             
             parts = []
             for material_name, count, res_tag, overlap_tag in rows:
+                # If a specific material filter is set, only show that material
+                if material_filter and material_name != material_filter:
+                    continue
                 abbr = self._abbreviate_material_for_display(material_name)
                 if count and count > 0:
                     parts.append(f"{abbr} ({count})")
@@ -2106,7 +2135,9 @@ class RingFinder(ColumnVisibilityMixin):
                         pass
                 
                 # Get ALL hotspots for this ring and format them for display
-                hotspots_display = self._get_ring_hotspots_display(system_name, body_name)
+                # If a specific material is selected, filter hotspot display to that material only
+                mat_filter = specific_material if not self._is_all_minerals(specific_material) else None
+                hotspots_display = self._get_ring_hotspots_display(system_name, body_name, material_filter=mat_filter)
                 
                 # Abbreviate RES tag for display
                 res_display = self._abbreviate_res_tag(res_tag)
@@ -2178,6 +2209,9 @@ class RingFinder(ColumnVisibilityMixin):
         """
         # Store force_database flag for use in search
         self._force_database = force_database
+        
+        # Save current reference system (complete name at search time)
+        self._save_filter_settings()
         
         # Temporarily update UI radio button to show "Local" when force_database is active
         self._saved_data_source = None
