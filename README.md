@@ -147,7 +147,7 @@ VoiceAttack must have plugin support enabled and both EliteMining and EliteAPI p
    - ✓ **EliteAPI (v4 EliteVA.dll)**
 5. Click **OK** and **restart VoiceAttack** for changes to take effect
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_plugin.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_plugin.png" width="900"><br>  
 *Enable both EliteMining and EliteAPI plugins in VoiceAttack*
 
 **Note:** Plugin changes require a VoiceAttack restart.
@@ -173,7 +173,7 @@ EliteMining now automatically detects when a new VoiceAttack profile is availabl
 3. Open the EliteMining profile → **Profile Options** → **Include Commands from Other Profiles**
 4. Select your custom profile from the list
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_profile_options.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_profile_options.png" width="900"><br>  
 *Include custom profiles to add your own commands without modifying EliteMining*
 
 **Benefits:**
@@ -207,7 +207,7 @@ Configure automation sequences for VoiceAttack integration. These settings can b
 
 Configure Elite Dangerous firegroups (A-H) and fire buttons (Primary/Secondary) for automated mining sequences:
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-main.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-main.png" width="900"><br>  
 *Firegroups configuration for mining tools and fire button assignments.*
 
 **Available Tools:**
@@ -223,7 +223,7 @@ Configure Elite Dangerous firegroups (A-H) and fire buttons (Primary/Secondary) 
 
 Control mining sequence timing and automated behaviors:
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-timers_toggles.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-timers_toggles.png" width="900"><br>  
 *Mining controls for automation sequences.*
 
 **Timers:** Configure duration for laser periods, pauses, and delays (1-50 seconds range)
@@ -278,7 +278,7 @@ The Hotspot Finder provides access to a comprehensive database of 61,000+ confir
 
 Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="900"><br>  
 *Hotspot Finder showing search results with minerals filters and distance calculations.*
 
 [Back to Top](#top)
@@ -315,10 +315,10 @@ The Commodity Market helps you find the best prices for mining commodities and t
 
 Perfect for planning your mining runs and finding the most profitable stations to sell your haul or locate trade goods.
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commidity_marked.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commidity_marked.png" width="900"><br>  
 *Commodity Market showing mining commodities search results with filters and distance calculations.*
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/trade_commodities.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/trade_commodities.png" width="900"><br>  
 *Trade Commodities tab with 15 categories covering all tradeable goods in Elite Dangerous.*
 
 [Back to Top](#top)
@@ -334,7 +334,7 @@ Track your active mining missions and quickly find hotspots matching mission req
 - **Find Hotspots** – Search for hotspots directly from mission commodity requirements
 - **Auto-Import** – Missions automatically imported from Elite Dangerous journals
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_missions.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_missions.png" width="900"><br>  
 *Mining Missions tab showing active missions with quick search options.*
 
 [Back to Top](#top)
@@ -350,7 +350,7 @@ Quick reference guide for ring types and mining minerals, accessible from the Mi
 - **Mineral Categories** – Laser (High/Low) and Core (High/Low) minerals for each ring type
 - **RES Sites Reference** – Resource Extraction Site types with pirate levels and mining bonus percentages
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_reference.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_reference.png" width="900"><br>  
 *Ring Mining Reference showing ring types and RES site bonuses.*
 
 [Back to Top](#top)
@@ -370,7 +370,7 @@ Search for nearby star systems with detailed status information. Perfect for fin
   - Right-click to copy system name or open in Inara/EDSM/Spansh
   - "Use Current" button fills reference system instantly
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/star_system.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/star_system.png" width="900"><br>  
 *Star Systems tab showing current system info and nearby system search with filters.*
 
 [Back to Top](#top)
@@ -393,7 +393,7 @@ Calculate distances between any two systems using real-time EDSM data. Perfect f
   - "Home" and "FC" buttons quickly fill destination field
   - Press Enter to calculate without clicking
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/distance_calc.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/distance_calc.png" width="900"><br>  
 *Distance Calculator showing system distances with Home and Fleet Carrier tracking.*
 
 [Back to Top](#top)
@@ -419,7 +419,7 @@ Calculate distances between any two systems using real-time EDSM data. Perfect f
 > **⚠️ Important for Automated Firegroup Switching:**  
 > For the mining sequence automation to work correctly, **ALL firegroups (A through H) must be populated** in Elite Dangerous, even if you don't actively use them. Not populated firegroups will prevent automatic switching.
 > 
-> <img src="Screenshot/fg_all.png" width="600"><br>
+> <img src="Screenshot/fg_all.png" width="900"><br>
 > *Example: All 8 firegroups configured (A-H). Unused groups can have any weapon assigned.*
 
 ### Key / HOTAS Bindings  
@@ -450,17 +450,17 @@ Calculate distances between any two systems using real-time EDSM data. Perfect f
 ### Mining Session Tab  
 
 #### Mining Session  
-<img src="Screenshot/mining-session.png" width="600"><br>  
+<img src="Screenshot/mining-session.png" width="900"><br>  
 *Tracks time, prospector reports, minerals, and progress.*  
 
-<img src="Screenshot/dashboard-graphs_yield_timeline_comparison.png" width="600"><br>  
+<img src="Screenshot/dashboard-graphs_yield_timeline_comparison.png" width="900"><br>  
 *Yield comparisons across sessions.*  
 
-<img src="Screenshot/dashboard-graphs_material_comparison.png" width="600"><br>  
+<img src="Screenshot/dashboard-graphs_material_comparison.png" width="900"><br>  
 *Minerals collection comparisons.*  
 
 #### Reports 
-<img src="Screenshot/mining-reports.png" width="600"><br>  
+<img src="Screenshot/mining-reports.png" width="900"><br>  
 *Detailed mining statistics and summaries.*  
 
 #### Detailed HTML Reports  
@@ -513,27 +513,27 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 </details>
 
 #### Bookmarks  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_bookmarks.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_bookmarks.png" width="900"><br>  
 *Save, search, and manage mining spots.*  
 
 #### Comprehensive Analytics  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_statistic.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_statistic.png" width="900"><br>  
 *Session statistics: yields, hit rates, and comparisons.*  
 
 ---
 
 #### Settings Tab  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-options.png" width="600" height="400"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-options.png" width="900"><br>  
 *UI and announcement preferences.*  
 
 #### Announcement Panel  
-<img src="Screenshot/mining-announcement.png" width="600"><br>  
+<img src="Screenshot/mining-announcement.png" width="900"><br>  
 *Controls announcements, thresholds, and filters.*  
 
-<img src="Screenshot/txt_overlay.png" width="600"><br>  
+<img src="Screenshot/txt_overlay.png" width="900"><br>  
 *Text overlay showing real-time mining announcements in-game.*
 
-<img src="Screenshot/txt_overlay_enhanced.png" width="600"><br>  
+<img src="Screenshot/txt_overlay_enhanced.png" width="900"><br>  
 *Enhanced overlay with improved readability and detailed mining statistics.*
 
 </details>
@@ -545,7 +545,7 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 ### Backup & Restore 
 - Easily save and restore your complete EliteMining setup including settings, bookmarks, and reports. Create timestamped backups before updates or quickly restore previous configurations with one click.  
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/backup.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/backup.png" width="900"><br>  
 
 [Back to Top](#top)
 
