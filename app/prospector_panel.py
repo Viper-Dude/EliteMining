@@ -7636,7 +7636,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Configure column widths - locked at startup size, no resizing allowed
         
-        self.reports_tree_tab.column("date", width=105, stretch=False, anchor="w")
+        self.reports_tree_tab.column("date", width=161, stretch=False, anchor="w")
         self.reports_tree_tab.column("duration", width=80, stretch=False, anchor="w")
         self.reports_tree_tab.column("session_type", width=90, stretch=False, anchor="w")
         self.reports_tree_tab.column("ship", width=250, stretch=False, anchor="w")
@@ -7650,7 +7650,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.reports_tree_tab.column("asteroids", width=80, stretch=False, anchor="center")
         self.reports_tree_tab.column("hit_rate", width=90, stretch=False, anchor="center")
         self.reports_tree_tab.column("quality", width=120, stretch=False, anchor="center")
-        self.reports_tree_tab.column("cargo", width=350, stretch=False, anchor="w")
+        self.reports_tree_tab.column("cargo", width=350, stretch=True, anchor="w")
         self.reports_tree_tab.column("prospects", width=70, stretch=False, anchor="center")
         self.reports_tree_tab.column("eng_materials", width=250, stretch=False, anchor="w")
         self.reports_tree_tab.column("comment", width=80, stretch=False, anchor="center")  # Wider to show header text
@@ -7660,7 +7660,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.setup_column_visibility(
             tree=self.reports_tree_tab,
             columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"),
-            default_widths={"date": 105, "duration": 80, "session_type": 90, "ship": 250, "system": 230, "body": 125, "tons": 80, "tph": 60, "tons_per": 85, "materials": 80, "total_hits": 80, "asteroids": 80, "hit_rate": 90, "quality": 120, "cargo": 350, "prospects": 70, "eng_materials": 250, "comment": 80, "enhanced": 100},
+            default_widths={"date": 161, "duration": 80, "session_type": 90, "ship": 250, "system": 230, "body": 125, "tons": 80, "tph": 60, "tons_per": 85, "materials": 80, "total_hits": 80, "asteroids": 80, "hit_rate": 90, "quality": 120, "cargo": 350, "prospects": 70, "eng_materials": 250, "comment": 80, "enhanced": 100},
             config_key='reports_tab'
         )
 

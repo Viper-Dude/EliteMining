@@ -494,9 +494,10 @@ class JournalParser:
                     # Convert Elite's ring class to our format
                     # eRingClass_Rocky -> Rocky
                     # eRingClass_Metallic -> Metallic
+                    # eRingClass_Metalic -> Metallic (game typo, single 'l')
                     # eRingClass_MetalRich -> Metal Rich
                     # eRingClass_Icy -> Icy
-                    clean_ring_class = ring_class.replace('eRingClass_', '').replace('MetalRich', 'Metal Rich')
+                    clean_ring_class = ring_class.replace('eRingClass_', '').replace('MetalRich', 'Metal Rich').replace('Metalic', 'Metallic')
                     
                     # Store with key: (SystemAddress, RingName)
                     key = (system_address, ring_name)
