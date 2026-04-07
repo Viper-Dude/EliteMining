@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v4.9.8
+AppVersion=v4.9.9
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -14,7 +14,7 @@ RestartApplications=no
 ; VA profile update notice — shown before install as a reminder to keep the profile option ticked.
 ; ENABLE  when this release includes a new VA profile:   remove the leading semicolon below
 ; DISABLE when no VA profile update in this release:     add a semicolon at the start of the line below
-;InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
+InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
 ; Close running EliteMining and VoiceAttack processes
 CloseApplicationsFilter=*.exe,VoiceAttack.exe,VoiceAttackEngine.exe
 
@@ -383,7 +383,7 @@ var
 begin
   ExistingEliteAPIPath := '';
   ProfileNeedsUpdate := False;
-  BundledProfileVersion := '4.9.7';
+  BundledProfileVersion := '4.9.9';
   
   { Default: Install plugin if VoiceAttack detected }
   InstallPlugin := VADetected;
@@ -464,57 +464,30 @@ begin
   if VADetected and (VABasePath <> '') then
   begin
     InstalledProfileVersion := '';
-    
-    { Iterate all matching profiles and keep the highest version found }
-    if FindFirst(VABasePath + '\Apps\EliteMining\EliteMining*v*-Profile.vap', FindRec) then
+
+    { Primary: read installed_version from va_profile_state.json }
+    StateFilePath := VABasePath + '\Apps\EliteMining\app\va_profile_state.json';
+    if FileExists(StateFilePath) then
     begin
-      try
-        repeat
-          ProfileFilename := FindRec.Name;
-          { Extract version between last 'v' and '-Profile.vap' }
-          if Pos('v', ProfileFilename) > 0 then
-          begin
-            ProfileVersion := Copy(ProfileFilename, Pos('v', ProfileFilename) + 1, Length(ProfileFilename));
-            ProfileVersion := Copy(ProfileVersion, 1, Pos('-Profile.vap', ProfileVersion) - 1);
-            Log('Found profile: ' + ProfileFilename + ' -> version: ' + ProfileVersion);
-            { Keep highest version (simple string compare works for x.y.z format) }
-            if ProfileVersion > InstalledProfileVersion then
-              InstalledProfileVersion := ProfileVersion;
-          end;
-        until not FindNext(FindRec);
-      finally
-        FindClose(FindRec);
-      end;
-    end;
-    Log('Best installed profile version from .vap files: ' + InstalledProfileVersion);
-    
-    { Fallback: check va_profile_state.json if no .vap file found }
-    if InstalledProfileVersion = '' then
-    begin
-      StateFilePath := VABasePath + '\Apps\EliteMining\app\va_profile_state.json';
-      if FileExists(StateFilePath) then
+      if LoadStringFromFile(StateFilePath, StateContent) then
       begin
-        if LoadStringFromFile(StateFilePath, StateContent) then
+        if Pos('"installed_version"', StateContent) > 0 then
         begin
-          // Parse version from JSON: "installed_version": "4.9.5"
-          if Pos('"installed_version"', StateContent) > 0 then
-          begin
-            ProfileVersion := Copy(StateContent, Pos('"installed_version"', StateContent), Length(StateContent));
-            { Skip to the value after the colon and opening quote }
-            ProfileVersion := Copy(ProfileVersion, Pos(':', ProfileVersion) + 1, Length(ProfileVersion));
-            ProfileVersion := Trim(ProfileVersion);
-            if (Length(ProfileVersion) > 0) and (ProfileVersion[1] = '"') then
-              ProfileVersion := Copy(ProfileVersion, 2, Pos('"', Copy(ProfileVersion, 2, Length(ProfileVersion))) - 1);
-            Log('Found profile version from va_profile_state.json: ' + ProfileVersion);
-            InstalledProfileVersion := ProfileVersion;
-          end;
+          ProfileVersion := Copy(StateContent, Pos('"installed_version"', StateContent), Length(StateContent));
+          ProfileVersion := Copy(ProfileVersion, Pos(':', ProfileVersion) + 1, Length(ProfileVersion));
+          ProfileVersion := Trim(ProfileVersion);
+          if (Length(ProfileVersion) > 0) and (ProfileVersion[1] = '"') then
+            ProfileVersion := Copy(ProfileVersion, 2, Pos('"', Copy(ProfileVersion, 2, Length(ProfileVersion))) - 1);
+          Log('Profile version from va_profile_state.json: ' + ProfileVersion);
+          InstalledProfileVersion := ProfileVersion;
         end;
       end;
     end;
-    
+
+    { No state file = fresh install; state file found but empty = treat as fresh install too }
     if InstalledProfileVersion = '' then
     begin
-      Log('No existing profile found - fresh install, profile update needed');
+      Log('No profile state found - treating as fresh install, profile update needed');
       ProfileNeedsUpdate := True;
     end
     else if InstalledProfileVersion <> BundledProfileVersion then
@@ -528,6 +501,14 @@ begin
       ProfileNeedsUpdate := False;
     end;
   end;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := False;
+  { Skip the VA profile update notice if the profile is already up to date }
+  if PageID = wpInfoBefore then
+    Result := not ProfileNeedsUpdate;
 end;
 
 procedure CurPageChanged(CurPageID: Integer);

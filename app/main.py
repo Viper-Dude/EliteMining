@@ -443,7 +443,7 @@ class TextOverlay:
             self.overlay_window = None
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.9.8"
+APP_VERSION = "v4.9.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1435,6 +1435,13 @@ class CargoMonitor:
         # Initialize JournalParser for proper Scan and SAASignalsFound processing
         # Add callbacks: hotspot added + game start + reserve updated
         self.journal_parser = JournalParser(self.journal_dir, self.user_db, self._on_hotspot_added, self._on_game_start, self._on_reserve_updated)
+
+        # Attach fleet carrier tracker to journal parser so it reads live carrier_data
+        try:
+            from fleet_carrier_tracker import get_fleet_carrier_tracker
+            get_fleet_carrier_tracker().set_journal_parser(self.journal_parser)
+        except Exception as _fce:
+            print(f"[FC] Could not attach fleet carrier tracker: {_fce}")
         
         # Flag to track pending Ring Finder refreshes
         self._pending_ring_finder_refresh = False
@@ -3494,6 +3501,11 @@ cargo panel forces Elite to write detailed inventory data.
                         self.current_system = system_name
                     
                     print(f"[CARRIER] CarrierJump: Now at {system_name}")
+                # Also update FC tracker with completed jump
+                try:
+                    self.journal_parser.process_carrier_jump_completed(event)
+                except Exception as _ce:
+                    pass
             
             elif event_type == "Location":
                 # Game loaded - check if this is offline carrier jump or normal login
@@ -3540,7 +3552,48 @@ cargo panel forces Elite to write detailed inventory data.
                     # Update current system display but DON'T count as visit
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'update_current_system'):
                         self.main_app_ref.update_current_system(system_name, None, count_visit=False)
-                        
+                # Always route to journal_parser carrier tracker
+                try:
+                    self.journal_parser.process_carrier_location(event)
+                except Exception as _ce:
+                    pass
+
+            elif event_type == "CarrierStats":
+                try:
+                    self.journal_parser.process_carrier_stats(event)
+                except Exception as _ce:
+                    pass
+
+            elif event_type == "CarrierFinance":
+                try:
+                    self.journal_parser.process_carrier_finance(event)
+                except Exception as _ce:
+                    pass
+
+            elif event_type == "CarrierJumpRequest":
+                try:
+                    self.journal_parser.process_carrier_jump_request(event)
+                except Exception as _ce:
+                    pass
+
+            elif event_type == "CarrierJumpCancelled":
+                try:
+                    self.journal_parser.process_carrier_jump_cancelled(event)
+                except Exception as _ce:
+                    pass
+
+            elif event_type == "CarrierDepositFuel":
+                try:
+                    self.journal_parser.process_carrier_deposit_fuel(event)
+                except Exception as _ce:
+                    pass
+
+            elif event_type == "CarrierBankTransfer":
+                try:
+                    self.journal_parser.process_carrier_bank_transfer(event)
+                except Exception as _ce:
+                    pass
+
             elif event_type == "Scan":
                 # Process Scan events through JournalParser to store ring info
                 try:
@@ -5005,11 +5058,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Check for updates after UI is ready (automatic check once per day)
         self.after(4000, self._check_for_updates_startup)  # Check after splash is dismissed (splash=3s)
         
-        # Early distance calculation using cached data (before journal scan)
-        self.after(2000, self._update_home_fc_distances)
-        
         # Full journal scan runs first (only call once!)
-        # Ring finder auto-search will be triggered AFTER journal scan completes
+        # Location refresh and distance calculation happens AFTER scan completes
         self.after(5000, self._background_journal_catchup)
         
         # Check for VA profile updates AFTER everything is loaded and settled
@@ -5187,7 +5237,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         system_finder_tab = ttk.Frame(self.notebook, padding=8)
         self._build_system_finder_tab(system_finder_tab)
         self.notebook.add(system_finder_tab, text=t('tabs.system_finder'))
-        
+
+        # Fleet Carrier tab - live FC status from journal events
+        try:
+            from fleet_carrier_tab import FleetCarrierTab
+            from fleet_carrier_tracker import get_fleet_carrier_tracker
+            fc_frame = ttk.Frame(self.notebook, padding=0)
+            self._build_fleet_carrier_tab(fc_frame)
+            self.notebook.add(fc_frame, text=t('fleet_carrier.tab_title'))
+        except Exception as _fce:
+            print(f"[DEBUG] Could not create Fleet Carrier tab: {_fce}")
+
         # Add Distance Calculator tab now (built earlier but added here for correct order)
         self.notebook.add(distance_tab, text=t('tabs.distance_calculator'))
 
@@ -5796,6 +5856,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             'VOICEATTACK': 'voiceattack',
             'BOOKMARKS': 'bookmarks',
             'SETTINGS': 'settings',
+            'FLEETCARRIER': 'fleet_carrier',
         }
         
         internal_name = tab_mapping.get(tab_name)
@@ -11255,16 +11316,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         def startup_thread():
             try:
-                # Auto-detect Fleet Carrier location from journals
-                if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
-                    try:
-                        self.fc_tracker.set_journal_directory(self.prospector_panel.journal_dir)
-                        carrier_system = self.fc_tracker.scan_journals_for_carrier()
-                        if carrier_system:
-                            self.after(0, lambda: self.distance_fc_system.set(carrier_system))
-                            print(f"Auto-detected Fleet Carrier in: {carrier_system}")
-                    except Exception as e:
-                        print(f"Error auto-detecting FC on startup: {e}")
+                # Auto-detect Fleet Carrier location from carrier_data (populated by JournalParser)
+                try:
+                    cd = self.fc_tracker.carrier_data
+                    carrier_system = cd.get('system') if cd else None
+                    if carrier_system:
+                        self.after(0, lambda s=carrier_system: self.distance_fc_system.set(s))
+                        print(f"Auto-detected Fleet Carrier in: {carrier_system}")
+                except Exception as e:
+                    print(f"Error auto-detecting FC on startup: {e}")
                 
                 # Distance updates are triggered after journal scan completes
                 # See _process_journals_for_catchup() which calls _update_home_fc_distances
@@ -11327,6 +11387,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Refresh current system and fleet carrier from journals"""
         try:
             # Set journal directory for tracker
+            journal_dir = (hasattr(self, 'prospector_panel') and 
+                          self.prospector_panel and 
+                          getattr(self.prospector_panel, 'journal_dir', None))
+            if not journal_dir:
+                # Journal dir not ready yet - retry in 2 seconds
+                self.after(2000, self._distance_refresh_locations)
+                return
             if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
                 self.fc_tracker.set_journal_directory(self.prospector_panel.journal_dir)
                 
@@ -11344,9 +11411,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         parser = JournalParser(self.prospector_panel.journal_dir)
                         current_system = parser.get_last_known_system()
                         
-                        # 2. Scan for fleet carrier
-                        carrier_system = self.fc_tracker.scan_journals_for_carrier()
-                        carrier_info = self.fc_tracker.get_carrier_info() if carrier_system else None
+                        # 2. Get fleet carrier location from carrier_data (populated by JournalParser)
+                        cd = self.fc_tracker.carrier_data
+                        carrier_system = cd.get('system') if cd else None
+                        carrier_name = cd.get('name') if cd else None
                         
                         # Update UI on main thread
                         def update_ui():
@@ -11357,7 +11425,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             
                             if carrier_system:
                                 self.distance_fc_system.set(carrier_system)
-                                carrier_name = carrier_info.get('carrier_name') if carrier_info else None
                                 if carrier_name:
                                     results.append(f"FC '{carrier_name}': {carrier_system}")
                                 else:
@@ -11550,8 +11617,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             try:
                 current_system = self.distance_current_system.get().strip()
                 if not current_system:
-                    self.after(0, lambda: self._clear_distance_labels())
+                    # Current system not populated yet - retry once after a short delay
+                    # Guard against multiple retry chains stacking
+                    if not getattr(self, '_distance_retry_pending', False):
+                        self._distance_retry_pending = True
+                        def _retry():
+                            self._distance_retry_pending = False
+                            self._update_home_fc_distances()
+                        self.after(3000, _retry)
                     return
+                self._distance_retry_pending = False
                 
                 # Calculate distance from current system to Sol
                 sol_distance = None
@@ -12381,11 +12456,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 'hotspots_finder': 1,
                 'commodity_market': 2,
                 'system_finder': 3,
-                'distance_calculator': 4,
-                'voiceattack': 5,
-                'bookmarks': 6,
-                'settings': 7,
-                'about': 8
+                'fleet_carrier': 4,
+                'distance_calculator': 5,
+                'voiceattack': 6,
+                'bookmarks': 7,
+                'settings': 8,
+                'about': 9
             }
             
             if tab_name in tab_indices:
@@ -15907,6 +15983,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Load saved preferences
         self._load_trade_preferences()
     
+    # ==================== FLEET CARRIER TAB ====================
+    def _build_fleet_carrier_tab(self, frame: ttk.Frame) -> None:
+        """Build the Fleet Carrier tab - live FC status from journal events"""
+        from fleet_carrier_tab import FleetCarrierTab
+        from fleet_carrier_tracker import get_fleet_carrier_tracker
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(0, weight=1)
+        self.fleet_carrier_tab = FleetCarrierTab(frame)
+        self.fleet_carrier_tab.grid(row=0, column=0, sticky="nsew")
+        self.fleet_carrier_tab.set_tracker(get_fleet_carrier_tracker())
+
     # ==================== SYSTEM FINDER TAB ====================
     def _build_system_finder_tab(self, frame: ttk.Frame) -> None:
         """Build the System Finder tab - search nearby systems by criteria"""
@@ -19534,6 +19621,9 @@ Your keybinds will need to be reconfigured manually."""
                 if migration_ran:
                     print("[JOURNAL] Migration already ran - skipping redundant visit scan")
                     self.after(0, lambda: self._set_status("Ready", 3000))
+                    # Still trigger location refresh (journal scan for current system + FC)
+                    if hasattr(self, '_distance_refresh_locations'):
+                        self.after(500, self._distance_refresh_locations)
                     return
                     
                 self.after(0, lambda: self._set_status("Scanning journal history...", 0))
@@ -19856,6 +19946,10 @@ Your keybinds will need to be reconfigured manually."""
         
         # Start batch mode for mission tracker
         mission_tracker = None
+        
+        # Suppress fleet carrier UI notifications during scan
+        self.cargo_monitor.journal_parser._suppress_carrier_notifications = True
+        
         try:
             from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
             if MISSIONS_AVAILABLE:
@@ -19911,6 +20005,33 @@ Your keybinds will need to be reconfigured manually."""
                                 if system_name:
                                     current_system = system_name
                             
+                            # Fleet carrier events - populate carrier_data
+                            elif event_type == 'CarrierLocation':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_location(event)
+                                except Exception:
+                                    pass
+                            elif event_type == 'CarrierStats':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_stats(event)
+                                except Exception:
+                                    pass
+                            elif event_type == 'CarrierFinance':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_finance(event)
+                                except Exception:
+                                    pass
+                            elif event_type == 'CarrierJumpRequest':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_jump_request(event)
+                                except Exception:
+                                    pass
+                            elif event_type == 'CarrierJumpCancelled':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_jump_cancelled(event)
+                                except Exception:
+                                    pass
+                            
                             elif event_type == 'Scan':
                                 try:
                                     self.cargo_monitor.journal_parser.process_scan(event)
@@ -19964,6 +20085,26 @@ Your keybinds will need to be reconfigured manually."""
         
         print(f"[FIRST INSTALL] Scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
         log.info(f"First install scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
+        
+        # Re-enable carrier notifications and fire a single update
+        self.cargo_monitor.journal_parser._suppress_carrier_notifications = False
+        if self.cargo_monitor.journal_parser.on_carrier_updated:
+            try:
+                cd = self.cargo_monitor.journal_parser.carrier_data
+                self.cargo_monitor.journal_parser.on_carrier_updated(cd)
+            except Exception:
+                pass
+        
+        # Sync FC location to distance calculator from the now-correct carrier_data
+        def _sync_fc_location():
+            try:
+                cd = self.cargo_monitor.journal_parser.carrier_data
+                fc_system = cd.get('system') if cd else None
+                if fc_system and hasattr(self, 'distance_fc_system'):
+                    self.distance_fc_system.set(fc_system)
+            except Exception:
+                pass
+        self.after(0, _sync_fc_location)
         
         # Mark full scan as complete using JSON file
         try:
@@ -20065,6 +20206,9 @@ Your keybinds will need to be reconfigured manually."""
         # Set flag to prevent auto-refresh triggers during catchup scan
         self.cargo_monitor._catchup_scan_in_progress = True
         
+        # Suppress fleet carrier UI notifications during scan
+        self.cargo_monitor.journal_parser._suppress_carrier_notifications = True
+        
         # Start batch mode for mission tracker to avoid UI spam during scan
         mission_tracker = None
         try:
@@ -20122,6 +20266,33 @@ Your keybinds will need to be reconfigured manually."""
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     current_system = system_name
+                            
+                            # Fleet carrier events - populate carrier_data
+                            elif event_type == 'CarrierLocation':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_location(event)
+                                except Exception:
+                                    pass
+                            elif event_type == 'CarrierStats':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_stats(event)
+                                except Exception:
+                                    pass
+                            elif event_type == 'CarrierFinance':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_finance(event)
+                                except Exception:
+                                    pass
+                            elif event_type == 'CarrierJumpRequest':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_jump_request(event)
+                                except Exception:
+                                    pass
+                            elif event_type == 'CarrierJumpCancelled':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_jump_cancelled(event)
+                                except Exception:
+                                    pass
                             
                             # Process Scan events for ring/hotspot data
                             elif event_type == 'Scan':
@@ -20199,6 +20370,26 @@ Your keybinds will need to be reconfigured manually."""
         # Clear catchup scan flag
         self.cargo_monitor._catchup_scan_in_progress = False
         
+        # Re-enable carrier notifications and fire a single update
+        self.cargo_monitor.journal_parser._suppress_carrier_notifications = False
+        if self.cargo_monitor.journal_parser.on_carrier_updated:
+            try:
+                cd = self.cargo_monitor.journal_parser.carrier_data
+                self.cargo_monitor.journal_parser.on_carrier_updated(cd)
+            except Exception:
+                pass
+        
+        # Sync FC location to distance calculator from the now-correct carrier_data
+        def _sync_fc_location():
+            try:
+                cd = self.cargo_monitor.journal_parser.carrier_data
+                fc_system = cd.get('system') if cd else None
+                if fc_system and hasattr(self, 'distance_fc_system'):
+                    self.distance_fc_system.set(fc_system)
+            except Exception:
+                pass
+        self.after(0, _sync_fc_location)
+        
         print(f"[JOURNAL] Scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
         log.info(f"Journal scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
         
@@ -20221,9 +20412,9 @@ Your keybinds will need to be reconfigured manually."""
         self.after(50, self._ensure_current_system_visited)
         
         # Distance calculation runs AFTER journal scan is complete (now has accurate visit data)
-        if hasattr(self, '_update_home_fc_distances'):
-            print("[JOURNAL] Triggering distance calculation...")
-            self.after(100, self._update_home_fc_distances)
+        if hasattr(self, '_distance_refresh_locations'):
+            print("[JOURNAL] Triggering location refresh and distance calculation...")
+            self.after(200, self._distance_refresh_locations)
         
         # Ring finder auto-search runs AFTER journal scan is complete
         self.after(200, self._trigger_ring_auto_search)
@@ -20565,9 +20756,9 @@ if __name__ == "__main__":
             # In dev: app_dir = .../app/ which contains Images/
             # When frozen: app_dir = .../Configurator/ — images are at ../app/Images/
             if getattr(sys, 'frozen', False):
-                _splash_img_path = os.path.join(os.path.dirname(app_dir), "app", "Images", "EliteMining_Main_logo498.png")
+                _splash_img_path = os.path.join(os.path.dirname(app_dir), "app", "Images", "EliteMining_splash.png")
             else:
-                _splash_img_path = os.path.join(app_dir, "Images", "EliteMining_Main_logo498.png")
+                _splash_img_path = os.path.join(app_dir, "Images", "EliteMining_splash.png")
             _pil_img = Image.open(_splash_img_path)
             _orig_w, _orig_h = _pil_img.size
             # Scale so width fits within 1200px, preserving exact aspect ratio

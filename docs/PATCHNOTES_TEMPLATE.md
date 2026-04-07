@@ -6,7 +6,11 @@
 
 
 ### Voiceattack Profile
-- No changes - latest version is v4.8.3 (included in the installer and zip file)
 
+
+
+#### Important Notes 
+
+- Remember to always check all your key and joystick bindings after every profile update.
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

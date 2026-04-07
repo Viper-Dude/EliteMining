@@ -41,7 +41,7 @@ TOGGLES = {
     "Headtracker Docking Control": ("toggleHeadtracker.txt", "Enable/disable automatic headtracker docking control (toggles the F9 key)."),
     "Repeated Mining Cycles": ("laserminingextraToggle.txt", "Enables additional laser mining cycles."),
     # "Multi-Session Mode": ("multiSessionMode.txt", "Accumulate statistics across multiple cargo loads without resetting.")  # Removed - only available in Mining Analytics panel
-    "Night Vision": ("nightvisionToggle.txt", "Automatically turn on night vision when starting or resetting mining sequence."),
+    "Night Vision": ("nightvisionToggle.txt", "Auto-enables on mining start/reset. Turns off on 'Clear and Jump'."),
     "FSD Jump Sequence": ("toggleSystem.txt", "After FSD jump: open/close system map, then auto-jump (not saved in ship presets)"),
     "Power Settings": ("powersettingsToggle.txt", "Enable = Max power to engines, disable = balance power when laser mining is completed."),
     "Prospector Sequence": ("prospectorSeq.txt", "Enable prospector sequence features (master control for Target Prospector and Thrust Up)."),

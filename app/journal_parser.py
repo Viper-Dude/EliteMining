@@ -222,6 +222,45 @@ class JournalParser:
         # Flag to track if we're in live monitoring mode (vs historical parsing)
         # Only fetch from Spansh API during live monitoring
         self.is_live_monitoring = False
+
+        # Fleet Carrier data - populated from CarrierStats, CarrierLocation,
+        # CarrierFinance, CarrierJumpRequest, CarrierDepositFuel, CarrierBankTransfer
+        self.carrier_data = {
+            'carrier_id': None,
+            'name': None,
+            'callsign': None,
+            'system': None,
+            'body_id': None,
+            'fuel_level': None,
+            'fuel_capacity': 1000,
+            'jump_range_curr': None,
+            'jump_range_max': None,
+            'docking_access': None,
+            'allow_notorious': None,
+            'pending_decommission': False,
+            'space_total': None,
+            'space_crew': None,
+            'space_cargo': None,
+            'space_free': None,
+            'balance': None,
+            'reserve_balance': None,
+            'available_balance': None,
+            'reserve_percent': None,
+            'tax_rearm': None,
+            'tax_refuel': None,
+            'tax_repair': None,
+            'crew': [],          # list of {CrewRole, Activated, Enabled, CrewName}
+            'jump_destination': None,
+            'jump_departure_time': None,
+            'jump_body': None,
+            'jump_history': [],  # list of {timestamp, system} most recent first, max 10
+            'last_updated': None,
+            # Optional callback: called whenever carrier_data changes
+            'on_carrier_updated': None,
+        }
+        self.on_carrier_updated = None  # set externally to receive update notifications
+        self._carrier_save_path = os.path.join(os.path.dirname(__file__), 'last_carrier_data.json')
+        self._load_carrier_data()
     
     @staticmethod
     def normalize_reserve_level(reserve_level: str) -> str:
@@ -456,7 +495,211 @@ class JournalParser:
             return system_name, ring_part
             
         return None, body_name
-    
+
+    # ------------------------------------------------------------------
+    # Fleet Carrier event processors
+    # ------------------------------------------------------------------
+
+    def _notify_carrier_updated(self):
+        """Fire the carrier update callback if set, and persist data to disk."""
+        self._save_carrier_data()
+        if getattr(self, '_suppress_carrier_notifications', False):
+            return
+        if self.on_carrier_updated:
+            try:
+                self.on_carrier_updated(self.carrier_data)
+            except Exception as e:
+                log.warning(f"on_carrier_updated callback error: {e}")
+
+    def _save_carrier_data(self):
+        """Persist carrier_data to disk so it survives app restarts."""
+        try:
+            saveable = {k: v for k, v in self.carrier_data.items()
+                        if k != 'on_carrier_updated'}
+            with open(self._carrier_save_path, 'w', encoding='utf-8') as f:
+                json.dump(saveable, f, indent=2)
+        except Exception as e:
+            log.warning(f"[FC] Could not save carrier data: {e}")
+
+    def _load_carrier_data(self):
+        """Load previously saved carrier_data from disk (skips live fields)."""
+        try:
+            if not os.path.exists(self._carrier_save_path):
+                return
+            with open(self._carrier_save_path, 'r', encoding='utf-8') as f:
+                saved = json.load(f)
+            # Merge saved values into carrier_data, keeping defaults for missing keys
+            # Skip in-flight fields that shouldn't persist
+            skip = {'jump_destination', 'jump_departure_time', 'jump_body',
+                    'on_carrier_updated'}
+            for k, v in saved.items():
+                if k not in skip and k in self.carrier_data:
+                    self.carrier_data[k] = v
+            log.debug(f"[FC] Loaded saved carrier data for {self.carrier_data.get('name')}")
+        except Exception as e:
+            log.warning(f"[FC] Could not load saved carrier data: {e}")
+
+    def process_carrier_stats(self, event: Dict[str, Any]) -> None:
+        """Process CarrierStats event — full snapshot of carrier state.
+        Note: CarrierStats has no CarrierType field; it always refers to the player's own carrier.
+        """
+        try:
+            cd = self.carrier_data
+            cd['carrier_id']   = event.get('CarrierID', cd['carrier_id'])
+            cd['name']         = event.get('Name', cd['name'])
+            cd['callsign']     = event.get('Callsign', cd['callsign'])
+            cd['fuel_level']   = event.get('FuelLevel', cd['fuel_level'])
+            cd['jump_range_curr'] = event.get('JumpRangeCurr', cd['jump_range_curr'])
+            cd['jump_range_max']  = event.get('JumpRangeMax',  cd['jump_range_max'])
+            cd['docking_access']  = event.get('DockingAccess', cd['docking_access'])
+            cd['allow_notorious'] = event.get('AllowNotorious', cd['allow_notorious'])
+            cd['pending_decommission'] = event.get('PendingDecommission', cd['pending_decommission'])
+
+            space = event.get('SpaceUsage', {})
+            if space:
+                cd['space_total'] = space.get('TotalCapacity', cd['space_total'])
+                cd['space_crew']  = space.get('Crew',          cd['space_crew'])
+                cd['space_cargo'] = space.get('Cargo',         cd['space_cargo'])
+                cd['space_free']  = space.get('FreeSpace',     cd['space_free'])
+
+            finance = event.get('Finance', {})
+            if finance:
+                cd['balance']           = finance.get('CarrierBalance',   cd['balance'])
+                cd['reserve_balance']   = finance.get('ReserveBalance',   cd['reserve_balance'])
+                cd['available_balance'] = finance.get('AvailableBalance', cd['available_balance'])
+                cd['reserve_percent']   = finance.get('ReservePercent',   cd['reserve_percent'])
+                cd['tax_rearm']  = finance.get('TaxRate_rearm',  cd['tax_rearm'])
+                cd['tax_refuel'] = finance.get('TaxRate_refuel', cd['tax_refuel'])
+                cd['tax_repair'] = finance.get('TaxRate_repair', cd['tax_repair'])
+
+            crew = event.get('Crew', [])
+            if crew:
+                cd['crew'] = crew
+
+            cd['last_updated'] = event.get('timestamp')
+            log.debug(f"[FC] CarrierStats: {cd['name']} ({cd['callsign']}) fuel={cd['fuel_level']}")
+            self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing CarrierStats: {e}")
+
+    def process_carrier_location(self, event: Dict[str, Any]) -> None:
+        """Process CarrierLocation event — where the carrier is parked."""
+        try:
+            carrier_type = event.get('CarrierType', '')
+            # Only skip if explicitly set to something other than FleetCarrier
+            if carrier_type and carrier_type != 'FleetCarrier':
+                return
+            cd = self.carrier_data
+            cd['carrier_id'] = event.get('CarrierID', cd['carrier_id'])
+            cd['system']     = event.get('StarSystem', cd['system'])
+            cd['body_id']    = event.get('BodyID', cd['body_id'])
+            cd['last_updated'] = event.get('timestamp')
+            log.debug(f"[FC] CarrierLocation: {cd['system']}")
+            self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing CarrierLocation: {e}")
+
+    def process_carrier_finance(self, event: Dict[str, Any]) -> None:
+        """Process CarrierFinance event — balance/tax update.
+        Note: CarrierFinance has no CarrierType field in most journal versions.
+        """
+        try:
+            cd = self.carrier_data
+            cd['carrier_id']        = event.get('CarrierID', cd['carrier_id'])
+            cd['balance']           = event.get('CarrierBalance',   cd['balance'])
+            cd['reserve_balance']   = event.get('ReserveBalance',   cd['reserve_balance'])
+            cd['available_balance'] = event.get('AvailableBalance', cd['available_balance'])
+            cd['reserve_percent']   = event.get('ReservePercent',   cd['reserve_percent'])
+            cd['tax_rearm']  = event.get('TaxRate_rearm',  cd['tax_rearm'])
+            cd['tax_refuel'] = event.get('TaxRate_refuel', cd['tax_refuel'])
+            cd['tax_repair'] = event.get('TaxRate_repair', cd['tax_repair'])
+            cd['last_updated'] = event.get('timestamp')
+            log.debug(f"[FC] CarrierFinance: balance={cd['balance']}")
+            self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing CarrierFinance: {e}")
+
+    def process_carrier_jump_request(self, event: Dict[str, Any]) -> None:
+        """Process CarrierJumpRequest — scheduled jump destination.
+        Note: No CarrierType field; always refers to the player's own carrier.
+        """
+        try:
+            cd = self.carrier_data
+            cd['carrier_id']        = event.get('CarrierID', cd['carrier_id'])
+            cd['jump_destination']  = event.get('SystemName', cd['jump_destination'])
+            cd['jump_body']         = event.get('Body', cd['jump_body'])
+            cd['jump_departure_time'] = event.get('DepartureTime')
+            cd['last_updated'] = event.get('timestamp')
+            log.debug(f"[FC] CarrierJumpRequest: -> {cd['jump_destination']} at {cd['jump_departure_time']}")
+            self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing CarrierJumpRequest: {e}")
+
+    def process_carrier_jump_cancelled(self, event: Dict[str, Any]) -> None:
+        """Process CarrierJumpCancelled — clear pending jump."""
+        try:
+            cd = self.carrier_data
+            cd['jump_destination']  = None
+            cd['jump_body']         = None
+            cd['jump_departure_time'] = None
+            cd['last_updated'] = event.get('timestamp')
+            log.debug("[FC] CarrierJumpCancelled")
+            self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing CarrierJumpCancelled: {e}")
+
+    def process_carrier_jump_completed(self, event: Dict[str, Any]) -> None:
+        """Process CarrierJump (completed) — update location, clear pending jump, add to history."""
+        try:
+            cd = self.carrier_data
+            system = event.get('StarSystem', '')
+            if system:
+                cd['system']   = system
+                cd['body_id']  = event.get('BodyID', cd['body_id'])
+                cd['jump_destination']   = None
+                cd['jump_body']          = None
+                cd['jump_departure_time'] = None
+                # Add to history (most recent first, cap at 10)
+                entry = {'timestamp': event.get('timestamp', ''), 'system': system}
+                cd['jump_history'] = ([entry] + cd['jump_history'])[:10]
+                cd['last_updated'] = event.get('timestamp')
+                log.debug(f"[FC] CarrierJump completed: {system}")
+                self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing CarrierJump (FC): {e}")
+
+    def process_carrier_deposit_fuel(self, event: Dict[str, Any]) -> None:
+        """Process CarrierDepositFuel — update fuel total."""
+        try:
+            cd = self.carrier_data
+            cd['carrier_id'] = event.get('CarrierID', cd['carrier_id'])
+            total = event.get('Total')
+            if total is not None:
+                cd['fuel_level'] = total
+            cd['last_updated'] = event.get('timestamp')
+            log.debug(f"[FC] CarrierDepositFuel: total={cd['fuel_level']}")
+            self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing CarrierDepositFuel: {e}")
+
+    def process_carrier_bank_transfer(self, event: Dict[str, Any]) -> None:
+        """Process CarrierBankTransfer — update carrier balance.
+        Note: No CarrierType field; always refers to the player's own carrier.
+        """
+        try:
+            cd = self.carrier_data
+            cd['carrier_id'] = event.get('CarrierID', cd['carrier_id'])
+            carrier_bal = event.get('CarrierBalance')
+            if carrier_bal is not None:
+                cd['balance'] = carrier_bal
+            cd['last_updated'] = event.get('timestamp')
+            log.debug(f"[FC] CarrierBankTransfer: balance={cd['balance']}")
+            self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing CarrierBankTransfer: {e}")
+
+    # ------------------------------------------------------------------
+
     def process_scan(self, event: Dict[str, Any]) -> None:
         """Process Scan event to extract ring class information
         
@@ -947,13 +1190,53 @@ class JournalParser:
                     # Location just tracks current system, doesn't count as a visit
                     current_system = self.process_location(event)
                     # Don't increment visit counters for Location events
+                    # If docked at a fleet carrier, use its system for carrier location
+                    if (event.get('StationType') == 'FleetCarrier'
+                            and event.get('Docked', False)
+                            and event.get('StarSystem')):
+                        cd = self.carrier_data
+                        cd['system'] = event['StarSystem']
+                        if event.get('StationName'):
+                            # StationName is callsign e.g. "V0W-W7T"; keep existing name
+                            cd['carrier_id'] = event.get('MarketID', cd['carrier_id'])
+                        cd['last_updated'] = event.get('timestamp')
+                        self._notify_carrier_updated()
+                elif event_type == 'Docked':
+                    if (event.get('StationType') == 'FleetCarrier'
+                            and event.get('StarSystem')):
+                        cd = self.carrier_data
+                        cd['system'] = event['StarSystem']
+                        cd['last_updated'] = event.get('timestamp')
+                        self._notify_carrier_updated()
                 elif event_type == 'CarrierJump':
                     # Fleet carrier jumps are real arrivals - count as visits
                     current_system = self.process_fsd_jump(event)  # Same structure as FSDJump
                     if current_system:
                         stats['systems_visited'] += 1
                         file_stats['visits'] += 1
-                
+                    self.process_carrier_jump_completed(event)
+
+                elif event_type == 'CarrierLocation':
+                    self.process_carrier_location(event)
+
+                elif event_type == 'CarrierStats':
+                    self.process_carrier_stats(event)
+
+                elif event_type == 'CarrierFinance':
+                    self.process_carrier_finance(event)
+
+                elif event_type == 'CarrierJumpRequest':
+                    self.process_carrier_jump_request(event)
+
+                elif event_type == 'CarrierJumpCancelled':
+                    self.process_carrier_jump_cancelled(event)
+
+                elif event_type == 'CarrierDepositFuel':
+                    self.process_carrier_deposit_fuel(event)
+
+                elif event_type == 'CarrierBankTransfer':
+                    self.process_carrier_bank_transfer(event)
+
                 elif event_type == 'Scan':
                     # Process Scan events to extract ring class information
                     self.process_scan(event)

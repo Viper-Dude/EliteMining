@@ -29,6 +29,8 @@ build/
 dist/
 dist_test/
 *.spec.bak
+EliteMiningPlugin/obj/
+EliteMiningPlugin/bin/
 
 # App specific
 app/Settings/*.json
@@ -40,8 +42,17 @@ backup_*
 # User-specific runtime files
 app/config.json
 app/last_journal_scan.json
+app/last_update_check.json
+app/last_carrier_data.json
+app/mining_missions.json
+app/mining_bookmarks.json
+app/ring_guide_state.json
+app/va_profile_state.json
 app/EliteVA/Logs/
 app/EliteVA/Variables/
+
+# User database (runtime data, not for repo)
+app/data/user_data.db
 
 # API Keys and sensitive data
 *api_key*

@@ -26,6 +26,7 @@
 - [Ring Mining Reference](#ring-mining-reference)
 - [Star Systems](#star-systems)
 - [Distance Calculator](#distance-calculator)
+- [Fleet Carrier](#fleet-carrier)
 - [Backup & Restore](#backup--restore)
 - [Getting Started](#getting-started)
 - [VoiceAttack Commands](#voiceattack-commands)
@@ -395,6 +396,26 @@ Calculate distances between any two systems using real-time EDSM data. Perfect f
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/distance_calc.png" width="900"><br>  
 *Distance Calculator showing system distances with Home and Fleet Carrier tracking.*
+
+[Back to Top](#top)
+
+---
+
+## Fleet Carrier
+
+Monitor your fleet carrier status at a glance — populated automatically from your Elite Dangerous journal files.
+
+### Key Features
+- **Live Status** – Carrier name, callsign, current location, docking access and tritium fuel level
+- **Jump Schedule** – Destination, body, departure time and live countdown timer
+- **Finances** – Carrier balance, available funds, reserve balance and reserve percentage
+- **Services** – All installed and active services listed; inactive/not-installed shown in grey
+- **Cargo Capacity** – Total capacity, cargo in use, crew modules and free space
+- **Jump History** – Last 10 jump destinations with timestamps
+- **VoiceAttack** – Say *"Show fleet carrier tab"* to switch directly to this tab
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/fleet_carrier.png" width="900"><br>  
+*Fleet Carrier tab showing live status, finances, services and cargo.*
 
 [Back to Top](#top)
 
