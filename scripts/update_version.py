@@ -8,8 +8,9 @@ from pathlib import Path
 from datetime import datetime
 
 # === CHANGE VERSION AND DATE HERE ===
-NEW_VERSION = "4.9.9"
-NEW_BUILD_DATE = "2025-04-06"  # Format: YYYY-MM-DD (leave empty for today's date)
+NEW_VERSION = "5.0.0"
+NEW_BUILD_DATE = "2025-04-08"  # Format: YYYY-MM-DD (leave empty for today's date)
+VA_PROFILE_VERSION = "5.0.0"  # Set to "" if this release does not include a VA profile update
 # ====================================
 
 def main():
@@ -43,6 +44,9 @@ def main():
     # Update EliteMiningInstaller.iss
     content = installer_file.read_text(encoding="utf-8")
     content = re.sub(r'AppVersion=v[^\r\n]+', f'AppVersion=v{NEW_VERSION}', content)
+    if VA_PROFILE_VERSION:
+        content = re.sub(r"BundledProfileVersion := '[^']+'", f"BundledProfileVersion := '{VA_PROFILE_VERSION}'", content)
+        content = re.sub(r'Install/Update VoiceAttack profile \(v[^)]+\)', f'Install/Update VoiceAttack profile (v{VA_PROFILE_VERSION})', content)
     installer_file.write_text(content, encoding="utf-8")
     print(f"✓ Updated {installer_file.name}")
     

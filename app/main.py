@@ -117,7 +117,7 @@ class TextOverlay:
         self.text_color = "#FFFFFF"  # Default white color
         self.position = "upper_left"  # Fixed position
         self.font_size = 12  # Default font size (Normal)
-        
+        self._outline_items = []
     def create_overlay(self):
         """Create the overlay window"""
         if self.overlay_window:
@@ -160,10 +160,14 @@ class TextOverlay:
         
         # Draw text BEFORE showing window to prevent flicker
         self._draw_text(message)
-        
+
+        # Force canvas to compute bbox so we can size the window correctly
+        self.canvas.update_idletasks()
+        self._fit_window_to_content()
+
         # CRITICAL: Reposition window every time before showing (Windows can reset position)
         self._set_window_position()
-        
+
         # Show window AFTER text is ready
         self.overlay_window.deiconify()
         
@@ -184,7 +188,11 @@ class TextOverlay:
         
         # Draw text BEFORE showing window to prevent flicker
         self._draw_text(message)
-        
+
+        # Force canvas to compute bbox so we can size the window correctly
+        self.canvas.update_idletasks()
+        self._fit_window_to_content()
+
         # Show window AFTER text is ready
         self.overlay_window.deiconify()
         
@@ -195,35 +203,54 @@ class TextOverlay:
 
     def _draw_text(self, message: str):
         """Draw text with outline on canvas"""
-        self.canvas.delete("all")
-        
         font_spec = ("Segoe UI", self.font_size, "normal")
         text_color = self._get_current_color()
-        
-        # Draw outline (shadow)
-        # Offset by 2 pixels to ensure outline is not clipped
         base_x, base_y = 2, 2
         offsets = [(-1, -1), (1, -1), (-1, 1), (1, 1), (0, 1), (0, -1), (1, 0), (-1, 0)]
-        for ox, oy in offsets:
-            self.canvas.create_text(
-                base_x + ox, base_y + oy,
+
+        if hasattr(self, '_outline_items') and self._outline_items:
+            # Update existing items — avoids delete-all flicker on subsequent updates
+            for item in self._outline_items:
+                self.canvas.itemconfig(item, text=message, font=font_spec)
+            self.canvas.itemconfig(self.text_item, text=message, font=font_spec, fill=text_color)
+        else:
+            # First time: create all items
+            self._outline_items = []
+            for ox, oy in offsets:
+                self._outline_items.append(self.canvas.create_text(
+                    base_x + ox, base_y + oy,
+                    text=message,
+                    font=font_spec,
+                    fill="black",
+                    anchor="nw",
+                    justify="left"
+                ))
+            self.text_item = self.canvas.create_text(
+                base_x, base_y,
                 text=message,
                 font=font_spec,
-                fill="black",
+                fill=text_color,
                 anchor="nw",
                 justify="left"
             )
-            
-        # Draw main text
-        self.text_item = self.canvas.create_text(
-            base_x, base_y,
-            text=message,
-            font=font_spec,
-            fill=text_color,
-            anchor="nw",
-            justify="left"
-        )
     
+    def _fit_window_to_content(self):
+        """Resize overlay window to fit current canvas content"""
+        if not self.overlay_window:
+            return
+        x_pos = 20
+        y_pos = 100
+        bbox = self.canvas.bbox("all") if hasattr(self, 'canvas') else None
+        if bbox:
+            window_width = max(400, bbox[2] + 30)
+            window_height = max(60, bbox[3] + 20)
+        else:
+            window_width = 750
+            window_height = 300
+        self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
+        if hasattr(self, 'canvas'):
+            self.canvas.config(width=window_width, height=window_height)
+
     def hide_overlay(self):
         """Hide the overlay window"""
         if self.overlay_window:
@@ -441,9 +468,10 @@ class TextOverlay:
                 self.overlay_window.after_cancel(self.fade_timer)
             self.overlay_window.destroy()
             self.overlay_window = None
+            self._outline_items = []
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v4.9.9"
+APP_VERSION = "v5.0.0"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4880,6 +4908,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Additional mining control variables (initialized once, not recreated in _build_timers_tab)
         self.laser_extra_repeat_var = tk.IntVar(value=1)
         self.prospector_delay_var = tk.DoubleVar(value=4.4)
+        self.thrust_upduration_var = tk.DoubleVar(value=1.2)
         self.thrust_closed_var = tk.DoubleVar(value=1.5)
         self.thrust_open_var = tk.DoubleVar(value=3.0)
         
@@ -5680,6 +5709,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._watched_files.add("delayprospector.txt")
         self._watched_files.add("thrustscoopopen.txt")
         self._watched_files.add("thrustscoopclosed.txt")
+        self._watched_files.add("thrustUpduration.txt")
         
         # Get initial file timestamps
         self._update_vars_timestamps()
@@ -7999,6 +8029,27 @@ class App(tk.Tk, ColumnVisibilityMixin):
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
+        # ========== VOICEATTACK PROFILE SECTION ==========
+        ttk.Label(scrollable_frame, text=t('settings.va_profile_section'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        r += 1
+
+        separator_va = tk.Frame(scrollable_frame, height=1, bg="#444444")
+        separator_va.grid(row=r, column=0, sticky="ew", pady=(0, 8))
+        r += 1
+
+        va_keybind_btn = tk.Button(scrollable_frame, text=t('settings.va_keybind_preserve_button'),
+                                  command=self._manual_va_keybind_preserve,
+                                  bg="#2a3a4a", fg="#e0e0e0",
+                                  activebackground="#3a4a5a", activeforeground="#ffffff",
+                                  relief="ridge", bd=1, padx=12, pady=4,
+                                  font=("Segoe UI", 9, "normal"), cursor="hand2")
+        va_keybind_btn.grid(row=r, column=0, sticky="w", pady=(4, 0))
+        ToolTip(va_keybind_btn, t('tooltips.va_keybind_preserve'))
+        r += 1
+        tk.Label(scrollable_frame, text=t('settings.va_keybind_preserve_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+
         # ========== UPDATES SECTION ==========
         ttk.Label(scrollable_frame, text=t('settings.updates_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
@@ -8936,6 +8987,43 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Thrust Up timing controls
             if name == "Thrust Up":
+                # Key hold duration
+                thrust_upduration_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                thrust_upduration_frame.grid(row=r, column=0, sticky="w", pady=2)
+                tk.Label(thrust_upduration_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+                tk.Label(thrust_upduration_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+
+                thrust_upduration_spinbox = tk.Spinbox(thrust_upduration_frame, from_=1.0, to=2.0, increment=0.1, width=6,
+                                                       textvariable=self.thrust_upduration_var, format="%.1f",
+                                                       command=self._save_thrust_upduration,
+                                                       bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                                       insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                                       relief="solid", bd=0, highlightthickness=1,
+                                                       highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                                       font=("Segoe UI", 9))
+                thrust_upduration_spinbox.pack(side="left", padx=(4, 6))
+
+                def on_thrust_upduration_scroll(event, var=self.thrust_upduration_var):
+                    try:
+                        current = float(var.get())
+                        if event.delta > 0:
+                            new_val = min(current + 0.1, 2.0)
+                        else:
+                            new_val = max(current - 0.1, 1.0)
+                        var.set(round(new_val, 1))
+                        self._save_thrust_upduration()
+                    except:
+                        pass
+                    return "break"
+                thrust_upduration_spinbox.bind("<MouseWheel>", on_thrust_upduration_scroll)
+
+                tk.Label(thrust_upduration_frame, text=f"{t('voiceattack.thrust_upduration_label')} [1.0..2.0]",
+                         bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9)).pack(side="left")
+                tk.Label(thrust_upduration_frame, text=t('voiceattack.help_thrust_upduration'),
+                         fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+
+                r += 1
+
                 # Scoop closed/retracted
                 thrust_closed_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
                 thrust_closed_frame.grid(row=r, column=0, sticky="w", pady=2)
@@ -9365,6 +9453,36 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[CARGO SCOOP DELAY] Error auto-saving: {e}")
     
+    def _save_thrust_upduration(self) -> None:
+        """Save thrust key hold duration to thrustUpduration.txt"""
+        if getattr(self, '_importing', False):
+            return
+        try:
+            delay = self.thrust_upduration_var.get()
+            txt_path = os.path.join(self.vars_dir, "thrustUpduration.txt")
+            delay_str = f"{delay:.1f}".replace(',', '.')
+            _atomic_write_text(txt_path, delay_str)
+            print(f"[THRUST UPDURATION] Saved: {delay_str} seconds")
+        except Exception as e:
+            print(f"[THRUST UPDURATION] Error saving: {e}")
+
+    def _load_thrust_upduration(self) -> None:
+        """Load thrust key hold duration from thrustUpduration.txt"""
+        try:
+            txt_path = os.path.join(self.vars_dir, "thrustUpduration.txt")
+            if os.path.exists(txt_path):
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    delay = float(f.read().strip())
+                    delay = max(1.0, min(2.0, delay))
+                    self.thrust_upduration_var.set(delay)
+                    print(f"[THRUST UPDURATION] Loaded: {delay:.1f} seconds")
+            else:
+                self._save_thrust_upduration()
+                print(f"[THRUST UPDURATION] Created default file: 1.2 seconds")
+        except Exception as e:
+            print(f"[THRUST UPDURATION] Error loading: {e}")
+            self.thrust_upduration_var.set(1.2)
+
     def _save_thrust_closed(self) -> None:
         """Save thrust closed timing to thrustScoopClosed.txt"""
         # Skip save during import to prevent feedback loop
@@ -9963,6 +10081,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 else:
                     missing.append(f"{prospector_delay_file}.txt")
 
+            # Thrust Key Hold Duration
+            if hasattr(self, 'thrust_upduration_var'):
+                thrust_upduration_file = "thrustUpduration"
+                raw = self._read_var_text(thrust_upduration_file)
+                if raw is not None:
+                    try:
+                        delay = float(raw)
+                        delay = max(1.0, min(2.0, delay))
+                        self.thrust_upduration_var.set(delay)
+                        found.append(f"{thrust_upduration_file}.txt")
+                        print(f"[IMPORT] Loaded thrust upduration: {delay:.1f}s")
+                    except Exception as e:
+                        missing.append(f"{thrust_upduration_file}.txt")
+                        print(f"[IMPORT] Error loading thrust upduration: {e}")
+                else:
+                    missing.append(f"{thrust_upduration_file}.txt")
+
             # Thrust Closed Timing
             if hasattr(self, 'thrust_closed_var'):
                 thrust_closed_file = "thrustScoopClosed"
@@ -10302,6 +10437,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             preset_data["ProspectorDelay"] = self.prospector_delay_var.get()
         
         # Add thrust timing values if available
+        if hasattr(self, 'thrust_upduration_var'):
+            preset_data["ThrustUpDuration"] = self.thrust_upduration_var.get()
         if hasattr(self, 'thrust_closed_var'):
             preset_data["ThrustClosed"] = self.thrust_closed_var.get()
         if hasattr(self, 'thrust_open_var'):
@@ -10375,6 +10512,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception as e:
                 print(f"[PRESET] Error loading prospector delay: {e}")
         
+        # Load thrust key hold duration if available
+        if "ThrustUpDuration" in data and hasattr(self, 'thrust_upduration_var'):
+            try:
+                delay = float(data["ThrustUpDuration"])
+                delay = max(1.0, min(2.0, delay))
+                self.thrust_upduration_var.set(delay)
+                self._save_thrust_upduration()
+                print(f"[PRESET] Loaded thrust up duration: {delay:.1f}s")
+            except Exception as e:
+                print(f"[PRESET] Error loading thrust up duration: {e}")
+
         # Load thrust closed timing if available
         if "ThrustClosed" in data and hasattr(self, 'thrust_closed_var'):
             try:
@@ -15615,17 +15763,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
             english_val = self._station_type_rev_map.get(selected, selected)
             if english_val == "Fleet Carrier":
                 self.marketplace_exclude_carriers.set(False)
+                self.marketplace_exclude_cb.config(state="disabled")
+            else:
+                self.marketplace_exclude_cb.config(state="normal")
             self._save_marketplace_preferences()
         self.marketplace_station_type.trace_add("write", on_station_type_change)
         
         self.marketplace_exclude_carriers = tk.BooleanVar(value=cfg.get('marketplace_exclude_carriers', True))
-        exclude_cb = tk.Checkbutton(row2_frame, text=t('marketplace.exclude_carriers'), variable=self.marketplace_exclude_carriers,
+        self.marketplace_exclude_cb = tk.Checkbutton(row2_frame, text=t('marketplace.exclude_carriers'), variable=self.marketplace_exclude_carriers,
                       command=self._save_marketplace_preferences,
                       bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
-        exclude_cb.pack(side="left", padx=(0, 10))
-        ToolTip(exclude_cb, t('tooltips.exclude_carriers'))
+        self.marketplace_exclude_cb.pack(side="left", padx=(0, 10))
+        ToolTip(self.marketplace_exclude_cb, t('tooltips.exclude_carriers'))
+        # Apply initial state if Fleet Carrier is already selected
+        if self._station_type_rev_map.get(self.marketplace_station_type.get(), '') == 'Fleet Carrier':
+            self.marketplace_exclude_carriers.set(False)
+            self.marketplace_exclude_cb.config(state="disabled")
         
         self.marketplace_large_pad_only = tk.BooleanVar(value=cfg.get('marketplace_large_pad_only', False))
         large_pad_cb = tk.Checkbutton(row2_frame, text=t('marketplace.large_pads'), variable=self.marketplace_large_pad_only,
@@ -19586,6 +19741,52 @@ Your keybinds will need to be reconfigured manually."""
             )
         )
     
+    def _manual_va_keybind_preserve(self):
+        """Triggered from Settings tab - full keybind merge flow"""
+        try:
+            from app_utils import centered_message
+            from tkinter import filedialog
+
+            elitemining_folder = self.va_root if hasattr(self, 'va_root') and self.va_root else os.path.expanduser("~")
+            suggested_filename = "EliteMining_old-Profile.vap"
+
+            # Step 1: Show instructions to export old profile
+            export_instructions = t("voiceattack.export_instructions").format(
+                folder=elitemining_folder,
+                filename=suggested_filename
+            )
+            centered_message(self, t("voiceattack.export_step_title"), export_instructions)
+
+            # Step 2: Select old profile (with custom keybinds)
+            old_profile_path = filedialog.askopenfilename(
+                parent=self,
+                title=t("voiceattack.select_exported_profile"),
+                filetypes=[("VoiceAttack Profile", "*.vap"), ("All files", "*.*")],
+                initialdir=elitemining_folder
+            )
+            if not old_profile_path:
+                return
+
+            # Step 3: Select new profile (the target to apply keybinds to)
+            new_profile_path = filedialog.askopenfilename(
+                parent=self,
+                title=t("voiceattack.select_new_profile"),
+                filetypes=[("VoiceAttack Profile", "*.vap"), ("All files", "*.*")],
+                initialdir=elitemining_folder
+            )
+            if not new_profile_path:
+                return
+
+            # Step 4: Merge
+            try:
+                self._merge_profiles_with_keybinds(old_profile_path, new_profile_path, None)
+            except Exception as e:
+                logging.error(f"[VA_PROFILE] Manual merge failed: {e}")
+                from app_utils import centered_message as cm
+                cm(self, "Merge Failed", f"Could not merge keybinds:\n{e}\n\nVerify both profile files are valid.")
+        except Exception as e:
+            logging.error(f"[VA_PROFILE] Error in manual keybind preserve: {e}")
+
     def _background_journal_catchup(self):
         """Background scan of journals at startup.
         

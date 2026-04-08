@@ -10289,349 +10289,251 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
     def _refresh_statistics_display(self) -> None:
         """Refresh the live statistics display"""
+        # ── REVERT FLAG ─────────────────────────────────────────────────────────
+        # Set to False to go back to the original delete-all / reinsert behaviour
+        _STATS_INPLACE = True
+        # ────────────────────────────────────────────────────────────────────────
         try:
-            # Clear existing statistics display
-            for item in self.stats_tree.get_children():
-                self.stats_tree.delete(item)
-            
-            # Get quality summary data based on announcement thresholds
-            summary_data = self.session_analytics.get_quality_summary(self.min_pct_map)
-            
-            # Get live cargo data per material
-            live_materials = {}
-            if (self.main_app and hasattr(self.main_app, 'cargo_monitor') and 
-                hasattr(self.main_app.cargo_monitor, 'get_live_session_materials')):
+            # Build the ordered list of rows we want to display
+            rows = self._build_stats_rows()
+
+            if _STATS_INPLACE:
                 try:
-                    live_materials = self.main_app.cargo_monitor.get_live_session_materials() or {}
-                except Exception as e:
-                    print(f"[DEBUG] Error getting live materials: {e}")
-            # Calculate session duration for TPH
-            elapsed_hours = 0.0
-            elapsed_str = self.session_elapsed.get()
-            if elapsed_str and elapsed_str != "00:00:00":
-                time_parts = elapsed_str.split(":")
-                elapsed_hours = int(time_parts[0]) + int(time_parts[1])/60 + int(time_parts[2])/3600
-            
-            # Get total asteroids prospected for ratio display
-            total_asteroids = self.session_analytics.get_total_asteroids()
-            
-            # Track which materials have been displayed
-            displayed_materials = set()
-            row_index = 0
-            
-            # First, display materials that met threshold (announced materials)
-            if summary_data:
-                for material_name in sorted(summary_data.keys()):
-                    displayed_materials.add(material_name)
-                    stats = summary_data.get(material_name)
-                    material_stats_all = self.session_analytics.material_stats_all.get(material_name) if hasattr(self.session_analytics, 'material_stats_all') else None
-                    avg_all_pct = "0.0%"
-                    if material_stats_all:
-                        avg_all = material_stats_all.get_average_percentage()
-                        avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
-                    avg_pct = f"{stats['avg_percentage']:.1f}%" if stats and stats['avg_percentage'] > 0 else "0.0%"
-                    best_pct = f"{stats['best_percentage']:.1f}%" if stats and stats['best_percentage'] > 0 else "0.0%"
-                    latest_pct = f"{stats['latest_percentage']:.1f}%" if stats and stats['latest_percentage'] > 0 else "0.0%"
-                    quality_hits = str(stats['quality_hits']) if stats else "0"
-                    display_name = self._abbreviate_material_for_stats(material_name)
-                    
-                    # Check if material has both core (0.0%) and non-core (>0%) finds (hybrid)
-                    has_core_finds = False
-                    has_noncore_finds = False
-                    if material_stats_all and hasattr(material_stats_all, 'finds'):
-                        for find in material_stats_all.finds:
-                            if find.percentage == 0.0:
-                                has_core_finds = True
-                            elif find.percentage > 0.0:
-                                has_noncore_finds = True
-                    
-                    # Determine display format based on find types
-                    if material_name in CORE_ONLY:
-                        # Core-only materials always show (Core)
-                        material_display = f"{display_name} (Core)"
-                    elif has_core_finds and has_noncore_finds:
-                        # Hybrid: both core and non-core finds detected
-                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
-                        material_display = f"{display_name} (Core, {threshold:.1f}%)"
-                    elif has_core_finds:
-                        # Only core finds detected
-                        material_display = f"{display_name} (Core)"
-                    else:
-                        # Only non-core finds (or no finds yet)
-                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
-                        material_display = f"{display_name} ({threshold:.1f}%)"
-                    
-                    # Get tons and TPH for this material
-                    material_tons = None
-                    material_tph = None
-                    if not self.session_active and hasattr(self, 'last_session_data'):
-                        # Session ended - use saved data
-                        saved = self.last_session_data.get(material_name, {})
-                        material_tons = saved.get('tons', 0.0)
-                        material_tph = saved.get('tph', 0.0)
-                    else:
-                        # Live session - use cargo data
-                        material_tons = live_materials.get(material_name, 0.0)
-                        material_tph = material_tons / elapsed_hours if elapsed_hours > 0 and material_tons > 0 else 0.0
-                    
-                    tons_str = f"{material_tons:.1f}" if material_tons > 0 else "—"
-                    tph_str = f"{material_tph:.1f}" if material_tph > 0 else "—"
-                    
-                    # Calculate Tons/Asteroid
-                    tons_per_val = None
-                    hits_count = 0
-                    try:
-                        qh = stats.get('quality_hits')
-                        if qh is not None:
-                            hits_count = int(float(qh))
-                    except Exception:
-                        hits_count = 0
-                    
-                    if hits_count > 0 and material_tons > 0:
-                        try:
-                            tons_per_val = material_tons / hits_count
-                        except Exception:
-                            tons_per_val = None
-                    
-                    tons_per_str = "—" if hits_count <= 0 else (f"{tons_per_val:.1f}" if tons_per_val is not None else "—")
-                    
-                    # Calculate all hits and quality rate
-                    all_hits_count = material_stats_all.get_find_count() if material_stats_all else 0
-                    if total_asteroids > 0 and all_hits_count > 0:
-                        find_rate_pct = (all_hits_count / total_asteroids) * 100
-                        all_hits_str = f"{all_hits_count}/{total_asteroids} ({find_rate_pct:.0f}%)"
-                    elif total_asteroids > 0:
-                        all_hits_str = f"0/{total_asteroids} (0%)"
-                    else:
-                        all_hits_str = str(all_hits_count)
-                    if all_hits_count > 0 and hits_count > 0:
-                        quality_rate_val = (hits_count / all_hits_count) * 100
-                        quality_rate_str = f"{hits_count}/{all_hits_count} ({quality_rate_val:.0f}%)"
-                    elif all_hits_count > 0:
-                        quality_rate_str = f"0/{all_hits_count} (0%)"
-                    else:
-                        quality_rate_str = "—"
-                    
-                    tag = "evenrow" if row_index % 2 == 0 else "oddrow"
-                    self.stats_tree.insert("", "end", values=(
-                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits, all_hits_str, quality_rate_str
-                    ), tags=(tag,))
-                    row_index += 1
-            
-            # Second, add materials from cargo that weren't announced (below threshold but still mined)
-            for material_name, material_tons in live_materials.items():
-                if material_name not in displayed_materials and material_tons > 0:
-                    # This material was mined but never announced (below threshold)
-                    displayed_materials.add(material_name)
-                    display_name = self._abbreviate_material_for_stats(material_name)
-                    
-                    # Check if material has both core (0.0%) and non-core (>0%) finds (hybrid)
-                    material_stats_all = self.session_analytics.material_stats_all.get(material_name)
-                    has_core_finds = False
-                    has_noncore_finds = False
-                    if material_stats_all and hasattr(material_stats_all, 'finds'):
-                        for find in material_stats_all.finds:
-                            if find.percentage == 0.0:
-                                has_core_finds = True
-                            elif find.percentage > 0.0:
-                                has_noncore_finds = True
-                    
-                    # Determine display format based on find types
-                    if material_name in CORE_ONLY:
-                        # Core-only materials always show (Core)
-                        material_display = f"{display_name} (Core)"
-                    elif has_core_finds and has_noncore_finds:
-                        # Hybrid: both core and non-core finds detected
-                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
-                        material_display = f"{display_name} (Core, {threshold:.1f}%)"
-                    elif has_core_finds:
-                        # Only core finds detected
-                        material_display = f"{display_name} (Core)"
-                    else:
-                        # Only non-core finds (or no finds yet)
-                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
-                        material_display = f"{display_name} ({threshold:.1f}%)"
-                    tons_str = f"{material_tons:.1f}"
-                    
-                    material_tph = 0.0
-                    if elapsed_hours > 0:
-                        material_tph = material_tons / elapsed_hours
-                    tph_str = f"{material_tph:.1f}" if material_tph > 0 else "—"
-                    
-                    # Check if we have prospector data in material_stats_all (all prospected asteroids)
-                    material_stats_all = self.session_analytics.material_stats_all.get(material_name)
-                    if material_stats_all and material_stats_all.get_find_count() > 0:
-                        # Material was prospected but never met threshold - show ALL stats
-                        avg_all = material_stats_all.get_average_percentage()
-                        avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
-                        best = material_stats_all.get_best_percentage()
-                        best_pct = f"{best:.1f}%" if best and best > 0 else "0.0%"
-                        latest = material_stats_all.get_latest_percentage()
-                        latest_pct = f"{latest:.1f}%" if latest and latest > 0 else "0.0%"
-                    else:
-                        # No prospector data at all
-                        avg_all_pct = "—"
-                        best_pct = "—"
-                        latest_pct = "—"
-                    
-                    # These always show "—" and 0 for below-threshold materials
-                    avg_pct = "—"
-                    quality_hits = "0"
-                    tons_per_str = "—"
-                    
-                    # Calculate all hits for below-threshold materials
-                    all_hits_count = material_stats_all.get_find_count() if material_stats_all else 0
-                    if total_asteroids > 0 and all_hits_count > 0:
-                        find_rate_pct = (all_hits_count / total_asteroids) * 100
-                        all_hits_str = f"{all_hits_count}/{total_asteroids} ({find_rate_pct:.0f}%)"
-                    elif total_asteroids > 0:
-                        all_hits_str = f"0/{total_asteroids} (0%)"
-                    else:
-                        all_hits_str = str(all_hits_count)
-                    quality_rate_str = "—"
-                    
-                    tag = "evenrow" if row_index % 2 == 0 else "oddrow"
-                    self.stats_tree.insert("", "end", values=(
-                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits, all_hits_str, quality_rate_str
-                    ), tags=(tag,))
-                    row_index += 1
-            
-            # Third, show selected minerals detected in asteroids but not yet displayed
-            # (detected at any % but below threshold and no cargo)
-            if hasattr(self.session_analytics, 'material_stats_all'):
-                for material_name, mat_stats in self.session_analytics.material_stats_all.items():
-                    if material_name in displayed_materials:
-                        continue
-                    if not mat_stats or mat_stats.get_find_count() <= 0:
-                        continue
-                    # Only show if this mineral is selected in the announcement panel
-                    is_selected = self.announce_map.get(material_name, False)
-                    if not is_selected:
-                        continue
-                    
-                    displayed_materials.add(material_name)
-                    display_name = self._abbreviate_material_for_stats(material_name)
-                    
-                    # Determine display format
-                    has_core_finds = False
-                    has_noncore_finds = False
-                    if hasattr(mat_stats, 'finds'):
-                        for find in mat_stats.finds:
-                            if find.percentage == 0.0:
-                                has_core_finds = True
-                            elif find.percentage > 0.0:
-                                has_noncore_finds = True
-                    
-                    if material_name in CORE_ONLY:
-                        material_display = f"{display_name} (Core)"
-                    elif has_core_finds and has_noncore_finds:
-                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
-                        material_display = f"{display_name} (Core, {threshold:.1f}%)"
-                    elif has_core_finds:
-                        material_display = f"{display_name} (Core)"
-                    else:
-                        threshold = self.min_pct_map.get(material_name, self.threshold.get())
-                        material_display = f"{display_name} ({threshold:.1f}%)"
-                    
-                    # Show prospector stats from all finds
-                    avg_all = mat_stats.get_average_percentage()
-                    avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
-                    best = mat_stats.get_best_percentage()
-                    best_pct = f"{best:.1f}%" if best and best > 0 else "0.0%"
-                    latest = mat_stats.get_latest_percentage()
-                    latest_pct = f"{latest:.1f}%" if latest and latest > 0 else "0.0%"
-                    
-                    # No cargo, no above-threshold hits
-                    tons_str = "—"
-                    tph_str = "—"
-                    tons_per_str = "—"
-                    avg_pct = "—"
-                    quality_hits = "0"
-                    
-                    # All hits and quality rate
-                    all_hits_count = mat_stats.get_find_count()
-                    if total_asteroids > 0 and all_hits_count > 0:
-                        find_rate_pct = (all_hits_count / total_asteroids) * 100
-                        all_hits_str = f"{all_hits_count}/{total_asteroids} ({find_rate_pct:.0f}%)"
-                    elif total_asteroids > 0:
-                        all_hits_str = f"0/{total_asteroids} (0%)"
-                    else:
-                        all_hits_str = str(all_hits_count)
-                    quality_rate_str = "—"
-                    
-                    tag = "evenrow" if row_index % 2 == 0 else "oddrow"
-                    self.stats_tree.insert("", "end", values=(
-                        material_display, tons_str, tph_str, tons_per_str, avg_all_pct, avg_pct, best_pct, latest_pct, quality_hits, all_hits_str, quality_rate_str
-                    ), tags=(tag,))
-                    row_index += 1
-            
-            # Update session summary with live tracking
-            total_asteroids = self.session_analytics.get_total_asteroids()
+                    self._apply_stats_rows_inplace(rows)
+                except Exception as _e:
+                    print(f"[stats] in-place update failed, falling back: {_e}")
+                    self._apply_stats_rows_full(rows)
+            else:
+                self._apply_stats_rows_full(rows)
+
+            # ── summary label & graphs (unchanged) ──────────────────────────────
+            summary_data     = self.session_analytics.get_quality_summary(self.min_pct_map)
+            total_asteroids  = self.session_analytics.get_total_asteroids()
             tracked_materials = len(summary_data) if summary_data else 0
-            
-            # Calculate total hits across all materials
-            total_hits = sum(self.session_analytics.get_material_statistics(mat).get_find_count() 
-                           for mat in self.session_analytics.get_tracked_materials() 
-                           if self.session_analytics.get_material_statistics(mat))
-            
-            # Get live cargo data
+            total_hits = sum(
+                self.session_analytics.get_material_statistics(mat).get_find_count()
+                for mat in self.session_analytics.get_tracked_materials()
+                if self.session_analytics.get_material_statistics(mat)
+            )
             live_tons = 0.0
-            live_tph = 0.0
-            if (self.main_app and 
-                hasattr(self.main_app, 'cargo_monitor') and 
-                hasattr(self.main_app.cargo_monitor, 'get_live_session_tons')):
+            live_tph  = 0.0
+            if (self.main_app and
+                    hasattr(self.main_app, 'cargo_monitor') and
+                    hasattr(self.main_app.cargo_monitor, 'get_live_session_tons')):
                 try:
                     live_tons = self.main_app.cargo_monitor.get_live_session_tons()
-                    
-                    # Multi-session mode: live_tons already includes ALL mined materials
-                    # (session_minerals_mined tracks cumulative total including sold/transferred)
-                    # DO NOT add sold/transferred again - it would be double counting!
-                    
-                    # Calculate TPH based on elapsed time
                     elapsed_str = self.session_elapsed.get()
                     if elapsed_str and elapsed_str != "00:00:00":
-                        time_parts = elapsed_str.split(":")
-                        hours = int(time_parts[0]) + int(time_parts[1])/60 + int(time_parts[2])/3600
+                        tp = elapsed_str.split(":")
+                        hours = int(tp[0]) + int(tp[1])/60 + int(tp[2])/3600
                         if hours > 0:
                             live_tph = live_tons / hours
-                except:
+                except Exception:
                     pass
-            
             if total_asteroids > 0 or live_tons > 0:
                 if live_tons > 0:
-                    base_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
-                    
-                    # Add multi-session info if enabled
+                    base_text = (f"Asteroids scanned: {total_asteroids} | "
+                                 f"Minerals tracked/hits: {tracked_materials}/{total_hits} | "
+                                 f"Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}")
                     if self.multi_session_mode and (self.session_sold_transferred > 0 or self.session_ejected > 0):
-                        multi_session_text = f" | Sold/Stored: {self.session_sold_transferred:.0f}t"
+                        base_text += f" | Sold/Stored: {self.session_sold_transferred:.0f}t"
                         if self.session_ejected > 0:
-                            multi_session_text += f" | Lost: {self.session_ejected:.0f}t"
-                        summary_text = base_text + multi_session_text
-                    else:
-                        summary_text = base_text
+                            base_text += f" | Lost: {self.session_ejected:.0f}t"
+                    summary_text = base_text
                 else:
-                    summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits}"
+                    summary_text = (f"Asteroids scanned: {total_asteroids} | "
+                                    f"Minerals tracked/hits: {tracked_materials}/{total_hits}")
                 self.stats_summary_label.config(text=summary_text, foreground="#e6e6e6")
             else:
                 self.stats_summary_label.config(text="No data yet", foreground="#888888")
-            
-            # Update graphs if available
             if self.charts_panel:
                 self.charts_panel.update_charts()
-                
+
         except Exception as e:
-            # Show basic info even if there's an error
             print(f"ERROR in _refresh_statistics_display: {e}")
-            import traceback
-            traceback.print_exc()
+            import traceback; traceback.print_exc()
             try:
                 total_asteroids = self.session_analytics.get_total_asteroids()
                 if total_asteroids > 0:
-                    self.stats_summary_label.config(text=f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: 0/0", foreground="#e6e6e6")
+                    self.stats_summary_label.config(
+                        text=f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: 0/0",
+                        foreground="#e6e6e6")
                 else:
                     self.stats_summary_label.config(text="No data yet", foreground="#888888")
-            except:
+            except Exception:
                 self.stats_summary_label.config(text="No data yet", foreground="#888888")
+
+    # ------------------------------------------------------------------
+    # Stats table helpers
+    # ------------------------------------------------------------------
+
+    def _build_stats_rows(self):
+        """Return ordered list of (iid, values_tuple, tag_suffix) for the stats table."""
+        summary_data    = self.session_analytics.get_quality_summary(self.min_pct_map)
+        total_asteroids = self.session_analytics.get_total_asteroids()
+        live_materials  = {}
+        if (self.main_app and
+                hasattr(self.main_app, 'cargo_monitor') and
+                hasattr(self.main_app.cargo_monitor, 'get_live_session_materials')):
+            try:
+                live_materials = self.main_app.cargo_monitor.get_live_session_materials() or {}
+            except Exception:
+                pass
+        elapsed_hours = 0.0
+        elapsed_str = self.session_elapsed.get()
+        if elapsed_str and elapsed_str != "00:00:00":
+            tp = elapsed_str.split(":")
+            elapsed_hours = int(tp[0]) + int(tp[1])/60 + int(tp[2])/3600
+
+        rows = []
+        displayed = set()
+
+        def _hits_str(all_hits, total_ast):
+            if total_ast > 0 and all_hits > 0:
+                return f"{all_hits}/{total_ast} ({(all_hits/total_ast)*100:.0f}%)"
+            elif total_ast > 0:
+                return f"0/{total_ast} (0%)"
+            return str(all_hits)
+
+        def _quality_str(q_hits, all_hits):
+            if all_hits > 0 and q_hits > 0:
+                return f"{q_hits}/{all_hits} ({(q_hits/all_hits)*100:.0f}%)"
+            elif all_hits > 0:
+                return f"0/{all_hits} (0%)"
+            return "—"
+
+        def _material_label(mat, display, stats_all):
+            has_core = has_ncore = False
+            if stats_all and hasattr(stats_all, 'finds'):
+                for f in stats_all.finds:
+                    if f.percentage == 0.0:   has_core  = True
+                    elif f.percentage > 0.0:  has_ncore = True
+            thr = self.min_pct_map.get(mat, self.threshold.get())
+            if mat in CORE_ONLY:
+                return f"{display} (Core)"
+            elif has_core and has_ncore:
+                return f"{display} (Core, {thr:.1f}%)"
+            elif has_core:
+                return f"{display} (Core)"
+            return f"{display} ({thr:.1f}%)"
+
+        # Pass 1 — threshold-meeting materials
+        if summary_data:
+            for mat in sorted(summary_data.keys()):
+                displayed.add(mat)
+                stats = summary_data[mat]
+                stats_all = (self.session_analytics.material_stats_all.get(mat)
+                             if hasattr(self.session_analytics, 'material_stats_all') else None)
+                avg_all = stats_all.get_average_percentage() if stats_all else None
+                avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
+                avg_pct    = f"{stats['avg_percentage']:.1f}%" if stats and stats['avg_percentage'] > 0 else "0.0%"
+                best_pct   = f"{stats['best_percentage']:.1f}%" if stats and stats['best_percentage'] > 0 else "0.0%"
+                latest_pct = f"{stats['latest_percentage']:.1f}%" if stats and stats['latest_percentage'] > 0 else "0.0%"
+                q_hits = int(float(stats['quality_hits'])) if stats and stats.get('quality_hits') is not None else 0
+                display_name  = self._abbreviate_material_for_stats(mat)
+                mat_label     = _material_label(mat, display_name, stats_all)
+                if not self.session_active and hasattr(self, 'last_session_data'):
+                    saved  = self.last_session_data.get(mat, {})
+                    m_tons = saved.get('tons', 0.0)
+                    m_tph  = saved.get('tph', 0.0)
+                else:
+                    m_tons = live_materials.get(mat, 0.0)
+                    m_tph  = m_tons / elapsed_hours if elapsed_hours > 0 and m_tons > 0 else 0.0
+                tons_str    = f"{m_tons:.1f}" if m_tons > 0 else "—"
+                tph_str     = f"{m_tph:.1f}"  if m_tph  > 0 else "—"
+                tons_per    = (m_tons / q_hits) if q_hits > 0 and m_tons > 0 else None
+                tons_per_str= f"{tons_per:.1f}" if tons_per is not None else "—"
+                all_hits    = stats_all.get_find_count() if stats_all else 0
+                rows.append((mat, (
+                    mat_label, tons_str, tph_str, tons_per_str,
+                    avg_all_pct, avg_pct, best_pct, latest_pct,
+                    str(q_hits), _hits_str(all_hits, total_asteroids),
+                    _quality_str(q_hits, all_hits)
+                )))
+
+        # Pass 2 — cargo-only materials (below threshold but mined)
+        for mat, m_tons in live_materials.items():
+            if mat in displayed or m_tons <= 0:
+                continue
+            displayed.add(mat)
+            stats_all    = (self.session_analytics.material_stats_all.get(mat)
+                            if hasattr(self.session_analytics, 'material_stats_all') else None)
+            display_name = self._abbreviate_material_for_stats(mat)
+            mat_label    = _material_label(mat, display_name, stats_all)
+            m_tph        = m_tons / elapsed_hours if elapsed_hours > 0 else 0.0
+            tph_str      = f"{m_tph:.1f}" if m_tph > 0 else "—"
+            if stats_all and stats_all.get_find_count() > 0:
+                avg_all  = stats_all.get_average_percentage()
+                avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
+                best     = stats_all.get_best_percentage()
+                best_pct = f"{best:.1f}%" if best and best > 0 else "0.0%"
+                latest   = stats_all.get_latest_percentage()
+                latest_pct = f"{latest:.1f}%" if latest and latest > 0 else "0.0%"
+            else:
+                avg_all_pct = best_pct = latest_pct = "—"
+            all_hits = stats_all.get_find_count() if stats_all else 0
+            rows.append((mat, (
+                mat_label, f"{m_tons:.1f}", tph_str, "—",
+                avg_all_pct, "—", best_pct, latest_pct,
+                "0", _hits_str(all_hits, total_asteroids), "—"
+            )))
+
+        # Pass 3 — selected-but-not-yet-mined materials with prospector hits
+        if hasattr(self.session_analytics, 'material_stats_all'):
+            for mat, mat_stats in self.session_analytics.material_stats_all.items():
+                if mat in displayed:
+                    continue
+                if not mat_stats or mat_stats.get_find_count() <= 0:
+                    continue
+                if not self.announce_map.get(mat, False):
+                    continue
+                displayed.add(mat)
+                display_name = self._abbreviate_material_for_stats(mat)
+                mat_label    = _material_label(mat, display_name, mat_stats)
+                avg_all  = mat_stats.get_average_percentage()
+                avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
+                best     = mat_stats.get_best_percentage()
+                best_pct = f"{best:.1f}%" if best and best > 0 else "0.0%"
+                latest   = mat_stats.get_latest_percentage()
+                latest_pct = f"{latest:.1f}%" if latest and latest > 0 else "0.0%"
+                all_hits = mat_stats.get_find_count()
+                rows.append((mat, (
+                    mat_label, "—", "—", "—",
+                    avg_all_pct, "—", best_pct, latest_pct,
+                    "0", _hits_str(all_hits, total_asteroids), "—"
+                )))
+
+        return rows
+
+    def _apply_stats_rows_inplace(self, rows):
+        """Update stats_tree in-place — no flicker. Adds/removes/reorders only when needed."""
+        tree       = self.stats_tree
+        wanted_ids = [iid for iid, _ in rows]
+        existing   = list(tree.get_children())
+
+        # Remove rows no longer needed
+        for iid in existing:
+            if iid not in wanted_ids:
+                tree.delete(iid)
+
+        # Insert or update, then move to correct position
+        for idx, (iid, values) in enumerate(rows):
+            tag = "evenrow" if idx % 2 == 0 else "oddrow"
+            if tree.exists(iid):
+                tree.item(iid, values=values, tags=(tag,))
+            else:
+                tree.insert("", idx, iid=iid, values=values, tags=(tag,))
+            tree.move(iid, "", idx)
+
+    def _apply_stats_rows_full(self, rows):
+        """Original delete-all / reinsert (fallback / revert path)."""
+        tree = self.stats_tree
+        for item in tree.get_children():
+            tree.delete(item)
+        for idx, (iid, values) in enumerate(rows):
+            tag = "evenrow" if idx % 2 == 0 else "oddrow"
+            tree.insert("", "end", iid=iid, values=values, tags=(tag,))
+
 
     def _quick_export_analytics(self) -> None:
         """Quick export of analytics data from the statistics panel"""

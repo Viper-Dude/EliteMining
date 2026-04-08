@@ -1,11 +1,13 @@
 ================================================================================
-  EliteMining v4.9.9 — VoiceAttack Profile Update
+  EliteMining v5.0.0 — VoiceAttack Profile Update
 ================================================================================
 
-This release includes an updated VoiceAttack profile (v4.9.9).
+This release includes an updated VoiceAttack profile (v5.0.0).
 
 The installer will guide you through the update process.
 Simply follow the on-screen instructions to complete the installation.
+
+After the update is commpleted, please check all your key and joystick binding
 
 --------------------------------------------------------------------------------
 If you do NOT want to update the profile now, untick the option on the next
