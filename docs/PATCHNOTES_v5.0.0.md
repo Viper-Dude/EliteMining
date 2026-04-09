@@ -13,16 +13,14 @@
 ### Voiceattack Profile - Updated to v5.0.0
 
 ### Important Notes 
-- This update is adding new and edits of existing command, some keybind could be missed when updating
-- Remember to always check all your key and joystick bindings after every profile update.
+- This update is adding new and edits of existing command, some keybind could be missed when updating, remember to always check all your key and joystick bindings after every profile update.
 
-### New VoiceAttack Commands
+### New VoiceAttack Commands - Turns the text overlay on or off by voice or keybind/joystik
 
-- **Enable/Disable Text Overlay** — turn the text overlay on or off by voice
-- **Enable/Disable Standard Text Overlay** — switch to standard text overlay mode
-- **Enable/Disable Enhanced Text Overlay** — switch to enhanced prospector overlay mode
-- **Enable/Disable Cargo Text Overlay** — turn the cargo status overlay on or off
-
+- **Enable/Disable Text Overlay** — Main switch for text overlay 
+- **Enable/Disable Standard Text Overlay** — Standard text overlay mode
+- **Enable/Disable Enhanced Text Overlay** — Enhanced prospector overlay mode
+- **Enable/Disable Cargo Text Overlay** — Cargo status overlay 
 
 ### VoiceAttack Controls Tab
 

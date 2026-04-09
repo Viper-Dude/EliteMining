@@ -601,7 +601,7 @@ class CargoTextOverlay:
 
     # -- drawing ------------------------------------------------------------
     def _draw_text(self, message: str):
-        font_spec = ("Segoe UI", self.font_size, "normal")
+        font_spec = ("Consolas", self.font_size, "normal")
         text_color = self._get_current_color()
         base_x, base_y = 2, 2
         offsets = [(-1, -1), (1, -1), (-1, 1), (1, 1),
@@ -633,7 +633,7 @@ class CargoTextOverlay:
         if enabled:
             if not self.overlay_window:
                 self.create_overlay()
-            self.overlay_window.deiconify()
+            # Don't deiconify here — let update_cargo() show it once data is ready
         elif self.overlay_window:
             self.overlay_window.withdraw()
 
@@ -665,7 +665,7 @@ class CargoTextOverlay:
         else:
             ind = ""
 
-        lines.append(f"Cargo Status  {cargo.current_cargo}/{cargo.max_cargo}t  ({pct:.0f}%){ind}")
+        lines.append(f"CARGO STATUS  {cargo.current_cargo}/{cargo.max_cargo}t  ({pct:.0f}%){ind}")
 
         if cargo.cargo_items:
             sorted_items = sorted(cargo.cargo_items.items(),
@@ -686,7 +686,7 @@ class CargoTextOverlay:
 
         if cargo.materials_collected:
             lines.append("")
-            lines.append("MATERIALS")
+            lines.append("ENGINEERING MATERIALS")
             sorted_mats = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
             for mat_name, qty in sorted_mats:
                 grade = cargo.MATERIAL_GRADES.get(mat_name, 0)
@@ -15974,6 +15974,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             app_dir = os.path.join(self.va_root, "app") if getattr(sys, 'frozen', False) and hasattr(self, 'va_root') and self.va_root else None
             # Pass shared user_db from CargoMonitor to avoid duplicate database initialization
             self.ring_finder = RingFinder(parent_frame, self.prospector_panel, app_dir, ToolTip, self.distance_calculator, self.cargo_monitor.user_db)
+            
+            # Sync auto-search state from file so both checkboxes match at startup
+            if hasattr(self, 'auto_search_enabled') and hasattr(self.ring_finder, 'auto_search_var'):
+                file_state = self.ring_finder.auto_search_var.get()
+                self.auto_search_enabled.set(file_state)
             
             # Check if there were any pending hotspot additions while Ring Finder was being created
             if getattr(self, '_pending_ring_finder_refresh', False):
