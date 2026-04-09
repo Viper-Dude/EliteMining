@@ -4907,10 +4907,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Additional mining control variables (initialized once, not recreated in _build_timers_tab)
         self.laser_extra_repeat_var = tk.IntVar(value=1)
-        self.prospector_delay_var = tk.DoubleVar(value=4.4)
+        self.prospector_delay_var = tk.DoubleVar(value=4.6)
         self.thrust_upduration_var = tk.DoubleVar(value=1.2)
         self.thrust_closed_var = tk.DoubleVar(value=1.5)
-        self.thrust_open_var = tk.DoubleVar(value=3.0)
+        self.thrust_open_var = tk.DoubleVar(value=3.8)
         
         # Announcement toggles (moved from TOGGLES to Text Overlay section)
         self.announcement_vars: Dict[str, tk.IntVar] = {name: tk.IntVar(value=0) for name in ANNOUNCEMENT_TOGGLES}
@@ -5709,7 +5709,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._watched_files.add("delayprospector.txt")
         self._watched_files.add("thrustscoopopen.txt")
         self._watched_files.add("thrustscoopclosed.txt")
-        self._watched_files.add("thrustUpduration.txt")
+        self._watched_files.add("thrustupduration.txt")
         
         # Get initial file timestamps
         self._update_vars_timestamps()
@@ -8941,7 +8941,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 return "break"
             prospector_spinbox.bind("<MouseWheel>", on_prospector_scroll)
             
-            prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [2.0..6.0]",
+            prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [2.0..6.0] seconds (default: 4.6s)",
                                        bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
             prospector_label.pack(side="left")
             
@@ -8993,7 +8993,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tk.Label(thrust_upduration_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 tk.Label(thrust_upduration_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
 
-                thrust_upduration_spinbox = tk.Spinbox(thrust_upduration_frame, from_=1.0, to=2.0, increment=0.1, width=6,
+                thrust_upduration_spinbox = tk.Spinbox(thrust_upduration_frame, from_=0.5, to=3.5, increment=0.1, width=6,
                                                        textvariable=self.thrust_upduration_var, format="%.1f",
                                                        command=self._save_thrust_upduration,
                                                        bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
@@ -9007,9 +9007,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     try:
                         current = float(var.get())
                         if event.delta > 0:
-                            new_val = min(current + 0.1, 2.0)
+                            new_val = min(current + 0.1, 3.5)
                         else:
-                            new_val = max(current - 0.1, 1.0)
+                            new_val = max(current - 0.1, 0.5)
                         var.set(round(new_val, 1))
                         self._save_thrust_upduration()
                     except:
@@ -9017,7 +9017,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     return "break"
                 thrust_upduration_spinbox.bind("<MouseWheel>", on_thrust_upduration_scroll)
 
-                tk.Label(thrust_upduration_frame, text=f"{t('voiceattack.thrust_upduration_label')} [1.0..2.0]",
+                tk.Label(thrust_upduration_frame, text=f"{t('voiceattack.thrust_upduration_label')} [0.5..3.5] seconds",
                          bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9)).pack(side="left")
                 tk.Label(thrust_upduration_frame, text=t('voiceattack.help_thrust_upduration'),
                          fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
@@ -9056,7 +9056,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     return "break"
                 thrust_closed_spinbox.bind("<MouseWheel>", on_thrust_closed_scroll)
                 
-                thrust_closed_label = tk.Label(thrust_closed_frame, text=f"{t('voiceattack.thrust_closed_label')} [1.0..5.0]",
+                thrust_closed_label = tk.Label(thrust_closed_frame, text=f"{t('voiceattack.thrust_closed_label')} [1.0..5.0] seconds",
                                               bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
                 thrust_closed_label.pack(side="left")
                 
@@ -9098,7 +9098,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     return "break"
                 thrust_open_spinbox.bind("<MouseWheel>", on_thrust_open_scroll)
                 
-                thrust_open_label = tk.Label(thrust_open_frame, text=f"{t('voiceattack.thrust_open_label')} [1.0..5.0]",
+                thrust_open_label = tk.Label(thrust_open_frame, text=f"{t('voiceattack.thrust_open_label')} [1.0..5.0] seconds",
                                             bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
                 thrust_open_label.pack(side="left")
                 
@@ -9356,7 +9356,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 print(f"[PROSPECTOR DELAY] Created default delay file: 4.4 seconds")
         except Exception as e:
             print(f"[PROSPECTOR DELAY] Error loading delay: {e}")
-            self.prospector_delay_var.set(4.4)  # Fallback to default
+            self.prospector_delay_var.set(4.6)  # Fallback to default
     
     def _save_toggle(self, toggle_name: str) -> None:
         """Save a toggle to file immediately on change"""
@@ -9473,7 +9473,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if os.path.exists(txt_path):
                 with open(txt_path, 'r', encoding='utf-8') as f:
                     delay = float(f.read().strip())
-                    delay = max(1.0, min(2.0, delay))
+                    delay = max(0.5, min(3.5, delay))
                     self.thrust_upduration_var.set(delay)
                     print(f"[THRUST UPDURATION] Loaded: {delay:.1f} seconds")
             else:
@@ -10088,7 +10088,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if raw is not None:
                     try:
                         delay = float(raw)
-                        delay = max(1.0, min(2.0, delay))
+                        delay = max(0.5, min(3.5, delay))
                         self.thrust_upduration_var.set(delay)
                         found.append(f"{thrust_upduration_file}.txt")
                         print(f"[IMPORT] Loaded thrust upduration: {delay:.1f}s")
@@ -10516,7 +10516,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if "ThrustUpDuration" in data and hasattr(self, 'thrust_upduration_var'):
             try:
                 delay = float(data["ThrustUpDuration"])
-                delay = max(1.0, min(2.0, delay))
+                delay = max(0.5, min(3.5, delay))
                 self.thrust_upduration_var.set(delay)
                 self._save_thrust_upduration()
                 print(f"[PRESET] Loaded thrust up duration: {delay:.1f}s")
