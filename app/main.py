@@ -470,6 +470,177 @@ class TextOverlay:
             self.overlay_window = None
             self._outline_items = []
 
+
+class CargoTextOverlay:
+    """Persistent cargo monitor overlay on the right side of the screen.
+    Shares font/color settings with the announcement TextOverlay."""
+
+    def __init__(self):
+        self.overlay_window = None
+        self.overlay_enabled = False
+        self.transparency = 0.9
+        self.text_color = "#FFFFFF"
+        self.font_size = 12
+        self._outline_items = []
+        self._update_timer = None
+
+    # -- window management --------------------------------------------------
+    def create_overlay(self):
+        if self.overlay_window:
+            return
+        self.overlay_window = tk.Toplevel()
+        self.overlay_window.title("Cargo Monitor")
+        self.overlay_window.wm_overrideredirect(True)
+        self.overlay_window.wm_attributes("-topmost", True)
+        self.overlay_window.wm_attributes("-transparentcolor", "#000001")
+        self.overlay_window.configure(bg="#000001")
+        self._set_window_position()
+        self.canvas = tk.Canvas(self.overlay_window, bg="#000001",
+                                highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True, padx=10, pady=5)
+        self.overlay_window.withdraw()
+
+    def _set_window_position(self):
+        if not self.overlay_window:
+            return
+        screen_w = self.overlay_window.winfo_screenwidth()
+        window_width = 400
+        window_height = 400
+        x_pos = screen_w - window_width - 20
+        y_pos = 100
+        self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
+
+    def _fit_window_to_content(self):
+        if not self.overlay_window:
+            return
+        screen_w = self.overlay_window.winfo_screenwidth()
+        bbox = self.canvas.bbox("all") if hasattr(self, 'canvas') else None
+        if bbox:
+            window_width = max(250, bbox[2] + 30)
+            window_height = max(60, bbox[3] + 20)
+        else:
+            window_width = 400
+            window_height = 400
+        x_pos = screen_w - window_width - 20
+        y_pos = 100
+        self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
+        if hasattr(self, 'canvas'):
+            self.canvas.config(width=window_width, height=window_height)
+
+    # -- drawing ------------------------------------------------------------
+    def _draw_text(self, message: str):
+        font_spec = ("Segoe UI", self.font_size, "normal")
+        text_color = self._get_current_color()
+        base_x, base_y = 2, 2
+        offsets = [(-1, -1), (1, -1), (-1, 1), (1, 1),
+                   (0, 1), (0, -1), (1, 0), (-1, 0)]
+        if hasattr(self, '_outline_items') and self._outline_items:
+            for item in self._outline_items:
+                self.canvas.itemconfig(item, text=message, font=font_spec)
+            self.canvas.itemconfig(self.text_item, text=message, font=font_spec, fill=text_color)
+        else:
+            self._outline_items = []
+            for ox, oy in offsets:
+                self._outline_items.append(self.canvas.create_text(
+                    base_x + ox, base_y + oy,
+                    text=message, font=font_spec, fill="black",
+                    anchor="nw", justify="left"))
+            self.text_item = self.canvas.create_text(
+                base_x, base_y, text=message, font=font_spec,
+                fill=text_color, anchor="nw", justify="left")
+
+    def _get_current_color(self):
+        base = self.text_color.lstrip('#')
+        r, g, b = int(base[0:2], 16), int(base[2:4], 16), int(base[4:6], 16)
+        f = self.transparency
+        return f"#{min(255,max(0,int(r*f))):02x}{min(255,max(0,int(g*f))):02x}{min(255,max(0,int(b*f))):02x}"
+
+    # -- public API (mirrors TextOverlay settings) --------------------------
+    def set_enabled(self, enabled: bool):
+        self.overlay_enabled = enabled
+        if enabled:
+            if not self.overlay_window:
+                self.create_overlay()
+            self.overlay_window.deiconify()
+        elif self.overlay_window:
+            self.overlay_window.withdraw()
+
+    def set_transparency(self, transparency_percent: int):
+        self.transparency = transparency_percent / 100.0
+
+    def set_color(self, color_hex: str):
+        self.text_color = color_hex
+
+    def set_font_size(self, size: int):
+        self.font_size = size
+
+    # -- cargo data update --------------------------------------------------
+    def update_cargo(self, cargo_monitor):
+        """Build text from cargo_monitor data and redraw."""
+        if not self.overlay_enabled:
+            return
+        if not self.overlay_window:
+            self.create_overlay()
+
+        lines = []
+        cargo = cargo_monitor
+        pct = (cargo.current_cargo / cargo.max_cargo * 100) if cargo.max_cargo > 0 else 0
+
+        if pct > 95:
+            ind = " [!]"
+        elif pct > 85:
+            ind = " [*]"
+        else:
+            ind = ""
+
+        lines.append(f"Cargo Status  {cargo.current_cargo}/{cargo.max_cargo}t  ({pct:.0f}%){ind}")
+
+        if cargo.cargo_items:
+            sorted_items = sorted(cargo.cargo_items.items(),
+                                  key=lambda x: (x[0].lower() != 'limpet', -x[1]))
+            for name, qty in sorted_items:
+                display = name.replace('_', ' ').replace('$', '').title()
+                is_limpet = "limpet" in name.lower()
+                if is_limpet:
+                    display = "Limpet"
+                if display in ('Low Temp. Diamonds', 'Low Temperature Diamonds'):
+                    display = 'LTD'
+                lines.append(f"{display:<14} {qty:>4}t")
+        else:
+            if cargo.current_cargo > 0:
+                lines.append(f"{cargo.current_cargo}t total")
+            else:
+                lines.append("Empty")
+
+        if cargo.materials_collected:
+            lines.append("")
+            lines.append("MATERIALS")
+            sorted_mats = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
+            for mat_name, qty in sorted_mats:
+                grade = cargo.MATERIAL_GRADES.get(mat_name, 0)
+                display = cargo.materials_localized_names.get(mat_name, mat_name)
+                lines.append(f"{display:<14} G{grade}  {qty:>3}")
+
+        message = "\n".join(lines)
+        self._draw_text(message)
+        self.canvas.update_idletasks()
+        self._fit_window_to_content()
+        self._set_window_position()
+        if self.overlay_enabled:
+            self.overlay_window.deiconify()
+
+    def destroy(self):
+        if self._update_timer:
+            try:
+                self.overlay_window.after_cancel(self._update_timer)
+            except Exception:
+                pass
+        if self.overlay_window:
+            self.overlay_window.destroy()
+            self.overlay_window = None
+            self._outline_items = []
+
+
 APP_TITLE = "EliteMining"
 APP_VERSION = "v5.0.0"
 PRESET_INDENT = "   "  # spaces used to indent preset names
@@ -4992,6 +5163,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Initialize text overlay for TTS announcements (before loading preferences)
         self.text_overlay = TextOverlay()
+        self.cargo_text_overlay = CargoTextOverlay()
         
         # Setup keyboard shortcuts
         self._setup_keyboard_shortcuts()
@@ -5021,6 +5193,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_position.trace('w', self._on_cargo_position_change)
         self.cargo_max_capacity.trace('w', self._on_cargo_capacity_change)
         self.cargo_transparency.trace('w', self._on_cargo_transparency_change)
+        self.cargo_show_in_overlay.trace('w', self._on_cargo_overlay_toggle)
 
         # Setup keyboard shortcuts
         self._setup_keyboard_shortcuts()
@@ -5682,6 +5855,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             pass  # Silently handle any update errors
         
+        # Update cargo text overlay if enabled
+        try:
+            if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled:
+                self.cargo_text_overlay.update_cargo(self.cargo_monitor)
+        except Exception:
+            pass
+        
         # Schedule next update
         self.after(2000, self._periodic_integrated_cargo_update)  # Every 2 seconds
     
@@ -5869,6 +6049,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 action = parts[1] if len(parts) > 1 else ""
                 self._va_handle_app(action)
                 
+            elif cmd_type == "OVERLAY":
+                # Overlay control: OVERLAY:ENABLE, OVERLAY:DISABLE, OVERLAY:STANDARD,
+                # OVERLAY:ENHANCED, OVERLAY:CARGO:ON, OVERLAY:CARGO:OFF
+                action = ":".join(parts[1:]) if len(parts) > 1 else ""
+                self._va_handle_overlay(action)
+                
             else:
                 log.warning(f"Unknown VA command: {command}")
                 
@@ -5976,6 +6162,61 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.lift()
             self.focus_force()
             self._set_status("EliteMining restored")
+    
+    def _va_handle_overlay(self, action: str):
+        """Handle overlay control commands from VoiceAttack.
+        
+        Commands: OVERLAY:TEXT:ON, OVERLAY:TEXT:OFF,
+                  OVERLAY:STANDARD:ON, OVERLAY:STANDARD:OFF,
+                  OVERLAY:ENHANCED:ON, OVERLAY:ENHANCED:OFF,
+                  OVERLAY:CARGO:ON, OVERLAY:CARGO:OFF
+        """
+        if action == "TEXT:ON":
+            self.text_overlay_enabled.set(1)
+            self._set_status("Text overlay enabled")
+            log.info("VA: Text overlay enabled")
+        elif action == "TEXT:OFF":
+            self.text_overlay_enabled.set(0)
+            self._set_status("Text overlay disabled")
+            log.info("VA: Text overlay disabled")
+        elif action == "STANDARD:ON":
+            self.overlay_mode.set("standard")
+            if hasattr(self, '_overlay_standard_var'):
+                self._overlay_standard_var.set(1)
+                self._overlay_enhanced_var.set(0)
+            self._set_status("Overlay mode: Standard Text")
+            log.info("VA: Standard overlay enabled")
+        elif action == "STANDARD:OFF":
+            self.overlay_mode.set("enhanced")
+            if hasattr(self, '_overlay_standard_var'):
+                self._overlay_standard_var.set(0)
+                self._overlay_enhanced_var.set(1)
+            self._set_status("Overlay mode: Enhanced Prospector")
+            log.info("VA: Standard overlay disabled (switched to enhanced)")
+        elif action == "ENHANCED:ON":
+            self.overlay_mode.set("enhanced")
+            if hasattr(self, '_overlay_standard_var'):
+                self._overlay_standard_var.set(0)
+                self._overlay_enhanced_var.set(1)
+            self._set_status("Overlay mode: Enhanced Prospector")
+            log.info("VA: Enhanced overlay enabled")
+        elif action == "ENHANCED:OFF":
+            self.overlay_mode.set("standard")
+            if hasattr(self, '_overlay_standard_var'):
+                self._overlay_standard_var.set(1)
+                self._overlay_enhanced_var.set(0)
+            self._set_status("Overlay mode: Standard Text")
+            log.info("VA: Enhanced overlay disabled (switched to standard)")
+        elif action == "CARGO:ON":
+            self.cargo_show_in_overlay.set(True)
+            self._set_status("Cargo status overlay enabled")
+            log.info("VA: Cargo overlay enabled")
+        elif action == "CARGO:OFF":
+            self.cargo_show_in_overlay.set(False)
+            self._set_status("Cargo status overlay disabled")
+            log.info("VA: Cargo overlay disabled")
+        else:
+            log.warning(f"VA: Unknown overlay action: {action}")
     
     def _close_app_gracefully(self):
         """Close the app gracefully, saving state"""
@@ -7481,6 +7722,47 @@ class App(tk.Tk, ColumnVisibilityMixin):
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 8))
         r += 1
         
+        # Overlay mode selection (Standard / Enhanced Prospector / Cargo Status) - all on one line
+        mode_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
+        mode_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
+        tk.Label(mode_frame, text=t('settings.overlay_mode'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        
+        self._overlay_standard_var = tk.IntVar(value=1 if self.overlay_mode.get() == "standard" else 0)
+        self._overlay_enhanced_var = tk.IntVar(value=1 if self.overlay_mode.get() == "enhanced" else 0)
+        
+        _cb_kw = dict(bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
+                      highlightcolor="#1e1e1e", takefocus=False)
+        
+        def _on_standard_cb(*a):
+            if self._overlay_standard_var.get():
+                self._overlay_enhanced_var.set(0)
+                self.overlay_mode.set("standard")
+            else:
+                if not self._overlay_enhanced_var.get():
+                    self._overlay_standard_var.set(1)
+        
+        def _on_enhanced_cb(*a):
+            if self._overlay_enhanced_var.get():
+                self._overlay_standard_var.set(0)
+                self.overlay_mode.set("enhanced")
+            else:
+                if not self._overlay_standard_var.get():
+                    self._overlay_enhanced_var.set(1)
+        
+        tk.Checkbutton(mode_frame, text=t('settings.overlay_standard'), variable=self._overlay_standard_var,
+                      command=_on_standard_cb, **_cb_kw).pack(side="left", padx=(8, 0))
+        tk.Checkbutton(mode_frame, text=t('settings.overlay_enhanced'), variable=self._overlay_enhanced_var,
+                      command=_on_enhanced_cb, **_cb_kw).pack(side="left", padx=(8, 0))
+        tk.Checkbutton(mode_frame, text=t('settings.enable_cargo_overlay'), variable=self.cargo_show_in_overlay,
+                      **_cb_kw).pack(side="left", padx=(8, 0))
+        r += 1
+        tk.Label(scrollable_frame, text=t('settings.overlay_mode_desc'),
+                 wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+        r += 1
+        
         # Text brightness slider
         transparency_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         transparency_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
@@ -7614,26 +7896,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Label(duration_frame, text=t('settings.seconds'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.duration_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
-        r += 1
-        
-        # Overlay mode selection (Standard vs Enhanced Prospector)
-        mode_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        mode_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(mode_frame, text=t('settings.overlay_mode'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
-        
-        # Radio buttons for mode selection
-        tk.Radiobutton(mode_frame, text=t('settings.overlay_standard'), value="standard", variable=self.overlay_mode,
-                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
-                      padx=4, pady=2, anchor="w").pack(side="left", padx=(8, 0))
-        tk.Radiobutton(mode_frame, text=t('settings.overlay_enhanced'), value="enhanced", variable=self.overlay_mode,
-                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
-                      padx=4, pady=2, anchor="w").pack(side="left", padx=(8, 0))
-        r += 1
-        tk.Label(scrollable_frame, text=t('settings.overlay_mode_desc'),
-                 wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
@@ -13205,6 +13467,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Set display duration
         self.text_overlay.set_display_duration(duration)
 
+        # Sync cargo text overlay with same visual settings
+        self.cargo_text_overlay.set_transparency(transparency)
+        self.cargo_text_overlay.set_color(color_hex)
+        self.cargo_text_overlay.set_font_size(size_value)
+
     def _save_text_overlay_preference(self) -> None:
         """Save text overlay enabled state, transparency, color, and settings to config"""
         from config import update_config_values
@@ -13229,6 +13496,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Called when brightness slider is changed"""
         transparency = int(self.text_overlay_transparency.get())
         self.text_overlay.set_transparency(transparency)
+        self.cargo_text_overlay.set_transparency(transparency)
         self._save_text_overlay_preference()
         
         # Show a preview message if overlay is enabled to test brightness
@@ -13240,6 +13508,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         color_name = self.text_overlay_color.get()
         color_hex = self.color_options.get(color_name, "#FFFFFF")
         self.text_overlay.set_color(color_hex)
+        self.cargo_text_overlay.set_color(color_hex)
         self._save_text_overlay_preference()
         
         # Update the option menu button to show the selected color
@@ -13254,6 +13523,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         size_name = self.text_overlay_size.get()
         size_value = self.size_options.get(size_name, 12)
         self.text_overlay.set_font_size(size_value)
+        self.cargo_text_overlay.set_font_size(size_value)
         self._save_text_overlay_preference()
         
         # Show a preview message if overlay is enabled to test size
@@ -13322,6 +13592,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_max_capacity.set(cfg.get("cargo_max_capacity", 200))
         self.cargo_transparency.set(cfg.get("cargo_transparency", 90))
         self.cargo_show_in_overlay.set(cfg.get("cargo_show_in_overlay", False))
+        # Apply saved cargo overlay state
+        self.cargo_text_overlay.set_enabled(cfg.get("cargo_show_in_overlay", False))
     
     def _save_cargo_preferences(self) -> None:
         """Save cargo monitor preferences to config"""
@@ -13392,6 +13664,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Called when cargo transparency is changed"""
         transparency = int(self.cargo_transparency.get())
         self.cargo_monitor.set_transparency(transparency)
+        self._save_cargo_preferences()
+
+    def _on_cargo_overlay_toggle(self, *args) -> None:
+        """Called when cargo monitor overlay checkbox is toggled"""
+        enabled = bool(self.cargo_show_in_overlay.get())
+        self.cargo_text_overlay.set_enabled(enabled)
         self._save_cargo_preferences()
 
     # ---------- Window geometry save/restore ----------
@@ -14641,6 +14919,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Clean up text overlay
         if hasattr(self, 'text_overlay'):
             self.text_overlay.destroy()
+        
+        # Clean up cargo text overlay
+        if hasattr(self, 'cargo_text_overlay'):
+            self.cargo_text_overlay.destroy()
             
         # Clean up cargo monitor with enhanced resource management
         if hasattr(self, 'cargo_monitor'):

@@ -54,12 +54,11 @@ Ensure VoiceAttack has plugin support enabled:
 1. Open **VoiceAttack → Options → General**
 2. Enable **"Enable Plugin Support"**
 3. Open **Plugin Manager**
-4. Verify these plugins are checked:
-   - ✓ EliteMining Plugin
+4. Verify this plugin is checked:
    - ✓ EliteAPI (EliteVA.dll)
 5. Restart VoiceAttack
 
-Without both plugins enabled, mining automation and game integration won't work.
+Without the EliteAPI plugin enabled, game integration won't work.
 </details>
 
 ## Features

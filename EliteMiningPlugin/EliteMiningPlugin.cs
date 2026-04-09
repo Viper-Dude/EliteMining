@@ -1,3 +1,10 @@
+// =============================================================================
+// PLUGIN DISABLED - All commands are handled via direct file writes from
+// VoiceAttack using: Write (overwrite), 'COMMAND' to file '{VA_APPS}\...'
+// This plugin is not currently used by any VA profile commands.
+// =============================================================================
+
+/*
 using System;
 using System.IO;
 
@@ -133,6 +140,11 @@ public class EliteMiningPlugin
 
                 case "APP":
                     WriteFile(Path.Combine(variablesPath, "eliteMiningCommand.txt"), $"APP:{param1.ToUpper()}");
+                    break;
+
+                case "OVERLAY":
+                    // Overlay commands: OVERLAY:TOGGLE, OVERLAY:STANDARD, OVERLAY:ENHANCED, OVERLAY:CARGO
+                    WriteFile(Path.Combine(variablesPath, "eliteMiningCommand.txt"), $"OVERLAY:{param1.ToUpper()}");
                     break;
 
                 // ============================================
@@ -288,3 +300,4 @@ public class EliteMiningPlugin
             return "";
         }
     }
+*/

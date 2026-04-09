@@ -138,18 +138,17 @@ The installer bundles the **EliteVA plugin**. No separate download required.
 3. Configure your mining hotkeys in the **"Custom Keybinds for Mining Control"** category
 
 ### Enable VoiceAttack Plugins
-VoiceAttack must have plugin support enabled and both EliteMining and EliteAPI plugins activated:
+VoiceAttack must have plugin support enabled and the EliteAPI plugin activated:
 
 1. Open **VoiceAttack → Options → General**
 2. Enable **"Enable Plugin Support"** checkbox
 3. Click **"Plugin Manager"**
-4. Enable these plugins:
-   - ✓ **EliteMining Plugin v1.0.0**
+4. Enable this plugin:
    - ✓ **EliteAPI (v4 EliteVA.dll)**
 5. Click **OK** and **restart VoiceAttack** for changes to take effect
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_plugin.png" width="900"><br>  
-*Enable both EliteMining and EliteAPI plugins in VoiceAttack*
+*Enable the EliteAPI plugin in VoiceAttack*
 
 **Note:** Plugin changes require a VoiceAttack restart.
 
@@ -642,6 +641,18 @@ Configure how many times the laser mining extra sequence runs:
 |---------------|--------|
 | Import settings | Import settings from game |
 | Apply settings | Apply settings to game |
+
+### Overlay Control
+| Voice Command | Action |
+|---------------|--------|
+| Enable text overlay | Turn on the text overlay |
+| Disable text overlay | Turn off the text overlay |
+| Enable standard text overlay | Switch to standard text overlay mode |
+| Disable standard text overlay | Switch off standard text overlay mode |
+| Enable enhanced text overlay | Switch to enhanced prospector overlay mode |
+| Disable enhanced text overlay | Switch off enhanced prospector overlay mode |
+| Enable cargo text overlay | Turn on the cargo status overlay |
+| Disable cargo text overlay | Turn off the cargo status overlay |
 
 > 💡 **Tip:** The VoiceAttack profile contains many more commands including firegroup assignments, status checks, and custom sequences. To see all available commands:
 > 1. Open VoiceAttack and export EliteMining profile

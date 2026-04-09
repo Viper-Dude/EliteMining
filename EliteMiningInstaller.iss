@@ -45,10 +45,9 @@ Source: "app\Ship Presets\*";  DestDir: "{app}\app\Ship Presets";  Flags: recurs
 ; New Configurator executable
 Source: "dist\EliteMining.exe"; DestDir: "{app}\Configurator"; Flags: ignoreversion
 
-; EliteMiningPlugin.dll (VoiceAttack plugin for variable access) - only update if version changed
-Source: "EliteMiningPlugin\bin\Release\net48\EliteMiningPlugin.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Check: ShouldInstallPlugin
-; Plugin version file
-Source: "app\elitemining_plugin_version.txt"; DestDir: "{app}\app"; Flags: ignoreversion; Check: IsVADetected
+; EliteMiningPlugin.dll - DISABLED: Plugin is not used, all commands use direct file writes
+; Source: "EliteMiningPlugin\bin\Release\net48\EliteMiningPlugin.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Check: ShouldInstallPlugin
+; Source: "app\elitemining_plugin_version.txt"; DestDir: "{app}\app"; Flags: ignoreversion; Check: IsVADetected
 
 ; Local systems database (~14 MB) - populated systems within the bubble for fast searches
 Source: "app\data\galaxy_systems.db"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
@@ -129,15 +128,15 @@ UninstalledAll=EliteMining has been successfully uninstalled.%n%nNOTE: Some file
 [Code]
 var
   VADetected: Boolean;
-  InstallPlugin: Boolean;
+  { InstallPlugin: Boolean; }  { DISABLED - plugin not used }
   ProfileNeedsUpdate: Boolean;
   VABasePath: String;  { Store VoiceAttack base path for EliteAPI checking }
   ExistingEliteAPIPath: String;  { Store actual path where EliteAPI.dll was found }
   VersionFile: String;  { Path to EliteAPI_Version.txt }
   ExistingVersion: AnsiString;  { Version string from EliteAPI_Version.txt }
-  PluginVersionFile: String;  { Path to elitemining_plugin_version.txt }
-  ExistingPluginVersion: AnsiString;  { Version string from plugin version file }
-  NewPluginVersion: AnsiString;  { New plugin version being installed }
+  { PluginVersionFile: String; }  { DISABLED - plugin not used }
+  { ExistingPluginVersion: AnsiString; }  { DISABLED - plugin not used }
+  { NewPluginVersion: AnsiString; }  { DISABLED - plugin not used }
 
 function IsVADetected: Boolean;
 begin
@@ -157,10 +156,12 @@ begin
   Result := IsVADetected and WizardIsTaskSelected('installeliteva');
 end;
 
+{ DISABLED - plugin not used
 function ShouldInstallPlugin: Boolean;
 begin
   Result := InstallPlugin and IsVADetected;
 end;
+}
 
 
 function GetEliteAPIDestDir(Param: String): String;
@@ -385,30 +386,26 @@ begin
   ProfileNeedsUpdate := False;
   BundledProfileVersion := '5.0.0';
   
-  { Default: Install plugin if VoiceAttack detected }
-  InstallPlugin := VADetected;
+  { DISABLED - plugin not used }
+  { InstallPlugin := VADetected; }
   
   Log('VADetected: ' + BoolToStr(VADetected));
   Log('VABasePath: ' + VABasePath);
   
-  { Check if plugin version needs updating (only if VA detected) }
-  { NOTE: New version is HARDCODED here - update when plugin changes! }
+  { DISABLED - plugin not used, all commands use direct file writes
   if VADetected and (VABasePath <> '') then
   begin
-    { Get the installation directory - use VABasePath + Apps\EliteMining }
     PluginVersionFile := VABasePath + '\Apps\EliteMining\app\elitemining_plugin_version.txt';
     
     Log('Checking plugin version file: ' + PluginVersionFile);
     
     if FileExists(PluginVersionFile) then
     begin
-      { Load existing version }
       if LoadStringFromFile(PluginVersionFile, ExistingPluginVersion) then
       begin
         ExistingPluginVersion := Trim(ExistingPluginVersion);
         Log('Existing plugin version: ' + String(ExistingPluginVersion));
         
-        { Compare with hardcoded new version (same approach as EliteAPI) }
         if ExistingPluginVersion = '1.0.0' then
         begin
           Log('Plugin version unchanged (1.0.0) - skipping plugin update');
@@ -434,6 +431,7 @@ begin
   end;
   
   Log('InstallPlugin: ' + BoolToStr(InstallPlugin));
+  }
   
   { Search for existing EliteAPI installation for path detection }
   if VADetected and (VABasePath <> '') then
@@ -526,7 +524,8 @@ begin
       end;
       if Pos('EliteVA', WizardForm.TasksList.ItemCaption[I]) > 0 then
       begin
-        WizardForm.TasksList.Checked[I] := InstallPlugin;
+        { Only pre-check if EliteVA is not installed or version differs from bundled 5.0.7 }
+        WizardForm.TasksList.Checked[I] := VADetected and (ExistingVersion <> '5.0.7');
       end;
     end;
   end;
