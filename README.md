@@ -556,6 +556,8 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 <img src="Screenshot/txt_overlay_enhanced.png" width="900"><br>  
 *Enhanced overlay with improved readability and detailed mining statistics.*
 
+> **Note:** The text overlay automatically follows the game window across monitors. On high DPI scaling settings (above 150%), the overlay position may be slightly offset. For best results, use 100–150% display scaling on the monitor running the game.
+
 </details>
 
 [Back to Top](#top)

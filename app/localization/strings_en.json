@@ -834,6 +834,7 @@
     "text_overlay_desc": "Announcements text overlay (same text that goes to TTS)",
     "enable_cargo_overlay": "Enable Cargo Monitor Overlay",
     "cargo_overlay_desc": "Live cargo status overlay on the right side of screen (minerals, limpets, graded materials)",
+    "overlay_only_game_focused": "Only when game is focused",
     "text_brightness": "Text Brightness:",
     "text_brightness_desc": "Adjust text brightness/opacity",
     "text_color": "Text Color:",

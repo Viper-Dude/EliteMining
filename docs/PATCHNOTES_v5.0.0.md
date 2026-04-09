@@ -1,5 +1,5 @@
 ### <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-04-07
+**Release Date:** 2026-04-09
 
 ## New Features & Improvements
 
@@ -7,24 +7,26 @@
 
 - Added option to update and preserve custom keybinds the VoiceAttack profile — available via Settings
 - Added **Cargo Status text Overlay** — live cargo monitoring displayed on screen while mining
+- Added **"Only when game is focused"** option — overlays automatically hide when you alt-tab out of Elite Dangerous and reappear when you return. Enabled by default.
+- Overlays now follow the game window across monitors — works correctly on multi-monitor setups and DPI scaling up to 150%
 
-### Voiceattack Profile - Updated to v5.0.0S
+### Voiceattack Profile - Updated to v5.0.0
+
+### Important Notes 
+- This update is adding new and edits of existing command, some keybind could be missed when updating
+- Remember to always check all your key and joystick bindings after every profile update.
 
 ### New VoiceAttack Commands
 
 - **Enable/Disable Text Overlay** — turn the text overlay on or off by voice
-- **Enable/Disable Standard Overlay** — switch to standard text overlay mode
-- **Enable/Disable Enhanced Overlay** — switch to enhanced prospector overlay mode
-- **Enable/Disable Cargo Overlay** — turn the cargo status overlay on or off
+- **Enable/Disable Standard Text Overlay** — switch to standard text overlay mode
+- **Enable/Disable Enhanced Text Overlay** — switch to enhanced prospector overlay mode
+- **Enable/Disable Cargo Text Overlay** — turn the cargo status overlay on or off
 
 
 ### VoiceAttack Controls Tab
 
 - Added **Thrust up duration** spinbox (0.5–3.0s, default 1.2s) — controls how long the upward thrust is applied during the prospector sequence. Value saved as part of the ship preset.
-
-### Important Notes 
-
-- Remember to always check all your key and joystick bindings after every profile update.
 
 ### Removed
 

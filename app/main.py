@@ -106,6 +106,61 @@ from ui.dialogs import centered_yesno_dialog, center_window, centered_info_dialo
 set_translate_func(t)
 from path_utils import get_ship_presets_dir, get_reports_dir
 
+
+def is_game_focused() -> bool:
+    """Check if Elite Dangerous game client is the active foreground window."""
+    try:
+        import ctypes
+        hwnd = ctypes.windll.user32.GetForegroundWindow()
+        length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+        buf = ctypes.create_unicode_buffer(length + 1)
+        ctypes.windll.user32.GetWindowTextW(hwnd, buf, length + 1)
+        return "Elite - Dangerous" in buf.value
+    except Exception:
+        return False
+
+
+def _find_game_window_rect():
+    """Find the Elite Dangerous game window rectangle (left, top, right, bottom).
+    Returns None if the game window is not found."""
+    try:
+        import ctypes
+        import ctypes.wintypes
+
+        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+        result = [None]
+
+        def enum_cb(hwnd, _lparam):
+            length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+            if length > 0:
+                buf = ctypes.create_unicode_buffer(length + 1)
+                ctypes.windll.user32.GetWindowTextW(hwnd, buf, length + 1)
+                if "Elite - Dangerous" in buf.value:
+                    rect = ctypes.wintypes.RECT()
+                    ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                    result[0] = (rect.left, rect.top, rect.right, rect.bottom)
+                    return False  # stop enumerating
+            return True
+
+        ctypes.windll.user32.EnumWindows(WNDENUMPROC(enum_cb), 0)
+        return result[0]
+    except Exception:
+        return None
+
+
+def get_game_monitor_offset():
+    """Return (x_offset, y_offset, screen_width) of the monitor the game is running on.
+    Falls back to (0, 0, primary_width) if game window not found."""
+    rect = _find_game_window_rect()
+    if rect:
+        # Use top-left of game window as the monitor origin
+        # For fullscreen/borderless, this is the monitor's top-left corner
+        game_left, game_top, game_right, _game_bottom = rect
+        game_width = game_right - game_left
+        return (game_left, game_top, game_width)
+    return (0, 0, None)  # None = use default screen width
+
+
 # --- Text Overlay class for TTS announcements ---
 class TextOverlay:
     def __init__(self):
@@ -118,6 +173,8 @@ class TextOverlay:
         self.position = "upper_left"  # Fixed position
         self.font_size = 12  # Default font size (Normal)
         self._outline_items = []
+        self._game_hidden = False  # Track if hidden due to game focus check
+        self._is_showing = False  # Track if overlay is actively displaying a message
     def create_overlay(self):
         """Create the overlay window"""
         if self.overlay_window:
@@ -168,15 +225,17 @@ class TextOverlay:
         # CRITICAL: Reposition window every time before showing (Windows can reset position)
         self._set_window_position()
 
-        # Show window AFTER text is ready
-        self.overlay_window.deiconify()
+        # Show window AFTER text is ready (skip if hidden by game focus check)
+        self._is_showing = True
+        if not self._game_hidden:
+            self.overlay_window.deiconify()
         
         # Cancel any existing timer
         if self.fade_timer:
             self.overlay_window.after_cancel(self.fade_timer)
             
         # Schedule hide after display duration
-        self.fade_timer = self.overlay_window.after(self.display_duration, self.hide_overlay)
+        self.fade_timer = self.overlay_window.after(self.display_duration, self._timed_hide)
         
     def show_persistent_message(self, message: str):
         """Display a message that stays visible until manually hidden (for cargo full prompt)"""
@@ -193,8 +252,10 @@ class TextOverlay:
         self.canvas.update_idletasks()
         self._fit_window_to_content()
 
-        # Show window AFTER text is ready
-        self.overlay_window.deiconify()
+        # Show window AFTER text is ready (skip if hidden by game focus check)
+        self._is_showing = True
+        if not self._game_hidden:
+            self.overlay_window.deiconify()
         
         # Cancel any existing timer - this message stays until manually hidden
         if self.fade_timer:
@@ -238,8 +299,9 @@ class TextOverlay:
         """Resize overlay window to fit current canvas content"""
         if not self.overlay_window:
             return
-        x_pos = 20
-        y_pos = 100
+        gx, gy, gw = get_game_monitor_offset()
+        x_pos = gx + 20
+        y_pos = gy + 100
         bbox = self.canvas.bbox("all") if hasattr(self, 'canvas') else None
         if bbox:
             window_width = max(400, bbox[2] + 30)
@@ -253,6 +315,13 @@ class TextOverlay:
 
     def hide_overlay(self):
         """Hide the overlay window"""
+        if self.overlay_window:
+            self.overlay_window.withdraw()
+            self._is_showing = False
+
+    def _timed_hide(self):
+        """Called when display duration expires"""
+        self._is_showing = False
         if self.overlay_window:
             self.overlay_window.withdraw()
             
@@ -330,15 +399,15 @@ class TextOverlay:
         # The new duration will apply to the next message
     
     def _set_window_position(self):
-        """Set window position - always upper left"""
+        """Set window position - upper left of the monitor the game is on"""
         if not self.overlay_window:
             return
-            
-        # Fixed position: upper left
+        
+        gx, gy, gw = get_game_monitor_offset()
         window_width = 750
         window_height = 300
-        x_pos = 20
-        y_pos = 100
+        x_pos = gx + 20
+        y_pos = gy + 100
         
         self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
     
@@ -483,6 +552,7 @@ class CargoTextOverlay:
         self.font_size = 12
         self._outline_items = []
         self._update_timer = None
+        self._game_hidden = False  # Track if hidden due to game focus check
 
     # -- window management --------------------------------------------------
     def create_overlay(self):
@@ -503,17 +573,19 @@ class CargoTextOverlay:
     def _set_window_position(self):
         if not self.overlay_window:
             return
-        screen_w = self.overlay_window.winfo_screenwidth()
+        gx, gy, gw = get_game_monitor_offset()
+        screen_w = gw if gw else self.overlay_window.winfo_screenwidth()
         window_width = 400
         window_height = 400
-        x_pos = screen_w - window_width - 20
-        y_pos = 100
+        x_pos = gx + screen_w - window_width - 20
+        y_pos = gy + 100
         self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
 
     def _fit_window_to_content(self):
         if not self.overlay_window:
             return
-        screen_w = self.overlay_window.winfo_screenwidth()
+        gx, gy, gw = get_game_monitor_offset()
+        screen_w = gw if gw else self.overlay_window.winfo_screenwidth()
         bbox = self.canvas.bbox("all") if hasattr(self, 'canvas') else None
         if bbox:
             window_width = max(250, bbox[2] + 30)
@@ -521,8 +593,8 @@ class CargoTextOverlay:
         else:
             window_width = 400
             window_height = 400
-        x_pos = screen_w - window_width - 20
-        y_pos = 100
+        x_pos = gx + screen_w - window_width - 20
+        y_pos = gy + 100
         self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
         if hasattr(self, 'canvas'):
             self.canvas.config(width=window_width, height=window_height)
@@ -626,7 +698,7 @@ class CargoTextOverlay:
         self.canvas.update_idletasks()
         self._fit_window_to_content()
         self._set_window_position()
-        if self.overlay_enabled:
+        if self.overlay_enabled and not self._game_hidden:
             self.overlay_window.deiconify()
 
     def destroy(self):
@@ -5131,11 +5203,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.prompt_on_cargo_full.trace('w', self._on_prompt_on_full_toggle)
         
         # Text overlay enable/disable, transparency, and color
-        self.text_overlay_enabled = tk.IntVar(value=0)  # Default disabled
+        self.text_overlay_enabled = tk.IntVar(value=1)  # Default enabled
         self.text_overlay_transparency = tk.IntVar(value=90)  # Default 90% (0.9 alpha)
         self.text_overlay_color = tk.StringVar(value="White")  # Default white
         self.text_overlay_duration = tk.IntVar(value=7)  # Default 7 seconds (range: 5-30)
-        self.overlay_mode = tk.StringVar(value="standard")  # "standard" or "enhanced" prospector overlay
+        self.overlay_mode = tk.StringVar(value="enhanced")  # "standard" or "enhanced" prospector overlay
         self.prospector_show_all = tk.IntVar(value=0)  # 0=threshold only, 1=all materials
         
         # EDDN sending enable/disable
@@ -5174,7 +5246,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_position = tk.StringVar(value="Upper Right")
         self.cargo_max_capacity = tk.IntVar(value=200)
         self.cargo_transparency = tk.IntVar(value=90)
-        self.cargo_show_in_overlay = tk.BooleanVar(value=False)
+        self.cargo_show_in_overlay = tk.BooleanVar(value=True)
+        self.overlay_only_game_focused = tk.BooleanVar(value=True)
 
         self._load_cargo_preferences()
         
@@ -5855,9 +5928,44 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             pass  # Silently handle any update errors
         
-        # Update cargo text overlay if enabled
+        # Check game focus FIRST — set _game_hidden flags before any overlay updates
         try:
-            if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled:
+            if self.overlay_only_game_focused.get():
+                game_active = is_game_focused()
+                # Cargo overlay
+                if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled and self.text_overlay_enabled.get():
+                    if game_active:
+                        if self.cargo_text_overlay._game_hidden:
+                            self.cargo_text_overlay._game_hidden = False
+                            if self.cargo_text_overlay.overlay_window:
+                                self.cargo_text_overlay.overlay_window.deiconify()
+                    else:
+                        if not self.cargo_text_overlay._game_hidden:
+                            self.cargo_text_overlay._game_hidden = True
+                            if self.cargo_text_overlay.overlay_window:
+                                self.cargo_text_overlay.overlay_window.withdraw()
+                # Text overlay — always track game focus, only manage window if showing
+                if hasattr(self, 'text_overlay') and self.text_overlay.overlay_enabled:
+                    if game_active:
+                        self.text_overlay._game_hidden = False
+                        if self.text_overlay._is_showing and self.text_overlay.overlay_window:
+                            self.text_overlay.overlay_window.deiconify()
+                    else:
+                        if not self.text_overlay._game_hidden and self.text_overlay._is_showing and self.text_overlay.overlay_window:
+                            self.text_overlay.overlay_window.withdraw()
+                        self.text_overlay._game_hidden = True
+            else:
+                # Setting disabled — clear hidden flags so overlays show normally
+                if hasattr(self, 'cargo_text_overlay'):
+                    self.cargo_text_overlay._game_hidden = False
+                if hasattr(self, 'text_overlay'):
+                    self.text_overlay._game_hidden = False
+        except Exception:
+            pass
+        
+        # Update cargo text overlay data (respects _game_hidden — won't deiconify if hidden)
+        try:
+            if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled and self.text_overlay_enabled.get():
                 self.cargo_text_overlay.update_cargo(self.cargo_monitor)
         except Exception:
             pass
@@ -7756,6 +7864,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Checkbutton(mode_frame, text=t('settings.overlay_enhanced'), variable=self._overlay_enhanced_var,
                       command=_on_enhanced_cb, **_cb_kw).pack(side="left", padx=(8, 0))
         tk.Checkbutton(mode_frame, text=t('settings.enable_cargo_overlay'), variable=self.cargo_show_in_overlay,
+                      **_cb_kw).pack(side="left", padx=(8, 0))
+        tk.Checkbutton(mode_frame, text=t('settings.overlay_only_game_focused'), variable=self.overlay_only_game_focused,
                       **_cb_kw).pack(side="left", padx=(8, 0))
         r += 1
         tk.Label(scrollable_frame, text=t('settings.overlay_mode_desc'),
@@ -13438,12 +13548,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _load_text_overlay_preference(self) -> None:
         """Load text overlay enabled state and transparency from config"""
         cfg = _load_cfg()
-        enabled = cfg.get("text_overlay_enabled", False)  # Default to disabled
+        enabled = cfg.get("text_overlay_enabled", True)  # Default to enabled
         transparency = cfg.get("text_overlay_transparency", 90)  # Default to 90%
         color = cfg.get("text_overlay_color", "White")  # Default to white
         size = cfg.get("text_overlay_size", "Normal")  # Default to normal size
         duration = cfg.get("text_overlay_duration", 7)  # Default to 7 seconds
-        overlay_mode = cfg.get("overlay_mode", "standard")  # Default to standard mode
+        overlay_mode = cfg.get("overlay_mode", "enhanced")  # Default to enhanced mode
         show_all = cfg.get("prospector_show_all", False)  # Default to threshold only
         
         self.text_overlay_enabled.set(1 if enabled else 0)
@@ -13487,9 +13597,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         update_config_values(updates)
 
     def _on_text_overlay_toggle(self, *args) -> None:
-        """Called when text overlay checkbox is toggled"""
+        """Called when text overlay checkbox is toggled (master toggle for all overlays)"""
         enabled = bool(self.text_overlay_enabled.get())
         self.text_overlay.set_enabled(enabled)
+        # Master toggle: also hide cargo overlay when text overlay is disabled
+        if not enabled and hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_window:
+            self.cargo_text_overlay.overlay_window.withdraw()
+        elif enabled and hasattr(self, 'cargo_text_overlay') and self.cargo_show_in_overlay.get():
+            self.cargo_text_overlay.set_enabled(True)
         self._save_text_overlay_preference()
         
     def _on_transparency_change(self, *args) -> None:
@@ -13591,9 +13706,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_position.set(cfg.get("cargo_position", "Upper Right"))
         self.cargo_max_capacity.set(cfg.get("cargo_max_capacity", 200))
         self.cargo_transparency.set(cfg.get("cargo_transparency", 90))
-        self.cargo_show_in_overlay.set(cfg.get("cargo_show_in_overlay", False))
+        self.cargo_show_in_overlay.set(cfg.get("cargo_show_in_overlay", True))
+        self.overlay_only_game_focused.set(cfg.get("overlay_only_game_focused", True))
         # Apply saved cargo overlay state
-        self.cargo_text_overlay.set_enabled(cfg.get("cargo_show_in_overlay", False))
+        self.cargo_text_overlay.set_enabled(cfg.get("cargo_show_in_overlay", True))
     
     def _save_cargo_preferences(self) -> None:
         """Save cargo monitor preferences to config"""
@@ -13604,7 +13720,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "cargo_position": str(self.cargo_position.get()),
             "cargo_max_capacity": int(self.cargo_max_capacity.get()),
             "cargo_transparency": int(self.cargo_transparency.get()),
-            "cargo_show_in_overlay": bool(self.cargo_show_in_overlay.get())
+            "cargo_show_in_overlay": bool(self.cargo_show_in_overlay.get()),
+            "overlay_only_game_focused": bool(self.overlay_only_game_focused.get())
         }
         update_config_values(updates)
     
