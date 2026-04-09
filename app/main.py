@@ -575,8 +575,12 @@ class CargoTextOverlay:
             return
         gx, gy, gw = get_game_monitor_offset()
         screen_w = gw if gw else self.overlay_window.winfo_screenwidth()
-        window_width = 400
-        window_height = 400
+        window_width = self.overlay_window.winfo_width()
+        window_height = self.overlay_window.winfo_height()
+        if window_width < 10:
+            window_width = 500
+        if window_height < 10:
+            window_height = 400
         x_pos = gx + screen_w - window_width - 20
         y_pos = gy + 100
         self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
@@ -5230,7 +5234,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.size_options = {
             "Small": 10,      # Small text (reduced from 12)
             "Normal": 12,     # Normal text (was Small)
-            "Large": 16       # Large text (was Normal)
+            "Large": 14       # Large text
         }
         
         # Initialize text overlay for TTS announcements (before loading preferences)
