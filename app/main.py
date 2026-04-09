@@ -264,7 +264,7 @@ class TextOverlay:
 
     def _draw_text(self, message: str):
         """Draw text with outline on canvas"""
-        font_spec = ("Segoe UI", self.font_size, "normal")
+        font_spec = ("Consolas", self.font_size, "normal")
         text_color = self._get_current_color()
         base_x, base_y = 2, 2
         offsets = [(-1, -1), (1, -1), (-1, 1), (1, 1), (0, 1), (0, -1), (1, 0), (-1, 0)]
@@ -386,9 +386,9 @@ class TextOverlay:
         self.font_size = size
         if self.overlay_window and hasattr(self, 'canvas'):
             try:
-                # Update all text items (shadows and main text)
-                font_spec = ("Segoe UI", size, "normal")
-                self.canvas.itemconfig("all", font=font_spec)
+                # Clear items so next _draw_text creates them fresh with new size
+                self.canvas.delete("all")
+                self._outline_items = []
             except Exception as e:
                 print(f"Error setting font size: {e}")
     
@@ -5233,8 +5233,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.text_overlay_size = tk.StringVar(value="Normal")  # Default normal size
         self.size_options = {
             "Small": 10,      # Small text (reduced from 12)
-            "Normal": 12,     # Normal text (was Small)
-            "Large": 14       # Large text
+            "Normal": 13,     # Normal text
+            "Large": 15       # Large text
         }
         
         # Initialize text overlay for TTS announcements (before loading preferences)
