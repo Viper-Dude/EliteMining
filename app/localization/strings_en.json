@@ -108,7 +108,7 @@
     "data_source_database": "Local",
     "data_source_spansh": "Spansh",
     "data_source_both": "Both",
-    "data_source_tooltip": "Database: Your scanned hotspots\nSpansh: spansh.co.uk API (all rings with reserve levels)\nBoth: Merged results (~50 LY typical)",
+    "data_source_tooltip": "Local: Local database (your scanned hotspots)\nSpansh: spansh.co.uk API (all rings with reserve levels)\nBoth: Merged results (~50 LY typical)",
     "reset_filters": "Reset Search Filters",
     "reset_filters_tooltip": "Reset all search filters to default values (All ring types, All reserves, All minerals, checkboxes unchecked)",
     "filters_reset": "All search filters have been reset to defaults",
