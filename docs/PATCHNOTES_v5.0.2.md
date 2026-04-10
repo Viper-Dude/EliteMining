@@ -10,6 +10,7 @@
 - **Hover the status indicator** for a summary of how data sources work together
 
 ### EDDN Cache (how it works)
+- EDDN data is collected in the background **only while EliteMining is running** — the longer the app is open, the more real-time prices it gathers
 - The local market database stores only mining-relevant commodities instead of everything — keeps file size small
 - Price data older than 8 hours is automatically cleaned up on app start and hourly while running
 
