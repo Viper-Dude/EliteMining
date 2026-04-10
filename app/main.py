@@ -711,7 +711,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.0.0"
+APP_VERSION = "v5.0.1"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -2826,7 +2826,7 @@ cargo panel forces Elite to write detailed inventory data.
                         self.last_heartbeat = current_time
                         with self._lock:  # Thread-safe access to materials_collected
                             materials_count = len(self.materials_collected)
-                        logging.info(f"[HEARTBEAT] Background monitor alive - Materials: {materials_count}")
+                        logging.debug(f"[HEARTBEAT] Background monitor alive - Materials: {materials_count}")
                     
                     # Check Status.json first for ship changes (faster than journal)
                     self._check_status_for_ship_changes()
@@ -19930,6 +19930,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 debug_log(f"Installed: {installed_version}, Available: {new_version}")
                 
+                # Helper to check if new version is actually newer
+                def is_newer_version(new_ver, old_ver):
+                    """Return True only if new_ver > old_ver using proper version comparison"""
+                    try:
+                        return pkg_version.parse(new_ver) > pkg_version.parse(old_ver)
+                    except:
+                        return new_ver != old_ver
+                
                 # Check if this is truly a first install or an existing user
                 if installed_version is None:
                     # No state file - check if old profile exists (existing user from pre-v4.76)
@@ -19960,12 +19968,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         # No old profile - true first install (only new versioned profile exists)
                         debug_log("True first install - creating state file silently")
                         self._save_va_profile_state(state_file, new_version)
-                elif installed_version != new_version:
-                    # Version changed - show update dialog with keybind preservation
+                elif is_newer_version(new_version, installed_version):
+                    # New version is actually newer - show update dialog with keybind preservation
                     debug_log(f"Update available: {installed_version} -> {new_version}")
                     return ({'current': installed_version, 'new': new_version}, new_profile_path)
                 else:
-                    debug_log(f"Profile up to date: {new_version}")
+                    debug_log(f"Profile up to date (installed: {installed_version}, available: {new_version})")
                     
             except Exception as e:
                 logging.error(f"[VA_PROFILE] Error checking new profile version: {e}")

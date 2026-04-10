@@ -144,17 +144,14 @@ class MarketHandler:
             # Build commodity in EDDN format (excluding forbidden fields)
             commodity = {
                 'name': name,
+                'meanPrice': item.get('MeanPrice', 0),
                 'buyPrice': item.get('BuyPrice', 0),
                 'sellPrice': item.get('SellPrice', 0),
                 'demand': item.get('Demand', 0),
-                'stock': item.get('Stock', 0),
                 'demandBracket': item.get('DemandBracket', 0),
+                'stock': item.get('Stock', 0),
                 'stockBracket': item.get('StockBracket', 0)
             }
-            
-            # Add optional meanPrice if present
-            if 'MeanPrice' in item:
-                commodity['meanPrice'] = item['MeanPrice']
             
             # Add optional statusFlags if present
             if 'StatusFlags' in item:

@@ -98,8 +98,7 @@ class EDDNSender:
                     "softwareName": self.app_name,
                     "softwareVersion": self.app_version,
                     "gameversion": self.game_version if self.game_version else "",
-                    "gamebuild": self.game_build if self.game_build else "",
-                    "gatewayTimestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    "gamebuild": self.game_build if self.game_build else ""
                 },
                 "message": {
                     "systemName": system_name,
@@ -116,12 +115,7 @@ class EDDNSender:
             if self.odyssey is not None:
                 message['message']['odyssey'] = self.odyssey
             
-            # Add optional station data
-            if station_data:
-                if 'type' in station_data:
-                    message['message']['stationType'] = station_data['type']
-                if 'distanceToArrival' in station_data:
-                    message['message']['distanceToArrival'] = station_data['distanceToArrival']
+            # Note: stationType and distanceToArrival are not part of the commodity v3 schema
             
             # Send to EDDN
             success = self._send_message(message)
