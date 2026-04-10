@@ -220,10 +220,7 @@ class TextOverlay:
 
         # Force canvas to compute bbox so we can size the window correctly
         self.canvas.update_idletasks()
-        self._fit_window_to_content()
-
-        # CRITICAL: Reposition window every time before showing (Windows can reset position)
-        self._set_window_position()
+        self._fit_window_to_content()  # Already sets both size AND position
 
         # Show window AFTER text is ready (skip if hidden by game focus check)
         self._is_showing = True
@@ -250,7 +247,7 @@ class TextOverlay:
 
         # Force canvas to compute bbox so we can size the window correctly
         self.canvas.update_idletasks()
-        self._fit_window_to_content()
+        self._fit_window_to_content()  # Already sets both size AND position
 
         # Show window AFTER text is ready (skip if hidden by game focus check)
         self._is_showing = True
@@ -693,8 +690,7 @@ class CargoTextOverlay:
         message = "\n".join(lines)
         self._draw_text(message)
         self.canvas.update_idletasks()
-        self._fit_window_to_content()
-        self._set_window_position()
+        self._fit_window_to_content()  # Already sets both size AND position
         if self.overlay_enabled and not self._game_hidden:
             self.overlay_window.deiconify()
 
@@ -5952,11 +5948,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             self.text_overlay.overlay_window.withdraw()
                         self.text_overlay._game_hidden = True
             else:
-                # Setting disabled — clear hidden flags so overlays show normally
+                # Setting disabled — still require the game to be running (window exists)
+                game_running = _find_game_window_rect() is not None
                 if hasattr(self, 'cargo_text_overlay'):
-                    self.cargo_text_overlay._game_hidden = False
+                    if game_running:
+                        self.cargo_text_overlay._game_hidden = False
+                    elif not self.cargo_text_overlay._game_hidden:
+                        self.cargo_text_overlay._game_hidden = True
+                        if self.cargo_text_overlay.overlay_window:
+                            self.cargo_text_overlay.overlay_window.withdraw()
                 if hasattr(self, 'text_overlay'):
-                    self.text_overlay._game_hidden = False
+                    if game_running:
+                        self.text_overlay._game_hidden = False
+                    elif not self.text_overlay._game_hidden:
+                        self.text_overlay._game_hidden = True
+                        if self.text_overlay._is_showing and self.text_overlay.overlay_window:
+                            self.text_overlay.overlay_window.withdraw()
         except Exception:
             pass
         
