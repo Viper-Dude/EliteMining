@@ -12382,10 +12382,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         status_color = ""
         
         if status == "online":
-            status_text = "🟢 Market API: Online (EDData)"
+            status_text = "🟢 Market API: Online (EDData + Spansh)"
             status_color = "#00ff00"
         elif status == "error":
-            status_text = "🟡 Market API: Online (Ardent)"
+            status_text = "🟡 Market API: Online (Ardent + Spansh)"
             status_color = "#ffaa00"
         else:
             status_text = "🔴 Market API: Offline"
@@ -18777,7 +18777,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Filter out stations with 0 demand/stock (belt and suspenders - API should handle this via minVolume but add safety check)
             if is_buy_mode:
                 # Buy mode (exports endpoint): filter out stations with 0 stock
-                # NOTE: exports endpoint has buyPrice as the actual selling price, sellPrice may be 0
                 results = [r for r in results if r.get('stock', 0) > 0 and (r.get('buyPrice', 0) > 0 or r.get('sellPrice', 0) > 0)]
                 print(f"[MARKETPLACE FILTER] After stock/price filter: {len(results)}")
             else:
