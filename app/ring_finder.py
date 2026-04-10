@@ -442,11 +442,14 @@ class RingFinder(ColumnVisibilityMixin):
         ttk.Label(search_frame, text=t('ring_finder.reference_system')).grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.system_var = tk.StringVar()
         self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=35)
-        self.system_entry.bind('<Return>', lambda e: self.search_hotspots())
         self.system_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         # Clear selection only on focus out to prevent unwanted text selection
         self.system_entry.bind('<FocusOut>', lambda e: (self.system_entry.selection_clear(), self._save_filter_settings()))
-        self.system_entry.bind('<Return>', lambda e: self._save_filter_settings())
+        self.system_entry.bind('<Return>', lambda e: (self._save_filter_settings(), self.search_hotspots()))
+
+        # --- Autocomplete (shared module) ---
+        from system_autocomplete import SystemAutocomplete
+        self._system_ac = SystemAutocomplete(self.system_entry, self.system_var, self.parent)
         
         # For compatibility, current_system_var points to the same system_var
         self.current_system_var = self.system_var
@@ -1495,7 +1498,10 @@ class RingFinder(ColumnVisibilityMixin):
                 current_system = self.prospector_panel.last_system
             
             if current_system:
+                self._system_ac.suppress()
                 self.current_system_var.set(current_system)
+                self._system_ac.unsuppress()
+                self._system_ac.hide()
                 self._update_sol_distance(current_system)
                 # Check if coordinates exist in cache
                 coords = self.systems_data.get(current_system.lower())
@@ -6235,7 +6241,10 @@ class RingFinder(ColumnVisibilityMixin):
             import time
             self._system_jump_time = time.time()  # Track when we jumped
             # Update reference system field
+            self._system_ac.suppress()
             self.system_var.set(system_name)
+            self._system_ac.unsuppress()
+            self._system_ac.hide()
             
             # Reset the CargoMonitor's refresh tracking so rings in new system can refresh
             if hasattr(self, 'prospector_panel') and self.prospector_panel:

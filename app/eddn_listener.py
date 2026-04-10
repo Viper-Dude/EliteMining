@@ -20,13 +20,50 @@ log = logging.getLogger('EliteMining.EDDN')
 
 class EDDNListener:
     """
-    Listens to EDDN stream and updates local commodity price database
+    Listens to EDDN stream and updates local commodity price database.
+    Only stores commodities relevant to EliteMining searches.
     """
-    
+
     EDDN_RELAY = "tcp://eddn.edcd.io:9500"
     RECONNECT_DELAY = 30  # Seconds between reconnection attempts
     CLEANUP_INTERVAL = 3600  # Clean up old data every hour
-    MAX_DATA_AGE_HOURS = 48  # Keep data for 2 days (48 hours)
+    MAX_DATA_AGE_HOURS = 8  # Keep data for 8 hours
+
+    # Only store these commodities — everything else is discarded at ingestion
+    TRACKED_COMMODITIES = frozenset({
+        # Mining high-value
+        "opal", "voidopal",
+        "lowtemperaturediamond",
+        "painite",
+        "platinum",
+        "bromellite",
+        "alexandrite",
+        "benitoite",
+        "grandidierite",
+        "monazite",
+        "musgravite",
+        "rhodplumsite",
+        "serendibite",
+        "taaffeite",
+        # Carrier fuel & common high-value
+        "tritium",
+        "gold",
+        "silver",
+        "palladium",
+        "osmium",
+        "uranium",
+        "cobalt",
+        "indium",
+        "beryllium",
+        "gallium",
+        "indite",
+        "praseodymium",
+        "samarium",
+        "coltan",
+        "lepidolite",
+        "bertrandite",
+        "lithium",
+    })
     
     def __init__(self, database_path: str):
         """
@@ -42,12 +79,67 @@ class EDDNListener:
         self.messages_received = 0
         self.last_message_time = None
         self.last_cleanup_time = time.time()
+        self._init_database()
+
+    def _init_database(self):
+        """Create tables if they don't exist"""
+        try:
+            with sqlite3.connect(self.database_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS system_coords (
+                        name TEXT PRIMARY KEY,
+                        x REAL,
+                        y REAL,
+                        z REAL,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS commodity_prices_data (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        system_name TEXT,
+                        system_x REAL,
+                        system_y REAL,
+                        system_z REAL,
+                        station_name TEXT,
+                        station_type TEXT,
+                        commodity_name TEXT,
+                        sell_price INTEGER,
+                        buy_price INTEGER,
+                        demand INTEGER,
+                        stock INTEGER,
+                        distance_to_arrival INTEGER,
+                        market_id INTEGER,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(system_name, station_name, commodity_name)
+                    )
+                ''')
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_commodity_name
+                    ON commodity_prices_data(commodity_name)
+                ''')
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_market_id
+                    ON commodity_prices_data(market_id)
+                ''')
+                # Drop FTS5 table if it exists from older versions (unused, wastes space)
+                cursor.execute('DROP TABLE IF EXISTS commodity_prices_fts')
+                conn.commit()
+                log.info("EDDN database initialized")
+        except Exception as e:
+            log.error(f"EDDN database init error: {e}")
         
     def start(self):
         """Start the EDDN listener in background thread"""
         if self.running:
             log.warning("EDDN listener already running")
             return
+        
+        # Purge stale data on startup (no point keeping >8h old prices)
+        deleted = self._cleanup_old_data()
+        if deleted > 0:
+            log.info(f"🧹 Startup cleanup: removed {deleted:,} stale records")
             
         self.running = True
         self.thread = threading.Thread(target=self._listen_loop, daemon=True)
@@ -103,27 +195,9 @@ class EDDNListener:
                     WHERE datetime(updated_at, '+{self.MAX_DATA_AGE_HOURS} hours') < datetime('now')
                 ''')
                 deleted_data = cursor.rowcount
-                
-                # Delete corresponding FTS5 entries (match by system+station+commodity)
-                cursor.execute(f'''
-                    DELETE FROM commodity_prices_fts
-                    WHERE rowid IN (
-                        SELECT f.rowid FROM commodity_prices_fts f
-                        LEFT JOIN commodity_prices_data d ON 
-                            f.system_name = d.system_name AND 
-                            f.station_name = d.station_name AND 
-                            f.commodity_name = d.commodity_name
-                        WHERE d.system_name IS NULL
-                    )
-                ''')
-                deleted_fts = cursor.rowcount
-                
-                # Vacuum to reclaim space
-                cursor.execute('VACUUM')
-                
                 conn.commit()
                 
-                return deleted_data + deleted_fts
+                return deleted_data
                 
         except Exception as e:
             log.error(f"Error cleaning up old data: {e}")
@@ -260,16 +334,18 @@ class EDDNListener:
                 system_y = coords_row[1] if coords_row else None
                 system_z = coords_row[2] if coords_row else None
                 
-                # Update each commodity
+                # Update each commodity — only tracked ones
                 for commodity in commodities:
                     commodity_name = commodity.get('name')
+                    if not commodity_name:
+                        continue
+                    # Discard irrelevant commodities to keep the DB small
+                    if commodity_name.lower() not in self.TRACKED_COMMODITIES:
+                        continue
                     sell_price = commodity.get('sellPrice', 0)
                     buy_price = commodity.get('buyPrice', 0)
                     demand = commodity.get('demand', 0)
                     stock = commodity.get('stock', 0)
-                    
-                    if not commodity_name:
-                        continue
                     
                     # Insert/update in data table
                     cursor.execute('''
@@ -281,21 +357,6 @@ class EDDNListener:
                     ''', (system_name, system_x, system_y, system_z, station_name, station_type,
                           commodity_name, sell_price, buy_price, demand, stock, 0,
                           market_id, timestamp))
-                    
-                    # Delete old FTS5 entry if exists
-                    cursor.execute('''
-                        DELETE FROM commodity_prices_fts 
-                        WHERE system_name = ? AND station_name = ? AND commodity_name = ?
-                    ''', (system_name, station_name, commodity_name))
-                    
-                    # Insert into FTS5
-                    cursor.execute('''
-                        INSERT INTO commodity_prices_fts
-                        (system_name, station_name, station_type, commodity_name, sell_price,
-                         buy_price, demand, stock, distance_to_arrival, market_id, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (system_name, station_name, station_type, commodity_name, sell_price,
-                          buy_price, demand, stock, 0, market_id, timestamp))
                 
                 conn.commit()
                 

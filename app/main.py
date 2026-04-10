@@ -560,12 +560,12 @@ class CargoTextOverlay:
         self.overlay_window.wm_overrideredirect(True)
         self.overlay_window.wm_attributes("-topmost", True)
         self.overlay_window.wm_attributes("-transparentcolor", "#000001")
+        self.overlay_window.wm_attributes("-alpha", 0)  # Start hidden (alpha avoids black flash vs withdraw/deiconify)
         self.overlay_window.configure(bg="#000001")
         self._set_window_position()
         self.canvas = tk.Canvas(self.overlay_window, bg="#000001",
                                 highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True, padx=10, pady=5)
-        self.overlay_window.withdraw()
 
     def _set_window_position(self):
         if not self.overlay_window:
@@ -634,9 +634,9 @@ class CargoTextOverlay:
         if enabled:
             if not self.overlay_window:
                 self.create_overlay()
-            # Don't deiconify here — let update_cargo() show it once data is ready
+            # Don't show here — let update_cargo() show it once data is ready
         elif self.overlay_window:
-            self.overlay_window.withdraw()
+            self.overlay_window.wm_attributes("-alpha", 0)
 
     def set_transparency(self, transparency_percent: int):
         self.transparency = transparency_percent / 100.0
@@ -692,7 +692,7 @@ class CargoTextOverlay:
         self.canvas.update_idletasks()
         self._fit_window_to_content()  # Already sets both size AND position
         if self.overlay_enabled and not self._game_hidden:
-            self.overlay_window.deiconify()
+            self.overlay_window.wm_attributes("-alpha", 1)
 
     def destroy(self):
         if self._update_timer:
@@ -707,7 +707,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.0.1"
+APP_VERSION = "v5.0.2"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5281,6 +5281,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.eddn_sender.set_enabled(self.eddn_send_enabled.get() == 1)
         print(f"[OK] EDDN sender {'enabled' if self.eddn_send_enabled.get() == 1 else 'disabled'}")
         
+        # Initialize EDDN listener for real-time market data
+        from eddn_listener import EDDNListener
+        eddn_cache_path = os.path.join(get_app_data_dir(), "data", "marketplace_cache.db")
+        os.makedirs(os.path.dirname(eddn_cache_path), exist_ok=True)
+        self.eddn_listener = EDDNListener(eddn_cache_path)
+        self.eddn_listener.start()
+        print(f"[OK] EDDN listener started (real-time market data) -> {eddn_cache_path}")
+        
+        # Make the EDDN cache path available to MarketplaceAPI
+        from marketplace_api import MarketplaceAPI
+        MarketplaceAPI.EDDN_CACHE_PATH = eddn_cache_path
+        
         # Initialize API uploader for session/hotspot sharing
         from api_uploader import APIUploader
         self.api_uploader = APIUploader()
@@ -5931,12 +5943,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         if self.cargo_text_overlay._game_hidden:
                             self.cargo_text_overlay._game_hidden = False
                             if self.cargo_text_overlay.overlay_window:
-                                self.cargo_text_overlay.overlay_window.deiconify()
+                                self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 1)
                     else:
                         if not self.cargo_text_overlay._game_hidden:
                             self.cargo_text_overlay._game_hidden = True
                             if self.cargo_text_overlay.overlay_window:
-                                self.cargo_text_overlay.overlay_window.withdraw()
+                                self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
                 # Text overlay — always track game focus, only manage window if showing
                 if hasattr(self, 'text_overlay') and self.text_overlay.overlay_enabled:
                     if game_active:
@@ -5956,7 +5968,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     elif not self.cargo_text_overlay._game_hidden:
                         self.cargo_text_overlay._game_hidden = True
                         if self.cargo_text_overlay.overlay_window:
-                            self.cargo_text_overlay.overlay_window.withdraw()
+                            self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
                 if hasattr(self, 'text_overlay'):
                     if game_running:
                         self.text_overlay._game_hidden = False
@@ -11628,6 +11640,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         home_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         home_entry.bind("<Return>", self._distance_set_home)  # Bind Enter key
         ToolTip(home_entry, t('tooltips.home_system'))
+        # Autocomplete
+        from system_autocomplete import SystemAutocomplete
+        self._ac_home = SystemAutocomplete(home_entry, self.distance_home_system, self)
         
         # Distance to Home (from current) and to Sol
         home_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
@@ -11705,6 +11720,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         system_a_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         system_a_entry.bind("<Return>", lambda e: self._calculate_distances())
         system_a_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
+        # Autocomplete
+        self._ac_system_a = SystemAutocomplete(system_a_entry, self.distance_system_a, self)
         
         use_current_btn = tk.Button(calc_frame, text=t('distance_calculator.use_current'), command=self._distance_use_current_system,
                                    bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
@@ -11723,6 +11740,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         system_b_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         system_b_entry.bind("<Return>", lambda e: self._calculate_distances())
         system_b_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
+        # Autocomplete
+        self._ac_system_b = SystemAutocomplete(system_b_entry, self.distance_system_b, self)
         
         # Quick buttons for System B
         buttons_frame = tk.Frame(calc_frame, bg="#1e1e1e")
@@ -11866,7 +11885,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             current_system = self.get_current_system()
             
             if current_system:
+                self._ac_system_a.suppress()
                 self.distance_system_a.set(current_system)
+                self._ac_system_a.unsuppress()
+                self._ac_system_a.hide()
                 self._set_status(f"Current system: {current_system}")
                 self.distance_status_label.config(text=f"Using current system: {current_system}", fg="#4da6ff")
                 # Update Home/FC distances
@@ -11883,7 +11905,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Fill System B with home system"""
         home = self.distance_home_system.get().strip()
         if home:
+            self._ac_system_b.suppress()
             self.distance_system_b.set(home)
+            self._ac_system_b.unsuppress()
+            self._ac_system_b.hide()
         else:
             from app_utils import centered_message
             centered_message(self, "No Home System", "Please set your home system first in Configuration section below.")
@@ -11892,7 +11917,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Fill System B with fleet carrier system"""
         fc = self.distance_fc_system.get().strip()
         if fc:
+            self._ac_system_b.suppress()
             self.distance_system_b.set(fc)
+            self._ac_system_b.unsuppress()
+            self._ac_system_b.hide()
         else:
             from app_utils import centered_message
             centered_message(self, "No Fleet Carrier", "Please set your fleet carrier location first, or use Auto-detect.")
@@ -12389,20 +12417,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         status_color = ""
         
         if status == "online":
-            status_text = "🟢 Market API: Online (EDData + Spansh)"
+            status_text = "🟢 Market API: Online (EDDN + EDData + Spansh)"
+            trade_text  = "🟢 Market API: Online (EDData + Spansh)"
             status_color = "#00ff00"
         elif status == "error":
-            status_text = "🟡 Market API: Online (Ardent + Spansh)"
+            status_text = "🟡 Market API: Online (EDDN + Ardent + Spansh)"
+            trade_text  = "🟡 Market API: Online (Ardent + Spansh)"
             status_color = "#ffaa00"
         else:
-            status_text = "🔴 Market API: Offline"
+            status_text = "🔴 Market API: Offline (EDDN only)"
+            trade_text  = "🔴 Market API: Offline"
             status_color = "#ff4444"
         
         # Update both commodity tab status labels
         if hasattr(self, 'eddata_mining_status_label'):
             self.eddata_mining_status_label.config(text=status_text, fg=status_color)
         if hasattr(self, 'eddata_trade_status_label'):
-            self.eddata_trade_status_label.config(text=status_text, fg=status_color)
+            self.eddata_trade_status_label.config(text=trade_text, fg=status_color)
     
     # ==================== END DISTANCE CALCULATOR ====================
 
@@ -13606,7 +13637,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.text_overlay.set_enabled(enabled)
         # Master toggle: also hide cargo overlay when text overlay is disabled
         if not enabled and hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_window:
-            self.cargo_text_overlay.overlay_window.withdraw()
+            self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
         elif enabled and hasattr(self, 'cargo_text_overlay') and self.cargo_show_in_overlay.get():
             self.cargo_text_overlay.set_enabled(True)
         self._save_text_overlay_preference()
@@ -16092,6 +16123,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.marketplace_ref_entry.pack(side="left", padx=(0, 5))
         self.marketplace_ref_entry.bind("<Return>", lambda e: self._search_marketplace())
         self.marketplace_ref_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
+        # Autocomplete
+        from system_autocomplete import SystemAutocomplete
+        self._ac_marketplace_ref = SystemAutocomplete(self.marketplace_ref_entry, self.marketplace_reference_system, self)
         
         self.marketplace_use_current_btn = tk.Button(row1_frame, text=t('marketplace.use_current'), 
                                     command=self._use_current_system_marketplace,
@@ -16369,6 +16403,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.trade_ref_entry.pack(side="left", padx=(0, 5))
         self.trade_ref_entry.bind("<Return>", lambda e: self._search_trade_market())
         self.trade_ref_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
+        # Autocomplete
+        from system_autocomplete import SystemAutocomplete
+        self._ac_trade_ref = SystemAutocomplete(self.trade_ref_entry, self.trade_reference_system, self)
         
         self.trade_use_current_btn = tk.Button(row1_frame, text=t('marketplace.use_current'), 
                                     command=self._use_current_system_trade,
@@ -16489,7 +16526,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.eddata_trade_status_label = tk.Label(row3_frame, text="⚫ Market API: checking...", 
                                           font=("Segoe UI", 8), fg="#888888", bg=_trade_cb_bg)
         self.eddata_trade_status_label.pack(side="right", padx=(0, 10))
-        ToolTip(self.eddata_trade_status_label, t('tooltips.eddata_status'))
+        ToolTip(self.eddata_trade_status_label, t('tooltips.eddata_trade_status'))
         
         # Max Age
         _max_age_fg = "#ff8c00" if _trade_cb_theme == "elite_orange" else "#e0e0e0"
@@ -16607,6 +16644,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ref_frame, textvariable=self.sysfinder_reference_system, width=30
         )
         self.sysfinder_ref_entry.pack(side="left")
+        # Autocomplete
+        from system_autocomplete import SystemAutocomplete
+        self._ac_sysfinder_ref = SystemAutocomplete(self.sysfinder_ref_entry, self.sysfinder_reference_system, self)
         
         # Use Current System button - right next to entry (like ring finder)
         self.sysfinder_use_current_btn = tk.Button(
@@ -17003,7 +17043,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             current = self.get_current_system()
             if current:
+                self._ac_sysfinder_ref.suppress()
                 self.sysfinder_reference_system.set(current)
+                self._ac_sysfinder_ref.unsuppress()
+                self._ac_sysfinder_ref.hide()
                 self._set_status(f"Using current system: {current}", 3000)
                 # Update reference system info display
                 self._update_sysfinder_ref_info(current)
@@ -17018,7 +17061,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             current = self.get_current_system()
             if current and hasattr(self, 'sysfinder_reference_system'):
                 if not self.sysfinder_reference_system.get():
+                    if hasattr(self, '_ac_sysfinder_ref'):
+                        self._ac_sysfinder_ref.suppress()
                     self.sysfinder_reference_system.set(current)
+                    if hasattr(self, '_ac_sysfinder_ref'):
+                        self._ac_sysfinder_ref.unsuppress()
                     # Update reference system info display
                     self._update_sysfinder_ref_info(current)
                     # Remove selection/focus from entry field
@@ -17810,7 +17857,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.ring_finder._auto_detect_system()
                 detected_system = self.ring_finder.system_var.get()
                 if detected_system:
+                    if hasattr(self, '_ac_marketplace_ref'):
+                        self._ac_marketplace_ref.suppress()
                     self.marketplace_reference_system.set(detected_system)
+                    if hasattr(self, '_ac_marketplace_ref'):
+                        self._ac_marketplace_ref.unsuppress()
         except:
             pass
     
@@ -17942,7 +17993,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.ring_finder._auto_detect_system()
                 detected_system = self.ring_finder.system_var.get()
                 if detected_system:
+                    self._ac_marketplace_ref.suppress()
                     self.marketplace_reference_system.set(detected_system)
+                    self._ac_marketplace_ref.unsuppress()
+                    self._ac_marketplace_ref.hide()
                     return
             
             # Fallback: No ring finder available
@@ -18180,7 +18234,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _use_current_system_trade(self):
         """Fill trade reference system with current system"""
         if self.current_system:
+            self._ac_trade_ref.suppress()
             self.trade_reference_system.set(self.current_system)
+            self._ac_trade_ref.unsuppress()
+            self._ac_trade_ref.hide()
             self._save_trade_preferences()
     
     def _load_trade_preferences(self):
@@ -18716,7 +18773,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
     # Kept here temporarily in case rollback is needed
     
     def _search_marketplace(self):
-        """Search for commodity prices using Ardent API"""
+        """Search for commodity prices using Ardent API (threaded to prevent UI freeze)"""
         try:
             # Save current search parameters
             self._save_marketplace_preferences()
@@ -18732,6 +18789,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 return
             
             # Mode-specific validation
+            reference_system = ""
             if search_mode == "near_system":
                 reference_system = self.marketplace_reference_system.get().strip()
                 if not reference_system:
@@ -18740,639 +18798,178 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Convert max age to days
             max_age_str = self._age_rev_map.get(self.marketplace_max_age.get(), self.marketplace_max_age.get())
-            max_days_ago = self._convert_age_to_days(max_age_str)
             
             # Determine buy/sell mode
             is_buy_mode = self.marketplace_buy_mode.get()
-            is_sell_mode = self.marketplace_sell_mode.get()
             
             # Get exclude carriers setting
             exclude_carriers = self.marketplace_exclude_carriers.get()
+            
+            # Capture all filter state upfront (main thread)
+            station_type_filter = self._station_type_rev_map.get(self.marketplace_station_type.get(), self.marketplace_station_type.get())
+            large_pad_only = self.marketplace_large_pad_only.get()
+            order_by = self._sort_rev_map.get(self.marketplace_order_by.get(), self.marketplace_order_by.get())
             
             # Show searching status
             if is_buy_mode:
                 self.marketplace_total_label.config(text=t('marketplace.searching_buying'))
             else:
                 self.marketplace_total_label.config(text=t('marketplace.searching_selling'))
+            self.config(cursor="watch")
             self.update()
             
-            # Call appropriate API based on search mode and buy/sell mode
-            # Always request 30 days from API, filter by max_age locally for accurate hour-level filtering
-            api_days = 30
+            # Run search in background thread to prevent UI freeze
+            import threading
+            def search_thread():
+                try:
+                    # Always request 30 days from API, filter by max_age locally for accurate hour-level filtering
+                    api_days = 30
+                    
+                    if search_mode == "galaxy_wide":
+                        if is_buy_mode:
+                            results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, api_days, exclude_carriers)
+                        else:
+                            results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, api_days, exclude_carriers)
+                    else:
+                        if is_buy_mode:
+                            results = MarketplaceAPI.search_sellers(commodity, reference_system, None, api_days, exclude_carriers)
+                        else:
+                            results = MarketplaceAPI.search_buyers(commodity, reference_system, None, api_days, exclude_carriers)
+                    
+                    # Update UI in main thread with results
+                    self.after(0, lambda: self._process_marketplace_search_results(
+                        results, search_mode, reference_system, is_buy_mode,
+                        exclude_carriers, station_type_filter, large_pad_only,
+                        max_age_str, order_by))
+                except Exception as e:
+                    log.error(f"Marketplace search failed: {e}")
+                    self.after(0, lambda: self._marketplace_search_error(str(e)))
             
-            if search_mode == "galaxy_wide":
-                # Galaxy-wide search
-                if is_buy_mode:
-                    results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, api_days, exclude_carriers)
-                else:
-                    results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, api_days, exclude_carriers)
-            else:
-                # Near system search (within 500 LY)
-                reference_system = self.marketplace_reference_system.get().strip()
-                if is_buy_mode:
-                    results = MarketplaceAPI.search_sellers(commodity, reference_system, None, api_days, exclude_carriers)
-                else:
-                    results = MarketplaceAPI.search_buyers(commodity, reference_system, None, api_days, exclude_carriers)
-            
-            # Apply filters
-            station_type_filter = self._station_type_rev_map.get(self.marketplace_station_type.get(), self.marketplace_station_type.get())
+            thread = threading.Thread(target=search_thread, daemon=True)
+            thread.start()
+                
+        except Exception as e:
+            self.marketplace_total_label.config(text=t('marketplace.search_failed').format(error=str(e)))
+
+    def _marketplace_search_error(self, error_msg: str):
+        """Handle marketplace search error (called on main thread)"""
+        self.marketplace_total_label.config(text=t('marketplace.search_failed').format(error=error_msg))
+        self.config(cursor="")
+
+    def _process_marketplace_search_results(self, results, search_mode, reference_system,
+                                             is_buy_mode, exclude_carriers, station_type_filter,
+                                             large_pad_only, max_age_str, order_by):
+        """Process and display marketplace search results (runs on main thread)"""
+        try:
+            self.config(cursor="")
             
             # Track original count before filtering for better error messages
             original_count = len(results)
             print(f"[MARKETPLACE FILTER] Starting with {original_count} results from API")
             
-            # Filter out stations with 0 demand/stock (belt and suspenders - API should handle this via minVolume but add safety check)
+            # Filter out stations with 0 demand/stock
             if is_buy_mode:
-                # Buy mode (exports endpoint): filter out stations with 0 stock
                 results = [r for r in results if r.get('stock', 0) > 0 and (r.get('buyPrice', 0) > 0 or r.get('sellPrice', 0) > 0)]
                 print(f"[MARKETPLACE FILTER] After stock/price filter: {len(results)}")
             else:
-                # Sell mode (imports endpoint): filter out stations with 0 demand
                 results = [r for r in results if r.get('demand', 0) > 0]
                 print(f"[MARKETPLACE FILTER] After demand filter: {len(results)}")
             
-            # Filter by Fleet Carriers (applies to both buy and sell modes)
+            # Filter by Fleet Carriers
             if exclude_carriers and station_type_filter != "Fleet Carrier":
                 results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
                 print(f"[MARKETPLACE FILTER] After carrier filter: {len(results)}")
             
-            # Filter by Station Type (Surface/Orbital/Carrier/MegaShip/Stronghold)
-            # NOTE: Stations with null stationType (Unknown) are only shown when filter is "All"
-            # This is correct behavior - we can't categorize stations without metadata
+            # Filter by Station Type
             if station_type_filter == "Orbital":
-                # Orbital stations - use substring match but exclude Surface types
                 orbital_keywords = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
                 surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
                 results = [r for r in results 
                           if any(keyword in (r.get('stationType') or '') for keyword in orbital_keywords)
                           and not any(surface_kw in (r.get('stationType') or '') for surface_kw in surface_keywords)]
             elif station_type_filter == "Surface":
-                # Surface stations - use substring match for variants
                 surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
                 results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in surface_keywords)]
             elif station_type_filter == "Fleet Carrier":
-                # Fleet Carriers - use substring match
                 results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '') or "Carrier" in (r.get('stationType') or '')]
             elif station_type_filter == "Megaship":
-                # MegaShips - use substring match
                 results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
             elif station_type_filter == "Stronghold":
-                # Stronghold Carriers - use substring match
                 results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
             
             if station_type_filter != "All":
                 print(f"[MARKETPLACE FILTER] After station type filter ({station_type_filter}): {len(results)}")
             
-            # Filter by Landing Pad Size (Large only if checked)
-            large_pad_only = self.marketplace_large_pad_only.get()
-            
+            # Filter by Landing Pad Size
             if large_pad_only:
-                # Only show stations with Large pads (maxLandingPadSize == 3)
                 results = [r for r in results if r.get('maxLandingPadSize') == 3]
                 print(f"[MARKETPLACE FILTER] After large pad filter: {len(results)}")
             
-            # Filter by Max Age (local filtering for hour-based options since API only supports days)
-            # This provides accurate hour-level filtering that the API cannot do
+            # Filter by Max Age
             count_before_age = len(results)
             results = self._filter_results_by_age(results, max_age_str)
             print(f"[MARKETPLACE FILTER] After age filter ({max_age_str}): {len(results)} (was {count_before_age})")
             
             if results:
-                # Sort results based on "Order by" selection
-                order_by = self._sort_rev_map.get(self.marketplace_order_by.get(), self.marketplace_order_by.get())
-                
+                # Sort results
                 if "Distance" in order_by:
-                    # Sort by distance (nearest first)
                     results_sorted = sorted(results, key=lambda x: x.get('distance', 999999), reverse=False)
                 elif "Best price" in order_by:
-                    # Sort by price - depends on buy/sell mode
                     if is_buy_mode:
-                        # Buy mode: lowest buyPrice first (cheapest to buy from)
-                        # NOTE: exports endpoint has actual price in buyPrice field
                         results_sorted = sorted(results, key=lambda x: x.get('buyPrice', 999999), reverse=False)
                     else:
-                        # Sell mode: highest sellPrice first (best price to sell to)
                         results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
                 elif "supply" in order_by or "demand" in order_by:
-                    # Sort by supply/demand (highest first) - depends on buy/sell mode
                     if is_buy_mode:
-                        # Buy mode: sort by stock (supply available)
                         results_sorted = sorted(results, key=lambda x: x.get('stock', 0), reverse=True)
                     else:
-                        # Sell mode: sort by demand
                         results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
                 elif "Last update" in order_by:
-                    # Sort by most recent update (newest first)
                     results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
                 else:
-                    # Default: sort by distance
                     results_sorted = sorted(results, key=lambda x: x.get('distance', 999999), reverse=False)
                 
-                # For galaxy-wide mode, calculate distances for top 30 results in background
+                # For galaxy-wide mode, calculate distances in background
                 if search_mode == "galaxy_wide":
-                    reference_system = self.marketplace_reference_system.get().strip()
-                    if reference_system:
-                        # Show results immediately without distances
+                    ref = reference_system or self.marketplace_reference_system.get().strip()
+                    if ref:
                         self._display_marketplace_results(results_sorted[:30])
                         self.marketplace_total_label.config(text=t('marketplace.calculating_distances'))
                         self.config(cursor="watch")
                         self.update_idletasks()
                         
-                        # Start distance calculation in background thread
                         import threading
                         def calculate_distances_thread():
                             try:
                                 top_30 = results_sorted[:30]
-                                top_30_with_dist = MarketplaceAPI.add_distances_to_results(top_30, reference_system)
-                                # Update UI in main thread
+                                top_30_with_dist = MarketplaceAPI.add_distances_to_results(top_30, ref)
                                 self.after(0, lambda: self._update_marketplace_with_distances(top_30_with_dist, len(results)))
                             except Exception as e:
                                 print(f"[MARKETPLACE] Distance calculation error: {e}")
                                 self.after(0, lambda: self._restore_marketplace_cursor(len(results)))
                         
-                        thread = threading.Thread(target=calculate_distances_thread, daemon=True)
-                        thread.start()
-                        # Results already displayed above, skip default display
+                        threading.Thread(target=calculate_distances_thread, daemon=True).start()
                     else:
-                        # No reference system - show without distances
                         self._display_marketplace_results(results_sorted[:30])
                         self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
                 elif search_mode == "near_system":
-                    # Near system: show top 30 by price (already sorted by distance in API)
                     self._display_marketplace_results(results_sorted[:30])
                     self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
             else:
-                # No results after filtering - clear the table and show message
                 self._clear_marketplace_results()
-                
-                # Check if we had results before filtering
                 if original_count > 0:
-                    # We had results but filtered them all out
                     if exclude_carriers:
                         self.marketplace_total_label.config(
-                            text=t('marketplace.all_fleet_carriers').format(count=original_count)
-                        )
+                            text=t('marketplace.all_fleet_carriers').format(count=original_count))
                     else:
                         self.marketplace_total_label.config(
-                            text=t('marketplace.no_match_filters').format(count=original_count)
-                        )
+                            text=t('marketplace.no_match_filters').format(count=original_count))
                 else:
-                    # No results from API at all
                     self.marketplace_total_label.config(text=t('marketplace.no_results'))
-                
         except Exception as e:
             self.marketplace_total_label.config(text=t('marketplace.search_failed').format(error=str(e)))
-    
-    def _marketplace_search_worker(self, commodity, reference_system, max_dist, station_type, max_results, price_age):
-        """Background worker for marketplace search to prevent UI hanging"""
-        try:
-            # Clear existing results on UI thread
-            self.after(0, self._clear_marketplace_results)
-            
-            # Perform search with timeout
-            results = []
-            try:
-                # Use a simplified search with fewer API calls - ignore max_dist (user can sort results)
-                results = self._quick_marketplace_search(commodity, reference_system, max_results * 2, None, price_age)
-            except Exception as search_error:
-                self.after(0, lambda: self.marketplace_total_label.config(
-                    text=f"❌ Search failed: {str(search_error)}"
-                ))
-                return
-            
-            if not results:
-                self.after(0, lambda: self.marketplace_total_label.config(
-                    text="❌ No selling stations found"
-                ))
-                return
-            
-            # Filter by station type
-            if station_type == "Large Landing Pads":
-                results = [r for r in results if self._has_large_pads(r.get('station_type', ''))]
-            elif station_type == "Medium Landing Pads":
-                results = [r for r in results if self._has_medium_pads(r.get('station_type', ''))]
-            elif station_type == "Small Landing Pads":
-                results = [r for r in results if self._has_small_pads(r.get('station_type', ''))]
-            elif station_type == "Fleet Carriers Only":
-                results = [r for r in results if "Fleet Carrier" in r.get('station_type', '')]
-            elif station_type == "Surface Stations Only":
-                results = [r for r in results if self._is_surface_station(r.get('station_type', ''))]
-            elif station_type == "Space Stations Only":
-                results = [r for r in results if self._is_space_station(r.get('station_type', ''))]
-            elif station_type == "Odyssey Settlements Only":
-                results = [r for r in results if "Odyssey Settlement" in r.get('station_type', '')]
-            elif station_type == "Regular Stations (No Carriers)":
-                results = [r for r in results if "Fleet Carrier" not in r.get('station_type', '')]
-            
-            # Remove duplicates - prioritize newest data first, then best price
-            unique_results = {}
-            for result in results:
-                station_key = f"{result['system_name']}_{result['station_name']}"
-                
-                if station_key not in unique_results:
-                    unique_results[station_key] = result
-                else:
-                    # Compare by update time first (newer is better)
-                    current_updated = result.get('updated', 'Unknown')
-                    existing_updated = unique_results[station_key].get('updated', 'Unknown')
-                    
-                    # Convert update strings to comparable values (hours as numbers)
-                    def parse_update_time(update_str):
-                        if 'h' in update_str:
-                            return float(update_str.replace('h', ''))
-                        elif 'd' in update_str:
-                            return float(update_str.replace('d', '')) * 24  # Convert days to hours
-                        else:
-                            return float('inf')  # Unknown = very old
-                    
-                    current_age = parse_update_time(current_updated)
-                    existing_age = parse_update_time(existing_updated)
-                    
-                    # Keep the newer data (smaller age number)
-                    if current_age < existing_age:
-                        unique_results[station_key] = result
-                    elif current_age == existing_age:
-                        # If same age, keep the higher price
-                        if result['sell_price'] > unique_results[station_key]['sell_price']:
-                            unique_results[station_key] = result
-            
-            # Convert back to list
-            results = list(unique_results.values())
-            
-            # Filter by distance
-            results = [r for r in results if r['system_distance'] <= max_dist]
-            
-            # Limit results
-            results = results[:max_results]
-            
-            if not results:
-                self.after(0, lambda: self.marketplace_total_label.config(
-                    text="❌ No results found within specified criteria"
-                ))
-                return
-            
-            # Update UI on main thread
-            self.after(0, lambda: self._populate_marketplace_results(results, commodity))
-            
-        except Exception as e:
-            error_msg = f"❌ Search failed: {str(e)}"
-            self.after(0, lambda: self.marketplace_total_label.config(text=error_msg))
-            print(f"Marketplace search error: {e}")
-    
-    def _quick_marketplace_search(self, commodity, reference_system, max_results, max_dist, price_age):
-        """Fast search using nearby systems from user database with price age filtering"""
-        from datetime import datetime, timedelta
-        
-        # Convert price age to hours for filtering
-        age_hours = self._convert_price_age_to_hours(price_age)
-        print(f"DEBUG: Price age filter: {price_age} = {age_hours} hours")
-        
-        # Get reference system coordinates from database (marketplace_finder removed)
-        ref_coords = self._get_system_coords_from_db(reference_system)
-        if not ref_coords:
-            raise Exception(f"Could not find coordinates for {reference_system} (use external sites instead)")
-        
-        # Get nearby systems from the user database (much faster than API calls)
-        nearby_systems = self._get_nearby_systems_from_db(reference_system, max_dist)
-        
-        # Debug: Check what the database search returned
-        print(f"DEBUG: Database returned {len(nearby_systems)} nearby systems")
-        if len(nearby_systems) > 0:
-            print(f"DEBUG: First 5 systems from DB: {nearby_systems[:5]}")
-        else:
-            print("DEBUG: Database search returned empty - will use fallback list")
-        
-        # If no nearby systems from DB, fall back to a comprehensive list of known trading systems
-        if not nearby_systems:
-            nearby_systems = [
-                reference_system, "Sol", "Shinrarta Dezhra", "Diaguandri", "LHS 3447",
-                # Major trading hubs
-                "Jameson Memorial", "Ray Gateway", "Ohm City", "Abraham Lincoln", 
-                "Daedalus", "Columbus", "Li Qing Jao", "M.Gorbachev",
-                # Common mining/trading systems  
-                "NADUR", "HR 5900", "COL 285 SECTOR UE-G C11-5", "KHAN GUBII",
-                "COL 285 SECTOR YK-E C12-33", "COL 285 SECTOR AL-O D6-68",
-                "COL 285 SECTOR NF-W A45-1", "COL 285 SECTOR KD-O B21-1", 
-                "COL 285 SECTOR XK-E C12-33", "COL 285 SECTOR SA-W A45-1",
-                "ASSIONES", "PAESIA", "DELKAR", "BORANN", "HYADES SECTOR DB-X D1-112",
-                "HIP 69643", "BIBRIGES", "SAN YAMURT",
-                # Additional trading systems
-                "WITCH HEAD SECTOR DL-Y D17", "WITCH HEAD SECTOR GW-W C1-4",
-                "LP 40-239", "GCRV 1568", "LTT 1345", "WOLF 562", "DECIAT",
-                "MAIA", "MEROPE", "ELECTRA", "TAYGETA", "ASTEROPE", "CELAENO",
-                # Industrial systems
-                "CEOS", "SOTHIS", "ROBIGO", "QUINCE", "RHEA", "DRACONIS",
-                # More bubble systems
-                "ACHENAR", "ALIOTH", "BETA HYDRI", "ETA CASSIOPEIAE", "PROCYON",
-                "SIRIUS", "VEGA", "ALTAIR", "FOMALHAUT", "ARCTURUS"
-            ]
-        
-        print(f"DEBUG: Searching {len(nearby_systems)} systems for {commodity}...")
-        
-        # Limit systems to check - only closest 30 systems
-        systems_to_check = nearby_systems[:30]
-        print(f"DEBUG: Will check {len(systems_to_check)} systems (limited from {len(nearby_systems)} total)")
-        
-        results = []
-        systems_checked = 0
-        total_systems = len(systems_to_check)
-        last_ui_update = 0
-        
-        for system_name in systems_to_check:
-            systems_checked += 1
-            
-            # Update progress only every 5 systems to avoid UI spam
-            if systems_checked - last_ui_update >= 5 or systems_checked == total_systems:
-                last_ui_update = systems_checked
-                self.after(0, lambda s=systems_checked, t=total_systems: 
-                          self.marketplace_total_label.config(
-                              text=f"🔍 Searching systems... ({s}/{t})"
-                          ))
-            
-            # Stop early if we have enough results
-            if len(results) >= max_results * 3:
-                print(f"DEBUG: Found enough results ({len(results)}), stopping search early")
-                break
-            
-            try:
-                # Get system coordinates from database (marketplace_finder removed)
-                system_coords = self._get_system_coords_from_db(system_name)
-                if not system_coords:
-                    continue
-                
-                # Calculate distance manually
-                distance = ((ref_coords['x'] - system_coords['x'])**2 + 
-                           (ref_coords['y'] - system_coords['y'])**2 + 
-                           (ref_coords['z'] - system_coords['z'])**2)**0.5
-                
-                if max_dist != float('inf') and distance > max_dist:
-                    continue
-                
-                # Debug first 10 systems
-                if systems_checked <= 10:
-                    print(f"DEBUG: Checking system {systems_checked}: {system_name} at {distance:.2f} LY")
-                
-                # marketplace_finder removed - this search function is obsolete (use external sites)
-                continue
-                
-                # Filter stations by market data age first
-                valid_stations = []
-                for station in stations:
-                    if not station.get('haveMarket') or not station.get('marketId'):
-                        continue
-                    
-                    # Check market update time if age filtering is enabled
-                    if age_hours is not None:
-                        update_time = station.get('updateTime', {}).get('market')
-                        if update_time:
-                            try:
-                                # Parse EDSM timestamp format: '2025-11-01 07:42:55'
-                                market_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
-                                age = (datetime.now() - market_time).total_seconds() / 3600
-                                
-                                if age > age_hours:
-                                    if systems_checked <= 5:
-                                        print(f"DEBUG:   Station {station.get('name')} excluded: {age:.1f}h > {age_hours}h")
-                                    continue  # Skip stations with old market data
-                                    
-                            except:
-                                # If we can't parse the time, include the station
-                                pass
-                    
-                    valid_stations.append(station)
-                
-                if not valid_stations:
-                    continue
-                
-                # Check ALL valid stations in the system
-                for station in valid_stations:
-                    try:
-                        market_data = self.marketplace_finder.get_station_market_data(station['marketId'])
-                        if not market_data or 'commodities' not in market_data:
-                            continue
-                    except:
-                        continue  # Skip this station if API call fails
-                    
-                    # Look for the commodity
-                    for commodity_data in market_data['commodities']:
-                        comm_name = commodity_data.get('name', '')
-                        if commodity.lower() in comm_name.lower():
-                            sell_price = commodity_data.get('sellPrice', 0)
-                            
-                            # Clean debug output for HR 5900 specifically (remove after testing)
-                            if "HR 5900" in system_name or "5900" in system_name:
-                                print(f"DEBUG: HR 5900 - Found {comm_name} at {station.get('name')} - Price: {sell_price}")
-                                update_time = station.get('updateTime', {}).get('market', '')
-                                if update_time:
-                                    print(f"DEBUG: HR 5900 - Raw timestamp: {update_time}")
-                                    try:
-                                        from datetime import datetime
-                                        market_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
-                                        age = (datetime.now() - market_time).total_seconds() / 3600
-                                        days = age / 24
-                                        print(f"DEBUG: HR 5900 - Age: {age:.1f}h ({days:.1f}d) -> Display: {int(days)}d")
-                                    except Exception as e:
-                                        print(f"DEBUG: HR 5900 - Timestamp parse error: {e}")
-                            
-                            if sell_price > 0:
-                                # Get demand and skip stations with zero demand
-                                demand = commodity_data.get('demand', 0)
-                                if demand <= 0:
-                                    continue  # Skip stations with no demand
-                                
-                                # Get market update time for the UPDATED column
-                                update_time = station.get('updateTime', {}).get('market', '')
-                                if update_time:
-                                    try:
-                                        from datetime import datetime
-                                        market_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
-                                        age = (datetime.now() - market_time).total_seconds() / 3600
-                                        if age < 24:
-                                            updated_str = f"{age:.0f}h"
-                                        else:
-                                            days = age / 24
-                                            # Use floor division to match how most sites show age
-                                            # 1.7 days shows as "1d", not "2d"
-                                            updated_str = f"{int(days)}d"
-                                    except:
-                                        updated_str = "Unknown"
-                                else:
-                                    updated_str = "Unknown"
-                                
-                                result = {
-                                    'system_name': system_name.title(),  # Ensure proper capitalization
-                                    'system_distance': distance,
-                                    'station_name': station.get('name'),
-                                    'station_type': station.get('type'),
-                                    'arrival_distance': station.get('distanceToArrival', 0),
-                                    'commodity_name': comm_name,
-                                    'sell_price': sell_price,
-                                    'demand': demand,  # Use the demand variable we already have
-                                    'updated': updated_str,
-                                }
-                                results.append(result)
-                                
-                                # Stop early if we have enough results
-                                if len(results) >= max_results:
-                                    break
-                    
-                    if len(results) >= max_results:
-                        break
-                        
-            except Exception as e:
-                print(f"Search error for {system_name}: {e}")
-                continue
-            
-            # Early exit if we have enough results
-            if len(results) >= max_results:
-                break
-        
-        # Sort by distance
-        results.sort(key=lambda x: x['system_distance'])
-        return results
-    
-    def _get_nearby_systems_from_db(self, reference_system, max_dist):
-        """Get nearby systems from database or EDSM API"""
-        try:
-            # Use galaxy_systems.db which has all known systems
-            from path_utils import get_app_data_dir
-            import os
-            galaxy_db_path = os.path.join(os.path.dirname(__file__), 'data', 'galaxy_systems.db')
-            
-            import sqlite3
-            with sqlite3.connect(galaxy_db_path) as conn:
-                cursor = conn.cursor()
-                
-                # Get reference system coordinates from galaxy database (table is named 'systems')
-                cursor.execute('''
-                    SELECT x, y, z FROM systems 
-                    WHERE name = ? COLLATE NOCASE
-                ''', (reference_system,))
-                
-                ref_row = cursor.fetchone()
-                if not ref_row:
-                    # Database empty - use EDSM API
-                    return self._get_nearby_systems_from_edsm(reference_system, max_dist)
-                
-                ref_x, ref_y, ref_z = ref_row
-                
-                # Get nearby systems from galaxy database
-                if max_dist == float('inf'):
-                    max_dist_sql = 1000  # Large but finite number for SQL
-                else:
-                    max_dist_sql = max_dist
-                
-                # Get nearby systems sorted by distance
-                cursor.execute('''
-                    SELECT name, x, y, z,
-                           SQRT(POWER(x - ?, 2) + POWER(y - ?, 2) + POWER(z - ?, 2)) as distance
-                    FROM systems 
-                    WHERE distance <= ?
-                    ORDER BY distance
-                    LIMIT 100
-                ''', (ref_x, ref_y, ref_z, max_dist_sql))
-                
-                nearby = cursor.fetchall()
-                if nearby:
-                    return [row[0] for row in nearby]
-                else:
-                    # Database has no nearby systems - use EDSM API
-                    return self._get_nearby_systems_from_edsm(reference_system, max_dist)
-                    
-        except Exception as e:
-            pass
-        
-        # Final fallback to EDSM API
-        return self._get_nearby_systems_from_edsm(reference_system, max_dist)
-    
-    def _get_nearby_systems_from_edsm(self, reference_system, max_dist):
-        """Get nearby systems from EDSM sphere-systems API (marketplace_finder removed)"""
-        print(f"DEBUG: marketplace_finder removed - use external sites (Inara/edtools.cc) instead")
-        return []
-    
-    def _get_system_coords_from_db(self, system_name):
-        """Get system coordinates from galaxy database"""
-        try:
-            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
-                db_path = self.cargo_monitor.user_db.db_path
-                
-                import sqlite3
-                with sqlite3.connect(db_path) as conn:
-                    cursor = conn.cursor()
-                    
-                    # Check if galaxy_systems table exists first
-                    cursor.execute("""
-                        SELECT name FROM sqlite_master 
-                        WHERE type='table' AND name='galaxy_systems'
-                    """)
-                    
-                    if not cursor.fetchone():
-                        # Table doesn't exist, return None to use EDSM fallback
-                        return None
-                    
-                    cursor.execute('''
-                        SELECT x, y, z FROM galaxy_systems 
-                        WHERE name = ? COLLATE NOCASE
-                    ''', (system_name,))
-                    
-                    row = cursor.fetchone()
-                    if row:
-                        return {'x': row[0], 'y': row[1], 'z': row[2]}
-        except Exception as e:
-            # Silently fall back to EDSM - don't print error messages
-            pass
-        
-        return None
-    
-    def _get_station_priority(self, station_type):
-        """Get priority order for station types (lower number = higher priority)"""
-        priority_order = {
-            'Coriolis Starport': 1,
-            'Orbis Starport': 2, 
-            'Ocellus Starport': 3,
-            'Asteroid Base': 4,
-            'Planetary Port': 5,
-            'Planetary Outpost': 6,
-            'Outpost': 7,
-            'Fleet Carrier': 8,
-            'Odyssey Settlement': 9
-        }
-        
-        for station_name, priority in priority_order.items():
-            if station_name in station_type:
-                return priority
-        
-        return 10  # Unknown types last
-    
-    def _convert_price_age_to_hours(self, price_age):
-        """Convert price age string to hours, return None for 'Any'"""
-        age_map = {
-            "Any": None,
-            "1 hour": 1,
-            "8 hours": 8,
-            "16 hours": 16,
-            "1 day": 24,
-            "2 days": 48,
-            "3 days": 72,
-            "7 days": 168,
-            "14 days": 336,
-            "30 days": 720,
-            "180 days": 4320
-        }
-        return age_map.get(price_age, None)
-    
-    def _check_landing_pad(self, station_type: str, required_pad: str) -> bool:
-        """Check if station has required landing pad size"""
-        large_stations = ["Coriolis", "Orbis", "Ocellus", "Asteroid Base", "Planetary Port"]
-        medium_stations = ["Outpost", "Planetary Outpost"]
-        
-        if required_pad == "Large":
-            return any(s in station_type for s in large_stations)
-        elif required_pad == "Medium":
-            return any(s in station_type for s in medium_stations) or any(s in station_type for s in large_stations)
-        else:  # Small
-            return True  # All stations have small pads
-    
+            self.config(cursor="")
+
     def _clear_marketplace_results(self):
         """Clear marketplace results tree"""
         for item in self.marketplace_tree.get_children():

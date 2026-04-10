@@ -5,16 +5,22 @@ All three APIs are queried in parallel. Results are merged by marketId, keeping 
 record with the newer updatedAt timestamp so the freshest price always wins.
 """
 import requests
+import functools
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional
 
+_system_coords_cache: Dict[str, object] = {}  # module-level coord cache
+
 
 class MarketplaceAPI:
-    """Dual-API market data: EDData + Ardent Insight, merged by freshness."""
+    """Dual-API market data: EDData + Ardent Insight + Spansh + EDDN cache, merged by freshness."""
 
     EDDATA_URL  = "https://api.eddata.dev/v2"
     ARDENT_URL  = "https://api.ardent-insight.com/v2"
     SPANSH_URL  = "https://spansh.co.uk"
+
+    # Set by main.py on boot when EDDN listener is started
+    EDDN_CACHE_PATH = None
 
     # Keep BASE_URL for any legacy callers; _fetch_both() ignores it
     PRIMARY_URL  = EDDATA_URL
@@ -188,19 +194,13 @@ class MarketplaceAPI:
                 else:
                     pad_size = 0
 
-                # Spansh field mapping depends on filter_type:
-                # selling_commodities (Buy mode): sell_price=buyPrice, demand=stock
-                # buying_commodities (Sell mode): sell_price=sellPrice, demand=demand
-                if filter_type == "selling_commodities":
-                    sell_p = entry.get("buy_price", 0)
-                    buy_p  = entry.get("sell_price", 0)
-                    dem    = 0
-                    stk    = entry.get("demand", 0) or entry.get("supply", 0)
-                else:
-                    sell_p = entry.get("sell_price", 0)
-                    buy_p  = entry.get("buy_price", 0)
-                    dem    = entry.get("demand", 0)
-                    stk    = entry.get("supply", 0)
+                # Spansh uses same field conventions as EDData/EDDN:
+                # sell_price = what station pays you, buy_price = what you pay
+                # supply/stock = station has for sale, demand = station wants to buy
+                sell_p = entry.get("sell_price", 0)
+                buy_p  = entry.get("buy_price", 0)
+                dem    = entry.get("demand", 0)
+                stk    = entry.get("supply", 0) or entry.get("stock", 0)
 
                 normalized.append({
                     "marketId":          mid,
@@ -323,23 +323,12 @@ class MarketplaceAPI:
                 if not entry:
                     continue
 
-                # Filter by trade direction:
-                # selling_commodities (Buy mode) -> carrier must have supply > 0
-                # buying_commodities (Sell mode) -> carrier must have demand > 0
-                if filter_type == "selling_commodities":
-                    if entry.get("supply", 0) <= 0 or entry.get("buy_price", 0) <= 0:
-                        continue
-                    sell_p = 0
-                    buy_p  = entry.get("buy_price", 0)
-                    dem    = 0
-                    stk    = entry.get("supply", 0)
-                else:
-                    if entry.get("demand", 0) <= 0 or entry.get("sell_price", 0) <= 0:
-                        continue
-                    sell_p = entry.get("sell_price", 0)
-                    buy_p  = 0
-                    dem    = entry.get("demand", 0)
-                    stk    = 0
+                # Spansh uses same field conventions as EDData/EDDN.
+                # Pass through all fields — UI filters by mode.
+                sell_p = entry.get("sell_price", 0)
+                buy_p  = entry.get("buy_price", 0)
+                dem    = entry.get("demand", 0)
+                stk    = entry.get("supply", 0) or entry.get("stock", 0)
 
                 if station.get("large_pads", 0) or station.get("has_large_pad"):
                     pad_size = 3
@@ -374,29 +363,199 @@ class MarketplaceAPI:
             return []
 
     @staticmethod
+    def _fetch_eddn_cache(
+        commodity_normalized: str,
+        reference_system: str,
+        filter_type: str,
+        max_distance: int = 500,
+        max_days_ago: float = 0.333,  # 8 hours — matches EDDN listener retention
+        exclude_carriers: bool = False,
+    ) -> List[Dict]:
+        """
+        Query local EDDN cache (marketplace_cache.db) for real-time market data.
+
+        EDDN data is the freshest possible — pushed by players in real-time.
+        """
+        if not MarketplaceAPI.EDDN_CACHE_PATH:
+            return []
+
+        try:
+            import sqlite3, math, os
+            from datetime import datetime, timedelta, timezone
+
+            if not os.path.exists(MarketplaceAPI.EDDN_CACHE_PATH):
+                return []
+
+            # EDDN uses lowercase names like "platinum", "painite"
+            # Spansh uses title case like "Platinum", "Painite"
+            # Match both formats
+            spansh_name = MarketplaceAPI.SPANSH_COMMODITY_MAP.get(
+                commodity_normalized, commodity_normalized.title())
+
+            ref_coords = MarketplaceAPI._get_system_coords(reference_system) if reference_system else None
+            rx, ry, rz = ref_coords if ref_coords else (0, 0, 0)
+
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=max_days_ago)).isoformat()
+
+            with sqlite3.connect(MarketplaceAPI.EDDN_CACHE_PATH) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                # Query by commodity name — match EDData normalized OR Spansh display name
+                cursor.execute('''
+                    SELECT system_name, system_x, system_y, system_z,
+                           station_name, station_type, commodity_name,
+                           sell_price, buy_price, demand, stock,
+                           distance_to_arrival, market_id, updated_at
+                    FROM commodity_prices_data
+                    WHERE (LOWER(commodity_name) = LOWER(?) OR LOWER(commodity_name) = LOWER(?))
+                      AND updated_at > ?
+                ''', (commodity_normalized, spansh_name, cutoff))
+
+                rows = cursor.fetchall()
+
+            # Batch-resolve coordinates for all systems missing them in one query
+            coords_cache = {}
+            missing_systems = {row["system_name"] for row in rows
+                               if row["system_x"] is None and row["system_name"]}
+            if missing_systems:
+                try:
+                    from local_database import LocalSystemsDatabase
+                    galaxy_db = LocalSystemsDatabase()
+                    if galaxy_db.is_database_available():
+                        import sqlite3 as _sqlite3
+                        placeholders = ",".join("?" for _ in missing_systems)
+                        with _sqlite3.connect(str(galaxy_db.db_path)) as _gconn:
+                            _gconn.row_factory = _sqlite3.Row
+                            _gcur = _gconn.cursor()
+                            _gcur.execute(
+                                f"SELECT name, x, y, z FROM systems WHERE name IN ({placeholders})",
+                                list(missing_systems)
+                            )
+                            for gr in _gcur.fetchall():
+                                coords_cache[gr["name"]] = (gr["x"], gr["y"], gr["z"])
+                except Exception as _ce:
+                    print(f"[EDDN CACHE] Batch coord lookup failed: {_ce}")
+
+            normalized: List[Dict] = []
+            for row in rows:
+                sx = row["system_x"]
+                sy = row["system_y"]
+                sz = row["system_z"]
+
+                # Resolve missing coords from galaxy DB
+                if sx is None and row["system_name"] in coords_cache:
+                    sx, sy, sz = coords_cache[row["system_name"]]
+
+                # Distance filter
+                if max_distance and ref_coords and sx is not None and sy is not None and sz is not None:
+                    dist = math.sqrt((sx - rx) ** 2 + (sy - ry) ** 2 + (sz - rz) ** 2)
+                    if dist > max_distance:
+                        continue
+                elif max_distance and ref_coords:
+                    continue  # No coords even after lookup, skip
+                else:
+                    dist = 0
+
+                stype = row["station_type"] or "Unknown"
+                # Detect carriers by market_id range (3.7 billion+)
+                mid = row["market_id"] or 0
+                is_carrier = ("Carrier" in stype or "FleetCarrier" in stype or "Drake" in stype
+                              or (mid >= 3700000000 and mid < 4000000000))
+                if exclude_carriers and is_carrier:
+                    continue
+
+                # Pass through all fields — UI picks correct ones by mode
+                sell_p = row["sell_price"] or 0
+                buy_p  = row["buy_price"] or 0
+                dem    = row["demand"] or 0
+                stk    = row["stock"] or 0
+
+                # Normalize station type for EDData compatibility
+                _type_map = {
+                    "FleetCarrier": "FleetCarrier",
+                    "Coriolis": "Coriolis",
+                    "Orbis": "Orbis",
+                    "Ocellus": "Ocellus",
+                    "Outpost": "Outpost",
+                    "CraterOutpost": "CraterOutpost",
+                    "CraterPort": "CraterPort",
+                }
+                if is_carrier:
+                    eddata_type = "FleetCarrier"
+                else:
+                    eddata_type = _type_map.get(stype, stype)
+
+                # Determine pad size
+                if is_carrier or eddata_type in ("Coriolis", "Orbis", "Ocellus"):
+                    pad_size = 3
+                elif "Outpost" in eddata_type:
+                    pad_size = 2
+                else:
+                    pad_size = 1
+
+                normalized.append({
+                    "marketId":          row["market_id"],
+                    "updatedAt":         row["updated_at"] or "",
+                    "systemName":        row["system_name"],
+                    "stationName":       row["station_name"],
+                    "stationType":       eddata_type,
+                    "maxLandingPadSize": pad_size,
+                    "distance":          dist,
+                    "distanceToArrival": row["distance_to_arrival"] or 0,
+                    "sellPrice":         sell_p,
+                    "buyPrice":          buy_p,
+                    "demand":            dem,
+                    "stock":             stk,
+                    "commodityName":     commodity_normalized,
+                    "systemX":           sx,
+                    "systemY":           sy,
+                    "systemZ":           sz,
+                    "_source":           "EDDN",
+                })
+
+            print(f"[EDDN CACHE] {filter_type}: {len(normalized)} results for {spansh_name}")
+            return normalized
+
+        except Exception as e:
+            print(f"[EDDN CACHE] Error: {e}")
+            return []
+
+    @staticmethod
+    @staticmethod
     def _get_system_coords(system_name: str):
-        """Return (x, y, z) for system_name, or None on failure."""
+        """Return (x, y, z) for system_name, or None on failure. Results are cached."""
+        return MarketplaceAPI._get_system_coords_cached(system_name)
+
+    @staticmethod
+    def _get_system_coords_cached(system_name: str):  # type: ignore[override]
+        """Cached implementation — avoid repeated DB opens for the same system."""
+        if system_name in _system_coords_cache:
+            return _system_coords_cache[system_name]
+        result = None
         try:
             from local_database import LocalSystemsDatabase
             db = LocalSystemsDatabase()
             if db.is_database_available():
                 c = db.get_system_coordinates(system_name)
                 if c:
-                    return c['x'], c['y'], c['z']
+                    result = c['x'], c['y'], c['z']
         except Exception:
             pass
-        try:
-            import urllib.parse
-            url = "https://www.edsm.net/api-v1/system?systemName={}&showCoordinates=1".format(
-                urllib.parse.quote(system_name))
-            r = requests.get(url, timeout=8)
-            r.raise_for_status()
-            coords = r.json().get('coords', {})
-            if coords:
-                return coords['x'], coords['y'], coords['z']
-        except Exception:
-            pass
-        return None
+        if result is None:
+            try:
+                import urllib.parse
+                url = "https://www.edsm.net/api-v1/system?systemName={}&showCoordinates=1".format(
+                    urllib.parse.quote(system_name))
+                r = requests.get(url, timeout=8)
+                r.raise_for_status()
+                coords = r.json().get('coords', {})
+                if coords:
+                    result = coords['x'], coords['y'], coords['z']
+            except Exception:
+                pass
+        _system_coords_cache[system_name] = result
+        return result
 
     @staticmethod
     def _fetch_spansh_nearby(
@@ -522,19 +681,13 @@ class MarketplaceAPI:
                 else:
                     pad_size = 0
 
-                # Spansh field mapping depends on filter_type:
-                # selling_commodities (Buy mode): sell_price=buyPrice, demand=stock
-                # buying_commodities (Sell mode): sell_price=sellPrice, demand=demand
-                if filter_type == "selling_commodities":
-                    sell_p = entry.get("buy_price", 0)
-                    buy_p  = entry.get("sell_price", 0)
-                    dem    = 0
-                    stk    = entry.get("demand", 0) or entry.get("supply", 0)
-                else:
-                    sell_p = entry.get("sell_price", 0)
-                    buy_p  = entry.get("buy_price", 0)
-                    dem    = entry.get("demand", 0)
-                    stk    = entry.get("supply", 0)
+                # Spansh uses same field conventions as EDData/EDDN:
+                # sell_price = what station pays you, buy_price = what you pay
+                # supply/stock = station has for sale, demand = station wants to buy
+                sell_p = entry.get("sell_price", 0)
+                buy_p  = entry.get("buy_price", 0)
+                dem    = entry.get("demand", 0)
+                stk    = entry.get("supply", 0) or entry.get("stock", 0)
 
                 normalized.append({
                     "marketId":          mid,
@@ -690,8 +843,8 @@ class MarketplaceAPI:
 
             print(f"[BUYERS] nearby path: {nearby_path} params: {nearby_params}")
 
-            # Run EDData+Ardent, Spansh stations, and Spansh carriers in parallel
-            with ThreadPoolExecutor(max_workers=3) as _pool:
+            # Run EDData+Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
+            with ThreadPoolExecutor(max_workers=4) as _pool:
                 _fut_both   = _pool.submit(MarketplaceAPI._fetch_both, nearby_path, nearby_params)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh_nearby,
@@ -703,10 +856,16 @@ class MarketplaceAPI:
                     commodity_normalized, reference_system, "buying_commodities",
                     500, max_days_ago, exclude_carriers
                 )
+                _fut_eddn = _pool.submit(
+                    MarketplaceAPI._fetch_eddn_cache,
+                    commodity_normalized, reference_system, "buying_commodities",
+                    500, max_days_ago, exclude_carriers
+                )
                 nearby_rows  = _fut_both.result()
                 spansh_rows  = _fut_spansh.result()
                 carrier_rows = _fut_carriers.result()
-            nearby_rows = nearby_rows + spansh_rows + carrier_rows
+                eddn_rows    = _fut_eddn.result()
+            nearby_rows = nearby_rows + spansh_rows + carrier_rows + eddn_rows
 
             # --- Local system imports (both APIs in parallel) ---
             local_path = f"/system/name/{system_encoded}/commodities/imports"
@@ -765,8 +924,8 @@ class MarketplaceAPI:
 
             print(f"[SELLERS] nearby path: {nearby_path} params: {nearby_params}")
 
-            # Run EDData+Ardent, Spansh stations, and Spansh carriers in parallel
-            with ThreadPoolExecutor(max_workers=3) as _pool:
+            # Run EDData+Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
+            with ThreadPoolExecutor(max_workers=4) as _pool:
                 _fut_both   = _pool.submit(MarketplaceAPI._fetch_both, nearby_path, nearby_params)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh_nearby,
@@ -778,10 +937,16 @@ class MarketplaceAPI:
                     commodity_normalized, reference_system, "selling_commodities",
                     500, max_days_ago, exclude_carriers
                 )
+                _fut_eddn = _pool.submit(
+                    MarketplaceAPI._fetch_eddn_cache,
+                    commodity_normalized, reference_system, "selling_commodities",
+                    500, max_days_ago, exclude_carriers
+                )
                 nearby_rows  = _fut_both.result()
                 spansh_rows  = _fut_spansh.result()
                 carrier_rows = _fut_carriers.result()
-            nearby_rows = nearby_rows + spansh_rows + carrier_rows
+                eddn_rows    = _fut_eddn.result()
+            nearby_rows = nearby_rows + spansh_rows + carrier_rows + eddn_rows
 
             # --- Local system exports (both APIs in parallel) ---
             local_path = f"/system/name/{system_encoded}/commodities/exports"
@@ -832,7 +997,7 @@ class MarketplaceAPI:
 
             print(f"[GALAXY BUYERS] path: {path} params: {params}")
 
-            with ThreadPoolExecutor(max_workers=3) as _pool:
+            with ThreadPoolExecutor(max_workers=4) as _pool:
                 _fut_both   = _pool.submit(MarketplaceAPI._fetch_both, path, params)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh,
@@ -844,10 +1009,16 @@ class MarketplaceAPI:
                     commodity_normalized, None, "buying_commodities",
                     0, max_days_ago, exclude_carriers
                 )
+                _fut_eddn = _pool.submit(
+                    MarketplaceAPI._fetch_eddn_cache,
+                    commodity_normalized, None, "buying_commodities",
+                    0, max_days_ago, exclude_carriers
+                )
                 rows        = _fut_both.result()
                 spansh_rows = _fut_spansh.result()
                 carrier_rows = _fut_carriers.result()
-            rows = rows + spansh_rows + carrier_rows
+                eddn_rows    = _fut_eddn.result()
+            rows = rows + spansh_rows + carrier_rows + eddn_rows
 
             results = MarketplaceAPI._merge_by_freshness(rows)
             return results
@@ -883,7 +1054,7 @@ class MarketplaceAPI:
 
             print(f"[GALAXY SELLERS] path: {path} params: {params}")
 
-            with ThreadPoolExecutor(max_workers=3) as _pool:
+            with ThreadPoolExecutor(max_workers=4) as _pool:
                 _fut_both   = _pool.submit(MarketplaceAPI._fetch_both, path, params)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh,
@@ -895,10 +1066,16 @@ class MarketplaceAPI:
                     commodity_normalized, None, "selling_commodities",
                     0, max_days_ago, exclude_carriers
                 )
+                _fut_eddn = _pool.submit(
+                    MarketplaceAPI._fetch_eddn_cache,
+                    commodity_normalized, None, "selling_commodities",
+                    0, max_days_ago, exclude_carriers
+                )
                 rows        = _fut_both.result()
                 spansh_rows = _fut_spansh.result()
                 carrier_rows = _fut_carriers.result()
-            rows = rows + spansh_rows + carrier_rows
+                eddn_rows    = _fut_eddn.result()
+            rows = rows + spansh_rows + carrier_rows + eddn_rows
 
             results = MarketplaceAPI._merge_by_freshness(rows)
             return results

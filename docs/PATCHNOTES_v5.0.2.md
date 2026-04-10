@@ -1,9 +1,24 @@
-# <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining v5.0.1 — Hotfix
-**Release Date:** 2026-04-10
+# <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining v5.0.2 
+
+**Release Date:** 2026-04-11
 
 ## New Features & Improvements
 
-### VoiceAttack Profile latest version is v5.0.1 (included in the installer and zip file)
+### Marketplace — Faster & Fresher Prices
+- **EDDN real-time data now appears in search results** — prices from other players are merged with API data so you see the freshest prices available
+- **Market API status** now shows all active data sources (EDDN, EDData, Spansh)
+- **Hover the status indicator** for a summary of how data sources work together
+
+### EDDN Cache Optimized
+- The local market database now only stores mining-relevant commodities instead of everything — keeps file size small
+- Price data older than 8 hours is automatically cleaned up on app start and hourly while running
+- Removed unnecessary database overhead — inserts are faster and the database stays compact
+
+### Quality of Life
+- **System name autocomplete** on every reference system field — start typing and pick from suggestions (Distance Calculator, Commodity Market, System Finder)
+
+
+### VoiceAttack Profile - latest version is v5.0.1 (included in the installer and zip file)
 
  **Note:** Always verify your joystick/HOTAS keybindings after a VoiceAttack profile update.
 
