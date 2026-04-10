@@ -9,14 +9,12 @@
 - **Market API status** now shows all active data sources (EDDN, EDData, Spansh)
 - **Hover the status indicator** for a summary of how data sources work together
 
-### EDDN Cache Optimized
-- The local market database now only stores mining-relevant commodities instead of everything — keeps file size small
+### EDDN Cache (how it works)
+- The local market database stores only mining-relevant commodities instead of everything — keeps file size small
 - Price data older than 8 hours is automatically cleaned up on app start and hourly while running
-- Removed unnecessary database overhead — inserts are faster and the database stays compact
 
 ### Quality of Life
-- **System name autocomplete** on every reference system field — start typing and pick from suggestions (Distance Calculator, Commodity Market, System Finder)
-
+- **System name autocomplete** on every reference system field — start typing and pick from suggestions (Hotspot finder, Distance Calculator, Commodity Market, System Finder)
 
 ### VoiceAttack Profile - latest version is v5.0.1 (included in the installer and zip file)
 
