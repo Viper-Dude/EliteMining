@@ -662,14 +662,7 @@ class CargoTextOverlay:
         cargo = cargo_monitor
         pct = (cargo.current_cargo / cargo.max_cargo * 100) if cargo.max_cargo > 0 else 0
 
-        if pct > 95:
-            ind = " [!]"
-        elif pct > 85:
-            ind = " [*]"
-        else:
-            ind = ""
-
-        lines.append(f"CARGO STATUS  {cargo.current_cargo}/{cargo.max_cargo}t  ({pct:.0f}%){ind}")
+        lines.append(f"CARGO STATUS  {cargo.current_cargo}/{cargo.max_cargo}t  ({pct:.0f}%)")
 
         if cargo.cargo_items:
             sorted_items = sorted(cargo.cargo_items.items(),
