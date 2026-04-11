@@ -1,8 +1,12 @@
-# <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining v5.0.2 
+# <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining v5.0.3 
 
 **Release Date:** 2026-04-11
 
 ## New Features & Improvements
+
+### EDDN Cache — Improved Data Retention
+- Increased local EDDN cache retention from 8 hours to 24 hours for more persistent real-time market data
+- Added 100MB size cap safety net — oldest records are automatically trimmed if the cache grows unexpectedly large
 
 ## Bug Fixes
 
