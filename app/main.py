@@ -660,7 +660,7 @@ class CargoTextOverlay:
                     display = "Limpet"
                 if display in ('Low Temp. Diamonds', 'Low Temperature Diamonds'):
                     display = 'LTD'
-                lines.append(f"{display:<14} {qty:>4}t")
+                lines.append(f"{display:<14}  {qty:>4}t")
         else:
             if cargo.current_cargo > 0:
                 lines.append(f"{cargo.current_cargo}t total")
@@ -694,7 +694,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.0.2"
+APP_VERSION = "v5.0.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
