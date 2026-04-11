@@ -369,7 +369,7 @@ class MarketplaceAPI:
         reference_system: str,
         filter_type: str,
         max_distance: int = 500,
-        max_days_ago: float = 0.333,  # 8 hours — matches EDDN listener retention
+        max_days_ago: float = 0.333,  # 8 hours default query window (listener retains 24h)
         exclude_carriers: bool = False,
     ) -> List[Dict]:
         """

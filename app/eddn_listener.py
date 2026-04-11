@@ -27,7 +27,8 @@ class EDDNListener:
     EDDN_RELAY = "tcp://eddn.edcd.io:9500"
     RECONNECT_DELAY = 30  # Seconds between reconnection attempts
     CLEANUP_INTERVAL = 3600  # Clean up old data every hour
-    MAX_DATA_AGE_HOURS = 8  # Keep data for 8 hours
+    MAX_DATA_AGE_HOURS = 24  # Keep data for 24 hours
+    MAX_DB_SIZE_BYTES = 100 * 1024 * 1024  # 100MB size cap safety net
 
     # Only store these commodities — everything else is discarded at ingestion
     TRACKED_COMMODITIES = frozenset({
@@ -171,7 +172,7 @@ class EDDNListener:
                     break
                 
                 # Perform cleanup
-                log.info("🧹 Running database cleanup (removing data older than 2 days)...")
+                log.info("🧹 Running database cleanup (removing data older than 24 hours)...")
                 deleted_count = self._cleanup_old_data()
                 log.info(f"🧹 Cleanup complete: Removed {deleted_count:,} old records")
                 
@@ -188,17 +189,38 @@ class EDDNListener:
         try:
             with sqlite3.connect(self.database_path) as conn:
                 cursor = conn.cursor()
-                
-                # Delete old data from main table
+
+                # Delete data older than MAX_DATA_AGE_HOURS
                 cursor.execute(f'''
                     DELETE FROM commodity_prices_data
                     WHERE datetime(updated_at, '+{self.MAX_DATA_AGE_HOURS} hours') < datetime('now')
                 ''')
                 deleted_data = cursor.rowcount
                 conn.commit()
-                
-                return deleted_data
-                
+
+            # Size cap: if DB exceeds 100MB, delete oldest rows until under limit
+            import os
+            db_size = os.path.getsize(self.database_path)
+            if db_size > self.MAX_DB_SIZE_BYTES:
+                log.warning(f"⚠️ DB size {db_size / 1024 / 1024:.1f}MB exceeds cap — trimming oldest rows...")
+                with sqlite3.connect(self.database_path) as conn:
+                    cursor = conn.cursor()
+                    # Delete oldest 20% of rows to avoid repeatedly hitting the cap
+                    cursor.execute('''
+                        DELETE FROM commodity_prices_data
+                        WHERE id IN (
+                            SELECT id FROM commodity_prices_data
+                            ORDER BY updated_at ASC
+                            LIMIT (SELECT COUNT(*) / 5 FROM commodity_prices_data)
+                        )
+                    ''')
+                    trimmed = cursor.rowcount
+                    conn.commit()
+                log.warning(f"⚠️ Size trim complete: removed {trimmed:,} oldest rows")
+                deleted_data += trimmed
+
+            return deleted_data
+
         except Exception as e:
             log.error(f"Error cleaning up old data: {e}")
             return 0
