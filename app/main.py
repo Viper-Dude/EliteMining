@@ -648,7 +648,9 @@ class CargoTextOverlay:
         cargo = cargo_monitor
         pct = (cargo.current_cargo / cargo.max_cargo * 100) if cargo.max_cargo > 0 else 0
 
-        lines.append(f"CARGO STATUS  {cargo.current_cargo}/{cargo.max_cargo}t  ({pct:.0f}%)")
+        header = f"CARGO STATUS  {cargo.current_cargo}/{cargo.max_cargo}t  ({pct:.0f}%)"
+        header_len = len(header)
+        lines.append(header)
 
         if cargo.cargo_items:
             sorted_items = sorted(cargo.cargo_items.items(),
@@ -660,7 +662,8 @@ class CargoTextOverlay:
                     display = "Limpet"
                 if display in ('Low Temp. Diamonds', 'Low Temperature Diamonds'):
                     display = 'LTD'
-                lines.append(f"{display:<14}  {qty:>4}t")
+                cargo_line = f"{display:<14}   {qty:>4}t"
+                lines.append(cargo_line.ljust(header_len))
         else:
             if cargo.current_cargo > 0:
                 lines.append(f"{cargo.current_cargo}t total")
@@ -669,12 +672,13 @@ class CargoTextOverlay:
 
         if cargo.materials_collected:
             lines.append("")
-            lines.append("ENGINEERING MATERIALS")
+            lines.append("ENGINEERING MATERIALS".ljust(header_len))
             sorted_mats = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
             for mat_name, qty in sorted_mats:
                 grade = cargo.MATERIAL_GRADES.get(mat_name, 0)
                 display = cargo.materials_localized_names.get(mat_name, mat_name)
-                lines.append(f"{display:<14} G{grade}  {qty:>3}")
+                mat_line = f"{display:<14} G{grade}  {qty:>3}"
+                lines.append(mat_line.ljust(header_len))
 
         message = "\n".join(lines)
         self._draw_text(message)
