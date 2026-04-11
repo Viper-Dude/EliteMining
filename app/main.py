@@ -220,13 +220,16 @@ class TextOverlay:
 
         # Force canvas to compute bbox so we can size the window correctly
         self.canvas.update_idletasks()
-        self._fit_window_to_content()  # Already sets both size AND position
+        self._fit_window_to_content()
 
-        # Show window AFTER text is ready (skip if hidden by game focus check)
+        # CRITICAL: Reposition window every time before showing (Windows can reset position)
+        self._set_window_position()
+
+        # Always show message — events come from journal files regardless of which app has focus.
         self._is_showing = True
         if not self._game_hidden:
             self.overlay_window.deiconify()
-        
+
         # Cancel any existing timer
         if self.fade_timer:
             self.overlay_window.after_cancel(self.fade_timer)
@@ -247,9 +250,9 @@ class TextOverlay:
 
         # Force canvas to compute bbox so we can size the window correctly
         self.canvas.update_idletasks()
-        self._fit_window_to_content()  # Already sets both size AND position
+        self._fit_window_to_content()
 
-        # Show window AFTER text is ready (skip if hidden by game focus check)
+        # Show window AFTER text is ready — always show persistent messages.
         self._is_showing = True
         if not self._game_hidden:
             self.overlay_window.deiconify()
@@ -560,7 +563,7 @@ class CargoTextOverlay:
         self.overlay_window.wm_overrideredirect(True)
         self.overlay_window.wm_attributes("-topmost", True)
         self.overlay_window.wm_attributes("-transparentcolor", "#000001")
-        self.overlay_window.wm_attributes("-alpha", 0)  # Start hidden (alpha avoids black flash vs withdraw/deiconify)
+        self.overlay_window.wm_attributes("-alpha", 0)  # Start hidden
         self.overlay_window.configure(bg="#000001")
         self._set_window_position()
         self.canvas = tk.Canvas(self.overlay_window, bg="#000001",
@@ -568,43 +571,25 @@ class CargoTextOverlay:
         self.canvas.pack(fill="both", expand=True, padx=10, pady=5)
 
     def _set_window_position(self):
+        """Position fixed-size window anchored to the right side of game monitor."""
         if not self.overlay_window:
             return
         gx, gy, gw = get_game_monitor_offset()
         screen_w = gw if gw else self.overlay_window.winfo_screenwidth()
-        window_width = self.overlay_window.winfo_width()
-        window_height = self.overlay_window.winfo_height()
-        if window_width < 10:
-            window_width = 500
-        if window_height < 10:
-            window_height = 400
+        # Fixed size — transparent background makes oversized window invisible
+        window_width = 700
+        window_height = 600
         x_pos = gx + screen_w - window_width - 20
         y_pos = gy + 100
         self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
-
-    def _fit_window_to_content(self):
-        if not self.overlay_window:
-            return
-        gx, gy, gw = get_game_monitor_offset()
-        screen_w = gw if gw else self.overlay_window.winfo_screenwidth()
-        bbox = self.canvas.bbox("all") if hasattr(self, 'canvas') else None
-        if bbox:
-            window_width = max(250, bbox[2] + 30)
-            window_height = max(60, bbox[3] + 20)
-        else:
-            window_width = 400
-            window_height = 400
-        x_pos = gx + screen_w - window_width - 20
-        y_pos = gy + 100
-        self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
-        if hasattr(self, 'canvas'):
-            self.canvas.config(width=window_width, height=window_height)
 
     # -- drawing ------------------------------------------------------------
     def _draw_text(self, message: str):
         font_spec = ("Consolas", self.font_size, "normal")
         text_color = self._get_current_color()
-        base_x, base_y = 2, 2
+        # Anchor text to the right side of the window (700px wide, minus padding)
+        base_x = 700 - 22  # window_width minus padx and margin
+        base_y = 2
         offsets = [(-1, -1), (1, -1), (-1, 1), (1, 1),
                    (0, 1), (0, -1), (1, 0), (-1, 0)]
         if hasattr(self, '_outline_items') and self._outline_items:
@@ -617,10 +602,10 @@ class CargoTextOverlay:
                 self._outline_items.append(self.canvas.create_text(
                     base_x + ox, base_y + oy,
                     text=message, font=font_spec, fill="black",
-                    anchor="nw", justify="left"))
+                    anchor="ne", justify="left"))
             self.text_item = self.canvas.create_text(
                 base_x, base_y, text=message, font=font_spec,
-                fill=text_color, anchor="nw", justify="left")
+                fill=text_color, anchor="ne", justify="left")
 
     def _get_current_color(self):
         base = self.text_color.lstrip('#')
@@ -646,6 +631,10 @@ class CargoTextOverlay:
 
     def set_font_size(self, size: int):
         self.font_size = size
+        # Clear canvas items so _draw_text creates fresh ones with new font size
+        if hasattr(self, 'canvas') and self._outline_items:
+            self.canvas.delete("all")
+            self._outline_items = []
 
     # -- cargo data update --------------------------------------------------
     def update_cargo(self, cargo_monitor):
@@ -689,8 +678,6 @@ class CargoTextOverlay:
 
         message = "\n".join(lines)
         self._draw_text(message)
-        self.canvas.update_idletasks()
-        self._fit_window_to_content()  # Already sets both size AND position
         if self.overlay_enabled and not self._game_hidden:
             self.overlay_window.wm_attributes("-alpha", 1)
 
@@ -5960,22 +5947,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             self.text_overlay.overlay_window.withdraw()
                         self.text_overlay._game_hidden = True
             else:
-                # Setting disabled — still require the game to be running (window exists)
-                game_running = _find_game_window_rect() is not None
+                # Setting disabled — clear hidden flags so overlays show normally
                 if hasattr(self, 'cargo_text_overlay'):
-                    if game_running:
-                        self.cargo_text_overlay._game_hidden = False
-                    elif not self.cargo_text_overlay._game_hidden:
-                        self.cargo_text_overlay._game_hidden = True
-                        if self.cargo_text_overlay.overlay_window:
-                            self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
+                    self.cargo_text_overlay._game_hidden = False
                 if hasattr(self, 'text_overlay'):
-                    if game_running:
-                        self.text_overlay._game_hidden = False
-                    elif not self.text_overlay._game_hidden:
-                        self.text_overlay._game_hidden = True
-                        if self.text_overlay._is_showing and self.text_overlay.overlay_window:
-                            self.text_overlay.overlay_window.withdraw()
+                    self.text_overlay._game_hidden = False
         except Exception:
             pass
         
