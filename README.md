@@ -299,7 +299,7 @@ The Commodity Market helps you find the best prices for mining commodities and t
 - **Buy/Sell Toggle:**
   - **Sell Mode** – Find stations buying your commodities (best sell prices)
   - **Buy Mode** – Find stations selling commodities you want to purchase (lowest buy prices)
-- **Real-Time Market Data** – Live commodity prices updated from active commanders
+- **Real-Time Market Data** – Live commodity prices from multiple sources: EDData/Ardent API, Spansh, and a local EDDN cache (data broadcast by other commanders in real-time, retained for 24 hours)
 - **Smart Filtering:**
   - Station type (Orbital/Surface/Fleet Carrier/MegaShip)
   - Landing pad size (Large pads only option)
