@@ -5135,8 +5135,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Additional mining control variables (initialized once, not recreated in _build_timers_tab)
         self.laser_extra_repeat_var = tk.IntVar(value=1)
         self.prospector_delay_var = tk.DoubleVar(value=4.6)
-        self.thrust_upduration_var = tk.DoubleVar(value=1.2)
-        self.thrust_closed_var = tk.DoubleVar(value=1.5)
+        self.thrust_upduration_var = tk.DoubleVar(value=1.5)
+        self.thrust_closed_var = tk.DoubleVar(value=1.6)
         self.thrust_open_var = tk.DoubleVar(value=3.8)
         
         # Announcement toggles (moved from TOGGLES to Text Overlay section)
@@ -9860,10 +9860,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     print(f"[THRUST UPDURATION] Loaded: {delay:.1f} seconds")
             else:
                 self._save_thrust_upduration()
-                print(f"[THRUST UPDURATION] Created default file: 1.2 seconds")
+                print(f"[THRUST UPDURATION] Created default file: 1.5 seconds")
         except Exception as e:
             print(f"[THRUST UPDURATION] Error loading: {e}")
-            self.thrust_upduration_var.set(1.2)
+            self.thrust_upduration_var.set(1.5)
 
     def _save_thrust_closed(self) -> None:
         """Save thrust closed timing to thrustScoopClosed.txt"""
@@ -9892,12 +9892,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.thrust_closed_var.set(delay)
                     print(f"[THRUST CLOSED] Loaded timing: {delay:.1f} seconds")
             else:
-                # Create default file with value 1.5
+                # Create default file with value 1.6
                 self._save_thrust_closed()
-                print(f"[THRUST CLOSED] Created default timing file: 1.5 seconds")
+                print(f"[THRUST CLOSED] Created default timing file: 1.6 seconds")
         except Exception as e:
             print(f"[THRUST CLOSED] Error loading timing: {e}")
-            self.thrust_closed_var.set(1.5)  # Fallback to default
+            self.thrust_closed_var.set(1.6)  # Fallback to default
     
     def _save_thrust_open(self) -> None:
         """Save thrust open timing to thrustScoopOpen.txt"""
