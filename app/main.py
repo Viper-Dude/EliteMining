@@ -5947,11 +5947,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             self.text_overlay.overlay_window.withdraw()
                         self.text_overlay._game_hidden = True
             else:
-                # Setting disabled — clear hidden flags so overlays show normally
+                # Setting disabled — still require the game to be running
+                game_running = _find_game_window_rect() is not None
                 if hasattr(self, 'cargo_text_overlay'):
-                    self.cargo_text_overlay._game_hidden = False
+                    if game_running:
+                        self.cargo_text_overlay._game_hidden = False
+                    elif not self.cargo_text_overlay._game_hidden:
+                        self.cargo_text_overlay._game_hidden = True
+                        if self.cargo_text_overlay.overlay_window:
+                            self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
                 if hasattr(self, 'text_overlay'):
-                    self.text_overlay._game_hidden = False
+                    if game_running:
+                        self.text_overlay._game_hidden = False
+                    elif not self.text_overlay._game_hidden:
+                        self.text_overlay._game_hidden = True
+                        if self.text_overlay._is_showing and self.text_overlay.overlay_window:
+                            self.text_overlay.overlay_window.withdraw()
         except Exception:
             pass
         
