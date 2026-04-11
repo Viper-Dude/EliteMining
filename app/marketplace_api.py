@@ -140,6 +140,7 @@ class MarketplaceAPI:
                 "Coriolis Starport":   "Coriolis",
                 "Orbis Starport":      "Orbis",
                 "Ocellus Starport":    "Ocellus",
+                "Dodecahedron Starport": "Dodec",
                 "Outpost":             "Outpost",
                 "Asteroid Base":       "AsteroidBase",
                 "Mega Ship":           "MegaShip",
@@ -477,6 +478,7 @@ class MarketplaceAPI:
                     "Coriolis": "Coriolis",
                     "Orbis": "Orbis",
                     "Ocellus": "Ocellus",
+                    "Dodec": "Dodec",
                     "Outpost": "Outpost",
                     "CraterOutpost": "CraterOutpost",
                     "CraterPort": "CraterPort",
@@ -487,7 +489,7 @@ class MarketplaceAPI:
                     eddata_type = _type_map.get(stype, stype)
 
                 # Determine pad size
-                if is_carrier or eddata_type in ("Coriolis", "Orbis", "Ocellus"):
+                if is_carrier or eddata_type in ("Coriolis", "Orbis", "Ocellus", "Dodec"):
                     pad_size = 3
                 elif "Outpost" in eddata_type:
                     pad_size = 2
@@ -621,6 +623,7 @@ class MarketplaceAPI:
                 "Coriolis Starport":   "Coriolis",
                 "Orbis Starport":      "Orbis",
                 "Ocellus Starport":    "Ocellus",
+                "Dodecahedron Starport": "Dodec",
                 "Outpost":             "Outpost",
                 "Asteroid Base":       "AsteroidBase",
                 "Mega Ship":           "MegaShip",

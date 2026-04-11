@@ -115,7 +115,9 @@ class EDDNSender:
             if self.odyssey is not None:
                 message['message']['odyssey'] = self.odyssey
             
-            # Note: stationType and distanceToArrival are not part of the commodity v3 schema
+            # Add station type if provided (supported by commodity v3 schema)
+            if station_data and station_data.get('type'):
+                message['message']['stationType'] = station_data['type']
             
             # Send to EDDN
             success = self._send_message(message)
