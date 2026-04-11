@@ -701,6 +701,7 @@ Configure how many times the laser mining extra sequence runs:
 ## Known Limitations
 - **Only works with in-game keybinds (HOTAS setup manual)**
 - **Works with EDCopilot**
+- **DPI / Resolution changes require restart** — If you change your display DPI scaling or screen resolution, restart EliteMining for the text overlays to render correctly.
 
 > **Note:** VoiceAttack startup warnings about EliteVA plugin bindings are normal due to recent Elite Dangerous changes and can be safely ignored – they don't impact EliteMining voice commands.
 
