@@ -20,6 +20,7 @@
   - [Enable VoiceAttack Plugins](#enable-voiceattack-plugins)
 - [VoiceAttack Controls](#voiceattack-controls)
 - [EliteMining App](#elitemining-app)
+  - [Text Overlay](#text-overlay)
 - [Hotspot Finder](#hotspot-finder)
 - [Commodity Market](#commodity-market)
 - [Mining Missions](#mining-missions)
@@ -550,6 +551,7 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 <img src="Screenshot/mining-announcement.png" width="900"><br>  
 *Controls announcements, thresholds, and filters.*  
 
+#### Text Overlay  
 <img src="Screenshot/txt_overlay.png" width="900"><br>  
 *Text overlay showing real-time mining announcements in-game.*
 
@@ -558,7 +560,10 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 > **Note:** The text overlay automatically follows the game window across monitors. On high DPI scaling settings (above 150%), the overlay position may be slightly offset. For best results, use 100–150% display scaling on the monitor running the game.
 
-> **Hide in Supercruise:** Enable "Hide in Supercruise" to automatically hide all text overlays (including cargo status) while in supercruise. Overlays are instantly restored when you drop out of supercruise.
+> **Hide in Supercruise:** Enable "Hide in Supercruise" in the General Settings tab to automatically hide all text overlays (including cargo status) while in supercruise. Overlays are instantly restored when you drop out of supercruise.
+
+<img src="Screenshot/txt_overlay_settings.png" width="900"><br>
+*Text overlay settings in the General Settings tab.*
 
 </details>
 
