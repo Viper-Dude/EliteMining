@@ -562,6 +562,8 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 > **Hide in Supercruise:** Enable "Hide in Supercruise" in the General Settings tab to automatically hide all text overlays (including cargo status) while in supercruise. Overlays are instantly restored when you drop out of supercruise.
 
+> **Only during Mining Session:** Enable "Only during Mining Session" to show overlays only while a mining session is active. When no session is running, overlays stay hidden to keep your screen clean.
+
 <img src="Screenshot/txt_overlay_settings.png" width="900"><br>
 *Text overlay settings in the General Settings tab.*
 
