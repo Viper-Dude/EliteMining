@@ -18935,7 +18935,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if search_mode == "galaxy_wide":
                     ref = reference_system or self.marketplace_reference_system.get().strip()
                     if ref:
-                        self._display_marketplace_results(results_sorted[:30])
+                        self._display_marketplace_results(results_sorted[:50])
                         self.marketplace_total_label.config(text=t('marketplace.calculating_distances'))
                         self.config(cursor="watch")
                         self.update_idletasks()
@@ -18943,7 +18943,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         import threading
                         def calculate_distances_thread():
                             try:
-                                top_30 = results_sorted[:30]
+                                top_30 = results_sorted[:50]
                                 top_30_with_dist = MarketplaceAPI.add_distances_to_results(top_30, ref)
                                 self.after(0, lambda: self._update_marketplace_with_distances(top_30_with_dist, len(results)))
                             except Exception as e:
@@ -18952,10 +18952,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         
                         threading.Thread(target=calculate_distances_thread, daemon=True).start()
                     else:
-                        self._display_marketplace_results(results_sorted[:30])
+                        self._display_marketplace_results(results_sorted[:50])
                         self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
                 elif search_mode == "near_system":
-                    self._display_marketplace_results(results_sorted[:30])
+                    self._display_marketplace_results(results_sorted[:50])
                     self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
             else:
                 self._clear_marketplace_results()
