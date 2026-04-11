@@ -5298,16 +5298,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from va_variables import VAVariablesManager
         self.va_variables = None  # Will be initialized after UI is built
         
+        # Build UI - ProspectorPanel will scan latest journal and populate current_system
+        self._build_ui()
+
         # Watch for Market.json changes to send to EDDN
+        # Must be AFTER _build_ui() so prospector_panel.journal_dir is available
         from file_watcher import get_file_watcher
         file_watcher = get_file_watcher()
         journal_dir = self.prospector_panel.journal_dir if hasattr(self, 'prospector_panel') else None
         if journal_dir and os.path.exists(journal_dir):
             file_watcher.add_watch(journal_dir, self._on_journal_file_change)
             print(f"[OK] Watching journal directory for Market.json updates")
-
-        # Build UI - ProspectorPanel will scan latest journal and populate current_system
-        self._build_ui()
+        else:
+            print(f"[WARN] Could not set up EDDN file watcher - journal_dir not available")
         
         # Clean up legacy files from older versions
         self._cleanup_legacy_files()
