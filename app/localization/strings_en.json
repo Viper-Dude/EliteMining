@@ -837,6 +837,7 @@
     "cargo_overlay_desc": "Live cargo status overlay on the right side of screen (minerals, limpets, graded materials)",
     "overlay_only_game_focused": "Only when game is focused",
     "hide_overlays_in_supercruise": "Hide in Supercruise",
+    "overlay_only_mining_session": "Only during Mining Session",
     "text_brightness": "Text Brightness:",
     "text_brightness_desc": "Adjust text brightness/opacity",
     "text_color": "Text Color:",

@@ -227,7 +227,7 @@ class TextOverlay:
 
         # Always show message — events come from journal files regardless of which app has focus.
         self._is_showing = True
-        if not self._game_hidden and not getattr(self, '_sc_hidden', False):
+        if not self._game_hidden and not getattr(self, '_sc_hidden', False) and not getattr(self, '_session_hidden', False):
             self.overlay_window.deiconify()
 
         # Cancel any existing timer
@@ -254,7 +254,7 @@ class TextOverlay:
 
         # Show window AFTER text is ready — always show persistent messages.
         self._is_showing = True
-        if not self._game_hidden and not getattr(self, '_sc_hidden', False):
+        if not self._game_hidden and not getattr(self, '_sc_hidden', False) and not getattr(self, '_session_hidden', False):
             self.overlay_window.deiconify()
         
         # Cancel any existing timer - this message stays until manually hidden
@@ -682,7 +682,7 @@ class CargoTextOverlay:
 
         message = "\n".join(lines)
         self._draw_text(message)
-        if self.overlay_enabled and not self._game_hidden and not getattr(self, '_sc_hidden', False):
+        if self.overlay_enabled and not self._game_hidden and not getattr(self, '_sc_hidden', False) and not getattr(self, '_session_hidden', False):
             self.overlay_window.wm_attributes("-alpha", 1)
 
     def destroy(self):
@@ -5233,6 +5233,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_show_in_overlay = tk.BooleanVar(value=True)
         self.overlay_only_game_focused = tk.BooleanVar(value=True)
         self.hide_overlays_in_supercruise = tk.BooleanVar(value=False)
+        self.overlay_only_mining_session = tk.BooleanVar(value=False)
         self._in_supercruise = False  # Track current supercruise state
 
         self._load_cargo_preferences()
@@ -5996,6 +5997,31 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self, 'text_overlay') and getattr(self.text_overlay, '_sc_hidden', False):
                     self.text_overlay._sc_hidden = False
                     if self.text_overlay._is_showing and not self.text_overlay._game_hidden:
+                        self.text_overlay.overlay_window.deiconify()
+        except Exception:
+            pass
+        
+        # Hide overlays when no mining session is active (if setting enabled)
+        try:
+            _session_active = hasattr(self, 'prospector_panel') and self.prospector_panel and getattr(self.prospector_panel, 'session_active', False)
+            if self.overlay_only_mining_session.get() and not _session_active:
+                if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_window:
+                    if not getattr(self.cargo_text_overlay, '_session_hidden', False):
+                        self.cargo_text_overlay._session_hidden = True
+                        self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
+                if hasattr(self, 'text_overlay') and self.text_overlay._is_showing and self.text_overlay.overlay_window:
+                    if not getattr(self.text_overlay, '_session_hidden', False):
+                        self.text_overlay._session_hidden = True
+                        self.text_overlay.overlay_window.withdraw()
+            else:
+                # Restore overlays when session starts or setting disabled
+                if hasattr(self, 'cargo_text_overlay') and getattr(self.cargo_text_overlay, '_session_hidden', False):
+                    self.cargo_text_overlay._session_hidden = False
+                    if self.cargo_text_overlay.overlay_enabled and not self.cargo_text_overlay._game_hidden and not getattr(self.cargo_text_overlay, '_sc_hidden', False):
+                        self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 1)
+                if hasattr(self, 'text_overlay') and getattr(self.text_overlay, '_session_hidden', False):
+                    self.text_overlay._session_hidden = False
+                    if self.text_overlay._is_showing and not self.text_overlay._game_hidden and not getattr(self.text_overlay, '_sc_hidden', False):
                         self.text_overlay.overlay_window.deiconify()
         except Exception:
             pass
@@ -7864,13 +7890,33 @@ class App(tk.Tk, ColumnVisibilityMixin):
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).pack(side="left")
-        tk.Checkbutton(text_overlay_row, text=t('settings.hide_overlays_in_supercruise'), variable=self.hide_overlays_in_supercruise,
+        self._sc_checkbox = tk.Checkbutton(text_overlay_row, text=t('settings.hide_overlays_in_supercruise'), variable=self.hide_overlays_in_supercruise,
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
+                      highlightcolor="#1e1e1e", takefocus=False)
+        self._sc_checkbox.pack(side="left", padx=(8, 0))
+        
+        def _on_mining_session_toggle(*a):
+            if self.overlay_only_mining_session.get():
+                self.hide_overlays_in_supercruise.set(False)
+                self._sc_checkbox.config(state="disabled", fg="#666666")
+            else:
+                self._sc_checkbox.config(state="normal", fg="#ffffff")
+            self._save_cargo_preferences()
+        
+        tk.Checkbutton(text_overlay_row, text=t('settings.overlay_only_mining_session'), variable=self.overlay_only_mining_session,
+                      command=_on_mining_session_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
                       highlightcolor="#1e1e1e", takefocus=False).pack(side="left", padx=(8, 0))
-        tk.Label(text_overlay_row, text=t('settings.text_overlay_desc'), fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+        # Apply initial state — grey out supercruise checkbox if mining session is already enabled
+        if self.overlay_only_mining_session.get():
+            self._sc_checkbox.config(state="disabled", fg="#666666")
+        r += 1
+        tk.Label(scrollable_frame, text=t('settings.text_overlay_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Overlay mode selection (Standard / Enhanced Prospector / Cargo Status) - all on one line
@@ -13771,6 +13817,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_show_in_overlay.set(cfg.get("cargo_show_in_overlay", True))
         self.overlay_only_game_focused.set(cfg.get("overlay_only_game_focused", True))
         self.hide_overlays_in_supercruise.set(cfg.get("hide_overlays_in_supercruise", False))
+        self.overlay_only_mining_session.set(cfg.get("overlay_only_mining_session", False))
         # Apply saved cargo overlay state
         self.cargo_text_overlay.set_enabled(cfg.get("cargo_show_in_overlay", True))
     
@@ -13785,7 +13832,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "cargo_transparency": int(self.cargo_transparency.get()),
             "cargo_show_in_overlay": bool(self.cargo_show_in_overlay.get()),
             "overlay_only_game_focused": bool(self.overlay_only_game_focused.get()),
-            "hide_overlays_in_supercruise": bool(self.hide_overlays_in_supercruise.get())
+            "hide_overlays_in_supercruise": bool(self.hide_overlays_in_supercruise.get()),
+            "overlay_only_mining_session": bool(self.overlay_only_mining_session.get())
         }
         update_config_values(updates)
     

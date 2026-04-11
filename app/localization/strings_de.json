@@ -842,6 +842,7 @@
     "cargo_overlay_desc": "Echtzeit-Frachtstatusanzeige auf der rechten Bildschirmseite (Mineralien, Drohnen, bewertete Materialien)",
     "overlay_only_game_focused": "Nur wenn Spiel fokussiert",
     "hide_overlays_in_supercruise": "Im Supercruise ausblenden",
+    "overlay_only_mining_session": "Nur während Bergbau-Sitzung",
     "text_brightness": "Texthelligkeit:",
     "text_brightness_desc": "Texthelligkeit/Transparenz anpassen",
     "text_color": "Textfarbe:",
