@@ -18457,7 +18457,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if search_mode == "galaxy_wide":
                     reference_system = self.trade_reference_system.get().strip()
                     if reference_system:
-                        self._display_trade_results(results_sorted[:30])
+                        self._display_trade_results(results_sorted[:50])
                         self.trade_total_label.config(text=t('marketplace.calculating_distances'))
                         self.config(cursor="watch")
                         self.update_idletasks()
@@ -18465,7 +18465,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         import threading
                         def calculate_distances_thread():
                             try:
-                                top_30 = results_sorted[:30]
+                                top_30 = results_sorted[:50]
                                 top_30_with_dist = MarketplaceAPI.add_distances_to_results(top_30, reference_system)
                                 self.after(0, lambda: self._update_trade_with_distances(top_30_with_dist, len(results)))
                             except Exception as e:
@@ -18475,11 +18475,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         thread = threading.Thread(target=calculate_distances_thread, daemon=True)
                         thread.start()
                     else:
-                        self._display_trade_results(results_sorted[:30])
+                        self._display_trade_results(results_sorted[:50])
                         self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
                         self.config(cursor="")
                 elif search_mode == "near_system":
-                    self._display_trade_results(results_sorted[:30])
+                    self._display_trade_results(results_sorted[:50])
                     self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
                     self.config(cursor="")
             else:
