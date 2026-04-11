@@ -22,7 +22,7 @@ class MarketHandler:
             eddn_sender: EDDNSender instance
         """
         self.eddn_sender = eddn_sender
-        self.last_market_id = None
+        self.last_market_mtime = None
         self.current_system = None
         self.current_station = None
     
@@ -71,11 +71,12 @@ class MarketHandler:
                 log.warning("Market.json missing required fields")
                 return
             
-            # Skip if same market (avoid duplicate sends)
-            if market_id == self.last_market_id:
+            # Skip if file hasn't actually changed (avoid duplicate sends from rapid watcher triggers)
+            file_mtime = os.path.getmtime(market_file_path)
+            if file_mtime == self.last_market_mtime:
                 return
             
-            self.last_market_id = market_id
+            self.last_market_mtime = file_mtime
             
             # Convert Elite's format to EDDN format
             eddn_commodities = self._convert_commodities(commodities)

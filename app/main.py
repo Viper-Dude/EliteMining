@@ -18628,12 +18628,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if is_numeric:
             def parse_value(val):
                 try:
-                    # Handle "?" for unknown values
-                    if val == '?':
+                    # Handle "?" or "-" for unknown values
+                    val = val.strip()
+                    if val in ('?', '-', ''):
                         return 999999
-                    # Remove commas and spaces, handle distance like "123 LY"
-                    val = val.replace(' LY', '').replace(',', '').strip()
-                    return float(val) if val and val != '-' else 999999
+                    # Handle time-based values (e.g., "30m", "1h", "2d")
+                    if val.endswith('m'):
+                        return float(val[:-1])
+                    elif val.endswith('h'):
+                        return float(val[:-1]) * 60
+                    elif val.endswith('d'):
+                        return float(val[:-1]) * 1440
+                    # Remove " CR", " LY", commas, spaces
+                    val = val.replace(' CR', '').replace(' LY', '').replace(',', '').strip()
+                    return float(val) if val else 999999
                 except:
                     return 999999
             items.sort(key=lambda x: parse_value(x[0]), reverse=self.trade_sort_reverse)
