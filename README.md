@@ -558,6 +558,8 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 > **Note:** The text overlay automatically follows the game window across monitors. On high DPI scaling settings (above 150%), the overlay position may be slightly offset. For best results, use 100–150% display scaling on the monitor running the game.
 
+> **Hide in Supercruise:** Enable "Hide in Supercruise" to automatically hide all text overlays (including cargo status) while in supercruise. Overlays are instantly restored when you drop out of supercruise.
+
 </details>
 
 [Back to Top](#top)

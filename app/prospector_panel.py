@@ -9805,6 +9805,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             self.session_body.set(body_display)
                     
             elif ev in ("SupercruiseEntry", "SupercruiseExit"):
+                # Update supercruise state on the main app for overlay suppression
+                if self.main_app:
+                    self.main_app._in_supercruise = (ev == "SupercruiseEntry")
                 # Handle SupercruiseExit during startup to get accurate BodyType for rings
                 if ev == "SupercruiseExit":
                     body_name = evt.get("Body") or evt.get("BodyName")

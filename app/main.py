@@ -227,7 +227,7 @@ class TextOverlay:
 
         # Always show message — events come from journal files regardless of which app has focus.
         self._is_showing = True
-        if not self._game_hidden:
+        if not self._game_hidden and not getattr(self, '_sc_hidden', False):
             self.overlay_window.deiconify()
 
         # Cancel any existing timer
@@ -254,7 +254,7 @@ class TextOverlay:
 
         # Show window AFTER text is ready — always show persistent messages.
         self._is_showing = True
-        if not self._game_hidden:
+        if not self._game_hidden and not getattr(self, '_sc_hidden', False):
             self.overlay_window.deiconify()
         
         # Cancel any existing timer - this message stays until manually hidden
@@ -682,7 +682,7 @@ class CargoTextOverlay:
 
         message = "\n".join(lines)
         self._draw_text(message)
-        if self.overlay_enabled and not self._game_hidden:
+        if self.overlay_enabled and not self._game_hidden and not getattr(self, '_sc_hidden', False):
             self.overlay_window.wm_attributes("-alpha", 1)
 
     def destroy(self):
@@ -5232,6 +5232,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_transparency = tk.IntVar(value=90)
         self.cargo_show_in_overlay = tk.BooleanVar(value=True)
         self.overlay_only_game_focused = tk.BooleanVar(value=True)
+        self.hide_overlays_in_supercruise = tk.BooleanVar(value=False)
+        self._in_supercruise = False  # Track current supercruise state
 
         self._load_cargo_preferences()
         
@@ -5251,6 +5253,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_max_capacity.trace('w', self._on_cargo_capacity_change)
         self.cargo_transparency.trace('w', self._on_cargo_transparency_change)
         self.cargo_show_in_overlay.trace('w', self._on_cargo_overlay_toggle)
+        self.hide_overlays_in_supercruise.trace('w', lambda *a: self._save_cargo_preferences())
 
         # Setup keyboard shortcuts
         self._setup_keyboard_shortcuts()
@@ -5970,6 +5973,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         self.text_overlay._game_hidden = True
                         if self.text_overlay._is_showing and self.text_overlay.overlay_window:
                             self.text_overlay.overlay_window.withdraw()
+        except Exception:
+            pass
+        
+        # Hide overlays in supercruise if setting is enabled
+        try:
+            if self.hide_overlays_in_supercruise.get() and self._in_supercruise:
+                if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_window:
+                    if not getattr(self.cargo_text_overlay, '_sc_hidden', False):
+                        self.cargo_text_overlay._sc_hidden = True
+                        self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
+                if hasattr(self, 'text_overlay') and self.text_overlay._is_showing and self.text_overlay.overlay_window:
+                    if not getattr(self.text_overlay, '_sc_hidden', False):
+                        self.text_overlay._sc_hidden = True
+                        self.text_overlay.overlay_window.withdraw()
+            else:
+                # Restore overlays when leaving supercruise
+                if hasattr(self, 'cargo_text_overlay') and getattr(self.cargo_text_overlay, '_sc_hidden', False):
+                    self.cargo_text_overlay._sc_hidden = False
+                    if self.cargo_text_overlay.overlay_enabled and not self.cargo_text_overlay._game_hidden:
+                        self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 1)
+                if hasattr(self, 'text_overlay') and getattr(self.text_overlay, '_sc_hidden', False):
+                    self.text_overlay._sc_hidden = False
+                    if self.text_overlay._is_showing and not self.text_overlay._game_hidden:
+                        self.text_overlay.overlay_window.deiconify()
         except Exception:
             pass
         
@@ -7829,15 +7856,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
         separator2.grid(row=r, column=0, sticky="ew", pady=(0, 8))
         r += 1
         
-        # Text overlay enable/disable
-        tk.Checkbutton(scrollable_frame, text=t('settings.enable_text_overlay'), variable=self.text_overlay_enabled, 
+        # Text overlay enable/disable + Hide in Supercruise on same row
+        text_overlay_row = tk.Frame(scrollable_frame, bg=_gs_bg)
+        text_overlay_row.grid(row=r, column=0, sticky="w")
+        tk.Checkbutton(text_overlay_row, text=t('settings.enable_text_overlay'), variable=self.text_overlay_enabled, 
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
-                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
-        r += 1
-        tk.Label(scrollable_frame, text=t('settings.text_overlay_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 8))
+                      highlightcolor="#1e1e1e", takefocus=False).pack(side="left")
+        tk.Checkbutton(text_overlay_row, text=t('settings.hide_overlays_in_supercruise'), variable=self.hide_overlays_in_supercruise,
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
+                      highlightcolor="#1e1e1e", takefocus=False).pack(side="left", padx=(8, 0))
+        tk.Label(text_overlay_row, text=t('settings.text_overlay_desc'), fg="gray", bg=_gs_bg,
+                 font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
         r += 1
         
         # Overlay mode selection (Standard / Enhanced Prospector / Cargo Status) - all on one line
@@ -7873,7 +7906,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                       command=_on_standard_cb, **_cb_kw).pack(side="left", padx=(8, 0))
         tk.Checkbutton(mode_frame, text=t('settings.overlay_enhanced'), variable=self._overlay_enhanced_var,
                       command=_on_enhanced_cb, **_cb_kw).pack(side="left", padx=(8, 0))
-        tk.Checkbutton(mode_frame, text=t('settings.enable_cargo_overlay'), variable=self.cargo_show_in_overlay,
+        tk.Checkbutton(mode_frame, text=t('settings.cargo_overlay'), variable=self.cargo_show_in_overlay,
                       **_cb_kw).pack(side="left", padx=(8, 0))
         tk.Checkbutton(mode_frame, text=t('settings.overlay_only_game_focused'), variable=self.overlay_only_game_focused,
                       **_cb_kw).pack(side="left", padx=(8, 0))
@@ -13737,6 +13770,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_transparency.set(cfg.get("cargo_transparency", 90))
         self.cargo_show_in_overlay.set(cfg.get("cargo_show_in_overlay", True))
         self.overlay_only_game_focused.set(cfg.get("overlay_only_game_focused", True))
+        self.hide_overlays_in_supercruise.set(cfg.get("hide_overlays_in_supercruise", False))
         # Apply saved cargo overlay state
         self.cargo_text_overlay.set_enabled(cfg.get("cargo_show_in_overlay", True))
     
@@ -13750,7 +13784,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "cargo_max_capacity": int(self.cargo_max_capacity.get()),
             "cargo_transparency": int(self.cargo_transparency.get()),
             "cargo_show_in_overlay": bool(self.cargo_show_in_overlay.get()),
-            "overlay_only_game_focused": bool(self.overlay_only_game_focused.get())
+            "overlay_only_game_focused": bool(self.overlay_only_game_focused.get()),
+            "hide_overlays_in_supercruise": bool(self.hide_overlays_in_supercruise.get())
         }
         update_config_values(updates)
     
