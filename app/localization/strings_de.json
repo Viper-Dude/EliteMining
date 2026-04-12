@@ -1120,8 +1120,8 @@
     "use_fc": "Mit Ihrem Flottenträger-Standort füllen",
     "calculate_distance": "Entfernungen zwischen Systemen berechnen (oder Enter drücken)",
     "edsm_status": "EDSM API-Status\n🟢 Online: API antwortet normal\n🟡 Langsam: API antwortet mit Fehlern\n🔴 Offline: API antwortet nicht",
-    "eddata_status": "Marktdatenquellen API (nach Priorität)\n\n📡 EDDN — Echtzeitpreise von Spielern (aktuellste)\n🟢 EDData — Primär\n🟡 Ardent — Fallback (wenn EDData offline)\n🌐 Spansh — Sekundär\n\nEDDN-Preise werden lokal gespeichert\nund nach 8 Stunden automatisch bereinigt.\n\nAlle Quellen werden parallel abgefragt.\nErgebnisse zusammengeführt — aktuellster Preis gewinnt.",
-    "eddata_trade_status": "Marktdatenquellen API (nach Priorität)\n\n🟢 EDData — Primär\n🟡 Ardent — Fallback (wenn EDData offline)\n🌐 Spansh — Sekundär\n\nAlle Quellen werden parallel abgefragt.\nErgebnisse zusammengeführt — aktuellster Preis gewinnt.",
+    "market_api_status": "Marktdatenquellen\n\n🟢 Vollständig — EDDN + Ardent + Spansh (alle online)\n🔴 Eingeschränkt — Nur EDDN (Verlaufs-APIs offline)\n\nEDDN: Echtzeitpreise von Spielern (aktuellste)\nArdent: Preishistorie\nSpansh: Ring- und Systemdaten\n\nAlle verfügbaren Quellen werden parallel abgefragt.\nDer aktuellste Preis gewinnt.",
+    "market_api_trade_status": "Marktdatenquellen\n\n🟢 Vollständig — Ardent + Spansh (alle online)\n🔴 Eingeschränkt — Verlaufs-APIs offline\n\nArdent: Preishistorie\nSpansh: Stationsdaten\n\nAlle verfügbaren Quellen werden parallel abgefragt.\nDer aktuellste Preis gewinnt.",
     
     "change_language": "Klicken, um die Sprache zu ändern",
     "about": "Klicken für App-Info, Links und Credits",

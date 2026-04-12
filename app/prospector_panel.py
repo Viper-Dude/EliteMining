@@ -7636,25 +7636,25 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Configure column widths - locked at startup size, no resizing allowed
         
-        self.reports_tree_tab.column("date", width=161, stretch=False, anchor="w")
-        self.reports_tree_tab.column("duration", width=80, stretch=False, anchor="w")
-        self.reports_tree_tab.column("session_type", width=90, stretch=False, anchor="w")
-        self.reports_tree_tab.column("ship", width=250, stretch=False, anchor="w")
-        self.reports_tree_tab.column("system", width=230, stretch=False, anchor="w")
-        self.reports_tree_tab.column("body", width=125, stretch=False, anchor="w")
-        self.reports_tree_tab.column("tons", width=80, stretch=False, anchor="center")
-        self.reports_tree_tab.column("tph", width=60, stretch=False, anchor="center")
-        self.reports_tree_tab.column("tons_per", width=85, stretch=False, anchor="center")
-        self.reports_tree_tab.column("materials", width=80, stretch=False, anchor="center")
-        self.reports_tree_tab.column("total_hits", width=80, stretch=False, anchor="center")
-        self.reports_tree_tab.column("asteroids", width=80, stretch=False, anchor="center")
-        self.reports_tree_tab.column("hit_rate", width=90, stretch=False, anchor="center")
-        self.reports_tree_tab.column("quality", width=120, stretch=False, anchor="center")
-        self.reports_tree_tab.column("cargo", width=350, stretch=True, anchor="w")
-        self.reports_tree_tab.column("prospects", width=70, stretch=False, anchor="center")
-        self.reports_tree_tab.column("eng_materials", width=250, stretch=False, anchor="w")
-        self.reports_tree_tab.column("comment", width=80, stretch=False, anchor="center")  # Wider to show header text
-        self.reports_tree_tab.column("enhanced", width=100, stretch=False, anchor="center")
+        self.reports_tree_tab.column("date", width=161, minwidth=80, stretch=False, anchor="w")
+        self.reports_tree_tab.column("duration", width=80, minwidth=50, stretch=False, anchor="w")
+        self.reports_tree_tab.column("session_type", width=90, minwidth=50, stretch=False, anchor="w")
+        self.reports_tree_tab.column("ship", width=250, minwidth=80, stretch=False, anchor="w")
+        self.reports_tree_tab.column("system", width=230, minwidth=80, stretch=False, anchor="w")
+        self.reports_tree_tab.column("body", width=125, minwidth=60, stretch=False, anchor="w")
+        self.reports_tree_tab.column("tons", width=80, minwidth=50, stretch=False, anchor="center")
+        self.reports_tree_tab.column("tph", width=60, minwidth=40, stretch=False, anchor="center")
+        self.reports_tree_tab.column("tons_per", width=85, minwidth=50, stretch=False, anchor="center")
+        self.reports_tree_tab.column("materials", width=80, minwidth=50, stretch=False, anchor="center")
+        self.reports_tree_tab.column("total_hits", width=80, minwidth=50, stretch=False, anchor="center")
+        self.reports_tree_tab.column("asteroids", width=80, minwidth=50, stretch=False, anchor="center")
+        self.reports_tree_tab.column("hit_rate", width=90, minwidth=50, stretch=False, anchor="center")
+        self.reports_tree_tab.column("quality", width=120, minwidth=60, stretch=False, anchor="center")
+        self.reports_tree_tab.column("cargo", width=350, minwidth=100, stretch=True, anchor="w")
+        self.reports_tree_tab.column("prospects", width=70, minwidth=40, stretch=False, anchor="center")
+        self.reports_tree_tab.column("eng_materials", width=250, minwidth=80, stretch=False, anchor="w")
+        self.reports_tree_tab.column("comment", width=80, minwidth=50, stretch=False, anchor="center")  # Wider to show header text
+        self.reports_tree_tab.column("enhanced", width=100, minwidth=60, stretch=False, anchor="center")
 
         # Setup column visibility for reports tab
         self.setup_column_visibility(
@@ -7685,7 +7685,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 print("[DEBUG] ButtonRelease-1 triggered on Reports Tab, attempting to save column widths...")
                 from config import save_mining_analysis_column_widths
                 widths = {}
-                for col in ["date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"]:
+                for col in ["date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"]:
                     try:
                         widths[col] = self.reports_tree_tab.column(col, "width")
                     except:

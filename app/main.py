@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.0.3"
+APP_VERSION = "v5.0.4"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -6778,7 +6778,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         credits = [
             "EliteVA by Somfic",
             "Ardent API by Iain Collins",
-            "EDData API by gOOvER | CMDR Shyvin",
             "EDCD/EDDN Community",
         ]
         
@@ -12450,65 +12449,46 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             self.edsm_status_label.config(text="🔴 EDSM: Offline", fg="#ff4444")
     
-    def _check_eddata_status(self):
-        """Check EDDATA API status in background and update indicator"""
+    def _check_market_api_status(self):
+        """Check market API status in background and update indicator"""
         def _background_check():
             import requests
             try:
-                # Test primary EDDATA API first
-                primary_url = "https://api.eddata.dev/v2/system/name/Sol/commodity/name/platinum/nearby/imports?minVolume=1&maxDaysAgo=2&maxDistance=50"
+                # Test Ardent API
+                ardent_url = "https://api.ardent-insight.com/v2/system/name/Sol/commodity/name/platinum/nearby/imports?minVolume=1&maxDaysAgo=2&maxDistance=50"
                 try:
-                    response = requests.get(primary_url, timeout=5)
-                    print(f"[EDDATA] primary status code: {response.status_code}")
+                    response = requests.get(ardent_url, timeout=5)
+                    print(f"[MARKET API] Ardent status code: {response.status_code}")
                     if response.status_code == 200:
-                        self.after(0, lambda: self._update_eddata_status("online"))
+                        self.after(0, lambda: self._update_market_api_status("online"))
                         return
                 except Exception as e:
-                    print(f"[EDDATA] primary exception: {e}")
-                    pass  # Try fallback
+                    print(f"[MARKET API] Ardent exception: {e}")
                 
-                # If primary fails, test fallback Ardent API
-                fallback_url = "https://api.ardent-insight.com/v2/system/name/Sol/commodity/name/platinum/nearby/imports?minVolume=1&maxDaysAgo=2&maxDistance=50"
-                try:
-                    response = requests.get(fallback_url, timeout=5)
-                    if response.status_code == 200:
-                        # Fallback is working (yellow = using fallback)
-                        self.after(0, lambda: self._update_eddata_status("error"))
-                        return
-                except:
-                    pass
-                
-                # Both failed = offline
-                self.after(0, lambda: self._update_eddata_status("offline"))
+                # Ardent failed = offline
+                self.after(0, lambda: self._update_market_api_status("offline"))
                 
             except Exception:
-                self.after(0, lambda: self._update_eddata_status("offline"))
+                self.after(0, lambda: self._update_market_api_status("offline"))
         
         threading.Thread(target=_background_check, daemon=True).start()
     
-    def _update_eddata_status(self, status: str):
-        """Update EDDATA status labels - called on UI thread"""
-        status_text = ""
-        status_color = ""
-        
+    def _update_market_api_status(self, status: str):
+        """Update market API status labels - called on UI thread"""
         if status == "online":
-            status_text = "🟢 Market API: Full (EDDN + EDData + Spansh)"
-            trade_text  = "🟢 Market API: Full (EDData + Spansh)"
+            status_text = "🟢 Market API: Full (EDDN + Ardent + Spansh)"
+            trade_text  = "🟢 Market API: Full (Ardent + Spansh)"
             status_color = "#00ff00"
-        elif status == "error":
-            status_text = "🟡 Market API: Partial (EDDN + Ardent + Spansh)"
-            trade_text  = "🟡 Market API: Partial (Ardent + Spansh)"
-            status_color = "#ffaa00"
         else:
             status_text = "🔴 Market API: Limited (EDDN only)"
             trade_text  = "🔴 Market API: Limited (EDDN only)"
             status_color = "#ff4444"
         
         # Update both commodity tab status labels
-        if hasattr(self, 'eddata_mining_status_label'):
-            self.eddata_mining_status_label.config(text=status_text, fg=status_color)
-        if hasattr(self, 'eddata_trade_status_label'):
-            self.eddata_trade_status_label.config(text=trade_text, fg=status_color)
+        if hasattr(self, 'market_mining_status_label'):
+            self.market_mining_status_label.config(text=status_text, fg=status_color)
+        if hasattr(self, 'market_trade_status_label'):
+            self.market_trade_status_label.config(text=trade_text, fg=status_color)
     
     # ==================== END DISTANCE CALCULATOR ====================
 
@@ -14626,7 +14606,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Frame(main_frame, height=1, bg="#444444", width=350).pack(pady=8)
         
         # Credits (compact)
-        credits_text = "Credits: EliteVA (Somfic) • Ardent API (Iain Collins) • EDData API (gOOvER | CMDR Shyvin) • EDCD/EDDN"
+        credits_text = "Credits: EliteVA (Somfic) • Ardent API (Iain Collins) • EDCD/EDDN"
         tk.Label(main_frame, text=credits_text, font=("Segoe UI", 8), 
                  fg="#888888", bg=_about_bg, wraplength=380).pack(pady=(0, 10))
         
@@ -16338,14 +16318,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                               font=("Segoe UI", 9, "bold"), cursor="hand2")
         search_btn.pack(side="left")
         
-        # EDDATA API status indicator (pack FIRST on right side to claim far right position)
-        self.eddata_mining_status_label = tk.Label(row3_frame, text="⚫ Market API: checking...", 
+        # Market API status indicator (pack FIRST on right side to claim far right position)
+        self.market_mining_status_label = tk.Label(row3_frame, text="⚫ Market API: checking...", 
                                           font=("Segoe UI", 8), fg="#888888", bg=_mkt_cb_bg)
-        self.eddata_mining_status_label.pack(side="right", padx=(0, 10))
-        ToolTip(self.eddata_mining_status_label, t('tooltips.eddata_status'))
+        self.market_mining_status_label.pack(side="right", padx=(0, 10))
+        ToolTip(self.market_mining_status_label, t('tooltips.market_api_status'))
         
-        # Start EDDATA status check
-        self.after(1000, self._check_eddata_status)
+        # Start market API status check
+        self.after(1000, self._check_market_api_status)
         
         # Max Age with left padding to align under Sort by above
         _max_age_fg = "#ff8c00" if _mkt_cb_theme == "elite_orange" else "#e0e0e0"
@@ -16601,11 +16581,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                               font=("Segoe UI", 9, "bold"), cursor="hand2")
         search_btn.pack(side="left")
         
-        # EDDATA API status indicator (pack FIRST on right side to claim far right position)
-        self.eddata_trade_status_label = tk.Label(row3_frame, text="⚫ Market API: checking...", 
+        # Market API status indicator (pack FIRST on right side to claim far right position)
+        self.market_trade_status_label = tk.Label(row3_frame, text="⚫ Market API: checking...", 
                                           font=("Segoe UI", 8), fg="#888888", bg=_trade_cb_bg)
-        self.eddata_trade_status_label.pack(side="right", padx=(0, 10))
-        ToolTip(self.eddata_trade_status_label, t('tooltips.eddata_trade_status'))
+        self.market_trade_status_label.pack(side="right", padx=(0, 10))
+        ToolTip(self.market_trade_status_label, t('tooltips.market_api_trade_status'))
         
         # Max Age
         _max_age_fg = "#ff8c00" if _trade_cb_theme == "elite_orange" else "#e0e0e0"
@@ -19295,7 +19275,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 elif api_type == 'MegaShip':
                     station_type = 'MegaShip'
                 elif api_type == 'Unknown':
-                    # Station lacks metadata in EDData API - show as Unknown
+                    # Station lacks metadata in API - show as Unknown
                     station_type = 'Unknown'
                 else:
                     station_type = api_type  # Fallback to original name

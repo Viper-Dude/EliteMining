@@ -32,12 +32,21 @@ class ColumnVisibilityMixin:
         if not hasattr(self, '_cv_trees'):
             self._cv_trees = {}
         
+        # Capture original stretch values before any visibility changes
+        original_stretch = {}
+        for col in columns:
+            try:
+                original_stretch[col] = tree.column(col, 'stretch')
+            except Exception:
+                original_stretch[col] = False
+        
         self._cv_trees[config_key] = {
             'tree': tree,
             'columns': columns,
             'default_widths': default_widths,
             'visible': {col: True for col in columns},
-            'saved_widths': {}  # Store actual widths before hiding
+            'saved_widths': {},  # Store actual widths before hiding
+            'original_stretch': original_stretch,  # Store original stretch per column
         }
         
         # Bind right-click with config_key context
@@ -147,9 +156,10 @@ class ColumnVisibilityMixin:
         visible[column] = not is_visible
         
         if visible[column]:
-            # Show column - restore saved width or default
+            # Show column - restore saved width or default, and original stretch
             width_to_restore = saved_widths.get(column, default_widths[column])
-            tree.column(column, width=width_to_restore, minwidth=50)
+            orig_stretch = tree_data.get('original_stretch', {}).get(column, False)
+            tree.column(column, width=width_to_restore, minwidth=50, stretch=orig_stretch)
         else:
             # Hide column - save current width first, then set to 0
             current_width = tree.column(column, "width")
@@ -174,8 +184,9 @@ class ColumnVisibilityMixin:
             visible[col] = True
             current_width = tree.column(col, "width")
             if current_width == 0:
-                # Column was hidden, restore default width
-                tree.column(col, width=default_widths[col], minwidth=50)
+                # Column was hidden, restore default width and original stretch
+                orig_stretch = tree_data.get('original_stretch', {}).get(col, False)
+                tree.column(col, width=default_widths[col], minwidth=50, stretch=orig_stretch)
         
         self._cv_save_visibility(config_key)
     

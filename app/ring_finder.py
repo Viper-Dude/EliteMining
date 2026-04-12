@@ -4773,18 +4773,15 @@ class RingFinder(ColumnVisibilityMixin):
         """Update results treeview with hotspot data"""
         # Store results in cache for future use (e.g., refresh after save to database)
         self._search_cache = hotspots
-        
+
+        # Bulk-prefetch visit counts for unvisited filter (avoids per-row DB connections)
+        _all_systems_early = list({h.get('systemName', h.get('system', '')) for h in hotspots if h.get('systemName', h.get('system', ''))})
+        _early_visit_counts = self.user_db.bulk_get_visit_counts(_all_systems_early) if _all_systems_early else {}
+
         # Filter for unvisited systems if checkbox is enabled
         if self.unvisited_only_var.get():
-            filtered_hotspots = []
-            for hotspot in hotspots:
-                system_name = hotspot.get("systemName", hotspot.get("system", ""))
-                if system_name:
-                    visit_data = self.user_db.is_system_visited(system_name)
-                    visit_count = visit_data.get('visit_count', 0) if visit_data else 0
-                    if visit_count == 0:
-                        filtered_hotspots.append(hotspot)
-            hotspots = filtered_hotspots
+            hotspots = [h for h in hotspots
+                        if _early_visit_counts.get(h.get('systemName', h.get('system', '')), 0) == 0]
             print(f"[FILTER] Unvisited Only: {len(hotspots)} systems with 0 visits")
         
         # Filter by Reserve level if not "All"
@@ -4867,7 +4864,28 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Force UI refresh
         self.results_tree.update()
-        
+
+        # --- Bulk-prefetch DB data to avoid per-row DB connections ---
+        all_system_names = list({h.get('system', h.get('systemName', '')) for h in hotspots if h.get('system', h.get('systemName', ''))})
+        _visit_counts = self.user_db.bulk_get_visit_counts(all_system_names) if all_system_names else {}
+        # Merge with early prefetch (may have already been fetched above)
+        _visit_counts.update(_early_visit_counts)
+
+        # Collect (system, body) pairs for Spansh entries to check local DB existence
+        spansh_pairs = []
+        for h in hotspots:
+            ds = h.get('data_source', '')
+            if 'Spansh' in ds or 'spansh' in ds.lower():
+                sys_n = h.get('system', h.get('systemName', ''))
+                ring_n = h.get('ring', h.get('bodyName', ''))
+                db_body = ring_n
+                if db_body.lower().startswith(sys_n.lower()):
+                    db_body = db_body[len(sys_n):].strip()
+                    if db_body and db_body[0] in ['-', ' ']:
+                        db_body = db_body[1:].strip()
+                spansh_pairs.append((sys_n, db_body))
+        _rings_in_db = self.user_db.bulk_check_rings_exist(spansh_pairs) if spansh_pairs else set()
+
         # Sort: green entries first, then other top entries, then rest by distance
         try:
             hotspots.sort(key=lambda x: (
@@ -4961,9 +4979,8 @@ class RingFinder(ColumnVisibilityMixin):
                 # Pure EDSM ring composition data - show "-"
                 hotspot_count_display = "-"
             
-            # Get visit count for this system
-            visit_data = self.user_db.is_system_visited(system_name)
-            visit_count = visit_data.get('visit_count', 0) if visit_data else 0
+            # Get visit count for this system (from prefetched bulk data)
+            visit_count = _visit_counts.get(system_name, 0)
             visited_status = str(visit_count)
             
             # Format reserve level for display
@@ -5035,22 +5052,16 @@ class RingFinder(ColumnVisibilityMixin):
             # Get source for this hotspot
             source_display = hotspot.get('data_source', 'Local')
             if 'Spansh' in source_display:
-                # Check if also exists in local database
+                # Check if also exists in local database (using prefetched bulk data)
                 db_body_name = ring_name
                 if db_body_name.lower().startswith(system_name.lower()):
                     db_body_name = db_body_name[len(system_name):].strip()
                     if db_body_name and db_body_name[0] in ['-', ' ']:
                         db_body_name = db_body_name[1:].strip()
-                
-                # Check if any material from this ring exists in local DB
-                in_local_db = False
-                try:
-                    if hasattr(self, 'user_db') and self.user_db:
-                        # Check if system+body exists in local database
-                        in_local_db = self.user_db.check_ring_exists(system_name, db_body_name)
-                except Exception:
-                    pass
-                
+
+                normalized_db_body = self.user_db._normalize_body_name(db_body_name, system_name) if hasattr(self.user_db, '_normalize_body_name') else db_body_name
+                in_local_db = (system_name, normalized_db_body) in _rings_in_db
+
                 if in_local_db:
                     source_display = "🌐🗄️"  # Both Spansh and Local
                 else:

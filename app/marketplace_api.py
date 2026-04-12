@@ -1,7 +1,7 @@
 """
-Marketplace API for commodity price lookups using EDData + Ardent Insight + Spansh APIs.
+Marketplace API for commodity price lookups using Ardent Insight + Spansh APIs.
 
-All three APIs are queried in parallel. Results are merged by marketId, keeping the
+All sources are queried in parallel. Results are merged by marketId, keeping the
 record with the newer updatedAt timestamp so the freshest price always wins.
 """
 import requests
@@ -13,21 +13,20 @@ _system_coords_cache: Dict[str, object] = {}  # module-level coord cache
 
 
 class MarketplaceAPI:
-    """Dual-API market data: EDData + Ardent Insight + Spansh + EDDN cache, merged by freshness."""
+    """Market data: Ardent Insight + Spansh + EDDN cache, merged by freshness."""
 
-    EDDATA_URL  = "https://api.eddata.dev/v2"
     ARDENT_URL  = "https://api.ardent-insight.com/v2"
     SPANSH_URL  = "https://spansh.co.uk"
 
     # Set by main.py on boot when EDDN listener is started
     EDDN_CACHE_PATH = None
 
-    # Keep BASE_URL for any legacy callers; _fetch_both() ignores it
-    PRIMARY_URL  = EDDATA_URL
+    # Keep BASE_URL for any legacy callers
+    PRIMARY_URL  = ARDENT_URL
     FALLBACK_URL = ARDENT_URL
     BASE_URL     = PRIMARY_URL
 
-    # Map normalized EDData commodity names -> Spansh display names
+    # Map normalized commodity names -> Spansh display names
     SPANSH_COMMODITY_MAP = {
         "opal":                   "Void Opal",
         "lowtemperaturediamond":  "Low Temperature Diamond",
@@ -48,7 +47,7 @@ class MarketplaceAPI:
         "palladium":              "Palladium",
     }
 
-    # Map EliteMining commodity names to EDData API names
+    # Map EliteMining commodity names to API names
     COMMODITY_NAME_MAP = {
         # Void Opals -> opal
         "void opals": "opal",
@@ -88,7 +87,7 @@ class MarketplaceAPI:
         """
         Fetch commodity data from Spansh (POST API) using parallel pagination
         (3 pages x 100) sorted by most recent market update.  Returns rows
-        normalized to the same format as EDData / Ardent.
+        normalized to the same format as Ardent.
 
         For galaxy-wide (max_distance=0) all results are kept.
         For distance-limited searches, results are filtered by distance field.
@@ -131,7 +130,7 @@ class MarketplaceAPI:
 
             cutoff = datetime.now(timezone.utc) - timedelta(days=max_days_ago + 0.5)
 
-            # Spansh type -> EDData-compatible stationType mapping
+            # Spansh type -> EDDN-compatible stationType mapping
             _type_map = {
                 "Fleet Carrier":       "FleetCarrier",
                 "Stronghold Carrier":  "StrongholdCarrier",
@@ -161,10 +160,10 @@ class MarketplaceAPI:
                     continue
 
                 spansh_type = station.get("type") or ""
-                eddata_type = _type_map.get(spansh_type, spansh_type)
+                mapped_type = _type_map.get(spansh_type, spansh_type)
 
                 # Skip carriers — handled separately by _fetch_spansh_carriers
-                if eddata_type == "FleetCarrier" or spansh_type == "Drake-Class Carrier":
+                if mapped_type == "FleetCarrier" or spansh_type == "Drake-Class Carrier":
                     continue
 
                 updated_raw = station.get("market_updated_at") or ""
@@ -195,7 +194,7 @@ class MarketplaceAPI:
                 else:
                     pad_size = 0
 
-                # Spansh uses same field conventions as EDData/EDDN:
+                # Spansh uses same field conventions as EDDN:
                 # sell_price = what station pays you, buy_price = what you pay
                 # supply/stock = station has for sale, demand = station wants to buy
                 sell_p = entry.get("sell_price", 0)
@@ -208,7 +207,7 @@ class MarketplaceAPI:
                     "updatedAt":         updated_raw,
                     "systemName":        station.get("system_name"),
                     "stationName":       station.get("name"),
-                    "stationType":       eddata_type,
+                    "stationType":       mapped_type,
                     "maxLandingPadSize": pad_size,
                     "distance":          dist,
                     "distanceToArrival": station.get("distance_to_arrival") or 0,
@@ -324,7 +323,7 @@ class MarketplaceAPI:
                 if not entry:
                     continue
 
-                # Spansh uses same field conventions as EDData/EDDN.
+                # Spansh uses same field conventions as EDDN.
                 # Pass through all fields — UI filters by mode.
                 sell_p = entry.get("sell_price", 0)
                 buy_p  = entry.get("buy_price", 0)
@@ -402,7 +401,7 @@ class MarketplaceAPI:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
-                # Query by commodity name — match EDData normalized OR Spansh display name
+                # Query by commodity name — match Spansh display name
                 cursor.execute('''
                     SELECT system_name, system_x, system_y, system_z,
                            station_name, station_type, commodity_name,
@@ -472,7 +471,7 @@ class MarketplaceAPI:
                 dem    = row["demand"] or 0
                 stk    = row["stock"] or 0
 
-                # Normalize station type for EDData compatibility
+                # Normalize station type for EDDN compatibility
                 _type_map = {
                     "FleetCarrier": "FleetCarrier",
                     "Coriolis": "Coriolis",
@@ -484,14 +483,14 @@ class MarketplaceAPI:
                     "CraterPort": "CraterPort",
                 }
                 if is_carrier:
-                    eddata_type = "FleetCarrier"
+                    mapped_type = "FleetCarrier"
                 else:
-                    eddata_type = _type_map.get(stype, stype)
+                    mapped_type = _type_map.get(stype, stype)
 
                 # Determine pad size
-                if is_carrier or eddata_type in ("Coriolis", "Orbis", "Ocellus", "Dodec"):
+                if is_carrier or mapped_type in ("Coriolis", "Orbis", "Ocellus", "Dodec"):
                     pad_size = 3
-                elif "Outpost" in eddata_type:
+                elif "Outpost" in mapped_type:
                     pad_size = 2
                 else:
                     pad_size = 1
@@ -501,7 +500,7 @@ class MarketplaceAPI:
                     "updatedAt":         row["updated_at"] or "",
                     "systemName":        row["system_name"],
                     "stationName":       row["station_name"],
-                    "stationType":       eddata_type,
+                    "stationType":       mapped_type,
                     "maxLandingPadSize": pad_size,
                     "distance":          dist,
                     "distanceToArrival": row["distance_to_arrival"] or 0,
@@ -651,10 +650,10 @@ class MarketplaceAPI:
                     continue
 
                 spansh_type = station.get("type") or ""
-                eddata_type = _type_map.get(spansh_type, spansh_type)
+                mapped_type = _type_map.get(spansh_type, spansh_type)
 
                 # Skip carriers — handled separately by _fetch_spansh_carriers
-                if eddata_type == "FleetCarrier" or spansh_type == "Drake-Class Carrier":
+                if mapped_type == "FleetCarrier" or spansh_type == "Drake-Class Carrier":
                     continue
 
                 updated_raw = station.get("market_updated_at") or ""
@@ -684,7 +683,7 @@ class MarketplaceAPI:
                 else:
                     pad_size = 0
 
-                # Spansh uses same field conventions as EDData/EDDN:
+                # Spansh uses same field conventions as EDDN:
                 # sell_price = what station pays you, buy_price = what you pay
                 # supply/stock = station has for sale, demand = station wants to buy
                 sell_p = entry.get("sell_price", 0)
@@ -697,7 +696,7 @@ class MarketplaceAPI:
                     "updatedAt":         updated_raw,
                     "systemName":        station.get("system_name"),
                     "stationName":       station.get("name"),
-                    "stationType":       eddata_type,
+                    "stationType":       mapped_type,
                     "maxLandingPadSize": pad_size,
                     "distance":          dist,
                     "distanceToArrival": station.get("distance_to_arrival") or 0,
@@ -727,36 +726,26 @@ class MarketplaceAPI:
         return response
 
     @staticmethod
-    def _fetch_both(path: str, params: dict, timeout: int = 10) -> List[Dict]:
+    def _fetch_ardent(path: str, params: dict, timeout: int = 10) -> List[Dict]:
         """
-        Fetch *path* from both EDData and Ardent in parallel, return the raw
-        combined list.  Each item keeps its source URL so _merge_by_freshness
-        can log it if needed.  If one API fails, the other's results are still
-        returned.
+        Fetch *path* from Ardent API.
         """
-        def _get(base: str) -> List[Dict]:
-            try:
-                url = f"{base}{path}"
-                r = requests.get(url, params=params, timeout=timeout)
-                r.raise_for_status()
-                data = r.json()
-                if isinstance(data, list):
-                    return data
-                if isinstance(data, dict) and "results" in data:
-                    return data["results"]
-                return []
-            except Exception as e:
-                print(f"[DUAL-API] {base} failed: {e}")
-                return []
-
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            fut_eddata  = pool.submit(_get, MarketplaceAPI.EDDATA_URL)
-            fut_ardent  = pool.submit(_get, MarketplaceAPI.ARDENT_URL)
-            eddata_rows = fut_eddata.result()
-            ardent_rows = fut_ardent.result()
-
-        print(f"[DUAL-API] EDData={len(eddata_rows)}  Ardent={len(ardent_rows)}")
-        return eddata_rows + ardent_rows
+        try:
+            url = f"{MarketplaceAPI.ARDENT_URL}{path}"
+            r = requests.get(url, params=params, timeout=timeout)
+            r.raise_for_status()
+            data = r.json()
+            if isinstance(data, list):
+                rows = data
+            elif isinstance(data, dict) and "results" in data:
+                rows = data["results"]
+            else:
+                rows = []
+            print(f"[ARDENT] {len(rows)} results")
+            return rows
+        except Exception as e:
+            print(f"[ARDENT] {MarketplaceAPI.ARDENT_URL} failed: {e}")
+            return []
 
     @staticmethod
     def _merge_by_freshness(rows: List[Dict]) -> List[Dict]:
@@ -846,9 +835,9 @@ class MarketplaceAPI:
 
             print(f"[BUYERS] nearby path: {nearby_path} params: {nearby_params}")
 
-            # Run EDData+Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
+            # Run Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(MarketplaceAPI._fetch_both, nearby_path, nearby_params)
+                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh_nearby,
                     commodity_normalized, reference_system, "buying_commodities",
@@ -875,7 +864,7 @@ class MarketplaceAPI:
             local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
 
             print(f"[BUYERS] local path: {local_path}")
-            local_rows_raw = MarketplaceAPI._fetch_both(local_path, local_params)
+            local_rows_raw = MarketplaceAPI._fetch_ardent(local_path, local_params)
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
             for r in local_rows:
                 r["distance"] = 0
@@ -885,10 +874,10 @@ class MarketplaceAPI:
             return results
             
         except requests.exceptions.RequestException as e:
-            print(f"[EDDATA API] Request error: {e}")
+            print(f"[MARKET API] Request error: {e}")
             return []
         except Exception as e:
-            print(f"[EDDATA API] Unexpected error: {e}")
+            print(f"[MARKET API] Unexpected error: {e}")
             return []
     
     @staticmethod
@@ -927,9 +916,9 @@ class MarketplaceAPI:
 
             print(f"[SELLERS] nearby path: {nearby_path} params: {nearby_params}")
 
-            # Run EDData+Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
+            # Run Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(MarketplaceAPI._fetch_both, nearby_path, nearby_params)
+                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh_nearby,
                     commodity_normalized, reference_system, "selling_commodities",
@@ -956,7 +945,7 @@ class MarketplaceAPI:
             local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
 
             print(f"[SELLERS] local path: {local_path}")
-            local_rows_raw = MarketplaceAPI._fetch_both(local_path, local_params)
+            local_rows_raw = MarketplaceAPI._fetch_ardent(local_path, local_params)
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
             for r in local_rows:
                 r["distance"] = 0
@@ -969,10 +958,10 @@ class MarketplaceAPI:
             return results
             
         except requests.exceptions.RequestException as e:
-            print(f"[EDDATA API SELLERS] Request error: {e}")
+            print(f"[MARKET API SELLERS] Request error: {e}")
             return []
         except Exception as e:
-            print(f"[EDDATA API SELLERS] Unexpected error: {e}")
+            print(f"[MARKET API SELLERS] Unexpected error: {e}")
             return []
     
     @staticmethod
@@ -1001,7 +990,7 @@ class MarketplaceAPI:
             print(f"[GALAXY BUYERS] path: {path} params: {params}")
 
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(MarketplaceAPI._fetch_both, path, params)
+                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, path, params)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh,
                     commodity_normalized, "Sol", "buying_commodities",
@@ -1027,10 +1016,10 @@ class MarketplaceAPI:
             return results
 
         except requests.exceptions.RequestException as e:
-            print(f"[EDDATA API GALAXY] Request error: {e}")
+            print(f"[MARKET API GALAXY] Request error: {e}")
             return []
         except Exception as e:
-            print(f"[EDDATA API GALAXY] Unexpected error: {e}")
+            print(f"[MARKET API GALAXY] Unexpected error: {e}")
             return []
     
     @staticmethod
@@ -1058,7 +1047,7 @@ class MarketplaceAPI:
             print(f"[GALAXY SELLERS] path: {path} params: {params}")
 
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(MarketplaceAPI._fetch_both, path, params)
+                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, path, params)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh,
                     commodity_normalized, "Sol", "selling_commodities",
@@ -1084,10 +1073,10 @@ class MarketplaceAPI:
             return results
 
         except requests.exceptions.RequestException as e:
-            print(f"[EDDATA API GALAXY SELLERS] Request error: {e}")
+            print(f"[MARKET API GALAXY SELLERS] Request error: {e}")
             return []
         except Exception as e:
-            print(f"[EDDATA API GALAXY SELLERS] Unexpected error: {e}")
+            print(f"[MARKET API GALAXY SELLERS] Unexpected error: {e}")
             return []
     
     @staticmethod

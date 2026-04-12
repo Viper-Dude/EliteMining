@@ -1112,8 +1112,8 @@
     "use_fc": "Fill with your Fleet Carrier location",
     "calculate_distance": "Calculate distances between systems (or press Enter)",
     "edsm_status": "EDSM API status indicator\n🟢 Online: API responding normally\n🟡 Slow: API responding with errors\n🔴 Offline: API not responding",
-    "eddata_status": "Market Data Sources API (by priority)\n\n📡 EDDN — Real-time prices from players (freshest)\n🟢 EDData — Primary\n🟡 Ardent — Fallback (when EDData is down)\n🌐 Spansh — Secondary\n\nEDDN prices are cached locally on your disk\nand auto-cleaned after 8 hours.\n\nAll sources queried in parallel.\nResults merged — freshest price wins.",
-    "eddata_trade_status": "Market Data Sources API (by priority)\n\n🟢 EDData — Primary\n🟡 Ardent — Fallback (when EDData is down)\n🌐 Spansh — Secondary\n\nAll sources queried in parallel.\nResults merged — freshest price wins.",
+    "market_api_status": "Market Data Sources\n\n🟢 Full  — EDDN + Ardent + Spansh (all online)\n🔴 Limited — EDDN only (history APIs offline)\n\nEDDN: Real-time prices from players (freshest)\nArdent: Price history\nSpansh: Ring & system data\n\nAll available sources are queried in parallel.\nFreshest price always wins.",
+    "market_api_trade_status": "Market Data Sources\n\n🟢 Full  — Ardent + Spansh (all online)\n🔴 Limited — history APIs offline\n\nArdent: Price history\nSpansh: Station data\n\nAll available sources are queried in parallel.\nFreshest price always wins.",
     
     "change_language": "Click to change language",
     "about": "Click for app info, links, and credits",

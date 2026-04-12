@@ -1399,8 +1399,56 @@ class UserDatabase:
         except Exception as e:
             log.error(f"Error checking ring existence: {e}")
             return False
-    
-    def check_hotspot_exists(self, system_name: str, body_name: str, material_name: str) -> bool:
+
+    def bulk_check_rings_exist(self, system_body_pairs: list) -> set:
+        """Batch check which (system_name, body_name) pairs exist in hotspot_data.
+        Returns a set of (system_name, body_name) tuples that exist."""
+        if not system_body_pairs:
+            return set()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                found = set()
+                # SQLite has a limit on parameters; process in chunks of 500 pairs
+                chunk_size = 250
+                for i in range(0, len(system_body_pairs), chunk_size):
+                    chunk = system_body_pairs[i:i + chunk_size]
+                    placeholders = ','.join('(?,?)' for _ in chunk)
+                    params = [v for pair in chunk for v in (pair[0], self._normalize_body_name(pair[1], pair[0]))]
+                    cursor.execute(
+                        f"SELECT system_name, body_name FROM hotspot_data WHERE (system_name, body_name) IN ({placeholders})",
+                        params
+                    )
+                    for row in cursor.fetchall():
+                        found.add((row[0], row[1]))
+                return found
+        except Exception as e:
+            log.error(f"Error bulk checking ring existence: {e}")
+            return set()
+
+    def bulk_get_visit_counts(self, system_names: list) -> dict:
+        """Batch fetch visit counts for a list of system names.
+        Returns a dict mapping system_name -> visit_count (0 if not visited)."""
+        if not system_names:
+            return {}
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                result = {name: 0 for name in system_names}
+                chunk_size = 500
+                for i in range(0, len(system_names), chunk_size):
+                    chunk = system_names[i:i + chunk_size]
+                    placeholders = ','.join('?' for _ in chunk)
+                    cursor.execute(
+                        f"SELECT system_name, visit_count FROM visited_systems WHERE system_name IN ({placeholders})",
+                        chunk
+                    )
+                    for row in cursor.fetchall():
+                        result[row[0]] = row[1]
+                return result
+        except Exception as e:
+            log.error(f"Error bulk fetching visit counts: {e}")
+            return {name: 0 for name in system_names}
         """Check if a hotspot entry already exists in the database
         
         Args:
