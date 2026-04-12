@@ -6,6 +6,7 @@ Reads Market.json from Elite Dangerous and sends commodity data to EDDN
 import json
 import os
 import logging
+import threading
 from typing import Dict, List, Optional
 
 log = logging.getLogger('EliteMining.MarketHandler')
@@ -49,7 +50,7 @@ class MarketHandler:
             self.current_station = event.get('StationName')
             self.current_system = event.get('StarSystem')
         
-    def process_market_file(self, market_file_path: str):
+    def process_market_file(self, market_file_path: str, _retries: int = 0):
         """
         Process Market.json file and send to EDDN
         
@@ -57,6 +58,20 @@ class MarketHandler:
             market_file_path: Path to Market.json
         """
         try:
+            # Elite writes Market.json by truncating then writing — watchdog fires on the
+            # truncation (empty file) before the write completes.  If the file is empty or
+            # invalid, schedule a retry so we don't miss the completed write.
+            if os.path.getsize(market_file_path) == 0:
+                if _retries < 5:
+                    threading.Timer(0.5, self.process_market_file,
+                                    args=[market_file_path, _retries + 1]).start()
+                return
+
+            # Skip if file hasn't actually changed
+            file_mtime = os.path.getmtime(market_file_path)
+            if file_mtime == self.last_market_mtime:
+                return
+
             # Read Market.json
             with open(market_file_path, 'r', encoding='utf-8') as f:
                 market_data = json.load(f)
@@ -71,11 +86,7 @@ class MarketHandler:
                 log.warning("Market.json missing required fields")
                 return
             
-            # Skip if file hasn't actually changed (avoid duplicate sends from rapid watcher triggers)
-            file_mtime = os.path.getmtime(market_file_path)
-            if file_mtime == self.last_market_mtime:
-                return
-            
+            # Record mtime only after a successful parse so a partial/empty write doesn't poison it
             self.last_market_mtime = file_mtime
             
             # Convert Elite's format to EDDN format
@@ -103,10 +114,11 @@ class MarketHandler:
                     log.warning(f"❌ Failed to send market data for {station_name}")
             
         except FileNotFoundError:
-            # Market.json doesn't exist yet (player hasn't docked)
             pass
         except json.JSONDecodeError as e:
-            log.error(f"Failed to parse Market.json: {e}")
+            if _retries < 5:
+                threading.Timer(0.5, self.process_market_file,
+                                args=[market_file_path, _retries + 1]).start()
         except Exception as e:
             log.error(f"Error processing Market.json: {e}")
     

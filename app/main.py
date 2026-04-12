@@ -12459,10 +12459,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 primary_url = "https://api.eddata.dev/v2/system/name/Sol/commodity/name/platinum/nearby/imports?minVolume=1&maxDaysAgo=2&maxDistance=50"
                 try:
                     response = requests.get(primary_url, timeout=5)
+                    print(f"[EDDATA] primary status code: {response.status_code}")
                     if response.status_code == 200:
                         self.after(0, lambda: self._update_eddata_status("online"))
                         return
-                except:
+                except Exception as e:
+                    print(f"[EDDATA] primary exception: {e}")
                     pass  # Try fallback
                 
                 # If primary fails, test fallback Ardent API
@@ -12490,16 +12492,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         status_color = ""
         
         if status == "online":
-            status_text = "🟢 Market API: Online (EDDN + EDData + Spansh)"
-            trade_text  = "🟢 Market API: Online (EDData + Spansh)"
+            status_text = "🟢 Market API: Full (EDDN + EDData + Spansh)"
+            trade_text  = "🟢 Market API: Full (EDData + Spansh)"
             status_color = "#00ff00"
         elif status == "error":
-            status_text = "🟡 Market API: Online (EDDN + Ardent + Spansh)"
-            trade_text  = "🟡 Market API: Online (Ardent + Spansh)"
+            status_text = "🟡 Market API: Partial (EDDN + Ardent + Spansh)"
+            trade_text  = "🟡 Market API: Partial (Ardent + Spansh)"
             status_color = "#ffaa00"
         else:
-            status_text = "🔴 Market API: Offline (EDDN only)"
-            trade_text  = "🔴 Market API: Offline"
+            status_text = "🔴 Market API: Limited (EDDN only)"
+            trade_text  = "🔴 Market API: Limited (EDDN only)"
             status_color = "#ff4444"
         
         # Update both commodity tab status labels
@@ -17328,8 +17330,36 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if not systems:
                 self.after(0, self._sysfinder_search_complete, [], None, has_filters)
                 return
-            
-            self.after(0, self._sysfinder_search_complete, systems, None, has_filters)
+
+            # Pre-format rows in background thread to keep main thread work minimal
+            formatted_rows = []
+            for idx, system in enumerate(systems):
+                row_tag = 'oddrow' if idx % 2 == 0 else 'evenrow'
+                pop = system.get('population', 0)
+                if pop >= 1_000_000_000:
+                    pop_str = f"{pop / 1_000_000_000:.1f}B"
+                elif pop >= 1_000_000:
+                    pop_str = f"{pop / 1_000_000:.1f}M"
+                elif pop >= 1000:
+                    pop_str = f"{pop / 1000:.1f}K"
+                elif pop > 0:
+                    pop_str = str(pop)
+                else:
+                    pop_str = "0"
+                economy = system.get('economy', {})
+                eco_str = economy.get('primary') or '-' if isinstance(economy, dict) else (str(economy) if economy else '-')
+                distance = system.get('distance', 0)
+                dist_str = f"{distance:.1f} ly" if distance else "0 ly"
+                state_val = system.get('state', 'Normal')
+                if not state_val or state_val in ('-', 'None'):
+                    state_val = 'Normal'
+                formatted_rows.append((
+                    (system.get('systemName', '-'), dist_str, system.get('security', '-'),
+                     system.get('allegiance', '-'), state_val, pop_str, eco_str),
+                    row_tag
+                ))
+
+            self.after(0, self._sysfinder_search_complete, formatted_rows, None, has_filters)
             
         except Exception as e:
             logging.error(f"[SYSTEM_FINDER] Search error: {e}")
@@ -17363,49 +17393,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             text=t('system_finder.results_count').format(count=len(results))
         )
         
-        # Populate results with alternating row colors
-        for idx, system in enumerate(results):
-            # Determine row tag for alternating colors
-            row_tag = 'oddrow' if idx % 2 == 0 else 'evenrow'
-            
-            # Format population
-            pop = system.get('population', 0)
-            if pop >= 1_000_000_000:
-                pop_str = f"{pop / 1_000_000_000:.1f}B"
-            elif pop >= 1_000_000:
-                pop_str = f"{pop / 1_000_000:.1f}M"
-            elif pop >= 1000:
-                pop_str = f"{pop / 1000:.1f}K"
-            elif pop > 0:
-                pop_str = str(pop)
-            else:
-                pop_str = "0"
-            
-            # Format economy - use "-" for missing data
-            economy = system.get('economy', {})
-            if isinstance(economy, dict):
-                eco_str = economy.get('primary') or '-'
-            else:
-                eco_str = str(economy) if economy else '-'
-            
-            # Format distance
-            distance = system.get('distance', 0)
-            dist_str = f"{distance:.1f} ly" if distance else "0 ly"
-            
-            # Normalize state - show 'Normal' for systems without active state
-            state_val = system.get('state', 'Normal')
-            if not state_val or state_val == '-' or state_val == 'None':
-                state_val = 'Normal'
-            
-            self.sysfinder_tree.insert("", "end", values=(
-                system.get('systemName', '-'),
-                dist_str,
-                system.get('security', '-'),
-                system.get('allegiance', '-'),
-                state_val,
-                pop_str,
-                eco_str
-            ), tags=(row_tag,))
+        # Populate results - rows are pre-formatted tuples (values, tag) from background thread
+        for values, row_tag in results:
+            self.sysfinder_tree.insert("", "end", values=values, tags=(row_tag,))
     
     def _sort_sysfinder_column(self, column: str, numeric: bool):
         """Sort system finder results by column"""
@@ -17584,9 +17574,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.marketplace_tree.xview)
         self.marketplace_tree.configure(xscrollcommand=h_scrollbar.set)
         
-        # Configure row tags for visible borders (alternating with subtle lines)
-        self.marketplace_tree.tag_configure('oddrow', background='#1e1e1e')
-        self.marketplace_tree.tag_configure('evenrow', background='#252525')
+        # Configure row tags for alternating colors (theme-aware, matches Ring Finder)
+        if self.current_theme == "elite_orange":
+            self.marketplace_tree.tag_configure('oddrow', background='#1e1e1e', foreground='#ff8c00')
+            self.marketplace_tree.tag_configure('evenrow', background='#252525', foreground='#ff8c00')
+        else:
+            self.marketplace_tree.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6')
+            self.marketplace_tree.tag_configure('evenrow', background='#282828', foreground='#e6e6e6')
         
         # Grid layout for treeview and scrollbars (like Ring Finder)
         self.marketplace_tree.grid(row=0, column=0, sticky="nsew")
@@ -18450,8 +18444,65 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         else:
                             results = MarketplaceAPI.search_buyers(commodity, reference_system, None, max_days_ago)
                     
-                    # Update UI in main thread with results
-                    self.after(0, lambda: self._process_trade_search_results(results, search_mode, is_buy_mode, max_age_str))
+                    # Do heavy filtering/sorting in background thread (keeps UI responsive)
+                    original_count = len(results)
+
+                    # Filter zero-stock/demand
+                    if is_buy_mode:
+                        results = [r for r in results if r.get('stock', 0) > 0]
+                    else:
+                        results = [r for r in results if r.get('demand', 0) > 0]
+
+                    # Filter carriers
+                    trade_station_type_filter = self._trade_station_type_rev_map.get(self.trade_station_type.get(), self.trade_station_type.get())
+                    if exclude_carriers and trade_station_type_filter != "Fleet Carrier":
+                        results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
+
+                    # Filter station type
+                    if trade_station_type_filter == "Orbital":
+                        orbital_kw = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
+                        surface_kw = ["Crater", "OnFoot", "Planetary", "Surface"]
+                        results = [r for r in results
+                                   if any(k in (r.get('stationType') or '') for k in orbital_kw)
+                                   and not any(k in (r.get('stationType') or '') for k in surface_kw)]
+                    elif trade_station_type_filter == "Surface":
+                        results = [r for r in results if any(k in (r.get('stationType') or '') for k in ["Crater", "OnFoot", "Planetary", "Surface"])]
+                    elif trade_station_type_filter == "Fleet Carrier":
+                        results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '') or "Carrier" in (r.get('stationType') or '')]
+                    elif trade_station_type_filter == "Megaship":
+                        results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
+                    elif trade_station_type_filter == "Stronghold":
+                        results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
+
+                    # Filter landing pad
+                    if self.trade_large_pad_only.get():
+                        results = [r for r in results if r.get('maxLandingPadSize') == 3]
+
+                    # Filter by age
+                    results = self._filter_results_by_age(results, max_age_str)
+
+                    # Sort
+                    if results:
+                        trade_order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
+                        if "Distance" in trade_order_by:
+                            results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+                        elif "Best price" in trade_order_by:
+                            if is_buy_mode:
+                                results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 999999))
+                            else:
+                                results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
+                        elif "supply" in trade_order_by or "demand" in trade_order_by:
+                            results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
+                        elif "Last update" in trade_order_by:
+                            results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
+                        else:
+                            results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+                    else:
+                        results_sorted = []
+
+                    # Send processed results to main thread for UI update only
+                    self.after(0, lambda: self._display_trade_search_results(
+                        results_sorted, search_mode, is_buy_mode, original_count))
                 except Exception as e:
                     log.error(f"Trade search failed: {e}")
                     self.after(0, lambda: self._trade_search_error(str(e)))
@@ -18464,6 +18515,39 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.trade_total_label.config(text=f"Error: {str(e)}")
             self.config(cursor="")
     
+    def _display_trade_search_results(self, results_sorted: list, search_mode: str, is_buy_mode: bool, original_count: int):
+        """Display pre-filtered/sorted trade results on the main thread (UI only)"""
+        self.config(cursor="")
+        if not results_sorted:
+            self._clear_trade_results()
+            if original_count > 0:
+                self.trade_total_label.config(text=t('marketplace.no_match_filters').format(count=original_count))
+            else:
+                self.trade_total_label.config(text=t('marketplace.no_results'))
+            return
+
+        if search_mode == "galaxy_wide":
+            reference_system = self.trade_reference_system.get().strip()
+            if reference_system:
+                self._display_trade_results(results_sorted[:50])
+                self.trade_total_label.config(text=t('marketplace.calculating_distances'))
+                self.config(cursor="watch")
+                self.update_idletasks()
+                import threading
+                def calculate_distances_thread():
+                    try:
+                        top = results_sorted[:50]
+                        top_with_dist = MarketplaceAPI.add_distances_to_results(top, reference_system)
+                        self.after(0, lambda: self._update_trade_with_distances(top_with_dist, len(results_sorted)))
+                    except Exception as e:
+                        print(f"[TRADE] Distance calculation error: {e}")
+                        self.after(0, lambda: self._restore_trade_cursor(len(results_sorted)))
+                threading.Thread(target=calculate_distances_thread, daemon=True).start()
+                return
+
+        self._display_trade_results(results_sorted[:50])
+        self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
+
     def _process_trade_search_results(self, results: list, search_mode: str, is_buy_mode: bool, max_age_str: str):
         """Process and display trade search results (runs on main thread)"""
         try:
@@ -18678,9 +18762,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.trade_tree.xview)
         self.trade_tree.configure(xscrollcommand=h_scrollbar.set)
         
-        # Configure row tags for alternating colors
-        self.trade_tree.tag_configure('oddrow', background='#1e1e1e')
-        self.trade_tree.tag_configure('evenrow', background='#252525')
+        # Configure row tags for alternating colors (theme-aware, matches Ring Finder)
+        if self.current_theme == "elite_orange":
+            self.trade_tree.tag_configure('oddrow', background='#1e1e1e', foreground='#ff8c00')
+            self.trade_tree.tag_configure('evenrow', background='#252525', foreground='#ff8c00')
+        else:
+            self.trade_tree.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6')
+            self.trade_tree.tag_configure('evenrow', background='#282828', foreground='#e6e6e6')
         
         # Grid layout for treeview and scrollbars (like Mining Commodities)
         self.trade_tree.grid(row=0, column=0, sticky="nsew")
@@ -18747,6 +18835,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Determine mode for correct field handling
         is_buy_mode = self.trade_buy_mode.get()
+
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
         
         # Display results
         for result in results:
@@ -18821,7 +18912,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 try:
                     from datetime import datetime, timezone
                     updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
-                    now = datetime.now(timezone.utc)
                     diff = now - updated_time
                     total_minutes = diff.total_seconds() / 60
                     if total_minutes < 60:
@@ -18835,7 +18925,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             else:
                 updated = '-'
             
-            # Insert row
+            # Insert row with alternating row tag
+            row_index = len(self.trade_tree.get_children())
+            row_tag = 'oddrow' if row_index % 2 == 0 else 'evenrow'
             self.trade_tree.insert('', 'end', values=(
                 f" {location} ",
                 f" {station_type} ",
@@ -18845,7 +18937,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 f" {volume} ",
                 f" {price} ",
                 f" {updated} "
-            ))
+            ), tags=(row_tag,))
     
     def _clear_trade_results(self):
         """Clear trade results table"""
@@ -18921,11 +19013,67 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         else:
                             results = MarketplaceAPI.search_buyers(commodity, reference_system, None, api_days, exclude_carriers)
                     
-                    # Update UI in main thread with results
-                    self.after(0, lambda: self._process_marketplace_search_results(
-                        results, search_mode, reference_system, is_buy_mode,
-                        exclude_carriers, station_type_filter, large_pad_only,
-                        max_age_str, order_by))
+                    # Do heavy filtering/sorting in background thread (keeps UI responsive)
+                    original_count = len(results)
+
+                    # Filter zero-stock/demand
+                    if is_buy_mode:
+                        results = [r for r in results if r.get('stock', 0) > 0 and (r.get('buyPrice', 0) > 0 or r.get('sellPrice', 0) > 0)]
+                    else:
+                        results = [r for r in results if r.get('demand', 0) > 0]
+
+                    # Filter carriers
+                    if exclude_carriers and station_type_filter != "Fleet Carrier":
+                        results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
+
+                    # Filter station type
+                    if station_type_filter == "Orbital":
+                        orbital_kw = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
+                        surface_kw = ["Crater", "OnFoot", "Planetary", "Surface"]
+                        results = [r for r in results
+                                   if any(k in (r.get('stationType') or '') for k in orbital_kw)
+                                   and not any(k in (r.get('stationType') or '') for k in surface_kw)]
+                    elif station_type_filter == "Surface":
+                        results = [r for r in results if any(k in (r.get('stationType') or '') for k in ["Crater", "OnFoot", "Planetary", "Surface"])]
+                    elif station_type_filter == "Fleet Carrier":
+                        results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '') or "Carrier" in (r.get('stationType') or '')]
+                    elif station_type_filter == "Megaship":
+                        results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
+                    elif station_type_filter == "Stronghold":
+                        results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
+
+                    # Filter landing pad
+                    if large_pad_only:
+                        results = [r for r in results if r.get('maxLandingPadSize') == 3]
+
+                    # Filter by age
+                    results = self._filter_results_by_age(results, max_age_str)
+
+                    # Sort
+                    if results:
+                        if "Distance" in order_by:
+                            results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+                        elif "Best price" in order_by:
+                            if is_buy_mode:
+                                results_sorted = sorted(results, key=lambda x: x.get('buyPrice', 999999))
+                            else:
+                                results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
+                        elif "supply" in order_by or "demand" in order_by:
+                            if is_buy_mode:
+                                results_sorted = sorted(results, key=lambda x: x.get('stock', 0), reverse=True)
+                            else:
+                                results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
+                        elif "Last update" in order_by:
+                            results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
+                        else:
+                            results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+                    else:
+                        results_sorted = []
+
+                    # Send processed results to main thread for UI update only
+                    self.after(0, lambda: self._display_marketplace_search_results(
+                        results_sorted, search_mode, reference_system, is_buy_mode,
+                        exclude_carriers, original_count))
                 except Exception as e:
                     log.error(f"Marketplace search failed: {e}")
                     self.after(0, lambda: self._marketplace_search_error(str(e)))
@@ -18940,6 +19088,43 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Handle marketplace search error (called on main thread)"""
         self.marketplace_total_label.config(text=t('marketplace.search_failed').format(error=error_msg))
         self.config(cursor="")
+
+    def _display_marketplace_search_results(self, results_sorted: list, search_mode: str, reference_system: str,
+                                             is_buy_mode: bool, exclude_carriers: bool, original_count: int):
+        """Display pre-filtered/sorted marketplace results on the main thread (UI only)"""
+        self.config(cursor="")
+        if not results_sorted:
+            self._clear_marketplace_results()
+            if original_count > 0:
+                if exclude_carriers:
+                    self.marketplace_total_label.config(text=t('marketplace.all_fleet_carriers').format(count=original_count))
+                else:
+                    self.marketplace_total_label.config(text=t('marketplace.no_match_filters').format(count=original_count))
+            else:
+                self.marketplace_total_label.config(text=t('marketplace.no_results'))
+            return
+
+        if search_mode == "galaxy_wide":
+            ref = reference_system or self.marketplace_reference_system.get().strip()
+            if ref:
+                self._display_marketplace_results(results_sorted[:50])
+                self.marketplace_total_label.config(text=t('marketplace.calculating_distances'))
+                self.config(cursor="watch")
+                self.update_idletasks()
+                import threading
+                def calculate_distances_thread():
+                    try:
+                        top = results_sorted[:50]
+                        top_with_dist = MarketplaceAPI.add_distances_to_results(top, ref)
+                        self.after(0, lambda: self._update_marketplace_with_distances(top_with_dist, len(results_sorted)))
+                    except Exception as e:
+                        print(f"[MARKETPLACE] Distance calculation error: {e}")
+                        self.after(0, lambda: self._restore_marketplace_cursor(len(results_sorted)))
+                threading.Thread(target=calculate_distances_thread, daemon=True).start()
+                return
+
+        self._display_marketplace_results(results_sorted[:50])
+        self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
 
     def _process_marketplace_search_results(self, results, search_mode, reference_system,
                                              is_buy_mode, exclude_carriers, station_type_filter,
@@ -19073,6 +19258,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _populate_marketplace_results(self, results, commodity):
         """Populate marketplace results in UI"""
         try:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+
             # Determine mode for correct field handling
             is_buy_mode = self.marketplace_buy_mode.get()
             
@@ -19162,9 +19350,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if updated_at and updated_at != 'Unknown':
                     try:
                         # Parse ISO timestamp (e.g., "2024-11-03T12:30:00Z")
-                        from datetime import datetime, timezone
                         updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
-                        now = datetime.now(timezone.utc)
                         diff = now - updated_time
                         
                         # Convert to minutes, hours, or days
@@ -19367,9 +19553,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Sort items
             items.sort(key=sort_key, reverse=self.marketplace_sort_reverse)
             
-            # Clear tree and re-insert sorted items
-            for values, item in items:
+            # Clear tree and re-insert sorted items, re-applying row tags
+            for new_idx, (values, item) in enumerate(items):
                 self.marketplace_tree.move(item, '', 'end')
+                tag = 'oddrow' if new_idx % 2 == 0 else 'evenrow'
+                self.marketplace_tree.item(item, tags=(tag,))
             
             # Update column headers to show sort direction
             display_names = ["Location", "Station Type", "Pad", "Distance", "Demand", "Price", "Updated"]

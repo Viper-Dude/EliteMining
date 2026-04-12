@@ -87,7 +87,7 @@ class MarketplaceAPI:
     ) -> List[Dict]:
         """
         Fetch commodity data from Spansh (POST API) using parallel pagination
-        (10 pages x 100) sorted by most recent market update.  Returns rows
+        (3 pages x 100) sorted by most recent market update.  Returns rows
         normalized to the same format as EDData / Ardent.
 
         For galaxy-wide (max_distance=0) all results are kept.
@@ -101,7 +101,7 @@ class MarketplaceAPI:
                 commodity_normalized.title(),
             )
 
-            # Parallel paginated fetch — 10 pages x 100 results
+            # Parallel paginated fetch — 3 pages x 100 results
             def _fetch_page(page_num):
                 try:
                     body = {
@@ -121,13 +121,13 @@ class MarketplaceAPI:
                     print(f"[SPANSH] page {page_num} error: {e}")
                     return []
 
-            with ThreadPoolExecutor(max_workers=10) as pool:
-                futures = [pool.submit(_fetch_page, p) for p in range(10)]
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                futures = [pool.submit(_fetch_page, p) for p in range(3)]
                 results = []
                 for f in futures:
                     results.extend(f.result())
 
-            print(f"[SPANSH] fetched {len(results)} stations from 10 pages")
+            print(f"[SPANSH] fetched {len(results)} stations from 3 pages")
 
             cutoff = datetime.now(timezone.utc) - timedelta(days=max_days_ago + 0.5)
 
@@ -275,8 +275,8 @@ class MarketplaceAPI:
                 except Exception:
                     return []
 
-            with ThreadPoolExecutor(max_workers=10) as pool:
-                futures = [pool.submit(_fetch_page, p) for p in range(10)]
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures = [pool.submit(_fetch_page, p) for p in range(2)]
                 raw = []
                 for f in futures:
                     raw.extend(f.result())
@@ -571,8 +571,8 @@ class MarketplaceAPI:
     ) -> List[Dict]:
         """
         Spansh nearby search using parallel paginated queries sorted by
-        market_updated_at desc.  Fetches 10 pages of 100 results concurrently
-        (1000 total) then filters by 3-D distance from reference_system.
+        market_updated_at desc.  Fetches 3 pages of 100 results concurrently
+        (300 total) then filters by 3-D distance from reference_system.
         """
         try:
             import math
@@ -587,7 +587,7 @@ class MarketplaceAPI:
             spansh_name = MarketplaceAPI.SPANSH_COMMODITY_MAP.get(
                 commodity_normalized, commodity_normalized.title())
 
-            # Parallel paginated fetch — 10 pages x 100 results
+            # Parallel paginated fetch — 3 pages x 100 results
             def _fetch_page(page_num):
                 try:
                     body = {
@@ -605,13 +605,13 @@ class MarketplaceAPI:
                     print(f"[SPANSH NEARBY] page {page_num} error: {e}")
                     return []
 
-            with ThreadPoolExecutor(max_workers=10) as pool:
-                futures = [pool.submit(_fetch_page, p) for p in range(10)]
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                futures = [pool.submit(_fetch_page, p) for p in range(3)]
                 raw_results = []
                 for f in futures:
                     raw_results.extend(f.result())
 
-            print(f"[SPANSH NEARBY] fetched {len(raw_results)} stations from 10 pages")
+            print(f"[SPANSH NEARBY] fetched {len(raw_results)} stations from 3 pages")
 
             cutoff = datetime.now(timezone.utc) - timedelta(days=max_days_ago + 0.5)
 
