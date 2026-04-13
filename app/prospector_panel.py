@@ -7516,7 +7516,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_reports.grid_rowconfigure(0, weight=1)
 
         # Create sortable treeview with Material Analysis columns (Ship column added - parsed from journal files)
-        self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
+        self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced", "_spacer"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
         self.reports_tree_tab.grid(row=0, column=0, sticky="nsew")
         
         # Configure row tags for alternating colors (theme-aware)
@@ -7650,11 +7650,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.reports_tree_tab.column("asteroids", width=80, minwidth=50, stretch=False, anchor="center")
         self.reports_tree_tab.column("hit_rate", width=90, minwidth=50, stretch=False, anchor="center")
         self.reports_tree_tab.column("quality", width=120, minwidth=60, stretch=False, anchor="center")
-        self.reports_tree_tab.column("cargo", width=350, minwidth=100, stretch=True, anchor="w")
+        self.reports_tree_tab.column("cargo", width=350, minwidth=100, stretch=False, anchor="w")
         self.reports_tree_tab.column("prospects", width=70, minwidth=40, stretch=False, anchor="center")
         self.reports_tree_tab.column("eng_materials", width=250, minwidth=80, stretch=False, anchor="w")
         self.reports_tree_tab.column("comment", width=80, minwidth=50, stretch=False, anchor="center")  # Wider to show header text
         self.reports_tree_tab.column("enhanced", width=100, minwidth=60, stretch=False, anchor="center")
+        # Spacer column — always last, gives every real column a draggable right border
+        self.reports_tree_tab.heading("_spacer", text="", anchor="w")
+        self.reports_tree_tab.column("_spacer", width=20, minwidth=20, stretch=True, anchor="w")
 
         # Setup column visibility for reports tab
         self.setup_column_visibility(

@@ -1095,9 +1095,7 @@ class RefineryDialog:
         current_total = sum(self.refinery_contents.values())
         if current_total + amount > 10.0:
             remaining_capacity = 10.0 - current_total
-            messagebox.showerror(t('refinery_dialog.capacity_exceeded_title'), 
-                               t('refinery_dialog.capacity_exceeded_msg', 
-                                 current=current_total, available=remaining_capacity, amount=amount))
+            self._show_capacity_error(current_total, remaining_capacity, amount)
             return
             
         if material in self.refinery_contents:
@@ -1132,9 +1130,7 @@ class RefineryDialog:
             current_total = sum(self.refinery_contents.values())
             if current_total + quantity > 10.0:
                 remaining_capacity = 10.0 - current_total
-                messagebox.showerror(t('refinery_dialog.capacity_exceeded_title'), 
-                                   t('refinery_dialog.capacity_exceeded_msg',
-                                     current=current_total, available=remaining_capacity, amount=quantity))
+                self._show_capacity_error(current_total, remaining_capacity, quantity)
                 return
                 
             if material in self.refinery_contents:
@@ -1157,6 +1153,78 @@ class RefineryDialog:
         # This function was causing double-writes and cross-session data contamination
         # The materials are stored in refinery_contents and added to the report at session end
         pass
+
+    def _show_capacity_error(self, current, available, amount):
+        """Show themed capacity exceeded error dialog, always on top"""
+        from config import load_theme
+        from app_utils import get_app_icon_path
+
+        theme = load_theme()
+        if theme == "elite_orange":
+            bg = "#000000"
+            fg = "#ff8c00"
+            btn_bg = "#1a1a1a"
+            btn_fg = "#ff9900"
+        else:
+            bg = "#1e1e1e"
+            fg = "#e0e0e0"
+            btn_bg = "#2a3a4a"
+            btn_fg = "#e0e0e0"
+
+        err = tk.Toplevel(self.dialog)
+        err.withdraw()
+        err.title(t('refinery_dialog.capacity_exceeded_title'))
+        err.configure(bg=bg)
+        err.resizable(False, False)
+
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                err.iconbitmap(icon_path)
+        except:
+            pass
+
+        frame = tk.Frame(err, bg=bg, padx=20, pady=15)
+        frame.pack(fill="both", expand=True)
+
+        msg = t('refinery_dialog.capacity_exceeded_msg',
+                current=current, available=available, amount=amount)
+        tk.Label(frame, text=msg, bg=bg, fg=fg,
+                 font=("Segoe UI", 10), justify="left").pack(pady=(0, 14))
+
+        tk.Button(frame, text="OK", command=err.destroy,
+                  bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg,
+                  font=("Segoe UI", 9), padx=24, pady=4, relief="flat",
+                  cursor="hand2").pack()
+
+        err.update_idletasks()
+        # Center on the refinery dialog
+        dw = err.winfo_reqwidth() or 300
+        dh = err.winfo_reqheight() or 150
+        px = self.dialog.winfo_x()
+        py = self.dialog.winfo_y()
+        pw = self.dialog.winfo_width()
+        ph = self.dialog.winfo_height()
+        err.geometry(f"{dw}x{dh}+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+
+        err.deiconify()
+        err.attributes('-topmost', True)
+        err.lift()
+        err.focus_force()
+        try:
+            err.grab_set()
+        except:
+            pass
+
+        def keep_on_top():
+            try:
+                if err.winfo_exists():
+                    err.lift()
+                    err.after(100, keep_on_top)
+            except:
+                pass
+        err.after(100, keep_on_top)
+        err.wait_window()
 
     def _remove_selected(self):
         """Remove selected material from refinery contents"""
@@ -5776,14 +5844,75 @@ class App(tk.Tk, ColumnVisibilityMixin):
         summary_text = f"{cargo.current_cargo}/{cargo.max_cargo}t ({percentage:.0f}%){status_color}"
         self.integrated_cargo_summary.configure(text=summary_text)
         
+        # Build the new content first, then skip the update if nothing changed
+        # This prevents scrollbar jitter from delete+reinsert on every tick
+        new_content_parts = []
+        new_tags_map = []  # list of (start_offset, end_offset, tags) for special items
+        
+        if not cargo.cargo_items:
+            if cargo.current_cargo > 0:
+                new_content_parts.append(f"📊 {cargo.current_cargo}t {t('sidebar.total')}\n💡 {t('sidebar.no_item_details')}")
+            else:
+                new_content_parts.append(f"📦 {t('sidebar.empty_cargo')}\n⛏️ {t('sidebar.start_mining')}")
+        else:
+            sorted_items = sorted(cargo.cargo_items.items(), key=lambda x: (x[0].lower() != 'limpet', -x[1]))
+            for i, (item_name, quantity) in enumerate(sorted_items):
+                display_name = item_name.replace('_', ' ').replace('$', '').title()
+                if display_name in ['Low Temp. Diamonds', 'Low Temperature Diamonds']:
+                    display_name = 'LTD'
+                is_limpet = "limpet" in item_name.lower()
+                if is_limpet:
+                    display_name = t('sidebar.limpet')
+                icon = "●"
+                name_field = f"{display_name:<12}"[:12]
+                quantity_text = f"{quantity:>4}t"
+                line = f"{icon} {name_field} {quantity_text}"
+                new_content_parts.append(line)
+                if i < len(sorted_items) - 1:
+                    new_content_parts.append("\n")
+        
+        if cargo.materials_collected:
+            sep_chars = 28
+            new_content_parts.append("\n" + "─" * sep_chars)
+            new_content_parts.append("\n")
+            new_content_parts.append(t('mining_session.engineering_materials') + " 🔩")
+            new_content_parts.append("\n")
+            sorted_materials = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
+            for i, (material_name, quantity) in enumerate(sorted_materials):
+                grade = cargo.MATERIAL_GRADES.get(material_name, 0)
+                display_name = cargo.materials_localized_names.get(material_name, material_name)[:12]
+                grade_text = f"(G{grade})"
+                line = f"{display_name:<12} {grade_text} {quantity:>3}"
+                new_content_parts.append(line)
+                if i < len(sorted_materials) - 1:
+                    new_content_parts.append("\n")
+        
+        sep_chars = 28
+        new_content_parts.append("\n" + "─" * sep_chars)
+        new_content_parts.append("\n" + t('sidebar.refinery_note'))
+        has_limpets = any("limpet" in name.lower() for name in cargo.cargo_items.keys())
+        if has_limpets:
+            new_content_parts.append("\n" + t('sidebar.limpet_click_help'))
+        
+        new_content_str = "".join(new_content_parts)
+        
+        # Compare with current content — skip full rewrite if unchanged
+        try:
+            self.integrated_cargo_text.configure(state="normal")
+            current_content = self.integrated_cargo_text.get(1.0, "end-1c")
+            if current_content == new_content_str:
+                self.integrated_cargo_text.configure(state="disabled")
+                return
+        except Exception:
+            pass
+        
+        # Content changed — do full rewrite
         # Save current scroll position before updating
         try:
             scroll_position = self.integrated_cargo_text.yview()
         except:
             scroll_position = None
         
-        # Update cargo list - very compact format
-        self.integrated_cargo_text.configure(state="normal")
         self.integrated_cargo_text.delete(1.0, tk.END)
         
         if not cargo.cargo_items:
@@ -5792,7 +5921,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             else:
                 self.integrated_cargo_text.insert(tk.END, f"📦 {t('sidebar.empty_cargo')}\n⛏️ {t('sidebar.start_mining')}")
         else:
-            # Vertical list with better alignment - show ALL items
             sorted_items = sorted(cargo.cargo_items.items(), key=lambda x: (x[0].lower() != 'limpet', -x[1]))
             
             # Configure clickable limpet tag (theme-aware color + hand cursor)

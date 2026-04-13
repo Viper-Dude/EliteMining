@@ -897,7 +897,7 @@ class RingFinder(ColumnVisibilityMixin):
                      arrowcolor=[('readonly', '#ff8c00')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "Source")
+        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "Source", "_spacer")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview")
         
         # Track column visibility and default widths
@@ -972,11 +972,16 @@ class RingFinder(ColumnVisibilityMixin):
             elif col == "Reserve":
                 # Reserve column - visible and showing reserve level
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
+            elif col == "_spacer":
+                # Spacer column — always last, gives every real column a draggable right border
+                self.results_tree.heading(col, text="", anchor="w")
+                self.results_tree.column(col, width=20, minwidth=20, anchor="w", stretch=True)
         
-        # Setup column visibility using mixin
+        # Setup column visibility using mixin (exclude _spacer from menu)
+        visibility_columns = tuple(c for c in columns if c != "_spacer")
         self.setup_column_visibility(
             tree=self.results_tree,
-            columns=columns,
+            columns=visibility_columns,
             default_widths=self.column_default_widths,
             config_key='ring_finder'
         )
