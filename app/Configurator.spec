@@ -62,7 +62,17 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # Exclude unused numpy submodules to reduce exe size
+        'numpy.testing', 'numpy._pytesttester',
+        'numpy.linalg', 'numpy.fft', 'numpy.polynomial',
+        'numpy.random', 'numpy.ma', 'numpy.matlib',
+        'numpy.distutils', 'numpy.f2py',
+        # Exclude other unused large packages
+        'unittest', 'email', 'html', 'http', 'xml', 'xmlrpc',
+        'pydoc', 'doctest', 'difflib', 'ftplib', 'imaplib',
+        'poplib', 'smtplib', 'telnetlib', 'nntplib',
+    ],
     noarchive=False,
     optimize=0,
 )
