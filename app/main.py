@@ -6068,7 +6068,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if game_active:
                         if self.cargo_text_overlay._game_hidden:
                             self.cargo_text_overlay._game_hidden = False
-                            if self.cargo_text_overlay.overlay_window:
+                            if self.cargo_text_overlay.overlay_window and not getattr(self.cargo_text_overlay, '_session_hidden', False) and not getattr(self.cargo_text_overlay, '_sc_hidden', False):
                                 self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 1)
                     else:
                         if not self.cargo_text_overlay._game_hidden:
@@ -6079,7 +6079,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self, 'text_overlay') and self.text_overlay.overlay_enabled:
                     if game_active:
                         self.text_overlay._game_hidden = False
-                        if self.text_overlay._is_showing and self.text_overlay.overlay_window:
+                        if self.text_overlay._is_showing and self.text_overlay.overlay_window and not getattr(self.text_overlay, '_session_hidden', False) and not getattr(self.text_overlay, '_sc_hidden', False):
                             self.text_overlay.overlay_window.deiconify()
                     else:
                         if not self.text_overlay._game_hidden and self.text_overlay._is_showing and self.text_overlay.overlay_window:
@@ -6133,24 +6133,27 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             _session_active = hasattr(self, 'prospector_panel') and self.prospector_panel and getattr(self.prospector_panel, 'session_active', False)
             if self.overlay_only_mining_session.get() and not _session_active:
-                if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_window:
-                    if not getattr(self.cargo_text_overlay, '_session_hidden', False):
-                        self.cargo_text_overlay._session_hidden = True
+                # Always set the flag regardless of whether the window exists yet
+                if hasattr(self, 'cargo_text_overlay'):
+                    self.cargo_text_overlay._session_hidden = True
+                    if self.cargo_text_overlay.overlay_window:
                         self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
-                if hasattr(self, 'text_overlay') and self.text_overlay._is_showing and self.text_overlay.overlay_window:
-                    if not getattr(self.text_overlay, '_session_hidden', False):
-                        self.text_overlay._session_hidden = True
+                if hasattr(self, 'text_overlay') and self.text_overlay._is_showing:
+                    self.text_overlay._session_hidden = True
+                    if self.text_overlay.overlay_window:
                         self.text_overlay.overlay_window.withdraw()
             else:
                 # Restore overlays when session starts or setting disabled
                 if hasattr(self, 'cargo_text_overlay') and getattr(self.cargo_text_overlay, '_session_hidden', False):
                     self.cargo_text_overlay._session_hidden = False
                     if self.cargo_text_overlay.overlay_enabled and not self.cargo_text_overlay._game_hidden and not getattr(self.cargo_text_overlay, '_sc_hidden', False):
-                        self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 1)
+                        if self.cargo_text_overlay.overlay_window:
+                            self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 1)
                 if hasattr(self, 'text_overlay') and getattr(self.text_overlay, '_session_hidden', False):
                     self.text_overlay._session_hidden = False
                     if self.text_overlay._is_showing and not self.text_overlay._game_hidden and not getattr(self.text_overlay, '_sc_hidden', False):
-                        self.text_overlay.overlay_window.deiconify()
+                        if self.text_overlay.overlay_window:
+                            self.text_overlay.overlay_window.deiconify()
         except Exception:
             pass
         
