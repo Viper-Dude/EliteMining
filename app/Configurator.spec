@@ -68,10 +68,9 @@ a = Analysis(
         'numpy.linalg', 'numpy.fft', 'numpy.polynomial',
         'numpy.random', 'numpy.ma', 'numpy.matlib',
         'numpy.distutils', 'numpy.f2py',
-        # Exclude other unused large packages
-        'unittest', 'email', 'html', 'http', 'xml', 'xmlrpc',
-        'pydoc', 'doctest', 'difflib', 'ftplib', 'imaplib',
-        'poplib', 'smtplib', 'telnetlib', 'nntplib',
+        # Exclude unused stdlib packages
+        'unittest', 'pydoc', 'doctest', 'difflib',
+        'ftplib', 'imaplib', 'poplib', 'smtplib', 'telnetlib', 'nntplib',
     ],
     noarchive=False,
     optimize=0,
