@@ -121,7 +121,7 @@
     "spansh_error": "Spansh API error - try again later",
     "no_hotspot_data": "No hotspot data",
     "auto_search": "Auto-Search",
-    "auto_search_tooltip": "Automatically refresh results when arriving in a new system or scanning a ring.\nUses your last search settings (ring type, mineral, distance).\n(Local database only - fast, no API calls)",
+    "auto_search_tooltip": "Automatically searches when jumping to a new system.\nResets all filters to defaults before each search for clean results.\n(Local database only - fast, no API calls)",
     "auto_switch_tabs": "Auto-Switch Tabs",
     "search": "Search",
     "searching": "⏳ Searching for rings...",

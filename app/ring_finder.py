@@ -6269,6 +6269,9 @@ class RingFinder(ColumnVisibilityMixin):
                     cargo_monitor = main_app.cargo_monitor
                     cargo_monitor._last_refreshed_rings = set()
             
+            # Reset filters before auto-search so results aren't filtered from previous session
+            self._reset_filters()
+
             # Trigger search with database only (don't query Spansh on auto-search)
             if self.search_btn['state'] == 'normal':
                 self.search_hotspots(force_database=True)
