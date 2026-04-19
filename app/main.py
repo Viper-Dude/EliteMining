@@ -6209,8 +6209,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if self.text_overlay.overlay_window:
                         self.text_overlay.overlay_window.withdraw()
             else:
-                # Restore overlays when session starts or setting disabled
-                if hasattr(self, 'cargo_text_overlay') and getattr(self.cargo_text_overlay, '_session_hidden', False):
+                # Session is active (or setting disabled) — restore and keep overlays visible each cycle
+                if hasattr(self, 'cargo_text_overlay'):
                     self.cargo_text_overlay._session_hidden = False
                     if self.cargo_text_overlay.overlay_enabled and not self.cargo_text_overlay._game_hidden and not getattr(self.cargo_text_overlay, '_sc_hidden', False):
                         if self.cargo_text_overlay.overlay_window:

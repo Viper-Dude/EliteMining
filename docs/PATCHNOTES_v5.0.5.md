@@ -1,10 +1,10 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-04-17
+**Release Date:** 2026-04-20
 
 ## New Features & Improvements
 
 - Ring Finder: Auto Search now resets all filters to defaults before each search when jumping to a new system
-- Announcement panel: Min % values now save correctly and are restored properly on restart
+
 
 #### VoiceAttack Profile - Update to V5.0.4
 
