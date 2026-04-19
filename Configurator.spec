@@ -33,9 +33,21 @@ a = Analysis(
         # Exclude unused stdlib packages
         'unittest', 'pydoc', 'doctest', 'difflib',
         'ftplib', 'imaplib', 'poplib', 'smtplib', 'telnetlib', 'nntplib',
+        # Exclude test/dev tooling never needed at runtime
+        'pytest', '_pytest', 'setuptools', 'pkg_resources', 'pip',
+        'lib2to3', 'xmlrpc', 'multiprocessing',
+        # Exclude unused matplotlib backends
+        'matplotlib.backends.backend_pdf', 'matplotlib.backends.backend_ps',
+        'matplotlib.backends.backend_svg', 'matplotlib.backends.backend_wx',
+        'matplotlib.backends.backend_gtk3', 'matplotlib.backends.backend_qt5',
+        'matplotlib.tests',
+        # Exclude unused PIL modules
+        'PIL.ImageQt', 'PIL.ImageWin',
+        # Exclude tkinter test modules
+        'tkinter.test',
     ],
     noarchive=False,
-    optimize=0,
+    optimize=1,
 )
 pyz = PYZ(a.pure)
 

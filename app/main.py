@@ -4906,6 +4906,49 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Window starts hidden and is shown later without grabbing focus
             self.withdraw()
 
+            # --- Show splash screen immediately so user sees something during init ---
+            self._splash = None
+            self._splash_photo = None  # prevent GC
+            try:
+                from PIL import Image, ImageTk
+                from config import load_window_geometry
+                _saved_geom = load_window_geometry()
+                _geom_str = _saved_geom.get("geometry", "")
+                _app_x, _app_y, _app_w, _app_h = 0, 0, 1350, 780
+                if _geom_str:
+                    import re as _re
+                    _gm = _re.match(r'(\d+)x(\d+)\+(-?\d+)\+(-?\d+)', _geom_str)
+                    if _gm:
+                        _app_w, _app_h, _app_x, _app_y = int(_gm.group(1)), int(_gm.group(2)), int(_gm.group(3)), int(_gm.group(4))
+                self._splash = tk.Toplevel(self)
+                self._splash.overrideredirect(True)
+                self._splash.attributes('-topmost', True)
+                # Use module-level app_dir (local 'app_dir' assigned later in __init__ shadows the global)
+                _app_dir = globals()['app_dir']
+                if getattr(sys, 'frozen', False):
+                    _splash_img_path = os.path.join(os.path.dirname(_app_dir), "app", "Images", "EliteMining_splash.png")
+                else:
+                    _splash_img_path = os.path.join(_app_dir, "Images", "EliteMining_splash.png")
+                _pil_img = Image.open(_splash_img_path)
+                _sw, _sh = _pil_img.size
+                self._splash_photo = ImageTk.PhotoImage(_pil_img)
+                _sx = _app_x + (_app_w - _sw) // 2
+                _sy = _app_y + (_app_h - _sh) // 2
+                self._splash.configure(bg="#000000")
+                self._splash.geometry(f"{_sw}x{_sh}+{_sx}+{_sy}")
+                tk.Label(self._splash, image=self._splash_photo, bd=0, bg="#000000").pack()
+                # Click anywhere to dismiss early
+                self._splash.bind("<Button-1>", lambda e: self._dismiss_splash())
+                self._splash.update()
+            except Exception as _e:
+                print(f"[SPLASH] Could not load splash image: {_e}")
+                if self._splash:
+                    try:
+                        self._splash.destroy()
+                    except Exception:
+                        pass
+                self._splash = None
+
             # Check and migrate config if needed on startup
             self._check_config_migration()
         except Exception as e:
@@ -5419,6 +5462,29 @@ class App(tk.Tk, ColumnVisibilityMixin):
         def mark_loaded():
             self._app_fully_loaded = True
         self.after(5000, mark_loaded)
+
+        # Dismiss splash after a short delay once mainloop starts
+        # (splash has been visible since the very start of __init__)
+        self.after(2000, self._dismiss_splash)
+
+    def _dismiss_splash(self):
+        """Dismiss the startup splash screen and reveal the main window."""
+        if self._splash:
+            try:
+                self._splash.destroy()
+            except Exception:
+                pass
+            self._splash = None
+            self._splash_photo = None
+        # Restore geometry and reveal main window
+        self._restore_window_geometry()
+        self.lift()
+        # Re-trigger sash initialization
+        self._sash_initialized = False
+        self._sidebar_sash_initialized = False
+        self.after(300, self._reinitialize_sash_positions)
+        # Apply stay-on-top AFTER splash is gone and window is fully visible
+        self.after(500, self._apply_stay_on_top_after_init)
 
     def _cleanup_legacy_files(self):
         """Remove legacy files from older versions that are no longer used"""
@@ -9623,7 +9689,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 # Use existing variable (initialized in __init__)
                 # NOTE: Don't set up trace during build - import will load values first
-                thrust_closed_spinbox = tk.Spinbox(thrust_closed_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
+                thrust_closed_spinbox = tk.Spinbox(thrust_closed_frame, from_=0.0, to=5.0, increment=0.1, width=6, 
                                                     textvariable=self.thrust_closed_var, format="%.1f",
                                                     command=self._save_thrust_closed,
                                                     bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
@@ -9639,7 +9705,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         if event.delta > 0:
                             new_val = min(current + 0.1, 5.0)
                         else:
-                            new_val = max(current - 0.1, 1.0)
+                            new_val = max(current - 0.1, 0.0)
                         var.set(round(new_val, 1))
                         self._save_thrust_closed()  # Save on scroll
                     except:
@@ -9647,7 +9713,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     return "break"
                 thrust_closed_spinbox.bind("<MouseWheel>", on_thrust_closed_scroll)
                 
-                thrust_closed_label = tk.Label(thrust_closed_frame, text=f"{t('voiceattack.thrust_closed_label')} [1.0..5.0] seconds",
+                thrust_closed_label = tk.Label(thrust_closed_frame, text=f"{t('voiceattack.thrust_closed_label')} [0.0..5.0] seconds",
                                               bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
                 thrust_closed_label.pack(side="left")
                 
@@ -9681,7 +9747,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         if event.delta > 0:
                             new_val = min(current + 0.1, 5.0)
                         else:
-                            new_val = max(current - 0.1, 1.0)
+                            new_val = max(current - 0.1, 0.5)
                         var.set(round(new_val, 1))
                         self._save_thrust_open()  # Save on scroll
                     except:
@@ -10097,7 +10163,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 with open(txt_path, 'r', encoding='utf-8') as f:
                     delay = float(f.read().strip())
                     # Clamp to valid range
-                    delay = max(1.0, min(5.0, delay))
+                    delay = max(0.0, min(5.0, delay))
                     self.thrust_closed_var.set(delay)
                     print(f"[THRUST CLOSED] Loaded timing: {delay:.1f} seconds")
             else:
@@ -10696,8 +10762,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if raw is not None:
                     try:
                         delay = float(raw)
-                        # Clamp to valid range (1.0-5.0)
-                        delay = max(1.0, min(5.0, delay))
+                        # Clamp to valid range (0.0-5.0)
+                        delay = max(0.0, min(5.0, delay))
                         self.thrust_closed_var.set(delay)
                         found.append(f"{thrust_closed_file}.txt")
                         print(f"[IMPORT] Loaded thrust closed: {delay:.1f}s")
@@ -21329,86 +21395,14 @@ if __name__ == "__main__":
     
     try:
         app = App()
-        # App.__init__ calls self.withdraw() — window is hidden at default OS position.
-        # Do NOT touch app geometry before the splash is done; any geometry() call on a
-        # withdrawn window can still cause Windows to briefly render/flash it.
-
-        # Read saved geometry from config to position the splash correctly.
-        _saved_geom = load_window_geometry()
-        _geom_str = _saved_geom.get("geometry", "")
-        _app_x, _app_y, _app_w, _app_h = 0, 0, 1350, 780
-        if _geom_str:
-            import re as _re
-            _gm = _re.match(r'(\d+)x(\d+)\+(-?\d+)\+(-?\d+)', _geom_str)
-            if _gm:
-                _app_w, _app_h, _app_x, _app_y = int(_gm.group(1)), int(_gm.group(2)), int(_gm.group(3)), int(_gm.group(4))
-
-        # --- Splash screen (Toplevel on hidden main window - avoids dual Tk() issue) ---
-        splash = None
-        try:
-            from PIL import Image, ImageTk
-            splash = tk.Toplevel(app)
-            splash.overrideredirect(True)
-            splash.attributes('-topmost', True)
-            # In dev: app_dir = .../app/ which contains Images/
-            # When frozen: app_dir = .../Configurator/ — images are at ../app/Images/
-            if getattr(sys, 'frozen', False):
-                _splash_img_path = os.path.join(os.path.dirname(app_dir), "app", "Images", "EliteMining_splash.png")
-            else:
-                _splash_img_path = os.path.join(app_dir, "Images", "EliteMining_splash.png")
-            _pil_img = Image.open(_splash_img_path)
-            _orig_w, _orig_h = _pil_img.size
-            # Scale so width fits within 1200px, preserving exact aspect ratio
-            _max_w = min(1200, _app_w)
-            _scale = _max_w / _orig_w
-            _sw = _max_w
-            _sh = int(_orig_h * _scale)
-            _pil_img = _pil_img.resize((_sw, _sh), Image.LANCZOS)
-            _splash_photo = ImageTk.PhotoImage(_pil_img)
-            # Center splash over the saved app window position
-            _sx = _app_x + (_app_w - _sw) // 2
-            _sy = _app_y + (_app_h - _sh) // 2
-            splash.configure(bg="#000000")
-            splash.geometry(f"{_sw}x{_sh}+{_sx}+{_sy}")
-            tk.Label(splash, image=_splash_photo, bd=0, bg="#000000").pack()
-            splash.update()
-        except Exception as _e:
-            print(f"[SPLASH] Could not load splash image: {_e}")
-            if splash:
-                try:
-                    splash.destroy()
-                except Exception:
-                    pass
-            splash = None
+        # Splash is now created inside App.__init__ and dismissed via after() + click.
+        # If splash failed to load, restore geometry immediately.
+        if not app._splash:
+            app._restore_window_geometry()
+            app.after(500, app._apply_stay_on_top_after_init)
 
         # Force dark title bar after window is fully created
         app.after(200, app._set_dark_title_bar)
-
-        # Splash: dismiss after 3 seconds, then restore geometry and reveal main window
-        _SPLASH_DURATION = 3000  # milliseconds
-
-        def _dismiss_splash():
-            if splash:
-                try:
-                    splash.destroy()
-                except Exception:
-                    pass
-            # Restore geometry NOW (just before showing) to avoid any pre-splash flash
-            app._restore_window_geometry()
-            app.lift()
-            # Re-trigger sash initialization — the initial attempt during the splash
-            # timed out because the window had no real geometry yet
-            app._sash_initialized = False
-            app._sidebar_sash_initialized = False
-            app.after(300, app._reinitialize_sash_positions)
-            # Apply stay-on-top AFTER splash is gone and window is fully visible
-            app.after(500, app._apply_stay_on_top_after_init)
-
-        if splash:
-            app.after(_SPLASH_DURATION, _dismiss_splash)
-        else:
-            app._restore_window_geometry()
-            app.after(500, app._apply_stay_on_top_after_init)
 
         app.mainloop()
     except KeyboardInterrupt:
