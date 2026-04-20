@@ -6,11 +6,10 @@
 - Ring Finder: Auto Search now resets all filters to defaults before each search when jumping to a new system
 
 
-#### VoiceAttack Profile - Update to V5.0.4
+#### VoiceAttack Profile - Update to V5.0.5
 
-- General Optimizing of commands
 - Fixed Clear and jump sometimes looping when entering supercruise 
-
+- General Optimizing of commands
 
 
 #### Important Notes 
