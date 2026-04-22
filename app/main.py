@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.0.5"
+APP_VERSION = "v5.0.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -4930,6 +4930,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 else:
                     _splash_img_path = os.path.join(_app_dir, "Images", "EliteMining_splash.png")
                 _pil_img = Image.open(_splash_img_path)
+                _max_w, _max_h = 600, 600
+                _pil_img.thumbnail((_max_w, _max_h), Image.LANCZOS)
                 _sw, _sh = _pil_img.size
                 self._splash_photo = ImageTk.PhotoImage(_pil_img)
                 _sx = _app_x + (_app_w - _sw) // 2
@@ -5466,6 +5468,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Dismiss splash after a short delay once mainloop starts
         # (splash has been visible since the very start of __init__)
         self.after(2000, self._dismiss_splash)
+
+        # Safety: re-apply cargo overlay state after full init settles
+        # Guards against any startup race where overlay ends up hidden despite being enabled
+        self.after(3500, self._reapply_cargo_overlay_state)
 
     def _dismiss_splash(self):
         """Dismiss the startup splash screen and reveal the main window."""
@@ -6134,8 +6140,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if game_active:
                         if self.cargo_text_overlay._game_hidden:
                             self.cargo_text_overlay._game_hidden = False
-                            if self.cargo_text_overlay.overlay_window and not getattr(self.cargo_text_overlay, '_session_hidden', False) and not getattr(self.cargo_text_overlay, '_sc_hidden', False):
-                                self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 1)
+                        # Always ensure alpha is restored when game is active
+                        if self.cargo_text_overlay.overlay_window and not getattr(self.cargo_text_overlay, '_session_hidden', False) and not getattr(self.cargo_text_overlay, '_sc_hidden', False):
+                            self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 1)
                     else:
                         if not self.cargo_text_overlay._game_hidden:
                             self.cargo_text_overlay._game_hidden = True
@@ -9174,6 +9181,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Target Prospector": "voiceattack.help_target_prospector",
             "Thrust Up": "voiceattack.help_thrust_up",
             "Pulse Wave Analyser": "voiceattack.help_pulse_wave",
+            "Continuous Pulsewave": "voiceattack.help_continuous_pulsewave",
             "Auto Deselect Prospector": "voiceattack.help_auto_deselect_prospector",
         }
         
@@ -9427,12 +9435,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
             self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
+            self.toggle_vars[name].trace_add("write", lambda *args: self._update_pulsewave_dependency())
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
-            
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
                      font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+
+            # Continuous Pulsewave checkbox on the same row
+            if "Continuous Pulsewave" in TOGGLES:
+                cp_name = "Continuous Pulsewave"
+                _cp_fname, cp_helptext = TOGGLES[cp_name]
+                cp_display_help = t(toggle_help_translations.get(cp_name, cp_name)) if cp_name in toggle_help_translations else cp_helptext
+                cp_checkbox = tk.Checkbutton(rowf, text=cp_name, variable=self.toggle_vars[cp_name],
+                                             bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
+                                             activebackground=_toggle_bg, activeforeground=_toggle_fg,
+                                             highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                                             padx=4, pady=2, anchor="w")
+                cp_checkbox.pack(side="left", padx=(20, 0))
+                self.toggle_checkboxes[cp_name] = cp_checkbox
+                self.toggle_vars[cp_name].trace_add("write", lambda *args, n=cp_name: self._save_toggle(n))
+                ToolTip(cp_checkbox, cp_display_help)
+                tk.Label(rowf, text=cp_display_help, fg=_help_fg, bg=_toggle_bg,
+                         font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+
             r += 1
         
         # Cargo Scoop toggle
@@ -9865,6 +9891,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Initialize dependent toggle states AFTER import has a chance to load values
         # Import runs at 100ms, so we delay this to 150ms
         self.after(150, self._update_prospector_dependencies)
+        self.after(150, self._update_pulsewave_dependency)
+
+    def _update_pulsewave_dependency(self):
+        """Enable/disable Continuous Pulsewave based on Pulse Wave Analyser state"""
+        try:
+            if "Pulse Wave Analyser" not in self.toggle_vars or "Continuous Pulsewave" not in self.toggle_checkboxes:
+                return
+            pwa_enabled = self.toggle_vars["Pulse Wave Analyser"].get() == 1
+            cp_checkbox = self.toggle_checkboxes["Continuous Pulsewave"]
+            if pwa_enabled:
+                cp_checkbox.configure(state="normal")
+            else:
+                cp_checkbox.configure(state="disabled")
+                # NOTE: Don't reset value - preserve user's setting
+                # Value is saved/restored from file; checkbox is just visually disabled
+        except Exception as e:
+            print(f"Error updating pulsewave dependency: {e}")
 
     def _update_prospector_dependencies(self):
         """Enable/disable dependent toggles based on Prospector Sequence state"""
@@ -14080,6 +14123,27 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.cargo_text_overlay.set_enabled(enabled)
         self._save_cargo_preferences()
 
+    def _reapply_cargo_overlay_state(self) -> None:
+        """Safety net: re-apply cargo overlay enabled state after full startup.
+        Guards against race conditions on first launch after an update where
+        the overlay ends up hidden despite being enabled in settings."""
+        try:
+            if not hasattr(self, 'cargo_text_overlay') or not hasattr(self, 'cargo_show_in_overlay'):
+                return
+            if self.cargo_show_in_overlay.get() and self.text_overlay_enabled.get():
+                # Don't restore if session-only mode and no session is active
+                if self.overlay_only_mining_session.get():
+                    session_active = hasattr(self, 'prospector_panel') and self.prospector_panel and getattr(self.prospector_panel, 'session_active', False)
+                    if not session_active:
+                        return
+                self.cargo_text_overlay.set_enabled(True)
+                # Reset _game_hidden so the next periodic cycle re-evaluates
+                self.cargo_text_overlay._game_hidden = False
+                self.cargo_text_overlay._session_hidden = False
+                self.cargo_text_overlay.update_cargo(self.cargo_monitor)
+        except Exception as e:
+            log.debug(f"_reapply_cargo_overlay_state: {e}")
+
     # ---------- Window geometry save/restore ----------
     def _restore_window_geometry(self) -> None:
         wcfg = load_window_geometry()
@@ -16561,6 +16625,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 bg=_mkt_cb_bg, fg="#888888",
                 font=("Segoe UI", 8)).pack(side="left")
         
+        # Average price label (right side, before total count)
+        _avg_fg = "#ffd700"  # gold — visible on both dark and orange themes
+        self.marketplace_avg_label = tk.Label(results_header, text="",
+                                              bg=_mkt_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
+        self.marketplace_avg_label.pack(side="right", padx=(0, 10))
+
         # Status label (moved to header, right side)
         self.marketplace_total_label = tk.Label(results_header, text=t('marketplace.enter_system_commodity'),
                                                bg=_mkt_cb_bg, fg="gray", font=("Segoe UI", 8))
@@ -16815,6 +16885,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 bg=_trade_cb_bg, fg="#888888",
                 font=("Segoe UI", 8)).pack(side="left")
         
+        # Average price label (right side, before total count)
+        _avg_fg = "#ffd700"  # gold — visible on both dark and orange themes
+        self.trade_avg_label = tk.Label(results_header, text="",
+                                        bg=_trade_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
+        self.trade_avg_label.pack(side="right", padx=(0, 10))
+
         # Status label
         self.trade_total_label = tk.Label(results_header, text=t('marketplace.enter_system_commodity'),
                                                bg=_trade_cb_bg, fg="gray", font=("Segoe UI", 8))
@@ -19009,7 +19085,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Clear existing results
         for item in self.trade_tree.get_children():
             self.trade_tree.delete(item)
-        
+        if hasattr(self, 'trade_avg_label'):
+            self.trade_avg_label.config(text="")
+
+        # Compute average price across all results
+        if results and hasattr(self, 'trade_avg_label'):
+            is_buy_mode = self.trade_buy_mode.get()
+            price_field = 'buyPrice' if is_buy_mode else 'sellPrice'
+            prices = [r.get(price_field, 0) for r in results if r.get(price_field, 0) > 0]
+            if prices:
+                avg = sum(prices) // len(prices)
+                self.trade_avg_label.config(text=f"Avg: {avg:,} CR")
+
         # Determine mode for correct field handling
         is_buy_mode = self.trade_buy_mode.get()
 
@@ -19121,6 +19208,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if hasattr(self, 'trade_tree'):
             for item in self.trade_tree.get_children():
                 self.trade_tree.delete(item)
+        if hasattr(self, 'trade_avg_label'):
+            self.trade_avg_label.config(text="")
     
     # ==================== UNUSED MARKETPLACE SEARCH METHODS (Kept for reference) ====================
     # These methods are no longer used - marketplace now uses external websites (Inara, edtools.cc)
@@ -19421,13 +19510,26 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Clear marketplace results tree"""
         for item in self.marketplace_tree.get_children():
             self.marketplace_tree.delete(item)
+        if hasattr(self, 'marketplace_avg_label'):
+            self.marketplace_avg_label.config(text="")
     
     def _display_marketplace_results(self, results):
         """Display marketplace results (already sorted by user's selected criteria)"""
         self._clear_marketplace_results()
-        
+
         # Results are already sorted by the search function based on user's "Sort by" selection
         # DO NOT re-sort here - just display them as provided
+
+        # Compute average price across all results
+        if results and hasattr(self, 'marketplace_avg_label'):
+            is_buy_mode = self.marketplace_buy_mode.get()
+            price_field = 'buyPrice' if is_buy_mode else 'sellPrice'
+            prices = [r.get(price_field, 0) for r in results if r.get(price_field, 0) > 0]
+            if prices:
+                avg = sum(prices) // len(prices)
+                self.marketplace_avg_label.config(text=f"Avg: {avg:,} CR")
+            else:
+                self.marketplace_avg_label.config(text="")
         
         commodity = self.marketplace_commodity.get()
         self._populate_marketplace_results(results, commodity)

@@ -357,11 +357,34 @@ class ReleaseBuilder:
             
             return result
     
+    def resize_splash_image(self):
+        """Resize EliteMining_splash.png to max 800x460 before building"""
+        self.print_step(0, "Resizing Splash Image")
+        splash_path = self.script_dir / "Images" / "EliteMining_splash.png"
+        if not splash_path.exists():
+            print(f"⚠️  Splash image not found: {splash_path} — skipping")
+            return
+        try:
+            from PIL import Image
+            img = Image.open(splash_path)
+            orig_size = img.size
+            img.thumbnail((800, 460), Image.LANCZOS)
+            if img.size != orig_size:
+                img.save(splash_path)
+                print(f"✅ Resized splash: {orig_size} → {img.size}")
+            else:
+                print(f"✅ Splash already fits ({orig_size}) — no resize needed")
+        except Exception as e:
+            print(f"⚠️  Could not resize splash image: {e}")
+
     def build_release(self):
         """Main method to build the complete release"""
         print("🚀 EliteMining Release Builder")
         print(f"Project root: {self.project_root}")
         
+        # Step 0: Resize splash image
+        self.resize_splash_image()
+
         # Step 1: Check prerequisites
         has_build_script = self.check_prerequisites()
         

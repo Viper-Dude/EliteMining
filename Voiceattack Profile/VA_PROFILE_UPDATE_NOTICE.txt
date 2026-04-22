@@ -1,8 +1,8 @@
 ================================================================================
-  EliteMining v5.0.5 — VoiceAttack Profile Update 
+  EliteMining v5.0.6 — VoiceAttack Profile Update 
 ================================================================================
 
-This release includes an updated VoiceAttack profile (v5.0.5).
+This release includes an updated VoiceAttack profile (v5.0.6).
 
 The installer will guide you through the update process.
 Simply follow the on-screen instructions to complete the installation.

@@ -10708,6 +10708,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.session_paused_seconds = 0.0
         self.session_totals = {}
         self.session_elapsed.set("00:00:00")
+
+        # Immediately show cargo text overlay if "only during session" is enabled
+        # (don't wait up to 2s for the next periodic cycle)
+        if self.main_app and hasattr(self.main_app, 'cargo_text_overlay'):
+            try:
+                overlay = self.main_app.cargo_text_overlay
+                if overlay.overlay_enabled and getattr(self.main_app, 'text_overlay_enabled', None) and self.main_app.text_overlay_enabled.get():
+                    overlay._session_hidden = False
+                    overlay._game_hidden = False
+                    overlay.update_cargo(self.main_app.cargo_monitor)
+            except Exception:
+                pass
         self.live_tph_var.set("")
         self.session_screenshots = []  # Initialize screenshots list for this session
         self.session_yield_data = {}  # Track yield data during session {material: [percentages]}

@@ -1,5 +1,9 @@
 # Git Commands Reference
 
+# Git Push
+git add .
+git commit -m "v5.0.5"
+git push
 ## Standard Commit and Push Process
 
 ```bash

@@ -49,6 +49,7 @@ TOGGLES = {
     "Target Prospector": ("prospectorTarget.txt", "Automatically target the prospector after launching it."),
     "Thrust Up": ("thrustUp.txt", "Apply upward thrust when firing a prospector. Adjust timing in ((Thrust Up)) command in VA Called Commands - Misc category."),
     "Pulse Wave Analyser": ("Pulsewavetoggle.txt", "Switch back to the Pulse Wave Analyser firegroup when laser mining is completed."),
+    "Continuous Pulsewave": ("continousePulsewave.txt", "Enable continuous Pulse Wave Analyser mode."),
     "Auto Deselect Prospector": ("targetToggle.txt", "Deselect prospector when laser mining is completed."),
 }
 
