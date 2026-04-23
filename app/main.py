@@ -4491,14 +4491,12 @@ cargo panel forces Elite to write detailed inventory data.
             
             # Create dialog
             dialog = tk.Toplevel(parent)
+            dialog.withdraw()  # Hide immediately to prevent blinking on wrong monitor
             dialog.title(t('dialogs.adjust_limpets_title'))
             dialog.configure(bg=bg_color)
             dialog.resizable(False, False)
+            dialog.minsize(300, 0)
             # dialog.transient(parent)  # Disabled - causes focus issues
-            try:
-                dialog.grab_set()
-            except:
-                pass
             
             # Set app icon
             try:
@@ -4578,11 +4576,19 @@ cargo panel forces Elite to write detailed inventory data.
             else:
                 # Fallback centering
                 dialog.geometry(f"+{parent.winfo_x() + 100}+{parent.winfo_y() + 100}" if parent else "")
-            
+
+            # Show dialog AFTER centering to prevent blinking on wrong monitor
+            dialog.deiconify()
+
             # Force dialog to stay on top and have focus
             dialog.attributes('-topmost', True)
             dialog.lift()
             dialog.focus_force()
+
+            try:
+                dialog.grab_set()
+            except:
+                pass
             
             # Keep dialog on top while open
             def keep_on_top():

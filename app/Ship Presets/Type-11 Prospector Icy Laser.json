@@ -34,26 +34,28 @@
     "Cargo Scoop": 1,
     "Headtracker Docking Control": 1,
     "Repeated Mining Cycles": 0,
-    "Night Vision": 0,
+    "Night Vision": 1,
     "Power Settings": 1,
     "Prospector Sequence": 1,
     "Prospector Sound Effect": 1,
     "Target Prospector": 0,
     "Thrust Up": 1,
     "Pulse Wave Analyser": 0,
+    "Continuous Pulsewave": 0,
     "Auto Deselect Prospector": 0
   },
   "Announcements": {},
   "Timers": {
-    "Duration for firing mining lasers (standard)": 25,
+    "Duration for firing mining lasers (standard)": 26,
     "Pause between mining cycles for weapon recharge/cooldown": 8,
     "Duration for repeated mining cycles (per cycle)": 8,
     "Delay before targeting the prospector after launching": 8,
-    "Delay before retracting cargo scoop after mining sequence": 16,
+    "Delay before retracting cargo scoop after mining sequence": 17,
     "Boost Interval (For Core Mining Boost sequense )": 1
   },
   "LaserExtraRepeatCount": 2,
-  "ProspectorDelay": 4.5,
-  "ThrustClosed": 1.5,
+  "ProspectorDelay": 4.6,
+  "ThrustUpDuration": 1.2,
+  "ThrustClosed": 1.2,
   "ThrustOpen": 3.8
 }
