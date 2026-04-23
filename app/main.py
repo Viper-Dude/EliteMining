@@ -9891,9 +9891,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Initialize dependent toggle states AFTER import has a chance to load values
         # Import runs at 100ms, so we delay this to 150ms
         self.after(150, self._update_prospector_dependencies)
-        self.after(150, self._update_pulsewave_dependency)
+        self.after(150, lambda: self._update_pulsewave_dependency(reset_value=False))
 
-    def _update_pulsewave_dependency(self):
+    def _update_pulsewave_dependency(self, reset_value=True):
         """Enable/disable Continuous Pulsewave based on Pulse Wave Analyser state"""
         try:
             if "Pulse Wave Analyser" not in self.toggle_vars or "Continuous Pulsewave" not in self.toggle_checkboxes:
@@ -9904,8 +9904,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cp_checkbox.configure(state="normal")
             else:
                 cp_checkbox.configure(state="disabled")
-                # NOTE: Don't reset value - preserve user's setting
-                # Value is saved/restored from file; checkbox is just visually disabled
+                if reset_value:
+                    self.toggle_vars["Continuous Pulsewave"].set(0)
         except Exception as e:
             print(f"Error updating pulsewave dependency: {e}")
 
