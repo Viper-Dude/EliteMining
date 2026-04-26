@@ -16383,9 +16383,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         search_frame = ttk.LabelFrame(main_container, text=t('marketplace.search_title'), padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
         
-        # Configure grid weights
-        search_frame.columnconfigure(1, weight=1)
-        
         # Load marketplace preferences from config
         cfg = _load_cfg()
         self.marketplace_search_mode = tk.StringVar(value=cfg.get('marketplace_search_mode', 'near_system'))
@@ -16404,8 +16401,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Row 0: Search Mode (Near/Galaxy) + Sell/Buy
         row0_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
-        row0_frame.grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 10))
-        
+        row0_frame.pack(fill="x", pady=(0, 10))
+
+        # Status label (packed right FIRST so it claims far-right space)
+        self.marketplace_total_label = tk.Label(row0_frame, text=t('marketplace.enter_system_commodity'),
+                                               bg=_mkt_cb_bg, fg="gray", font=("Segoe UI", 8))
+        self.marketplace_total_label.pack(side="right", padx=(0, 5))
+
         rb1 = tk.Radiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.marketplace_search_mode,
                       value="near_system", bg=_mkt_cb_bg, fg="#ffffff", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
@@ -16440,7 +16442,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Row 1: Reference System + Commodity
         row1_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
-        row1_frame.grid(row=1, column=0, columnspan=5, sticky="w", pady=(0, 10))
+        row1_frame.pack(fill="x", pady=(0, 10))
         
         # Fixed-width label for perfect alignment with Station: below
         ttk.Label(row1_frame, text=t('marketplace.ref_system'), width=12).pack(side="left", padx=(0, 5))
@@ -16496,7 +16498,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Row 2: All filters (aligned with Row 1)
         row2_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
-        row2_frame.grid(row=2, column=0, columnspan=5, sticky="w", pady=(0, 10))
+        row2_frame.pack(fill="x", pady=(0, 10))
         
         # Station type localization maps
         station_type_map = get_station_types()
@@ -16575,7 +16577,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Row 3: Search button and Max Age
         row3_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
-        row3_frame.grid(row=3, column=0, columnspan=5, sticky="ew")
+        row3_frame.pack(fill="x")
         
         search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'), 
                               command=self._search_marketplace,
@@ -16637,11 +16639,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                               bg=_mkt_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
         self.marketplace_avg_label.pack(side="right", padx=(0, 10))
 
-        # Status label (moved to header, right side)
-        self.marketplace_total_label = tk.Label(results_header, text=t('marketplace.enter_system_commodity'),
-                                               bg=_mkt_cb_bg, fg="gray", font=("Segoe UI", 8))
-        self.marketplace_total_label.pack(side="right")
-        
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
         
@@ -16670,9 +16667,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         search_frame = ttk.LabelFrame(main_container, text=t('marketplace.search_title'), padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
         
-        # Configure grid weights
-        search_frame.columnconfigure(1, weight=1)
-        
         # Load marketplace preferences from config
         cfg = _load_cfg()
         self.trade_search_mode = tk.StringVar(value=cfg.get('trade_search_mode', 'near_system'))
@@ -16691,8 +16685,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Row 0: Search Mode (Near/Galaxy) + Sell/Buy
         row0_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
-        row0_frame.grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 10))
-        
+        row0_frame.pack(fill="x", pady=(0, 10))
+
+        # Status label (packed right FIRST so it claims far-right space)
+        self.trade_total_label = tk.Label(row0_frame, text=t('marketplace.enter_system_commodity'),
+                                          bg=_trade_cb_bg, fg="gray", font=("Segoe UI", 8))
+        self.trade_total_label.pack(side="right", padx=(0, 5))
+
         rb1 = tk.Radiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.trade_search_mode,
                       value="near_system", bg=_trade_cb_bg, fg="#ffffff", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
@@ -16727,7 +16726,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Row 1: Reference System + Category + Commodity
         row1_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
-        row1_frame.grid(row=1, column=0, columnspan=5, sticky="w", pady=(0, 10))
+        row1_frame.pack(fill="x", pady=(0, 10))
         
         ttk.Label(row1_frame, text=t('marketplace.ref_system'), width=12).pack(side="left", padx=(0, 5))
         self.trade_reference_system = tk.StringVar(value=cfg.get('trade_reference_system', ''))
@@ -16774,7 +16773,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Row 2: All filters (same as mining tab)
         row2_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
-        row2_frame.grid(row=2, column=0, columnspan=5, sticky="w", pady=(0, 10))
+        row2_frame.pack(fill="x", pady=(0, 10))
         
         # Station type
         station_type_map = get_station_types()
@@ -16844,7 +16843,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Row 3: Search button and Max Age
         row3_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
-        row3_frame.grid(row=3, column=0, columnspan=5, sticky="ew")
+        row3_frame.pack(fill="x")
         
         search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'), 
                               command=self._search_trade_market,
@@ -16897,11 +16896,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                         bg=_trade_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
         self.trade_avg_label.pack(side="right", padx=(0, 10))
 
-        # Status label
-        self.trade_total_label = tk.Label(results_header, text=t('marketplace.enter_system_commodity'),
-                                               bg=_trade_cb_bg, fg="gray", font=("Segoe UI", 8))
-        self.trade_total_label.pack(side="right")
-        
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
         
@@ -18744,7 +18738,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if results:
                         trade_order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
                         if "Distance" in trade_order_by:
-                            results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+                            if search_mode == "galaxy_wide":
+                                # Galaxy-wide: no distances yet — pre-sort by best price so top
+                                # candidates make it into the distance-calculation window (top 50).
+                                # Actual distance re-sort happens in _update_trade_with_distances.
+                                if is_buy_mode:
+                                    results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 999999))
+                                else:
+                                    results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
+                            else:
+                                results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
                         elif "Best price" in trade_order_by:
                             if is_buy_mode:
                                 results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 999999))
@@ -18755,7 +18758,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         elif "Last update" in trade_order_by:
                             results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
                         else:
-                            results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+                            results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
                     else:
                         results_sorted = []
 
@@ -18866,7 +18869,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
                 
                 if "Distance" in order_by:
-                    results_sorted = sorted(results, key=lambda x: x.get('distance', 999999), reverse=False)
+                    results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')), reverse=False)
                 elif "Best price" in order_by:
                     if is_buy_mode:
                         results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 999999), reverse=False)
@@ -18877,7 +18880,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 elif "Last update" in order_by:
                     results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
                 else:
-                    results_sorted = sorted(results, key=lambda x: x.get('distance', 999999), reverse=False)
+                    results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')), reverse=False)
                 
                 # Display results using trade table (separate from mining table)
                 if search_mode == "galaxy_wide":
@@ -18928,6 +18931,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _update_trade_with_distances(self, results_with_distances: list, total_count: int):
         """Update trade results with calculated distances"""
+        order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
+        if "Distance" in order_by:
+            results_with_distances = sorted(results_with_distances, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
         self._display_trade_results(results_with_distances)
         self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=total_count))
         self.config(cursor="")
@@ -19119,6 +19125,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if api_type is None or api_type == '':
                 api_type = 'Unknown'
             
+            # Exact known types first, then prefix-based fallback for new
+            # Trailblazers/colonization types (PlanetaryConstructionDepot, SpaceConstructionDepot, etc.)
             if api_type == 'AsteroidBase':
                 station_type = 'Orbital/Asteroid'
             elif api_type in ['Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Dodec']:
@@ -19127,18 +19135,32 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 station_type = 'Surface/Crater'
             elif api_type == 'CraterPort':
                 station_type = 'Surface/Port'
-            elif api_type == 'SurfaceStation':
-                station_type = 'Surface Station'
+            elif api_type in ('SurfaceStation', 'SurfacePort'):
+                station_type = 'Surface/Port'
             elif api_type == 'OnFootSettlement':
-                station_type = 'Surface/OnFoot'
+                station_type = 'Surface/Settlement'
             elif api_type == 'FleetCarrier':
                 station_type = 'Carrier'
             elif api_type == 'StrongholdCarrier':
                 station_type = 'Stronghold'
             elif api_type == 'MegaShip':
                 station_type = 'MegaShip'
+            elif api_type == 'Unknown':
+                station_type = 'Unknown'
+            elif 'Planetary' in api_type or 'Crater' in api_type or 'Ground' in api_type:
+                station_type = 'Surface/Station'
+            elif 'Space' in api_type and 'Construction' in api_type:
+                station_type = 'Orbital/Station'
+            elif 'Surface' in api_type or 'Settlement' in api_type or 'OnFoot' in api_type:
+                station_type = 'Surface/Station'
+            elif 'Carrier' in api_type or 'Drake' in api_type:
+                station_type = 'Carrier'
+            elif 'Outpost' in api_type:
+                station_type = 'Orbital/Outpost'
+            elif 'Orbital' in api_type or 'Port' in api_type or 'Station' in api_type:
+                station_type = 'Orbital/Station'
             else:
-                station_type = api_type
+                station_type = 'Orbital/Station'
             
             # PAD (Landing pad size)
             pad_size = result.get('maxLandingPadSize')
@@ -19324,7 +19346,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     # Sort
                     if results:
                         if "Distance" in order_by:
-                            results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+                            if search_mode == "galaxy_wide":
+                                # Galaxy-wide: no distances yet — pre-sort by best price so top
+                                # candidates make it into the distance-calculation window (top 50).
+                                # Actual distance re-sort happens in _update_marketplace_with_distances.
+                                if is_buy_mode:
+                                    results_sorted = sorted(results, key=lambda x: x.get('buyPrice', 999999))
+                                else:
+                                    results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
+                            else:
+                                results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
                         elif "Best price" in order_by:
                             if is_buy_mode:
                                 results_sorted = sorted(results, key=lambda x: x.get('buyPrice', 999999))
@@ -19338,7 +19369,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         elif "Last update" in order_by:
                             results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
                         else:
-                            results_sorted = sorted(results, key=lambda x: x.get('distance', 999999))
+                            results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
                     else:
                         results_sorted = []
 
@@ -19348,7 +19379,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         exclude_carriers, original_count))
                 except Exception as e:
                     log.error(f"Marketplace search failed: {e}")
-                    self.after(0, lambda: self._marketplace_search_error(str(e)))
+                    _err = str(e)
+                    self.after(0, lambda err=_err: self._marketplace_search_error(err))
             
             thread = threading.Thread(target=search_thread, daemon=True)
             thread.start()
@@ -19455,7 +19487,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if results:
                 # Sort results
                 if "Distance" in order_by:
-                    results_sorted = sorted(results, key=lambda x: x.get('distance', 999999), reverse=False)
+                    results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')), reverse=False)
                 elif "Best price" in order_by:
                     if is_buy_mode:
                         results_sorted = sorted(results, key=lambda x: x.get('buyPrice', 999999), reverse=False)
@@ -19469,7 +19501,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 elif "Last update" in order_by:
                     results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
                 else:
-                    results_sorted = sorted(results, key=lambda x: x.get('distance', 999999), reverse=False)
+                    results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')), reverse=False)
                 
                 # For galaxy-wide mode, calculate distances in background
                 if search_mode == "galaxy_wide":
@@ -19561,6 +19593,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     api_type = 'Unknown'
                 
                 # Orbital starports - show as "Orbital/Type"
+                # Exact known types first, then prefix-based fallback for new
+                # Trailblazers/colonization types (OrbitalConstruction, SurfaceConstruction, etc.)
                 if api_type == 'AsteroidBase':
                     station_type = 'Orbital/Asteroid Base'
                 elif api_type in ['Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Dodec']:
@@ -19569,10 +19603,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     station_type = 'Surface/Crater Outpost'
                 elif api_type == 'CraterPort':
                     station_type = 'Surface/Crater Port'
-                elif api_type == 'SurfaceStation':
-                    station_type = 'Surface Station'
+                elif api_type in ('SurfaceStation', 'SurfacePort'):
+                    station_type = 'Surface/Port'
                 elif api_type == 'OnFootSettlement':
-                    station_type = 'Surface/OnFoot Settlement'
+                    station_type = 'Surface/Settlement'
                 elif api_type == 'FleetCarrier':
                     station_type = 'Carrier'
                 elif api_type == 'StrongholdCarrier':
@@ -19580,10 +19614,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 elif api_type == 'MegaShip':
                     station_type = 'MegaShip'
                 elif api_type == 'Unknown':
-                    # Station lacks metadata in API - show as Unknown
                     station_type = 'Unknown'
+                elif 'Surface' in api_type or 'Crater' in api_type or 'Ground' in api_type:
+                    station_type = 'Surface/Station'
+                elif 'Carrier' in api_type or 'Drake' in api_type:
+                    station_type = 'Carrier'
+                elif 'Settlement' in api_type or 'OnFoot' in api_type:
+                    station_type = 'Surface/Settlement'
+                elif 'Outpost' in api_type:
+                    station_type = 'Orbital/Outpost'
+                elif 'Orbital' in api_type or 'Port' in api_type or 'Station' in api_type:
+                    station_type = 'Orbital/Station'
                 else:
-                    station_type = api_type  # Fallback to original name
+                    station_type = 'Orbital/Station'  # Safe default for any future types
                 
                 # PAD (Landing pad size) - Ardent API returns integer: 0=?, 1=S, 2=M, 3=L
                 pad_size = result.get('maxLandingPadSize')
@@ -19599,10 +19642,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     pad = '?'
                 
                 # DISTANCE (System distance) - calculate for both modes
-                if 'distance' in result:
+                if result.get('distance') is not None:
                     distance = f"{result['distance']:.1f}"
                 else:
-                    distance = "Unknown"  # No distance available
+                    distance = "-"  # No distance available
                 
                 # LS (Station distance from star) - from distanceToArrival field
                 station_ls = result.get('distanceToArrival')

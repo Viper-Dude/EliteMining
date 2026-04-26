@@ -3,21 +3,19 @@
 
 ## New Features & Improvements
 
-
-
-### Mining Controls
-
-- Added **Continuous Pulsewave** toggle next to the Pulse Wave Analyser checkbox. When enabled, the PWA fires continuously. The option is greyed out and cleared if Pulse Wave Analyser is disabled.
-
 ### Commodity Market
 
 - **Average Price** is now displayed in the Search Results header for both Mining Commodities and Trade Commodities tabs. After each search, the average price across all results is shown in gold next to the result count.
 
-### Voiceattack Profile
+### Mining Controls
 
-#### VoiceAttack Profile - Update to V5.0.5
+- Added **Continuous Pulsewave** toggle next to the Pulse Wave Analyser checkbox. When enabled, the PWA fires continuously. The option is greyed out and cleared if Pulse Wave Analyser is disabled. (Useful for Tritium mining)
+ 
 
-- Added command for the new **Continuous Pulsewave** toggle mention above
+### VoiceAttack Profile - Update to V5.0.5
+
+- Added new command 
+**Start Continuous pulse wave** For manuell Continuous Pulsewave 
 - General Optimizing of commands
 
 #### Important Notes 

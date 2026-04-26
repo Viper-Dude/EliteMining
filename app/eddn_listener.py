@@ -124,6 +124,23 @@ class EDDNListener:
                     CREATE INDEX IF NOT EXISTS idx_market_id
                     ON commodity_prices_data(market_id)
                 ''')
+                # Station metadata cache — populated from EDDN Docked/Location events.
+                # Commodity messages don't carry stationType, so we cache it separately.
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS station_metadata (
+                        market_id INTEGER PRIMARY KEY,
+                        station_name TEXT,
+                        system_name TEXT,
+                        station_type TEXT,
+                        max_landing_pad_size INTEGER,
+                        distance_to_arrival REAL,
+                        updated_at TEXT
+                    )
+                ''')
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_station_metadata_mid
+                    ON station_metadata(market_id)
+                ''')
                 # Drop FTS5 table if it exists from older versions (unused, wastes space)
                 cursor.execute('DROP TABLE IF EXISTS commodity_prices_fts')
                 conn.commit()
@@ -295,11 +312,19 @@ class EDDNListener:
         try:
             schema_ref = message.get('$schemaRef', '')
             
-            # We only care about commodity market data
-            if 'commodity' not in schema_ref.lower():
-                return
+            # Commodity market data — update prices
+            if 'commodity' in schema_ref.lower():
+                self._process_commodity_message(message)
+            # Journal Docked/Location events — cache station metadata (stationType etc.)
+            elif 'journal' in schema_ref.lower():
+                self._process_journal_message(message)
+                
+        except Exception as e:
+            log.error(f"EDDN: Error processing message: {e}")
             
-            # Extract message data
+    def _process_commodity_message(self, message: dict):
+        """Handle EDDN commodity/v3 messages — update price data."""
+        try:
             msg_data = message.get('message', {})
             header = message.get('header', {})
             
@@ -311,11 +336,11 @@ class EDDNListener:
             if not system_name or not station_name or not commodities:
                 return
             
-            # Get station metadata
             market_id = msg_data.get('marketId', 0)
-            station_type = msg_data.get('stationType', 'Unknown')
+            # Commodity schema does NOT include stationType — always falls back to 'Unknown'.
+            # The actual type is sourced from station_metadata (populated by Docked events).
+            station_type = msg_data.get('stationType') or 'Unknown'
             
-            # Update database
             self._update_commodity_prices(
                 system_name=system_name,
                 station_name=station_name,
@@ -324,9 +349,66 @@ class EDDNListener:
                 commodities=commodities,
                 timestamp=timestamp
             )
-            
         except Exception as e:
-            log.error(f"EDDN: Error processing message: {e}")
+            log.error(f"EDDN: Error processing commodity message: {e}")
+
+    def _process_journal_message(self, message: dict):
+        """Handle EDDN journal messages — extract Docked/Location for station metadata."""
+        try:
+            msg_data = message.get('message', {})
+            event = msg_data.get('event', '')
+            
+            if event not in ('Docked', 'Location'):
+                return
+            
+            market_id = msg_data.get('MarketID')
+            station_type = msg_data.get('StationType')
+            if not market_id or not station_type:
+                return
+            
+            station_name = msg_data.get('StationName', '')
+            system_name = msg_data.get('StarSystem', '')
+            distance_to_arrival = msg_data.get('DistFromStarLS') or msg_data.get('DistanceFromArrivalLS')
+            timestamp = msg_data.get('timestamp') or message.get('header', {}).get('gatewayTimestamp', '')
+            
+            # Derive max landing pad from StationEconomies or pad counts if present
+            max_pad = self._infer_max_pad(station_type)
+            
+            try:
+                with sqlite3.connect(self.database_path) as conn:
+                    conn.execute('''
+                        INSERT OR REPLACE INTO station_metadata
+                        (market_id, station_name, system_name, station_type,
+                         max_landing_pad_size, distance_to_arrival, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (market_id, station_name, system_name, station_type,
+                          max_pad, distance_to_arrival, timestamp))
+                    conn.commit()
+            except Exception as e:
+                log.debug(f"EDDN: station_metadata write error: {e}")
+
+        except Exception as e:
+            log.error(f"EDDN: Error processing journal message: {e}")
+
+    @staticmethod
+    def _infer_max_pad(station_type: str) -> int:
+        """Infer max landing pad size from station type string."""
+        large_pad_types = {
+            'Coriolis', 'Orbis', 'Ocellus', 'Dodec', 'DodecahedronBay',
+            'AsteroidBase', 'MegaShip', 'FleetCarrier', 'DrakeClass',
+            'StrongholdCarrier', 'CraterPort',
+            'OrbitalStation', 'SpaceConstructionDepot',
+        }
+        medium_pad_types = {'Outpost', 'CraterOutpost', 'PlanetaryConstructionDepot'}
+        if station_type in large_pad_types:
+            return 3
+        if station_type in medium_pad_types or 'Outpost' in station_type:
+            return 2
+        if 'Carrier' in station_type or 'Orbis' in station_type or 'Coriolis' in station_type:
+            return 3
+        if 'Surface' in station_type or 'Planetary' in station_type:
+            return 2
+        return 3  # Default to large for unknown orbital types
             
     def _update_commodity_prices(self, system_name: str, station_name: str, 
                                  station_type: str, market_id: int,
@@ -377,7 +459,7 @@ class EDDNListener:
                          market_id, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (system_name, system_x, system_y, system_z, station_name, station_type,
-                          commodity_name, sell_price, buy_price, demand, stock, 0,
+                          commodity_name, sell_price, buy_price, demand, stock, None,
                           market_id, timestamp))
                 
                 conn.commit()

@@ -155,8 +155,8 @@ class MarketplaceAPI:
                 if mid:
                     seen_ids.add(mid)
 
-                dist = station.get("distance") or 0
-                if max_distance and dist > max_distance:
+                dist = station.get("distance") or None
+                if max_distance and (dist is None or dist > max_distance):
                     continue
 
                 spansh_type = station.get("type") or ""
@@ -295,12 +295,12 @@ class MarketplaceAPI:
                 sx = station.get("system_x")
                 sy = station.get("system_y")
                 sz = station.get("system_z")
-                if max_distance and ref_coords:
-                    if sx is None or sy is None or sz is None:
-                        continue
+                if ref_coords and sx is not None and sy is not None and sz is not None:
                     dist = math.sqrt((sx - rx) ** 2 + (sy - ry) ** 2 + (sz - rz) ** 2)
-                    if dist > max_distance:
+                    if max_distance and dist > max_distance:
                         continue
+                elif max_distance and ref_coords:
+                    continue  # No coords, skip when distance-limited
                 else:
                     dist = station.get("distance") or 0
 
@@ -401,15 +401,20 @@ class MarketplaceAPI:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
-                # Query by commodity name — match Spansh display name
+                # Query commodity data, LEFT JOIN station_metadata to fill in missing
+                # station types (commodity messages don't carry stationType).
                 cursor.execute('''
-                    SELECT system_name, system_x, system_y, system_z,
-                           station_name, station_type, commodity_name,
-                           sell_price, buy_price, demand, stock,
-                           distance_to_arrival, market_id, updated_at
-                    FROM commodity_prices_data
-                    WHERE (LOWER(commodity_name) = LOWER(?) OR LOWER(commodity_name) = LOWER(?))
-                      AND updated_at > ?
+                    SELECT c.system_name, c.system_x, c.system_y, c.system_z,
+                           c.station_name, c.commodity_name,
+                           c.sell_price, c.buy_price, c.demand, c.stock,
+                           c.market_id, c.updated_at,
+                           COALESCE(NULLIF(c.station_type, 'Unknown'), m.station_type, 'Unknown') AS station_type,
+                           COALESCE(c.distance_to_arrival, m.distance_to_arrival)             AS distance_to_arrival,
+                           COALESCE(m.max_landing_pad_size, 0)                                AS meta_pad_size
+                    FROM commodity_prices_data c
+                    LEFT JOIN station_metadata m ON c.market_id = m.market_id
+                    WHERE (LOWER(c.commodity_name) = LOWER(?) OR LOWER(c.commodity_name) = LOWER(?))
+                      AND c.updated_at > ?
                 ''', (commodity_normalized, spansh_name, cutoff))
 
                 rows = cursor.fetchall()
@@ -448,14 +453,14 @@ class MarketplaceAPI:
                     sx, sy, sz = coords_cache[row["system_name"]]
 
                 # Distance filter
-                if max_distance and ref_coords and sx is not None and sy is not None and sz is not None:
+                if ref_coords and sx is not None and sy is not None and sz is not None:
                     dist = math.sqrt((sx - rx) ** 2 + (sy - ry) ** 2 + (sz - rz) ** 2)
-                    if dist > max_distance:
+                    if max_distance and dist > max_distance:
                         continue
                 elif max_distance and ref_coords:
                     continue  # No coords even after lookup, skip
                 else:
-                    dist = 0
+                    dist = None
 
                 stype = row["station_type"] or "Unknown"
                 # Detect carriers by market_id range (3.7 billion+)
@@ -472,8 +477,10 @@ class MarketplaceAPI:
                 stk    = row["stock"] or 0
 
                 # Normalize station type for EDDN compatibility
+                # Exact matches first; unknown/new types fall through to substring logic below
                 _type_map = {
                     "FleetCarrier": "FleetCarrier",
+                    "StrongholdCarrier": "StrongholdCarrier",
                     "Coriolis": "Coriolis",
                     "Orbis": "Orbis",
                     "Ocellus": "Ocellus",
@@ -481,19 +488,35 @@ class MarketplaceAPI:
                     "Outpost": "Outpost",
                     "CraterOutpost": "CraterOutpost",
                     "CraterPort": "CraterPort",
+                    "AsteroidBase": "AsteroidBase",
+                    "MegaShip": "MegaShip",
+                    "OnFootSettlement": "OnFootSettlement",
+                    # Trailblazers / colonization types
+                    "SpaceConstructionDepot": "OrbitalStation",
+                    "PlanetaryConstructionDepot": "SurfaceStation",
                 }
                 if is_carrier:
                     mapped_type = "FleetCarrier"
                 else:
                     mapped_type = _type_map.get(stype, stype)
 
-                # Determine pad size
-                if is_carrier or mapped_type in ("Coriolis", "Orbis", "Ocellus", "Dodec"):
+                # Determine pad size — prefer station_metadata value, then infer from type
+                meta_pad = row["meta_pad_size"] or 0
+                if meta_pad > 0:
+                    pad_size = meta_pad
+                elif is_carrier or mapped_type in ("Coriolis", "Orbis", "Ocellus", "Dodec"):
+                    pad_size = 3
+                elif mapped_type in ("AsteroidBase", "CraterPort", "MegaShip", "StrongholdCarrier", "OrbitalStation"):
                     pad_size = 3
                 elif "Outpost" in mapped_type:
                     pad_size = 2
                 else:
-                    pad_size = 1
+                    # Unknown type — don't guess; 0 shows as '?' in UI
+                    pad_size = 0
+
+                # distanceToArrival — NULL from commodity messages (not in EDDN schema);
+                # may be filled from station_metadata (populated by Docked events).
+                dist_to_arrival = row["distance_to_arrival"]  # None if not known
 
                 normalized.append({
                     "marketId":          row["market_id"],
@@ -503,7 +526,7 @@ class MarketplaceAPI:
                     "stationType":       mapped_type,
                     "maxLandingPadSize": pad_size,
                     "distance":          dist,
-                    "distanceToArrival": row["distance_to_arrival"] or 0,
+                    "distanceToArrival": dist_to_arrival,
                     "sellPrice":         sell_p,
                     "buyPrice":          buy_p,
                     "demand":            dem,
@@ -750,8 +773,10 @@ class MarketplaceAPI:
     @staticmethod
     def _merge_by_freshness(rows: List[Dict]) -> List[Dict]:
         """
-        Deduplicate by marketId, keeping the record with the newer updatedAt.
-        Records without marketId are kept as-is (e.g. some on-foot settlements).
+        Deduplicate by marketId, keeping the fresher price data but
+        preserving station metadata (stationType, maxLandingPadSize) from
+        whichever source has valid data.  EDDN is freshest for prices but
+        often lacks station metadata — Ardent/Spansh fill that in.
         """
         from datetime import datetime
 
@@ -762,6 +787,20 @@ class MarketplaceAPI:
             except Exception:
                 return datetime.min
 
+        def _has_meta(row: Dict) -> bool:
+            """True when the row carries valid station-type metadata."""
+            stype = row.get("stationType") or ""
+            return bool(stype) and stype != "Unknown"
+
+        def _pick_dist_to_arrival(winner: Dict, loser: Dict):
+            """Return the best (non-None, non-zero) distanceToArrival from either record."""
+            w = winner.get("distanceToArrival")
+            l = loser.get("distanceToArrival")
+            # Prefer a real non-zero value; 0 is valid for fleet carriers
+            if w is not None:
+                return w
+            return l  # may still be None — UI shows '?'
+
         best: Dict[int, Dict] = {}
         no_id: List[Dict] = []
 
@@ -770,8 +809,31 @@ class MarketplaceAPI:
             if mid is None:
                 no_id.append(row)
                 continue
-            if mid not in best or _ts(row) > _ts(best[mid]):
+            if mid not in best:
                 best[mid] = row
+            else:
+                existing = best[mid]
+                if _ts(row) > _ts(existing):
+                    # Newer record wins for pricing data
+                    merged = dict(row)
+                    # Preserve metadata from older record if newer lacks it
+                    if not _has_meta(merged) and _has_meta(existing):
+                        merged["stationType"] = existing["stationType"]
+                    if merged.get("maxLandingPadSize", 0) <= 1 and existing.get("maxLandingPadSize", 0) > 1:
+                        merged["maxLandingPadSize"] = existing["maxLandingPadSize"]
+                    merged["distanceToArrival"] = _pick_dist_to_arrival(merged, existing)
+                    best[mid] = merged
+                else:
+                    # Existing is newer — patch in metadata from newer row if existing lacks it
+                    if not _has_meta(existing) and _has_meta(row):
+                        best[mid] = dict(existing)
+                        best[mid]["stationType"] = row["stationType"]
+                    if existing.get("maxLandingPadSize", 0) <= 1 and row.get("maxLandingPadSize", 0) > 1:
+                        best[mid] = dict(best[mid])
+                        best[mid]["maxLandingPadSize"] = row["maxLandingPadSize"]
+                    if best[mid].get("distanceToArrival") is None:
+                        best[mid] = dict(best[mid])
+                        best[mid]["distanceToArrival"] = _pick_dist_to_arrival(existing, row)
 
         merged = list(best.values()) + no_id
         print(f"[DUAL-API] After merge: {len(merged)} unique results")
@@ -1124,9 +1186,35 @@ class MarketplaceAPI:
                 ref_x, ref_y, ref_z = ref_coords['x'], ref_coords['y'], ref_coords['z']
                 print(f"[DISTANCE CALC] Using EDSM fallback for {reference_system}")
             
-            # Calculate distance for each result using API coordinates (instant, no additional queries!)
+            # Batch-resolve missing coords from galaxy DB for results without systemX/Y/Z
+            missing_coord_results = [r for r in results
+                                     if r.get('systemX') is None and r.get('systemName')]
+            if missing_coord_results:
+                try:
+                    from local_database import LocalSystemsDatabase
+                    import sqlite3 as _sqlite3
+                    galaxy_db = LocalSystemsDatabase()
+                    if galaxy_db.is_database_available():
+                        missing_names = list({r['systemName'] for r in missing_coord_results})
+                        placeholders = ",".join("?" for _ in missing_names)
+                        with _sqlite3.connect(str(galaxy_db.db_path)) as _conn:
+                            _conn.row_factory = _sqlite3.Row
+                            _cur = _conn.cursor()
+                            _cur.execute(
+                                f"SELECT name, x, y, z FROM systems WHERE name IN ({placeholders})",
+                                missing_names
+                            )
+                            coord_lookup = {row['name']: (row['x'], row['y'], row['z'])
+                                            for row in _cur.fetchall()}
+                        for result in missing_coord_results:
+                            coords = coord_lookup.get(result['systemName'])
+                            if coords:
+                                result['systemX'], result['systemY'], result['systemZ'] = coords
+                except Exception as _ce:
+                    print(f"[DISTANCE CALC] Batch coord lookup failed: {_ce}")
+
+            # Calculate distance for each result
             for result in results:
-                # Use coordinates already in API response
                 sys_x = result.get('systemX')
                 sys_y = result.get('systemY')
                 sys_z = result.get('systemZ')
