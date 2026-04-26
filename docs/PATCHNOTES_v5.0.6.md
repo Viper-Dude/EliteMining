@@ -1,9 +1,10 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-03-16
+**Release Date:** 2026-04-26
 
 ## New Features & Improvements
 
 ### Commodity Market
+- **Fixed** Some system returned with distance set to 0.0 and Landing Pad set to ?
 
 - **Average Price** is now displayed in the Search Results header for both Mining Commodities and Trade Commodities tabs. After each search, the average price across all results is shown in gold next to the result count.
 
@@ -12,7 +13,7 @@
 - Added **Continuous Pulsewave** toggle next to the Pulse Wave Analyser checkbox. When enabled, the PWA fires continuously. The option is greyed out and cleared if Pulse Wave Analyser is disabled. (Useful for Tritium mining)
  
 
-### VoiceAttack Profile - Update to V5.0.5
+### VoiceAttack Profile - Update to V5.0.6
 
 - Added new command 
 **Start Continuous pulse wave** For manuell Continuous Pulsewave 
