@@ -2,7 +2,7 @@
 
 # Git Push
 git add .
-git commit -m "v5.0.6"
+git commit -m "v5.0.7"
 git push
 ## Standard Commit and Push Process
 

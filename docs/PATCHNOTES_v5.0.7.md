@@ -6,13 +6,16 @@
 ### Commodity Market
 - **Average and Best Price** - Now displayed in the Search Results header for both the Mining Commodities and Trade Commodities tabs.
 
+### Mining Reports 
+- **Fixed** -  Not sorting correct when clicked on the  "Date/Time" time column header
+
 ### Mining Controls
 
 - Optimised **Prospector Sequence** - Significantly decreased cooldown time
 
 ### VoiceAttack Profile - Update to V5.0.7
 
-- **Fixed** "AutoHonk not always triggering after FSD jump"
+- **Fixed** - "AutoHonk not always triggering after FSD jump"
 - Optimised **Prospector Sequence** - Significantly decreased cooldown time
 - General optimisation of commands
 

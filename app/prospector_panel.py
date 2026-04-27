@@ -3039,15 +3039,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         system_filename = (row.get('system', '') or '').replace(' ', '_')
                         body_filename = (row.get('body', '') or '').replace(' ', '_')
 
-                        # Try several filename patterns (exact, wildcard time, body fallback)
-                        patterns = [
-                            f"Session_{date_part}_{time_part}_{system_filename}_{body_filename}.txt",
-                            f"Session_{date_part}_*_{system_filename}_*.txt",
-                            f"Session_{date_part}_*_*_{body_filename}.txt",
-                        ]
-                        matches = []
-                        for p in patterns:
-                            matches.extend(glob.glob(os.path.join(self.reports_dir, p)))
+                        # Only use exact filename match to avoid picking up hits from other sessions
+                        # at the same system/body (wildcard patterns caused cross-session bleed-through)
+                        exact_pattern = f"Session_{date_part}_{time_part}_{system_filename}_{body_filename}.txt"
+                        matches = glob.glob(os.path.join(self.reports_dir, exact_pattern))
 
                         for txt_path in matches:
                             try:
@@ -7574,10 +7569,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         except:
                             return 0.0
                     items.sort(key=lambda x: safe_float(x[0]), reverse=reverse)
+                elif col == 'date':
+                    # Sort by raw ISO timestamp — display format mm/dd/yy sorts incorrectly as string
+                    def date_sort_key(item_id):
+                        try:
+                            session = self.reports_tab_session_lookup.get(item_id, {})
+                            raw = session.get('timestamp_raw', '')
+                            if raw:
+                                return raw
+                            display = self.reports_tree_tab.set(item_id, 'date')
+                            return dt.datetime.strptime(display, "%m/%d/%y %H:%M").strftime("%Y-%m-%dT%H:%M:%S")
+                        except Exception:
+                            return ''
+                    items_with_ids = [(item, date_sort_key(item)) for item in self.reports_tree_tab.get_children('')]
+                    items_with_ids.sort(key=lambda x: x[1], reverse=reverse)
+                    for index, (item, _) in enumerate(items_with_ids):
+                        self.reports_tree_tab.move(item, '', index)
+                    tab_sort_dirs[col] = not reverse
+                    return
                 else:
                     # String sorting for text columns
                     items.sort(key=lambda x: str(x[0]).lower(), reverse=reverse)
-                    
+
                 for index, (val, item) in enumerate(items):
                     self.reports_tree_tab.move(item, '', index)
                 tab_sort_dirs[col] = not reverse
