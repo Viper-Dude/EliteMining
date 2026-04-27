@@ -13,6 +13,7 @@
 ### VoiceAttack Profile - Update to V5.0.7
 
 - **Fixed** "AutoHonk not always triggering after FSD jump"
+- Optimised **Prospector Sequence** - Significantly decreased cooldown time
 - General optimisation of commands
 
 #### Important Notes
