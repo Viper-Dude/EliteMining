@@ -41,6 +41,7 @@
     "Target Prospector": 0,
     "Thrust Up": 1,
     "Pulse Wave Analyser": 0,
+    "Continuous Pulsewave": 0,
     "Auto Deselect Prospector": 1
   },
   "Announcements": {},
@@ -53,7 +54,7 @@
     "Boost Interval (For Core Mining Boost sequense )": 1
   },
   "LaserExtraRepeatCount": 2,
-  "ProspectorDelay": 4.6,
+  "ProspectorDelay": 2.6,
   "ThrustUpDuration": 1.2,
   "ThrustClosed": 1.5,
   "ThrustOpen": 3.8

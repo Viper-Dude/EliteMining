@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.0.6"
+APP_VERSION = "v5.0.7"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5253,7 +5253,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Additional mining control variables (initialized once, not recreated in _build_timers_tab)
         self.laser_extra_repeat_var = tk.IntVar(value=1)
-        self.prospector_delay_var = tk.DoubleVar(value=4.6)
+        self.prospector_delay_var = tk.DoubleVar(value=2.6)
         self.thrust_upduration_var = tk.DoubleVar(value=1.5)
         self.thrust_closed_var = tk.DoubleVar(value=1.6)
         self.thrust_open_var = tk.DoubleVar(value=3.8)
@@ -9606,7 +9606,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Use existing variable (initialized in __init__)
             # NOTE: Don't set up trace during build - import will load values first
-            prospector_spinbox = tk.Spinbox(prospector_frame, from_=2.0, to=6.0, increment=0.1, width=5, 
+            prospector_spinbox = tk.Spinbox(prospector_frame, from_=1.0, to=6.0, increment=0.1, width=5,
                                              textvariable=self.prospector_delay_var, format="%.1f",
                                              command=self._save_prospector_delay,
                                              bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
@@ -9630,7 +9630,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 return "break"
             prospector_spinbox.bind("<MouseWheel>", on_prospector_scroll)
             
-            prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [2.0..6.0] seconds (default: 4.6s)",
+            prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [1.0..6.0] seconds (default: 2.6s)",
                                        bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
             prospector_label.pack(side="left")
             
@@ -10053,16 +10053,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 with open(txt_path, 'r', encoding='utf-8') as f:
                     delay = float(f.read().strip())
                     # Clamp to valid range
-                    delay = max(2.0, min(6.0, delay))
+                    delay = max(1.0, min(6.0, delay))
                     self.prospector_delay_var.set(delay)
                     print(f"[PROSPECTOR DELAY] Loaded delay: {delay:.1f} seconds")
             else:
-                # Create default file with value 4.4
                 self._save_prospector_delay()
-                print(f"[PROSPECTOR DELAY] Created default delay file: 4.4 seconds")
         except Exception as e:
             print(f"[PROSPECTOR DELAY] Error loading delay: {e}")
-            self.prospector_delay_var.set(4.6)  # Fallback to default
+            self.prospector_delay_var.set(2.6)  # Fallback to default
     
     def _save_toggle(self, toggle_name: str) -> None:
         """Save a toggle to file immediately on change"""
@@ -10776,8 +10774,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if raw is not None:
                     try:
                         delay = float(raw)
-                        # Clamp to valid range (2.0-6.0)
-                        delay = max(2.0, min(6.0, delay))
+                        # Clamp to valid range (1.0-6.0)
+                        delay = max(1.0, min(6.0, delay))
                         self.prospector_delay_var.set(delay)
                         found.append(f"{prospector_delay_file}.txt")
                         print(f"[IMPORT] Loaded prospector delay: {delay:.1f}s")
@@ -11210,8 +11208,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if "ProspectorDelay" in data and hasattr(self, 'prospector_delay_var'):
             try:
                 delay = float(data["ProspectorDelay"])
-                # Clamp to valid range (2.0-6.0)
-                delay = max(2.0, min(6.0, delay))
+                # Clamp to valid range (1.0-6.0)
+                delay = max(1.0, min(6.0, delay))
                 self.prospector_delay_var.set(delay)
                 self._save_prospector_delay()
                 print(f"[PRESET] Loaded prospector delay: {delay:.1f}s")
@@ -16638,6 +16636,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.marketplace_avg_label = tk.Label(results_header, text="",
                                               bg=_mkt_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
         self.marketplace_avg_label.pack(side="right", padx=(0, 10))
+        self.marketplace_best_label = tk.Label(results_header, text="",
+                                               bg=_mkt_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
+        self.marketplace_best_label.pack(side="right", padx=(0, 10))
 
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
@@ -16895,6 +16896,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.trade_avg_label = tk.Label(results_header, text="",
                                         bg=_trade_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
         self.trade_avg_label.pack(side="right", padx=(0, 10))
+        self.trade_best_label = tk.Label(results_header, text="",
+                                         bg=_trade_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
+        self.trade_best_label.pack(side="right", padx=(0, 10))
 
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
@@ -19099,8 +19103,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.trade_tree.delete(item)
         if hasattr(self, 'trade_avg_label'):
             self.trade_avg_label.config(text="")
+        if hasattr(self, 'trade_best_label'):
+            self.trade_best_label.config(text="")
 
-        # Compute average price across all results
+        # Compute average and best price across all results
         if results and hasattr(self, 'trade_avg_label'):
             is_buy_mode = self.trade_buy_mode.get()
             price_field = 'buyPrice' if is_buy_mode else 'sellPrice'
@@ -19108,6 +19114,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if prices:
                 avg = sum(prices) // len(prices)
                 self.trade_avg_label.config(text=f"Avg: {avg:,} CR")
+                best = min(prices) if is_buy_mode else max(prices)
+                label = "Best Buy" if is_buy_mode else "Best Sell"
+                self.trade_best_label.config(text=f"{label}: {best:,} CR")
 
         # Determine mode for correct field handling
         is_buy_mode = self.trade_buy_mode.get()
@@ -19558,7 +19567,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Results are already sorted by the search function based on user's "Sort by" selection
         # DO NOT re-sort here - just display them as provided
 
-        # Compute average price across all results
+        # Compute average and best price across all results
         if results and hasattr(self, 'marketplace_avg_label'):
             is_buy_mode = self.marketplace_buy_mode.get()
             price_field = 'buyPrice' if is_buy_mode else 'sellPrice'
@@ -19566,8 +19575,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if prices:
                 avg = sum(prices) // len(prices)
                 self.marketplace_avg_label.config(text=f"Avg: {avg:,} CR")
+                best = min(prices) if is_buy_mode else max(prices)
+                label = "Best Buy" if is_buy_mode else "Best Sell"
+                self.marketplace_best_label.config(text=f"{label}: {best:,} CR")
             else:
                 self.marketplace_avg_label.config(text="")
+                self.marketplace_best_label.config(text="")
         
         commodity = self.marketplace_commodity.get()
         self._populate_marketplace_results(results, commodity)

@@ -54,7 +54,7 @@
     "Boost Interval (For Core Mining Boost sequense )": 1
   },
   "LaserExtraRepeatCount": 2,
-  "ProspectorDelay": 4.6,
+  "ProspectorDelay": 2.6,
   "ThrustUpDuration": 1.2,
   "ThrustClosed": 1.2,
   "ThrustOpen": 3.8
