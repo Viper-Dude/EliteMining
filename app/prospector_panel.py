@@ -3053,9 +3053,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                         tf_m = re.search(r'Total Material Finds:\s*(\d+)', txt_content)
                                     if tf_m:
                                         parsed = int(tf_m.group(1))
-                                        if parsed > 0:
-                                            total_finds = parsed
-                                            break
+                                        total_finds = parsed  # trust TXT (even if 0)
+                                    else:
+                                        total_finds = 0  # TXT found but no hits line — reset, don't keep stale CSV value
+                                    break
                             except Exception:
                                 continue
                         # Targeted debug for known timestamp to help trace matching
@@ -9320,14 +9321,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         time_part = ts.strftime("%H-%M-%S")
                         system_filename = (session.get('system','') or '').replace(' ', '_')
                         body_filename = (session.get('body','') or '').replace(' ', '_')
-                        patterns = [
-                            f"Session_{date_part}_{time_part}_{system_filename}_{body_filename}.txt",
-                            f"Session_{date_part}_*_{system_filename}_*.txt",
-                            f"Session_{date_part}_*_*_{body_filename}.txt",
-                        ]
-                        matches = []
-                        for p in patterns:
-                            matches.extend(glob.glob(os.path.join(self.reports_dir, p)))
+                        exact_pattern = f"Session_{date_part}_{time_part}_{system_filename}_{body_filename}.txt"
+                        matches = glob.glob(os.path.join(self.reports_dir, exact_pattern))
                         for txt_path in matches:
                             try:
                                 with open(txt_path, 'r', encoding='utf-8') as tf:
@@ -9336,10 +9331,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                     if not tf_m:
                                         tf_m = re.search(r'Total Material Finds:\s*(\d+)', txt_content)
                                     if tf_m:
-                                        parsed = int(tf_m.group(1))
-                                        if parsed > 0:
-                                            total_finds_val = parsed
-                                            break
+                                        total_finds_val = int(tf_m.group(1))
+                                    else:
+                                        total_finds_val = 0
+                                    break
                             except Exception:
                                 continue
                     except Exception:
