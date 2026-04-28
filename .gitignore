@@ -75,6 +75,8 @@ test_*.py
 # Claude Code
 .claude/
 
+# Gitignore
+.gitignore/
 # Personal/Private files
 *prompts*
 copilot-instructions.md
