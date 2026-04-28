@@ -14,12 +14,14 @@
 - **Fixed** - Not sorting correctly when clicking the "Date/Time" column header
 - **Fixed** - Mining card is only generated when using the "Mining Card" button and no longer when ending a mining session
 
+
 ### Mining Controls
 - Optimised **Prospector Sequence** - Significantly decreased cooldown time
 
 ### VoiceAttack Profile - Update to V5.0.7
 - **Fixed** - "AutoHonk not always triggering after FSD jump"
-- Optimised **Prospector Sequence** - Significantly decreased cooldown time
+- Optimised **Prospector Sequence** - Significantly decreased cooldown time for faster launch
+-  **Landing Request** - Landing gear is now automatically deployed 10 seconds after docking clearance is granted at stations without a mail slot
 - General optimisation of commands
 
 #### Important Notes

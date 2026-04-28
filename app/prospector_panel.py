@@ -12467,8 +12467,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         h_scrollbar.grid(row=2, column=0, sticky="ew")
         self.bookmarks_tree.configure(xscrollcommand=h_scrollbar.set)
 
-        # Add sorting functionality
-        sort_dirs = {}
+        # Add sorting functionality — persist sort state so refreshes re-apply it
+        if not hasattr(self, '_bookmark_sort_dirs'):
+            self._bookmark_sort_dirs = {}
+        if not hasattr(self, '_bookmark_sort_col'):
+            self._bookmark_sort_col = None
+        sort_dirs = self._bookmark_sort_dirs
         def sort_bookmark_col(col):
             try:
                 reverse = sort_dirs.get(col, False)
@@ -12498,6 +12502,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 for index, (val, item) in enumerate(items):
                     self.bookmarks_tree.move(item, '', index)
                 sort_dirs[col] = not reverse
+                self._bookmark_sort_col = col
             except Exception as e:
                 print(f"Bookmark sorting error for column {col}: {e}")
 
@@ -12715,6 +12720,36 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 notes_display
             ), tags=(tag,))
             row_index += 1
+
+        # Re-apply current sort, defaulting to last_mined descending (newest on top)
+        if hasattr(self, '_bookmark_sort_col') and self._bookmark_sort_col:
+            active_col = self._bookmark_sort_col
+        else:
+            active_col = 'last_mined'
+            self._bookmark_sort_dirs['last_mined'] = True  # True means next click reverses → current is descending
+        try:
+            reverse = not self._bookmark_sort_dirs.get(active_col, False)  # apply opposite of "next" state = current state
+            items = [(self.bookmarks_tree.set(item, active_col), item) for item in self.bookmarks_tree.get_children('')]
+            if active_col == 'last_mined':
+                def safe_date(x):
+                    try:
+                        return dt.datetime.strptime(str(x), '%Y-%m-%d') if x else dt.datetime.min
+                    except:
+                        return dt.datetime.min
+                items.sort(key=lambda x: safe_date(x[0]), reverse=reverse)
+            elif active_col == 'avg_yield':
+                def safe_float(x):
+                    try:
+                        return float(str(x).replace(' T/hr', '').strip()) if x else 0.0
+                    except:
+                        return 0.0
+                items.sort(key=lambda x: safe_float(x[0]), reverse=reverse)
+            else:
+                items.sort(key=lambda x: str(x[0]).lower(), reverse=reverse)
+            for index, (val, item) in enumerate(items):
+                self.bookmarks_tree.move(item, '', index)
+        except Exception:
+            pass
 
     def _on_bookmark_double_click(self, event) -> None:
         """Handle double-click on bookmark tree - only edit if clicking on an item, not header"""
