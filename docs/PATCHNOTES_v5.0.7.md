@@ -1,5 +1,5 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-04-27
+**Release Date:** 2026-04-28
 
 ## New Features & Improvements
 - **General bug fixes**
