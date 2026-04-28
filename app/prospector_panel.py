@@ -9821,6 +9821,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     self.main_app._in_supercruise = (ev == "SupercruiseEntry")
                 # Handle SupercruiseExit during startup to get accurate BodyType for rings
                 if ev == "SupercruiseExit":
+                    self._sc_tab_switched = False  # Allow switch again on next entry
                     body_name = evt.get("Body") or evt.get("BodyName")
                     if body_name:
                         self.last_body = body_name
@@ -10602,19 +10603,26 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
     
     def _auto_switch_to_ring_finder_tab(self) -> None:
         """Auto-switch to Hotspots Finder tab if the setting is enabled
-        
+
         Note: Will NOT switch if a mining session is active (user is still mining)
+        Only switches once per supercruise entry — reset by SupercruiseExit.
         """
         try:
+            # Only switch once per supercruise entry
+            if getattr(self, '_sc_tab_switched', False):
+                print("[AUTO-TAB] Already switched for this supercruise entry, skipping")
+                return
+
             # Don't switch if a mining session is active
             if self.session_active:
                 print("[AUTO-TAB] Skipping switch to ring finder - mining session is active")
                 return
-                
+
             if self.main_app and hasattr(self.main_app, 'auto_switch_tabs'):
                 if self.main_app.auto_switch_tabs.get():
                     if hasattr(self.main_app, 'switch_to_tab'):
                         self.main_app.switch_to_tab('hotspots_finder')
+                        self._sc_tab_switched = True
         except Exception as e:
             print(f"[AUTO-TAB] Error switching to hotspots finder tab: {e}")
     
