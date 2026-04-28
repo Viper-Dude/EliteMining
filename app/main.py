@@ -1728,6 +1728,7 @@ class CargoMonitor:
             "empire_trader": "Imperial Clipper",
             "federation_corvette": "Federal Corvette",
             "mandalay": "Mandalay",
+            "mediumtransport01": "Lynx Highliner",
             "orca": "Orca",
             "panthermkii": "Panther Clipper Mk II",
             "type8": "Type-8 Transporter",
@@ -2022,9 +2023,14 @@ class CargoMonitor:
         
         # Build ship info string
         parts = []
-        if self.ship_name:
-            # Capitalize properly and fix Mk II formatting
-            formatted_name = self.ship_name.title()
+        # Use ShipName if it's a custom name (differs from ship type), else fall back to ShipIdent
+        display_name = ""
+        if self.ship_name and self.ship_name.lower() != ship_type_display.lower():
+            display_name = self.ship_name
+        elif self.ship_ident:
+            display_name = self.ship_ident
+        if display_name:
+            formatted_name = display_name.title()
             formatted_name = formatted_name.replace("Mk Ii", "Mk II").replace("Mk Iii", "Mk III")
             formatted_name = formatted_name.replace("Mk Iv", "Mk IV").replace("Mk V", "Mk V")
             formatted_name = formatted_name.replace("Mk Vi", "Mk VI").replace("Mk Vii", "Mk VII")
@@ -2032,7 +2038,7 @@ class CargoMonitor:
         # Ship ident (ID) removed from display - not needed for analytics
         # Users don't need to see (VIPD68) style IDs in reports/analytics
         if ship_type_display and ship_type_display not in ["", "Unknown"]:
-            parts.append(f"- {ship_type_display}")
+            parts.append(f"- {ship_type_display}" if parts else ship_type_display)
         
         return " ".join(parts) if parts else ""
     
@@ -3101,15 +3107,15 @@ cargo panel forces Elite to write detailed inventory data.
                     
                     # Capture ship info from LoadGame or Loadout events
                     if event_type in ["LoadGame", "Loadout"]:
-                        if not self.ship_name:  # Only capture if not already set
-                            self.ship_name = event.get("ShipName", "")
-                            self.ship_ident = event.get("ShipIdent", "")
-                            # Prefer Ship_Localised, use mapping for Ship field if needed
-                            if "Ship_Localised" in event:
-                                self.ship_type = event["Ship_Localised"]
-                            elif "Ship" in event:
-                                ship_id = event["Ship"].lower()
-                                self.ship_type = self.ship_type_map.get(ship_id, event["Ship"].replace("_", " ").title())
+                        # Always update — journal events are in order, last Loadout is current ship
+                        self.ship_name = event.get("ShipName", "")
+                        self.ship_ident = event.get("ShipIdent", "")
+                        # Prefer Ship_Localised, use mapping for Ship field if needed
+                        if "Ship_Localised" in event:
+                            self.ship_type = event["Ship_Localised"]
+                        elif "Ship" in event:
+                            ship_id = event["Ship"].lower()
+                            self.ship_type = self.ship_type_map.get(ship_id, event["Ship"].replace("_", " ").title())
                     
                     # Look for cargo capacity (existing logic)
                     if not cargo_found and event_type == "Loadout":

@@ -12119,36 +12119,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 except Exception as graph_error:
                     print(f"Warning: Could not auto-save graphs: {graph_error}")
             
-            # Auto-generate mining card
-            try:
-                from mining_card_generator import create_card_from_session
-                from path_utils import get_reports_dir
-                
-                # Create Cards directory
-                cards_dir = os.path.join(get_reports_dir(), "Cards")
-                os.makedirs(cards_dir, exist_ok=True)
-                
-                # Generate card filename matching report format
-                card_filename = f"Session_{session_timestamp}_{sysname}_{body}_Card.png"
-                card_path = os.path.join(cards_dir, card_filename)
-                
-                # Prepare session info for card
-                session_info = {
-                    'system': sysname.replace('_', ' '),
-                    'body': body.replace('_', ' '),
-                    'ship': self.session_ship_name if hasattr(self, 'session_ship_name') and self.session_ship_name else None,
-                    'duration_text': elapsed_txt
-                }
-                
-                # Generate the card
-                if create_card_from_session(cargo_session_data, session_info, card_path):
-                    print(f"[SESSION] Mining card generated: {card_filename}")
-                else:
-                    print(f"[SESSION] Failed to generate mining card")
-                    
-            except Exception as card_error:
-                print(f"Warning: Could not generate mining card: {card_error}")
-            
             # Refresh reports tab and window if open (don't auto-open popup)
             try:
                 self._refresh_reports_tab()  # Always refresh the main reports tab
