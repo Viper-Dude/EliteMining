@@ -72,6 +72,9 @@ EliteMiningSetup.exe
 # Test files
 test_*.py
 
+# Claude Code (personal settings only; shared settings.json can still be committed)
+.claude/settings.local.json
+
 # Personal/Private files
 *prompts*
 copilot-instructions.md
