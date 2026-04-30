@@ -16,6 +16,6 @@
 - **Clear and jump** - Now continues boosting until the ship has fully entered supercruise, rather than stopping as soon as the supercruise charge begins
 
 ### Important Notes
-- Remember to always check all your key and joystick bindings after every profile update.
+- Remember to always check all your key and joystick bindings after every profile update
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
