@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.0.7"
+APP_VERSION = "v5.0.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5477,6 +5477,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._app_fully_loaded = True
         self.after(5000, mark_loaded)
 
+        # Grace period: prevent game-focus check from hiding overlay during startup
+        self._overlay_startup_grace = True
+        def end_grace():
+            self._overlay_startup_grace = False
+        self.after(7000, end_grace)
+
         # Dismiss splash after a short delay once mainloop starts
         # (splash has been visible since the very start of __init__)
         self.after(2000, self._dismiss_splash)
@@ -5484,6 +5490,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Safety: re-apply cargo overlay state after full init settles
         # Guards against any startup race where overlay ends up hidden despite being enabled
         self.after(3500, self._reapply_cargo_overlay_state)
+        self.after(6000, self._reapply_cargo_overlay_state)  # Second pass after grace period ends
 
     def _dismiss_splash(self):
         """Dismiss the startup splash screen and reveal the main window."""
@@ -6156,7 +6163,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         if self.cargo_text_overlay.overlay_window and not getattr(self.cargo_text_overlay, '_session_hidden', False) and not getattr(self.cargo_text_overlay, '_sc_hidden', False):
                             self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 1)
                     else:
-                        if not self.cargo_text_overlay._game_hidden:
+                        if not self.cargo_text_overlay._game_hidden and not getattr(self, '_overlay_startup_grace', False):
                             self.cargo_text_overlay._game_hidden = True
                             if self.cargo_text_overlay.overlay_window:
                                 self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
@@ -7431,10 +7438,33 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     # Add tooltip
                     ToolTip(preset_btn, f"Left-click: Load | Right-click: Save | Ctrl+Click: Rename")
                 
-                # Restore active preset indicator from config
+                # Restore active preset and reload its settings on startup
                 try:
                     active_num = cfg.get('active_preset_num')
                     if active_num is not None:
+                        preset_key = f'announce_preset_{active_num}'
+                        data = cfg.get(preset_key)
+                        if data:
+                            preset_announce = data.get('announce_map', {})
+                            preset_minpct = data.get('min_pct_map', {})
+                            for material in KNOWN_MATERIALS:
+                                if material not in preset_announce:
+                                    preset_announce[material] = self.prospector_panel.announce_map.get(material, True)
+                                if material not in preset_minpct:
+                                    preset_minpct[material] = self.prospector_panel.min_pct_map.get(material, 20.0)
+                            self.prospector_panel.announce_map = preset_announce
+                            self.prospector_panel.min_pct_map = preset_minpct
+                            self.prospector_panel.threshold.set(data.get('announce_threshold', 20.0))
+                            if hasattr(self, 'announcement_vars') and self.announcement_vars:
+                                if "Core Asteroids" in self.announcement_vars and 'Core Asteroids' in data:
+                                    self.announcement_vars["Core Asteroids"].set(data['Core Asteroids'])
+                                if "Non-Core Asteroids" in self.announcement_vars and 'Non-Core Asteroids' in data:
+                                    self.announcement_vars["Non-Core Asteroids"].set(data['Non-Core Asteroids'])
+                            if hasattr(self, '_ann_minpct_vars'):
+                                for mat, var in self._ann_minpct_vars.items():
+                                    if mat in self.prospector_panel.min_pct_map:
+                                        var.set(self.prospector_panel.min_pct_map[mat])
+                            self._ann_update_display()
                         self._active_preset_num = active_num
                         self._active_preset_snapshot = self._ann_get_current_snapshot()
                         self._ann_update_preset_buttons()
@@ -7482,7 +7512,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Set the active preset and take a snapshot"""
         self._active_preset_num = num
         self._active_preset_snapshot = self._ann_get_current_snapshot()
-        # Save to config
+        # Save to config — immediate attempt plus a delayed retry to beat the save throttle.
+        # _save_announce_map/_save_min_pct_map fire just before this, so the immediate
+        # save is often throttled (only cache-updated). The retry at 800 ms runs after
+        # the 0.5 s throttle but within the 2 s cache TTL, so the load returns the full
+        # in-memory cache (including all preset data) and the disk write succeeds.
         if hasattr(self, 'prospector_panel') and self.prospector_panel:
             try:
                 cfg = self.prospector_panel._load_cfg()
@@ -7490,6 +7524,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.prospector_panel._save_cfg(cfg)
             except Exception:
                 pass
+
+            def _retry_save():
+                try:
+                    cfg2 = self.prospector_panel._load_cfg()
+                    cfg2['active_preset_num'] = num
+                    self.prospector_panel._save_cfg(cfg2)
+                except Exception:
+                    pass
+            self.after(800, _retry_save)
         self._ann_update_preset_buttons()
 
     def _ann_clear_active_preset(self):
@@ -8117,15 +8160,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.hide_overlays_in_supercruise.set(False)
                 self._sc_checkbox.config(state="disabled", fg="#666666")
             else:
-                self._sc_checkbox.config(state="normal", fg="#ffffff")
+                if bool(self.text_overlay_enabled.get()):
+                    self._sc_checkbox.config(state="normal", fg="#ffffff")
             self._save_cargo_preferences()
         
-        tk.Checkbutton(text_overlay_row, text=t('settings.overlay_only_mining_session'), variable=self.overlay_only_mining_session,
+        self._mining_session_cb = tk.Checkbutton(text_overlay_row, text=t('settings.overlay_only_mining_session'), variable=self.overlay_only_mining_session,
                       command=_on_mining_session_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
-                      highlightcolor="#1e1e1e", takefocus=False).pack(side="left", padx=(8, 0))
+                      highlightcolor="#1e1e1e", takefocus=False)
+        self._mining_session_cb.pack(side="left", padx=(8, 0))
         # Apply initial state — grey out supercruise checkbox if mining session is already enabled
         if self.overlay_only_mining_session.get():
             self._sc_checkbox.config(state="disabled", fg="#666666")
@@ -8163,14 +8208,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if not self._overlay_standard_var.get():
                     self._overlay_enhanced_var.set(1)
         
-        tk.Checkbutton(mode_frame, text=t('settings.overlay_standard'), variable=self._overlay_standard_var,
-                      command=_on_standard_cb, **_cb_kw).pack(side="left", padx=(8, 0))
-        tk.Checkbutton(mode_frame, text=t('settings.overlay_enhanced'), variable=self._overlay_enhanced_var,
-                      command=_on_enhanced_cb, **_cb_kw).pack(side="left", padx=(8, 0))
-        tk.Checkbutton(mode_frame, text=t('settings.cargo_overlay'), variable=self.cargo_show_in_overlay,
-                      **_cb_kw).pack(side="left", padx=(8, 0))
-        tk.Checkbutton(mode_frame, text=t('settings.overlay_only_game_focused'), variable=self.overlay_only_game_focused,
-                      **_cb_kw).pack(side="left", padx=(8, 0))
+        _std_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_standard'), variable=self._overlay_standard_var,
+                      command=_on_standard_cb, **_cb_kw)
+        _std_cb.pack(side="left", padx=(8, 0))
+        _enh_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_enhanced'), variable=self._overlay_enhanced_var,
+                      command=_on_enhanced_cb, **_cb_kw)
+        _enh_cb.pack(side="left", padx=(8, 0))
+        _cargo_cb = tk.Checkbutton(mode_frame, text=t('settings.cargo_overlay'), variable=self.cargo_show_in_overlay,
+                      **_cb_kw)
+        _cargo_cb.pack(side="left", padx=(8, 0))
+        _focused_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_only_game_focused'), variable=self.overlay_only_game_focused,
+                      **_cb_kw)
+        _focused_cb.pack(side="left", padx=(8, 0))
+        self._overlay_mode_cbs = [_std_cb, _enh_cb, _cargo_cb, _focused_cb]
         r += 1
         tk.Label(scrollable_frame, text=t('settings.overlay_mode_desc'),
                  wraplength=760, justify="left", fg="gray", bg=_gs_bg,
@@ -8326,6 +8376,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         #          font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         # r += 1
         
+        # Apply initial greyed-out state for overlay sub-controls if master toggle is off
+        self._apply_overlay_enabled_state()
+
         # ========== TEXT-TO-SPEECH AUDIO SECTION ==========
         ttk.Label(scrollable_frame, text=t('settings.tts_settings'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
@@ -13936,6 +13989,35 @@ class App(tk.Tk, ColumnVisibilityMixin):
         }
         update_config_values(updates)
 
+    def _apply_overlay_enabled_state(self) -> None:
+        """Grey out or restore all overlay sub-controls based on the master toggle state."""
+        enabled = bool(self.text_overlay_enabled.get())
+        state = "normal" if enabled else "disabled"
+        fg = "#ffffff" if enabled else "#666666"
+
+        for cb in getattr(self, '_overlay_mode_cbs', []):
+            cb.config(state=state, fg=fg)
+
+        if hasattr(self, '_mining_session_cb'):
+            self._mining_session_cb.config(state=state, fg=fg)
+
+        if hasattr(self, '_sc_checkbox'):
+            if not enabled:
+                self._sc_checkbox.config(state="disabled", fg="#666666")
+            elif self.overlay_only_mining_session.get():
+                self._sc_checkbox.config(state="disabled", fg="#666666")
+            else:
+                self._sc_checkbox.config(state="normal", fg="#ffffff")
+
+        if hasattr(self, 'transparency_scale'):
+            self.transparency_scale.config(state=state)
+        if hasattr(self, 'duration_scale'):
+            self.duration_scale.config(state=state)
+        if hasattr(self, 'color_menu'):
+            self.color_menu.config(state=state)
+        if hasattr(self, 'size_combo'):
+            self.size_combo.config(state="readonly" if enabled else "disabled")
+
     def _on_text_overlay_toggle(self, *args) -> None:
         """Called when text overlay checkbox is toggled (master toggle for all overlays)"""
         enabled = bool(self.text_overlay_enabled.get())
@@ -13945,6 +14027,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
         elif enabled and hasattr(self, 'cargo_text_overlay') and self.cargo_show_in_overlay.get():
             self.cargo_text_overlay.set_enabled(True)
+        self._apply_overlay_enabled_state()
         self._save_text_overlay_preference()
         
     def _on_transparency_change(self, *args) -> None:

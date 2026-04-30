@@ -12726,7 +12726,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             active_col = self._bookmark_sort_col
         else:
             active_col = 'last_mined'
-            self._bookmark_sort_dirs['last_mined'] = True  # True means next click reverses → current is descending
+            self._bookmark_sort_col = 'last_mined'
+            self._bookmark_sort_dirs['last_mined'] = False  # next click = ascending; current (default) = descending
         try:
             reverse = not self._bookmark_sort_dirs.get(active_col, False)  # apply opposite of "next" state = current state
             items = [(self.bookmarks_tree.set(item, active_col), item) for item in self.bookmarks_tree.get_children('')]
