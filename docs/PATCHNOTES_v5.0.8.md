@@ -7,13 +7,13 @@
 - **Average and Best Price** - Now displayed in the Search Results header for both the Mining Commodities and Trade Commodities tabs.
 
 ### Bookmarks
-- **Fixed** - Now always showing the lates session on top by default
+- **Fixed** - Now always showing the latest session on top by default
 
+### Announcements
+- **Fixed** - Selected announcement preset is now remembered and restored on app restart.
 
 ### VoiceAttack Profile - Update to V5.0.8
 - **Clear and jump** - Now continues boosting until the ship has fully entered supercruise, rather than stopping as soon as the supercruise charge begins
-- **Prospector Sequence** - When launch a prospector while running a mining sequence, mining sequence will stop 
-- General optimisation of commands
 
 ### Important Notes
 - Remember to always check all your key and joystick bindings after every profile update.
