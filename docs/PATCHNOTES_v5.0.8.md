@@ -10,7 +10,7 @@
 - **Fixed** - Now always showing the latest session on top by default
 
 ### Announcements
-- **Fixed** - Selected announcement preset is now remembered and restored on app restart.
+- **Fixed** - Selected announcement preset is now remembered and restored on app restart
 
 ### VoiceAttack Profile - Update to V5.0.8
 - **Clear and jump** - Now continues boosting until the ship has fully entered supercruise, rather than stopping as soon as the supercruise charge begins
