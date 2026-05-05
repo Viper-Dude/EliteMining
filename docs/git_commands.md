@@ -1,8 +1,11 @@
+# Firs run simulation
+python firstrun_sim.py
+
 # Git Commands Reference
 
 # Git Push
 git add .
-git commit -m "v5.0.8 - Minor fixes"
+git commit -m "v5.0.8 - Moved read_pdf  "
 git push
 ## Standard Commit and Push Process
 

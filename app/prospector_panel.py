@@ -2109,7 +2109,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_mineral.grid(row=0, column=0, sticky="nsew")
         
         # Statistics tree for live percentage yields
-        self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "all_hits", "quality_rate"), 
+        self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "all_hits", "quality_rate", "_spacer"),
                            show="headings", height=7, style="MineralAnalysis.Treeview")
         self.stats_tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.stats_tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
@@ -2124,7 +2124,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.stats_tree.heading("count", text=t('mining_session.hits'), anchor="center")
         self.stats_tree.heading("all_hits", text=t('mining_session.all_hits'), anchor="center")
         self.stats_tree.heading("quality_rate", text=t('mining_session.quality_rate'), anchor="center")
-        
+        self.stats_tree.heading("_spacer", text="", anchor="w")
+
         self.stats_tree.column("material", width=135, minwidth=110, anchor="w", stretch=False)
         self.stats_tree.column("tons", width=65, minwidth=50, anchor="center", stretch=False)
         self.stats_tree.column("tph", width=65, minwidth=50, anchor="center", stretch=False)
@@ -2133,9 +2134,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.stats_tree.column("avg_pct", width=130, minwidth=100, anchor="center", stretch=False)
         self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="center", stretch=False)
-        self.stats_tree.column("count", width=80, minwidth=60, anchor="center", stretch=False)
+        self.stats_tree.column("count", width=100, minwidth=80, anchor="center", stretch=False)
         self.stats_tree.column("all_hits", width=95, minwidth=70, anchor="center", stretch=False)
-        self.stats_tree.column("quality_rate", width=100, minwidth=80, anchor="center", stretch=True)
+        self.stats_tree.column("quality_rate", width=125, minwidth=100, anchor="center", stretch=False)
+        self.stats_tree.column("_spacer", width=20, minwidth=20, anchor="w", stretch=True)
         
         # Setup column visibility for material analysis
         self.setup_column_visibility(
@@ -7656,19 +7658,19 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.reports_tree_tab.column("ship", width=250, minwidth=80, stretch=False, anchor="w")
         self.reports_tree_tab.column("system", width=230, minwidth=80, stretch=False, anchor="w")
         self.reports_tree_tab.column("body", width=125, minwidth=60, stretch=False, anchor="w")
-        self.reports_tree_tab.column("tons", width=80, minwidth=50, stretch=False, anchor="center")
+        self.reports_tree_tab.column("tons", width=95, minwidth=70, stretch=False, anchor="center")
         self.reports_tree_tab.column("tph", width=60, minwidth=40, stretch=False, anchor="center")
-        self.reports_tree_tab.column("tons_per", width=85, minwidth=50, stretch=False, anchor="center")
-        self.reports_tree_tab.column("materials", width=80, minwidth=50, stretch=False, anchor="center")
-        self.reports_tree_tab.column("total_hits", width=80, minwidth=50, stretch=False, anchor="center")
-        self.reports_tree_tab.column("asteroids", width=80, minwidth=50, stretch=False, anchor="center")
-        self.reports_tree_tab.column("hit_rate", width=90, minwidth=50, stretch=False, anchor="center")
-        self.reports_tree_tab.column("quality", width=120, minwidth=60, stretch=False, anchor="center")
+        self.reports_tree_tab.column("tons_per", width=110, minwidth=70, stretch=False, anchor="center")
+        self.reports_tree_tab.column("materials", width=90, minwidth=60, stretch=False, anchor="center")
+        self.reports_tree_tab.column("total_hits", width=90, minwidth=60, stretch=False, anchor="center")
+        self.reports_tree_tab.column("asteroids", width=95, minwidth=60, stretch=False, anchor="center")
+        self.reports_tree_tab.column("hit_rate", width=100, minwidth=70, stretch=False, anchor="center")
+        self.reports_tree_tab.column("quality", width=140, minwidth=90, stretch=False, anchor="center")
         self.reports_tree_tab.column("cargo", width=350, minwidth=100, stretch=False, anchor="w")
-        self.reports_tree_tab.column("prospects", width=70, minwidth=40, stretch=False, anchor="center")
+        self.reports_tree_tab.column("prospects", width=80, minwidth=50, stretch=False, anchor="center")
         self.reports_tree_tab.column("eng_materials", width=250, minwidth=80, stretch=False, anchor="w")
-        self.reports_tree_tab.column("comment", width=80, minwidth=50, stretch=False, anchor="center")  # Wider to show header text
-        self.reports_tree_tab.column("enhanced", width=100, minwidth=60, stretch=False, anchor="center")
+        self.reports_tree_tab.column("comment", width=90, minwidth=60, stretch=False, anchor="center")
+        self.reports_tree_tab.column("enhanced", width=115, minwidth=80, stretch=False, anchor="center")
         # Spacer column — always last, gives every real column a draggable right border
         self.reports_tree_tab.heading("_spacer", text="", anchor="w")
         self.reports_tree_tab.column("_spacer", width=20, minwidth=20, stretch=True, anchor="w")

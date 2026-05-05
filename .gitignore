@@ -122,3 +122,6 @@ app/data/All_Materials_Combined_ready_matched_cleaned_density_locale.xlsx
 notes.txt
 todo.txt
 *.notes
+read_pdf.py
+firstrun_sim.py
+app/config.json.firstrun_bak
