@@ -1,35 +1,38 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_all
+
+# Collect matplotlib's data files (fonts, mpl-data), binaries, and submodules
+mpl_datas, mpl_binaries, mpl_hiddenimports = collect_all('matplotlib')
+# Collect numpy fully — required by matplotlib at runtime
+np_datas, np_binaries, np_hiddenimports = collect_all('numpy')
 
 a = Analysis(
     ['app\\main.py'],
     pathex=['app'],
-    binaries=[],
-    datas=[],
+    binaries=mpl_binaries + np_binaries,
+    datas=mpl_datas + np_datas,
     hiddenimports=[
-        'requests', 'requests.adapters', 'requests.auth', 'requests.cookies', 
-        'requests.models', 'requests.sessions', 'requests.structures', 'urllib3', 
+        'requests', 'requests.adapters', 'requests.auth', 'requests.cookies',
+        'requests.models', 'requests.sessions', 'requests.structures', 'urllib3',
         'hotspot_finder', 'zlib',
         # Logging and journal scanning modules
         'logging_setup', 'incremental_journal_scanner', 'journal_scan_state',
         # Event-driven file monitoring (optional)
         'file_watcher', 'watchdog', 'watchdog.observers', 'watchdog.events',
-        # Matplotlib for charts and graphs
+        # Matplotlib for charts and graphs (data files + submodules collected via collect_all above)
         'matplotlib', 'matplotlib.pyplot', 'matplotlib.dates', 'matplotlib.backends.backend_tkagg',
         # Additional dependencies
         'ctypes', 'ctypes.wintypes',
         # UI module components
         'ui', 'ui.theme', 'ui.tooltip', 'ui.dialogs'
-    ],
+    ] + mpl_hiddenimports + np_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Exclude unused numpy submodules to reduce exe size
-        'numpy.testing', 'numpy._pytesttester',
-        'numpy.linalg', 'numpy.fft', 'numpy.polynomial',
-        'numpy.random', 'numpy.ma', 'numpy.matlib',
-        'numpy.distutils', 'numpy.f2py',
+        # NOTE: numpy submodules cannot be safely excluded — matplotlib + numpy's
+        # internal _distributor_init machinery requires them. Use collect_all('numpy').
         # Exclude unused stdlib packages
         'unittest', 'pydoc', 'doctest', 'difflib',
         'ftplib', 'imaplib', 'poplib', 'smtplib', 'telnetlib', 'nntplib',
