@@ -243,6 +243,8 @@ Control mining sequence timing and automated behaviors:
 
 💡 **Tip:** Use "Stop all profile commands" in VoiceAttack to interrupt any active sequence.
 
+💡 **Reset interrupted / out-of-sync sequences:** If a mining sequence is interrupted and a toggle ends up in the wrong state (e.g. lasers won't fire when they should), use the **"Stop and Reset"** command (also recognised: *"Stop and reset all profile commands"*, *"Stop all"*, *"Reset all"*) to clear every sequence flag and return the profile to a clean baseline.
+
 [Back to Top](#top)
 
 ---
