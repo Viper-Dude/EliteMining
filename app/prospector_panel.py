@@ -564,9 +564,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         highlightthickness=1)
         entry.pack(side="left", padx=(10, 10))
         
-        entry.focus_set()
-        entry.select_range(0, tk.END)
-        
         # Result variable
         result = [None]
         
@@ -622,7 +619,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             dialog.grab_set()
         except:
             pass
-        
+
+        # Focus the entry AFTER focus_force/grab_set so the user can type immediately
+        # without clicking. Deferred via after() to win against any late focus events.
+        def _focus_entry():
+            try:
+                entry.focus_set()
+                entry.select_range(0, tk.END)
+                entry.icursor(tk.END)
+            except Exception:
+                pass
+        dialog.after(50, _focus_entry)
+
         # Keep dialog on top while open
         def keep_on_top():
             try:
