@@ -1,11 +1,15 @@
 # Firs run simulation
 python firstrun_sim.py
 
+# Git Commands Change message only
+  git commit --amend -m "your corrected message"
+  git push --force
+
 # Git Commands Reference
 
 # Git Push
 git add .
-git commit -m "v5.0.8 - Moved read_pdf  "
+git commit -m "v5.0.9 - Minor bug fixes and failed matplot import for the installer"
 git push
 ## Standard Commit and Push Process
 

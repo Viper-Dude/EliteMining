@@ -8,6 +8,7 @@ Follows EDDN schema specifications
 import requests
 import json
 import gzip
+import os
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
 import logging
@@ -59,8 +60,9 @@ class EDDNSender:
         Args:
             load_game_event: LoadGame event from journal
         """
-        self.game_version = load_game_event.get('GameVersion', '')
-        self.game_build = load_game_event.get('Build', '')
+        # Elite's LoadGame event uses lowercase 'gameversion'/'build' (not 'GameVersion'/'Build')
+        self.game_version = load_game_event.get('gameversion') or load_game_event.get('GameVersion', '')
+        self.game_build = load_game_event.get('build') or load_game_event.get('Build', '')
         self.horizons = load_game_event.get('Horizons')
         self.odyssey = load_game_event.get('Odyssey')
         
@@ -69,26 +71,76 @@ class EDDNSender:
             self.commander_name = load_game_event['Commander']
         
         log.info(f"Updated game info: {self.game_version}, Horizons={self.horizons}, Odyssey={self.odyssey}")
+
+    def prime_from_journal(self, journal_dir: str) -> bool:
+        """
+        Scan the latest journal file for a LoadGame event and prime game info.
+
+        Needed when the user launches EliteMining after Elite is already running —
+        the live watcher will never see a LoadGame, so gameversion/gamebuild stay
+        empty and EDDN rejects every commodity message.
+
+        Returns True if a LoadGame was found and applied.
+        """
+        try:
+            if not journal_dir or not os.path.isdir(journal_dir):
+                return False
+
+            journal_files = [f for f in os.listdir(journal_dir)
+                             if f.startswith("Journal.") and f.endswith(".log")]
+            if not journal_files:
+                return False
+            journal_files.sort(reverse=True)
+
+            for jf in journal_files[:3]:
+                path = os.path.join(journal_dir, jf)
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line or '"LoadGame"' not in line:
+                                continue
+                            try:
+                                entry = json.loads(line)
+                            except Exception:
+                                continue
+                            if entry.get("event") == "LoadGame":
+                                self.update_game_info(entry)
+                                return True
+                except Exception as e:
+                    log.debug(f"EDDN prime: error reading {jf}: {e}")
+                    continue
+            return False
+        except Exception as e:
+            log.error(f"EDDN prime_from_journal error: {e}")
+            return False
         
-    def send_commodity_data(self, system_name: str, station_name: str, 
+    def send_commodity_data(self, system_name: str, station_name: str,
                            market_id: int, commodities: List[Dict],
-                           station_data: Optional[Dict] = None) -> bool:
+                           station_data: Optional[Dict] = None,
+                           timestamp: Optional[str] = None) -> bool:
         """
         Send commodity market data to EDDN
-        
+
         Args:
             system_name: System name
             station_name: Station name
             market_id: Market ID
             commodities: List of commodity dictionaries
             station_data: Optional station metadata
-            
+            timestamp: ISO 8601 timestamp from Market.json (preferred over wall-clock)
+
         Returns:
             True if sent successfully
         """
         if not self.enabled:
             return False
-            
+
+        # EDDN requires gameversion/gamebuild — drop the message rather than send empty strings
+        if not self.game_version or not self.game_build:
+            log.warning("EDDN: skipping commodity send — gameversion/gamebuild not yet known (no LoadGame seen)")
+            return False
+
         try:
             # Build EDDN message
             message = {
@@ -97,14 +149,14 @@ class EDDNSender:
                     "uploaderID": self.commander_name,
                     "softwareName": self.app_name,
                     "softwareVersion": self.app_version,
-                    "gameversion": self.game_version if self.game_version else "",
-                    "gamebuild": self.game_build if self.game_build else ""
+                    "gameversion": self.game_version,
+                    "gamebuild": self.game_build
                 },
                 "message": {
                     "systemName": system_name,
                     "stationName": station_name,
                     "marketId": market_id,
-                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "timestamp": timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "commodities": commodities
                 }
             }

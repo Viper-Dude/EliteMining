@@ -98,14 +98,15 @@ class MarketHandler:
                 'distanceToArrival': market_data.get('DistanceToArrival')
             }
             
-            # Send to EDDN
+            # Send to EDDN — pass Market.json's timestamp so consumers can correlate with the journal stream
             if self.eddn_sender.enabled:
                 success = self.eddn_sender.send_commodity_data(
                     system_name=system_name,
                     station_name=station_name,
                     market_id=market_id,
                     commodities=eddn_commodities,
-                    station_data=station_data
+                    station_data=station_data,
+                    timestamp=market_data.get('timestamp')
                 )
                 
                 if success:

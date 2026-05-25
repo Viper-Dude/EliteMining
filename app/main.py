@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.0.9"
+APP_VERSION = "v5.1.0"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5442,6 +5442,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if journal_dir and os.path.exists(journal_dir):
             file_watcher.add_watch(journal_dir, self._on_journal_file_change)
             print(f"[OK] Watching journal directory for Market.json updates")
+            # Prime EDDN sender with LoadGame from the latest journal — required so
+            # gameversion/gamebuild are populated before the first Market.json event arrives.
+            if self.eddn_sender.prime_from_journal(journal_dir):
+                print(f"[OK] EDDN sender primed from journal (CMDR={self.eddn_sender.commander_name}, version={self.eddn_sender.game_version})")
+            else:
+                print(f"[WARN] EDDN sender could not find LoadGame in recent journals — commodity uploads will be deferred until next LoadGame")
         else:
             print(f"[WARN] Could not set up EDDN file watcher - journal_dir not available")
         
