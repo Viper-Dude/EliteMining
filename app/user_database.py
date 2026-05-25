@@ -1730,12 +1730,18 @@ class UserDatabase:
                     
                     if should_update:
                         log.debug(f"Updating hotspot ({update_reason}): {system_name} - {body_name} - {material_name}")
+                        # COALESCE the ring-metadata fields: journal SAASignalsFound doesn't carry
+                        # ring_type / ls_distance / radii / mass (those come from the planet Scan
+                        # event), so passing NULL must NOT wipe values previously set by Spansh.
                         cursor.execute('''
-                            UPDATE hotspot_data 
+                            UPDATE hotspot_data
                             SET hotspot_count = ?, scan_date = ?, system_address = ?, body_id = ?,
-                                x_coord = ?, y_coord = ?, z_coord = ?, coord_source = ?, 
-                                ring_type = ?, ls_distance = ?, inner_radius = ?, outer_radius = ?,
-                                ring_mass = ?
+                                x_coord = ?, y_coord = ?, z_coord = ?, coord_source = ?,
+                                ring_type = COALESCE(?, ring_type),
+                                ls_distance = COALESCE(?, ls_distance),
+                                inner_radius = COALESCE(?, inner_radius),
+                                outer_radius = COALESCE(?, outer_radius),
+                                ring_mass = COALESCE(?, ring_mass)
                             WHERE id = ?
                         ''', (hotspot_count, scan_date, system_address, body_id,
                               x_coord, y_coord, z_coord, coord_source,
