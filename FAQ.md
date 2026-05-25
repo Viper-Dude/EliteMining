@@ -61,6 +61,12 @@ Ensure VoiceAttack has plugin support enabled:
 Without the EliteAPI plugin enabled, game integration won't work.
 </details>
 
+<details>
+<summary><b>A mining sequence got interrupted / out of sync — how do I reset it?</b></summary>
+
+If a mining sequence is interrupted and a toggle ends up in the wrong state (e.g. lasers won't fire when they should), use the **"Stop and Reset"** command (also recognised: *"Stop and reset all profile commands"*, *"Stop all"*, *"Reset all"*) to clear every sequence flag and return the profile to a clean baseline.
+</details>
+
 ## Features
 
 <details>
