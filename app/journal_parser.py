@@ -702,15 +702,37 @@ class JournalParser:
 
     def process_scan(self, event: Dict[str, Any]) -> None:
         """Process Scan event to extract ring class information
-        
+
         Args:
             event: Journal Scan event data
         """
         try:
             rings = event.get('Rings', [])
+
+            # Ring-body Scan events (BodyName ends in " Ring") carry DistanceFromArrivalLS
+            # but no Rings array and no RingClass. Use them to fill in ls_distance for
+            # hotspot rows that have NULL LS (e.g. ring DSS'd without FSS-resolving the
+            # parent planet, so no parent-body Scan event was ever produced).
             if not rings:
+                body_name_full = event.get('BodyName', '') or ''
+                if body_name_full.endswith(' Ring'):
+                    ls_distance_only = event.get('DistanceFromArrivalLS')
+                    star_system_only = event.get('StarSystem')
+                    if star_system_only and ls_distance_only is not None:
+                        body_name_stripped = body_name_full
+                        if body_name_stripped.lower().startswith(star_system_only.lower()):
+                            body_name_stripped = body_name_stripped[len(star_system_only):].strip()
+                        try:
+                            self.user_db.update_ring_metadata(
+                                system_name=star_system_only,
+                                body_name=body_name_stripped,
+                                ls_distance=ls_distance_only,
+                            )
+                            log.debug(f"Ring-body Scan: filled LS {ls_distance_only} for {star_system_only} - {body_name_stripped}")
+                        except Exception as e:
+                            log.debug(f"Ring-body Scan LS update error: {e}")
                 return
-            
+
             system_address = event.get('SystemAddress')
             body_id = event.get('BodyID')
             ls_distance = event.get('DistanceFromArrivalLS')
