@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add .
-git commit -m "v5.0.9 - Minor bug fixes and failed matplot import for the installer"
+git commit -m "v5.1.0 - v5.1.0 - EDDN market data fix and minor UX improvements"
 git push
 ## Standard Commit and Push Process
 
