@@ -2,14 +2,14 @@
 python firstrun_sim.py
 
 # Git Commands Change message only
-  git commit --amend -m "your corrected message"
+  git commit --amend -m v5.1.0 - EDDN market data fix and minor UX improvements"
   git push --force
 
 # Git Commands Reference
 
 # Git Push
 git add .
-git commit -m "v5.1.0 - v5.1.0 - EDDN market data fix and minor UX improvements"
+git commit -m "v5.1.0 - EDDN market data fix and minor UX improvements"
 git push
 ## Standard Commit and Push Process
 
