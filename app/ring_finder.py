@@ -977,6 +977,20 @@ class RingFinder(ColumnVisibilityMixin):
                 self.results_tree.heading(col, text="", anchor="w")
                 self.results_tree.column(col, width=20, minwidth=20, anchor="w", stretch=True)
         
+        # Load saved column widths FIRST so visibility (applied next) wins for hidden cols
+        try:
+            from config import load_ring_finder_column_widths
+            saved_widths = load_ring_finder_column_widths()
+            if saved_widths:
+                for col_name, width in saved_widths.items():
+                    try:
+                        if width > 0:
+                            self.results_tree.column(col_name, width=width)
+                    except:
+                        pass
+        except Exception as e:
+            print(f"[DEBUG] Could not load Ring Finder column widths: {e}")
+
         # Setup column visibility using mixin (exclude _spacer from menu)
         visibility_columns = tuple(c for c in columns if c != "_spacer")
         self.setup_column_visibility(
@@ -985,28 +999,17 @@ class RingFinder(ColumnVisibilityMixin):
             default_widths=self.column_default_widths,
             config_key='ring_finder'
         )
-        
-        # Load saved column widths from config
-        try:
-            from config import load_ring_finder_column_widths
-            saved_widths = load_ring_finder_column_widths()
-            if saved_widths:
-                for col_name, width in saved_widths.items():
-                    try:
-                        self.results_tree.column(col_name, width=width)
-                    except:
-                        pass
-        except Exception as e:
-            print(f"[DEBUG] Could not load Ring Finder column widths: {e}")
 
         # Bind column resize event to save widths
         def save_ring_finder_widths(event=None):
             try:
-                from config import save_ring_finder_column_widths
-                widths = {}
+                from config import save_ring_finder_column_widths, load_ring_finder_column_widths
+                widths = load_ring_finder_column_widths() or {}
                 for col in columns:
                     try:
-                        widths[col] = self.results_tree.column(col, "width")
+                        w = self.results_tree.column(col, "width")
+                        if w > 0:
+                            widths[col] = w
                     except:
                         pass
                 save_ring_finder_column_widths(widths)
