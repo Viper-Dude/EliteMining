@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add .
-git commit -m "v5.1.0 - EDDN market data fix and minor UX improvements"
+git commit -m "v5.1.1 - Fixed column visibility"
 git push
 ## Standard Commit and Push Process
 
