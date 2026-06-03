@@ -2,15 +2,16 @@
 python firstrun_sim.py
 
 # Git Commands Change message only
-  git commit --amend -m v5.1.0 - EDDN market data fix and minor UX improvements"
+  git commit --amend -m v5.1.2 - EDDN market data fix and minor UX improvements"
   git push --force
 
 # Git Commands Reference
 
 # Git Push
 git add .
-git commit -m "v5.1.1 - Fixed column visibility"
+git commit -m "v5.1.2 - Rename weapon recharge setting and update timer behavior"
 git push
+
 ## Standard Commit and Push Process
 
 ```bash
