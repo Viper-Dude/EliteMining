@@ -1,12 +1,15 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-05-30
+**Release Date:** 2026-06-03
 
 ## New Features & Improvements
-- **Fixed** - Hotspot Finder now correctly remembers column visibility selections from the right-click menu across app restarts.
-- General bug fixes
+* **Mining Controls**: Renamed **"Pause between mining cycles for weapon recharge/cooldown"** to **"Pause between mining cycles / weapon recharge"**.
+* General bug fixes.
 
-### VoiceAttack Profile - Update to v5.1.0
-- Clean up and General optimisation of commands
+### VoiceAttack Profile - Updated to v5.1.2
+
+* **Mining Controls**: The **"Pause between mining cycles / weapon recharge"** setting now controls the weapon recharge timer both between mining cycles and after a mining sequence.
+* General command cleanup and optimization.
+
 
  **Note:** Always verify your joystick/HOTAS keybindings after a VoiceAttack profile update.
 

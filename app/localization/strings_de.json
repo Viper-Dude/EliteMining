@@ -516,7 +516,7 @@
     "tip_clear_jump": "\"Clear and Jump\" löst die Massesperre, springt dann in den Supercruise, zum ausgewählten System oder verlässt den Supercruise.",
     "tip_stop_all": "Verwende \"Alle Profilbefehle stoppen\" in VoiceAttack, um jede aktive Sequenz zu unterbrechen.",
     "timer_laser_first": "Dauer für das Feuern der Bergbaulaser (erste Periode)",
-    "timer_pause": "Pause zwischen Laserperioden für Waffen-Aufladung/Abkühlung",
+    "timer_pause": "Pause zwischen Laserperioden/ Waffen-Aufladung",
     "timer_laser_extra": "Dauer für wiederholte Bergbauzyklen (pro Zyklus)",
     "timer_target": "Verzögerung vor dem Anvisieren des Prospektors nach dem Abschuss",
     "timer_cargoscoop": "Verzögerung vor Einfahren der Laderampe nach Bergbausequenz",

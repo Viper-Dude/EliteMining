@@ -520,7 +520,7 @@
     "tip_clear_jump": "\"Clear and Jump\" clears mass lock then enters supercruise, jumps to selected system, or drop from supercruise.",
     "tip_stop_all": "Use \"Stop all profile commands\" in VoiceAttack to interrupt any active sequence.",
     "timer_laser_first": "Duration for firing mining lasers (standard)",
-    "timer_pause": "Pause between mining cycles for weapon recharge/cooldown",
+    "timer_pause": "Pause between mining cycles/ weapon recharge",
     "timer_laser_extra": "Duration for repeated mining cycles (per cycle)",
     "timer_target": "Delay before targeting the prospector after launching",
     "timer_cargoscoop": "Delay before retracting cargo scoop after mining sequence",
