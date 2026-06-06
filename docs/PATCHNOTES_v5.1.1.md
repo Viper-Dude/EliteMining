@@ -1,5 +1,5 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-06-03
+**Release Date:** 2026-06-04
 
 ## New Features & Improvements
 * **Mining Controls**: Renamed **"Pause between mining cycles for weapon recharge/cooldown"** to **"Pause between mining cycles / weapon recharge"**
@@ -7,8 +7,8 @@
 
 ### VoiceAttack Profile - Updated to v5.1.2
 
-* **Mining Controls**: The **"Pause between mining cycles / weapon recharge"** setting now controls the weapon recharge timer both between mining cycles and after a mining sequence
-* **Fixed**: Continuous pulse wave not starting at the end of the prospector sequence
+* **Mining Controls**: The **"Pause between mining cycles / weapon recharge"** setting now controls the weapon recharge timer both between mining cycles and after a mining sequence.
+* **Fixed**: Cargo scoop not retracting during mining sequence reset when **Continuous Pulse Wave** is enabled.
 
 * General command cleanup and optimization
 
