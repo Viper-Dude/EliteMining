@@ -571,7 +571,7 @@ class MarketplaceAPI:
                 import urllib.parse
                 url = "https://www.edsm.net/api-v1/system?systemName={}&showCoordinates=1".format(
                     urllib.parse.quote(system_name))
-                r = requests.get(url, timeout=8)
+                r = requests.get(url, timeout=15, headers={"User-Agent": "EliteMining/5.1.3"})
                 r.raise_for_status()
                 coords = r.json().get('coords', {})
                 if coords:
@@ -1174,7 +1174,7 @@ class MarketplaceAPI:
                 system_encoded = urllib.parse.quote(reference_system)
                 edsm_url = f"https://www.edsm.net/api-v1/system?systemName={system_encoded}&showCoordinates=1"
                 
-                response = requests.get(edsm_url, timeout=5)
+                response = requests.get(edsm_url, timeout=15, headers={"User-Agent": "EliteMining/5.1.3 (+https://github.com/Viper-Dude/EliteMining)"})
                 response.raise_for_status()
                 ref_data = response.json()
                 

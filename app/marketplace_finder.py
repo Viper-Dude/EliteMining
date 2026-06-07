@@ -16,6 +16,9 @@ import os
 
 log = logging.getLogger("EliteMining.MarketplaceFinder")
 
+# EDSM's Cloudflare blocks default python-requests UA with 403
+EDSM_HEADERS = {"User-Agent": "EliteMining/5.1.3 (+https://github.com/Viper-Dude/EliteMining)"}
+
 from column_visibility_helper import ColumnVisibilityMixin
 
 
@@ -171,7 +174,7 @@ class MarketplaceFinder(ColumnVisibilityMixin):
         
         try:
             time.sleep(self.api_delay)  # Rate limiting
-            response = requests.get(url, params=params, timeout=self.api_timeout)
+            response = requests.get(url, params=params, timeout=self.api_timeout, headers=EDSM_HEADERS)
             
             if response.status_code == 200:
                 data = response.json()
@@ -242,13 +245,13 @@ class MarketplaceFinder(ColumnVisibilityMixin):
         
         try:
             time.sleep(self.api_delay)  # Rate limiting
-            response = requests.get(url, params=params, timeout=self.api_timeout)
+            response = requests.get(url, params=params, timeout=self.api_timeout, headers=EDSM_HEADERS)
             
             if response.status_code == 429:
                 # Rate limited - wait longer and retry once
                 print(f"DEBUG: Rate limited for {system_name}, waiting 5 seconds...")
                 time.sleep(5)
-                response = requests.get(url, params=params, timeout=self.api_timeout)
+                response = requests.get(url, params=params, timeout=self.api_timeout, headers=EDSM_HEADERS)
             
             if response.status_code == 200:
                 data = response.json()
@@ -331,7 +334,7 @@ class MarketplaceFinder(ColumnVisibilityMixin):
         
         try:
             time.sleep(self.api_delay)  # Rate limiting
-            response = requests.get(url, params=params, timeout=self.api_timeout)
+            response = requests.get(url, params=params, timeout=self.api_timeout, headers=EDSM_HEADERS)
             
             if response.status_code == 200:
                 data = response.json()
@@ -533,7 +536,7 @@ class MarketplaceFinder(ColumnVisibilityMixin):
         
         try:
             time.sleep(self.api_delay)  # Rate limiting
-            response = requests.get(url, params=params, timeout=timeout)
+            response = requests.get(url, params=params, timeout=timeout, headers=EDSM_HEADERS)
             
             print(f"DEBUG EDSM: Status {response.status_code}, URL: {response.url}")
             

@@ -17,11 +17,13 @@ class EDSMDistanceCalculator:
     
     def __init__(self):
         self.api_base_url = "https://www.edsm.net/api-v1/system"
-        self.timeout = 3  # seconds - reduced from 10 to fail faster on server errors
+        self.timeout = 15  # seconds - allow more time when EDSM is slow
         self.cache = {}  # Cache system coordinates
         self.cache_expiry = 300  # 5 minutes
         self.last_request_time = 0
         self.min_request_interval = 0.5  # Rate limiting: 500ms between requests
+        # EDSM's Cloudflare blocks default python-requests UA with 403
+        self.headers = {"User-Agent": "EliteMining/5.1.3 (+https://github.com/Viper-Dude/EliteMining)"}
         
     def _rate_limit(self):
         """Ensure we don't make requests too quickly"""
@@ -64,7 +66,7 @@ class EDSMDistanceCalculator:
         
         # Retry logic: up to 3 attempts with increasing delays
         max_retries = 3
-        retry_delays = [0, 1, 2]  # seconds to wait before each retry
+        retry_delays = [0, 2, 4]  # seconds to wait before each retry
         
         for attempt in range(max_retries):
             try:
@@ -83,19 +85,35 @@ class EDSMDistanceCalculator:
                 }
                 
                 logger.info(f"Querying EDSM for system: {system_name}")
-                response = requests.get(self.api_base_url, params=params, timeout=self.timeout)
+                response = requests.get(self.api_base_url, params=params, timeout=self.timeout, headers=self.headers)
                 
-                # Fast-fail on server errors (5xx) - don't retry
+                # Retry on server errors (5xx) - EDSM is likely slow/overloaded
                 if response.status_code >= 500:
-                    logger.error(f"EDSM server error {response.status_code} for {system_name} - not retrying")
-                    return None
+                    logger.warning(f"EDSM server error {response.status_code} for {system_name} (attempt {attempt + 1}/{max_retries})")
+                    if attempt == max_retries - 1:
+                        logger.error(f"All retry attempts failed for {system_name} due to server errors")
+                        return None
+                    continue
                 
                 response.raise_for_status()
-                
-                data = response.json()
-                
-                if "coords" not in data:
-                    # System genuinely not found - don't retry
+
+                # Empty body from EDSM = overloaded, not "not found" - retry
+                if not response.text or not response.text.strip():
+                    logger.warning(f"EDSM returned empty body for {system_name} (attempt {attempt + 1}/{max_retries})")
+                    if attempt == max_retries - 1:
+                        return None
+                    continue
+
+                try:
+                    data = response.json()
+                except ValueError:
+                    logger.warning(f"EDSM returned invalid JSON for {system_name} (attempt {attempt + 1}/{max_retries})")
+                    if attempt == max_retries - 1:
+                        return None
+                    continue
+
+                if not data or "coords" not in data:
+                    # System genuinely not found in EDSM
                     logger.warning(f"System '{system_name}' not found in EDSM or has no coordinates")
                     return None
                 

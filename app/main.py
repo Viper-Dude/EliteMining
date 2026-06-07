@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.1.2"
+APP_VERSION = "v5.1.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -12719,9 +12719,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         def _background_check():
             import requests
             try:
-                response = requests.get("https://www.edsm.net/api-v1/system", 
-                                       params={"systemName": "Sol", "showCoordinates": 1}, 
-                                       timeout=3)
+                response = requests.get("https://www.edsm.net/api-v1/system",
+                                       params={"systemName": "Sol", "showCoordinates": 1},
+                                       timeout=5,
+                                       headers={"User-Agent": "EliteMining/5.1.3 (+https://github.com/Viper-Dude/EliteMining)"})
                 if response.status_code == 200 and response.text.strip():
                     self.after(0, lambda: self._update_edsm_status("online"))
                 elif response.status_code >= 500:

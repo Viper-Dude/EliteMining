@@ -3582,7 +3582,7 @@ class RingFinder(ColumnVisibilityMixin):
                 pass
             
             print(f" DEBUG: Calling EDSM bodies API for '{system_name}': {url}")
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=15, headers={"User-Agent": "EliteMining/5.1.3"})
             print(f" DEBUG: EDSM bodies API status: {response.status_code}")
             
             if response.status_code == 200:
@@ -3846,8 +3846,8 @@ class RingFinder(ColumnVisibilityMixin):
                 params["apiKey"] = api_key
             
             print(f" DEBUG: EDSM cube-systems API call: {url}")
-            
-            response = requests.get(url, params=params, timeout=15)
+
+            response = requests.get(url, params=params, timeout=15, headers={"User-Agent": "EliteMining/5.1.3"})
             response.raise_for_status()
             print(f" DEBUG: EDSM cube-systems Response status: {response.status_code}")
             
@@ -3934,8 +3934,8 @@ class RingFinder(ColumnVisibilityMixin):
                         
                         if api_key:
                             params["apiKey"] = api_key
-                        
-                        response = requests.get(url, params=params, timeout=30)
+
+                        response = requests.get(url, params=params, timeout=30, headers={"User-Agent": "EliteMining/5.1.3"})
                         if response.status_code == 200:
                             systems = response.json()
                             if isinstance(systems, list):
@@ -4748,8 +4748,8 @@ class RingFinder(ColumnVisibilityMixin):
                 "systemName": system_name,
                 "showCoordinates": 1
             }
-            
-            response = requests.get(url, params=params, timeout=10)
+
+            response = requests.get(url, params=params, timeout=15, headers={"User-Agent": "EliteMining/5.1.3"})
             
             if response.status_code == 200:
                 data = response.json()

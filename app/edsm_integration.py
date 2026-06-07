@@ -29,7 +29,7 @@ class EDSMIntegration:
     
     EDSM_API_BASE = "https://www.edsm.net/api-system-v1"
     REQUEST_DELAY = 0.5  # Seconds between requests (be nice to EDSM)
-    TIMEOUT = 10  # Request timeout in seconds
+    TIMEOUT = 15  # Request timeout in seconds
     
     def __init__(self, user_db_path: str):
         """
@@ -67,7 +67,7 @@ class EDSMIntegration:
             
             print(f"[EDSM] Querying: {system_name}")
             
-            response = requests.get(url, timeout=self.TIMEOUT)
+            response = requests.get(url, timeout=self.TIMEOUT, headers={"User-Agent": "EliteMining/5.1.3 (+https://github.com/Viper-Dude/EliteMining)"})
             
             if response.status_code == 200:
                 data = response.json()
