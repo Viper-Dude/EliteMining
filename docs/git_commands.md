@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add .
-git commit -m "v5.1.3 - Fix EDSM lookup failures and improve API reliability and fixes for VA FG settings"
+git commit -m "v5.1.4 - Fix firegroup switching to select the wrong firegroup"
 git push
 
 ## Standard Commit and Push Process
