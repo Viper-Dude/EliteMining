@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.1.4"
+APP_VERSION = "v5.1.5"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -12175,9 +12175,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Distance A ↔ B
         row = 0
-        self.distance_ab_label = tk.Label(results_frame, text=f"➤ {t('distance_calculator.distance')} A ↔ B: ---", 
+        dist_row = tk.Frame(results_frame, bg=_dc_bg)
+        dist_row.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        # Descriptive text (system names, gold)
+        self.distance_ab_label = tk.Label(dist_row, text=f"➤ {t('distance_calculator.distance')} A ↔ B:",
                                          font=("Segoe UI", 11, "bold"), fg="#ffcc00", bg=_dc_bg, anchor="w")
-        self.distance_ab_label.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        self.distance_ab_label.pack(side="left")
+        # Distance value (bright green) - sits right after the text
+        self.distance_ab_value_label = tk.Label(dist_row, text="---",
+                                         font=("Segoe UI", 11, "bold"), fg="#66ff99", bg=_dc_bg, anchor="w")
+        self.distance_ab_value_label.pack(side="left", padx=(15, 0))
         
         # Separator
         row += 1
@@ -12419,7 +12426,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._set_status("Calculating distances...")
         
         # Reset labels
-        self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}: ...", fg="#cccccc")
+        self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}:", fg="#cccccc")
+        self.distance_ab_value_label.config(text="...", fg="#cccccc")
         self.distance_a_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
         self.distance_a_coords_label.config(text=t('distance_calculator.coordinates') + " ---", fg="#ffffff")
         self.distance_b_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
@@ -12462,11 +12470,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if sys_a_info and sys_b_info:
                 distance_ab = self.distance_calculator.calculate_distance(sys_a_info, sys_b_info)
                 if distance_ab is not None:
-                    self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a} ↔ {system_b}: {distance_ab:.2f} LY", fg="#ffcc00")
+                    self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a} ↔ {system_b}:", fg="#ffcc00")
+                    self.distance_ab_value_label.config(text=f"{distance_ab:.2f} LY", fg="#66ff99")
                 else:
-                    self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a} ↔ {system_b}: ---", fg="#ff6666")
+                    self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a} ↔ {system_b}:", fg="#ff6666")
+                    self.distance_ab_value_label.config(text="---", fg="#ff6666")
             else:
-                self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}: ---", fg="#cccccc")
+                self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}:", fg="#cccccc")
+                self.distance_ab_value_label.config(text="---", fg="#cccccc")
             
             # System A info
             if sys_a_info:
@@ -16561,7 +16572,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Commodity list with localization
         self._commodity_order = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
-                             "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Indite", 
+                             "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Haematite", "Indite",
                              "Lepidolite", "Low Temperature Diamonds", "Monazite", "Musgravite", 
                              "Osmium", "Painite", "Palladium", "Platinum", "Praseodymium", 
                              "Rhodplumsite", "Rutile", "Samarium", "Serendibite", "Silver", 
