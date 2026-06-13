@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add .
-git commit -m "v5.1.4 - Fix firegroup switching to select the wrong firegroup"
+git commit -m "v5.1.5 - Added Haematite to the Minerals list, change color for dist calc results"
 git push
 
 ## Standard Commit and Push Process
