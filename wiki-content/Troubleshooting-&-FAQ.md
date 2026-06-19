@@ -51,6 +51,14 @@ Common issues and solutions for EliteMining users.
 - Manually scan journals using Import function
 - Ensure EliteMining has read permissions for journal folder
 
+### Mining text overlay not showing in game
+**Symptoms:** In-game text overlay disappears or never appears
+
+**Solutions:**
+- Restart EliteMining — this is usually all that is needed
+- This commonly happens after a fresh install, a graphics settings change, or a driver update
+- The overlay will reposition correctly on the next startup
+
 ## Performance Issues
 
 ### Slow startup or operation
