@@ -8,6 +8,7 @@
 ## Bug Fixes
 
 * **Edit Visits** – Fixed visit count not displaying correctly in the Ring Finder after editing via right-click.
+* **VA Profile Installer** – Fixed an issue from v5.1.5 where the installer incorrectly offered a VA profile update to users who already had the latest profile installed.
 
 
 ### Voiceattack Profile
