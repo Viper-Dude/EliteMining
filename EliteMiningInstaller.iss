@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v5.1.5
+AppVersion=v5.1.6
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -372,6 +372,42 @@ begin
   end;
 end;
 
+function IsVersionNewer(const NewVer, OldVer: String): Boolean;
+{ Returns True only if NewVer is strictly greater than OldVer (e.g. "5.1.5" > "5.1.4") }
+var
+  N, O: String;
+  NDot, ODot: Integer;
+  NPart, OPart: Integer;
+begin
+  Result := False;
+  N := NewVer;
+  O := OldVer;
+  repeat
+    NDot := Pos('.', N);
+    ODot := Pos('.', O);
+    if NDot > 0 then
+    begin
+      NPart := StrToIntDef(Copy(N, 1, NDot - 1), 0);
+      N := Copy(N, NDot + 1, Length(N));
+    end else
+    begin
+      NPart := StrToIntDef(N, 0);
+      N := '';
+    end;
+    if ODot > 0 then
+    begin
+      OPart := StrToIntDef(Copy(O, 1, ODot - 1), 0);
+      O := Copy(O, ODot + 1, Length(O));
+    end else
+    begin
+      OPart := StrToIntDef(O, 0);
+      O := '';
+    end;
+    if NPart > OPart then begin Result := True; Exit; end;
+    if NPart < OPart then Exit;
+  until (N = '') and (O = '');
+end;
+
 procedure InitializeWizard;
 var
   InstalledProfileVersion: String;
@@ -488,7 +524,7 @@ begin
       Log('No profile state found - treating as fresh install, profile update needed');
       ProfileNeedsUpdate := True;
     end
-    else if InstalledProfileVersion <> BundledProfileVersion then
+    else if IsVersionNewer(BundledProfileVersion, InstalledProfileVersion) then
     begin
       Log('Profile update available: ' + InstalledProfileVersion + ' -> ' + BundledProfileVersion);
       ProfileNeedsUpdate := True;

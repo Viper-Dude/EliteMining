@@ -11,13 +11,14 @@ log = logging.getLogger(__name__)
 
 class SystemFinderAPI:
     """Spansh API integration for system finder functionality with server-side filtering"""
-    
-    # Spansh API URL
+
+    # Spansh API URLs
     SPANSH_URL = "https://spansh.co.uk/api/systems/search"
-    
+    SPANSH_STATIONS_URL = "https://spansh.co.uk/api/stations/search"
+
     # Request timeout
     TIMEOUT = 30
-    
+
     # Maximum results to return
     MAX_RESULTS = 100
     
@@ -215,6 +216,108 @@ class SystemFinderAPI:
             'faction': faction,
         }
     
+    @classmethod
+    def search_material_traders(cls, reference_system: str, trader_type: str,
+                                max_results: int = None, progress_callback=None) -> List[Dict]:
+        """
+        Search for the nearest stations with a specific material trader using Spansh API.
+
+        Args:
+            reference_system: Name of the reference system
+            trader_type: 'Encoded', 'Manufactured', or 'Raw'
+            max_results: Maximum number of results (default 100)
+            progress_callback: Optional callback(current, total, message) for progress
+
+        Returns:
+            List of stations sorted by distance, each with system/station info
+
+        NOTE: If results come back empty, verify the Spansh filter field name for
+        material_trader against https://spansh.co.uk/api/stations/search schema,
+        as it may be 'has_encoded_materials_trader' / 'has_manufactured_materials_trader' /
+        'has_raw_materials_trader' boolean flags instead of a single typed field.
+        """
+        if progress_callback:
+            progress_callback(0, 100, f"Searching for {trader_type} material traders...")
+
+        max_results = max_results or cls.MAX_RESULTS
+
+        # Map our trader type labels to Spansh API values
+        trader_type_map = {
+            'Encoded':       'Encoded',
+            'Manufactured':  'Manufactured',
+            'Raw':           'Raw',
+        }
+        spansh_trader_type = trader_type_map.get(trader_type, trader_type)
+
+        payload = {
+            'reference_system': reference_system,
+            'size': max_results,
+            'sort': [{'distance': {'direction': 'asc'}}],
+            'filters': {
+                'material_trader': {'value': spansh_trader_type}
+            }
+        }
+
+        log.info(f"[SYSTEM_FINDER] Searching {trader_type} material traders near {reference_system}")
+        print(f"[SYSTEM_FINDER DEBUG] Material trader payload: {payload}")
+
+        try:
+            if progress_callback:
+                progress_callback(20, 100, "Searching Spansh station database...")
+
+            response = requests.post(cls.SPANSH_STATIONS_URL, json=payload, timeout=cls.TIMEOUT)
+            response.raise_for_status()
+            data = response.json()
+
+            total_count = data.get('count', 0)
+            results = data.get('results', [])
+
+            log.info(f"[SYSTEM_FINDER] Spansh returned {len(results)} of {total_count} material trader stations")
+            print(f"[SYSTEM_FINDER DEBUG] Material traders found: {total_count} total, {len(results)} returned")
+
+            if progress_callback:
+                progress_callback(80, 100, f"Processing {len(results)} results...")
+
+            converted = [cls._convert_spansh_station(s, trader_type) for s in results]
+
+            if progress_callback:
+                progress_callback(100, 100, f"Found {len(converted)} {trader_type} material traders")
+
+            return converted
+
+        except requests.exceptions.RequestException as e:
+            log.error(f"[SYSTEM_FINDER] Spansh stations API error: {e}")
+            print(f"[SYSTEM_FINDER DEBUG] Material trader API error: {e}")
+            return []
+        except Exception as e:
+            log.error(f"[SYSTEM_FINDER] Unexpected error in material trader search: {e}")
+            print(f"[SYSTEM_FINDER DEBUG] Material trader unexpected error: {e}")
+            return []
+
+    @classmethod
+    def _convert_spansh_station(cls, station: Dict, trader_type: str = '') -> Dict:
+        """Convert Spansh station format to our display format for material traders"""
+        # Derive max landing pad from pad counts
+        if station.get('large_pads', 0) or station.get('has_large_pad'):
+            pad_size = 'L'
+        elif station.get('medium_pads', 0):
+            pad_size = 'M'
+        elif station.get('small_pads', 0):
+            pad_size = 'S'
+        else:
+            pad_size = '-'
+
+        return {
+            'systemName':        station.get('system_name', ''),
+            'distance':          station.get('distance', 0),
+            'stationName':       station.get('name', ''),
+            'stationType':       station.get('type') or '-',
+            'landingPad':        pad_size,
+            'distanceToArrival': station.get('distance_to_arrival'),
+            'isPlanetary':       station.get('is_planetary', False),
+            'traderType':        trader_type,
+        }
+
     # Legacy method for backwards compatibility - now uses Spansh
     @classmethod
     def get_systems_with_status(cls, reference_system: str, max_range: int = 100,
@@ -331,7 +434,10 @@ ECONOMY_OPTIONS = [
 
 # Inara-style population options
 POPULATION_OPTIONS = [
-    'Any', 'None', 'Above 1', 'Above 10,000', 'Above 100,000', 
+    'Any', 'None', 'Above 1', 'Above 10,000', 'Above 100,000',
     'Above 1,000,000', 'Above 1,000,000,000',
     'Below 10,000', 'Below 100,000', 'Below 1,000,000', 'Below 1,000,000,000'
 ]
+
+# Material trader types
+MATERIAL_TRADER_OPTIONS = ['Encoded', 'Manufactured', 'Raw']

@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.1.5"
+APP_VERSION = "v5.1.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -17042,7 +17042,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Build the System Finder tab - search nearby systems by criteria"""
         from system_finder_api import (
             SECURITY_OPTIONS, ALLEGIANCE_OPTIONS, GOVERNMENT_OPTIONS,
-            STATE_OPTIONS, ECONOMY_OPTIONS, POPULATION_OPTIONS
+            STATE_OPTIONS, ECONOMY_OPTIONS, POPULATION_OPTIONS,
+            MATERIAL_TRADER_OPTIONS
         )
         from config import load_theme
         
@@ -17239,7 +17240,36 @@ class App(tk.Tk, ColumnVisibilityMixin):
             font=("Segoe UI", 8), fg="#888888", bg=sf_bg
         )
         self.sysfinder_spansh_status_label.pack(side="left", pady=(4, 0))
-        
+
+        # Row 5: Separator
+        ttk.Separator(search_frame, orient='horizontal').grid(
+            row=5, column=0, columnspan=4, sticky="ew", pady=(8, 4))
+
+        # Row 6: Material Trader search
+        ttk.Label(search_frame, text="Material Trader:").grid(
+            row=6, column=0, sticky="e", padx=(0, 5), pady=3)
+
+        trader_ctrl_frame = ttk.Frame(search_frame)
+        trader_ctrl_frame.grid(row=6, column=1, columnspan=3, sticky="w", padx=5, pady=3)
+
+        self.sysfinder_trader_type = tk.StringVar(value="Encoded")
+        trader_combo = ttk.Combobox(
+            trader_ctrl_frame, textvariable=self.sysfinder_trader_type,
+            values=MATERIAL_TRADER_OPTIONS, width=15, state="readonly"
+        )
+        trader_combo.pack(side="left")
+        trader_combo.bind("<<ComboboxSelected>>", lambda e: trader_combo.selection_clear())
+
+        self.sysfinder_trader_btn = tk.Button(
+            trader_ctrl_frame, text="Find Nearest",
+            command=self._search_material_traders,
+            bg="#2a4a2a", fg="#e0e0e0",
+            activebackground="#3a5a3a", activeforeground="#ffffff",
+            relief="ridge", bd=1, padx=15, pady=4,
+            font=("Segoe UI", 8, "normal"), cursor="hand2"
+        )
+        self.sysfinder_trader_btn.pack(side="left", padx=(10, 0))
+
         # Add trace to update info when reference system changes (with debounce)
         self._sysfinder_ref_update_pending = None
         def on_ref_system_change(*args):
@@ -17262,8 +17292,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_reference_system.trace_add('write', on_ref_system_change)
         
         # Results section
-        results_frame = ttk.LabelFrame(main_container, text="", padding=5)
+        results_frame = ttk.LabelFrame(main_container, text="Systems", padding=5)
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
+        self.sysfinder_results_frame = results_frame
         
         # Status/count label
         self.sysfinder_status_label = ttk.Label(results_frame, text="")
@@ -17642,6 +17673,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.sysfinder_status_label.config(text=t('system_finder.no_system_entered'))
             return
         
+        # Ensure system columns are showing
+        self._sysfinder_set_system_columns()
+
         # Disable search button during search
         self.sysfinder_search_btn.config(state="disabled")
         self.sysfinder_status_label.config(text=t('system_finder.searching'))
@@ -17777,8 +17811,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     val = val.strip()
                     if not val:
                         return 0
-                    # Remove ' ly' suffix for distance
-                    val = val.replace(' ly', '').strip()
+                    # Remove ' ly' / ' ls' suffixes
+                    val = val.replace(' ly', '').replace(' ls', '').strip()
                     # Handle B/M/K suffixes
                     if val.endswith('B'):
                         return float(val[:-1]) * 1_000_000_000
@@ -17801,6 +17835,123 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
         except Exception as e:
             logging.error(f"[SYSTEM_FINDER] Sort error: {e}")
+
+    def _sysfinder_set_system_columns(self):
+        """Restore treeview headings/widths for system search mode"""
+        if not hasattr(self, 'sysfinder_tree'):
+            return
+        tree = self.sysfinder_tree
+        tree.heading("system",     text="System")
+        tree.heading("distance",   text="Distance")
+        tree.heading("security",   text="Security")
+        tree.heading("allegiance", text="Allegiance")
+        tree.heading("state",      text="State")
+        tree.heading("population", text="Population")
+        tree.heading("economy",    text="Economy")
+        tree.column("system",     width=150)
+        tree.column("security",   width=80)
+        tree.column("allegiance", width=90)
+        tree.column("state",      width=90)
+        tree.column("population", width=100)
+        tree.column("economy",    width=120)
+        if hasattr(self, 'sysfinder_results_frame'):
+            self.sysfinder_results_frame.configure(text="Systems")
+
+    def _sysfinder_set_trader_columns(self):
+        """Switch treeview headings/widths for material trader mode"""
+        if not hasattr(self, 'sysfinder_tree'):
+            return
+        tree = self.sysfinder_tree
+        tree.heading("system",     text="System")
+        tree.heading("distance",   text="Distance")
+        tree.heading("security",   text="Station")
+        tree.heading("allegiance", text="Type")
+        tree.heading("state",      text="Pad")
+        tree.heading("population", text="Arrival (ls)")
+        tree.heading("economy",    text="Planetary")
+        tree.column("system",     width=130)
+        tree.column("security",   width=160)
+        tree.column("allegiance", width=110)
+        tree.column("state",      width=45)
+        tree.column("population", width=90)
+        tree.column("economy",    width=70)
+        if hasattr(self, 'sysfinder_results_frame'):
+            trader_type = getattr(self, 'sysfinder_trader_type', None)
+            label = (trader_type.get() + " ") if trader_type else ""
+            self.sysfinder_results_frame.configure(text=f"{label}Material Traders")
+
+    def _search_material_traders(self):
+        """Search for nearest material traders"""
+        reference = self.sysfinder_reference_system.get().strip()
+        if not reference:
+            self.sysfinder_status_label.config(text=t('system_finder.no_system_entered'))
+            return
+        self._sysfinder_set_trader_columns()
+        self.sysfinder_trader_btn.config(state="disabled")
+        self.sysfinder_search_btn.config(state="disabled")
+        self.sysfinder_status_label.config(text="Searching for material traders...")
+        self.config(cursor="wait")
+        self.update()
+        threading.Thread(target=self._search_material_traders_worker, daemon=True).start()
+
+    def _search_material_traders_worker(self):
+        """Background worker for material trader search"""
+        try:
+            from system_finder_api import SystemFinderAPI
+            reference = self.sysfinder_reference_system.get().strip()
+            trader_type = self.sysfinder_trader_type.get()
+
+            def progress_callback(current, total, message):
+                self.after(0, lambda: self.sysfinder_status_label.config(text=message))
+
+            results = SystemFinderAPI.search_material_traders(
+                reference_system=reference,
+                trader_type=trader_type,
+                max_results=50,
+                progress_callback=progress_callback
+            )
+
+            formatted_rows = []
+            for idx, r in enumerate(results):
+                row_tag = 'oddrow' if idx % 2 == 0 else 'evenrow'
+                dist = r.get('distance', 0)
+                arrival = r.get('distanceToArrival')
+                arrival_str = f"{arrival:.0f} ls" if arrival is not None else '-'
+                planetary = "Yes" if r.get('isPlanetary') else "No"
+                formatted_rows.append((
+                    (r.get('systemName', '-'),
+                     f"{dist:.1f} ly",
+                     r.get('stationName', '-'),
+                     r.get('stationType', '-'),
+                     r.get('landingPad', '-'),
+                     arrival_str,
+                     planetary),
+                    row_tag
+                ))
+
+            self.after(0, self._sysfinder_trader_complete, formatted_rows, None)
+        except Exception as e:
+            logging.error(f"[SYSTEM_FINDER] Material trader search error: {e}")
+            self.after(0, self._sysfinder_trader_complete, [], str(e))
+
+    def _sysfinder_trader_complete(self, results: list, error: str = None):
+        """Handle material trader search completion"""
+        self.sysfinder_trader_btn.config(state="normal")
+        self.sysfinder_search_btn.config(state="normal")
+        self.config(cursor="")
+        for item in self.sysfinder_tree.get_children():
+            self.sysfinder_tree.delete(item)
+        if error:
+            self.sysfinder_status_label.config(text=f"Error: {error}")
+            return
+        if not results:
+            self.sysfinder_status_label.config(text="No material traders found")
+            return
+        trader_type = self.sysfinder_trader_type.get()
+        self.sysfinder_status_label.config(
+            text=f"Found {len(results)} {trader_type} material traders")
+        for values, row_tag in results:
+            self.sysfinder_tree.insert("", "end", values=values, tags=(row_tag,))
 
     def _create_marketplace_results_table(self, parent_frame):
         """Create results table for marketplace search"""

@@ -368,6 +368,7 @@ Search for nearby star systems with detailed status information. Perfect for fin
 - **Current System Info** – View detailed status of your current system (security, allegiance, government, state, economy, population)
 - **Nearby System Search** – Find systems within range of your reference system
 - **Server-Side Filtering** – Filter by Security, Allegiance, Government, State, Economy, Population
+- **Nearest Material Trader** – Find the closest Encoded, Manufactured, or Raw material trader, showing station name, type, landing pad size, and distance to arrival
 - **Distance Sorting** – Results sorted by distance from reference system
 - **Quick Actions:**
   - Right-click to copy system name or open in Inara/EDSM/Spansh

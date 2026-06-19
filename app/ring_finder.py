@@ -6769,8 +6769,10 @@ class RingFinder(ColumnVisibilityMixin):
     def _refresh_row_visits(self, item, system_name):
         """Refresh the visit status display for a row after editing"""
         try:
-            # Get formatted visit status
-            visit_status = self.user_db.format_visited_status(system_name)
+            # Match the raw count format used when populating search results
+            visit_data = self.user_db.is_system_visited(system_name)
+            visit_count = visit_data.get('visit_count', 0) if visit_data else 0
+            visit_status = str(visit_count)
             
             # Update the row - Visit Status is column index 5
             values = list(self.results_tree.item(item, 'values'))

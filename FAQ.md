@@ -149,6 +149,12 @@ If you scan a ring and discover new hotspots but they don't appear in the Hotspo
 </details>
 
 <details>
+<summary><b>The mining text overlay is not showing in game.</b></summary>
+
+The overlay can stop showing after a fresh install, a graphics settings change, or a driver update. Simply restart EliteMining — it will reposition the overlay correctly on startup.
+</details>
+
+<details>
 <summary><b>Mining announcements not working?</b></summary>
 
 Check Settings → Interface → Text-to-Speech. Test voice and volume. Enable announcement filters.
