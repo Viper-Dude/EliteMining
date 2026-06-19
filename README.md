@@ -738,15 +738,6 @@ Configure how many times the laser mining extra sequence runs:
 
 ## Community & Resources
 
-### GitHub
-- **Discussion and Bug Reports:** [GitHub Issues](https://github.com/Viper-Dude/EliteMining/issues)
-
-### Help Translate
-Want to help translate EliteMining into your language? See our [Translation Guide](docs/TRANSLATION_GUIDE.md).
-
-**Currently supported:** English, German  
-**Needed:** French, Spanish, Russian, Portuguese
-
 ### Discord
 Join our Discord server for real-time help, mining tips, and community discussions:  
 [![Discord](https://img.shields.io/badge/EliteMining%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
