@@ -7,6 +7,19 @@ EliteMining is a comprehensive Python/Tkinter application for Elite Dangerous mi
 
 **Version**: 4.0.5 (see `app/version.py` for current version constants and config schema versioning)
 
+## Chat Rules
+
+- **Be concise.** Short, direct responses. No padding, no preamble, no trailing summaries of what you just did.
+- **Code-first.** Show code changes directly. Don't narrate what you're about to do — just do it.
+- **No unsolicited refactoring.** Fix what was asked. Don't clean up surrounding code, rename variables, or restructure unless explicitly requested.
+- **No feature creep.** Don't add error handling, validation, or abstractions for scenarios not in scope. Don't design for hypothetical future requirements.
+- **No comments unless the WHY is non-obvious.** Don't explain what the code does. Don't add task/PR references in comments.
+- **No emojis** unless explicitly asked.
+- **Follow existing patterns.** Match the style, naming conventions, and architecture already in the codebase. Check how similar things are done before inventing a new approach.
+- **Git commits**: No `Co-Authored-By: Claude` or similar AI trailers. Commit messages should be concise and focus on the "why".
+- **When uncertain**, ask one targeted question rather than listing options or making assumptions.
+- **Don't re-explain decisions** already made in the conversation. Move forward.
+
 ## Key Components & Data Flows
 
 ### Core Application Architecture

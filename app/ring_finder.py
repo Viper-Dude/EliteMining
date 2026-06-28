@@ -4515,7 +4515,7 @@ class RingFinder(ColumnVisibilityMixin):
                         
                         # Format distance safely
                         try:
-                            formatted_distance = round(distance, 1) if distance < 999 else 999.9
+                            formatted_distance = round(distance, 1)
                         except (TypeError, ValueError):
                             formatted_distance = 999.9
                         
@@ -5613,8 +5613,8 @@ class RingFinder(ColumnVisibilityMixin):
                 centered_info_dialog(self.parent, t('ring_finder.save_failed_title'), message)
             return
         
-        # Check if more than 50 items selected for processing
-        if len(items_to_process) > 50:
+        # Check if more than 150 items selected for processing
+        if len(items_to_process) > 150:
             message = t('ring_finder.too_many_rows_selected', count=len(items_to_process))
             centered_info_dialog(self.parent, t('ring_finder.save_limit_exceeded'), 
                                message)
