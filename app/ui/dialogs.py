@@ -31,13 +31,17 @@ def center_window(child, parent):
     child.update_idletasks()
     pw = parent.winfo_width()
     ph = parent.winfo_height()
-    px = parent.winfo_rootx()
-    py = parent.winfo_rooty()
-    cw = child.winfo_width()
-    ch = child.winfo_height()
+    px = parent.winfo_x()
+    py = parent.winfo_y()
+    cw = child.winfo_reqwidth()
+    ch = child.winfo_reqheight()
+    if cw < 50:
+        cw = child.winfo_width()
+    if ch < 50:
+        ch = child.winfo_height()
     x = px + (pw - cw) // 2
     y = py + (ph - ch) // 2
-    child.geometry(f"+{x}+{y}")
+    child.geometry(f"{cw}x{ch}+{x}+{y}")
 
 
 def centered_yesno_dialog(parent, title, message):

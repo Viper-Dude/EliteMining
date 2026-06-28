@@ -5372,13 +5372,13 @@ class RingFinder(ColumnVisibilityMixin):
                     mineral = self._to_english(mineral_display)
                     is_specific_mineral = not self._is_all_minerals(mineral)
                     
-                    # Menu item index for "Find Sell Station" is 6 (after copy_system, separator, inara, edsm, spansh, separator)
+                    # Menu item index for "Find Sell Station" is 7 (after copy_system, find_in_star_systems, separator, inara, edsm, spansh, separator)
                     if is_specific_mineral:
-                        self.context_menu.entryconfig(6, state="normal")
+                        self.context_menu.entryconfig(7, state="normal")
                     else:
-                        self.context_menu.entryconfig(6, state="disabled")
-                    
-                    # Show/hide "Save to Database" option (index 8, after separator) based on Source column
+                        self.context_menu.entryconfig(7, state="disabled")
+
+                    # Show/hide "Save to Database" option (index 9, after separator) based on Source column
                     # Allow save in Ring Search mode if row has hotspot data
                     is_ring_search_mode = self.ring_type_only_var.get()
                     has_hotspot_data = False
@@ -5388,28 +5388,30 @@ class RingFinder(ColumnVisibilityMixin):
                             hotspots_col = values[8]  # Hotspots column is index 8
                             # Has data if not "-" or empty
                             has_hotspot_data = hotspots_col and hotspots_col != "-" and hotspots_col.strip() != ""
-                    
+
                     # Enable if Spansh rows AND (not ring search mode OR has hotspot data)
                     if has_spansh_rows and (not is_ring_search_mode or has_hotspot_data):
-                        self.context_menu.entryconfig(8, state="normal")
-                    else:
-                        self.context_menu.entryconfig(8, state="disabled")
-                    
-                    # Show/hide "Update Reserve Level" option (index 9) based on Local source + missing reserve
-                    if enable_update_reserve:
                         self.context_menu.entryconfig(9, state="normal")
                     else:
                         self.context_menu.entryconfig(9, state="disabled")
-                    
-                    # Enable/disable "Set Reserve" option (index 14) - only for local database entries
-                    if has_local_only:
-                        self.context_menu.entryconfig(14, state="normal")
+
+                    # Show/hide "Update Reserve Level" option (index 10) based on Local source + missing reserve
+                    if enable_update_reserve:
+                        self.context_menu.entryconfig(10, state="normal")
                     else:
-                        self.context_menu.entryconfig(14, state="disabled")
-                    
-                    # Note: Menu items after index 10 (separator):
-                    # 11: Edit Hotspots, 12: Set Overlap, 13: Set RES, 14: Set Reserve, 15: Edit Visits
-                    # 16: separator, 17: Bookmark Location
+                        self.context_menu.entryconfig(10, state="disabled")
+
+                    # Enable/disable "Set Reserve" option (index 15) - only for local database entries
+                    if has_local_only:
+                        self.context_menu.entryconfig(15, state="normal")
+                    else:
+                        self.context_menu.entryconfig(15, state="disabled")
+
+                    # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: separator,
+                    # 3: inara, 4: edsm, 5: spansh, 6: separator, 7: find_sell_station, 8: separator,
+                    # 9: save_to_db, 10: update_reserve, 11: separator,
+                    # 12: edit_hotspots, 13: set_overlap, 14: set_res, 15: set_reserve, 16: edit_visits
+                    # 17: separator, 18: bookmark
                     
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -5679,7 +5681,8 @@ class RingFinder(ColumnVisibilityMixin):
         progress_bar.pack(pady=(0, 5))
         progress_bar.start(12)
         wait_dialog.update_idletasks()
-        center_window(wait_dialog, self.parent.winfo_toplevel())
+        _top = self.parent.winfo_toplevel()
+        _top._center_dialog_on_parent(wait_dialog)
         wait_dialog.deiconify()
         wait_dialog.attributes('-topmost', True)
         wait_dialog.lift()
