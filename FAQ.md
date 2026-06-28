@@ -44,7 +44,7 @@ If you prefer to do it manually:
 <details>
 <summary><b>Does EliteVA need any special setup?</b></summary>
 
-Set Controls in Elite Dangerous to a saved Custom preset. This creates `Custom.binds` required by EliteVA.
+Set your **keyboard** controls in Elite Dangerous to a saved Custom preset. This creates `Custom.binds` required by EliteVA to read your keyboard bindings.
 </details>
 
 ## Features
