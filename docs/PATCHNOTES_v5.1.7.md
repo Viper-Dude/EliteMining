@@ -3,12 +3,15 @@
 
 ## New Features & Improvements
 
-* **Spansh search** - Save hotspots to local database increased the limit from 50 to 150 rows.
+* **Spansh search**:
+  * Save hotspots to local database increased the limit from 50 to 150 rows.
+  * Added a progress dialog when saving results to the local database.
 
-* **Spansh search** - Added a 'Saving to local database, please wait...' progress dialog when saving Spansh results to the local database.
 
+* **Star Systems**:
+  * Added Powerplay info (Power, control state, and Reinforce/Acquire/Undermine merit value) next to Allegiance. 
 
-* **Star Systems** - Added Powerplay info (Power, control state, and Reinforce/Acquire/Undermine merit value) next to Allegiance. *(Beta — feedback welcome)*
+  * Right-click any system in the results to jump straight to Hotspots Finder with that system as the search origin.
 
 ## Bug Fixes
 
@@ -24,7 +27,8 @@
 
 * If and after updating the VoiceAttack profile, always verify your keyboard, joystick, and HOTAS bindings to ensure they are configured correctly.
 
-## Development Notice
+* For the Prospector sequence to work, make sure your joystick/HOTAS fire button isn’t bound to the Prospector Limpet Controller fire control (Game Controller Options > Weapons). Shared bindings will interrupt the sequence.
+
 
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

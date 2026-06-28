@@ -371,6 +371,7 @@ Search for nearby star systems with detailed status information. Perfect for fin
 - **Nearest Material Trader** – Find the closest Encoded, Manufactured, or Raw material trader, showing station name, type, landing pad size, and distance to arrival
 - **Distance Sorting** – Results sorted by distance from reference system
 - **Quick Actions:**
+  - Right-click → **Find Hotspots** to jump directly to Hotspots Finder with the selected system as reference and trigger a search
   - Right-click to copy system name or open in Inara/EDSM/Spansh
   - "Use Current" button fills reference system instantly
 
