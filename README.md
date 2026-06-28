@@ -446,6 +446,12 @@ Monitor your fleet carrier status at a glance — populated automatically from y
 > <img src="Screenshot/fg_all.png" width="900"><br>
 > *Example: All 8 firegroups configured (A-H). Unused groups can have any weapon assigned.*
 
+> **⚠️ Important for Prospector Sequence:**  
+> For the prospector sequence to work correctly, make sure your **joystick or HOTAS fire button is not bound to the same fire button assigned to the Prospector Limpet Controller** in Elite Dangerous. If it is, the joystick will interfere with the automated sequence and prevent it from firing correctly.
+> 
+> <img src="Screenshot/in_game_bindings1.png" width="700"><br>
+> *Example: JOY 1 is bound to Primary Fire. If your Prospector Limpet Controller is also set to Primary, remove the joystick binding from Primary Fire in the Elite Dangerous controls menu.*
+
 ### Key / HOTAS Bindings  
 | Action | Description |
 |--------|-------------|

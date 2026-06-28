@@ -187,6 +187,8 @@
     "error_details": "Errors",
     "showing_errors": "Showing first 10 of {count} errors",
     "saved_to_db": "Saved {count} entries to database",
+    "saving_title": "Saving",
+    "saving_please_wait": "Saving to local database, please wait...",
     "save_complete": "Save Complete",
     "no_entries_saved": "No entries could be saved.",
     "save_failed": "Save failed - no valid entries",

@@ -67,6 +67,12 @@ Without the EliteAPI plugin enabled, game integration won't work.
 If a mining sequence is interrupted and a toggle ends up in the wrong state (e.g. lasers won't fire when they should), use the **"Stop and Reset"** command (also recognised: *"Stop and reset all profile commands"*, *"Stop all"*, *"Reset all"*) to clear every sequence flag and return the profile to a clean baseline.
 </details>
 
+<details>
+<summary><b>The prospector sequence doesn't fire correctly — what should I check?</b></summary>
+
+Make sure your **joystick or HOTAS fire button is not bound to the same fire button assigned to the Prospector Limpet Controller** in Elite Dangerous. If a physical joystick button shares that binding, it will interfere with the automated sequence and prevent it from working correctly. Remove the joystick binding from that fire button in the Elite Dangerous controls menu.
+</details>
+
 ## Features
 
 <details>

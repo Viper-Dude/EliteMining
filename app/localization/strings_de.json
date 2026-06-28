@@ -183,6 +183,8 @@
     "error_details": "Fehler",
     "showing_errors": "Zeige erste 10 von {count} Fehlern",
     "saved_to_db": "{count} Einträge in Datenbank gespeichert",
+    "saving_title": "Speichern",
+    "saving_please_wait": "In lokale Datenbank speichern, bitte warten...",
     "save_complete": "Speichern abgeschlossen",
     "no_entries_saved": "Keine Einträge konnten gespeichert werden.",
     "save_failed": "Speichern fehlgeschlagen - keine gültigen Einträge",

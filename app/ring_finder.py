@@ -5627,11 +5627,57 @@ class RingFinder(ColumnVisibilityMixin):
             if values and len(values) >= 11:
                 items_data.append(values)
         
+        # Show progress dialog while saving
+        from config import load_theme
+        from ui.dialogs import center_window
+        _theme = load_theme()
+        _bg = "#000000" if _theme == "elite_orange" else "#1e1e1e"
+        _fg = "#ff8c00" if _theme == "elite_orange" else "#e0e0e0"
+
+        wait_dialog = tk.Toplevel(self.parent)
+        wait_dialog.withdraw()  # Prevent blinking on wrong monitor
+        wait_dialog.title(t('ring_finder.saving_title'))
+        wait_dialog.resizable(False, False)
+        wait_dialog.protocol("WM_DELETE_WINDOW", lambda: None)
+        wait_dialog.configure(bg=_bg)
+        try:
+            from app_utils import get_app_icon_path
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                wait_dialog.iconbitmap(icon_path)
+        except Exception:
+            pass
+        wait_frame = tk.Frame(wait_dialog, bg=_bg, padx=20, pady=15)
+        wait_frame.pack(fill="both", expand=True)
+        tk.Label(wait_frame, text=t('ring_finder.saving_please_wait'),
+                 bg=_bg, fg=_fg, font=("Segoe UI", 10)).pack(pady=(0, 12))
+        progress_bar = ttk.Progressbar(wait_frame, mode='indeterminate', length=260)
+        progress_bar.pack(pady=(0, 5))
+        progress_bar.start(12)
+        wait_dialog.update_idletasks()
+        center_window(wait_dialog, self.parent.winfo_toplevel())
+        wait_dialog.deiconify()
+        wait_dialog.attributes('-topmost', True)
+        wait_dialog.lift()
+        try:
+            wait_dialog.grab_set()
+        except Exception:
+            pass
+
+        def _keep_wait_on_top():
+            try:
+                if wait_dialog.winfo_exists():
+                    wait_dialog.lift()
+                    wait_dialog.after(100, _keep_wait_on_top)
+            except Exception:
+                pass
+        wait_dialog.after(100, _keep_wait_on_top)
+
         # Run save operation in background thread with extracted data
         self.status_var.set(f"Saving {len(items_data)} entries to database...")
-        threading.Thread(target=self._save_to_database_worker, args=(items_data,), daemon=True).start()
+        threading.Thread(target=self._save_to_database_worker, args=(items_data, wait_dialog, progress_bar), daemon=True).start()
     
-    def _save_to_database_worker(self, items_data):
+    def _save_to_database_worker(self, items_data, wait_dialog=None, progress_bar=None):
         """Worker thread for saving to database"""
         saved_rows = 0  # Count of successfully saved rows
         new_rows = 0  # Count of new entries
@@ -5824,10 +5870,18 @@ class RingFinder(ColumnVisibilityMixin):
                 errors.append(f"Row error: {str(e)[:50]}")
         
         # Update UI on main thread
-        self.parent.after(0, lambda: self._save_to_database_complete(saved_rows, new_rows, updated_rows, skipped_count, error_count, errors))
+        self.parent.after(0, lambda: self._save_to_database_complete(saved_rows, new_rows, updated_rows, skipped_count, error_count, errors, wait_dialog, progress_bar))
     
-    def _save_to_database_complete(self, saved_rows, new_rows, updated_rows, skipped_count, error_count, errors):
+    def _save_to_database_complete(self, saved_rows, new_rows, updated_rows, skipped_count, error_count, errors, wait_dialog=None, progress_bar=None):
         """Handle completion of save to database (runs on main thread)"""
+        if progress_bar is not None:
+            progress_bar.stop()
+        if wait_dialog is not None:
+            try:
+                wait_dialog.grab_release()
+                wait_dialog.destroy()
+            except Exception:
+                pass
         # Show results
         if saved_rows > 0:
             message = t('ring_finder.save_success').format(count=saved_rows)

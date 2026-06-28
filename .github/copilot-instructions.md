@@ -62,6 +62,24 @@ EliteMining is a comprehensive Python/Tkinter application for Elite Dangerous mi
 - **Data Binding**: All UI uses `StringVar`/`IntVar` with automatic persistence via config system. Scrollable frames (`ttk.Scrollbar`) required for all tabs to handle content overflow.
 - **Dark Theme**: Consistent styling via `ttk.Style` configuration in main.py initialization with custom button/label colors.
 
+### Dialog / Popup Window Rules (see `docs/DIALOG_GUIDELINES.md`)
+Every `tk.Toplevel` dialog **must** follow this order exactly — failure causes blinking on the wrong monitor or app freeze on multi-monitor setups:
+
+1. `dialog.withdraw()` — call **immediately** after `tk.Toplevel()`, before any other setup
+2. **No `transient()`** — omit it; it causes dialogs to hide behind the parent and freeze the app
+3. Theme colors — always from `load_theme()` (`config.py`); use `tk.Frame`/`tk.Label` with explicit `bg`/`fg`, not `ttk` widgets
+4. Set icon via `get_app_icon_path()` (`app_utils.py`) in a try/except
+5. Add all widgets while the dialog is still hidden
+6. `dialog.update_idletasks()`
+7. `center_window(dialog, self.parent.winfo_toplevel())` from `ui/dialogs.py` — keeps dialog on the same monitor as the main app; **never** use `winfo_screenwidth/height` to clamp
+8. `dialog.deiconify()` — show only after centering (no blink)
+9. `dialog.attributes('-topmost', True)` → `dialog.lift()` → `dialog.focus_force()`
+10. `grab_set()` in a try/except (can fail if another grab is active)
+11. `keep_on_top()` loop — reschedules itself every 100 ms via `dialog.after`; prevents dialog hiding behind parent which would freeze the app
+12. Localization — add new string keys to **both** `strings_en.json` and `strings_de.json`
+
+Use `centered_info_dialog` / `centered_yesno_dialog` from `ui/dialogs.py` for standard info and yes/no popups — they already implement all of the above.
+
 ### Background Processing Patterns
 - **Multi-Threading**: CargoMonitor and ProspectorPanel use background threads with **silent failure** philosophy - extensive logging but no user-visible errors to avoid interrupting gameplay.
 - **Ship Change Detection**: `refresh_ship_capacity()` monitors Status.json changes and automatically updates cargo capacity when ship swaps occur (handles ShipyardSwap, StoredShips events).

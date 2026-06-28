@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add .
-git commit -m "v5.1.7 - Fixes"
+git commit -m "v5.1.7 - Added Powerplay"
 git push
 
 ## Standard Commit and Push Process

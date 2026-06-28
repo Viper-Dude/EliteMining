@@ -5,6 +5,8 @@
 
 * **Spansh search** - Save hotspots to local database increased the limit from 50 to 150 rows.
 
+* **Spansh search** - Added a 'Saving to local database, please wait...' progress dialog when saving Spansh results to the local database.
+
 
 * **Star Systems** - Added Powerplay info (Power, control state, and Reinforce/Acquire/Undermine merit value) next to Allegiance. *(Beta — feedback welcome)*
 
