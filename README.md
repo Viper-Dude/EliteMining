@@ -36,7 +36,7 @@
 - [Known Limitations](#known-limitations)
 - [Training Speech Recognition](#training-speech-recognition)
 - [In Development](#in-development)
-- [FAQ](#faq)
+- [FAQ](FAQ.md)
 - [Contact](#contact)
 - [Community & Resources](#community--resources)
 - [License](#license--third-party-notices)

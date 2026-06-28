@@ -1,6 +1,6 @@
 # EliteMining — FAQ
 
-## Installation
+## Setup / Installation
 
 <details>
 <summary><b>How do I install the app?</b></summary>
@@ -45,32 +45,6 @@ If you prefer to do it manually:
 <summary><b>Does EliteVA need any special setup?</b></summary>
 
 Set Controls in Elite Dangerous to a saved Custom preset. This creates `Custom.binds` required by EliteVA.
-</details>
-
-<details>
-<summary><b>VoiceAttack commands aren't working. What should I check?</b></summary>
-
-Ensure VoiceAttack has plugin support enabled:
-1. Open **VoiceAttack → Options → General**
-2. Enable **"Enable Plugin Support"**
-3. Open **Plugin Manager**
-4. Verify this plugin is checked:
-   - ✓ EliteAPI (EliteVA.dll)
-5. Restart VoiceAttack
-
-Without the EliteAPI plugin enabled, game integration won't work.
-</details>
-
-<details>
-<summary><b>A mining sequence got interrupted / out of sync — how do I reset it?</b></summary>
-
-If a mining sequence is interrupted and a toggle ends up in the wrong state (e.g. lasers won't fire when they should), use the **"Stop and Reset"** command (also recognised: *"Stop and reset all profile commands"*, *"Stop all"*, *"Reset all"*) to clear every sequence flag and return the profile to a clean baseline.
-</details>
-
-<details>
-<summary><b>The prospector sequence doesn't fire correctly — what should I check?</b></summary>
-
-Make sure your **joystick or HOTAS fire button is not bound to the same fire button assigned to the Prospector Limpet Controller** in Elite Dangerous. If a physical joystick button shares that binding, it will interfere with the automated sequence and prevent it from working correctly. Remove the joystick binding from that fire button in the Elite Dangerous controls menu.
 </details>
 
 ## Features
@@ -123,6 +97,32 @@ Open the app → Backup & Restore. You can also copy the install folder to a saf
 </details>
 
 ## Troubleshooting
+
+<details>
+<summary><b>VoiceAttack commands aren't working. What should I check?</b></summary>
+
+Ensure VoiceAttack has plugin support enabled:
+1. Open **VoiceAttack → Options → General**
+2. Enable **"Enable Plugin Support"**
+3. Open **Plugin Manager**
+4. Verify this plugin is checked:
+   - ✓ EliteAPI (EliteVA.dll)
+5. Restart VoiceAttack
+
+Without the EliteAPI plugin enabled, game integration won't work.
+</details>
+
+<details>
+<summary><b>A mining sequence got interrupted / out of sync — how do I reset it?</b></summary>
+
+If a mining sequence is interrupted and a toggle ends up in the wrong state (e.g. lasers won't fire when they should), use the **"Stop and Reset"** command (also recognised: *"Stop and reset all profile commands"*, *"Stop all"*, *"Reset all"*) to clear every sequence flag and return the profile to a clean baseline.
+</details>
+
+<details>
+<summary><b>The prospector sequence doesn't fire correctly — what should I check?</b></summary>
+
+Make sure your **joystick or HOTAS fire button is not bound to the same fire button assigned to the Prospector Limpet Controller** in Elite Dangerous. If a physical joystick button shares that binding, it will interfere with the automated sequence and prevent it from working correctly. Remove the joystick binding from that fire button in the Elite Dangerous controls menu.
+</details>
 
 <details>
 <summary><b>The app will not start. What should I try?</b></summary>

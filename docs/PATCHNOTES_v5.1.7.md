@@ -26,7 +26,5 @@
 
 ## Development Notice
 
-* No further updates are currently planned for the summer period.
-* Hotfixes may still be released if critical issues are discovered or reported.
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
