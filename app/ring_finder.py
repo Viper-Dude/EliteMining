@@ -1445,19 +1445,22 @@ class RingFinder(ColumnVisibilityMixin):
         """Check Spansh API status in background and update indicator"""
         def _background_check():
             import requests
+            def _schedule(status):
+                try:
+                    self.parent.after(0, lambda: self._update_spansh_status(status))
+                except RuntimeError:
+                    pass  # Tkinter loop already stopped — app is shutting down
             try:
                 # Test Spansh API with a minimal request
                 url = 'https://spansh.co.uk/api/systems/field_values/system_names'
                 response = requests.get(url, params={'q': 'Sol'}, timeout=10)
-                
                 if response.status_code == 200:
-                    self.parent.after(0, lambda: self._update_spansh_status("online"))
+                    _schedule("online")
                 else:
-                    self.parent.after(0, lambda: self._update_spansh_status("offline"))
-                
+                    _schedule("offline")
             except Exception as e:
                 print(f"[SPANSH STATUS] Check failed: {e}")
-                self.parent.after(0, lambda: self._update_spansh_status("offline"))
+                _schedule("offline")
         
         threading.Thread(target=_background_check, daemon=True).start()
     
@@ -5251,6 +5254,7 @@ class RingFinder(ColumnVisibilityMixin):
                                    activeforeground=menu_active_fg,
                                    selectcolor=menu_active_bg)
         self.context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_name)
+        self.context_menu.add_command(label=t('context_menu.find_in_star_systems'), command=self._find_in_star_systems)
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara)
         self.context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm)
@@ -5424,6 +5428,26 @@ class RingFinder(ColumnVisibilityMixin):
                 self.parent.clipboard_append(system_name)
                 self.status_var.set(f"Copied '{system_name}' to clipboard")
     
+    def _find_in_star_systems(self):
+        """Switch to Star Systems tab and search for the selected system"""
+        selection = self.results_tree.selection()
+        if not selection:
+            return
+        values = self.results_tree.item(selection[0], 'values')
+        if not values or len(values) <= 2:
+            return
+        system_name = values[2]
+        try:
+            main_app = self.parent.winfo_toplevel()
+            if hasattr(main_app, 'sysfinder_reference_system'):
+                main_app.sysfinder_reference_system.set(system_name)
+            if hasattr(main_app, 'notebook'):
+                main_app.notebook.select(3)  # Star Systems tab index
+            if hasattr(main_app, '_search_systems'):
+                main_app.after(100, main_app._search_systems)
+        except Exception as e:
+            print(f"[RING FINDER] Error jumping to Star Systems: {e}")
+
     def _open_inara(self):
         """Open selected system in Inara"""
         selection = self.results_tree.selection()

@@ -9134,6 +9134,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         saved_pos <= total_height - min_cargo_height):
                         paned.sashpos(0, saved_pos)
                     self._sidebar_sash_initialized = True
+
         except Exception as e:
             print(f"Error reinitializing sash positions: {e}")
         
@@ -12252,7 +12253,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     cd = self.fc_tracker.carrier_data
                     carrier_system = cd.get('system') if cd else None
                     if carrier_system:
-                        self.after(0, lambda s=carrier_system: self.distance_fc_system.set(s))
+                        try:
+                            self.after(0, lambda s=carrier_system: self.distance_fc_system.set(s))
+                        except RuntimeError:
+                            pass  # Tkinter loop already stopped
                         print(f"Auto-detected Fleet Carrier in: {carrier_system}")
                 except Exception as e:
                     print(f"Error auto-detecting FC on startup: {e}")
@@ -12568,7 +12572,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         def _retry():
                             self._distance_retry_pending = False
                             self._update_home_fc_distances()
-                        self.after(3000, _retry)
+                        try:
+                            self.after(3000, _retry)
+                        except RuntimeError:
+                            pass  # Tkinter loop already stopped
                     return
                 self._distance_retry_pending = False
                 
@@ -12614,11 +12621,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             pass
                 
                 # Update UI on main thread with all calculated values
-                self.after(0, lambda: self._apply_distance_updates(
-                    sol_distance, home_distance, home_sol_distance, home_visits,
-                    fc_distance, fc_sol_distance, fc_visits
-                ))
-                
+                try:
+                    self.after(0, lambda: self._apply_distance_updates(
+                        sol_distance, home_distance, home_sol_distance, home_visits,
+                        fc_distance, fc_sol_distance, fc_visits
+                    ))
+                except RuntimeError:
+                    pass  # Tkinter loop already stopped
+
             except Exception as e:
                 print(f"Error updating home/FC distances: {e}")
         
@@ -12729,30 +12739,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Check EDSM API status in background and update indicator"""
         def _background_check():
             import requests
+            def _schedule(status):
+                try:
+                    self.after(0, lambda: self._update_edsm_status(status))
+                except RuntimeError:
+                    pass  # Tkinter loop already stopped — app is shutting down
             try:
                 response = requests.get("https://www.edsm.net/api-v1/system",
                                        params={"systemName": "Sol", "showCoordinates": 1},
                                        timeout=5,
                                        headers={"User-Agent": "EliteMining/5.1.3 (+https://github.com/Viper-Dude/EliteMining)"})
                 if response.status_code == 200 and response.text.strip():
-                    self.after(0, lambda: self._update_edsm_status("online"))
+                    _schedule("online")
                 elif response.status_code >= 500:
-                    # Server errors (500+) = offline
-                    self.after(0, lambda: self._update_edsm_status("offline"))
+                    _schedule("offline")
                 elif response.status_code >= 400:
-                    # Client errors (400+) = slow/error
-                    self.after(0, lambda: self._update_edsm_status("error"))
+                    _schedule("error")
                 else:
-                    self.after(0, lambda: self._update_edsm_status("error"))
+                    _schedule("error")
             except (requests.Timeout, requests.exceptions.ReadTimeout, requests.exceptions.ConnectTimeout):
-                # All timeout types = offline (server not responding)
-                self.after(0, lambda: self._update_edsm_status("offline"))
+                _schedule("offline")
             except requests.exceptions.RequestException:
-                # Other connection errors = offline
-                self.after(0, lambda: self._update_edsm_status("offline"))
+                _schedule("offline")
             except Exception:
-                # Unexpected errors = offline
-                self.after(0, lambda: self._update_edsm_status("offline"))
+                _schedule("offline")
         
         threading.Thread(target=_background_check, daemon=True).start()
         # Re-check every 5 minutes so status stays current
@@ -12774,6 +12784,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Check market API status in background and update indicator"""
         def _background_check():
             import requests
+            def _schedule(status):
+                try:
+                    self.after(0, lambda: self._update_market_api_status(status))
+                except RuntimeError:
+                    pass  # Tkinter loop already stopped — app is shutting down
             try:
                 # Test Ardent API
                 ardent_url = "https://api.ardent-insight.com/v2/system/name/Sol/commodity/name/platinum/nearby/imports?minVolume=1&maxDaysAgo=2&maxDistance=50"
@@ -12781,16 +12796,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     response = requests.get(ardent_url, timeout=5)
                     print(f"[MARKET API] Ardent status code: {response.status_code}")
                     if response.status_code == 200:
-                        self.after(0, lambda: self._update_market_api_status("online"))
+                        _schedule("online")
                         return
                 except Exception as e:
                     print(f"[MARKET API] Ardent exception: {e}")
-                
-                # Ardent failed = offline
-                self.after(0, lambda: self._update_market_api_status("offline"))
-                
+                _schedule("offline")
             except Exception:
-                self.after(0, lambda: self._update_market_api_status("offline"))
+                _schedule("offline")
         
         threading.Thread(target=_background_check, daemon=True).start()
     
@@ -17066,7 +17078,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Main container
         main_container = ttk.Frame(frame)
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
-        
+
         # Search section
         search_frame = ttk.LabelFrame(main_container, text=t('system_finder.title'), padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
@@ -17509,6 +17521,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             label=t('system_finder.copy_system'),
             command=self._copy_sysfinder_system
         )
+        self.sysfinder_context_menu.add_command(
+            label=t('system_finder.find_hotspots'),
+            command=self._find_hotspots_from_sysfinder
+        )
         self.sysfinder_context_menu.add_separator()
         self.sysfinder_context_menu.add_command(
             label=t('system_finder.open_inara'),
@@ -17543,6 +17559,25 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.clipboard_append(system_name)
             self._set_status(f"Copied: {system_name}", 3000)
     
+    def _find_hotspots_from_sysfinder(self):
+        """Switch to Hotspots Finder with the selected system as reference"""
+        selection = self.sysfinder_tree.selection()
+        if not selection:
+            return
+        system_name = self.sysfinder_tree.item(selection[0])['values'][0]
+        if not system_name:
+            return
+        self.notebook.select(1)  # Hotspots Finder tab
+        if hasattr(self, 'ring_finder'):
+            self.ring_finder.system_var.set(system_name)
+            if hasattr(self.ring_finder, 'min_hotspots_var'):
+                self.ring_finder.min_hotspots_var.set("1")
+            if hasattr(self.ring_finder, 'distance_var'):
+                self.ring_finder.distance_var.set("100")
+            if hasattr(self.ring_finder, 'max_results_var'):
+                self.ring_finder.max_results_var.set("All")
+            self.after(100, self.ring_finder.search_hotspots)
+
     def _open_sysfinder_inara(self):
         """Open selected system in Inara"""
         selection = self.sysfinder_tree.selection()
@@ -17759,16 +17794,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Check Spansh API status in background and update indicator"""
         def _background_check():
             import requests
+            def _schedule(status):
+                try:
+                    self.after(0, lambda: self._update_sysfinder_spansh_status(status))
+                except RuntimeError:
+                    pass  # Tkinter loop already stopped — app is shutting down
             try:
                 url = 'https://spansh.co.uk/api/systems/field_values/system_names'
                 response = requests.get(url, params={'q': 'Sol'}, timeout=10)
                 if response.status_code == 200:
-                    self.after(0, lambda: self._update_sysfinder_spansh_status("online"))
+                    _schedule("online")
                 else:
-                    self.after(0, lambda: self._update_sysfinder_spansh_status("offline"))
+                    _schedule("offline")
             except Exception as e:
                 print(f"[SYSFINDER SPANSH STATUS] Check failed: {e}")
-                self.after(0, lambda: self._update_sysfinder_spansh_status("offline"))
+                _schedule("offline")
 
         import threading
         threading.Thread(target=_background_check, daemon=True).start()

@@ -702,6 +702,17 @@ def save_main_sash_position(position: int) -> None:
     cfg["main_sash_position"] = position
     _save_cfg(cfg)
 
+def load_sysfinder_sash_position() -> Optional[int]:
+    """Load saved system finder vertical sash position (filters / results split)"""
+    cfg = _load_cfg()
+    return cfg.get("sysfinder_sash_position")
+
+def save_sysfinder_sash_position(position: int) -> None:
+    """Save system finder vertical sash position"""
+    cfg = _load_cfg()
+    cfg["sysfinder_sash_position"] = position
+    _save_cfg(cfg)
+
 def load_prospector_tables_sash_position() -> Optional[int]:
     """Load saved prospector tables sash position (Prospector Reports / Material Analysis split)"""
     cfg = _load_cfg()
