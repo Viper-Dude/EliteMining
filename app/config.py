@@ -508,7 +508,10 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     if "cmdr_name_for_api" not in config:
         config["cmdr_name_for_api"] = ""
         api_fields_added.append("cmdr_name_for_api")
-    
+    if "player_power" not in config:
+        config["player_power"] = ""
+        api_fields_added.append("player_power")
+
     if api_fields_added:
         log.info(f"Added API upload fields: {', '.join(api_fields_added)}")
     
@@ -588,6 +591,17 @@ def save_cmdr_name_for_api(name: str) -> None:
     """Save Commander name for API to config"""
     cfg = _load_cfg()
     cfg["cmdr_name_for_api"] = name.strip()
+    _save_cfg(cfg)
+
+def load_player_power() -> str:
+    """Load player's pledged Powerplay power from config"""
+    cfg = _load_cfg()
+    return cfg.get("player_power", "")
+
+def save_player_power(power: str) -> None:
+    """Save player's pledged Powerplay power to config"""
+    cfg = _load_cfg()
+    cfg["player_power"] = power.strip()
     _save_cfg(cfg)
 
 def load_api_upload_settings() -> Dict[str, Any]:

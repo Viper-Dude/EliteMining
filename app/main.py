@@ -17043,7 +17043,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from system_finder_api import (
             SECURITY_OPTIONS, ALLEGIANCE_OPTIONS, GOVERNMENT_OPTIONS,
             STATE_OPTIONS, ECONOMY_OPTIONS, POPULATION_OPTIONS,
-            MATERIAL_TRADER_OPTIONS
+            MATERIAL_TRADER_OPTIONS, ELITE_POWERS,
+            POWER_FILTER_OPTIONS, PP_STATE_OPTIONS
         )
         from config import load_theme
         
@@ -17081,7 +17082,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Frame to hold entry, buttons side by side
         ref_frame = ttk.Frame(search_frame)
-        ref_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5, pady=3)
+        ref_frame.grid(row=row, column=1, columnspan=3, sticky="ew", padx=5, pady=3)
         
         self.sysfinder_reference_system = tk.StringVar()
         self.sysfinder_ref_entry = ttk.Entry(
@@ -17113,6 +17114,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             font=("Segoe UI", 8, "normal"), cursor="hand2"
         )
         self.sysfinder_search_btn.pack(side="left", padx=(10, 0))
+
+        # Spansh status indicator - to the right of Search button
+        self.sysfinder_spansh_status_label = tk.Label(
+            ref_frame, text="⚫ Spansh: checking...",
+            font=("Segoe UI", 8), fg="#888888",
+            bg=ttk.Style().lookup('TFrame', 'background')
+        )
+        self.sysfinder_spansh_status_label.pack(side="right", padx=(0, 8))
         
         # Row 1: Allegiance and Population
         row = 1
@@ -17181,9 +17190,32 @@ class App(tk.Tk, ColumnVisibilityMixin):
         )
         state_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
         
-        # Row 4: Reference system info display (shows info about the "Reference System")
-        # Split into 2 rows: Row 1 = System name, Row 2 = Properties
+        # Row 4: Power and PP State filters
         row = 4
+        ttk.Label(search_frame, text=t('system_finder.pp_power') + ":").grid(
+            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+
+        self.sysfinder_power = tk.StringVar(value="Any")
+        power_combo = ttk.Combobox(
+            search_frame, textvariable=self.sysfinder_power,
+            values=POWER_FILTER_OPTIONS, width=22, state="readonly"
+        )
+        power_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
+        power_combo.bind("<<ComboboxSelected>>", lambda e: power_combo.selection_clear())
+
+        ttk.Label(search_frame, text=t('system_finder.pp_state') + ":").grid(
+            row=row, column=2, sticky="e", padx=(15, 5), pady=3)
+
+        self.sysfinder_pp_state = tk.StringVar(value="Any")
+        pp_state_combo = ttk.Combobox(
+            search_frame, textvariable=self.sysfinder_pp_state,
+            values=PP_STATE_OPTIONS, width=18, state="readonly"
+        )
+        pp_state_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
+        pp_state_combo.bind("<<ComboboxSelected>>", lambda e: pp_state_combo.selection_clear())
+
+        # Row 5: Reference system info display
+        row = 5
         ref_info_frame = tk.Frame(search_frame, bg=sf_bg)
         ref_info_frame.grid(row=row, column=0, columnspan=4, pady=(8, 3), sticky="ew")
         
@@ -17195,6 +17227,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
         font_label = ("Segoe UI", 9)
         font_value = ("Segoe UI", 9, "bold")
         
+        # Row 0: My Power config (compact, above system info)
+        from config import load_player_power
+        row0_mypower = tk.Frame(ref_info_frame, bg=sf_bg)
+        row0_mypower.pack(anchor="center", pady=(2, 10))
+        tk.Label(row0_mypower, text="My Power:", font=font_label, fg="#aaaaaa", bg=sf_bg).pack(side="left")
+        _saved_power = load_player_power()
+        if _saved_power in ("Not pledged", ""):
+            _saved_power = "Select your pledge..."
+        self.sysfinder_my_power_var = tk.StringVar(value=_saved_power)
+        mypower_combo = ttk.Combobox(
+            row0_mypower, textvariable=self.sysfinder_my_power_var,
+            values=ELITE_POWERS, width=22, state="readonly"
+        )
+        mypower_combo.pack(side="left", padx=(4, 0))
+        mypower_combo.bind("<<ComboboxSelected>>", lambda e: (mypower_combo.selection_clear(), self._save_player_power()))
+
         # Row 1: System name (centered)
         row1_container = tk.Frame(ref_info_frame, bg=sf_bg)
         row1_container.pack(anchor="center")
@@ -17230,27 +17278,40 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Label(row2_container, text=" | State:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_state = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_state.pack(side="left")
-        
-        # Row 3: Spansh API status indicator
-        row3_container = tk.Frame(ref_info_frame, bg=sf_bg)
-        row3_container.pack(anchor="center")
-        
-        self.sysfinder_spansh_status_label = tk.Label(
-            row3_container, text="⚫ Spansh: checking...",
-            font=("Segoe UI", 8), fg="#888888", bg=sf_bg
-        )
-        self.sysfinder_spansh_status_label.pack(side="left", pady=(4, 0))
 
-        # Row 5: Separator
+        # Row PP: Powerplay info (hidden until data is available)
+        row_pp = tk.Frame(ref_info_frame, bg=sf_bg)
+        self.sysfinder_pp_frame = row_pp
+        tk.Label(row_pp, text="Powerplay:", font=font_label, fg="#aaaaaa", bg=sf_bg).pack(side="left")
+        self.sysfinder_ref_val_pp_power = tk.Label(row_pp, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_pp_power.pack(side="left")
+        tk.Label(row_pp, text=" | State:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        self.sysfinder_ref_val_pp_state = tk.Label(row_pp, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_pp_state.pack(side="left")
+        _foryou_lbl = tk.Label(row_pp, text=" | For you:", font=font_label, fg="white", bg=sf_bg)
+        _foryou_lbl.pack(side="left")
+        self.sysfinder_ref_val_pp_foryou = tk.Label(row_pp, text=" -", font=font_value, fg="#ff9900", bg=sf_bg)
+        self.sysfinder_ref_val_pp_foryou.pack(side="left")
+        ToolTip(_foryou_lbl, t('system_finder.pp_tooltip_foryou'))
+        ToolTip(self.sysfinder_ref_val_pp_foryou, t('system_finder.pp_tooltip_foryou'))
+        _merits_lbl = tk.Label(row_pp, text=" | Merits:", font=font_label, fg="white", bg=sf_bg)
+        _merits_lbl.pack(side="left")
+        self.sysfinder_ref_val_pp_merits = tk.Label(row_pp, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
+        self.sysfinder_ref_val_pp_merits.pack(side="left")
+        ToolTip(_merits_lbl, t('system_finder.pp_tooltip_merits'))
+        ToolTip(self.sysfinder_ref_val_pp_merits, t('system_finder.pp_tooltip_merits'))
+
+
+        # Row 6: Separator
         ttk.Separator(search_frame, orient='horizontal').grid(
-            row=5, column=0, columnspan=4, sticky="ew", pady=(8, 4))
+            row=6, column=0, columnspan=4, sticky="ew", pady=(8, 4))
 
         # Row 6: Material Trader search
         ttk.Label(search_frame, text="Material Trader:").grid(
-            row=6, column=0, sticky="e", padx=(0, 5), pady=3)
+            row=7, column=0, sticky="e", padx=(0, 5), pady=3)
 
         trader_ctrl_frame = ttk.Frame(search_frame)
-        trader_ctrl_frame.grid(row=6, column=1, columnspan=3, sticky="w", padx=5, pady=3)
+        trader_ctrl_frame.grid(row=7, column=1, columnspan=3, sticky="w", padx=5, pady=3)
 
         self.sysfinder_trader_type = tk.StringVar(value="Encoded")
         trader_combo = ttk.Combobox(
@@ -17289,6 +17350,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.sysfinder_ref_val_eco.config(text=" -")
                 self.sysfinder_ref_val_pop.config(text=" -")
                 self.sysfinder_ref_val_state.config(text=" -")
+                self.sysfinder_pp_frame.pack_forget()
         self.sysfinder_reference_system.trace_add('write', on_ref_system_change)
         
         # Results section
@@ -17328,7 +17390,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         table_frame.pack(fill="both", expand=True, padx=2, pady=2)
         
         # Define columns (faction removed - users can right-click → Inara for details)
-        columns = ("system", "distance", "security", "allegiance", "state", "population", "economy")
+        columns = ("system", "distance", "security", "allegiance", "state", "population", "economy", "powerplay")
         
         # Configure treeview style based on theme
         from config import load_theme
@@ -17379,9 +17441,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     command=lambda: self._sort_sysfinder_column("state", False))
         self.sysfinder_tree.heading("population", text=t('system_finder.col_population'), 
                                     command=lambda: self._sort_sysfinder_column("population", True))
-        self.sysfinder_tree.heading("economy", text=t('system_finder.col_economy'), 
+        self.sysfinder_tree.heading("economy", text=t('system_finder.col_economy'),
                                     command=lambda: self._sort_sysfinder_column("economy", False))
-        
+        self.sysfinder_tree.heading("powerplay", text=t('system_finder.col_powerplay'),
+                                    command=lambda: self._sort_sysfinder_column("powerplay", False))
+
         # Column widths
         self.sysfinder_tree.column("system", width=150, minwidth=100)
         self.sysfinder_tree.column("distance", width=70, minwidth=50, anchor="center")
@@ -17390,12 +17454,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_tree.column("state", width=90, minwidth=70, anchor="center")
         self.sysfinder_tree.column("population", width=100, minwidth=70, anchor="center")
         self.sysfinder_tree.column("economy", width=120, minwidth=80, anchor="center")
-        
+        self.sysfinder_tree.column("powerplay", width=170, minwidth=100, anchor="center")
+
         # Setup column visibility for system finder
         self.setup_column_visibility(
             tree=self.sysfinder_tree,
             columns=columns,
-            default_widths={"system": 150, "distance": 70, "security": 80, "allegiance": 90, "state": 90, "population": 100, "economy": 120},
+            default_widths={"system": 150, "distance": 70, "security": 80, "allegiance": 90, "state": 90, "population": 100, "economy": 120, "powerplay": 170},
             config_key='system_finder'
         )
         
@@ -17549,11 +17614,47 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception:
             pass
     
+    def _save_player_power(self):
+        """Persist the My Power dropdown selection to config"""
+        from config import save_player_power
+        save_player_power(self.sysfinder_my_power_var.get())
+
+    @staticmethod
+    def _compute_pp_foryou(power: str, power_state: str, player_power: str) -> str:
+        """Return contextual Powerplay action text for the player."""
+        if not power:
+            return "Acquire"
+        if power_state and power_state.lower() == "expansion":
+            return "Acquire"
+        if not player_power or player_power in ("Select your pledge...", "Not pledged", ""):
+            return ""
+        if power == player_power:
+            return "Reinforce ✓ (your Power)"
+        return "Undermine"
+
+    @staticmethod
+    def _compute_pp_merits(power_state: str, bgs_state: str) -> str:
+        """Return a merit yield indicator string."""
+        if not power_state:
+            return ""
+        boom = bool(bgs_state and bgs_state.lower() == "boom")
+        state = power_state.lower()
+        if state == "stronghold":
+            base = "+"      # already maxed, lowest reinforcement priority
+        elif state in ("controlled", "turmoil"):
+            base = "+++"    # needs reinforcement most / critical
+        else:
+            base = "++"     # Fortified, Expansion, Exploited, etc.
+        if boom and base != "+++":
+            base += "+"     # Boom adds one tier
+        context = " (Boom)" if boom else ""
+        return f"{base}{context}"
+
     def _update_sysfinder_ref_info(self, system_name: str):
         """Update the reference system info display with system status"""
         if not system_name or not hasattr(self, 'sysfinder_ref_val_system'):
             return
-        
+
         # Show loading state
         self.sysfinder_ref_val_system.config(text=f" {system_name}")
         self.sysfinder_ref_val_sec.config(text=" ...")
@@ -17562,14 +17663,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_ref_val_eco.config(text=" ...")
         self.sysfinder_ref_val_pop.config(text=" ...")
         self.sysfinder_ref_val_state.config(text=" ...")
-        
+
         def fetch_info():
             try:
                 from system_finder_api import SystemFinderAPI
-                print(f"[REF_INFO DEBUG] Fetching info for: {system_name}")
                 status = SystemFinderAPI.get_system_status(system_name)
-                print(f"[REF_INFO DEBUG] API returned: {status}")
-                
+
                 if status:
                     # Extract values
                     security = status.get('security') or '-'
@@ -17584,7 +17683,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         economy_str = economy.get('primary') or '-'
                     else:
                         economy_str = economy or '-'
-                    
+
                     # Format population with suffix
                     if population >= 1_000_000_000:
                         pop_str = f"{population / 1_000_000_000:.1f}B"
@@ -17596,7 +17695,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         pop_str = str(population)
                     else:
                         pop_str = "-"
-                    
+
+                    # Powerplay
+                    power = status.get('power') or None
+                    power_state = status.get('power_state') or None
+                    player_power = self.sysfinder_my_power_var.get() if hasattr(self, 'sysfinder_my_power_var') else ""
+                    pp_power_str = power or "Unoccupied"
+                    pp_state_str = power_state or "-"
+                    pp_foryou_str = self._compute_pp_foryou(power, power_state, player_power)
+                    pp_merits_str = self._compute_pp_merits(power_state, state)
+                    has_pp = bool(power or power_state)
+
                     # Update each value label on main thread
                     def update_labels():
                         self.sysfinder_ref_val_system.config(text=f" {system_name}")
@@ -17606,6 +17715,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         self.sysfinder_ref_val_eco.config(text=f" {economy_str}")
                         self.sysfinder_ref_val_pop.config(text=f" {pop_str}")
                         self.sysfinder_ref_val_state.config(text=f" {state}")
+                        if has_pp:
+                            self.sysfinder_ref_val_pp_power.config(text=f" {pp_power_str}")
+                            self.sysfinder_ref_val_pp_state.config(text=f" {pp_state_str}")
+                            self.sysfinder_ref_val_pp_foryou.config(text=f" {pp_foryou_str}" if pp_foryou_str else "")
+                            self.sysfinder_ref_val_pp_merits.config(text=f" {pp_merits_str}" if pp_merits_str else "")
+                            self.sysfinder_pp_frame.pack(anchor="center")
+                        else:
+                            self.sysfinder_pp_frame.pack_forget()
                     self.after(0, update_labels)
                 else:
                     # No data available
@@ -17617,8 +17734,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         self.sysfinder_ref_val_eco.config(text=" -")
                         self.sysfinder_ref_val_pop.config(text=" -")
                         self.sysfinder_ref_val_state.config(text=" -")
+                        self.sysfinder_pp_frame.pack_forget()
                     self.after(0, update_no_data)
-                
+
             except Exception as e:
                 logging.error(f"[SYSTEM_FINDER] Error fetching ref system info: {e}")
                 def update_error():
@@ -17629,8 +17747,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.sysfinder_ref_val_eco.config(text=" -")
                     self.sysfinder_ref_val_pop.config(text=" -")
                     self.sysfinder_ref_val_state.config(text=" -")
+                    self.sysfinder_pp_frame.pack_forget()
                 self.after(0, update_error)
-        
+
         # Run in background thread to avoid blocking UI
         import threading
         thread = threading.Thread(target=fetch_info, daemon=True)
@@ -17706,12 +17825,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 'economy': self.sysfinder_economy.get(),
                 'state': self.sysfinder_state.get(),
                 'population': self.sysfinder_population.get(),
+                'power': self.sysfinder_power.get() if hasattr(self, 'sysfinder_power') else 'Any',
+                'pp_state': self.sysfinder_pp_state.get() if hasattr(self, 'sysfinder_pp_state') else 'Any',
             }
             
             print(f"[SYSTEM_FINDER DEBUG] Filters: {filters}")
             
             # Check if any filters are active
-            has_filters = any(v != 'Any' for v in filters.values())
+            has_filters = any(v not in ('Any', '') for v in filters.values())
             
             # Use new Spansh-based search with server-side filtering
             systems = SystemFinderAPI.search_systems(
@@ -17751,9 +17872,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 state_val = system.get('state', 'Normal')
                 if not state_val or state_val in ('-', 'None'):
                     state_val = 'Normal'
+                pp_power = system.get('power') or ''
+                pp_state_val = system.get('power_state') or ''
+                if pp_power and pp_state_val:
+                    pp_str = f"{pp_power} / {pp_state_val}"
+                elif pp_power:
+                    pp_str = pp_power
+                else:
+                    pp_str = '—'
                 formatted_rows.append((
                     (system.get('systemName', '-'), dist_str, system.get('security', '-'),
-                     system.get('allegiance', '-'), state_val, pop_str, eco_str),
+                     system.get('allegiance', '-'), state_val, pop_str, eco_str, pp_str),
                     row_tag
                 ))
 

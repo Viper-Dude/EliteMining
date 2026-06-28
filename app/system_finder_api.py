@@ -83,6 +83,10 @@ class SystemFinderAPI:
                 progress_callback(80, 100, f"Processing {len(results)} results...")
             
             # Convert Spansh format to our format
+            if results:
+                r0 = results[0]
+                print(f"[PP DEBUG] raw[0] keys: {list(r0.keys())}")
+                print(f"[PP DEBUG] raw[0] powers={r0.get('powers')!r} power={r0.get('power')!r} power_state={r0.get('power_state')!r}")
             converted = []
             for system in results:
                 converted.append(cls._convert_spansh_system(system))
@@ -147,7 +151,17 @@ class SystemFinderAPI:
             pop_filter = cls._build_population_filter(population)
             if pop_filter:
                 spansh_filters['population'] = pop_filter
-        
+
+        # Powerplay — controlling power (Spansh field is 'power', value is a list)
+        power = filters.get('power', 'Any')
+        if power and power != 'Any':
+            spansh_filters['power'] = {'value': [power]}
+
+        # Powerplay — system state
+        pp_state = filters.get('pp_state', 'Any')
+        if pp_state and pp_state != 'Any':
+            spansh_filters['power_state'] = {'value': [pp_state]}
+
         return spansh_filters
     
     @classmethod
@@ -198,6 +212,23 @@ class SystemFinderAPI:
         
         population = system.get('population', 0)
         
+        # Extract powerplay — Spansh search uses 'power' (list), single-system may use 'powers' (list)
+        pp_power = None
+        for _pf in ('powers', 'power'):
+            _raw = system.get(_pf)
+            if not _raw:
+                continue
+            if isinstance(_raw, list):
+                _first = _raw[0] if _raw else None
+                if isinstance(_first, list):
+                    _first = _first[0] if _first else None
+                if isinstance(_first, str) and _first:
+                    pp_power = _first.strip("[]'\" \t") or None
+            elif isinstance(_raw, str):
+                pp_power = _raw.strip("[]'\" \t") or None
+            if pp_power:
+                break
+
         return {
             'systemName': system.get('name', ''),
             'distance': system.get('distance', 0),
@@ -214,6 +245,8 @@ class SystemFinderAPI:
             'economy': {'primary': primary_economy, 'secondary': secondary_economy},
             'population': population,
             'faction': faction,
+            'power': pp_power,
+            'power_state': system.get('power_state') or None,
         }
     
     @classmethod
@@ -380,6 +413,25 @@ class SystemFinderAPI:
             primary_economy = system.get('primary_economy') or '-'
             secondary_economy = system.get('secondary_economy')
             
+            # Extract powerplay — Spansh search uses 'power' (list), single-system may use 'powers' (list)
+            power = None
+            for _pf in ('powers', 'power'):
+                _raw = system.get(_pf)
+                if not _raw:
+                    continue
+                if isinstance(_raw, list):
+                    _first = _raw[0] if _raw else None
+                    if isinstance(_first, list):
+                        _first = _first[0] if _first else None
+                    if isinstance(_first, str) and _first:
+                        power = _first.strip("[]'\" \t") or None
+                elif isinstance(_raw, str):
+                    power = _raw.strip("[]'\" \t") or None
+                if power:
+                    break
+            log.debug(f"[POWERPLAY] extracted power={power!r}")
+            power_state = system.get('power_state') or None
+
             return {
                 'security': system.get('security') or 'Anarchy',
                 'allegiance': allegiance,
@@ -388,6 +440,8 @@ class SystemFinderAPI:
                 'economy': {'primary': primary_economy, 'secondary': secondary_economy},
                 'population': system.get('population', 0),
                 'faction': system.get('controlling_minor_faction') or '-',
+                'power': power,
+                'power_state': power_state,
             }
             
         except requests.exceptions.RequestException as e:
@@ -441,3 +495,25 @@ POPULATION_OPTIONS = [
 
 # Material trader types
 MATERIAL_TRADER_OPTIONS = ['Encoded', 'Manufactured', 'Raw']
+
+# Powerplay powers — used for "My Power" pledge dropdown
+ELITE_POWERS = [
+    "Select your pledge...", "Aisling Duval", "Archon Delaine",
+    "Arissa Lavigny-Duval", "Denton Patreus", "Edmund Mahon",
+    "Felicia Winters", "Li Yong-Rui", "Pranav Antal",
+    "Yuri Grom", "Zemina Torval"
+]
+
+# Power filter options for system search (includes Any)
+POWER_FILTER_OPTIONS = [
+    'Any', 'Aisling Duval', 'Archon Delaine',
+    'Arissa Lavigny-Duval', 'Denton Patreus', 'Edmund Mahon',
+    'Felicia Winters', 'Li Yong-Rui', 'Pranav Antal',
+    'Yuri Grom', 'Zemina Torval'
+]
+
+# Powerplay state filter options
+PP_STATE_OPTIONS = [
+    'Any', 'Controlled', 'Fortified', 'Stronghold',
+    'Contested', 'Expansion', 'Turmoil'
+]

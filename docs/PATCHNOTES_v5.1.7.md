@@ -1,9 +1,12 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** June 21, 2026
+**Release Date:** June 28, 2026
 
 ## New Features & Improvements
 
 * **Spansh search** - Save hotspots to local database increased the limit from 50 to 150 rows.
+
+
+* **Star Systems** - Added Powerplay info (Power, control state, and Reinforce/Acquire/Undermine merit value) next to Allegiance. *(Beta — feedback welcome)*
 
 ## Bug Fixes
 
@@ -13,7 +16,7 @@
 ### Voiceattack Profile
 
 * Updated to version 5.1.7
-* Optimized the autoHonk command
+* General command cleanup and optimization for improved reliability and performance.
 
 ## Important Notes
 

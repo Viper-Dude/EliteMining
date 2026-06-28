@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add .
-git commit -m "v5.1.5 - Added Haematite to the Minerals list, change color & font for dist calc results"
+git commit -m "v5.1.7 - Fixes"
 git push
 
 ## Standard Commit and Push Process
