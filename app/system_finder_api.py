@@ -4,6 +4,8 @@ Provides nearby system lookup with full server-side filtering (security, allegia
 """
 import requests
 import logging
+import sqlite3
+import json
 from typing import List, Dict, Optional, Any
 
 log = logging.getLogger(__name__)
@@ -21,7 +23,53 @@ class SystemFinderAPI:
 
     # Maximum results to return
     MAX_RESULTS = 100
+
+    # Set from main.py after EDDN listener starts — enables local powerplay cache lookups
+    EDDN_CACHE_PATH = None
     
+    @classmethod
+    def _batch_get_powerplay(cls, system_names: List[str]) -> Dict[str, Dict]:
+        """
+        Query local EDDN powerplay cache for a list of systems in one SQL call.
+        Returns {system_name: {controlling_power, power_state}} for hits only.
+        Falls back to empty dict if cache unavailable.
+        """
+        if not cls.EDDN_CACHE_PATH or not system_names:
+            return {}
+        try:
+            placeholders = ','.join('?' * len(system_names))
+            with sqlite3.connect(cls.EDDN_CACHE_PATH) as conn:
+                rows = conn.execute(
+                    f'SELECT system_name, controlling_power, power_state FROM system_powerplay'
+                    f' WHERE system_name IN ({placeholders}) COLLATE NOCASE',
+                    system_names
+                ).fetchall()
+            return {
+                row[0]: {'controlling_power': row[1], 'power_state': row[2]}
+                for row in rows if row[1]  # only rows where controlling_power is known
+            }
+        except Exception as e:
+            log.debug(f"[SYSTEM_FINDER] EDDN powerplay batch lookup error: {e}")
+            return {}
+
+    @classmethod
+    def _get_powerplay_from_cache(cls, system_name: str) -> Optional[Dict]:
+        """Single-system EDDN powerplay cache lookup. Returns None if not cached."""
+        if not cls.EDDN_CACHE_PATH:
+            return None
+        try:
+            with sqlite3.connect(cls.EDDN_CACHE_PATH) as conn:
+                row = conn.execute(
+                    'SELECT controlling_power, power_state FROM system_powerplay'
+                    ' WHERE system_name = ? COLLATE NOCASE',
+                    (system_name,)
+                ).fetchone()
+            if row and row[0]:
+                return {'controlling_power': row[0], 'power_state': row[1]}
+        except Exception as e:
+            log.debug(f"[SYSTEM_FINDER] EDDN powerplay lookup error: {e}")
+        return None
+
     @classmethod
     def search_systems(cls, reference_system: str, filters: Dict[str, str] = None,
                        max_results: int = None, progress_callback=None) -> List[Dict]:
@@ -82,14 +130,14 @@ class SystemFinderAPI:
             if progress_callback:
                 progress_callback(80, 100, f"Processing {len(results)} results...")
             
+            # Batch-fetch powerplay data from local EDDN cache for all returned systems
+            system_names = [s.get('name', '') for s in results if s.get('name')]
+            pp_cache = cls._batch_get_powerplay(system_names)
+
             # Convert Spansh format to our format
-            if results:
-                r0 = results[0]
-                print(f"[PP DEBUG] raw[0] keys: {list(r0.keys())}")
-                print(f"[PP DEBUG] raw[0] powers={r0.get('powers')!r} power={r0.get('power')!r} power_state={r0.get('power_state')!r}")
             converted = []
             for system in results:
-                converted.append(cls._convert_spansh_system(system))
+                converted.append(cls._convert_spansh_system(system, pp_cache))
             
             if progress_callback:
                 progress_callback(100, 100, f"Found {len(converted)} systems")
@@ -191,7 +239,7 @@ class SystemFinderAPI:
         return None
     
     @classmethod
-    def _convert_spansh_system(cls, system: Dict) -> Dict:
+    def _convert_spansh_system(cls, system: Dict, pp_cache: Dict = None) -> Dict:
         """Convert Spansh system format to our display format"""
         # Get economy info
         primary_economy = system.get('primary_economy') or '-'
@@ -212,25 +260,34 @@ class SystemFinderAPI:
         
         population = system.get('population', 0)
         
-        # Extract powerplay — Spansh search uses 'power' (list), single-system may use 'powers' (list)
-        pp_power = None
-        for _pf in ('powers', 'power'):
-            _raw = system.get(_pf)
-            if not _raw:
-                continue
-            if isinstance(_raw, list):
-                _first = _raw[0] if _raw else None
-                if isinstance(_first, list):
-                    _first = _first[0] if _first else None
-                if isinstance(_first, str) and _first:
-                    pp_power = _first.strip("[]'\" \t") or None
-            elif isinstance(_raw, str):
-                pp_power = _raw.strip("[]'\" \t") or None
-            if pp_power:
-                break
+        system_name = system.get('name', '')
+
+        # Powerplay — prefer local EDDN cache (has explicit controlling_power) over Spansh flat list
+        cached_pp = (pp_cache or {}).get(system_name)
+        if cached_pp:
+            pp_power = cached_pp['controlling_power']
+            pp_state = cached_pp['power_state'] or system.get('power_state') or None
+        else:
+            # Spansh fallback — first entry in power list (correct for single-power systems)
+            pp_power = None
+            for _pf in ('powers', 'power'):
+                _raw = system.get(_pf)
+                if not _raw:
+                    continue
+                if isinstance(_raw, list):
+                    _first = _raw[0] if _raw else None
+                    if isinstance(_first, list):
+                        _first = _first[0] if _first else None
+                    if isinstance(_first, str) and _first:
+                        pp_power = _first.strip("[]'\" \t") or None
+                elif isinstance(_raw, str):
+                    pp_power = _raw.strip("[]'\" \t") or None
+                if pp_power:
+                    break
+            pp_state = system.get('power_state') or None
 
         return {
-            'systemName': system.get('name', ''),
+            'systemName': system_name,
             'distance': system.get('distance', 0),
             'systemAddress': system.get('id64'),
             'coords': {
@@ -238,7 +295,7 @@ class SystemFinderAPI:
                 'y': system.get('y', 0),
                 'z': system.get('z', 0),
             },
-            'security': system.get('security') or 'Anarchy',  # Unpopulated = Anarchy
+            'security': system.get('security') or 'Anarchy',
             'allegiance': allegiance,
             'government': system.get('government') or '-',
             'state': state,
@@ -246,7 +303,7 @@ class SystemFinderAPI:
             'population': population,
             'faction': faction,
             'power': pp_power,
-            'power_state': system.get('power_state') or None,
+            'power_state': pp_state,
         }
     
     @classmethod
@@ -413,24 +470,30 @@ class SystemFinderAPI:
             primary_economy = system.get('primary_economy') or '-'
             secondary_economy = system.get('secondary_economy')
             
-            # Extract powerplay — Spansh search uses 'power' (list), single-system may use 'powers' (list)
-            power = None
-            for _pf in ('powers', 'power'):
-                _raw = system.get(_pf)
-                if not _raw:
-                    continue
-                if isinstance(_raw, list):
-                    _first = _raw[0] if _raw else None
-                    if isinstance(_first, list):
-                        _first = _first[0] if _first else None
-                    if isinstance(_first, str) and _first:
-                        power = _first.strip("[]'\" \t") or None
-                elif isinstance(_raw, str):
-                    power = _raw.strip("[]'\" \t") or None
-                if power:
-                    break
-            log.debug(f"[POWERPLAY] extracted power={power!r}")
-            power_state = system.get('power_state') or None
+            # Powerplay — prefer local EDDN cache, fall back to Spansh flat list
+            cached_pp = cls._get_powerplay_from_cache(system_name)
+            if cached_pp:
+                power = cached_pp['controlling_power']
+                power_state = cached_pp['power_state'] or system.get('power_state') or None
+                log.debug(f"[POWERPLAY] EDDN cache hit: power={power!r} state={power_state!r}")
+            else:
+                power = None
+                for _pf in ('powers', 'power'):
+                    _raw = system.get(_pf)
+                    if not _raw:
+                        continue
+                    if isinstance(_raw, list):
+                        _first = _raw[0] if _raw else None
+                        if isinstance(_first, list):
+                            _first = _first[0] if _first else None
+                        if isinstance(_first, str) and _first:
+                            power = _first.strip("[]'\" \t") or None
+                    elif isinstance(_raw, str):
+                        power = _raw.strip("[]'\" \t") or None
+                    if power:
+                        break
+                power_state = system.get('power_state') or None
+                log.debug(f"[POWERPLAY] Spansh fallback: power={power!r} state={power_state!r}")
 
             return {
                 'security': system.get('security') or 'Anarchy',

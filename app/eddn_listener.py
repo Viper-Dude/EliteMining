@@ -141,6 +141,16 @@ class EDDNListener:
                     CREATE INDEX IF NOT EXISTS idx_station_metadata_mid
                     ON station_metadata(market_id)
                 ''')
+                # Powerplay data — populated from FSDJump/Location journal events
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS system_powerplay (
+                        system_name TEXT PRIMARY KEY,
+                        controlling_power TEXT,
+                        power_state TEXT,
+                        powers TEXT,
+                        updated_at TEXT
+                    )
+                ''')
                 # Drop FTS5 table if it exists from older versions (unused, wastes space)
                 cursor.execute('DROP TABLE IF EXISTS commodity_prices_fts')
                 conn.commit()
@@ -353,42 +363,71 @@ class EDDNListener:
             log.error(f"EDDN: Error processing commodity message: {e}")
 
     def _process_journal_message(self, message: dict):
-        """Handle EDDN journal messages — extract Docked/Location for station metadata."""
+        """Handle EDDN journal messages — station metadata and powerplay data."""
         try:
             msg_data = message.get('message', {})
             event = msg_data.get('event', '')
-            
-            if event not in ('Docked', 'Location'):
+
+            if event not in ('Docked', 'Location', 'FSDJump'):
                 return
-            
-            market_id = msg_data.get('MarketID')
-            station_type = msg_data.get('StationType')
-            if not market_id or not station_type:
-                return
-            
-            station_name = msg_data.get('StationName', '')
-            system_name = msg_data.get('StarSystem', '')
-            distance_to_arrival = msg_data.get('DistFromStarLS') or msg_data.get('DistanceFromArrivalLS')
+
             timestamp = msg_data.get('timestamp') or message.get('header', {}).get('gatewayTimestamp', '')
-            
-            # Derive max landing pad from StationEconomies or pad counts if present
-            max_pad = self._infer_max_pad(station_type)
-            
-            try:
-                with sqlite3.connect(self.database_path) as conn:
-                    conn.execute('''
-                        INSERT OR REPLACE INTO station_metadata
-                        (market_id, station_name, system_name, station_type,
-                         max_landing_pad_size, distance_to_arrival, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ''', (market_id, station_name, system_name, station_type,
-                          max_pad, distance_to_arrival, timestamp))
-                    conn.commit()
-            except Exception as e:
-                log.debug(f"EDDN: station_metadata write error: {e}")
+
+            # Station metadata — Docked and Location only
+            if event in ('Docked', 'Location'):
+                market_id = msg_data.get('MarketID')
+                station_type = msg_data.get('StationType')
+                if market_id and station_type:
+                    station_name = msg_data.get('StationName', '')
+                    system_name = msg_data.get('StarSystem', '')
+                    distance_to_arrival = msg_data.get('DistFromStarLS') or msg_data.get('DistanceFromArrivalLS')
+                    max_pad = self._infer_max_pad(station_type)
+                    try:
+                        with sqlite3.connect(self.database_path) as conn:
+                            conn.execute('''
+                                INSERT OR REPLACE INTO station_metadata
+                                (market_id, station_name, system_name, station_type,
+                                 max_landing_pad_size, distance_to_arrival, updated_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ''', (market_id, station_name, system_name, station_type,
+                                  max_pad, distance_to_arrival, timestamp))
+                            conn.commit()
+                    except Exception as e:
+                        log.debug(f"EDDN: station_metadata write error: {e}")
+
+            # Powerplay data — FSDJump and Location carry system-level PP fields
+            if event in ('FSDJump', 'Location'):
+                self._process_powerplay_from_event(msg_data, timestamp)
 
         except Exception as e:
             log.error(f"EDDN: Error processing journal message: {e}")
+
+    def _process_powerplay_from_event(self, msg_data: dict, timestamp: str):
+        """Upsert powerplay data for a system from a FSDJump or Location event."""
+        system_name = msg_data.get('StarSystem')
+        if not system_name:
+            return
+
+        controlling_power = msg_data.get('ControllingPower')  # PP2.0 explicit field
+        power_state = msg_data.get('PowerplayState')
+        powers = msg_data.get('Powers')  # list of all powers present
+
+        # Only store if there is powerplay data at all
+        if not power_state and not controlling_power and not powers:
+            return
+
+        powers_json = json.dumps(powers) if powers else None
+
+        try:
+            with sqlite3.connect(self.database_path) as conn:
+                conn.execute('''
+                    INSERT OR REPLACE INTO system_powerplay
+                    (system_name, controlling_power, power_state, powers, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (system_name, controlling_power, power_state, powers_json, timestamp))
+                conn.commit()
+        except Exception as e:
+            log.debug(f"EDDN: system_powerplay write error: {e}")
 
     @staticmethod
     def _infer_max_pad(station_type: str) -> int:

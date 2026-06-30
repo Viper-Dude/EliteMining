@@ -197,11 +197,15 @@ class EDDNSender:
         """
         if not self.enabled:
             return False
-            
+
+        if not self.game_version or not self.game_build:
+            log.warning("EDDN: skipping journal send — gameversion/gamebuild not yet known (no LoadGame seen)")
+            return False
+
         try:
             # Filter sensitive data
             filtered_data = self._filter_journal_data(event_data)
-            
+
             # Build EDDN message
             message = {
                 "$schemaRef": self.SCHEMA_JOURNAL_V1,
@@ -209,6 +213,8 @@ class EDDNSender:
                     "uploaderID": self.commander_name,
                     "softwareName": self.app_name,
                     "softwareVersion": self.app_version,
+                    "gameversion": self.game_version,
+                    "gamebuild": self.game_build,
                     "gatewayTimestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                 },
                 "message": filtered_data
@@ -275,13 +281,19 @@ class EDDNSender:
         Returns:
             Filtered event data safe for EDDN
         """
-        # Remove sensitive fields that shouldn't be shared
-        sensitive_fields = ['Commander', 'FID', 'Name', 'Ship', 'ShipID']
-        
+        # Commander identity and private fields never shared
+        sensitive_fields = [
+            'Commander', 'FID', 'Name', 'Ship', 'ShipID',
+            # FSDJump/CarrierJump — player-specific flight data not in EDDN schema
+            'JumpDist', 'FuelUsed', 'FuelLevel', 'BoostUsed',
+            # Location/FSDJump — player status not in EDDN schema
+            'Wanted', 'ActiveFine',
+        ]
+
         filtered = event_data.copy()
         for field in sensitive_fields:
             filtered.pop(field, None)
-        
+
         return filtered
     
     def get_stats(self) -> Dict:

@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.1.7"
+APP_VERSION = "v5.1.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -3809,7 +3809,9 @@ cargo panel forces Elite to write detailed inventory data.
                         self.current_system = system_name
                     
                     print(f"[JUMP] FSDJump: Arrived at {system_name}")
-            
+                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
+                        self.main_app_ref.eddn_sender.send_journal_event("FSDJump", event)
+
             elif event_type == "CarrierJump":
                 # Player is docked on Fleet Carrier that jumped - player arrived at new system
                 # CarrierJump only fires when player is docked, so this is a real arrival - count as visit
@@ -3830,6 +3832,8 @@ cargo panel forces Elite to write detailed inventory data.
                         self.current_system = system_name
                     
                     print(f"[CARRIER] CarrierJump: Now at {system_name}")
+                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
+                        self.main_app_ref.eddn_sender.send_journal_event("CarrierJump", event)
                 # Also update FC tracker with completed jump
                 try:
                     self.journal_parser.process_carrier_jump_completed(event)
@@ -3867,7 +3871,9 @@ cargo panel forces Elite to write detailed inventory data.
                         self.main_app_ref.update_current_system(system_name, coords, count_visit=count_visit, event_timestamp=event_ts)
                     else:
                         self.current_system = system_name
-            
+                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
+                        self.main_app_ref.eddn_sender.send_journal_event("Location", event)
+
             elif event_type == "CarrierLocation":
                 # CarrierLocation tells us where YOUR carrier is
                 # This is informational - it does NOT count as a visit because:
@@ -5409,9 +5415,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.eddn_listener.start()
         print(f"[OK] EDDN listener started (real-time market data) -> {eddn_cache_path}")
         
-        # Make the EDDN cache path available to MarketplaceAPI
+        # Make the EDDN cache path available to MarketplaceAPI and SystemFinderAPI
         from marketplace_api import MarketplaceAPI
         MarketplaceAPI.EDDN_CACHE_PATH = eddn_cache_path
+        from system_finder_api import SystemFinderAPI
+        SystemFinderAPI.EDDN_CACHE_PATH = eddn_cache_path
         
         # Initialize API uploader for session/hotspot sharing
         from api_uploader import APIUploader
@@ -5448,6 +5456,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 print(f"[OK] EDDN sender primed from journal (CMDR={self.eddn_sender.commander_name}, version={self.eddn_sender.game_version})")
             else:
                 print(f"[WARN] EDDN sender could not find LoadGame in recent journals — commodity uploads will be deferred until next LoadGame")
+            # Process existing Market.json on startup — covers the case where the player
+            # was already docked at a market before EliteMining was launched.
+            market_path = os.path.join(journal_dir, 'Market.json')
+            if os.path.exists(market_path) and hasattr(self, 'market_handler'):
+                self.market_handler.process_market_file(market_path)
+                print(f"[OK] Processed existing Market.json on startup")
         else:
             print(f"[WARN] Could not set up EDDN file watcher - journal_dir not available")
         
@@ -17134,6 +17148,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             bg=ttk.Style().lookup('TFrame', 'background')
         )
         self.sysfinder_spansh_status_label.pack(side="right", padx=(0, 8))
+
+        # EDDN status indicator - to the left of Spansh
+        self.sysfinder_eddn_status_label = tk.Label(
+            ref_frame, text="⚫ EDDN: checking...",
+            font=("Segoe UI", 8), fg="#888888",
+            bg=ttk.Style().lookup('TFrame', 'background')
+        )
+        self.sysfinder_eddn_status_label.pack(side="right", padx=(0, 4))
         
         # Row 1: Allegiance and Population
         row = 1
@@ -17389,8 +17411,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Auto-populate current system after a delay
         self.after(2000, self._populate_sysfinder_system)
         
-        # Start Spansh status check
+        # Start Spansh and EDDN status checks
         self.after(1000, self._check_sysfinder_spansh_status)
+        self.after(1200, self._check_sysfinder_eddn_status)
         
         # Remove focus from entry field (prevent highlight on tab switch)
         # Focus the frame instead of the entry
@@ -17824,6 +17847,38 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         if hasattr(self, 'sysfinder_spansh_status_label'):
             self.sysfinder_spansh_status_label.config(text=status_text, fg=status_color)
+
+    def _check_sysfinder_eddn_status(self):
+        """Check EDDN gateway status in background and update indicator"""
+        def _background_check():
+            import requests
+            def _schedule(status):
+                try:
+                    self.after(0, lambda: self._update_sysfinder_eddn_status(status))
+                except RuntimeError:
+                    pass
+            try:
+                response = requests.get('https://eddn.edcd.io:4430/', timeout=10)
+                _schedule("online")
+            except requests.exceptions.ConnectionError:
+                _schedule("offline")
+            except Exception:
+                _schedule("online")  # Any HTTP response (even 4xx) means the server is up
+
+        import threading
+        threading.Thread(target=_background_check, daemon=True).start()
+
+    def _update_sysfinder_eddn_status(self, status: str):
+        """Update EDDN status label in system finder - called on UI thread"""
+        if status == "online":
+            status_text = "🟢 EDDN: Online"
+            status_color = "#00ff00"
+        else:
+            status_text = "🔴 EDDN: Offline"
+            status_color = "#ff4444"
+
+        if hasattr(self, 'sysfinder_eddn_status_label'):
+            self.sysfinder_eddn_status_label.config(text=status_text, fg=status_color)
 
     def _search_systems(self):
         """Search for systems matching criteria"""
