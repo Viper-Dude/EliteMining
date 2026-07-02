@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.1.9"
+APP_VERSION = "v5.2.0"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -17604,6 +17604,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             label=t('system_finder.find_hotspots'),
             command=self._find_hotspots_from_sysfinder
         )
+        self.sysfinder_context_menu.add_command(
+            label=t('system_finder.set_as_reference'),
+            command=self._set_sysfinder_as_reference
+        )
         self.sysfinder_context_menu.add_separator()
         self.sysfinder_context_menu.add_command(
             label=t('system_finder.open_inara'),
@@ -17656,6 +17660,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if hasattr(self.ring_finder, 'max_results_var'):
                 self.ring_finder.max_results_var.set("All")
             self.after(100, self.ring_finder.search_hotspots)
+
+    def _set_sysfinder_as_reference(self):
+        """Set the selected system as the reference system and re-run the search"""
+        selection = self.sysfinder_tree.selection()
+        if not selection:
+            return
+        system_name = self.sysfinder_tree.item(selection[0])['values'][0]
+        if not system_name:
+            return
+        self.sysfinder_reference_system.set(system_name)
+        self.after(100, self._search_systems)
 
     def _sysfinder_on_double_click(self, event):
         """Open Inara and fetch/refresh PP data when double-clicking a row."""
@@ -18197,6 +18212,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         return 0
                 
                 items.sort(key=lambda x: parse_value(x[0]), reverse=reverse)
+            elif column == "powerplay":
+                # No data / not fetched should sort to the top in ascending order
+                no_data_str = t('common.pp_no_data')
+                def sort_key(val):
+                    if not val or val == no_data_str:
+                        return (0, "")
+                    return (1, val.lower())
+                items.sort(key=lambda x: sort_key(x[0]), reverse=reverse)
             else:
                 items.sort(key=lambda x: x[0].lower(), reverse=reverse)
             

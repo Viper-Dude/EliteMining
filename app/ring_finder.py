@@ -1146,6 +1146,15 @@ class RingFinder(ColumnVisibilityMixin):
                 val = item[0]
                 return reserve_order.get(val, 0)
             data.sort(key=sort_key, reverse=reverse)
+        elif col == "PowerPlay":
+            # No data / not fetched should sort to the top in ascending order
+            no_data_str = t('common.pp_no_data')
+            def sort_key(item):
+                val = item[0]
+                if not val or val == no_data_str:
+                    return (0, "")
+                return (1, val.lower())
+            data.sort(key=sort_key, reverse=reverse)
         elif col == "Hotspots":
             # Hotspots column - extract number from formats like "Plat (2)" or "LTD (3), Plat (2)"
             import re
@@ -5417,6 +5426,7 @@ class RingFinder(ColumnVisibilityMixin):
                                    selectcolor=menu_active_bg)
         self.context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_name)
         self.context_menu.add_command(label=t('context_menu.find_in_star_systems'), command=self._find_in_star_systems)
+        self.context_menu.add_command(label=t('context_menu.set_as_reference'), command=self._set_as_reference_system)
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara)
         self.context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm)
@@ -5532,11 +5542,11 @@ class RingFinder(ColumnVisibilityMixin):
                     mineral = self._to_english(mineral_display)
                     is_specific_mineral = not self._is_all_minerals(mineral)
                     
-                    # Menu item index for "Find Sell Station" is 7 (after copy_system, find_in_star_systems, separator, inara, edsm, spansh, separator)
+                    # Menu item index for "Find Sell Station" is 8 (after copy_system, find_in_star_systems, set_as_reference, separator, inara, edsm, spansh, separator)
                     if is_specific_mineral:
-                        self.context_menu.entryconfig(7, state="normal")
+                        self.context_menu.entryconfig(8, state="normal")
                     else:
-                        self.context_menu.entryconfig(7, state="disabled")
+                        self.context_menu.entryconfig(8, state="disabled")
 
                     # Show/hide "Save to Database" option (index 9, after separator) based on Source column
                     # Allow save in Ring Search mode if row has hotspot data
@@ -5551,27 +5561,27 @@ class RingFinder(ColumnVisibilityMixin):
 
                     # Enable if Spansh rows AND (not ring search mode OR has hotspot data)
                     if has_spansh_rows and (not is_ring_search_mode or has_hotspot_data):
-                        self.context_menu.entryconfig(9, state="normal")
-                    else:
-                        self.context_menu.entryconfig(9, state="disabled")
-
-                    # Show/hide "Update Reserve Level" option (index 10) based on Local source + missing reserve
-                    if enable_update_reserve:
                         self.context_menu.entryconfig(10, state="normal")
                     else:
                         self.context_menu.entryconfig(10, state="disabled")
 
-                    # Enable/disable "Set Reserve" option (index 16) - only for local database entries
-                    if has_local_only:
-                        self.context_menu.entryconfig(16, state="normal")
+                    # Show/hide "Update Reserve Level" option (index 11) based on Local source + missing reserve
+                    if enable_update_reserve:
+                        self.context_menu.entryconfig(11, state="normal")
                     else:
-                        self.context_menu.entryconfig(16, state="disabled")
+                        self.context_menu.entryconfig(11, state="disabled")
 
-                    # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: separator,
-                    # 3: inara, 4: edsm, 5: spansh, 6: separator, 7: find_sell_station, 8: separator,
-                    # 9: save_to_db, 10: update_reserve, 11: separator,
-                    # 12: edit_hotspots, 13: set_overlap, 14: set_res, 15: set_reserve, 16: edit_visits
-                    # 17: separator, 18: bookmark
+                    # Enable/disable "Set Reserve" option (index 17) - only for local database entries
+                    if has_local_only:
+                        self.context_menu.entryconfig(17, state="normal")
+                    else:
+                        self.context_menu.entryconfig(17, state="disabled")
+
+                    # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: set_as_reference, 3: separator,
+                    # 4: inara, 5: edsm, 6: spansh, 7: separator, 8: find_sell_station, 9: separator,
+                    # 10: save_to_db, 11: update_reserve, 12: separator,
+                    # 13: edit_hotspots, 14: set_overlap, 15: set_res, 16: set_reserve, 17: edit_visits
+                    # 18: separator, 19: bookmark
                     
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -5609,6 +5619,18 @@ class RingFinder(ColumnVisibilityMixin):
                 main_app.after(100, main_app._search_systems)
         except Exception as e:
             print(f"[RING FINDER] Error jumping to Star Systems: {e}")
+
+    def _set_as_reference_system(self):
+        """Set the selected system as the reference system and re-run the search"""
+        selection = self.results_tree.selection()
+        if not selection:
+            return
+        values = self.results_tree.item(selection[0], 'values')
+        if not values or len(values) <= 2:
+            return
+        system_name = values[2]
+        self.system_var.set(system_name)
+        self.parent.after(100, self.search_hotspots)
 
     def _on_double_click(self, event):
         """Open Inara and fetch/refresh PP data when double-clicking a row's PowerPlay cell."""
