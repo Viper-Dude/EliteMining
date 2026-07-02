@@ -8,7 +8,7 @@
 
 #### Important Notes
 
-* The PowerPlay column fills in instantly for systems you jump into yourself, and automatically from EDDN (live data from other commanders) for the rest — only while the app is running. If a system shows **No data ↗**, double-click it to open Inara and fetch the info automatically.
+* The PowerPlay column fills in instantly for systems you jump into yourself, and automatically from EDDN (live data from other commanders) for the rest — only while the app is running, so that part of the coverage can take hours to days to build up. If a system shows **No data ↗**, double-click it to open Inara and fetch the info automatically.
 
 ## Voiceattack 
 * No update - Current version is 5.1.7
