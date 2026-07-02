@@ -15,9 +15,9 @@ a = Analysis(
     hiddenimports=[
         'requests', 'requests.adapters', 'requests.auth', 'requests.cookies',
         'requests.models', 'requests.sessions', 'requests.structures', 'urllib3',
-        'hotspot_finder', 'zlib',
-        # Logging and journal scanning modules
-        'logging_setup', 'incremental_journal_scanner', 'journal_scan_state',
+        'zlib',
+        # Logging
+        'logging_setup',
         # Event-driven file monitoring (optional)
         'file_watcher', 'watchdog', 'watchdog.observers', 'watchdog.events',
         # Matplotlib for charts and graphs (data files + submodules collected via collect_all above)

@@ -102,7 +102,7 @@ class ReleaseBuilder:
         
         if spec_file.exists():
             print(f"Running PyInstaller with spec: {spec_file}")
-            return self.run_command(f"python -m PyInstaller --clean \"{spec_file}\"", cwd=str(self.project_root))
+            return self.run_command(f"\"{sys.executable}\" -m PyInstaller --clean \"{spec_file}\"", cwd=str(self.project_root))
         else:
             print("❌ No spec file found")
             return False

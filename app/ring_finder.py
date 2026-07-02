@@ -1413,9 +1413,10 @@ class RingFinder(ColumnVisibilityMixin):
             if hasattr(self, 'distance_combo'):
                 self.distance_combo['values'] = ("10", "50", "100", "150", "200")
 
-        # PP column: hide for Spansh-only (no PP data from Spansh API), restore otherwise
+        # PP column: hide when Spansh rows can appear (Spansh-only or mixed Both), since
+        # Treeview row-coloring would otherwise show PP data (always from local DB) in Spansh's blue
         if hasattr(self, 'results_tree'):
-            if source == "spansh":
+            if source in ("spansh", "both"):
                 current_width = self.results_tree.column("PowerPlay", "width")
                 if current_width > 0:
                     self._pp_spansh_hidden_width = current_width
@@ -1428,6 +1429,17 @@ class RingFinder(ColumnVisibilityMixin):
                     self.results_tree.column("PowerPlay", width=restore_width, minwidth=80, stretch=False)
                     self._pp_hidden_for_spansh = False
                 self._cv_set_excluded('ring_finder', 'PowerPlay', False)
+
+        # Power / Power State filters: disable when Spansh rows can appear (Spansh-only or Both)
+        if hasattr(self, 'pp_power_combo') and hasattr(self, 'pp_state_combo'):
+            if source in ("spansh", "both"):
+                self.pp_power_var.set('Any')
+                self.pp_state_var.set('Any')
+                self.pp_power_combo.configure(state="disabled")
+                self.pp_state_combo.configure(state="disabled")
+            else:
+                self.pp_power_combo.configure(state="readonly")
+                self.pp_state_combo.configure(state="readonly")
 
         self._save_filter_settings()
 
@@ -1446,8 +1458,9 @@ class RingFinder(ColumnVisibilityMixin):
         if self.ring_type_only_var.get():
             # Automatically switch to Spansh (Ring Type Only only works with Spansh)
             self.data_source_var.set("spansh")
+            self._on_data_source_changed()
             print("[DEBUG] Ring Type Only enabled - switched to Spansh data source")
-            
+
             # Disable Database and Both radio buttons - only Spansh works with Ring Type Only
             self.data_source_db_rb.configure(state="disabled")
             self.data_source_both_rb.configure(state="disabled")
