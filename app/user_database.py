@@ -2503,7 +2503,59 @@ class UserDatabase:
         except Exception as e:
             log.error(f"Error getting RES for ring: {e}")
             return []
-    
+
+    def bulk_get_overlaps_for_rings(self, system_names: list) -> dict:
+        """Batch fetch overlap tags for all rings belonging to a list of systems.
+        Returns {(system_name, body_name): [{'material_name': ..., 'overlap_tag': ...}]}
+        One DB connection instead of one per ring.
+        """
+        if not system_names:
+            return {}
+        unique_systems = list(set(system_names))
+        placeholders = ','.join('?' * len(unique_systems))
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                rows = conn.execute(
+                    f'SELECT system_name, body_name, material_name, overlap_tag '
+                    f'FROM hotspot_data WHERE overlap_tag IS NOT NULL '
+                    f'AND system_name IN ({placeholders}) ORDER BY system_name, body_name, material_name',
+                    unique_systems
+                ).fetchall()
+            result = {}
+            for sys_name, body_name, mat_name, overlap_tag in rows:
+                key = (sys_name, body_name)
+                result.setdefault(key, []).append({'material_name': mat_name, 'overlap_tag': overlap_tag})
+            return result
+        except Exception as e:
+            log.error(f"Error bulk getting overlaps: {e}")
+            return {}
+
+    def bulk_get_res_for_rings(self, system_names: list) -> dict:
+        """Batch fetch RES tags for all rings belonging to a list of systems.
+        Returns {(system_name, body_name): [{'material_name': ..., 'res_tag': ...}]}
+        One DB connection instead of one per ring.
+        """
+        if not system_names:
+            return {}
+        unique_systems = list(set(system_names))
+        placeholders = ','.join('?' * len(unique_systems))
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                rows = conn.execute(
+                    f'SELECT system_name, body_name, material_name, res_tag '
+                    f'FROM hotspot_data WHERE res_tag IS NOT NULL '
+                    f'AND system_name IN ({placeholders}) ORDER BY system_name, body_name, material_name',
+                    unique_systems
+                ).fetchall()
+            result = {}
+            for sys_name, body_name, mat_name, res_tag in rows:
+                key = (sys_name, body_name)
+                result.setdefault(key, []).append({'material_name': mat_name, 'res_tag': res_tag})
+            return result
+        except Exception as e:
+            log.error(f"Error bulk getting RES: {e}")
+            return {}
+
     def get_database_stats(self) -> Dict[str, int]:
         """Get statistics about the database contents
         

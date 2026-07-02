@@ -19,6 +19,8 @@
     "ok": "OK",
     "error": "Error",
     "warning": "Warning",
+    "pp_no_data": "No data  ↗",
+    "pp_no_power": "No Powerplay",
     "info": "Info",
     "loading": "Loading...",
     "please_wait": "Please wait...",
@@ -72,13 +74,14 @@
   },
   "ring_finder": {
     "title": "Search For Hotspots",
+    "help_tooltip": "Open Hotspot Finder guide (README)",
     "distances": "Distances:",
     "reference_system": "Reference System:",
     "use_current_system": "Use Current System",
     "search_results": "Search Results",
     "search_help": "Search: User database (your scans) + Spansh | Both: ~50 LY | Tip: Select specific mineral | Reserve: Spansh only",
     "no_data_help": "Ring Search: Spansh only (Select ring type to activate)",
-    "right_click_help": "Right-click rows for options (Save Spansh to Local Database, Update Reserve Level, etc.) | Source: 🌐=Spansh, 🗄️=Local, 🌐🗄️=Both",
+    "right_click_help": "Right-click for options · Double-click to open system on Inara",
     "source_legend": "Source: 🌐=Spansh | 🗄️=Local | 🌐🗄️=Both",
     "source_legend_tooltip": "🌐 = Data from Spansh only\n🗄️ = Data from Local database only\n🌐🗄️ = Data exists in both sources",
     "ring_type": "Ring Type",
@@ -201,9 +204,21 @@
     "too_many_rows_selected": "You have selected {count} Spansh rows. To prevent API overflow, please select 150 or fewer rows at a time.",
     "too_many_systems_for_reserve": "You have selected {count} rows. To prevent API overflow, please select 50 or fewer rows at a time.",
     "update_reserve_title": "Update Reserve Levels",
+    "fetching_pp": "Fetching Powerplay data for {system}...",
+    "fetching_pp_batch": "Fetching Powerplay for {n} systems...",
+    "fetching_pp_progress": "Fetching PP: {current}/{total} — {system}",
+    "fetching_pp_done": "Powerplay fetch complete — {done} updated, {failed} not found",
+    "pp_fetch_success": "Powerplay updated: {system} → {power}",
+    "pp_fetch_none": "No Powerplay data found on Inara for {system}",
+    "pp_fetch_no_power": "{system} has no controlling power",
     "no_local_missing_reserve": "No local entries with missing reserve levels selected.",
     "reserve_update_success": "✓ Updated reserve levels for {rings} rings in {systems} system(s).\n\nAll rings in those systems have been updated.",
-    "reserve_update_none": "No reserve levels found on Spansh for {systems} system(s).\n\nVisit and scan the ring to update."
+    "reserve_update_none": "No reserve levels found on Spansh for {systems} system(s).\n\nVisit and scan the ring to update.",
+    "col_powerplay": "Powerplay",
+    "pp_power": "Power",
+    "pp_state": "Power State",
+    "pp_power_tooltip": "Filter by controlling power.\n\nThe PowerPlay column auto-fills from EDDN (live data broadcast by other players) and from your own journal as you jump through systems.\n'No data ↗' = not yet in cache — double-click to open on Inara and fetch automatically.\n'No Powerplay' = confirmed no controlling power.",
+    "pp_state_tooltip": "Filter by PowerPlay state — Exploited, Fortified, Stronghold, Expansion, or Contested.\n\nState data comes from EDDN and updates automatically as players jump through systems. Coverage builds up gradually and can take hours to days to fill in, especially in less-visited systems.\nNote: EDDN data is only received and stored locally while this app is running."
   },
   "sidebar": {
     "ship_presets": "Ship Presets (VoiceAttack)",
@@ -253,6 +268,7 @@
     "unknown_time": "Unknown"
   },
   "mining_session": {
+    "help_tooltip": "Open Mining Session guide (README)",
     "start": "Start",
     "end": "End",
     "pause": "Pause",
@@ -406,6 +422,7 @@
   },
   "marketplace": {
     "search_title": "Search For Commodity Prices",
+    "help_tooltip": "Open Commodity Market guide (README)",
     "near_system": "Near System (500 LY)",
     "galaxy_wide": "Galaxy-Wide",
     "sell": "Sell (find buyers)",
@@ -472,6 +489,7 @@
   },
   "distance_calculator": {
     "configuration": "Configuration",
+    "help_tooltip": "Open Distance Calculator guide (README)",
     "current_system": "Current System:",
     "home_system": "Home System:",
     "fleet_carrier": "Fleet Carrier:",
@@ -500,6 +518,7 @@
     "calculating": "Calculating..."
   },
   "voiceattack": {
+    "help_tooltip": "Open VoiceAttack Controls guide (README)",
     "mining_controls": "Mining Controls",
     "firegroups": "Firegroups & Fire Buttons",
     "timers": "General",
@@ -596,6 +615,7 @@
   },
   "bookmarks": {
     "title": "Mining Bookmarks",
+    "help_tooltip": "Open Bookmarks guide (README)",
     "filter": "Filter:",
     "search": "Search:",
     "all_locations": "All Locations",
@@ -792,6 +812,7 @@
     "screenshots": "Screenshots (if any)"
   },
   "settings": {
+    "help_tooltip": "Open Settings guide (README)",
     "announcements": "Announcements",
     "general_settings": "General Settings",
     "journal_directory": "Journal Directory",
@@ -1218,6 +1239,7 @@
   },
   "system_finder": {
     "title": "System Finder",
+    "help_tooltip": "Open Star Systems guide (README)",
     "tab_title": "System Finder",
     "near_system": "Near System",
     "reference_system": "Reference System",
@@ -1275,10 +1297,15 @@
     "pp_acquire": "Acquire",
     "pp_select_pledge": "← Select your pledge above",
     "pp_tooltip_foryou": "Your recommended Powerplay action for this system.\nBased on the system's controlling power vs your pledged power (My Power).\nReinforce = system belongs to your power — mining here earns fortification merits.\nUndermine = enemy power's system — mining here weakens their hold.\nAcquire   = unoccupied or in Expansion — system can be claimed for your power.",
-    "pp_tooltip_merits": "Merit yield indicator for mining activity in this system.\n+++ = High yield  (Controlled state needs reinforcing, or Boom BGS bonus)\n++  = Standard yield  (Fortified / Expansion / other states)\n+   = Low priority  (Stronghold — already maxed, merits less impactful)\nBoom BGS state adds one bonus tier to the base rating."
+    "pp_tooltip_merits": "Merit yield indicator for mining activity in this system.\n+++ = High yield  (Controlled state needs reinforcing, or Boom BGS bonus)\n++  = Standard yield  (Fortified / Expansion / other states)\n+   = Low priority  (Stronghold — already maxed, merits less impactful)\nBoom BGS state adds one bonus tier to the base rating.",
+    "pp_power_tooltip": "Filter by controlling power.\n\nThe PowerPlay column auto-fills from EDDN (live data broadcast by other players) and from your own journal as you jump through systems.\n'No data ↗' = not yet in cache — double-click to open on Inara and fetch automatically.\n'No Powerplay' = confirmed no controlling power.",
+    "pp_state_tooltip": "Filter by PowerPlay state — Exploited, Fortified, Stronghold, Expansion, or Contested.\n\nState data comes from EDDN and updates automatically as players jump through systems. Coverage builds up gradually and can take hours to days to fill in, especially in less-visited systems.\nNote: EDDN data is only received and stored locally while this app is running.",
+    "eddn_status_tooltip": "EDDN status — live data feed for PowerPlay and market data",
+    "spansh_status_tooltip": "Spansh API status — checks connectivity to spansh.co.uk"
   },
   "fleet_carrier": {
     "tab_title": "Fleet Carrier",
+    "help_tooltip": "Open Fleet Carrier guide (README)",
     "section_status": "Fleet Carrier Status",
     "section_jump": "Jump Schedule",
     "section_finance": "Finance",

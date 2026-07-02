@@ -19,6 +19,8 @@
     "ok": "OK",
     "error": "Fehler",
     "warning": "Warnung",
+    "pp_no_data": "Keine Daten  ↗",
+    "pp_no_power": "Kein Powerplay",
     "info": "Info",
     "loading": "Laden...",
     "please_wait": "Bitte warten...",
@@ -72,13 +74,14 @@
   },
   "ring_finder": {
     "title": "Hotspot-Suche",
+    "help_tooltip": "Hotspot-Finder-Anleitung öffnen (README)",
     "distances": "Entfernungen:",
     "reference_system": "Referenzsystem:",
     "use_current_system": "Aktuelles System",
     "search_results": "Suchergebnisse",
     "search_help": "Suche: Benutzerdatenbank (Ihre Scans) + Spansh | Beide: ~50 LJ | Tipp: Spezifisches Mineral | Reserve: nur Spansh",
     "no_data_help": "Ringsuche: nur Spansh (Ringtyp auswählen zum Aktivieren)",
-    "right_click_help": "Rechtsklick für Optionen (Spansh in lokaler Datenbank speichern, Reserve-Level aktualisieren, usw.) | Quelle: 🌐=Spansh, 🗄️=Lokal, 🌐🗄️=Beide",
+    "right_click_help": "Rechtsklick für Optionen · Doppelklick öffnet System auf Inara",
     "source_legend": "Quelle: 🌐=Spansh | 🗄️=Lokal | 🌐🗄️=Beide",
     "source_legend_tooltip": "🌐 = Nur Spansh-Daten\n🗄️ = Nur lokale Datenbank\n🌐🗄️ = In beiden Quellen vorhanden",
     "ring_type": "Ringtyp",
@@ -197,9 +200,21 @@
     "too_many_rows_selected": "Sie haben {count} Spansh-Zeilen ausgewählt. Um API-Überlastung zu verhindern, wählen Sie bitte maximal 150 Zeilen gleichzeitig aus.",
     "too_many_systems_for_reserve": "Sie haben {count} Zeilen ausgewählt. Um API-Überlastung zu verhindern, wählen Sie bitte maximal 50 Zeilen gleichzeitig aus.",
     "update_reserve_title": "Reserve-Level aktualisieren",
+    "fetching_pp": "Powerplay-Daten für {system} werden abgerufen...",
+    "fetching_pp_batch": "Powerplay für {n} Systeme wird abgerufen...",
+    "fetching_pp_progress": "PP abrufen: {current}/{total} — {system}",
+    "fetching_pp_done": "Powerplay-Abruf abgeschlossen — {done} aktualisiert, {failed} nicht gefunden",
+    "pp_fetch_success": "Powerplay aktualisiert: {system} → {power}",
+    "pp_fetch_none": "Keine Powerplay-Daten auf Inara für {system} gefunden",
+    "pp_fetch_no_power": "{system} hat keine kontrollierende Macht",
     "no_local_missing_reserve": "Keine lokalen Einträge mit fehlenden Reserve-Leveln ausgewählt.",
     "reserve_update_success": "✓ Reserve-Level für {rings} Ringe in {systems} System(en) aktualisiert.\n\nAlle Ringe in diesen Systemen wurden aktualisiert.",
-    "reserve_update_none": "Keine Reserve-Level auf Spansh für {systems} System(e) gefunden.\n\nBesuche und scanne den Ring zum Aktualisieren."
+    "reserve_update_none": "Keine Reserve-Level auf Spansh für {systems} System(e) gefunden.\n\nBesuche und scanne den Ring zum Aktualisieren.",
+    "col_powerplay": "Powerplay",
+    "pp_power": "Macht",
+    "pp_state": "Power-Zustand",
+    "pp_power_tooltip": "Nach kontrollierender Macht filtern.\n\nDie Powerplay-Spalte wird automatisch aus EDDN befüllt (Live-Daten anderer Spieler) sowie aus deinem eigenen Logbuch, sobald du durch Systeme springst.\n'Keine Daten ↗' = noch nicht im Cache — Doppelklick öffnet System auf Inara und ruft Daten automatisch ab.\n'Kein Powerplay' = bestätigt keine kontrollierende Macht.",
+    "pp_state_tooltip": "Nach Powerplay-Zustand filtern — Ausgebeutet, Befestigt, Hochburg, Expansion oder Umkämpft.\n\nZustandsdaten kommen von EDDN und werden automatisch aktualisiert, wenn Spieler durch Systeme springen. Die Abdeckung baut sich allmählich auf und kann Stunden bis Tage dauern, besonders in wenig besuchten Systemen.\nHinweis: EDDN-Daten werden nur empfangen und lokal gespeichert, solange diese App läuft."
   },
   "sidebar": {
     "ship_presets": "Schiff-Presets (VoiceAttack)",
@@ -249,6 +264,7 @@
     "unknown_time": "Unbekannt"
   },
   "mining_session": {
+    "help_tooltip": "Anleitung zur Mining-Sitzung öffnen (README)",
     "start": "Start",
     "end": "Ende",
     "pause": "Pause",
@@ -402,6 +418,7 @@
   },
   "marketplace": {
     "search_title": "Rohstoffpreise suchen",
+    "help_tooltip": "Anleitung zum Rohstoffmarkt öffnen (README)",
     "near_system": "Nahe System (500 LY)",
     "galaxy_wide": "Galaxisweit",
     "sell": "Verkaufen (Käufer finden)",
@@ -468,6 +485,7 @@
   },
   "distance_calculator": {
     "configuration": "Konfiguration",
+    "help_tooltip": "Anleitung zum Entfernungsrechner öffnen (README)",
     "current_system": "Aktuelles System:",
     "home_system": "Heimatsystem:",
     "fleet_carrier": "Flottenträger:",
@@ -496,6 +514,7 @@
     "calculating": "Berechne..."
   },
   "voiceattack": {
+    "help_tooltip": "Anleitung zur VoiceAttack-Steuerung öffnen (README)",
     "mining_controls": "Bergbau-Steuerung",
     "firegroups": "Feuergruppen & Feuertasten",
     "timers": "Allgemein",
@@ -601,6 +620,7 @@
   },
   "bookmarks": {
     "title": "Bergbau-Lesezeichen",
+    "help_tooltip": "Anleitung zu Lesezeichen öffnen (README)",
     "filter": "Filter:",
     "search": "Suche:",
     "all_locations": "Alle Standorte",
@@ -797,6 +817,7 @@
     "screenshots": "Screenshots (falls vorhanden)"
   },
   "settings": {
+    "help_tooltip": "Anleitung zu Einstellungen öffnen (README)",
     "announcements": "Ankündigungen",
     "general_settings": "Allgemeine Einstellungen",
     "journal_directory": "Journal-Verzeichnis",
@@ -1226,6 +1247,7 @@
   },
   "system_finder": {
     "title": "Systemfinder",
+    "help_tooltip": "Anleitung zu Sternensystemen öffnen (README)",
     "tab_title": "Systemfinder",
     "near_system": "Nahe System",
     "reference_system": "Referenzsystem",
@@ -1283,10 +1305,15 @@
     "pp_acquire": "Erwerben",
     "pp_select_pledge": "← Wähle deine Macht oben",
     "pp_tooltip_foryou": "Deine empfohlene Powerplay-Aktion für dieses System.\nBasiert auf der kontrollierenden Macht vs. deiner gepledgten Macht (Meine Macht).\nVerstärken = System gehört deiner Macht — Mining hier bringt Befestigungs-Verdienste.\nUntergraben = System einer feindlichen Macht — Mining hier schwächt deren Kontrolle.\nErwerben   = Unbesetzt oder in Expansion — System kann für deine Macht beansprucht werden.",
-    "pp_tooltip_merits": "Verdienstindikator für Mining-Aktivitäten in diesem System.\n+++ = Hoher Ertrag  (Kontrollierter Zustand braucht Verstärkung, oder Boom-Bonus)\n++  = Standardertrag  (Befestigt / Expansion / andere Zustände)\n+   = Niedrige Priorität  (Hochburg — bereits maximal befestigt)\nBoom-BGS-Zustand fügt eine Bonusstufe zum Basiswert hinzu."
+    "pp_tooltip_merits": "Verdienstindikator für Mining-Aktivitäten in diesem System.\n+++ = Hoher Ertrag  (Kontrollierter Zustand braucht Verstärkung, oder Boom-Bonus)\n++  = Standardertrag  (Befestigt / Expansion / andere Zustände)\n+   = Niedrige Priorität  (Hochburg — bereits maximal befestigt)\nBoom-BGS-Zustand fügt eine Bonusstufe zum Basiswert hinzu.",
+    "pp_power_tooltip": "Nach kontrollierender Macht filtern.\n\nDie Powerplay-Spalte wird automatisch aus EDDN befüllt (Live-Daten anderer Spieler) sowie aus deinem eigenen Logbuch, sobald du durch Systeme springst.\n'Keine Daten ↗' = noch nicht im Cache — Doppelklick öffnet System auf Inara und ruft Daten automatisch ab.\n'Kein Powerplay' = bestätigt keine kontrollierende Macht.",
+    "pp_state_tooltip": "Nach Powerplay-Zustand filtern — Ausgebeutet, Befestigt, Hochburg, Expansion oder Umkämpft.\n\nZustandsdaten kommen von EDDN und werden automatisch aktualisiert, wenn Spieler durch Systeme springen. Die Abdeckung baut sich allmählich auf und kann Stunden bis Tage dauern, besonders in wenig besuchten Systemen.\nHinweis: EDDN-Daten werden nur empfangen und lokal gespeichert, solange diese App läuft.",
+    "eddn_status_tooltip": "EDDN-Status — Live-Datenfeed für Powerplay und Marktdaten",
+    "spansh_status_tooltip": "Spansh-API-Status — prüft die Verbindung zu spansh.co.uk"
   },
   "fleet_carrier": {
     "tab_title": "Flottenträger",
+    "help_tooltip": "Anleitung zum Flottenträger öffnen (README)",
     "section_status": "Flottenträger Status",
     "section_jump": "Sprungplan",
     "section_finance": "Finanzen",

@@ -148,12 +148,17 @@ class FleetCarrierTab(tk.Frame):
                         bg=parent.cget("bg"), fg=fg or self.fg,
                         font=font or ("Helvetica", 10), **kw)
 
-    def _section_header(self, parent, title_key, large=False):
+    def _section_header(self, parent, title_key, large=False, help_anchor=None):
         hdr = tk.Frame(parent, bg=self.hdr_bg)
         hdr.pack(fill="x", pady=(10, 2))
         font = ("Helvetica", 13, "bold") if large else ("Helvetica", 10, "bold")
         tk.Label(hdr, text=f"  {t(title_key)}", bg=self.hdr_bg, fg=self.fg_bright,
-                 font=font, anchor="w").pack(fill="x", ipady=4)
+                 font=font, anchor="w").pack(side="left", ipady=4)
+        if help_anchor:
+            from ui.tooltip import ToolTip
+            from ui.help_link import create_help_link
+            create_help_link(hdr, help_anchor, t('fleet_carrier.help_tooltip'), ToolTip,
+                              bg=self.hdr_bg, fg=self.fg_bright).pack(side="left", padx=(4, 0))
 
     def _row(self, parent, label_key, sv_key, default="-", value_fg=None):
         row = tk.Frame(parent, bg=self.sect_bg)
@@ -220,7 +225,7 @@ class FleetCarrierTab(tk.Frame):
         # shown only when location is known but stats not yet received
 
     def _build_status_section(self, parent):
-        self._section_header(parent, "fleet_carrier.section_status", large=True)
+        self._section_header(parent, "fleet_carrier.section_status", large=True, help_anchor="fleet-carrier")
         sect = tk.Frame(parent, bg=self.sect_bg)
         sect.pack(fill="x", padx=4, pady=2)
 

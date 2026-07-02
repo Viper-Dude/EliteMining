@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.1.8"
+APP_VERSION = "v5.1.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5420,7 +5420,25 @@ class App(tk.Tk, ColumnVisibilityMixin):
         MarketplaceAPI.EDDN_CACHE_PATH = eddn_cache_path
         from system_finder_api import SystemFinderAPI
         SystemFinderAPI.EDDN_CACHE_PATH = eddn_cache_path
-        
+
+        # Wire the EDDN cache path into the live journal parser so every FSDJump the player
+        # makes is also written directly to system_powerplay (no EDDN round-trip needed).
+        # Then backfill from recent journal files so searches have PP data immediately.
+        if hasattr(self, 'cargo_monitor') and self.cargo_monitor and \
+                hasattr(self.cargo_monitor, 'journal_parser') and self.cargo_monitor.journal_parser:
+            self.cargo_monitor.journal_parser.eddn_cache_path = eddn_cache_path
+
+            def _backfill_pp():
+                try:
+                    jp = self.cargo_monitor.journal_parser
+                    count = jp.scan_recent_journals_for_powerplay()
+                    if count:
+                        print(f"[OK] Journal PP backfill: {count} systems loaded from local journals")
+                except Exception as e:
+                    print(f"[WARN] Journal PP backfill failed: {e}")
+
+            threading.Thread(target=_backfill_pp, daemon=True).start()
+
         # Initialize API uploader for session/hotspot sharing
         from api_uploader import APIUploader
         self.api_uploader = APIUploader()
@@ -6890,6 +6908,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
     # ---------- Interface Options tab ----------
     def _build_settings_notebook(self, frame: ttk.Frame) -> None:
         """Build the Settings tab with sub-tabs for different setting categories"""
+        # Title row with help link
+        settings_title_row = ttk.Frame(frame)
+        settings_title_row.pack(fill="x", pady=(0, 5))
+        ttk.Label(settings_title_row, text=t('tabs.settings'), font=("Segoe UI", 9, "bold")).pack(side="left")
+        from ui.help_link import create_help_link
+        create_help_link(settings_title_row, "settings-tab", t('settings.help_tooltip'), ToolTip).pack(side="left", padx=(6, 0))
+
         # Create a notebook for settings sub-tabs
         self.settings_notebook = ttk.Notebook(frame)
         self.settings_notebook.pack(fill="both", expand=True)
@@ -7062,6 +7087,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _build_voiceattack_controls_tab(self, frame: ttk.Frame) -> None:
         """Build the VoiceAttack Controls tab with Mining Controls and Firegroups"""
+        # Title row with help link
+        va_title_row = ttk.Frame(frame)
+        va_title_row.pack(fill="x", pady=(0, 5))
+        ttk.Label(va_title_row, text=t('tabs.voiceattack_controls'), font=("Segoe UI", 9, "bold")).pack(side="left")
+        from ui.help_link import create_help_link
+        create_help_link(va_title_row, "voiceattack-controls", t('voiceattack.help_tooltip'), ToolTip).pack(side="left", padx=(6, 0))
+
         # Create a notebook for VoiceAttack sub-tabs
         self.voiceattack_notebook = ttk.Notebook(frame)
         self.voiceattack_notebook.pack(fill="both", expand=True)
@@ -11977,9 +12009,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Configuration section (moved to top)
-        config_frame = ttk.LabelFrame(main_container, text=t('distance_calculator.configuration'), padding=10)
+        config_frame = ttk.LabelFrame(main_container, padding=10)
         config_frame.pack(fill="x", pady=(0, 10))
-        
+        from ui.help_link import create_labelframe_title
+        config_frame.configure(labelwidget=create_labelframe_title(
+            config_frame, t('distance_calculator.configuration'), "distance-calculator", t('distance_calculator.help_tooltip'), ToolTip))
+
         # Configure column weights: label, input (limited expand), button, distance info, visits
         config_frame.columnconfigure(0, weight=0, minsize=120)  # Label column (fixed)
         config_frame.columnconfigure(1, weight=0, minsize=250)  # Input column (fixed width)
@@ -16511,9 +16546,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Search section
-        search_frame = ttk.LabelFrame(main_container, text=t('marketplace.search_title'), padding=10)
+        search_frame = ttk.LabelFrame(main_container, padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
-        
+        from ui.help_link import create_labelframe_title
+        search_frame.configure(labelwidget=create_labelframe_title(
+            search_frame, t('marketplace.search_title'), "commodity-market", t('marketplace.help_tooltip'), ToolTip))
+
         # Load marketplace preferences from config
         cfg = _load_cfg()
         self.marketplace_search_mode = tk.StringVar(value=cfg.get('marketplace_search_mode', 'near_system'))
@@ -16798,9 +16836,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Search section
-        search_frame = ttk.LabelFrame(main_container, text=t('marketplace.search_title'), padding=10)
+        search_frame = ttk.LabelFrame(main_container, padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
-        
+        from ui.help_link import create_labelframe_title
+        search_frame.configure(labelwidget=create_labelframe_title(
+            search_frame, t('marketplace.search_title'), "commodity-market", t('marketplace.help_tooltip'), ToolTip))
+
         # Load marketplace preferences from config
         cfg = _load_cfg()
         self.trade_search_mode = tk.StringVar(value=cfg.get('trade_search_mode', 'near_system'))
@@ -17094,9 +17135,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Search section
-        search_frame = ttk.LabelFrame(main_container, text=t('system_finder.title'), padding=10)
+        search_frame = ttk.LabelFrame(main_container, padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
-        
+        from ui.help_link import create_labelframe_title
+        search_frame.configure(labelwidget=create_labelframe_title(
+            search_frame, t('system_finder.title'), "star-systems", t('system_finder.help_tooltip'), ToolTip))
+
         # Configure grid weights
         for i in range(4):
             search_frame.columnconfigure(i, weight=1)
@@ -17104,7 +17148,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Row 0: Reference system, Use Current System button, and Search button
         row = 0
         ttk.Label(search_frame, text=t('system_finder.reference_system') + ":").grid(
-            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+            row=row, column=0, sticky="w", padx=(0, 5), pady=3)
         
         # Frame to hold entry, buttons side by side
         ref_frame = ttk.Frame(search_frame)
@@ -17148,6 +17192,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             bg=ttk.Style().lookup('TFrame', 'background')
         )
         self.sysfinder_spansh_status_label.pack(side="right", padx=(0, 8))
+        ToolTip(self.sysfinder_spansh_status_label, t('system_finder.spansh_status_tooltip'))
 
         # EDDN status indicator - to the left of Spansh
         self.sysfinder_eddn_status_label = tk.Label(
@@ -17156,11 +17201,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             bg=ttk.Style().lookup('TFrame', 'background')
         )
         self.sysfinder_eddn_status_label.pack(side="right", padx=(0, 4))
+        ToolTip(self.sysfinder_eddn_status_label, t('system_finder.eddn_status_tooltip'))
         
         # Row 1: Allegiance and Population
         row = 1
         ttk.Label(search_frame, text=t('system_finder.allegiance') + ":").grid(
-            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+            row=row, column=0, sticky="w", padx=(0, 5), pady=3)
         
         self.sysfinder_allegiance = tk.StringVar(value="Any")
         allegiance_combo = ttk.Combobox(
@@ -17170,7 +17216,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         allegiance_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
         
         ttk.Label(search_frame, text=t('system_finder.population') + ":").grid(
-            row=row, column=2, sticky="e", padx=(15, 5), pady=3)
+            row=row, column=2, sticky="w", padx=(15, 5), pady=3)
         
         # Population options (Inara-style thresholds - no localization needed)
         self.sysfinder_population = tk.StringVar(value="Any")
@@ -17183,7 +17229,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Row 2: Government and Security
         row = 2
         ttk.Label(search_frame, text=t('system_finder.government') + ":").grid(
-            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+            row=row, column=0, sticky="w", padx=(0, 5), pady=3)
         
         self.sysfinder_government = tk.StringVar(value="Any")
         gov_combo = ttk.Combobox(
@@ -17193,7 +17239,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         gov_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
         
         ttk.Label(search_frame, text=t('system_finder.security') + ":").grid(
-            row=row, column=2, sticky="e", padx=(15, 5), pady=3)
+            row=row, column=2, sticky="w", padx=(15, 5), pady=3)
         
         self.sysfinder_security = tk.StringVar(value="Any")
         security_combo = ttk.Combobox(
@@ -17205,7 +17251,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Row 3: Economy and State
         row = 3
         ttk.Label(search_frame, text=t('system_finder.economy') + ":").grid(
-            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+            row=row, column=0, sticky="w", padx=(0, 5), pady=3)
         
         self.sysfinder_economy = tk.StringVar(value="Any")
         economy_combo = ttk.Combobox(
@@ -17215,7 +17261,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         economy_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
         
         ttk.Label(search_frame, text=t('system_finder.state') + ":").grid(
-            row=row, column=2, sticky="e", padx=(15, 5), pady=3)
+            row=row, column=2, sticky="w", padx=(15, 5), pady=3)
         
         self.sysfinder_state = tk.StringVar(value="Any")
         state_combo = ttk.Combobox(
@@ -17227,7 +17273,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Row 4: Power and PP State filters
         row = 4
         ttk.Label(search_frame, text=t('system_finder.pp_power') + ":").grid(
-            row=row, column=0, sticky="e", padx=(0, 5), pady=3)
+            row=row, column=0, sticky="w", padx=(0, 5), pady=3)
 
         self.sysfinder_power = tk.StringVar(value="Any")
         power_combo = ttk.Combobox(
@@ -17236,9 +17282,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         )
         power_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
         power_combo.bind("<<ComboboxSelected>>", lambda e: power_combo.selection_clear())
+        ToolTip(power_combo, t('system_finder.pp_power_tooltip'))
 
         ttk.Label(search_frame, text=t('system_finder.pp_state') + ":").grid(
-            row=row, column=2, sticky="e", padx=(15, 5), pady=3)
+            row=row, column=2, sticky="w", padx=(15, 5), pady=3)
 
         self.sysfinder_pp_state = tk.StringVar(value="Any")
         pp_state_combo = ttk.Combobox(
@@ -17247,6 +17294,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         )
         pp_state_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
         pp_state_combo.bind("<<ComboboxSelected>>", lambda e: pp_state_combo.selection_clear())
+        ToolTip(pp_state_combo, t('system_finder.pp_state_tooltip'))
 
         # Row 5: Reference system info display
         row = 5
@@ -17281,7 +17329,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row1_container = tk.Frame(ref_info_frame, bg=sf_bg)
         row1_container.pack(anchor="center")
         
-        tk.Label(row1_container, text="Current System:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        tk.Label(row1_container, text="System:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_system = tk.Label(row1_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_system.pack(side="left")
         
@@ -17388,13 +17436,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_reference_system.trace_add('write', on_ref_system_change)
         
         # Results section
-        results_frame = ttk.LabelFrame(main_container, text="Systems", padding=5)
+        results_frame = ttk.LabelFrame(main_container, padding=(5, 8, 5, 5))
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
         self.sysfinder_results_frame = results_frame
-        
-        # Status/count label
-        self.sysfinder_status_label = ttk.Label(results_frame, text="")
-        self.sysfinder_status_label.pack(anchor="w", pady=(0, 5))
+
+        # Title row: "Systems" + help text + status/count, used as the LabelFrame's title
+        title_row = ttk.Frame(results_frame)
+        ttk.Label(title_row, text="Systems", style="TLabelframe.Label").pack(side="left")
+        ttk.Label(title_row, text=t('ring_finder.right_click_help'),
+                 font=("Segoe UI", 8), foreground="#666666").pack(side="left", padx=(10, 0))
+        self.sysfinder_status_label = ttk.Label(title_row, text="", font=("Segoe UI", 8))
+        self.sysfinder_status_label.pack(side="left", padx=(10, 0))
+        results_frame.configure(labelwidget=title_row)
         
         # Store theme colors for context menu (before creating it)
         self._sysfinder_menu_bg = sf_menu_bg
@@ -17525,7 +17578,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._context_handlers = {}
         self._context_handlers['system_finder'] = self._show_sysfinder_context_menu
         # Note: Right-click binding handled by column visibility mixin
-        
+
+        # Double-click a row to open Inara and fetch/refresh PP data
+        self.sysfinder_tree.bind("<Double-1>", self._sysfinder_on_double_click)
+
         # Store sort direction
         self._sysfinder_sort_reverse = {}
     
@@ -17601,8 +17657,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.ring_finder.max_results_var.set("All")
             self.after(100, self.ring_finder.search_hotspots)
 
+    def _sysfinder_on_double_click(self, event):
+        """Open Inara and fetch/refresh PP data when double-clicking a row."""
+        item = self.sysfinder_tree.identify_row(event.y)
+        if not item:
+            return
+        self.sysfinder_tree.selection_set(item)
+        self._open_sysfinder_inara()
+
     def _open_sysfinder_inara(self):
-        """Open selected system in Inara"""
+        """Open selected system(s) in Inara and fetch/refresh their PP data"""
         selection = self.sysfinder_tree.selection()
         if selection:
             item = self.sysfinder_tree.item(selection[0])
@@ -17611,7 +17675,85 @@ class App(tk.Tk, ColumnVisibilityMixin):
             import webbrowser
             url = f"https://inara.cz/elite/starsystem/?search={urllib.parse.quote(system_name)}"
             webbrowser.open(url)
-    
+        self._fetch_sysfinder_pp_from_inara()
+
+    PP_FETCH_MAX_BATCH = 10
+    PP_FETCH_DELAY_SECS = 1.5
+
+    def _fetch_sysfinder_pp_from_inara(self):
+        """Fetch Inara powerplay for all uniquely-named selected systems (up to PP_FETCH_MAX_BATCH)."""
+        selection = self.sysfinder_tree.selection()
+        if not selection:
+            return
+        seen = set()
+        systems = []
+        for item in selection:
+            vals = self.sysfinder_tree.item(item, 'values')
+            if vals and len(vals) > 0:
+                sys_name = vals[0]
+                if sys_name and sys_name not in seen:
+                    seen.add(sys_name)
+                    systems.append(sys_name)
+        if not systems:
+            return
+        if len(systems) > self.PP_FETCH_MAX_BATCH:
+            systems = systems[:self.PP_FETCH_MAX_BATCH]
+        if len(systems) == 1:
+            self.sysfinder_status_label.config(text=t('ring_finder.fetching_pp').format(system=systems[0]))
+        else:
+            self.sysfinder_status_label.config(text=t('ring_finder.fetching_pp_batch').format(n=len(systems)))
+        threading.Thread(target=self._fetch_sysfinder_pp_batch_worker, args=(systems,), daemon=True).start()
+
+    def _fetch_sysfinder_pp_batch_worker(self, systems):
+        """Sequential background fetch: one Inara request per system with a delay between."""
+        import time
+        from system_finder_api import SystemFinderAPI
+        total = len(systems)
+        done = 0
+        failed = 0
+        for i, system_name in enumerate(systems):
+            self.after(0, lambda n=system_name, idx=i + 1:
+                self.sysfinder_status_label.config(text=t('ring_finder.fetching_pp_progress').format(
+                    current=idx, total=total, system=n)))
+            result = SystemFinderAPI.fetch_and_store_powerplay_from_inara(system_name)
+            if result:
+                done += 1
+            else:
+                failed += 1
+            quiet = total > 1
+            self.after(0, lambda n=system_name, r=result, q=quiet:
+                self._fetch_sysfinder_pp_complete(n, r, quiet=q))
+            if i < total - 1:
+                time.sleep(self.PP_FETCH_DELAY_SECS)
+        if total > 1:
+            self.after(0, lambda d=done, f=failed:
+                self.sysfinder_status_label.config(text=t('ring_finder.fetching_pp_done').format(done=d, failed=f)))
+
+    def _fetch_sysfinder_pp_complete(self, system_name, result, quiet=False):
+        """Update treeview row(s) for system_name with fetched PP data (runs on main thread)."""
+        if result:
+            pp_power = result.get('controlling_power', '')
+            pp_state = result.get('power_state', '')
+            if pp_power == '~none~':
+                pp_str = pp_state or t('common.pp_no_power')
+            elif pp_power and pp_state:
+                pp_str = f"{pp_power} / {pp_state}"
+            else:
+                pp_str = pp_power
+            for item in self.sysfinder_tree.get_children():
+                vals = list(self.sysfinder_tree.item(item, 'values'))
+                if vals and len(vals) > 7 and vals[0] == system_name:
+                    vals[7] = pp_str
+                    self.sysfinder_tree.item(item, values=vals)
+            if not quiet:
+                if pp_power == '~none~':
+                    self.sysfinder_status_label.config(text=t('ring_finder.pp_fetch_no_power').format(system=system_name))
+                else:
+                    self.sysfinder_status_label.config(text=t('ring_finder.pp_fetch_success').format(system=system_name, power=pp_str))
+        else:
+            if not quiet:
+                self.sysfinder_status_label.config(text=t('ring_finder.pp_fetch_none').format(system=system_name))
+
     def _open_sysfinder_edsm(self):
         """Open selected system in EDSM"""
         selection = self.sysfinder_tree.selection()
@@ -17969,12 +18111,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     state_val = 'Normal'
                 pp_power = system.get('power') or ''
                 pp_state_val = system.get('power_state') or ''
-                if pp_power and pp_state_val:
-                    pp_str = f"{pp_power} / {pp_state_val}"
+                from app_utils import format_relative_age
+                pp_age = format_relative_age(system.get('power_updated_at')) if pp_power else ''
+                pp_age_suffix = f" ({pp_age})" if pp_age else ''
+                if pp_power == '~none~':
+                    pp_str = (pp_state_val or t('common.pp_no_power')) + pp_age_suffix
+                elif pp_power and pp_state_val:
+                    pp_str = f"{pp_power} / {pp_state_val}{pp_age_suffix}"
                 elif pp_power:
-                    pp_str = pp_power
+                    pp_str = f"{pp_power}{pp_age_suffix}"
                 else:
-                    pp_str = '—'
+                    pp_str = t('common.pp_no_data')
                 formatted_rows.append((
                     (system.get('systemName', '-'), dist_str, system.get('security', '-'),
                      system.get('allegiance', '-'), state_val, pop_str, eco_str, pp_str),

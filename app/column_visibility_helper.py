@@ -47,6 +47,7 @@ class ColumnVisibilityMixin:
             'visible': {col: True for col in columns},
             'saved_widths': {},  # Store actual widths before hiding
             'original_stretch': original_stretch,  # Store original stretch per column
+            'excluded_from_menu': set(),  # Columns hidden from the visibility menu
         }
         
         # Bind right-click with config_key context
@@ -122,8 +123,11 @@ class ColumnVisibilityMixin:
             self._cv_menu_vars = {}
         self._cv_menu_vars[config_key] = {}
         
-        # Add checkboxes for each column
+        # Add checkboxes for each column (skip excluded ones)
+        excluded = tree_data.get('excluded_from_menu', set())
         for col in columns:
+            if col in excluded:
+                continue
             display_name = tree.heading(col, "text")
             is_visible = visible.get(col, True)
             var = tk.BooleanVar(value=is_visible)
@@ -190,6 +194,17 @@ class ColumnVisibilityMixin:
         
         self._cv_save_visibility(config_key)
     
+    def _cv_set_excluded(self, config_key, column, exclude: bool):
+        """Add or remove a column from the visibility menu without affecting its visible state."""
+        tree_data = self._cv_trees.get(config_key)
+        if not tree_data:
+            return
+        excluded = tree_data['excluded_from_menu']
+        if exclude:
+            excluded.add(column)
+        else:
+            excluded.discard(column)
+
     def _cv_save_visibility(self, config_key):
         """Save column visibility preferences"""
         tree_data = self._cv_trees.get(config_key)

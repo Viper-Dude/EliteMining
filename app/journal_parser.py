@@ -7,8 +7,10 @@ import os
 import json
 import glob
 import logging
+import sqlite3
+import time
 from typing import List, Dict, Any, Optional, Generator, Tuple
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import re
 
 from user_database import UserDatabase
@@ -192,21 +194,24 @@ class JournalParser:
         'Осмий': 'Osmium',  # Russian
     }
     
-    def __init__(self, journal_dir: str, user_db: Optional[UserDatabase] = None, on_hotspot_added: Optional[callable] = None, on_game_start: Optional[callable] = None, on_reserve_updated: Optional[callable] = None):
+    def __init__(self, journal_dir: str, user_db: Optional[UserDatabase] = None, on_hotspot_added: Optional[callable] = None, on_game_start: Optional[callable] = None, on_reserve_updated: Optional[callable] = None, eddn_cache_path: Optional[str] = None):
         """Initialize the journal parser
-        
+
         Args:
             journal_dir: Path to Elite Dangerous journal directory
             user_db: UserDatabase instance. If None, creates a new one.
             on_hotspot_added: Optional callback function called when a hotspot is added to database
             on_game_start: Optional callback function called when LoadGame event is detected
             on_reserve_updated: Optional callback function called when reserve levels are updated
+            eddn_cache_path: Path to marketplace_cache.db. When set, FSDJump/Location events
+                             also write PowerPlay data to system_powerplay for use by searches.
         """
         self.journal_dir = journal_dir
         self.user_db = user_db or UserDatabase()
         self.on_hotspot_added = on_hotspot_added
         self.on_game_start_callback = on_game_start
         self.on_reserve_updated = on_reserve_updated
+        self.eddn_cache_path: Optional[str] = eddn_cache_path
         
         # Regex pattern to identify ring bodies from their names
         self.ring_pattern = re.compile(r'.* [A-Z]+ Ring$', re.IGNORECASE)
@@ -1105,12 +1110,119 @@ class JournalParser:
                         log.info(f"[RESERVE] Bulk updated {updated_count} existing entries in {system_name}")
             
             log.debug(f"Added visited system: {system_name}")
+
+            if self.eddn_cache_path:
+                self._upsert_pp_from_event(event)
+
             return system_name
-            
+
         except Exception as e:
             log.error(f"Error processing FSDJump event: {e}")
             return None
-    
+
+    def _upsert_pp_from_event(self, event: Dict[str, Any]) -> None:
+        """Write PowerPlay fields from a journal FSDJump/Location event to the EDDN cache."""
+        system_name = event.get('StarSystem')
+        controlling_power = event.get('ControllingPower')
+        power_state = event.get('PowerplayState')
+        powers = event.get('Powers')
+        timestamp = event.get('timestamp')
+
+        if not system_name or (not controlling_power and not power_state and not powers):
+            return
+
+        powers_json = json.dumps(powers) if powers else None
+        try:
+            with sqlite3.connect(self.eddn_cache_path) as conn:
+                conn.execute(
+                    'INSERT OR REPLACE INTO system_powerplay '
+                    '(system_name, controlling_power, power_state, powers, updated_at) '
+                    'VALUES (?, ?, ?, ?, ?)',
+                    (system_name, controlling_power, power_state, powers_json, timestamp)
+                )
+                conn.commit()
+        except Exception as e:
+            log.debug(f"[PP] Journal cache write failed for {system_name}: {e}")
+
+    def scan_recent_journals_for_powerplay(self, max_age_hours: int = 24) -> int:
+        """Scan recent journal files for FSDJump/Location events with PowerPlay data
+        and write them to the EDDN cache. Events older than max_age_hours are skipped
+        (they will be removed by the normal TTL cleanup anyway).
+        Returns the number of unique systems written.
+        """
+        if not self.eddn_cache_path:
+            return 0
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        cutoff_ts = cutoff.timestamp()
+
+        # Use a wider file-mtime window (2x) so we don't miss the tail of an older session file.
+        # The per-event timestamp check below is the authoritative age filter.
+        all_files = sorted(glob.glob(os.path.join(self.journal_dir, 'Journal.*.log')))
+        recent_files = [f for f in all_files if os.path.getmtime(f) > cutoff_ts - (max_age_hours * 3600)]
+        # Always include at least the last 2 files in case the player hasn't played recently
+        if all_files:
+            for f in all_files[-2:]:
+                if f not in recent_files:
+                    recent_files.append(f)
+
+        rows: Dict[str, tuple] = {}
+        for fpath in recent_files:
+            try:
+                with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            event = json.loads(line)
+                        except (json.JSONDecodeError, ValueError):
+                            continue
+
+                        if event.get('event') not in ('FSDJump', 'Location', 'CarrierJump'):
+                            continue
+
+                        system_name = event.get('StarSystem')
+                        controlling_power = event.get('ControllingPower')
+                        power_state = event.get('PowerplayState')
+                        powers = event.get('Powers')
+                        timestamp = event.get('timestamp')
+
+                        if not system_name or (not controlling_power and not power_state and not powers):
+                            continue
+
+                        # Filter by event timestamp — only keep fresh data
+                        if timestamp:
+                            try:
+                                ts_dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                if ts_dt.timestamp() < cutoff_ts:
+                                    continue
+                            except Exception:
+                                continue
+
+                        powers_json = json.dumps(powers) if powers else None
+                        # Later entries overwrite earlier ones — keeps most recent jump per system
+                        rows[system_name] = (system_name, controlling_power, power_state, powers_json, timestamp)
+            except Exception as e:
+                log.debug(f"[PP] Error reading {fpath}: {e}")
+
+        if not rows:
+            return 0
+
+        try:
+            with sqlite3.connect(self.eddn_cache_path) as conn:
+                conn.executemany(
+                    'INSERT OR REPLACE INTO system_powerplay '
+                    '(system_name, controlling_power, power_state, powers, updated_at) '
+                    'VALUES (?, ?, ?, ?, ?)',
+                    rows.values()
+                )
+                conn.commit()
+            return len(rows)
+        except Exception as e:
+            log.debug(f"[PP] Batch journal write error: {e}")
+            return 0
+
     def process_location(self, event: Dict[str, Any]) -> Optional[str]:
         """Process Location event (current system on game start)
         

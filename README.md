@@ -271,6 +271,7 @@ The Hotspot Finder provides access to a comprehensive database of 61,000+ confir
 - **Overlap Tracking** – Add and find hotspot overlaps (2x, 3x) for higher yield mining locations
 - **RES Site Tracking** – Add and find Resource Extraction Sites (Hazardous, High, Low) for combat mining
 - **Pre-loaded Overlap & RES Data** – Ships with 161 known overlaps and 71 RES site locations
+- **PowerPlay Column** – Displays the controlling power and state for each system. Fills in instantly for systems you jump into yourself, and via EDDN (live data from other commanders, stored locally while the app runs) for the rest — coverage of systems you haven't visited can take hours to days to build up. Double-click any row showing 'No data ↗' to open the system on Inara and fetch the data automatically.
 
 ### Setting & Managing Overlap/RES Data
 - **Set Overlap** – Right-click any ring to set hotspot overlaps (2x, 3x) for specific minerals
@@ -302,7 +303,7 @@ The Commodity Market helps you find the best prices for mining commodities and t
 - **Buy/Sell Toggle:**
   - **Sell Mode** – Find stations buying your commodities (best sell prices)
   - **Buy Mode** – Find stations selling commodities you want to purchase (lowest buy prices)
-- **Real-Time Market Data** – Live commodity prices from multiple sources: Ardent API, Spansh, and a local EDDN cache (data broadcast by other commanders in real-time, retained for 24 hours)
+- **Real-Time Market Data** – Live commodity prices from multiple sources: Ardent API, Spansh, and a local EDDN cache (data broadcast by other commanders in real-time, retained for 24 hours). EDDN coverage depends on commander traffic, so it can take hours to days to fill in for less-visited systems — Ardent and Spansh cover the gaps in the meantime.
 - **Smart Filtering:**
   - Station type (Orbital/Surface/Fleet Carrier/MegaShip)
   - Landing pad size (Large pads only option)

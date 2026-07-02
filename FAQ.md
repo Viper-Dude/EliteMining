@@ -137,6 +137,18 @@ Make sure all firegroups A–H are populated in Elite Dangerous. Empty firegroup
 </details>
 
 <details>
+<summary><b>Why does the PowerPlay column show 'No data ↗'?</b></summary>
+
+PowerPlay data fills in instantly for systems you jump into yourself. For other systems, it comes from EDDN — live broadcasts from other commanders as they pass through — which is only received while EliteMining is running, so coverage can take hours or even days to build up in systems few commanders visit. If a system shows **No data ↗**, double-click the row to open it on Inara — the app will fetch and store the PowerPlay info automatically.
+</details>
+
+<details>
+<summary><b>Why is commodity market data missing for some stations?</b></summary>
+
+Market data from EDDN is crowdsourced — it only appears once another commander has docked there and their client has broadcast the prices. Coverage can take hours or days to build up, especially for less-visited stations. Ardent and Spansh results fill the gap in the meantime, so you'll still get prices even before EDDN catches up.
+</details>
+
+<details>
 <summary><b>Hotspot finder shows no data.</b></summary>
 
 Log out and back into Elite Dangerous once. Make sure the game journal files are accessible to the app.

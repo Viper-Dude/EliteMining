@@ -199,7 +199,7 @@ class EDDNListener:
                     break
                 
                 # Perform cleanup
-                log.info("🧹 Running database cleanup (removing data older than 24 hours)...")
+                log.info("🧹 Running database cleanup (24h for market data; PowerPlay kept until size cap)...")
                 deleted_count = self._cleanup_old_data()
                 log.info(f"🧹 Cleanup complete: Removed {deleted_count:,} old records")
                 
@@ -217,12 +217,16 @@ class EDDNListener:
             with sqlite3.connect(self.database_path) as conn:
                 cursor = conn.cursor()
 
-                # Delete data older than MAX_DATA_AGE_HOURS
-                cursor.execute(f'''
-                    DELETE FROM commodity_prices_data
-                    WHERE datetime(updated_at, '+{self.MAX_DATA_AGE_HOURS} hours') < datetime('now')
-                ''')
-                deleted_data = cursor.rowcount
+                # Delete data older than MAX_DATA_AGE_HOURS from most tables.
+                # system_powerplay is excluded - PowerPlay control/state only changes on the
+                # weekly tick, and often persists across many ticks, so a fixed age cutoff would
+                # discard still-accurate data. It's bounded instead by the size cap below.
+                cutoff_expr = f"datetime('now', '-{self.MAX_DATA_AGE_HOURS} hours')"
+                total_deleted = 0
+                for table in ('commodity_prices_data', 'station_metadata', 'system_coords'):
+                    cursor.execute(f'DELETE FROM {table} WHERE updated_at < {cutoff_expr}')
+                    total_deleted += cursor.rowcount
+                deleted_data = total_deleted
                 conn.commit()
 
             # Size cap: if DB exceeds 100MB, delete oldest rows until under limit
@@ -232,16 +236,18 @@ class EDDNListener:
                 log.warning(f"⚠️ DB size {db_size / 1024 / 1024:.1f}MB exceeds cap — trimming oldest rows...")
                 with sqlite3.connect(self.database_path) as conn:
                     cursor = conn.cursor()
-                    # Delete oldest 20% of rows to avoid repeatedly hitting the cap
-                    cursor.execute('''
-                        DELETE FROM commodity_prices_data
-                        WHERE id IN (
-                            SELECT id FROM commodity_prices_data
-                            ORDER BY updated_at ASC
-                            LIMIT (SELECT COUNT(*) / 5 FROM commodity_prices_data)
-                        )
-                    ''')
-                    trimmed = cursor.rowcount
+                    # Delete oldest 20% of rows in each table to avoid repeatedly hitting the cap
+                    trimmed = 0
+                    for table, pk in (('commodity_prices_data', 'id'), ('system_powerplay', 'system_name')):
+                        cursor.execute(f'''
+                            DELETE FROM {table}
+                            WHERE {pk} IN (
+                                SELECT {pk} FROM {table}
+                                ORDER BY updated_at ASC
+                                LIMIT (SELECT COUNT(*) / 5 FROM {table})
+                            )
+                        ''')
+                        trimmed += cursor.rowcount
                     conn.commit()
                 log.warning(f"⚠️ Size trim complete: removed {trimmed:,} oldest rows")
                 deleted_data += trimmed

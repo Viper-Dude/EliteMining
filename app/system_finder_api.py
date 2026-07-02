@@ -6,6 +6,8 @@ import requests
 import logging
 import sqlite3
 import json
+import re
+import datetime
 from typing import List, Dict, Optional, Any
 
 log = logging.getLogger(__name__)
@@ -40,12 +42,12 @@ class SystemFinderAPI:
             placeholders = ','.join('?' * len(system_names))
             with sqlite3.connect(cls.EDDN_CACHE_PATH) as conn:
                 rows = conn.execute(
-                    f'SELECT system_name, controlling_power, power_state FROM system_powerplay'
+                    f'SELECT system_name, controlling_power, power_state, updated_at FROM system_powerplay'
                     f' WHERE system_name IN ({placeholders}) COLLATE NOCASE',
                     system_names
                 ).fetchall()
             return {
-                row[0]: {'controlling_power': row[1], 'power_state': row[2]}
+                row[0]: {'controlling_power': row[1], 'power_state': row[2], 'updated_at': row[3]}
                 for row in rows if row[1]  # only rows where controlling_power is known
             }
         except Exception as e:
@@ -60,15 +62,98 @@ class SystemFinderAPI:
         try:
             with sqlite3.connect(cls.EDDN_CACHE_PATH) as conn:
                 row = conn.execute(
-                    'SELECT controlling_power, power_state FROM system_powerplay'
+                    'SELECT controlling_power, power_state, updated_at FROM system_powerplay'
                     ' WHERE system_name = ? COLLATE NOCASE',
                     (system_name,)
                 ).fetchone()
             if row and row[0]:
-                return {'controlling_power': row[0], 'power_state': row[1]}
+                return {'controlling_power': row[0], 'power_state': row[1], 'updated_at': row[2]}
         except Exception as e:
             log.debug(f"[SYSTEM_FINDER] EDDN powerplay lookup error: {e}")
         return None
+
+    # Actual Inara HTML: <span class="bigger"><span class="positive">Stronghold</span></span>
+    # The nested span inside "bigger" requires (?:<[^>]+>)? to skip the inner tag.
+    _INARA_PP_PATTERN = re.compile(
+        r'<span class="uppercase minor small">Powerplay</span>'
+        r'.*?<a href="/elite/power/\d+/">([^<]+)</a>\s*<small>\(Controlling\)</small>'
+        r'.*?<span class="bigger">(?:<[^>]+>)?([^<]+)</span>',
+        re.DOTALL
+    )
+
+    # No controlling power: <span class="bigger">Expansion</span> or
+    # <span class="bigger"><span class="minor">Unoccupied</span></span>
+    _INARA_PP_NO_CONTROLLER_PATTERN = re.compile(
+        r'<span class="uppercase minor small">Powerplay</span>\s*<br>\s*'
+        r'<span class="bigger">(?:<[^>]+>)?([^<]+)<'
+    )
+
+    _INARA_CHALLENGE_PATTERN = re.compile(r"'([a-f0-9]{32})'")
+
+    _INARA_HEADERS = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+    }
+
+    @classmethod
+    def fetch_and_store_powerplay_from_inara(cls, system_name: str) -> Optional[Dict]:
+        """Fetch powerplay data for system_name from Inara and store to cache.
+        Returns {'controlling_power': ..., 'power_state': ...} on success, None on failure."""
+        if not cls.EDDN_CACHE_PATH:
+            return None
+        try:
+            import urllib.parse, random
+            url = f"https://inara.cz/elite/starsystem/?search={urllib.parse.quote(system_name)}"
+            session = requests.Session()
+            session.headers.update(cls._INARA_HEADERS)
+            resp = session.get(url, timeout=10)
+            resp.raise_for_status()
+            html = resp.text
+            # Inara bot challenge: small page containing validatechallenge.php
+            if 'validatechallenge.php' in html:
+                cm = cls._INARA_CHALLENGE_PATTERN.search(html)
+                if cm:
+                    token = cm.group(1)
+                    ts = int(datetime.datetime.utcnow().timestamp() * 1000)
+                    cf = random.randint(0, 9999)
+                    session.post(
+                        'https://inara.cz/validatechallenge.php',
+                        data=f'challenge={urllib.parse.quote(token)}&ts={ts}&cf={cf}',
+                        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                        timeout=10
+                    )
+                    resp = session.get(url, timeout=10)
+                    resp.raise_for_status()
+                    html = resp.text
+            m = cls._INARA_PP_PATTERN.search(html)
+            timestamp = datetime.datetime.utcnow().isoformat()
+            if m:
+                controlling_power = m.group(1).strip()
+                power_state = m.group(2).strip()
+            else:
+                m2 = cls._INARA_PP_NO_CONTROLLER_PATTERN.search(html)
+                if m2:
+                    controlling_power = '~none~'
+                    power_state = m2.group(1).strip()
+                elif len(html) > 15000:
+                    # Valid system page but Powerplay section didn't match either pattern
+                    controlling_power = '~none~'
+                    power_state = ''
+                else:
+                    return None
+            with sqlite3.connect(cls.EDDN_CACHE_PATH) as conn:
+                conn.execute(
+                    'INSERT OR REPLACE INTO system_powerplay '
+                    '(system_name, controlling_power, power_state, powers, updated_at) '
+                    'VALUES (?, ?, ?, ?, ?)',
+                    (system_name, controlling_power, power_state, None, timestamp)
+                )
+                conn.commit()
+            return {'controlling_power': controlling_power, 'power_state': power_state}
+        except Exception as e:
+            log.debug(f"[POWERPLAY] Inara fetch error for {system_name!r}: {e}")
+            return None
 
     @classmethod
     def search_systems(cls, reference_system: str, filters: Dict[str, str] = None,
@@ -262,29 +347,16 @@ class SystemFinderAPI:
         
         system_name = system.get('name', '')
 
-        # Powerplay — prefer local EDDN cache (has explicit controlling_power) over Spansh flat list
+        # Powerplay — EDDN cache only; no Spansh fallback (Spansh PP data can be cycles stale)
         cached_pp = (pp_cache or {}).get(system_name)
         if cached_pp:
             pp_power = cached_pp['controlling_power']
-            pp_state = cached_pp['power_state'] or system.get('power_state') or None
+            pp_state = cached_pp['power_state'] or None
+            pp_updated_at = cached_pp.get('updated_at')
         else:
-            # Spansh fallback — first entry in power list (correct for single-power systems)
             pp_power = None
-            for _pf in ('powers', 'power'):
-                _raw = system.get(_pf)
-                if not _raw:
-                    continue
-                if isinstance(_raw, list):
-                    _first = _raw[0] if _raw else None
-                    if isinstance(_first, list):
-                        _first = _first[0] if _first else None
-                    if isinstance(_first, str) and _first:
-                        pp_power = _first.strip("[]'\" \t") or None
-                elif isinstance(_raw, str):
-                    pp_power = _raw.strip("[]'\" \t") or None
-                if pp_power:
-                    break
-            pp_state = system.get('power_state') or None
+            pp_state = None
+            pp_updated_at = None
 
         return {
             'systemName': system_name,
@@ -304,6 +376,7 @@ class SystemFinderAPI:
             'faction': faction,
             'power': pp_power,
             'power_state': pp_state,
+            'power_updated_at': pp_updated_at,
         }
     
     @classmethod
@@ -470,30 +543,16 @@ class SystemFinderAPI:
             primary_economy = system.get('primary_economy') or '-'
             secondary_economy = system.get('secondary_economy')
             
-            # Powerplay — prefer local EDDN cache, fall back to Spansh flat list
+            # Powerplay — EDDN cache only; no Spansh fallback (Spansh PP data can be cycles stale)
             cached_pp = cls._get_powerplay_from_cache(system_name)
             if cached_pp:
                 power = cached_pp['controlling_power']
-                power_state = cached_pp['power_state'] or system.get('power_state') or None
+                power_state = cached_pp['power_state'] or None
                 log.debug(f"[POWERPLAY] EDDN cache hit: power={power!r} state={power_state!r}")
             else:
                 power = None
-                for _pf in ('powers', 'power'):
-                    _raw = system.get(_pf)
-                    if not _raw:
-                        continue
-                    if isinstance(_raw, list):
-                        _first = _raw[0] if _raw else None
-                        if isinstance(_first, list):
-                            _first = _first[0] if _first else None
-                        if isinstance(_first, str) and _first:
-                            power = _first.strip("[]'\" \t") or None
-                    elif isinstance(_raw, str):
-                        power = _raw.strip("[]'\" \t") or None
-                    if power:
-                        break
-                power_state = system.get('power_state') or None
-                log.debug(f"[POWERPLAY] Spansh fallback: power={power!r} state={power_state!r}")
+                power_state = None
+                log.debug(f"[POWERPLAY] No EDDN cache entry for {system_name!r}")
 
             return {
                 'security': system.get('security') or 'Anarchy',
@@ -577,6 +636,6 @@ POWER_FILTER_OPTIONS = [
 
 # Powerplay state filter options
 PP_STATE_OPTIONS = [
-    'Any', 'Controlled', 'Fortified', 'Stronghold',
-    'Contested', 'Expansion', 'Turmoil'
+    'Any', 'Exploited', 'Fortified', 'Stronghold',
+    'Contested', 'Expansion'
 ]

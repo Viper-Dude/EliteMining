@@ -1825,6 +1825,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
+        # Help link - positioned next to the last sub-tab (Reference) once all tabs exist
+        from config import load_theme
+        from ui.theme import get_theme_colors
+        from ui.help_link import create_help_link
+        _ms_theme = get_theme_colors(load_theme())
+        self._session_help_link = create_help_link(
+            nb, "mining-session-tab", t('mining_session.help_tooltip'), self.ToolTip,
+            bg=_ms_theme["bg_accent"], fg=_ms_theme["tip_fg"])
+
         # Reports tab (live prospector readouts)
         rep = ttk.Frame(nb, padding=8)
         rep.columnconfigure(0, weight=1)
@@ -2736,6 +2745,36 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[DEBUG] Could not create Ring Guide sub-tab: {e}")
             self.ring_guide_tab = None
+
+        # Now that all sub-tabs exist, place the help link right after the last one (Reference).
+        # ttk.Notebook has no working bbox-for-tab API, so find the tab strip's right edge by
+        # scanning identify() (a real ttk command) for where it stops reporting a tab/label.
+        def _tab_strip_right_edge():
+            nb.update_idletasks()
+            width = nb.winfo_width()
+            if width <= 1:
+                return None
+            last_x = None
+            for x in range(0, width, 4):
+                if nb.identify(x, 10):
+                    last_x = x
+            return last_x
+
+        def _position_session_help_link(event=None):
+            end_x = _tab_strip_right_edge()
+            if end_x is not None:
+                self._session_help_link.place(x=end_x + 10, y=4, anchor="nw")
+                return True
+            return False
+
+        def _poll_position():
+            if not _position_session_help_link():
+                nb.after(150, _poll_position)
+
+        nb.bind("<Map>", _position_session_help_link, add="+")
+        nb.bind("<Configure>", _position_session_help_link, add="+")
+        _poll_position()
+        nb.after(50, _position_session_help_link)
 
     # --- Cargo Monitor ---
     def _open_cargo_monitor(self) -> None:
@@ -12242,14 +12281,22 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         main_frame = ttk.Frame(parent)
         main_frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(0, weight=0)  # Filter frame
-        main_frame.rowconfigure(1, weight=1)  # Treeview
-        main_frame.rowconfigure(2, weight=0)  # Horizontal scrollbar
-        main_frame.rowconfigure(3, weight=0)  # Buttons
+        main_frame.rowconfigure(0, weight=0)  # Title row
+        main_frame.rowconfigure(1, weight=0)  # Filter frame
+        main_frame.rowconfigure(2, weight=1)  # Treeview
+        main_frame.rowconfigure(3, weight=0)  # Horizontal scrollbar
+        main_frame.rowconfigure(4, weight=0)  # Buttons
+
+        # Title row with help link
+        title_row = ttk.Frame(main_frame)
+        title_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+        ttk.Label(title_row, text=t('bookmarks.title'), font=("Segoe UI", 9, "bold")).pack(side="left")
+        from ui.help_link import create_help_link
+        create_help_link(title_row, "bookmarks", t('bookmarks.help_tooltip'), self.ToolTip).pack(side="left", padx=(6, 0))
 
         # Filter frame
         filter_frame = ttk.Frame(main_frame)
-        filter_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 24))
+        filter_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 24))
         
         ttk.Label(filter_frame, text=t('bookmarks.filter')).pack(side="left", padx=(0, 5))
         
@@ -12338,7 +12385,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Create wrapper frame for bordered table
         tree_frame_bookmarks = ttk.Frame(main_frame, relief="solid", borderwidth=1)
-        tree_frame_bookmarks.grid(row=1, column=0, sticky="nsew")
+        tree_frame_bookmarks.grid(row=2, column=0, sticky="nsew")
         tree_frame_bookmarks.grid_columnconfigure(0, weight=1)
         tree_frame_bookmarks.grid_rowconfigure(0, weight=1)
 
@@ -12474,7 +12521,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Add horizontal scrollbar
         h_scrollbar = ttk.Scrollbar(main_frame, orient="horizontal", command=self.bookmarks_tree.xview)
-        h_scrollbar.grid(row=2, column=0, sticky="ew")
+        h_scrollbar.grid(row=3, column=0, sticky="ew")
         self.bookmarks_tree.configure(xscrollcommand=h_scrollbar.set)
 
         # Add sorting functionality — persist sort state so refreshes re-apply it
@@ -12522,7 +12569,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Buttons frame
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=3, column=0, columnspan=2, pady=(8, 0), sticky="ew")
+        button_frame.grid(row=4, column=0, columnspan=2, pady=(8, 0), sticky="ew")
         
         # Add Bookmark button
         add_btn = tk.Button(button_frame, text=t('bookmarks.add_bookmark'), 

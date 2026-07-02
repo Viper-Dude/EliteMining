@@ -469,6 +469,27 @@ def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> 
     return result['value']
 
 
+# ==================== TIME UTILITIES ====================
+
+def format_relative_age(updated_at: Optional[str]) -> str:
+    """Format an ISO timestamp as a short age suffix (e.g. '5m', '3h', '2d'). Returns '' if unparseable."""
+    if not updated_at:
+        return ''
+    try:
+        updated_time = dt.datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+        if updated_time.tzinfo is None:
+            updated_time = updated_time.replace(tzinfo=dt.timezone.utc)
+        total_minutes = (dt.datetime.now(dt.timezone.utc) - updated_time).total_seconds() / 60
+        if total_minutes < 60:
+            return f"{max(int(total_minutes), 0)}m"
+        elif total_minutes < 1440:
+            return f"{int(total_minutes / 60)}h"
+        else:
+            return f"{int(total_minutes / 1440)}d"
+    except Exception:
+        return ''
+
+
 # ==================== LEGACY COMPATIBILITY ====================
 
 # Keep old function names for backward compatibility during migration
