@@ -285,10 +285,12 @@ class SystemFinderAPI:
             if pop_filter:
                 spansh_filters['population'] = pop_filter
 
-        # Powerplay — controlling power (Spansh field is 'power', value is a list)
+        # Powerplay — controlling power. Spansh's 'power' field lists ALL powers present/contesting
+        # in the system, not just the controller, so filtering on it barely restricts results.
+        # 'controlling_power' is the actual controller and is what we want to filter by.
         power = filters.get('power', 'Any')
         if power and power != 'Any':
-            spansh_filters['power'] = {'value': [power]}
+            spansh_filters['controlling_power'] = {'value': [power]}
 
         # Powerplay — system state
         pp_state = filters.get('pp_state', 'Any')
