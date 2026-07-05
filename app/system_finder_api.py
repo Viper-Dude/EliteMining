@@ -24,7 +24,7 @@ class SystemFinderAPI:
     TIMEOUT = 30
 
     # Maximum results to return
-    MAX_RESULTS = 100
+    MAX_RESULTS = 500
 
     # Set from main.py after EDDN listener starts — enables local powerplay cache lookups
     EDDN_CACHE_PATH = None

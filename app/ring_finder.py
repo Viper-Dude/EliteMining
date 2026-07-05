@@ -5647,6 +5647,8 @@ class RingFinder(ColumnVisibilityMixin):
 
     def _on_double_click(self, event):
         """Open Inara and fetch/refresh PP data when double-clicking a row's PowerPlay cell."""
+        if self.results_tree.identify_region(event.x, event.y) != "cell":
+            return
         item = self.results_tree.identify_row(event.y)
         if not item:
             return

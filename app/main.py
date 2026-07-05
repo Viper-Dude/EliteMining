@@ -17993,6 +17993,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         import threading
         threading.Thread(target=_background_check, daemon=True).start()
 
+        # Re-check periodically so the indicator recovers after a connectivity drop
+        try:
+            self.after(60000, self._check_sysfinder_spansh_status)
+        except RuntimeError:
+            pass
+
     def _update_sysfinder_spansh_status(self, status: str):
         """Update Spansh status label in system finder - called on UI thread"""
         if status == "online":
@@ -18024,6 +18030,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         import threading
         threading.Thread(target=_background_check, daemon=True).start()
+
+        # Re-check periodically so the indicator recovers after a connectivity drop
+        try:
+            self.after(60000, self._check_sysfinder_eddn_status)
+        except RuntimeError:
+            pass
 
     def _update_sysfinder_eddn_status(self, status: str):
         """Update EDDN status label in system finder - called on UI thread"""

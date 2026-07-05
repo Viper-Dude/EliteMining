@@ -12806,6 +12806,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 items.sort(key=lambda x: str(x[0]).lower(), reverse=reverse)
             for index, (val, item) in enumerate(items):
                 self.bookmarks_tree.move(item, '', index)
+                self.bookmarks_tree.item(item, tags=("evenrow" if index % 2 == 0 else "oddrow",))
         except Exception:
             pass
 
