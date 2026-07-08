@@ -53,6 +53,7 @@ app/EliteVA/Variables/
 
 # User database (runtime data, not for repo)
 app/data/user_data.db
+app/data/marketplace_cache.db
 
 # API Keys and sensitive data
 *api_key*
