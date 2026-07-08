@@ -6,10 +6,11 @@
 
 ## Bug Fixes
 * Fixed Fleet Carrier Jump History not showing past jumps in the Fleet Carrier tab.
+* Fixed PowerPlay info not loading when double-clicking a system (inara) in Star Systems.
 
 
 ## Voiceattack v5.2.3
-* Optimized the **"Clear and Jump"** command for faster carrier jumps.
+* Optimized the **"Clear and Jump"** command for faster jumps.
 
 
 ### Reminder

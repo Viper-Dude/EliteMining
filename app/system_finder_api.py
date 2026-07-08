@@ -108,10 +108,9 @@ class SystemFinderAPI:
             session = requests.Session()
             session.headers.update(cls._INARA_HEADERS)
             resp = session.get(url, timeout=10)
-            resp.raise_for_status()
             html = resp.text
-            # Inara bot challenge: small page containing validatechallenge.php
-            if 'validatechallenge.php' in html:
+            # Inara bot challenge: 503 page with a base64-encoded /validatechallenge.php endpoint
+            if resp.status_code == 503 or 'challenge-container' in html:
                 cm = cls._INARA_CHALLENGE_PATTERN.search(html)
                 if cm:
                     token = cm.group(1)
