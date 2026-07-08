@@ -1324,6 +1324,7 @@
     "section_cargo": "Frachtkapazität",
     "section_history": "Sprungverlauf",
     "label_location": "Standort",
+    "copy_location_hint": "Rechtsklick zum Kopieren",
     "label_docking": "Andocken",
     "label_jump_range": "Sprungreichweite",
     "label_fuel": "Tritium-Treibstoff",

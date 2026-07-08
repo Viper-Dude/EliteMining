@@ -160,14 +160,40 @@ class FleetCarrierTab(tk.Frame):
             create_help_link(hdr, help_anchor, t('fleet_carrier.help_tooltip'), ToolTip,
                               bg=self.hdr_bg, fg=self.fg_bright).pack(side="left", padx=(4, 0))
 
-    def _row(self, parent, label_key, sv_key, default="-", value_fg=None):
+    def _row(self, parent, label_key, sv_key, default="-", value_fg=None, copyable=False):
         row = tk.Frame(parent, bg=self.sect_bg)
         row.pack(fill="x", padx=8, pady=1)
         tk.Label(row, text=t(label_key), bg=self.sect_bg, fg=self.fg_dim,
                  font=("Helvetica", 9), width=22, anchor="w").pack(side="left")
         lbl = self._sv_label(row, sv_key, default, fg=value_fg or self.fg,
                              font=("Helvetica", 9), anchor="w")
-        lbl.pack(side="left", fill="x", expand=True)
+        lbl.pack(side="left")
+        if copyable:
+            self._make_copyable(lbl, sv_key)
+            tk.Label(row, text=t("fleet_carrier.copy_location_hint"), bg=self.sect_bg,
+                     fg=self.fg_dim, font=("Helvetica", 8, "italic"),
+                     anchor="w").pack(side="left", padx=(12, 0))
+
+    def _make_copyable(self, widget, sv_key):
+        menu = tk.Menu(widget, tearoff=0, bg=self.sect_bg, fg=self.fg,
+                       activebackground=self.hdr_bg, activeforeground=self.fg_bright)
+        menu.add_command(label=t('common.copy'),
+                         command=lambda: self._copy_to_clipboard(self._sv[sv_key].get()))
+
+        def show_menu(event):
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        widget.bind("<Button-3>", show_menu)
+
+    def _copy_to_clipboard(self, text):
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(text)
+        except Exception as e:
+            log.warning(f"FC tab clipboard copy error: {e}")
 
     # ------------------------------------------------------------------
     # UI build
@@ -230,7 +256,7 @@ class FleetCarrierTab(tk.Frame):
         sect.pack(fill="x", padx=4, pady=2)
 
         self._row(sect, "fleet_carrier.label_name",      "status_name")
-        self._row(sect, "fleet_carrier.label_location",  "status_system")
+        self._row(sect, "fleet_carrier.label_location",  "status_system", copyable=True)
         self._row(sect, "fleet_carrier.label_docking",   "status_docking")
         self._row(sect, "fleet_carrier.label_jump_range","status_jump_range")
 

@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.2.1"
+APP_VERSION = "v5.2.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -21490,7 +21490,11 @@ Your keybinds will need to be reconfigured manually."""
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     current_system = system_name
-                                    
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_jump_completed(event)
+                                except Exception:
+                                    pass
+
                             elif event_type == 'Location':
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
@@ -21751,7 +21755,11 @@ Your keybinds will need to be reconfigured manually."""
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     current_system = system_name
-                            
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_jump_completed(event)
+                                except Exception:
+                                    pass
+
                             elif event_type == 'Location':
                                 # Location = game loaded, just track current system for context
                                 system_name = event.get('StarSystem', '')

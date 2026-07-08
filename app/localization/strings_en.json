@@ -1316,6 +1316,7 @@
     "section_cargo": "Cargo Capacity",
     "section_history": "Jump History",
     "label_location": "Location",
+    "copy_location_hint": "right-click to copy",
     "label_docking": "Docking",
     "label_jump_range": "Jump Range",
     "label_fuel": "Tritium Fuel",
