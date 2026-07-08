@@ -3811,6 +3811,15 @@ cargo panel forces Elite to write detailed inventory data.
                     print(f"[JUMP] FSDJump: Arrived at {system_name}")
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
                         self.main_app_ref.eddn_sender.send_journal_event("FSDJump", event)
+                    try:
+                        if self.journal_parser.eddn_cache_path:
+                            pp_result = self.journal_parser._upsert_pp_from_event(event)
+                            if pp_result and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
+                                self.main_app_ref._fetch_sysfinder_pp_complete(pp_result['system_name'], pp_result, quiet=True)
+                    except Exception as pp_exc:
+                        import traceback
+                        print(f"[PP] live-write block raised: {pp_exc}")
+                        traceback.print_exc()
 
             elif event_type == "CarrierJump":
                 # Player is docked on Fleet Carrier that jumped - player arrived at new system
@@ -3834,6 +3843,15 @@ cargo panel forces Elite to write detailed inventory data.
                     print(f"[CARRIER] CarrierJump: Now at {system_name}")
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
                         self.main_app_ref.eddn_sender.send_journal_event("CarrierJump", event)
+                    try:
+                        if self.journal_parser.eddn_cache_path:
+                            pp_result = self.journal_parser._upsert_pp_from_event(event)
+                            if pp_result and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
+                                self.main_app_ref._fetch_sysfinder_pp_complete(pp_result['system_name'], pp_result, quiet=True)
+                    except Exception as pp_exc:
+                        import traceback
+                        print(f"[PP] live-write block raised: {pp_exc}")
+                        traceback.print_exc()
                 # Also update FC tracker with completed jump
                 try:
                     self.journal_parser.process_carrier_jump_completed(event)
@@ -3873,6 +3891,15 @@ cargo panel forces Elite to write detailed inventory data.
                         self.current_system = system_name
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
                         self.main_app_ref.eddn_sender.send_journal_event("Location", event)
+                    try:
+                        if self.journal_parser.eddn_cache_path:
+                            pp_result = self.journal_parser._upsert_pp_from_event(event)
+                            if pp_result and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
+                                self.main_app_ref._fetch_sysfinder_pp_complete(pp_result['system_name'], pp_result, quiet=True)
+                    except Exception as pp_exc:
+                        import traceback
+                        print(f"[PP] live-write block raised: {pp_exc}")
+                        traceback.print_exc()
 
             elif event_type == "CarrierLocation":
                 # CarrierLocation tells us where YOUR carrier is
@@ -21157,7 +21184,13 @@ Your keybinds will need to be reconfigured manually."""
                     self.after(0, lambda n=len(journals_to_scan): self._set_status(f"Scanning {n} journals...", 0))
                 
                 self._process_journals_for_catchup(journals_to_scan, is_full_sync=False)
-                
+
+                # Historical catch-up is done — from here on, FSDJump/Location events reaching
+                # the live journal watcher are genuinely live (current PP2.0-era session), so it's
+                # now safe to enable live-only inference (see journal_parser._upsert_pp_from_event).
+                if hasattr(self, 'cargo_monitor') and self.cargo_monitor and self.cargo_monitor.journal_parser:
+                    self.cargo_monitor.journal_parser.is_live_monitoring = True
+
             except Exception as e:
                 print(f"[JOURNAL] ERROR: {e}")
                 self.after(0, lambda: self._set_status("Journal scan failed", 5000))
@@ -21383,6 +21416,10 @@ Your keybinds will need to be reconfigured manually."""
             except Exception as e:
                 print(f"[FULL SCAN] Error: {e}")
             finally:
+                # Historical catch-up is done — safe to enable live-only PP inference now
+                # (see journal_parser._upsert_pp_from_event).
+                if hasattr(self, 'cargo_monitor') and self.cargo_monitor and self.cargo_monitor.journal_parser:
+                    self.cargo_monitor.journal_parser.is_live_monitoring = True
                 # Close dialog when done
                 self.after(0, lambda: self._close_full_scan_dialog(progress_dialog))
         

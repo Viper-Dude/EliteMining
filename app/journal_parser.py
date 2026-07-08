@@ -1120,8 +1120,9 @@ class JournalParser:
             log.error(f"Error processing FSDJump event: {e}")
             return None
 
-    def _upsert_pp_from_event(self, event: Dict[str, Any]) -> None:
-        """Write PowerPlay fields from a journal FSDJump/Location event to the EDDN cache."""
+    def _upsert_pp_from_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Write PowerPlay fields from a journal FSDJump/Location event to the EDDN cache.
+        Returns {'system_name', 'controlling_power', 'power_state'} on write, else None."""
         system_name = event.get('StarSystem')
         controlling_power = event.get('ControllingPower')
         power_state = event.get('PowerplayState')
@@ -1129,13 +1130,15 @@ class JournalParser:
         timestamp = event.get('timestamp')
 
         if not system_name:
-            return
+            print("[PP] _upsert_pp_from_event: no StarSystem in event, skipping")
+            return None
         if not controlling_power and not power_state and not powers:
             # No PP fields at all. During live monitoring (current game session, PP2.0 active)
             # this reliably means the system isn't claimed by any Power. Skip during historical
             # replay (parse_all_journals) since old journal lines may predate PP2.0 entirely.
             if not self.is_live_monitoring:
-                return
+                print(f"[PP] {system_name}: no PP fields and not live monitoring, skipping")
+                return None
             controlling_power = '~none~'
             power_state = 'Unoccupied'
 
@@ -1150,7 +1153,12 @@ class JournalParser:
                 )
                 conn.commit()
         except Exception as e:
-            log.debug(f"[PP] Journal cache write failed for {system_name}: {e}")
+            print(f"[PP] Journal cache write FAILED for {system_name}: {e}")
+            log.error(f"[PP] Journal cache write failed for {system_name}: {e}")
+            return None
+        print(f"[PP] Journal live-write OK: {system_name} -> {controlling_power} / {power_state}")
+        log.info(f"[PP] Journal live-write: {system_name} -> {controlling_power} / {power_state}")
+        return {'system_name': system_name, 'controlling_power': controlling_power, 'power_state': power_state}
 
     def scan_recent_journals_for_powerplay(self, max_age_hours: int = 24) -> int:
         """Scan recent journal files for FSDJump/Location events with PowerPlay data
