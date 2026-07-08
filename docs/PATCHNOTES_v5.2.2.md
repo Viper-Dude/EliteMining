@@ -1,21 +1,20 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** July 05, 2026
+**Release Date:** July 08, 2026
 
+## New Features & Improvements
+* Added a right-click copy option for the Fleet Carrier location in the Fleet Carrier tab.
 
 ## Bug Fixes
+* Fixed Fleet Carrier Jump History not showing past jumps in the Fleet Carrier tab.
+* Fixed PowerPlay info not being fetched when double-clicking "No data" (Open Inara in browser) in the PowerPlay column of the Star Systems tab.
 
-* Fixed a sorting issue in the Powerplay results column for the Star System tab.
-* Fixed inconsistent row striping in the Bookmark table
-* Fixed EDDN and Spansh status stuck offline after network reconnect.
+## Voiceattack v5.2.3
+* Optimized the **"Clear and Jump"** command for faster jumps.
 
-## Voiceattack 
-* No update - Current version is 5.1.7
 
-### Important Notes
+### Reminder
+* After updating, please review the [README](https://github.com/Viper-Dude/EliteMining#installation) **Installation** section to verify your setup and configuration.
 
-* If and after updating the VoiceAttack profile, always verify your keyboard, joystick, and HOTAS bindings to ensure they are configured correctly.
-
-* For the Prospector sequence to work, make sure your joystick/HOTAS fire button isn’t bound to the Prospector Limpet Controller fire control (Game Controller Options > Weapons). Shared bindings will interrupt the sequence.
 
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

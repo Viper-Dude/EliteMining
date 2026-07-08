@@ -1128,8 +1128,16 @@ class JournalParser:
         powers = event.get('Powers')
         timestamp = event.get('timestamp')
 
-        if not system_name or (not controlling_power and not power_state and not powers):
+        if not system_name:
             return
+        if not controlling_power and not power_state and not powers:
+            # No PP fields at all. During live monitoring (current game session, PP2.0 active)
+            # this reliably means the system isn't claimed by any Power. Skip during historical
+            # replay (parse_all_journals) since old journal lines may predate PP2.0 entirely.
+            if not self.is_live_monitoring:
+                return
+            controlling_power = '~none~'
+            power_state = 'Unoccupied'
 
         powers_json = json.dumps(powers) if powers else None
         try:
@@ -1188,8 +1196,14 @@ class JournalParser:
                         powers = event.get('Powers')
                         timestamp = event.get('timestamp')
 
-                        if not system_name or (not controlling_power and not power_state and not powers):
+                        if not system_name:
                             continue
+                        if not controlling_power and not power_state and not powers:
+                            # No PP fields — within this recent (max_age_hours) window PP2.0 is
+                            # guaranteed active, so absence reliably means unclaimed. Same
+                            # reasoning as the live-monitoring path in _upsert_pp_from_event.
+                            controlling_power = '~none~'
+                            power_state = 'Unoccupied'
 
                         # Filter by event timestamp — only keep fresh data
                         if timestamp:
@@ -1253,6 +1267,9 @@ class JournalParser:
                     if self.on_reserve_updated:
                         self.on_reserve_updated(system_name)
         
+        if self.eddn_cache_path:
+            self._upsert_pp_from_event(event)
+
         # Return system name - do NOT add as visit
         # Location is just "where am I now", not "I arrived here"
         return system_name
