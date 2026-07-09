@@ -376,6 +376,8 @@ Search for nearby star systems with detailed status information. Perfect for fin
   - Right-click to copy system name or open in Inara/EDSM/Spansh
   - "Use Current" button fills reference system instantly
 
+**Note:** The Elite Dangerous journal does not report the Unoccupied Powerplay state. The app infers this state when no controlling Power is present and updates it automatically when newer EDDN data becomes available.
+
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/star_system.png" width="900"><br>  
 *Star Systems tab showing current system info and nearby system search with filters.*
 

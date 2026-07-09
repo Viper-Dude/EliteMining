@@ -1139,6 +1139,9 @@ class JournalParser:
             if not self.is_live_monitoring:
                 print(f"[PP] {system_name}: no PP fields and not live monitoring, skipping")
                 return None
+            # Frontier journals do not emit an "Unoccupied" power state.
+            # When a system has no controlling Power, we infer the PP2.0
+            # state as "Unoccupied" until newer EDDN data is available.
             controlling_power = '~none~'
             power_state = 'Unoccupied'
 
