@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v5.2.3
+AppVersion=v5.2.4
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -92,7 +92,7 @@ Source: "NOTICE"; DestDir: "{app}"
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"
 ; VoiceAttack integration options (only shown if VA detected)
 Name: "installeliteva"; Description: "Install EliteVA v5.0.7 (VoiceAttack plugin)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
-Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.2.3)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
+Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.2.4)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
 
 [Icons]
 ; Start Menu shortcut
@@ -420,7 +420,7 @@ var
 begin
   ExistingEliteAPIPath := '';
   ProfileNeedsUpdate := False;
-  BundledProfileVersion := '5.2.3';
+  BundledProfileVersion := '5.2.4';
   
   { DISABLED - plugin not used }
   { InstallPlugin := VADetected; }

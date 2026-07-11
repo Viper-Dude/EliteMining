@@ -8,9 +8,9 @@ from pathlib import Path
 from datetime import datetime
 
 # === CHANGE VERSION AND DATE HERE ===
-NEW_VERSION = "5.2.3"
-NEW_BUILD_DATE = "2026-July-08"  # Format: YYYY-MM-DD (leave empty for today's date)
-VA_PROFILE_VERSION = "5.2.3"  # Set to "" if this release does not include a VA profile update
+NEW_VERSION = "5.2.4"
+NEW_BUILD_DATE = "2026-July-11"  # Format: YYYY-MM-DD (leave empty for today's date)
+VA_PROFILE_VERSION = "5.2.4"  # Set to "" if this release does not include a VA profile update
 # ====================================
 
 def main():
