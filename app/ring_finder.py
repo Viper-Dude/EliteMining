@@ -5454,6 +5454,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
         self.context_menu.add_command(label=t('context_menu.set_res'), command=self._show_res_dialog)
         self.context_menu.add_command(label=t('context_menu.set_reserve'), command=self._show_reserve_dialog)
+        self.context_menu.add_command(label=t('context_menu.edit_ring_type'), command=self._show_edit_ring_type_dialog)
         self.context_menu.add_command(label=t('context_menu.edit_visits'), command=self._show_edit_visits_dialog)
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.bookmark_location'), command=self._bookmark_selected)
@@ -7714,4 +7715,153 @@ class RingFinder(ColumnVisibilityMixin):
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
             print(f"Error refreshing reserve display: {e}")
+
+    def _show_edit_ring_type_dialog(self):
+        """Show dialog to set/correct ring type for selected ring"""
+        try:
+            selection = self.results_tree.selection()
+            if not selection:
+                self.status_var.set("No ring selected")
+                return
+
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if not values or len(values) < 5:
+                self.status_var.set("Invalid selection")
+                return
+
+            system_name = values[2]  # System column
+            ring_name = values[3]    # Ring column
+
+            if not system_name or not ring_name:
+                self.status_var.set("Cannot set ring type: missing system or ring info")
+                return
+
+            # Create dialog
+            dialog = tk.Toplevel(self.parent)
+            dialog.title(t('context_menu.set_ring_type_title'))
+            dialog.resizable(False, False)
+            dialog.transient(self.parent.winfo_toplevel())
+
+            # Set app icon
+            try:
+                from app_utils import get_app_icon_path
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+
+            frame = ttk.Frame(dialog, padding=15)
+            frame.pack(fill="both", expand=True)
+
+            # Header
+            ttk.Label(frame, text=t('context_menu.set_ring_type_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
+
+            # Ring type selection
+            ttk.Label(frame, text=t('context_menu.ring_type_label')).grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
+            ring_type_var = tk.StringVar(value=t('context_menu.none'))
+
+            ring_type_frame = tk.Frame(frame, bg="#1e1e1e")
+            ring_type_frame.grid(row=2, column=1, sticky="w", pady=5, columnspan=2)
+
+            # Dark themed radio buttons
+            rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b",
+                        "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
+
+            # Ring type options: Metallic, Rocky, Icy, Metal Rich, None (2x3 grid)
+            ring_type_options = [
+                ("Metallic", "Metallic"),
+                ("Rocky", "Rocky"),
+                ("Icy", "Icy"),
+                ("Metal Rich", "Metal Rich"),
+                (t('context_menu.none'), "None")
+            ]
+
+            for i, (label, value) in enumerate(ring_type_options):
+                row = i // 3
+                col = i % 3
+                tk.Radiobutton(ring_type_frame, text=label, variable=ring_type_var, value=value, **rb_style).grid(row=row, column=col, sticky="w", padx=(0, 10), pady=2)
+
+            # Load current ring type value
+            current_ring_type = self.user_db.get_ring_type(system_name, ring_name)
+            if current_ring_type:
+                ring_type_var.set(current_ring_type)
+            else:
+                ring_type_var.set("None")
+
+            # Buttons
+            button_frame = ttk.Frame(frame)
+            button_frame.grid(row=4, column=0, columnspan=3, pady=(15, 0))
+
+            def save():
+                ring_type_value = ring_type_var.get()
+                tag_value = ring_type_value if ring_type_value != "None" else None
+
+                success = self.user_db.set_ring_type(system_name, ring_name, tag_value)
+                if success:
+                    if tag_value:
+                        self.status_var.set(f"Ring type set: {tag_value}")
+                    else:
+                        self.status_var.set(f"Ring type cleared")
+                    # Refresh the current row's ring type display
+                    self._refresh_row_ring_type(item, system_name, ring_name)
+                else:
+                    self.status_var.set(f"Failed to save ring type")
+                dialog.destroy()
+
+            def cancel():
+                dialog.destroy()
+
+            save_btn = tk.Button(button_frame, text=t('dialogs.save'), command=save,
+                                bg="#2a5a2a", fg="#ffffff",
+                                activebackground="#3a6a3a", activeforeground="#ffffff",
+                                relief="solid", bd=1, cursor="hand2",
+                                pady=6, padx=15, font=("Segoe UI", 9))
+            save_btn.pack(side="left", padx=(0, 8))
+
+            cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
+                                  bg="#5a2a2a", fg="#ffffff",
+                                  activebackground="#6a3a3a", activeforeground="#ffffff",
+                                  relief="solid", bd=1, cursor="hand2",
+                                  pady=6, padx=15, font=("Segoe UI", 9))
+            cancel_btn.pack(side="left")
+
+            # Center dialog
+            dialog.update_idletasks()
+            w = dialog.winfo_width()
+            h = dialog.winfo_height()
+            parent = self.parent.winfo_toplevel()
+            px = parent.winfo_x()
+            py = parent.winfo_y()
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            x = px + (pw // 2) - (w // 2)
+            y = py + (ph // 2) - (h // 2)
+            dialog.geometry(f"+{x}+{y}")
+
+            dialog.grab_set()
+            dialog.focus_set()
+
+        except Exception as e:
+            print(f"Error showing ring type dialog: {e}")
+            import traceback
+            traceback.print_exc()
+            self.status_var.set(f"Error: {e}")
+
+    def _refresh_row_ring_type(self, item_id: str, system_name: str, ring_name: str):
+        """Refresh Ring Type display for a specific row after setting ring type"""
+        try:
+            ring_type = self.user_db.get_ring_type(system_name, ring_name)
+
+            ring_type_display = translate_ring_type(ring_type) if ring_type else "No data"
+
+            # Get current values and update Ring Type column (index 6)
+            values = list(self.results_tree.item(item_id, 'values'))
+            if len(values) >= 7:
+                values[6] = ring_type_display
+                self.results_tree.item(item_id, values=values)
+        except Exception as e:
+            print(f"Error refreshing ring type display: {e}")
 

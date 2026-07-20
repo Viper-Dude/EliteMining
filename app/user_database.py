@@ -1601,8 +1601,88 @@ class UserDatabase:
             import traceback
             traceback.print_exc()
             return False
-    
-    def add_hotspot_data(self, system_name: str, body_name: str, material_name: str, 
+
+    def get_ring_type(self, system_name: str, body_name: str) -> Optional[str]:
+        """Get ring type for a ring
+
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the celestial body (ring)
+
+        Returns:
+            Ring type string ('Rocky', 'Metallic', 'Icy', 'Metal Rich') or None
+        """
+        try:
+            body_name = self._normalize_body_name(body_name, system_name)
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT ring_type FROM hotspot_data
+                    WHERE system_name = ? AND body_name = ? AND ring_type IS NOT NULL
+                    LIMIT 1
+                ''', (system_name, body_name))
+
+                row = cursor.fetchone()
+
+                if row and row[0]:
+                    return row[0]
+
+                return None
+
+        except Exception as e:
+            log.error(f"Error getting ring type: {e}")
+            return None
+
+    def set_ring_type(self, system_name: str, body_name: str, ring_type: Optional[str]) -> bool:
+        """Set ring type for a ring
+
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the celestial body (ring)
+            ring_type: Ring type ('Rocky', 'Metallic', 'Icy', 'Metal Rich') or None to clear
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            body_name = self._normalize_body_name(body_name, system_name)
+
+            log.info(f"[SET RING TYPE] Setting ring type for {system_name} - {body_name} to {ring_type}")
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    SELECT COUNT(*) FROM hotspot_data
+                    WHERE system_name = ? AND body_name = ?
+                ''', (system_name, body_name))
+
+                count = cursor.fetchone()[0]
+                log.info(f"[SET RING TYPE] Found {count} entries for this ring")
+
+                if count > 0:
+                    cursor.execute('''
+                        UPDATE hotspot_data
+                        SET ring_type = ?
+                        WHERE system_name = ? AND body_name = ?
+                    ''', (ring_type, system_name, body_name))
+                    log.info(f"[SET RING TYPE] Updated {cursor.rowcount} rows")
+                else:
+                    log.warning(f"[SET RING TYPE] No hotspot entries found for {system_name} - {body_name}, cannot set ring type")
+                    return False
+
+                conn.commit()
+                log.info(f"[SET RING TYPE] Changes committed successfully")
+                return True
+
+        except Exception as e:
+            log.error(f"Error setting ring type: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def add_hotspot_data(self, system_name: str, body_name: str, material_name: str,
                         hotspot_count: int, scan_date: str, system_address: Optional[int] = None,
                         body_id: Optional[int] = None, coordinates: Optional[Tuple[float, float, float]] = None,
                         coord_source: str = "journal", ring_type: Optional[str] = None,

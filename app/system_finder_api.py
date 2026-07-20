@@ -26,6 +26,9 @@ class SystemFinderAPI:
     # Maximum results to return
     MAX_RESULTS = 500
 
+    # Power states Spansh doesn't index at all — filtered from the local EDDN cache instead
+    LOCAL_ONLY_PP_STATES = ('Expansion', 'Contested')
+
     # Set from main.py after EDDN listener starts — enables local powerplay cache lookups
     EDDN_CACHE_PATH = None
     
@@ -142,11 +145,17 @@ class SystemFinderAPI:
                 else:
                     return None
             with sqlite3.connect(cls.EDDN_CACHE_PATH) as conn:
+                # Preserve any 'powers' list already captured from EDDN — this fetch
+                # only knows controlling_power/power_state, not the contesting powers list.
+                existing = conn.execute(
+                    'SELECT powers FROM system_powerplay WHERE system_name = ?', (system_name,)
+                ).fetchone()
+                powers_json = existing[0] if existing else None
                 conn.execute(
                     'INSERT OR REPLACE INTO system_powerplay '
                     '(system_name, controlling_power, power_state, powers, updated_at) '
                     'VALUES (?, ?, ?, ?, ?)',
-                    (system_name, controlling_power, power_state, None, timestamp)
+                    (system_name, controlling_power, power_state, powers_json, timestamp)
                 )
                 conn.commit()
             return {'controlling_power': controlling_power, 'power_state': power_state}
@@ -180,14 +189,19 @@ class SystemFinderAPI:
         
         max_results = max_results or cls.MAX_RESULTS
         filters = filters or {}
-        
+
+        # Expansion/Contested aren't in Spansh's index — cast a wider net so there's a
+        # reasonable pool of nearby systems to filter locally against the EDDN cache.
+        pp_state = filters.get('pp_state', 'Any')
+        local_only_pp = pp_state in cls.LOCAL_ONLY_PP_STATES
+
         # Build Spansh filter object
         spansh_filters = cls._build_spansh_filters(filters)
-        
+
         # Build request payload
         payload = {
             'reference_system': reference_system,
-            'size': max_results,
+            'size': cls.MAX_RESULTS if local_only_pp else max_results,
             'sort': [{'distance': {'direction': 'asc'}}]
         }
         
@@ -222,10 +236,16 @@ class SystemFinderAPI:
             converted = []
             for system in results:
                 converted.append(cls._convert_spansh_system(system, pp_cache))
-            
+
+            # Expansion/Contested: Spansh can't filter on these, so filter locally against
+            # whatever the EDDN cache has for these nearby systems, then trim to max_results.
+            if local_only_pp:
+                converted = [c for c in converted if c.get('power_state') == pp_state]
+                converted = converted[:max_results]
+
             if progress_callback:
                 progress_callback(100, 100, f"Found {len(converted)} systems")
-            
+
             return converted
             
         except requests.exceptions.RequestException as e:
@@ -291,9 +311,11 @@ class SystemFinderAPI:
         if power and power != 'Any':
             spansh_filters['controlling_power'] = {'value': [power]}
 
-        # Powerplay — system state
+        # Powerplay — system state. Spansh only indexes Unoccupied/Exploited/Fortified/Stronghold;
+        # Expansion/Contested aren't in Spansh's dataset at all, so those are filtered from the
+        # local EDDN cache after fetching instead (see search_systems).
         pp_state = filters.get('pp_state', 'Any')
-        if pp_state and pp_state != 'Any':
+        if pp_state and pp_state != 'Any' and pp_state not in cls.LOCAL_ONLY_PP_STATES:
             spansh_filters['power_state'] = {'value': [pp_state]}
 
         return spansh_filters
@@ -348,7 +370,9 @@ class SystemFinderAPI:
         
         system_name = system.get('name', '')
 
-        # Powerplay — EDDN cache only; no Spansh fallback (Spansh PP data can be cycles stale)
+        # Powerplay — EDDN cache preferred (has controlling power + state).
+        # If not cached, fall back to Spansh's own power_state (state only — Spansh's
+        # 'power' field lists all contesting powers, which is ambiguous, so we skip it).
         cached_pp = (pp_cache or {}).get(system_name)
         if cached_pp:
             pp_power = cached_pp['controlling_power']
@@ -356,7 +380,7 @@ class SystemFinderAPI:
             pp_updated_at = cached_pp.get('updated_at')
         else:
             pp_power = None
-            pp_state = None
+            pp_state = system.get('power_state') or None
             pp_updated_at = None
 
         return {
@@ -635,8 +659,9 @@ POWER_FILTER_OPTIONS = [
     'Yuri Grom', 'Zemina Torval'
 ]
 
-# Powerplay state filter options
+# Powerplay state filter options. Unoccupied/Exploited/Fortified/Stronghold are searched via
+# Spansh; Expansion/Contested aren't in Spansh's index, so those search the local EDDN cache
+# instead (see LOCAL_ONLY_PP_STATES / search_systems) — results limited to what's already cached.
 PP_STATE_OPTIONS = [
-    'Any', 'Exploited', 'Fortified', 'Stronghold',
-    'Contested', 'Expansion'
+    'Any', 'Unoccupied', 'Exploited', 'Fortified', 'Stronghold', 'Expansion', 'Contested'
 ]

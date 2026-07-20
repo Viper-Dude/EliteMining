@@ -465,8 +465,10 @@ class MarketplaceAPI:
                 stype = row["station_type"] or "Unknown"
                 # Detect carriers by market_id range (3.7 billion+)
                 mid = row["market_id"] or 0
-                is_carrier = ("Carrier" in stype or "FleetCarrier" in stype or "Drake" in stype
-                              or (mid >= 3700000000 and mid < 4000000000))
+                is_stronghold = "Stronghold" in stype
+                is_carrier = (not is_stronghold) and (
+                    "Carrier" in stype or "FleetCarrier" in stype or "Drake" in stype
+                    or (mid >= 3700000000 and mid < 4000000000))
                 if exclude_carriers and is_carrier:
                     continue
 
@@ -495,7 +497,9 @@ class MarketplaceAPI:
                     "SpaceConstructionDepot": "OrbitalStation",
                     "PlanetaryConstructionDepot": "SurfaceStation",
                 }
-                if is_carrier:
+                if is_stronghold:
+                    mapped_type = "StrongholdCarrier"
+                elif is_carrier:
                     mapped_type = "FleetCarrier"
                 else:
                     mapped_type = _type_map.get(stype, stype)

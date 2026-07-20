@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.2.4"
+APP_VERSION = "v5.2.5"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -18174,6 +18174,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     pp_str = f"{pp_power} / {pp_state_val}{pp_age_suffix}"
                 elif pp_power:
                     pp_str = f"{pp_power}{pp_age_suffix}"
+                elif pp_state_val:
+                    pp_str = pp_state_val
                 else:
                     pp_str = t('common.pp_no_data')
                 formatted_rows.append((
@@ -19416,7 +19418,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     elif trade_station_type_filter == "Surface":
                         results = [r for r in results if any(k in (r.get('stationType') or '') for k in ["Crater", "OnFoot", "Planetary", "Surface"])]
                     elif trade_station_type_filter == "Fleet Carrier":
-                        results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '') or "Carrier" in (r.get('stationType') or '')]
+                        results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
                     elif trade_station_type_filter == "Megaship":
                         results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
                     elif trade_station_type_filter == "Stronghold":
@@ -19543,7 +19545,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in surface_keywords)]
             elif station_type_filter == "Fleet Carrier":
                 # Fleet Carriers - use substring match
-                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '') or "Carrier" in (r.get('stationType') or '')]
+                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
             elif station_type_filter == "Megaship":
                 # MegaShips - use substring match
                 results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
@@ -19938,6 +19940,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.trade_tree.delete(item)
         if hasattr(self, 'trade_avg_label'):
             self.trade_avg_label.config(text="")
+        if hasattr(self, 'trade_best_label'):
+            self.trade_best_label.config(text="")
     
     # ==================== UNUSED MARKETPLACE SEARCH METHODS (Kept for reference) ====================
     # These methods are no longer used - marketplace now uses external websites (Inara, edtools.cc)
@@ -20030,7 +20034,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     elif station_type_filter == "Surface":
                         results = [r for r in results if any(k in (r.get('stationType') or '') for k in ["Crater", "OnFoot", "Planetary", "Surface"])]
                     elif station_type_filter == "Fleet Carrier":
-                        results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '') or "Carrier" in (r.get('stationType') or '')]
+                        results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
                     elif station_type_filter == "Megaship":
                         results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
                     elif station_type_filter == "Stronghold":
@@ -20165,7 +20169,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
                 results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in surface_keywords)]
             elif station_type_filter == "Fleet Carrier":
-                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '') or "Carrier" in (r.get('stationType') or '')]
+                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
             elif station_type_filter == "Megaship":
                 results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
             elif station_type_filter == "Stronghold":
@@ -20250,6 +20254,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.marketplace_tree.delete(item)
         if hasattr(self, 'marketplace_avg_label'):
             self.marketplace_avg_label.config(text="")
+        if hasattr(self, 'marketplace_best_label'):
+            self.marketplace_best_label.config(text="")
     
     def _display_marketplace_results(self, results):
         """Display marketplace results (already sorted by user's selected criteria)"""
@@ -20608,8 +20614,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Update marketplace display after distance calculation completes (called from thread)"""
         try:
             # Re-sort results based on current sort order after distances are added
-            order_by = self.marketplace_order_by.get()
-            
+            order_by = self._sort_rev_map.get(self.marketplace_order_by.get(), self.marketplace_order_by.get())
+
             if "Distance" in order_by:
                 # Sort by distance (nearest first)
                 results_sorted = sorted(results_with_distances, key=lambda x: x.get('distance', 999999), reverse=False)
