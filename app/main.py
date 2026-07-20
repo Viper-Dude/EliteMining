@@ -14563,7 +14563,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     log.warning("[MIGRATION] 'Metalic' typo fix failed")
             else:
                 log.info("[MIGRATION] 'Metalic' typo fix not needed or already applied")
-            
+
+            # Show a one-time notice if the hotspot dataset merge (user_database.py) added new hotspots
+            try:
+                notice = getattr(self.cargo_monitor.user_db, 'last_hotspot_merge_notice', None)
+                if notice:
+                    backup_line = f"\n\nA backup of your previous database was saved to:\n{notice['backup_path']}" if notice.get('backup_path') else ""
+                    centered_info_dialog(
+                        self,
+                        "Hotspot Database Updated",
+                        f"Added {notice['inserted']} new community hotspots to your database.\n"
+                        f"Your existing hotspots and visit history were not changed.{backup_line}"
+                    )
+                    self.cargo_monitor.user_db.last_hotspot_merge_notice = None
+            except Exception as notice_error:
+                log.warning(f"Could not show hotspot merge notice: {notice_error}")
+
         except Exception as e:
             log.error(f"Database migrations failed: {e}", exc_info=True)
             # Continue startup even if migration fails

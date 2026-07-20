@@ -4,6 +4,7 @@ Handles hotspot data and visited systems tracking
 """
 
 import os
+import shutil
 import sqlite3
 import logging
 import math
@@ -193,7 +194,17 @@ class UserDatabase:
                 self._set_migration_version('fix_zero_hotspot_count', 1)
             else:
                 log.info("[Migration] Zero hotspot count fix already applied")
-                
+
+            # v5.2.5: Merge expanded hotspot dataset (80K+ hotspots) from bundled install database
+            # Same one-time, additive-only merge used for the v4.7.2 dataset update
+            if self._get_migration_version('hotspot_merge_v525') < 1:
+                log.info("[Migration] Merging hotspot data from bundled database (v5.2.5)...")
+                print("[MIGRATION] Merging hotspot data from bundled database (v5.2.5)...")
+                self._merge_hotspots_from_bundled_db()
+                self._set_migration_version('hotspot_merge_v525', 1)
+            else:
+                log.info("[Migration] Hotspot merge v5.2.5 already applied")
+
         except Exception as e:
             print(f"[MIGRATION ERROR] {e}")
             log.error(f"[Migration] Error during migration: {e}")
@@ -630,18 +641,19 @@ class UserDatabase:
             log.warning(f"[RES Data] Could not apply RES data: {e}")
     
     def _merge_hotspots_from_bundled_db(self) -> None:
-        """Merge hotspot data from bundled install database (v4.7.2 one-time migration)
-        
+        """Merge hotspot data from bundled install database (reused across releases)
+
         This migration:
         1. Reads hotspots from the bundled 'UserDb for install/user_data.db'
         2. Adds ONLY hotspots that don't exist in user's database
         3. Does NOT overwrite any existing user data
         4. Does NOT touch visited_systems table
-        
-        This gives new installs AND existing users access to 34K+ community hotspots.
+
+        Backs up the user's database before merging and records the result in
+        self.last_hotspot_merge_notice so the UI can inform the user once, after startup.
         """
         from datetime import datetime
-        
+
         try:
             # Find the bundled database
             bundled_db_paths = [
@@ -649,29 +661,39 @@ class UserDatabase:
                 os.path.join(get_app_data_dir(), 'data', 'UserDb for install', 'user_data.db'),
                 os.path.join(os.path.dirname(os.path.dirname(__file__)), 'app', 'data', 'UserDb for install', 'user_data.db'),
             ]
-            
-            log.info("[Migration v4.7.2] Searching for bundled hotspot database...")
+
+            log.info("[Migration] Searching for bundled hotspot database...")
             bundled_db_path = None
             for path in bundled_db_paths:
                 exists = os.path.exists(path)
-                log.info(f"[Migration v4.7.2] Checking: {path} - {'EXISTS' if exists else 'NOT FOUND'}")
+                log.info(f"[Migration] Checking: {path} - {'EXISTS' if exists else 'NOT FOUND'}")
                 if exists:
                     bundled_db_path = path
                     break
-            
+
             if not bundled_db_path:
-                log.warning("[Migration v4.7.2] Bundled database not found - skipping migration")
-                print("[MIGRATION v4.7.2] Bundled hotspot database not found - skipping")
+                log.warning("[Migration] Bundled database not found - skipping hotspot merge")
+                print("[MIGRATION] Bundled hotspot database not found - skipping")
                 return
-            
+
             # Don't try to merge with ourselves
             if os.path.normpath(bundled_db_path) == os.path.normpath(self.db_path):
-                log.info("[Migration v4.7.2] Bundled DB is same as user DB - skipping")
+                log.info("[Migration] Bundled DB is same as user DB - skipping hotspot merge")
                 return
-            
-            print(f"[MIGRATION v4.7.2] Merging hotspots from: {bundled_db_path}")
-            log.info(f"[Migration v4.7.2] Source database: {bundled_db_path}")
-            
+
+            print(f"[MIGRATION] Merging hotspots from: {bundled_db_path}")
+            log.info(f"[Migration] Source database: {bundled_db_path}")
+
+            backup_path = None
+            try:
+                backup_name = f"user_data_backup_before_hotspot_merge_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+                backup_path = os.path.join(os.path.dirname(self.db_path), backup_name)
+                shutil.copy2(self.db_path, backup_path)
+                log.info(f"[Migration] Backed up user database to {backup_path} before hotspot merge")
+            except Exception as backup_error:
+                log.warning(f"[Migration] Could not back up user database before hotspot merge: {backup_error}")
+                backup_path = None
+
             inserted_count = 0
             skipped_count = 0
             
@@ -734,15 +756,22 @@ class UserDatabase:
                 cursor.execute("SELECT COUNT(*) FROM hotspot_data")
                 total_in_user_db = cursor.fetchone()[0]
             
-            print(f"[MIGRATION v4.7.2] Added {inserted_count} new hotspots, skipped {skipped_count} existing")
-            print(f"[MIGRATION v4.7.2] User database now has {total_in_user_db} total hotspots")
-            log.info(f"[Migration v4.7.2] Added {inserted_count} new hotspots, skipped {skipped_count} existing")
-            log.info(f"[Migration v4.7.2] User database now has {total_in_user_db} total hotspots")
-            
+            print(f"[MIGRATION] Added {inserted_count} new hotspots, skipped {skipped_count} existing")
+            print(f"[MIGRATION] User database now has {total_in_user_db} total hotspots")
+            log.info(f"[Migration] Added {inserted_count} new hotspots, skipped {skipped_count} existing")
+            log.info(f"[Migration] User database now has {total_in_user_db} total hotspots")
+
+            if inserted_count > 0:
+                self.last_hotspot_merge_notice = {
+                    'inserted': inserted_count,
+                    'skipped': skipped_count,
+                    'backup_path': backup_path,
+                }
+
         except Exception as e:
             # Don't fail startup if migration fails
-            print(f"[MIGRATION v4.7.2] Warning: Could not merge hotspots: {e}")
-            log.warning(f"[Migration v4.7.2] Could not merge hotspots: {e}")
+            print(f"[MIGRATION] Warning: Could not merge hotspots: {e}")
+            log.warning(f"[Migration] Could not merge hotspots: {e}")
             import traceback
             log.error(traceback.format_exc())
     

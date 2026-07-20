@@ -60,9 +60,12 @@ Source: "app\data\res_sites.csv"; DestDir: "{app}\app\data"; Flags: ignoreversio
 ; v4.7.7+: Trade commodities data
 Source: "app\data\commodities.json"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 
-; v4.1.8+: Use smart version checking instead of forced overwrite
-; Database will only update if new version > existing version, with automatic backup
+; v4.1.8+: Fresh installs get the full bundled dataset as their live database
 Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\app\data"; Flags: onlyifdoesntexist
+
+; v5.2.5+: Always refresh the bundled reference copy (never the live db) so the in-app
+; hotspot merge migration has a current dataset to read from after upgrades
+Source: "app\data\UserDb for install\user_data.db"; DestDir: "{app}\app\data\UserDb for install"; Flags: ignoreversion
 
 ; Version checking utilities
 Source: "scripts\installer\config_installer.py"; DestDir: "{tmp}"; Flags: deleteafterinstall
