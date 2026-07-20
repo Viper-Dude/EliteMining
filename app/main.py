@@ -4954,6 +4954,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # --- Show splash screen immediately so user sees something during init ---
             self._splash = None
             self._splash_photo = None  # prevent GC
+            self._splash_status_var = None
+            self._startup_dialog_active = False
             try:
                 from PIL import Image, ImageTk
                 from config import load_window_geometry
@@ -4982,8 +4984,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 _sx = _app_x + (_app_w - _sw) // 2
                 _sy = _app_y + (_app_h - _sh) // 2
                 self._splash.configure(bg="#000000")
-                self._splash.geometry(f"{_sw}x{_sh}+{_sx}+{_sy}")
                 tk.Label(self._splash, image=self._splash_photo, bd=0, bg="#000000").pack()
+                self._splash_status_var = tk.StringVar(value="Starting EliteMining...")
+                tk.Label(self._splash, textvariable=self._splash_status_var, bg="#000000",
+                         fg="#cccccc", font=("Segoe UI", 9)).pack(pady=(0, 6))
+                self._splash.update_idletasks()
+                _sw = max(_sw, self._splash.winfo_reqwidth())
+                _sh = self._splash.winfo_reqheight()
+                _sx = _app_x + (_app_w - _sw) // 2
+                _sy = _app_y + (_app_h - _sh) // 2
+                self._splash.geometry(f"{_sw}x{_sh}+{_sx}+{_sy}")
                 # Click anywhere to dismiss early
                 self._splash.bind("<Button-1>", lambda e: self._dismiss_splash())
                 self._splash.update()
@@ -5255,14 +5265,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.commodities_data = {}
             
         # Initialize cargo monitor with correct app directory (after va_root is set)
+        self._set_splash_status("Preparing hotspot database...")
         app_dir = get_app_data_dir() if getattr(sys, 'frozen', False) else None
-        self.cargo_monitor = CargoMonitor(update_callback=self._on_cargo_changed, 
+        self.cargo_monitor = CargoMonitor(update_callback=self._on_cargo_changed,
                                         capacity_changed_callback=self._on_cargo_capacity_detected,
                                         ship_info_changed_callback=self._on_ship_info_changed,
                                         app_dir=app_dir)
         # Set the main app reference so cargo monitor can access prospector panel later
         self.cargo_monitor.main_app_ref = self
-        
+        self._set_splash_status("Preparing interface...")
+
         # Centralized current system tracking (single source of truth)
         self.current_system = ""
         self.current_system_coords = None
@@ -5485,6 +5497,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.va_variables = None  # Will be initialized after UI is built
         
         # Build UI - ProspectorPanel will scan latest journal and populate current_system
+        self._set_splash_status("Building interface...")
         self._build_ui()
 
         # Watch for Market.json changes to send to EDDN
@@ -5557,6 +5570,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(3500, self._reapply_cargo_overlay_state)
         self.after(6000, self._reapply_cargo_overlay_state)  # Second pass after grace period ends
 
+    def _set_splash_status(self, text: str) -> None:
+        """Update the splash screen's status line, forcing an immediate repaint
+        even though mainloop() hasn't started yet (update() pumps pending events)."""
+        if self._splash and self._splash_status_var:
+            try:
+                self._splash_status_var.set(text)
+                self._splash.update()
+            except Exception:
+                pass
+
     def _dismiss_splash(self):
         """Dismiss the startup splash screen and reveal the main window."""
         if self._splash:
@@ -5566,9 +5589,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 pass
             self._splash = None
             self._splash_photo = None
+            self._splash_status_var = None
         # Restore geometry and reveal main window
         self._restore_window_geometry()
         self.lift()
+        # Now that the window has its real, restored position, it's safe to check
+        # for pending database migrations and show any related notice dialogs
+        # (centering on self would use stale/default geometry before this point)
+        self.after(200, self._run_database_migrations)
         # Re-trigger sash initialization
         self._sash_initialized = False
         self._sidebar_sash_initialized = False
@@ -14529,13 +14557,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 log.warning(f"Layout migration failed: {layout_error}")
                 
             log.info(f"=== CONFIG MIGRATION CHECK END === {datetime.now().isoformat()}")
-            
-            # Run database migrations
-            self.after(500, self._run_database_migrations)
-                
+
+            # Database migrations are scheduled from _dismiss_splash(), after window
+            # geometry is restored - centering dialogs on self here would use stale geometry
+
         except Exception as e:
             log.error(f"Config migration check failed: {e}", exc_info=True)
             # Continue startup even if migration fails
+
+    def _show_startup_dialog(self, dialog_fn, *args, **kwargs):
+        """Run a blocking startup dialog while flagging it active, so other
+        startup flows (e.g. VA profile update) can wait for it to close first."""
+        self._startup_dialog_active = True
+        try:
+            return dialog_fn(*args, **kwargs)
+        finally:
+            self._startup_dialog_active = False
 
     def _run_database_migrations(self):
         """Run any pending database migrations"""
@@ -14569,7 +14606,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 notice = getattr(self.cargo_monitor.user_db, 'last_hotspot_merge_notice', None)
                 if notice:
                     backup_line = f"\n\nA backup of your previous database was saved to:\n{notice['backup_path']}" if notice.get('backup_path') else ""
-                    centered_info_dialog(
+                    self._show_startup_dialog(
+                        centered_info_dialog,
                         self,
                         "Hotspot Database Updated",
                         f"Added {notice['inserted']} new community hotspots to your database.\n"
@@ -20937,7 +20975,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if self.winfo_width() < 100 or self.winfo_height() < 100:
                     self.after(1000, show_when_ready)
                     return
-                    
+
+                # Wait for any other startup dialog (e.g. hotspot database notice) to close first
+                if getattr(self, '_startup_dialog_active', False):
+                    self.after(1000, show_when_ready)
+                    return
+
                 self._show_va_profile_update_dialog_impl(current_version, new_version, profile_path)
             except Exception as e:
                 logging.error(f"[VA_PROFILE] Error showing dialog: {e}")
@@ -21283,7 +21326,7 @@ Your keybinds will need to be reconfigured manually."""
     
     def _run_full_scan_with_dialog(self, journals, scan_type='first_install'):
         """Run full journal scan with a progress dialog
-        
+
         Args:
             journals: List of journal files to scan
             scan_type: 'first_install' or 'migration'
@@ -21291,7 +21334,15 @@ Your keybinds will need to be reconfigured manually."""
         import threading
         from localization import t
         from app_utils import get_app_icon_path
-        
+
+        # Wait for any other startup dialog (hotspot notice, VA profile update) to close
+        # first - this dialog grabs input and can't be closed by the user, so showing it
+        # alongside another modal leaves that other dialog stuck and unclickable
+        if getattr(self, "_startup_dialog_active", False):
+            self.after(1000, lambda: self._run_full_scan_with_dialog(journals, scan_type))
+            return
+        self._startup_dialog_active = True
+
         # Get theme colors
         if self.current_theme == "elite_orange":
             bg_color = "#000000"
@@ -21455,6 +21506,7 @@ Your keybinds will need to be reconfigured manually."""
             dialog.destroy()
         except:
             pass
+        self._startup_dialog_active = False
         self._set_status("Journal scan complete", 5000)
     
     def _process_journals_for_catchup_with_progress(self, journals, is_full_sync=False, is_migration=False, progress_callback=None):

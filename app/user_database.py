@@ -4,6 +4,7 @@ Handles hotspot data and visited systems tracking
 """
 
 import os
+import sys
 import shutil
 import sqlite3
 import logging
@@ -122,6 +123,10 @@ class UserDatabase:
     def _run_migrations(self) -> None:
         """Run database migrations silently on startup (only runs each migration once)"""
         try:
+            # Tables created before the UNIQUE constraint existed in _create_tables() have
+            # no protection against duplicate inserts - must run before any hotspot merge
+            self._ensure_hotspot_unique_index()
+
             # Migration v4.4.6: Normalize material names to fix language duplicates
             self._migrate_material_names_v446()
             
@@ -143,15 +148,17 @@ class UserDatabase:
             else:
                 log.info("[Migration] RES CSV already applied (version 3)")
             
-            # v4.7.2: Merge hotspot data from bundled install database (one-time migration)
-            # This adds 34K+ community hotspots while preserving user's existing data
-            if self._get_migration_version('hotspot_merge_v472') < 1:
+            # v4.7.2 / v5.2.5: Merge hotspot data from bundled install database (one-time migration)
+            # Both keys point at the same bundled file - run once and mark both, so a db that
+            # never applied v4.7.2 doesn't pay for two full merge passes (and two backups) in a row
+            if self._get_migration_version('hotspot_merge_v472') < 1 or self._get_migration_version('hotspot_merge_v525') < 1:
                 log.info("[Migration] Merging hotspot data from bundled database...")
                 print("[MIGRATION] Merging hotspot data from bundled database...")
                 self._merge_hotspots_from_bundled_db()
                 self._set_migration_version('hotspot_merge_v472', 1)
+                self._set_migration_version('hotspot_merge_v525', 1)
             else:
-                log.info("[Migration] Hotspot merge v4.7.2 already applied")
+                log.info("[Migration] Hotspot merge already applied")
             
             # v4.7.6: Fix corrupted body_name entries where body_name has wrong system prefix
             # e.g., system_name="Palliyan" but body_name="HIP 54072 A 1 A Ring"
@@ -195,15 +202,7 @@ class UserDatabase:
             else:
                 log.info("[Migration] Zero hotspot count fix already applied")
 
-            # v5.2.5: Merge expanded hotspot dataset (80K+ hotspots) from bundled install database
-            # Same one-time, additive-only merge used for the v4.7.2 dataset update
-            if self._get_migration_version('hotspot_merge_v525') < 1:
-                log.info("[Migration] Merging hotspot data from bundled database (v5.2.5)...")
-                print("[MIGRATION] Merging hotspot data from bundled database (v5.2.5)...")
-                self._merge_hotspots_from_bundled_db()
-                self._set_migration_version('hotspot_merge_v525', 1)
-            else:
-                log.info("[Migration] Hotspot merge v5.2.5 already applied")
+            self._cleanup_bundled_reference_db()
 
         except Exception as e:
             print(f"[MIGRATION ERROR] {e}")
@@ -211,7 +210,89 @@ class UserDatabase:
             import traceback
             traceback.print_exc()
             log.error(traceback.format_exc())
-    
+
+    def _ensure_hotspot_unique_index(self) -> None:
+        """Ensure hotspot_data has a unique index on (system_name, body_name, material_name).
+
+        The UNIQUE constraint only exists because it's part of the CREATE TABLE
+        statement in _create_tables() - on any live db whose table was already
+        created by an older version of the app (before that constraint was added),
+        CREATE TABLE IF NOT EXISTS is a no-op and the table has no uniqueness
+        enforcement at all. Without it, INSERT OR IGNORE in the hotspot merge
+        migrations silently inserts full duplicates instead of skipping them.
+
+        Cheap and safe to run on every startup: if the index already exists this
+        is a fast no-op; if duplicates already exist, dedupe them first (merging
+        any user-set tags onto the surviving row) so the index can be created.
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute('''
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_hotspot_unique_key
+                        ON hotspot_data(system_name, body_name, material_name)
+                    ''')
+                    conn.commit()
+                    return
+                except sqlite3.IntegrityError:
+                    pass  # duplicates exist - dedupe below before retrying
+
+                log.warning("[Migration] hotspot_data has duplicate keys - deduplicating before enforcing unique index")
+                print("[MIGRATION] Deduplicating hotspot_data before enforcing unique index...")
+
+                # Merge any user-set tags/counts from duplicates onto the surviving
+                # (highest id) row before deleting the rest, so nothing is lost
+                cursor.execute('''
+                    UPDATE hotspot_data
+                    SET overlap_tag = (SELECT MAX(h2.overlap_tag) FROM hotspot_data h2
+                                        WHERE h2.system_name = hotspot_data.system_name
+                                          AND h2.body_name = hotspot_data.body_name
+                                          AND h2.material_name = hotspot_data.material_name),
+                        res_tag = (SELECT MAX(h2.res_tag) FROM hotspot_data h2
+                                    WHERE h2.system_name = hotspot_data.system_name
+                                      AND h2.body_name = hotspot_data.body_name
+                                      AND h2.material_name = hotspot_data.material_name),
+                        reserve_level = (SELECT MAX(h2.reserve_level) FROM hotspot_data h2
+                                          WHERE h2.system_name = hotspot_data.system_name
+                                            AND h2.body_name = hotspot_data.body_name
+                                            AND h2.material_name = hotspot_data.material_name),
+                        hotspot_count = (SELECT MAX(h2.hotspot_count) FROM hotspot_data h2
+                                          WHERE h2.system_name = hotspot_data.system_name
+                                            AND h2.body_name = hotspot_data.body_name
+                                            AND h2.material_name = hotspot_data.material_name)
+                    WHERE id IN (
+                        SELECT MAX(id) FROM hotspot_data
+                        GROUP BY system_name, body_name, material_name
+                        HAVING COUNT(*) > 1
+                    )
+                ''')
+
+                cursor.execute('''
+                    DELETE FROM hotspot_data
+                    WHERE id NOT IN (
+                        SELECT MAX(id) FROM hotspot_data
+                        GROUP BY system_name, body_name, material_name
+                    )
+                ''')
+                removed = cursor.rowcount
+                conn.commit()
+
+                cursor.execute('''
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_hotspot_unique_key
+                    ON hotspot_data(system_name, body_name, material_name)
+                ''')
+                conn.commit()
+
+                print(f"[MIGRATION] Removed {removed} duplicate hotspot entries, unique index now enforced")
+                log.info(f"[Migration] Removed {removed} duplicate hotspot entries, unique index now enforced")
+
+        except Exception as e:
+            print(f"[MIGRATION] Warning: Could not ensure hotspot unique index: {e}")
+            log.warning(f"[Migration] Could not ensure hotspot unique index: {e}")
+            import traceback
+            log.error(traceback.format_exc())
+
     def _migrate_material_names_v446(self) -> None:
         """Migrate material names to English-only format (v4.4.6)
         
@@ -694,68 +775,51 @@ class UserDatabase:
                 log.warning(f"[Migration] Could not back up user database before hotspot merge: {backup_error}")
                 backup_path = None
 
-            inserted_count = 0
-            skipped_count = 0
-            
             # Open bundled database (read-only)
             bundled_conn = sqlite3.connect(f"file:{bundled_db_path}?mode=ro", uri=True)
             bundled_cursor = bundled_conn.cursor()
-            
+
             # Get all hotspots from bundled database
             bundled_cursor.execute('''
                 SELECT system_name, body_name, material_name, hotspot_count, scan_date,
                        system_address, body_id, x_coord, y_coord, z_coord, coord_source,
-                       ring_type, ls_distance, reserve_level, data_source, 
+                       ring_type, ls_distance, reserve_level, data_source,
                        inner_radius, outer_radius, ring_mass, overlap_tag, res_tag
                 FROM hotspot_data
             ''')
-            
+
             bundled_hotspots = bundled_cursor.fetchall()
             bundled_conn.close()
-            
-            log.info(f"[Migration v4.7.2] Found {len(bundled_hotspots)} hotspots in bundled database")
-            print(f"[MIGRATION v4.7.2] Processing {len(bundled_hotspots)} hotspots...")
-            
+
+            log.info(f"[Migration] Found {len(bundled_hotspots)} hotspots in bundled database")
+            print(f"[MIGRATION] Processing {len(bundled_hotspots)} hotspots...")
+
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                
-                for row in bundled_hotspots:
-                    system_name, body_name, material_name = row[0], row[1], row[2]
-                    
-                    # Check if this hotspot already exists in user's database
-                    cursor.execute('''
-                        SELECT id FROM hotspot_data 
-                        WHERE system_name = ? AND body_name = ? AND material_name = ?
-                    ''', (system_name, body_name, material_name))
-                    
-                    if cursor.fetchone() is not None:
-                        # Hotspot already exists - DO NOT overwrite user's data
-                        skipped_count += 1
-                        continue
-                    
-                    # Insert new hotspot (user doesn't have this one)
-                    try:
-                        cursor.execute('''
-                            INSERT INTO hotspot_data 
-                            (system_name, body_name, material_name, hotspot_count, scan_date,
-                             system_address, body_id, x_coord, y_coord, z_coord, coord_source,
-                             ring_type, ls_distance, reserve_level, data_source,
-                             inner_radius, outer_radius, ring_mass, overlap_tag, res_tag)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', row)
-                        inserted_count += 1
-                    except sqlite3.IntegrityError:
-                        # Race condition - entry was added between check and insert
-                        skipped_count += 1
-                
+
+                cursor.execute("SELECT COUNT(*) FROM hotspot_data")
+                total_before = cursor.fetchone()[0]
+
+                # INSERT OR IGNORE relies on the UNIQUE(system_name, body_name, material_name)
+                # constraint to silently skip hotspots the user already has - same
+                # "never overwrite, only add missing" behavior as a per-row check, in one bulk pass
+                cursor.executemany('''
+                    INSERT OR IGNORE INTO hotspot_data
+                    (system_name, body_name, material_name, hotspot_count, scan_date,
+                     system_address, body_id, x_coord, y_coord, z_coord, coord_source,
+                     ring_type, ls_distance, reserve_level, data_source,
+                     inner_radius, outer_radius, ring_mass, overlap_tag, res_tag)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', bundled_hotspots)
+
                 conn.commit()
-            
-            total_in_user_db = 0
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
+
                 cursor.execute("SELECT COUNT(*) FROM hotspot_data")
                 total_in_user_db = cursor.fetchone()[0]
-            
+
+            inserted_count = total_in_user_db - total_before
+            skipped_count = len(bundled_hotspots) - inserted_count
+
             print(f"[MIGRATION] Added {inserted_count} new hotspots, skipped {skipped_count} existing")
             print(f"[MIGRATION] User database now has {total_in_user_db} total hotspots")
             log.info(f"[Migration] Added {inserted_count} new hotspots, skipped {skipped_count} existing")
@@ -774,7 +838,37 @@ class UserDatabase:
             log.warning(f"[Migration] Could not merge hotspots: {e}")
             import traceback
             log.error(traceback.format_exc())
-    
+
+    def _cleanup_bundled_reference_db(self) -> None:
+        """Remove the bundled 'UserDb for install' reference copy if present (installed builds only)
+
+        Runs every launch, independent of the hotspot-merge migration gate, because the
+        installer unconditionally re-places this file on every install/upgrade (Flags:
+        ignoreversion) even for users whose db has already applied the merge - so cleanup
+        can't be tied to that one-time migration or it would never run again for them.
+        """
+        if not getattr(sys, 'frozen', False):
+            return
+
+        bundled_db_paths = [
+            os.path.join(os.path.dirname(__file__), 'data', 'UserDb for install', 'user_data.db'),
+            os.path.join(get_app_data_dir(), 'data', 'UserDb for install', 'user_data.db'),
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'app', 'data', 'UserDb for install', 'user_data.db'),
+        ]
+
+        for bundled_db_path in bundled_db_paths:
+            if not os.path.exists(bundled_db_path):
+                continue
+            try:
+                os.remove(bundled_db_path)
+                log.info(f"[Migration] Removed bundled reference copy: {bundled_db_path}")
+                bundled_db_dir = os.path.dirname(bundled_db_path)
+                if not os.listdir(bundled_db_dir):
+                    os.rmdir(bundled_db_dir)
+                    log.info(f"[Migration] Removed now-empty folder: {bundled_db_dir}")
+            except Exception as cleanup_error:
+                log.warning(f"[Migration] Could not remove bundled reference copy at {bundled_db_path}: {cleanup_error}")
+
     def _fix_body_name_prefix_corruption(self) -> None:
         """Fix corrupted body_name entries where body_name has wrong system prefix (v4.7.6)
         

@@ -13,7 +13,7 @@ import shutil
 import sqlite3
 
 
-def strip_personal_data(db_path: str, database_version: str) -> None:
+def strip_personal_data(db_path: str) -> None:
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
@@ -26,11 +26,9 @@ def strip_personal_data(db_path: str, database_version: str) -> None:
         if cursor.fetchone():
             cursor.execute("DROP TABLE hotspot_data_new")
 
-        cursor.execute("DELETE FROM database_version")
-        cursor.execute(
-            "INSERT INTO database_version (version, updated_date) VALUES (?, datetime('now'))",
-            (database_version,)
-        )
+        # database_version is a dead field the app never reads or writes -
+        # migration_history is the real source of truth for what's been applied
+        cursor.execute("DROP TABLE IF EXISTS database_version")
 
         conn.commit()
         conn.execute("VACUUM")
@@ -41,7 +39,6 @@ def strip_personal_data(db_path: str, database_version: str) -> None:
         total_hotspots = cursor.fetchone()[0]
 
         print(f"Removed {visited_count} personal visit records")
-        print(f"Database version set to {database_version}")
         print(f"hotspot_data: {hotspot_count} rows, {total_hotspots} total hotspots")
     finally:
         conn.close()
@@ -51,11 +48,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", help="Path to the personal working copy to strip")
     parser.add_argument("--output", help="Write result here instead of stripping in place")
-    parser.add_argument("--version", required=True, help="Database version to stamp, e.g. 5.2.5")
     args = parser.parse_args()
 
     target = args.output or args.source
     if args.output:
         shutil.copy2(args.source, args.output)
 
-    strip_personal_data(target, args.version)
+    strip_personal_data(target)

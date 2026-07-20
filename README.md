@@ -7,7 +7,7 @@
   <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/EliteMining_Main_logo.png" alt="EliteMining Logo" width="100%">
 </p>
 
-**EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 61,000+ mining locations plus Spansh API integration for galaxy-wide ring search, overlaps, and RES sites as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
+**EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 80,000+ mining locations plus Spansh API integration for galaxy-wide ring search, overlaps, and RES sites as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
 
 ---
 
@@ -61,7 +61,7 @@ Full-featured mining companion with GUI controls:
 - Ship configuration management  
 - GUI for firegroups, timers, toggles, and announcements  
 - **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
-- **Hotspot Finder** – Search 61,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
+- **Hotspot Finder** – Search 80,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
 - **Overlaps** – Find and tag double/triple hotspot overlaps for maximum yield  
 - **RES Sites** – Locate Resource Extraction Sites (Hazardous, High, Low)  
 - **Commodity Market** – Find the best sell prices for your mined commodities with real-time market data and distance calculations  
@@ -251,7 +251,7 @@ Control mining sequence timing and automated behaviors:
 
 ## Hotspot Finder
 
-The Hotspot Finder provides access to a comprehensive database of 61,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities, plus integrated Spansh data.
+The Hotspot Finder provides access to a comprehensive database of 80,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities, plus integrated Spansh data.
 
 ### Key Features
 - **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
@@ -263,7 +263,7 @@ The Hotspot Finder provides access to a comprehensive database of 61,000+ confir
 - **Save to Local Database** – Right-click Spansh results to save them to your personal database for offline access (max 50 rows)
 - **Update Reserve Level** – Right-click local entries with missing reserve data to fetch and update from Spansh
 - **Auto-Search** – Automatically searches for hotspots when jumping to new systems and auto-refreshes results when scanning rings (remembers preference across restarts)
-- **Pre-loaded Database** – 61,000+ hotspots with minerals types, ring densities
+- **Pre-loaded Database** – 80,000+ hotspots with minerals types, ring densities
 - **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
 - **Distance-Based Results** – Filter by jump range (up to 500 LY) to find nearby opportunities
 - **Ring Composition Details** – View distance from arrival (LS) with comma-separated formatting

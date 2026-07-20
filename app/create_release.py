@@ -250,13 +250,6 @@ class ReleaseBuilder:
                 else:
                     print("⚠️  User database not found - ZIP users will start with empty database")
                 
-                # Add database metadata if it exists
-                metadata_path = self.project_root / "app" / "data" / "database_metadata.json"
-                if metadata_path.exists():
-                    arc_name = "EliteMining/app/data/database_metadata.json"
-                    zipf.write(metadata_path, arc_name)
-                    print(f"✅ Added: EliteMining/app/data/database_metadata.json")
-                
                 # Add overlap and RES site CSV files for migration
                 overlaps_csv = self.project_root / "app" / "data" / "overlaps.csv"
                 if overlaps_csv.exists():

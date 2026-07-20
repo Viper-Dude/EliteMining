@@ -51,7 +51,6 @@ Source: "dist\EliteMining.exe"; DestDir: "{app}\Configurator"; Flags: ignorevers
 
 ; Local systems database (~14 MB) - populated systems within the bubble for fast searches
 Source: "app\data\galaxy_systems.db"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "app\data\database_metadata.json"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; v4.6.0+: Overlap and RES site data CSV files for migration
 Source: "app\data\overlaps.csv"; DestDir: "{app}\app\data"; Flags: ignoreversion skipifsourcedoesntexist
