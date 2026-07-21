@@ -188,6 +188,20 @@ class FleetCarrierTab(tk.Frame):
 
         widget.bind("<Button-3>", show_menu)
 
+    def _make_copyable_text(self, widget, text):
+        menu = tk.Menu(widget, tearoff=0, bg=self.sect_bg, fg=self.fg,
+                       activebackground=self.hdr_bg, activeforeground=self.fg_bright)
+        menu.add_command(label=t('common.copy'),
+                         command=lambda: self._copy_to_clipboard(text))
+
+        def show_menu(event):
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        widget.bind("<Button-3>", show_menu)
+
     def _copy_to_clipboard(self, text):
         try:
             self.clipboard_clear()
@@ -478,9 +492,12 @@ class FleetCarrierTab(tk.Frame):
                 tk.Label(row, text=ts_text,
                          bg=self.sect_bg, fg=self.fg_dim, font=("Helvetica", 9),
                          width=20, anchor="w").pack(side="left")
-                tk.Label(row, text=entry.get("system", "-"),
+                system_name = entry.get("system", "-")
+                sys_lbl = tk.Label(row, text=system_name,
                          bg=self.sect_bg, fg=self.fg, font=("Helvetica", 9),
-                         anchor="w").pack(side="left")
+                         anchor="w")
+                sys_lbl.pack(side="left")
+                self._make_copyable_text(sys_lbl, system_name)
                 self._history_rows.append(row)
 
     # ------------------------------------------------------------------

@@ -17,15 +17,16 @@
 - Fixed the **Star Systems** Power State filter displaying options that never returned results, and added the missing **"Unoccupied"** option.
 - Fixed **Star Systems** occasionally losing part of their saved Powerplay data when refreshed from Inara.
 - Fixed the **Commodity Market** **Fleet Carrier** filter incorrectly including Stronghold Carriers.
+- Fixed the **Fleet Carrier** jump history missing jumps that happened while offline or made by a remote carrier.
+- You can now right-click any system in the **Fleet Carrier** jump history to copy its name.
 
-### Voiceattack Profile
+### Voiceattack Profile updated to  v5.2.5
 
 * Optimised the Prospector sequence command
 * General optimizations
 
 ### Reminder
 * After updating, please review the [README](https://github.com/Viper-Dude/EliteMining#installation) **Installation** section to verify your setup and configuration.
-
 
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
