@@ -126,3 +126,7 @@ todo.txt
 read_pdf.py
 firstrun_sim.py
 app/config.json.firstrun_bak
+
+# Personal reference material (not app docs)
+docs/PP 2_0/
+docs/PP2.0 Information.xlsx
