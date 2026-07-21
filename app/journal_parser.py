@@ -587,6 +587,22 @@ class JournalParser:
         except Exception as e:
             log.warning(f"Error processing CarrierStats: {e}")
 
+    def _record_carrier_location_change(self, new_system: str, timestamp: str, exact: bool) -> None:
+        """Append a jump_history entry if the carrier's tracked system actually changed.
+
+        Location updates (CarrierLocation/Docked/Location) self-heal cd['system'] even
+        when the CarrierJump event itself was never logged (only fires when the
+        commander is docked on the carrier at jump time). Deriving history from any
+        change in system — not just CarrierJump — makes history self-healing too.
+        """
+        cd = self.carrier_data
+        old_system = cd.get('system')
+        if new_system and old_system and new_system != old_system:
+            history = cd.get('jump_history') or []
+            if not history or history[0].get('system') != new_system:
+                entry = {'timestamp': timestamp, 'system': new_system, 'exact': exact}
+                cd['jump_history'] = ([entry] + history)[:10]
+
     def process_carrier_location(self, event: Dict[str, Any]) -> None:
         """Process CarrierLocation event — where the carrier is parked."""
         try:
@@ -595,14 +611,49 @@ class JournalParser:
             if carrier_type and carrier_type != 'FleetCarrier':
                 return
             cd = self.carrier_data
+            new_system = event.get('StarSystem', cd['system'])
+            self._record_carrier_location_change(new_system, event.get('timestamp', ''), exact=False)
             cd['carrier_id'] = event.get('CarrierID', cd['carrier_id'])
-            cd['system']     = event.get('StarSystem', cd['system'])
+            cd['system']     = new_system
             cd['body_id']    = event.get('BodyID', cd['body_id'])
             cd['last_updated'] = event.get('timestamp')
             log.debug(f"[FC] CarrierLocation: {cd['system']}")
             self._notify_carrier_updated()
         except Exception as e:
             log.warning(f"Error processing CarrierLocation: {e}")
+
+    def process_carrier_docked(self, event: Dict[str, Any]) -> None:
+        """Process Docked event when docked at own fleet carrier."""
+        try:
+            if not (event.get('StationType') == 'FleetCarrier' and event.get('StarSystem')):
+                return
+            cd = self.carrier_data
+            new_system = event['StarSystem']
+            self._record_carrier_location_change(new_system, event.get('timestamp', ''), exact=False)
+            cd['system'] = new_system
+            cd['last_updated'] = event.get('timestamp')
+            self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing Docked (FC): {e}")
+
+    def process_carrier_docked_via_location(self, event: Dict[str, Any]) -> None:
+        """Process Location event when it shows the commander docked at own fleet carrier."""
+        try:
+            if not (event.get('StationType') == 'FleetCarrier'
+                    and event.get('Docked', False)
+                    and event.get('StarSystem')):
+                return
+            cd = self.carrier_data
+            new_system = event['StarSystem']
+            self._record_carrier_location_change(new_system, event.get('timestamp', ''), exact=False)
+            cd['system'] = new_system
+            if event.get('StationName'):
+                # StationName is callsign e.g. "V0W-W7T"; keep existing name
+                cd['carrier_id'] = event.get('MarketID', cd['carrier_id'])
+            cd['last_updated'] = event.get('timestamp')
+            self._notify_carrier_updated()
+        except Exception as e:
+            log.warning(f"Error processing Location (FC docked): {e}")
 
     def process_carrier_finance(self, event: Dict[str, Any]) -> None:
         """Process CarrierFinance event — balance/tax update.
@@ -659,14 +710,12 @@ class JournalParser:
             cd = self.carrier_data
             system = event.get('StarSystem', '')
             if system:
+                self._record_carrier_location_change(system, event.get('timestamp', ''), exact=True)
                 cd['system']   = system
                 cd['body_id']  = event.get('BodyID', cd['body_id'])
                 cd['jump_destination']   = None
                 cd['jump_body']          = None
                 cd['jump_departure_time'] = None
-                # Add to history (most recent first, cap at 10)
-                entry = {'timestamp': event.get('timestamp', ''), 'system': system}
-                cd['jump_history'] = ([entry] + cd['jump_history'])[:10]
                 cd['last_updated'] = event.get('timestamp')
                 log.debug(f"[FC] CarrierJump completed: {system}")
                 self._notify_carrier_updated()
@@ -1352,24 +1401,9 @@ class JournalParser:
                     # Location just tracks current system, doesn't count as a visit
                     current_system = self.process_location(event)
                     # Don't increment visit counters for Location events
-                    # If docked at a fleet carrier, use its system for carrier location
-                    if (event.get('StationType') == 'FleetCarrier'
-                            and event.get('Docked', False)
-                            and event.get('StarSystem')):
-                        cd = self.carrier_data
-                        cd['system'] = event['StarSystem']
-                        if event.get('StationName'):
-                            # StationName is callsign e.g. "V0W-W7T"; keep existing name
-                            cd['carrier_id'] = event.get('MarketID', cd['carrier_id'])
-                        cd['last_updated'] = event.get('timestamp')
-                        self._notify_carrier_updated()
+                    self.process_carrier_docked_via_location(event)
                 elif event_type == 'Docked':
-                    if (event.get('StationType') == 'FleetCarrier'
-                            and event.get('StarSystem')):
-                        cd = self.carrier_data
-                        cd['system'] = event['StarSystem']
-                        cd['last_updated'] = event.get('timestamp')
-                        self._notify_carrier_updated()
+                    self.process_carrier_docked(event)
                 elif event_type == 'CarrierJump':
                     # Fleet carrier jumps are real arrivals - count as visits
                     current_system = self.process_fsd_jump(event)  # Same structure as FSDJump

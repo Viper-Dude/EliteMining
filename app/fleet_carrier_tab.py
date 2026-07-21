@@ -472,7 +472,10 @@ class FleetCarrierTab(tk.Frame):
             for entry in history[:10]:
                 row = tk.Frame(self._history_frame, bg=self.sect_bg)
                 row.pack(fill="x", padx=8, pady=1)
-                tk.Label(row, text=_fmt_ts(entry.get("timestamp", "")),
+                ts_text = _fmt_ts(entry.get("timestamp", ""))
+                if entry.get("exact", True) is False and ts_text != "-":
+                    ts_text = f"~{ts_text}"
+                tk.Label(row, text=ts_text,
                          bg=self.sect_bg, fg=self.fg_dim, font=("Helvetica", 9),
                          width=20, anchor="w").pack(side="left")
                 tk.Label(row, text=entry.get("system", "-"),

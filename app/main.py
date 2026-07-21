@@ -3900,6 +3900,18 @@ cargo panel forces Elite to write detailed inventory data.
                         import traceback
                         print(f"[PP] live-write block raised: {pp_exc}")
                         traceback.print_exc()
+                # Also update FC tracker if this Location shows us docked at our own carrier
+                try:
+                    self.journal_parser.process_carrier_docked_via_location(event)
+                except Exception as _ce:
+                    pass
+
+            elif event_type == "Docked":
+                # Update FC tracker if this is a dock at our own fleet carrier
+                try:
+                    self.journal_parser.process_carrier_docked(event)
+                except Exception as _ce:
+                    pass
 
             elif event_type == "CarrierLocation":
                 # CarrierLocation tells us where YOUR carrier is
@@ -21609,7 +21621,17 @@ Your keybinds will need to be reconfigured manually."""
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     current_system = system_name
-                            
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_docked_via_location(event)
+                                except Exception:
+                                    pass
+
+                            elif event_type == 'Docked':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_docked(event)
+                                except Exception:
+                                    pass
+
                             # Fleet carrier events - populate carrier_data
                             elif event_type == 'CarrierLocation':
                                 try:
@@ -21875,7 +21897,17 @@ Your keybinds will need to be reconfigured manually."""
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     current_system = system_name
-                            
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_docked_via_location(event)
+                                except Exception:
+                                    pass
+
+                            elif event_type == 'Docked':
+                                try:
+                                    self.cargo_monitor.journal_parser.process_carrier_docked(event)
+                                except Exception:
+                                    pass
+
                             # Fleet carrier events - populate carrier_data
                             elif event_type == 'CarrierLocation':
                                 try:
