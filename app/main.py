@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.2.5"
+APP_VERSION = "v5.2.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -17229,7 +17229,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Search section
         search_frame = ttk.LabelFrame(main_container, padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
-        from ui.help_link import create_labelframe_title
+        from ui.help_link import create_labelframe_title, create_help_link
         search_frame.configure(labelwidget=create_labelframe_title(
             search_frame, t('system_finder.title'), "star-systems", t('system_finder.help_tooltip'), ToolTip))
 
@@ -17474,6 +17474,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_ref_val_pp_merits.pack(side="left")
         ToolTip(_merits_lbl, t('system_finder.pp_tooltip_merits'))
         ToolTip(self.sysfinder_ref_val_pp_merits, t('system_finder.pp_tooltip_merits'))
+        create_help_link(row_pp, "powerplay-merits-and-mining", t('system_finder.pp_tooltip_merits'), ToolTip,
+                          bg=sf_bg, fg="#ffcc00").pack(side="left", padx=(4, 0))
 
 
         # Row 6: Separator
@@ -17941,17 +17943,25 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     @staticmethod
     def _compute_pp_merits(power_state: str, bgs_state: str) -> str:
-        """Return a merit yield indicator string."""
+        """Return a merit yield indicator string.
+
+        PP2.0 only ever reports six system states (Unoccupied, Expansion, Contested,
+        Exploited, Fortified, Stronghold — confirmed against live EDDN data). Undermining
+        a rival's system carries a +15% merit buff; acquiring an Unoccupied/Expansion
+        system carries 0% buff, so those rank lower despite being "available" targets.
+        """
         if not power_state:
             return ""
         boom = bool(bgs_state and bgs_state.lower() == "boom")
         state = power_state.lower()
         if state == "stronghold":
-            base = "+"      # already maxed, lowest reinforcement priority
-        elif state in ("controlled", "turmoil"):
-            base = "+++"    # needs reinforcement most / critical
+            base = "+"      # already maxed, lowest reinforcement/undermining priority
+        elif state == "contested":
+            base = "+++"    # actively up for grabs, highest priority window
+        elif state in ("exploited", "fortified"):
+            base = "++"     # undermining buff applies
         else:
-            base = "++"     # Fortified, Expansion, Exploited, etc.
+            base = "+"      # Unoccupied, Expansion — acquisition gets no merit buff
         if boom and base != "+++":
             base += "+"     # Boom adds one tier
         context = " (Boom)" if boom else ""

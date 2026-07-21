@@ -263,7 +263,7 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 - **Save to Local Database** – Right-click Spansh results to save them to your personal database for offline access (max 50 rows)
 - **Update Reserve Level** – Right-click local entries with missing reserve data to fetch and update from Spansh
 - **Auto-Search** – Automatically searches for hotspots when jumping to new systems and auto-refreshes results when scanning rings (remembers preference across restarts)
-- **Pre-loaded Database** – 80,000+ hotspots with minerals types, ring densities
+- **Pre-loaded Database** – 80,000+ hotspots with mineral type, ring type, reserve level, etc.
 - **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
 - **Distance-Based Results** – Filter by jump range (up to 500 LY) to find nearby opportunities
 - **Ring Composition Details** – View distance from arrival (LS) with comma-separated formatting
@@ -377,6 +377,12 @@ Search for nearby star systems with detailed status information. Perfect for fin
   - "Use Current" button fills reference system instantly
 
 **Note:** The Elite Dangerous journal does not report the Unoccupied Powerplay state. The app infers this state when no controlling Power is present and updates it automatically when newer EDDN data becomes available.
+
+### Powerplay Merits and Mining
+
+Where you sell your mined goods matters just as much as where you mine them.
+- **Reinforcing your own Power's system or Undermining a rival's** — you must mine and sell in that same system. Selling elsewhere earns no Powerplay merits for that cargo.
+- **Acquiring an Unoccupied system** — you sell in the Unoccupied system itself, but the goods can be mined anywhere within 20 ly of it if your nearest system is Fortified, or 30 ly if it's a Stronghold.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/star_system.png" width="900"><br>  
 *Star Systems tab showing current system info and nearby system search with filters.*

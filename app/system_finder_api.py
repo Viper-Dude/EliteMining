@@ -371,8 +371,7 @@ class SystemFinderAPI:
         system_name = system.get('name', '')
 
         # Powerplay — EDDN cache preferred (has controlling power + state).
-        # If not cached, fall back to Spansh's own power_state (state only — Spansh's
-        # 'power' field lists all contesting powers, which is ambiguous, so we skip it).
+        # If not cached, fall back to Spansh's own controlling_power/power_state.
         cached_pp = (pp_cache or {}).get(system_name)
         if cached_pp:
             pp_power = cached_pp['controlling_power']
@@ -382,6 +381,16 @@ class SystemFinderAPI:
             pp_power = None
             pp_state = system.get('power_state') or None
             pp_updated_at = None
+
+        # EDDN cache only ever infers a generic 'Unoccupied' — it never emits 'Expansion'
+        # or a specific controller for that case. If Spansh's own data disagrees (a real
+        # controller/state exists), prefer Spansh's answer over the stale/inferred cache entry.
+        if pp_power == '~none~' and (not pp_state or pp_state == 'Unoccupied'):
+            spansh_state = system.get('power_state') or None
+            if spansh_state and spansh_state != 'Unoccupied':
+                pp_power = system.get('controlling_power') or pp_power
+                pp_state = spansh_state
+                pp_updated_at = None
 
         return {
             'systemName': system_name,
@@ -568,7 +577,10 @@ class SystemFinderAPI:
             primary_economy = system.get('primary_economy') or '-'
             secondary_economy = system.get('secondary_economy')
             
-            # Powerplay — EDDN cache only; no Spansh fallback (Spansh PP data can be cycles stale)
+            # Powerplay — EDDN cache preferred. If the cache only has the generic
+            # inferred 'Unoccupied' (EDDN/journal never emits it explicitly, so it's a
+            # local guess), fall back to Spansh's own controlling_power/power_state for
+            # this same response when Spansh reports something more specific.
             cached_pp = cls._get_powerplay_from_cache(system_name)
             if cached_pp:
                 power = cached_pp['controlling_power']
@@ -578,6 +590,13 @@ class SystemFinderAPI:
                 power = None
                 power_state = None
                 log.debug(f"[POWERPLAY] No EDDN cache entry for {system_name!r}")
+
+            if power == '~none~' and (not power_state or power_state == 'Unoccupied'):
+                spansh_state = system.get('power_state') or None
+                if spansh_state and spansh_state != 'Unoccupied':
+                    power = system.get('controlling_power') or power
+                    power_state = spansh_state
+                    log.debug(f"[POWERPLAY] Spansh fallback for {system_name!r}: power={power!r} state={power_state!r}")
 
             return {
                 'security': system.get('security') or 'Anarchy',
