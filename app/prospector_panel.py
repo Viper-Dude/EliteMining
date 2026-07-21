@@ -13576,6 +13576,29 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         else:
             self._set_status("No system name to copy")
 
+    def _make_stat_label_copyable(self, widget, text_getter) -> None:
+        """Add a right-click 'Copy' context menu to a statistics label"""
+        menu = tk.Menu(widget, tearoff=0, bg=widget.cget("bg"), fg=widget.cget("fg"),
+                       activebackground="#444444", activeforeground="#ffffff")
+        menu.add_command(label=t('common.copy'), command=lambda: self._copy_stat_text(text_getter()))
+
+        def show_menu(event):
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        widget.bind("<Button-3>", show_menu)
+
+    def _copy_stat_text(self, text: str) -> None:
+        """Copy a statistics value to clipboard, ignoring placeholder/empty values"""
+        if not text or text in ("—", "None", "No sessions found"):
+            return
+        self.clipboard_clear()
+        self.clipboard_append(text)
+        self.update()
+        self._set_status(f"Copied '{text}' to clipboard")
+
     def _create_statistics_panel(self, parent: ttk.Widget) -> None:
         """Create the statistics panel for comprehensive mining analytics with scrolling support"""
         # Get theme for styling
@@ -13675,15 +13698,17 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         for i, (label_text, key) in enumerate(best_records_data):
             # Label
-            label = tk.Label(left_column, text=label_text, font=("Consolas", 10), 
+            label = tk.Label(left_column, text=label_text, font=("Consolas", 10),
                            fg="#cccccc", bg=_stats_bg, anchor="w")
             label.grid(row=10+i, column=0, sticky="w", pady=2, padx=(0, 10))
-            
+
             # Value
-            value_label = tk.Label(left_column, text="0", font=("Consolas", 10, "bold"), 
+            value_label = tk.Label(left_column, text="0", font=("Consolas", 10, "bold"),
                                  fg="#00ff00", bg=_stats_bg, anchor="w")
             value_label.grid(row=10+i, column=1, sticky="w", pady=2)
             self.stats_labels[key] = value_label
+            if key in ("best_session_system", "most_mined_system"):
+                self._make_stat_label_copyable(value_label, lambda w=value_label: w.cget("text"))
         
         # Records (Right Column) - Top 5 Best Systems only
         top_systems_title = tk.Label(right_column, text=t('statistics.top_5_systems'), font=("Consolas", 10, "bold"), 
@@ -13691,13 +13716,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         top_systems_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 1), padx=(0, 10))
         
         # Create labels for top 5 systems (3 lines per system: System|Body, Material, then metrics)
+        self._top_system_names = {}
         row_offset = 0
         for rank in range(1, 6):
             # Line 1: Rank. System | Body
-            system_label = tk.Label(right_column, text=f"{rank}. — | —", font=("Consolas", 9), 
+            system_label = tk.Label(right_column, text=f"{rank}. — | —", font=("Consolas", 9),
                                    fg="#ffffff", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
             system_label.grid(row=1+row_offset, column=0, columnspan=2, sticky="w", pady=(1, 0), padx=(0, 10))
             self.stats_labels[f'top_system_{rank}_line1'] = system_label
+            self._make_stat_label_copyable(system_label, lambda r=rank: self._top_system_names.get(r, ""))
             
             # Line 2: Material (indented to align below system name, after "1. ")
             material_label = tk.Label(right_column, text="—", font=("Consolas", 9), 
@@ -14073,6 +14100,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     self.stats_labels[f'top_system_{rank}_line1'].config(text=f"{rank}. — | —")
                     self.stats_labels[f'top_system_{rank}_line2'].config(text="—")
                     self.stats_labels[f'top_system_{rank}_line3'].config(text="—")
+                    self._top_system_names[rank] = ""
                 return
             
             # Update overall statistics
@@ -14125,6 +14153,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     sys_data = top_systems[rank - 1]
                     # Line 1: Rank. System | Body
                     line1_text = f"{rank}. {sys_data['system']} | {sys_data['body']}"
+                    self._top_system_names[rank] = sys_data['system']
                     # Line 2: Material with label (localized)
                     material_localized = get_material(sys_data['material']) if sys_data['material'] else sys_data['material']
                     line2_text = f"{t('statistics.minerals_label')} {material_localized}"
@@ -14134,6 +14163,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     line1_text = f"{rank}. — | —"
                     line2_text = "—"
                     line3_text = "—"
+                    self._top_system_names[rank] = ""
                 
                 self.stats_labels[f'top_system_{rank}_line1'].config(text=line1_text)
                 self.stats_labels[f'top_system_{rank}_line2'].config(text=line2_text)
