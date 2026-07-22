@@ -23,7 +23,7 @@
 ### Reminder
 * After updating, please review the [README](https://github.com/Viper-Dude/EliteMining#installation) **Installation** section to verify your setup and configuration.
 
-* **Updating from a version older than v5.2.5?** Read the [v5.2.5 patch notes](PATCHNOTES_v5.2.5.md) first — it covers an important hotspot database change.
+* **Updating from a version older than v5.2.5?** Read the [v5.2.5 patch notes](https://github.com/Viper-Dude/EliteMining/blob/main/docs/PATCHNOTES_v5.2.5.md) first — it covers an important hotspot database change.
 
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
