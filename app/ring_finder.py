@@ -455,7 +455,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.system_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         # Clear selection only on focus out to prevent unwanted text selection
         self.system_entry.bind('<FocusOut>', lambda e: (self.system_entry.selection_clear(), self._save_filter_settings()))
-        self.system_entry.bind('<Return>', lambda e: (self._save_filter_settings(), self.search_hotspots()))
+        self.system_entry.bind('<Return>', lambda e: (self._system_ac.hide(), self._save_filter_settings(), self.search_hotspots()))
 
         # --- Autocomplete (shared module) ---
         from system_autocomplete import SystemAutocomplete
@@ -1886,14 +1886,6 @@ class RingFinder(ColumnVisibilityMixin):
         if hasattr(self, 'min_hotspots_var'):
             self.min_hotspots_var.set(1)
         
-        # Max Distance
-        if hasattr(self, 'distance_var'):
-            self.distance_var.set("50")
-
-        # Max Results
-        if hasattr(self, 'max_results_var'):
-            self.max_results_var.set("50")
-
         # Ring Search (Spansh)
         if hasattr(self, 'ring_type_only_var'):
             self.ring_type_only_var.set(False)

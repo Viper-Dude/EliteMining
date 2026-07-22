@@ -12136,11 +12136,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                              bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
                              insertbackground="#ffffff")
         home_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        home_entry.bind("<Return>", self._distance_set_home)  # Bind Enter key
         ToolTip(home_entry, t('tooltips.home_system'))
         # Autocomplete
         from system_autocomplete import SystemAutocomplete
         self._ac_home = SystemAutocomplete(home_entry, self.distance_home_system, self)
+        home_entry.bind("<Return>", lambda e: (self._ac_home.hide(), self._distance_set_home(e)))  # Bind Enter key
         
         # Distance to Home (from current) and to Sol
         home_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
@@ -12216,10 +12216,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                   bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
                                   insertbackground="#ffffff")
         system_a_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        system_a_entry.bind("<Return>", lambda e: self._calculate_distances())
         system_a_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
         # Autocomplete
         self._ac_system_a = SystemAutocomplete(system_a_entry, self.distance_system_a, self)
+        system_a_entry.bind("<Return>", lambda e: (self._ac_system_a.hide(), self._calculate_distances()))
         
         use_current_btn = tk.Button(calc_frame, text=t('distance_calculator.use_current'), command=self._distance_use_current_system,
                                    bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
@@ -12236,10 +12236,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                   bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
                                   insertbackground="#ffffff")
         system_b_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        system_b_entry.bind("<Return>", lambda e: self._calculate_distances())
         system_b_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
         # Autocomplete
         self._ac_system_b = SystemAutocomplete(system_b_entry, self.distance_system_b, self)
+        system_b_entry.bind("<Return>", lambda e: (self._ac_system_b.hide(), self._calculate_distances()))
         
         # Quick buttons for System B
         buttons_frame = tk.Frame(calc_frame, bg="#1e1e1e")
@@ -17254,6 +17254,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Autocomplete
         from system_autocomplete import SystemAutocomplete
         self._ac_sysfinder_ref = SystemAutocomplete(self.sysfinder_ref_entry, self.sysfinder_reference_system, self)
+        self.sysfinder_ref_entry.bind("<Return>", lambda e: (self._ac_sysfinder_ref.hide(), self._search_systems()))
         
         # Use Current System button - right next to entry (like ring finder)
         self.sysfinder_use_current_btn = tk.Button(
@@ -17862,6 +17863,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             if not quiet:
                 self.sysfinder_status_label.config(text=t('ring_finder.pp_fetch_none').format(system=system_name))
+
+        if hasattr(self, 'sysfinder_reference_system') and self.sysfinder_reference_system.get() == system_name:
+            self._update_sysfinder_ref_info(system_name)
 
     def _open_sysfinder_edsm(self):
         """Open selected system in EDSM"""
@@ -21262,14 +21266,31 @@ Your keybinds will need to be reconfigured manually."""
                     self.after(0, lambda j=journals_to_scan, st=scan_type: self._run_full_scan_with_dialog(j, st))
                     return  # Don't continue - dialog handles the scan
                 else:
-                    # Subsequent runs: scan last 6 months silently
-                    cutoff_date = datetime.now() - timedelta(days=180)
-                    journals_to_scan = self._filter_journals_by_date(all_journals, cutoff_date)
-                    print(f"[STARTUP] Regular scan: {len(journals_to_scan)} of {len(all_journals)} journals (last 6 months)")
-                    log.info(f"Startup: Regular scan - {len(journals_to_scan)} of {len(all_journals)} journals (last 6 months)")
-                    self.after(0, lambda n=len(journals_to_scan): self._set_status(f"Scanning {n} journals...", 0))
-                
-                self._process_journals_for_catchup(journals_to_scan, is_full_sync=False)
+                    # Subsequent runs: only scan journal content written since the last
+                    # successful scan. The 180-day window is kept purely as a safety net
+                    # for when no checkpoint exists yet or the checkpointed file is gone.
+                    checkpoint = self._load_journal_scan_checkpoint()
+                    journals_to_scan, resume_offsets = self._get_new_journals_since_checkpoint(all_journals, checkpoint)
+                    if journals_to_scan is None:
+                        cutoff_date = datetime.now() - timedelta(days=180)
+                        journals_to_scan = self._filter_journals_by_date(all_journals, cutoff_date)
+                        resume_offsets = {}
+                        print(f"[STARTUP] Regular scan (no checkpoint): {len(journals_to_scan)} of {len(all_journals)} journals (last 6 months)")
+                        log.info(f"Startup: Regular scan (no checkpoint) - {len(journals_to_scan)} of {len(all_journals)} journals (last 6 months)")
+                    else:
+                        print(f"[STARTUP] Regular scan: {len(journals_to_scan)} new journal file(s) since last scan")
+                        log.info(f"Startup: Regular scan - {len(journals_to_scan)} new journal file(s) since last scan")
+                    self.after(0, lambda n=len(journals_to_scan): self._set_status(f"Scanning {n} journals..." if n else "Journals up to date", 0 if n else 3000))
+
+                self._process_journals_for_catchup(journals_to_scan, is_full_sync=False, resume_offsets=resume_offsets)
+
+                if all_journals:
+                    newest_file = all_journals[-1]
+                    try:
+                        newest_offset = os.path.getsize(newest_file)
+                        self._save_journal_scan_checkpoint(os.path.basename(newest_file), newest_offset)
+                    except OSError:
+                        pass
 
                 # Historical catch-up is done — from here on, FSDJump/Location events reaching
                 # the live journal watcher are genuinely live (current PP2.0-era session), so it's
@@ -21345,7 +21366,68 @@ Your keybinds will need to be reconfigured manually."""
         except Exception as e:
             print(f"[STARTUP] _is_first_install exception: {e}")
         return 'first_install'  # Assume first install if we can't determine
-    
+
+    def _get_journal_scan_state_path(self) -> str:
+        """Path to the incremental journal catch-up checkpoint file"""
+        from path_utils import get_app_data_dir
+        return os.path.join(get_app_data_dir(), "journal_scan_state.json")
+
+    def _load_journal_scan_checkpoint(self) -> dict:
+        """Load the last-processed journal filename/byte-offset checkpoint"""
+        import json
+        path = self._get_journal_scan_state_path()
+        try:
+            if os.path.exists(path):
+                with open(path, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"[JOURNAL] Failed to read scan checkpoint: {e}")
+        return {}
+
+    def _save_journal_scan_checkpoint(self, last_file: str, last_offset: int) -> None:
+        """Persist the newest journal filename and its byte size after a scan"""
+        import json
+        path = self._get_journal_scan_state_path()
+        try:
+            with open(path, 'w') as f:
+                json.dump({"last_file": last_file, "last_offset": last_offset}, f)
+        except Exception as e:
+            print(f"[JOURNAL] Failed to save scan checkpoint: {e}")
+
+    def _get_new_journals_since_checkpoint(self, all_journals: list, checkpoint: dict):
+        """Return (journals_to_scan, resume_offsets) for files newer than the checkpoint.
+
+        Returns (None, {}) if the checkpoint is missing or its file is no longer
+        on disk, signaling the caller to fall back to the 180-day safety net scan.
+        """
+        last_file = checkpoint.get('last_file')
+        if not last_file:
+            return None, {}
+
+        last_path = None
+        for p in all_journals:
+            if os.path.basename(p) == last_file:
+                last_path = p
+                break
+        if last_path is None:
+            return None, {}
+
+        idx = all_journals.index(last_path)
+        last_offset = checkpoint.get('last_offset', 0)
+        resume_offsets = {}
+        journals_to_scan = []
+
+        try:
+            current_size = os.path.getsize(last_path)
+        except OSError:
+            current_size = 0
+        if current_size > last_offset:
+            journals_to_scan.append(last_path)
+            resume_offsets[last_path] = last_offset
+
+        journals_to_scan.extend(all_journals[idx + 1:])
+        return journals_to_scan, resume_offsets
+
     def _run_full_scan_with_dialog(self, journals, scan_type='first_install'):
         """Run full journal scan with a progress dialog
 
@@ -21825,14 +21907,17 @@ Your keybinds will need to be reconfigured manually."""
         
         return filtered
     
-    def _process_journals_for_catchup(self, journals, is_full_sync=False):
+    def _process_journals_for_catchup(self, journals, is_full_sync=False, resume_offsets=None):
         """Process journal files for catchup scan
-        
+
         Processes hotspots/ring data, visits, and missions from journal files.
-        
+
         Args:
             journals: List of journal file paths to process
             is_full_sync: If True, this is a full sync (all journals)
+            resume_offsets: Optional dict mapping journal path -> byte offset to
+                seek to before reading, for a file that was partially scanned
+                on a previous run
         """
         import json
         
@@ -21862,11 +21947,16 @@ Your keybinds will need to be reconfigured manually."""
             if idx % 25 == 0:  # Update every 25 files
                 progress = f"Scanning journals... {idx}/{len(journals)}"
                 self.after(0, lambda p=progress: self._set_status(p, 0))
-            
+
             try:
                 with open(journal_path, 'r', encoding='utf-8') as f:
+                    if resume_offsets and journal_path in resume_offsets:
+                        try:
+                            f.seek(resume_offsets[journal_path])
+                        except Exception:
+                            pass
                     current_system = None
-                    
+
                     for line in f:
                         line = line.strip()
                         if not line:

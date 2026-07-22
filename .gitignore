@@ -50,6 +50,7 @@ app/ring_guide_state.json
 app/va_profile_state.json
 app/EliteVA/Logs/
 app/EliteVA/Variables/
+app/journal_scan_state.json
 
 # User database (runtime data, not for repo)
 app/data/user_data.db

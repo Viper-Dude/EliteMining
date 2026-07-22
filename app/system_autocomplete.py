@@ -40,6 +40,9 @@ class SystemAutocomplete:
         # Wrap existing FocusOut — delay hide so listbox click fires first
         self._entry.bind('<FocusOut>', self._on_focusout, add='+')
 
+        # Catch clicks anywhere else in the app (non-focusable widgets don't fire FocusOut)
+        self._root.bind_all('<Button-1>', self._on_global_click, add='+')
+
     # --- public helpers ---
 
     def suppress(self):
@@ -77,6 +80,14 @@ class SystemAutocomplete:
 
     def _on_focusout(self, event):
         self._root.after(150, self._delayed_hide)
+
+    def _on_global_click(self, event):
+        if self._listbox_toplevel is None:
+            return
+        widget = event.widget
+        if widget is self._entry or widget is self._lb:
+            return
+        self.hide()
 
     def _delayed_hide(self):
         if self._mouse_over:
