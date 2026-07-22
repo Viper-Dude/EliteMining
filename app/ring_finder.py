@@ -1494,22 +1494,24 @@ class RingFinder(ColumnVisibilityMixin):
     def _preload_data(self):
         """Preload systems data in background"""
         try:
-            # Check if parent window still exists
-            if not self.parent.winfo_exists():
-                return
-            # Use after(0, ...) to update status on main thread
-            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.loading_database')) if self.parent.winfo_exists() else None)
+            # winfo_exists() can raise "main thread is not in main loop" if the
+            # mainloop hasn't started yet - treat that the same as "still fine, proceed"
+            def safe_after(callback):
+                try:
+                    self.parent.after(0, callback)
+                except RuntimeError:
+                    pass
+
+            safe_after(lambda: self.status_var.set(t('ring_finder.loading_database')))
             self._load_systems_cache()
-            if self.parent.winfo_exists():
-                self.parent.after(0, lambda: self.status_var.set(t('ring_finder.database_ready')) if self.parent.winfo_exists() else None)
+            safe_after(lambda: self.status_var.set(t('ring_finder.database_ready')))
         except Exception as ex:
+            error_msg = str(ex)
             try:
-                error_msg = str(ex)
-                if self.parent.winfo_exists():
-                    self.parent.after(0, lambda msg=error_msg: self.status_var.set(f"Error loading database: {msg}") if self.parent.winfo_exists() else None)
-            except:
+                self.parent.after(0, lambda msg=error_msg: self.status_var.set(f"Error loading database: {msg}"))
+            except Exception:
                 pass  # Window already destroyed
-    
+
     def _warmup_spansh_connection(self):
         """Pre-establish connection to Spansh API to make first search faster"""
         def warmup():
@@ -1761,7 +1763,7 @@ class RingFinder(ColumnVisibilityMixin):
         """Initialize empty systems cache for coordinate lookups"""
         # Start with empty cache - coordinates will be fetched from EDSM as needed
         self.systems_data = {}
-        
+
         # Schedule tkinter operations on main thread to avoid "main thread is not in main loop" error
         # These operations involve tkinter variable .set() and trace_add() calls
         def _setup_filter_settings_on_main_thread():
@@ -1770,11 +1772,11 @@ class RingFinder(ColumnVisibilityMixin):
                     return
                 # Load saved filter settings (uses .set() on tkinter variables)
                 self._load_filter_settings()
-                
+
                 # Update Ring Type Only checkbox state after loading settings
                 # (checkbox might be disabled if ring type was "All" during load)
                 self._on_ring_type_changed()
-                
+
                 # Add traces to save settings when they change
                 self.material_var.trace_add('write', lambda *args: self._save_filter_settings())
                 self.specific_material_var.trace_add('write', lambda *args: self._save_filter_settings())
@@ -1783,13 +1785,14 @@ class RingFinder(ColumnVisibilityMixin):
                 self.min_hotspots_var.trace_add('write', lambda *args: self._save_filter_settings())
             except Exception as e:
                 print(f"Warning: Could not setup filter settings: {e}")
-        
-        # Use after(0, ...) to ensure this runs on the main thread
+
+        # Called from a background thread before mainloop may have started -
+        # winfo_exists() can raise "main thread is not in main loop" here, so skip
+        # the pre-check and just try to schedule; after() itself is safe to queue early.
         try:
-            if self.parent.winfo_exists():
-                self.parent.after(0, _setup_filter_settings_on_main_thread)
+            self.parent.after(0, _setup_filter_settings_on_main_thread)
         except Exception:
-            pass  # Window may not be ready yet
+            pass
     
     def _on_material_change(self, event=None):
         """Update confirmed hotspots checkbox when material filter changes"""
@@ -1965,11 +1968,12 @@ class RingFinder(ColumnVisibilityMixin):
                 except Exception:
                     self.specific_material_var.set(settings["specific_material"])
             if "distance" in settings:
-                # Always use default 50 LY - ignore saved preference
-                pass
+                self.distance_var.set(settings["distance"])
             if "max_results" in settings:
-                # Always use default 50 - ignore saved preference
-                pass
+                max_results_value = settings["max_results"]
+                if max_results_value == "All":
+                    max_results_value = t('common.all')
+                self.max_results_var.set(max_results_value)
             if "min_hotspots" in settings:
                 self.min_hotspots_var.set(settings["min_hotspots"])
             if "data_source" in settings:

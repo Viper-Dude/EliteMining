@@ -90,7 +90,7 @@ except Exception as e:
 # Now import modules that depend on localization
 from ring_finder import RingFinder
 from marketplace_api import MarketplaceAPI
-from config import _load_cfg, _save_cfg, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry, load_cargo_window_position, save_cargo_window_position
+from config import _load_cfg, _save_cfg, flush_config, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry, load_cargo_window_position, save_cargo_window_position
 from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
 from update_checker import UpdateChecker
 from user_database import UserDatabase
@@ -15687,7 +15687,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             pass
         
         # EDDN listener removed - no longer needed
-            
+
+        # Flush any config changes still only in the in-memory cache (throttle window)
+        try:
+            flush_config()
+        except Exception:
+            pass
+
         self.destroy()
 
     def _setup_announcement_tracing(self):

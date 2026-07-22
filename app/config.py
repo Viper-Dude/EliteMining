@@ -86,7 +86,7 @@ def _save_cfg(cfg: Dict[str, Any]) -> None:
         # Update cache anyway so the data isn't lost
         _cached_config = cfg.copy()
         return
-    
+
     try:
         # Ensure the directory exists
         config_dir = os.path.dirname(CONFIG_FILE)
@@ -113,6 +113,17 @@ def _save_cfg(cfg: Dict[str, Any]) -> None:
             
     except Exception as e:
         log.exception("Failed saving config: %s", e)
+
+def flush_config() -> None:
+    """Force-write the cached config to disk, bypassing the save throttle.
+
+    Call on app shutdown so a setting changed just before exit (within the
+    throttle window) isn't lost because it only reached the in-memory cache.
+    """
+    global _last_save_time
+    if _cached_config is not None:
+        _last_save_time = 0
+        _save_cfg(_cached_config)
 
 def update_config_value(key: str, value: Any) -> None:
     """Update a single config key without affecting other values"""
