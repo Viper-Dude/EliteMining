@@ -3,22 +3,19 @@
 
 ## New Features & Improvements
 
-- Added a new **Powerplay Merits and Mining** section to the README, explaining where you need to sell mined goods to actually earn Powerplay merits — click the **?** next to "Merits" on the **Star Systems** tab to open it.
-
 - You can now press Enter to search on the **Star Systems**, **Ring Finder**, and **Distance Calculator** tabs.
-- The system name suggestions dropdown now closes properly.
-- The **Star Systems** tab now updates Powerplay info right away after fetching it from Inara.
 - Faster app startup for frequent players. Only new journal entries are checked, not months of history.
+- Ring Finder and the "Reset Search Filters"  no longer resetting Max Distance and Max Results. They now stay as you set them.
 
 ### Bug Fixes
 
+- Fixed **System name suggestions dropdown** now closes properly.
 - Fixed **Star Systems** sometimes showing "Unoccupied" for a system with a real controlling Power.
 - Fixed the Powerplay merit rating on **Star Systems** to better match real in-game values.
 - Fixed **Ring Finder**'s "Reset Search Filters" resetting Max Distance and Max Results. They now stay as you set them.
 - Fixed **Ring Finder**'s Max Distance and Max Results not being remembered after restarting the app.
 
 ### Voiceattack Profile no update (v5.2.5)
-
 
 ### Reminder
 * After updating, please review the [README](https://github.com/Viper-Dude/EliteMining#installation) **Installation** section to verify your setup and configuration.
