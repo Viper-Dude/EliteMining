@@ -1,13 +1,14 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** July 22, 2026
+**Release Date:** July 23, 2026
 
 ## New Features & Improvements
 
 - You can now press Enter to search on the **Star Systems**, **Ring Finder**, and **Distance Calculator** tabs.
 - Faster app startup for frequent players. Only new journal entries are checked, not months of history.
 - Ring Finder and the "Reset Search Filters"  no longer resetting Max Distance and Max Results. They now stay as you set them.
-- You can now link an Announcement Preset to a Ship Preset, so it's applied automatically when you load that ship.
+- You can now link an Announcement Preset to a Ship Preset, so it's applied automatically when you load that ship. (Ship Preset -right click menu)
 - You can now hide or show the Ship Presets/Cargo Monitor sidebar by right-clicking the tabs.
+- Core and none core finds of the same mineral (like Low Temp. Diamonds) now show as separate rows in Material Analysis.
 
 ### Bug Fixes
 

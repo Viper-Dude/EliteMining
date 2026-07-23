@@ -170,24 +170,29 @@ class SessionAnalytics:
         
         # Track ALL materials found (for "Avg % All" column)
         for material_name, percentage in materials_found.items():
-            material_selected = any(sel.lower() == material_name.lower() for sel in selected_materials)
+            is_core = material_name.endswith(" (Core)")
+            lookup_name = material_name[:-len(" (Core)")] if is_core else material_name
+            material_selected = any(sel.lower() == lookup_name.lower() for sel in selected_materials)
             if material_selected:
-                threshold_key = next((sel for sel in selected_materials if sel.lower() == material_name.lower()), material_name)
-                
+                threshold_key = next((sel for sel in selected_materials if sel.lower() == lookup_name.lower()), lookup_name)
+                display_key = f"{threshold_key} (Core)" if is_core else threshold_key
+
                 # Track in material_stats_all (ALL finds regardless of threshold)
-                if threshold_key not in self.material_stats_all:
-                    self.material_stats_all[threshold_key] = MaterialStatistics(threshold_key)
-                self.material_stats_all[threshold_key].add_find(percentage, timestamp)
-        
+                if display_key not in self.material_stats_all:
+                    self.material_stats_all[display_key] = MaterialStatistics(display_key)
+                self.material_stats_all[display_key].add_find(percentage, timestamp)
+
         # Only track materials that are selected for announcements AND meet thresholds
         for material_name, percentage in materials_found.items():
+            is_core = material_name.endswith(" (Core)")
+            lookup_name = material_name[:-len(" (Core)")] if is_core else material_name
             # Case-insensitive material matching
-            material_selected = any(sel.lower() == material_name.lower() for sel in selected_materials)
+            material_selected = any(sel.lower() == lookup_name.lower() for sel in selected_materials)
             if material_selected:
                 # Check if this material meets the announcement threshold
                 meets_threshold = False
                 # Find the correct case version for threshold lookup
-                threshold_key = next((sel for sel in selected_materials if sel.lower() == material_name.lower()), material_name)
+                threshold_key = next((sel for sel in selected_materials if sel.lower() == lookup_name.lower()), lookup_name)
                 if min_pct_map and threshold_key in min_pct_map:
                     min_threshold = min_pct_map[threshold_key]
                     # CORE ASTEROID FIX: Motherlode materials (0.0%) should be counted if enabled
@@ -199,16 +204,17 @@ class SessionAnalytics:
                     # If no threshold map provided, count any selected material
                     meets_threshold = True
                     has_valuable_materials = True
-                
+
                 # Only add to statistics if it meets the threshold
                 if meets_threshold:
-                    # Use the properly capitalized name from selected materials for display
-                    display_name = threshold_key
-                    
+                    # Use the properly capitalized name from selected materials for display,
+                    # keep the (Core) suffix distinct so core/non-core get separate rows
+                    display_name = f"{threshold_key} (Core)" if is_core else threshold_key
+
                     # Initialize material stats if first time seeing this material
                     if display_name not in self.material_stats:
                         self.material_stats[display_name] = MaterialStatistics(display_name)
-                    
+
                     # Add the find (use 0.0 for motherlode materials)
                     self.material_stats[display_name].add_find(percentage, timestamp)
         
@@ -235,6 +241,9 @@ class SessionAnalytics:
             log.debug("Skipping depleted asteroid (Remaining: {:.2f})".format(remaining))
             return
         
+        # Normalize material names to match KNOWN_MATERIALS (handles all languages)
+        from journal_parser import JournalParser
+
         # Extract materials from Elite Dangerous event format
         materials_found = {}
         if 'Materials' in event:
@@ -243,9 +252,6 @@ class SessionAnalytics:
                 localized_name = material_data.get('Name_Localised', '').strip()
                 raw_name = material_data.get('Name', '').strip()
                 material_name = localized_name if localized_name else raw_name
-                
-                # Normalize material names to match KNOWN_MATERIALS (handles all languages)
-                from journal_parser import JournalParser
                 material_name = JournalParser.normalize_material_name(material_name)
                 
                 percentage = material_data.get('Proportion', 0.0)
@@ -267,11 +273,17 @@ class SessionAnalytics:
         if motherlode_material:
             self.core_asteroids_found += 1
             log.debug(f"Core asteroid detected: {motherlode_material} (total: {self.core_asteroids_found})")
-            # For core asteroids, the motherlode material should be counted as a material type
-            # Use 0.0 to distinguish motherlode (core) from surface materials
-            # This ensures it's counted in "Mat Types" but shows as 0% in analytics
-            if motherlode_material not in materials_found:
-                materials_found[motherlode_material] = 0.0  # Mark as core material with 0% surface yield
+            # Materials that are always core-only (e.g. Void Opals) never appear as a
+            # surface find, so keep their existing bare-name key. Materials that can be
+            # both core and non-core get a distinct "(Core)" key so they're tracked as a
+            # separate row/accumulator from surface (non-core) hits of the same material.
+            from prospector_panel import CORE_ONLY
+            if motherlode_material in CORE_ONLY:
+                core_key = motherlode_material
+            else:
+                core_key = f"{motherlode_material} (Core)"
+            if core_key not in materials_found:
+                materials_found[core_key] = 0.0  # Mark as core material with 0% surface yield
         
         # Use the existing add_prospector_result method
         self.add_prospector_result(materials_found, selected_materials, min_pct_map)

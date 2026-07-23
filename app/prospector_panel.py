@@ -472,15 +472,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if not values or len(values) < 9:
             return
         
-        material_display = values[0]  # e.g., "Bromellite (15.0%)" or "LTD (10.0%)"
         current_hits = values[8]  # Hits column
-        
-        # Extract material name from display (remove threshold part)
-        material_name = material_display.split(" (")[0].strip() if " (" in material_display else material_display
-        
-        # Reverse the abbreviation to get original material name for lookup
-        material_name_full = self._reverse_abbreviate_material(material_name)
-        
+
+        # The tree iid is the exact material_stats/material_stats_all key
+        # (including any "(Core)" suffix), so use it directly for lookup
+        material_name_full = item
+
         # Create edit dialog
         self._show_hits_edit_dialog(material_name_full, current_hits, item)
     
@@ -10333,9 +10330,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
     def _abbreviate_material_for_stats(self, material_name: str) -> str:
         """Abbreviate long material names for Mineral Analysis table display, with localization"""
+        is_core = material_name.endswith(" (Core)")
+        base_name = material_name[:-len(" (Core)")] if is_core else material_name
+
         # First get localized name
-        localized_name = get_material(material_name)
-        
+        localized_name = get_material(base_name)
+
         # Then abbreviate for display
         abbreviations = {
             'Methanol Monohydrate Crystals': 'Methanol Cryst',
@@ -10347,9 +10347,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             'Liquid Oxygen': 'Liq Oxygen',
         }
         # Try English abbreviation first, fall back to localized name
-        if material_name in abbreviations:
-            return abbreviations[material_name]
-        return localized_name
+        result = abbreviations.get(base_name, localized_name)
+        return result
 
     def _refresh_statistics_display(self) -> None:
         """Refresh the live statistics display"""
@@ -10467,17 +10466,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return "—"
 
         def _material_label(mat, display, stats_all):
-            has_core = has_ncore = False
-            if stats_all and hasattr(stats_all, 'finds'):
-                for f in stats_all.finds:
-                    if f.percentage == 0.0:   has_core  = True
-                    elif f.percentage > 0.0:  has_ncore = True
             thr = self.min_pct_map.get(mat, self.threshold.get())
-            if mat in CORE_ONLY:
-                return f"{display} (Core)"
-            elif has_core and has_ncore:
-                return f"{display} (Core, {thr:.1f}%)"
-            elif has_core:
+            if mat in CORE_ONLY or mat.endswith(" (Core)"):
                 return f"{display} (Core)"
             return f"{display} ({thr:.1f}%)"
 
