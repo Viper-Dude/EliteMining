@@ -6,6 +6,8 @@
 - You can now press Enter to search on the **Star Systems**, **Ring Finder**, and **Distance Calculator** tabs.
 - Faster app startup for frequent players. Only new journal entries are checked, not months of history.
 - Ring Finder and the "Reset Search Filters"  no longer resetting Max Distance and Max Results. They now stay as you set them.
+- You can now link an Announcement Preset to a Ship Preset, so it's applied automatically when you load that ship.
+- You can now hide or show the Ship Presets/Cargo Monitor sidebar by right-clicking the tabs.
 
 ### Bug Fixes
 

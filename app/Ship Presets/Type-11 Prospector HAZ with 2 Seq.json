@@ -57,5 +57,6 @@
   "ProspectorDelay": 2.6,
   "ThrustUpDuration": 1.2,
   "ThrustClosed": 1.5,
-  "ThrustOpen": 3.8
+  "ThrustOpen": 3.8,
+  "AnnouncementPresetSlot": 1
 }

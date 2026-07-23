@@ -264,7 +264,8 @@ class JournalParser:
             'on_carrier_updated': None,
         }
         self.on_carrier_updated = None  # set externally to receive update notifications
-        self._carrier_save_path = os.path.join(os.path.dirname(__file__), 'last_carrier_data.json')
+        from path_utils import get_app_data_dir
+        self._carrier_save_path = os.path.join(get_app_data_dir(), 'last_carrier_data.json')
         self._load_carrier_data()
     
     @staticmethod

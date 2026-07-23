@@ -5825,16 +5825,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         actions.grid_columnconfigure(1, weight=1)  # Expandable space in middle
         actions.grid_columnconfigure(2, weight=0)  # Info frame fixed
         actions.grid_columnconfigure(3, weight=0)  # Theme button fixed
-        
+
         # CMDR/System info container (right side) - uses frame for mixed colors
         # Use black background for orange theme
         from config import load_theme
         _info_theme = load_theme()
         _info_bg = "#000000" if _info_theme == "elite_orange" else "#1e1e1e"
-        
+
         info_frame = tk.Frame(actions, bg=_info_bg)
         info_frame.grid(row=0, column=2, sticky="e", padx=(10, 5))
-        
+
         # EliteMining logo (resized to fit status bar)
         try:
             from PIL import Image, ImageTk
@@ -5897,6 +5897,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
         sb = ttk.Label(self, textvariable=self.status, relief=tk.SUNKEN, anchor="w")
         sb.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 6))
 
+        # Sidebar show/hide - right-click menu on the notebook tab bar (always accessible,
+        # no persistent button needed so it can't be affected by the sidebar being hidden)
+        self._sidebar_visible = True
+        from core.constants import get_menu_colors
+        _tab_menu_colors = get_menu_colors(self.current_theme)
+        self._sidebar_tab_menu = tk.Menu(self, tearoff=0,
+                                  bg=_tab_menu_colors["bg"], fg=_tab_menu_colors["fg"],
+                                  activebackground=_tab_menu_colors["activebackground"],
+                                  activeforeground=_tab_menu_colors["activeforeground"],
+                                  selectcolor=_tab_menu_colors["selectcolor"])
+        self._sidebar_tab_menu.add_command(label=t('sidebar.hide_sidebar'), command=self._toggle_sidebar_visibility)
+        self.notebook.bind("<Button-3>", self._show_sidebar_tab_menu)
+
         # Import existing values from VoiceAttack profile
         self.after(100, self._import_all_from_txt)
         # Set up tracing AFTER loading from .txt files
@@ -5949,10 +5962,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Configure LabelFrame font to match Ship Presets title
         style = ttk.Style()
-        style.configure("Cargo.TLabelframe.Label", font=("Segoe UI", 10, "bold"))
-        
+        style.configure("Cargo.TLabelframe.Label", font=("Segoe UI", 9, "bold"))
+
         # Create a LabelFrame to provide visual border around cargo monitor
-        cargo_frame = ttk.LabelFrame(parent_frame, text="🚛 " + t('sidebar.cargo_monitor'), padding=6, style="Cargo.TLabelframe")
+        cargo_frame = ttk.LabelFrame(parent_frame, text=t('sidebar.cargo_monitor'), padding=6, style="Cargo.TLabelframe")
         cargo_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=(2, 0))  # sticky="nsew" - expand in all directions
         cargo_frame.columnconfigure(0, weight=1)
         cargo_frame.rowconfigure(1, weight=1)  # Content row expands
@@ -5963,11 +5976,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         header_frame.columnconfigure(1, weight=1)
         
         # Title and summary in one line
-        title_label = ttk.Label(header_frame, text=t('sidebar.cargo_status'), font=("Segoe UI", 10, "bold"))
+        title_label = ttk.Label(header_frame, text=t('sidebar.cargo_status'), font=("Segoe UI", 9, "bold"))
         title_label.grid(row=0, column=0, sticky="w")
-        
-        self.integrated_cargo_summary = ttk.Label(header_frame, text="0/200t (0%) - Empty", 
-                                                 font=("Segoe UI", 10))
+
+        self.integrated_cargo_summary = ttk.Label(header_frame, text="0/200t (0%) - Empty",
+                                                 font=("Segoe UI", 9))
         self.integrated_cargo_summary.grid(row=0, column=1, sticky="w", padx=(6, 0))
         
         # Content area - expandable
@@ -9055,7 +9068,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         presets_pane.rowconfigure(3, weight=0)  # Row 3 (buttons) stays at bottom
 
         # Ship Presets title
-        presets_title = ttk.Label(presets_pane, text="⚙️ " + t('sidebar.ship_presets'), font=("Segoe UI", 10, "bold"))
+        presets_title = ttk.Label(presets_pane, text=t('sidebar.ship_presets'), font=("Segoe UI", 9, "bold"))
         presets_title.grid(row=0, column=0, sticky="w", pady=(0, 2))
         
         # Set minimum height for presets pane to prevent collapse
@@ -9091,7 +9104,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             style.map("ShipPresets.Treeview",
                      background=[("selected", "#404040")],
                      foreground=[("selected", "#ffffff")])
-        
+
         # Scrollable preset list - hierarchical treeview with ship groups
         self.preset_list = ttk.Treeview(presets_pane, columns=("name",), show="tree", selectmode="browse", style="ShipPresets.Treeview")
         self.preset_list.column("#0", anchor="w", stretch=True, width=280, minwidth=220)
@@ -9134,6 +9147,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._preset_menu.add_command(label=t('context_menu.export'), command=self._export_selected_preset)
         self._preset_menu.add_command(label=t('context_menu.import'), command=self._import_preset_file)
         self._preset_menu.add_separator()
+        self._ann_preset_submenu = tk.Menu(self._preset_menu, tearoff=0,
+                                  bg=menu_colors["bg"], fg=menu_colors["fg"],
+                                  activebackground=menu_colors["activebackground"],
+                                  activeforeground=menu_colors["activeforeground"],
+                                  selectcolor=menu_colors["selectcolor"])
+        self._preset_menu.add_cascade(label=t('context_menu.announcement_preset'), menu=self._ann_preset_submenu)
+        self._ann_preset_menu_var = tk.IntVar(value=0)
+        self._preset_menu.add_separator()
         self._preset_menu.add_command(label=t('context_menu.expand_all'), command=self._expand_all_preset_groups)
         self._preset_menu.add_command(label=t('context_menu.collapse_all'), command=self._collapse_all_preset_groups)
         self._preset_menu.add_separator()
@@ -9166,7 +9187,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Theme toggle button below cargo monitor (styled to match current theme)
         theme_btn_frame = ttk.Frame(sidebar)
         theme_btn_frame.grid(row=1, column=0, sticky="e", pady=(6, 6))
-        
+
         # Get theme-appropriate colors (subtle styling)
         if self.current_theme == "elite_orange":
             _tbtn_bg, _tbtn_fg = "#2a2a2a", "#d4a020"  # Darker bg, muted yellow-orange text
@@ -9174,7 +9195,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             _tbtn_bg, _tbtn_fg = "#252525", "#999999"  # Darker bg, muted gray text
             _tbtn_active_bg, _tbtn_active_fg = "#353535", "#cccccc"
-        
+
         self.theme_toggle_btn = tk.Button(
             theme_btn_frame,
             text=self._theme_btn_config["text"],
@@ -9191,16 +9212,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             cursor="hand2"
         )
         self.theme_toggle_btn.pack(side="left")
-        
+
         # Language flag buttons (next to theme button)
         self._create_language_flags(theme_btn_frame)
-        
+
         # Version button (opens About dialog)
         self._create_version_button(theme_btn_frame)
 
         # Refresh the preset list
         self._refresh_preset_list()
-        
+
         # Save sidebar sash position when it changes (only after initialization)
         def _on_sidebar_sash_moved(event):
             if not getattr(self, '_sidebar_sash_initialized', False):
@@ -12949,8 +12970,58 @@ class App(tk.Tk, ColumnVisibilityMixin):
             with open(self._settings_path(sel), "r", encoding="utf-8") as f:
                 data = json.load(f)
             self._apply_mapping(data)
+            slot = data.get("AnnouncementPresetSlot")
+            if slot:
+                self._ann_load_preset(slot)
         except Exception as e:
             messagebox.showerror("Load failed", str(e))
+
+    def _populate_announcement_preset_submenu(self, preset_full_name: str) -> None:
+        """Rebuild the Announcement Preset submenu for the right-clicked ship preset"""
+        self._ann_preset_submenu.delete(0, "end")
+
+        current_slot = 0
+        try:
+            with open(self._settings_path(preset_full_name), "r", encoding="utf-8") as f:
+                data = json.load(f)
+            current_slot = data.get("AnnouncementPresetSlot") or 0
+        except Exception:
+            pass
+        self._ann_preset_menu_var.set(current_slot)
+
+        cfg = self.prospector_panel._load_cfg() if hasattr(self, 'prospector_panel') else {}
+        preset_names = cfg.get('preset_names', {})
+
+        for i in range(1, 7):
+            name = preset_names.get(str(i), f"Preset {i}")
+            self._ann_preset_submenu.add_radiobutton(
+                label=name, variable=self._ann_preset_menu_var, value=i,
+                command=lambda i=i: self._set_preset_announcement_link(preset_full_name, i))
+        self._ann_preset_submenu.add_separator()
+        self._ann_preset_submenu.add_radiobutton(
+            label=t('context_menu.no_announcement_preset'), variable=self._ann_preset_menu_var, value=0,
+            command=lambda: self._set_preset_announcement_link(preset_full_name, None))
+
+    def _set_preset_announcement_link(self, preset_full_name: str, slot: Optional[int]) -> None:
+        """Link or unlink an announcement preset slot to a ship preset"""
+        path = self._settings_path(preset_full_name)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Update failed", str(e))
+            return
+
+        if slot:
+            data["AnnouncementPresetSlot"] = slot
+        else:
+            data.pop("AnnouncementPresetSlot", None)
+
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            messagebox.showerror("Update failed", str(e))
 
     def _delete_selected(self) -> None:
         sel = self._get_selected_preset()
@@ -13311,6 +13382,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # It's a preset - show full menu
             self.preset_list.selection_set(item)
             self.preset_list.focus(item)
+            values = self.preset_list.item(item, "values")
+            if values:
+                self._populate_announcement_preset_submenu(values[0])
             self._preset_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self._preset_menu.grab_release()
@@ -14781,6 +14855,36 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except:
                 pass
             # Continue startup even if migration fails
+
+    def _show_sidebar_tab_menu(self, event) -> None:
+        """Show the Hide/Show Sidebar context menu when right-clicking the tab bar"""
+        label = t('sidebar.show_sidebar') if self._sidebar_visible else t('sidebar.hide_sidebar')
+        self._sidebar_tab_menu.entryconfig(0, label=label)
+        try:
+            self._sidebar_tab_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self._sidebar_tab_menu.grab_release()
+
+    def _toggle_sidebar_visibility(self) -> None:
+        """Show or hide the Ship Presets + Cargo Monitor sidebar column"""
+        if self._sidebar_visible:
+            try:
+                from config import save_main_sash_position
+                self._sidebar_last_sash_pos = self.main_paned.sashpos(0)
+                save_main_sash_position(self._sidebar_last_sash_pos)
+            except Exception:
+                self._sidebar_last_sash_pos = None
+            self.main_paned.forget(self._sidebar_frame)
+            self._sidebar_visible = False
+        else:
+            self.main_paned.add(self._sidebar_frame, weight=1)
+            pos = getattr(self, '_sidebar_last_sash_pos', None)
+            if pos:
+                def _restore_sash():
+                    self.main_paned.update_idletasks()
+                    self.main_paned.sashpos(0, pos)
+                self.after(50, _restore_sash)
+            self._sidebar_visible = True
 
     def _toggle_theme(self) -> None:
         """Toggle between Elite Orange and Dark Gray themes"""
@@ -21277,6 +21381,12 @@ Your keybinds will need to be reconfigured manually."""
                     # for when no checkpoint exists yet or the checkpointed file is gone.
                     checkpoint = self._load_journal_scan_checkpoint()
                     journals_to_scan, resume_offsets = self._get_new_journals_since_checkpoint(all_journals, checkpoint)
+                    if journals_to_scan is not None and not self._fc_carrier_data_has_history():
+                        # Checkpoint exists but the Fleet Carrier location/jump history
+                        # cache is empty (missing/deleted last_carrier_data.json) - the
+                        # incremental scan alone would never backfill it, so fall back
+                        # to the 180-day scan once to rebuild it from journal content.
+                        journals_to_scan = None
                     if journals_to_scan is None:
                         cutoff_date = datetime.now() - timedelta(days=180)
                         journals_to_scan = self._filter_journals_by_date(all_journals, cutoff_date)
@@ -21399,6 +21509,21 @@ Your keybinds will need to be reconfigured manually."""
                 json.dump({"last_file": last_file, "last_offset": last_offset}, f)
         except Exception as e:
             print(f"[JOURNAL] Failed to save scan checkpoint: {e}")
+
+    def _fc_carrier_data_has_history(self) -> bool:
+        """Whether the persisted Fleet Carrier cache already has a location or jump history.
+
+        Used to detect a desync between journal_scan_state.json (incremental scan
+        checkpoint) and last_carrier_data.json (FC cache) - e.g. the FC cache was
+        deleted/never written even though a scan checkpoint already exists.
+        """
+        try:
+            cd = self.cargo_monitor.journal_parser.carrier_data
+        except AttributeError:
+            return True
+        if not cd:
+            return True
+        return bool(cd.get('system') or cd.get('jump_history'))
 
     def _get_new_journals_since_checkpoint(self, all_journals: list, checkpoint: dict):
         """Return (journals_to_scan, resume_offsets) for files newer than the checkpoint.

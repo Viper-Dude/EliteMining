@@ -31,10 +31,13 @@ class SystemAutocomplete:
         self._request_id = 0
         self._suppressed = False
         self._mouse_over = False
+        self._active_index = -1
+        self._typed_text = ""
 
         # Bind entry events
         self._entry.bind('<KeyRelease>', self._on_key, add='+')
-        self._entry.bind('<Down>', self._focus_listbox, add='+')
+        self._entry.bind('<Down>', lambda e: self._move_selection(1), add='+')
+        self._entry.bind('<Up>', lambda e: self._move_selection(-1), add='+')
         self._entry.bind('<Escape>', lambda e: self.hide(), add='+')
 
         # Wrap existing FocusOut — delay hide so listbox click fires first
@@ -60,6 +63,7 @@ class SystemAutocomplete:
             self._root.after_cancel(self._timer)
             self._timer = None
         self._mouse_over = False
+        self._active_index = -1
 
     # --- internal ---
 
@@ -70,6 +74,8 @@ class SystemAutocomplete:
             return
         if self._suppressed:
             return
+        self._typed_text = self._var.get()
+        self._active_index = -1
         text = self._var.get().strip()
         if len(text) < 3:
             self.hide()
@@ -119,6 +125,8 @@ class SystemAutocomplete:
             self.hide()
             return
 
+        self._active_index = -1
+
         if self._listbox_toplevel is None:
             self._listbox_toplevel = tk.Toplevel(self._root)
             self._listbox_toplevel.wm_overrideredirect(True)
@@ -129,8 +137,6 @@ class SystemAutocomplete:
                                   highlightthickness=0, bd=1, relief="solid")
             self._lb.pack(fill="both", expand=True)
             self._lb.bind('<ButtonRelease-1>', self._select)
-            self._lb.bind('<Return>', self._select)
-            self._lb.bind('<Escape>', lambda e: self.hide())
             self._lb.bind('<Enter>', lambda e: setattr(self, '_mouse_over', True))
             self._lb.bind('<Leave>', lambda e: setattr(self, '_mouse_over', False))
 
@@ -160,10 +166,31 @@ class SystemAutocomplete:
         self._entry.focus_set()
         self._entry.icursor(tk.END)
 
-    def _focus_listbox(self, event=None):
-        if self._listbox_toplevel and self._lb and self._lb.size() > 0:
-            self._lb.focus_set()
-            self._lb.selection_clear(0, tk.END)
-            self._lb.selection_set(0)
-            self._lb.activate(0)
-            return "break"
+    def _suppress_and_set(self, text: str):
+        self._suppressed = True
+        self._var.set(text)
+        self._suppressed = False
+        self._entry.icursor(tk.END)
+
+    def _move_selection(self, delta: int):
+        """Move the highlighted suggestion up/down and preview it in the entry,
+        keeping keyboard focus in the entry (like a browser address bar)."""
+        if not self._listbox_toplevel or not self._lb or self._lb.size() == 0:
+            return
+        size = self._lb.size()
+        new_index = self._active_index + delta
+        if new_index < -1:
+            new_index = -1
+        elif new_index >= size:
+            new_index = size - 1
+        self._active_index = new_index
+
+        self._lb.selection_clear(0, tk.END)
+        if new_index == -1:
+            self._suppress_and_set(self._typed_text)
+        else:
+            self._lb.selection_set(new_index)
+            self._lb.activate(new_index)
+            self._lb.see(new_index)
+            self._suppress_and_set(self._lb.get(new_index))
+        return "break"
