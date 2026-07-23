@@ -562,6 +562,18 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 ---
 
+#### Ship Presets & Cargo Monitor Sidebar
+*The Ship Presets and Cargo Monitor panels are always visible on the right side of the app.*
+
+- **Ship Presets** — double-click a preset to apply it to VoiceAttack; right-click for save, edit, duplicate, rename, export/import, and delete options.
+- **Cargo Monitor** — live cargo hold status, updated in real time while mining.
+- **Hide/Show Sidebar** — right-click the tab bar at the top of the app to toggle the sidebar and reclaim screen space.
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/sidebar.png" width="900"><br>
+*Right-click the tab bar to hide or show the sidebar.*
+
+---
+
 #### Settings Tab  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/configurator-options.png" width="900"><br>  
 *UI and announcement preferences.*  
@@ -700,14 +712,14 @@ Configure how many times the laser mining extra sequence runs:
 <details>
 <summary>Click to expand</summary>
 
-### Hazardous Mining Preset  
-- **Command:** `"Set mining configuration for 3 x haz"`  
-- Pre-configured firegroups, timers, and toggles for HAZ mining.  
-
 ### Customization  
 - Create and manage ship presets via the **EliteMining App UI**
 - Adjust firegroups/timers on-the-fly  
 - Modify via built-in commands  
+- Link a ship preset to an Announcement Preset (right-click a ship preset → Announcement Preset) so the right mineral announcements load automatically when you switch ships.
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/preset_tie.png" width="900"><br>
+*Link an Announcement Preset to a Ship Preset via the right-click menu.*
 
 </details>
 

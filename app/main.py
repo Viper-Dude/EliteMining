@@ -14858,7 +14858,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _show_sidebar_tab_menu(self, event) -> None:
         """Show the Hide/Show Sidebar context menu when right-clicking the tab bar"""
-        label = t('sidebar.show_sidebar') if self._sidebar_visible else t('sidebar.hide_sidebar')
+        label = t('sidebar.hide_sidebar') if self._sidebar_visible else t('sidebar.show_sidebar')
         self._sidebar_tab_menu.entryconfig(0, label=label)
         try:
             self._sidebar_tab_menu.tk_popup(event.x_root, event.y_root)
