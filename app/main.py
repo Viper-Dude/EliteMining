@@ -13022,6 +13022,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 json.dump(data, f, indent=2)
         except Exception as e:
             messagebox.showerror("Update failed", str(e))
+            return
+
+        if slot:
+            self._ann_load_preset(slot)
 
     def _delete_selected(self) -> None:
         sel = self._get_selected_preset()
