@@ -2132,6 +2132,7 @@ class ReportGenerator:
             individual_yields = session_data.get('individual_yields', {})
             filtered_yields = session_data.get('filtered_yields', {})
             total_avg_yield = session_data.get('total_average_yield', 0.0)
+            perf_data_for_core = session_data.get('mineral_performance', {}) or {}
             
             # Fallback: calculate from individual_yields if not stored
             if not total_avg_yield and individual_yields:
@@ -2176,25 +2177,35 @@ class ReportGenerator:
                     
                     # Sort filtered yields by percentage (highest first)
                     sorted_filtered = sorted(filtered_yields.items(), key=lambda x: x[1], reverse=True)
-                    
+
                     for material, yield_percent in sorted_filtered:
-                        # Color code based on yield quality - filtered yields tend to be higher
-                        if yield_percent >= 30.0:
-                            color_style = "background: linear-gradient(135deg, #4CAF50, #45a049); color: white;"
-                        elif yield_percent >= 20.0:
-                            color_style = "background: linear-gradient(135deg, #2196F3, #1976D2); color: white;"
-                        elif yield_percent >= 10.0:
-                            color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
-                        else:
+                        # Core (motherlode) finds have no surface yield %, so show their
+                        # hit count instead of a meaningless 0.0% value
+                        is_core_material = material.endswith(' (Core)')
+                        if is_core_material:
+                            core_entry = perf_data_for_core.get(material, {}) or {}
+                            core_hits = core_entry.get('finds', 0)
                             color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
-                        
+                            value_display = f"{core_hits}x hit" if core_hits == 1 else f"{core_hits}x hits"
+                        else:
+                            # Color code based on yield quality - filtered yields tend to be higher
+                            if yield_percent >= 30.0:
+                                color_style = "background: linear-gradient(135deg, #4CAF50, #45a049); color: white;"
+                            elif yield_percent >= 20.0:
+                                color_style = "background: linear-gradient(135deg, #2196F3, #1976D2); color: white;"
+                            elif yield_percent >= 10.0:
+                                color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
+                            else:
+                                color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
+                            value_display = f"{yield_percent:.1f}%"
+
                         analytics_html += f"""
                         <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
                             <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{self._expand_material_name(material)}</div>
-                            <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
+                            <div style="font-size: 18px; font-weight: bold;">{value_display}</div>
                         </div>
                         """
-                    
+
                     analytics_html += "</div></div>"
                 
                 # Show comprehensive yields (all asteroids)
@@ -2227,25 +2238,33 @@ class ReportGenerator:
                     
                     # Sort materials by yield percentage (highest first)
                     sorted_yields = sorted(individual_yields.items(), key=lambda x: x[1], reverse=True)
-                    
+
                     for material, yield_percent in sorted_yields:
-                        # Color code based on yield quality - comprehensive yields tend to be lower
-                        if yield_percent >= 15.0:
-                            color_style = "background: linear-gradient(135deg, #4CAF50, #45a049); color: white;"
-                        elif yield_percent >= 10.0:
-                            color_style = "background: linear-gradient(135deg, #2196F3, #1976D2); color: white;"
-                        elif yield_percent >= 5.0:
-                            color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
-                        else:
+                        is_core_material = material.endswith(' (Core)')
+                        if is_core_material:
+                            core_entry = perf_data_for_core.get(material, {}) or {}
+                            core_hits = core_entry.get('finds', 0)
                             color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
-                        
+                            value_display = f"{core_hits}x hit" if core_hits == 1 else f"{core_hits}x hits"
+                        else:
+                            # Color code based on yield quality - comprehensive yields tend to be lower
+                            if yield_percent >= 15.0:
+                                color_style = "background: linear-gradient(135deg, #4CAF50, #45a049); color: white;"
+                            elif yield_percent >= 10.0:
+                                color_style = "background: linear-gradient(135deg, #2196F3, #1976D2); color: white;"
+                            elif yield_percent >= 5.0:
+                                color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
+                            else:
+                                color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
+                            value_display = f"{yield_percent:.1f}%"
+
                         analytics_html += f"""
                         <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
                             <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{self._expand_material_name(material)}</div>
-                            <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
+                            <div style="font-size: 18px; font-weight: bold;">{value_display}</div>
                         </div>
                         """
-                    
+
                     analytics_html += "</div></div>"
                 
                 analytics_html += "</div>"
@@ -2799,7 +2818,20 @@ class ReportGenerator:
             core_asteroids_match = re.search(r'Core Asteroids Found:\s*(\d+)', content)
             if core_asteroids_match:
                 analytics_data['core_asteroids'] = int(core_asteroids_match.group(1))
-            
+
+            # Parse core hits: sum of core (motherlode) finds across all minerals.
+            # Current report format writes "• Core Hits: N" under the base mineral.
+            core_hits_total = sum(int(m) for m in re.findall(r'•\s*Core Hits:\s*(\d+)', content))
+            if core_hits_total == 0:
+                # Legacy format fallback: older reports wrote a separate "<Mineral> (Core):"
+                # block with its own "• Hits: N" line instead of a "• Core Hits:" sub-line.
+                for block_match in re.finditer(r'^(.+?) \(Core\):\n((?:[ \t]+.+\n?)*)', content, re.MULTILINE):
+                    hits_match = re.search(r'•\s*Hits:\s*(\d+)', block_match.group(2))
+                    if hits_match:
+                        core_hits_total += int(hits_match.group(1))
+            if core_hits_total > 0:
+                analytics_data['core_hits'] = core_hits_total
+
             # Parse best material/performer (TXT uses "Best Performer")
             best_material_match = re.search(r'Best (?:Material|Performer):\s*([^(\n]+)', content)
             if best_material_match:
@@ -3186,6 +3218,13 @@ class ReportGenerator:
                 best_material = session_text_data.get('best_material')
             if best_material:
                 properties.append(("Best Performer", best_material))
+
+            # Core Hits (motherlode finds, summed across all minerals)
+            core_hits = session_data.get('core_hits')
+            if core_hits is None and session_text_data:
+                core_hits = session_text_data.get('core_hits')
+            if core_hits:
+                properties.append(("Core Hits", str(core_hits)))
             
             # Add engineering materials if any were collected
             engineering_materials = session_data.get('engineering_materials', {})

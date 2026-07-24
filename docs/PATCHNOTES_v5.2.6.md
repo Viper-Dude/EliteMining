@@ -8,7 +8,8 @@
 - Ring Finder and the "Reset Search Filters"  no longer resetting Max Distance and Max Results. They now stay as you set them.
 - You can now link an Announcement Preset to a Ship Preset, so it's applied automatically when you load that ship. (Ship Preset -right click menu)
 - You can now hide or show the Ship Presets/Cargo Monitor sidebar by right-clicking the tabs.
-- Core and none core finds of the same mineral (like Low Temp. Diamonds) now show as separate rows in Material Analysis.
+- Material Analysis now shows a Core Hits column, so minerals found both as a core and surface deposit (like Low Temp. Diamonds) stay on one row with a separate core count.
+- The Reports tab now also shows a Core Hits column, for a quick per-session count of core (motherlode) finds.
 
 ### Bug Fixes
 

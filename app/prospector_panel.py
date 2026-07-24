@@ -466,16 +466,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Column #9 is the "count" (Hits) column
         if column != "#9":
             return
-        
+
         # Get current values
         values = self.stats_tree.item(item, "values")
         if not values or len(values) < 9:
             return
-        
+
         current_hits = values[8]  # Hits column
 
         # The tree iid is the exact material_stats/material_stats_all key
-        # (including any "(Core)" suffix), so use it directly for lookup
         material_name_full = item
 
         # Create edit dialog
@@ -2123,7 +2122,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_mineral.grid(row=0, column=0, sticky="nsew")
         
         # Statistics tree for live percentage yields
-        self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "all_hits", "quality_rate", "_spacer"),
+        self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "core_hits", "all_hits", "quality_rate", "_spacer"),
                            show="headings", height=7, style="MineralAnalysis.Treeview")
         self.stats_tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.stats_tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
@@ -2136,6 +2135,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.stats_tree.heading("best_pct", text=t('mining_session.best_pct'), anchor="center")
         self.stats_tree.heading("latest_pct", text=t('mining_session.latest_pct'), anchor="center")
         self.stats_tree.heading("count", text=t('mining_session.hits'), anchor="center")
+        self.stats_tree.heading("core_hits", text=t('mining_session.core_hits'), anchor="center")
         self.stats_tree.heading("all_hits", text=t('mining_session.all_hits'), anchor="center")
         self.stats_tree.heading("quality_rate", text=t('mining_session.quality_rate'), anchor="center")
         self.stats_tree.heading("_spacer", text="", anchor="w")
@@ -2149,18 +2149,19 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("count", width=100, minwidth=80, anchor="center", stretch=False)
+        self.stats_tree.column("core_hits", width=80, minwidth=60, anchor="center", stretch=False)
         self.stats_tree.column("all_hits", width=95, minwidth=70, anchor="center", stretch=False)
         self.stats_tree.column("quality_rate", width=125, minwidth=100, anchor="center", stretch=False)
         self.stats_tree.column("_spacer", width=20, minwidth=20, anchor="w", stretch=True)
-        
+
         # Setup column visibility for material analysis
         self.setup_column_visibility(
             tree=self.stats_tree,
-            columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "all_hits", "quality_rate"),
-            default_widths={"material": 135, "tons": 65, "tph": 65, "tons_per": 85, "avg_all": 95, "avg_pct": 130, "best_pct": 80, "latest_pct": 80, "count": 65, "all_hits": 70, "quality_rate": 80},
+            columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "core_hits", "all_hits", "quality_rate"),
+            default_widths={"material": 135, "tons": 65, "tph": 65, "tons_per": 85, "avg_all": 95, "avg_pct": 130, "best_pct": 80, "latest_pct": 80, "count": 65, "core_hits": 80, "all_hits": 70, "quality_rate": 80},
             config_key='mineral_analysis'
         )
-        
+
         # Load saved column widths from config
         try:
             from config import load_mineral_analysis_column_widths
@@ -2179,7 +2180,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             try:
                 from config import save_mineral_analysis_column_widths
                 widths = {}
-                for col in ["material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "all_hits", "quality_rate"]:
+                for col in ["material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "core_hits", "all_hits", "quality_rate"]:
                     try:
                         widths[col] = self.stats_tree.column(col, "width")
                     except:
@@ -6073,18 +6074,21 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             parts.append("\n--- Mineral Performance ---")
             
             # Sort materials by average percentage (best first)
-            sorted_materials = sorted(material_summary.items(), 
-                                    key=lambda x: x[1]['avg_percentage'], reverse=True)
+            sorted_materials = sorted(material_summary.items(),
+                                    key=lambda x: x[1]['avg_percentage'] or 0.0, reverse=True)
             
             for material_name, stats in sorted_materials:
-                avg_pct = stats['avg_percentage']
-                best_pct = stats['best_percentage']
+                avg_pct = stats['avg_percentage'] or 0.0
+                best_pct = stats['best_percentage'] or 0.0
                 count = stats['find_count']
+                core_hits = stats.get('core_hits', 0)
 
                 parts.append(f"{material_name}:")
                 parts.append(f"  • Average: {avg_pct:.1f}%")
                 parts.append(f"  • Best: {best_pct:.1f}%")
                 parts.append(f"  • Hits: {count}")
+                if core_hits:
+                    parts.append(f"  • Core Hits: {core_hits}")
 
                 # Add tons and tons-per-hit (if cargo session data available)
                 mat_tons = 0.0
@@ -6115,9 +6119,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     # Fallback to Material Analysis
                     all_percentages = []
                     for stats in material_summary.values():
-                        if stats['find_count'] > 0:
+                        if stats['find_count'] > 0 and stats['avg_percentage'] is not None:
                             all_percentages.extend([stats['avg_percentage']] * stats['find_count'])
-                    
+
                     if all_percentages:
                         overall_avg = sum(all_percentages) / len(all_percentages)
                         yield_source = "material analysis"
@@ -6143,7 +6147,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 
                 # Best performer
                 best_material = sorted_materials[0]
-                parts.append(f"Best Performer: {best_material[0]} ({best_material[1]['avg_percentage']:.1f}% avg, {best_material[1]['find_count']}x finds)")
+                best_avg = best_material[1]['avg_percentage'] or 0.0
+                parts.append(f"Best Performer: {best_material[0]} ({best_avg:.1f}% avg, {best_material[1]['find_count']}x finds)")
         
         # Add material breakdown from cargo tracking if available
         if cargo_session_data and cargo_session_data.get('materials_mined'):
@@ -6291,7 +6296,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     raw_yields = {}  # Initialize raw_yields to prevent UnboundLocalError
                     all_percentages = []
                     for stats in material_summary.values():
-                        if stats['find_count'] > 0:
+                        if stats['find_count'] > 0 and stats['avg_percentage'] is not None:
                             all_percentages.extend([stats['avg_percentage']] * stats['find_count'])
                     if all_percentages:
                         avg_quality = sum(all_percentages) / len(all_percentages)
@@ -6299,10 +6304,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     else:
                         avg_quality = 0.0
                         yield_display_string = "0.0"
-                
+
                 # Best material
-                best_performer = max(material_summary.items(), key=lambda x: x[1]['avg_percentage'])
-                best_material = f"{best_performer[0]} ({best_performer[1]['avg_percentage']:.1f}%)"
+                best_performer = max(material_summary.items(), key=lambda x: x[1]['avg_percentage'] or 0.0)
+                best_performer_avg = best_performer[1]['avg_percentage'] or 0.0
+                best_material = f"{best_performer[0]} ({best_performer_avg:.1f}%)"
             
             # Add cargo tracking data if available
             materials_breakdown = ""
@@ -7558,7 +7564,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_reports.grid_rowconfigure(0, weight=1)
 
         # Create sortable treeview with Material Analysis columns (Ship column added - parsed from journal files)
-        self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced", "_spacer"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
+        self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced", "_spacer"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
         self.reports_tree_tab.grid(row=0, column=0, sticky="nsew")
         
         # Configure row tags for alternating colors (theme-aware)
@@ -7579,6 +7585,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.reports_tree_tab.heading("materials", text=t('reports.mat_types'), anchor="w")
         # New column: Total Hits (number of asteroids that contained tracked materials)
         self.reports_tree_tab.heading("total_hits", text=t('reports.total_hits'), anchor="w")
+        self.reports_tree_tab.heading("core_hits", text=t('reports.core_hits'), anchor="w")
         self.reports_tree_tab.heading("hit_rate", text=t('reports.hit_rate'), anchor="w")
         self.reports_tree_tab.heading("quality", text=t('reports.avg_yield'), anchor="w")
         self.reports_tree_tab.heading("cargo", text=t('reports.minerals_column'), anchor="w")
@@ -7707,6 +7714,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.reports_tree_tab.column("tons_per", width=110, minwidth=70, stretch=False, anchor="center")
         self.reports_tree_tab.column("materials", width=90, minwidth=60, stretch=False, anchor="center")
         self.reports_tree_tab.column("total_hits", width=90, minwidth=60, stretch=False, anchor="center")
+        self.reports_tree_tab.column("core_hits", width=85, minwidth=60, stretch=False, anchor="center")
         self.reports_tree_tab.column("asteroids", width=95, minwidth=60, stretch=False, anchor="center")
         self.reports_tree_tab.column("hit_rate", width=100, minwidth=70, stretch=False, anchor="center")
         self.reports_tree_tab.column("quality", width=140, minwidth=90, stretch=False, anchor="center")
@@ -7722,8 +7730,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Setup column visibility for reports tab
         self.setup_column_visibility(
             tree=self.reports_tree_tab,
-            columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"),
-            default_widths={"date": 161, "duration": 80, "session_type": 90, "ship": 250, "system": 230, "body": 125, "tons": 80, "tph": 60, "tons_per": 85, "materials": 80, "total_hits": 80, "asteroids": 80, "hit_rate": 90, "quality": 120, "cargo": 350, "prospects": 70, "eng_materials": 250, "comment": 80, "enhanced": 100},
+            columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"),
+            default_widths={"date": 161, "duration": 80, "session_type": 90, "ship": 250, "system": 230, "body": 125, "tons": 80, "tph": 60, "tons_per": 85, "materials": 80, "total_hits": 80, "core_hits": 75, "asteroids": 80, "hit_rate": 90, "quality": 120, "cargo": 350, "prospects": 70, "eng_materials": 250, "comment": 80, "enhanced": 100},
             config_key='reports_tab'
         )
 
@@ -8619,8 +8627,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     "#7": t('tooltips.mineral_best'),
                     "#8": t('tooltips.mineral_current'),
                     "#9": t('tooltips.mineral_hits'),
-                    "#10": t('tooltips.mineral_all_hits'),
-                    "#11": t('tooltips.mineral_quality_rate')
+                    "#10": t('tooltips.mineral_core_hits'),
+                    "#11": t('tooltips.mineral_all_hits'),
+                    "#12": t('tooltips.mineral_quality_rate')
                 }
                 
                 tooltip_text = column_tooltips.get(column)
@@ -9386,6 +9395,49 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     except Exception:
                         pass
 
+                try:
+                    core_hits_val = int(str(session.get('core_hits', '')).strip() or 0)
+                except Exception:
+                    core_hits_val = 0
+
+                # If CSV/session dict lacks core_hits, attempt to parse the TXT report directly now
+                # (Core Hits isn't persisted to CSV, same as total_finds — always derived from the TXT report)
+                if not core_hits_val and session.get('timestamp_raw'):
+                    try:
+                        import datetime as _dt, glob, re
+                        raw_ts = session.get('timestamp_raw')
+                        if raw_ts.endswith('Z'):
+                            ts = _dt.datetime.fromisoformat(raw_ts.replace('Z', '+00:00'))
+                            ts = ts.replace(tzinfo=_dt.timezone.utc).astimezone()
+                        else:
+                            ts = _dt.datetime.fromisoformat(raw_ts)
+                        date_part = ts.strftime("%Y-%m-%d")
+                        time_part = ts.strftime("%H-%M-%S")
+                        system_filename = (session.get('system','') or '').replace(' ', '_')
+                        body_filename = (session.get('body','') or '').replace(' ', '_')
+                        exact_pattern = f"Session_{date_part}_{time_part}_{system_filename}_{body_filename}.txt"
+                        matches = glob.glob(os.path.join(self.reports_dir, exact_pattern))
+                        for txt_path in matches:
+                            try:
+                                with open(txt_path, 'r', encoding='utf-8') as tf:
+                                    txt_content = tf.read()
+                                    # Sum "• Core Hits: N" across all mineral blocks in Mineral Performance section
+                                    core_hits_val = sum(int(m) for m in re.findall(r'•\s*Core Hits:\s*(\d+)', txt_content))
+                                    # Legacy format fallback: older reports wrote core hits as a
+                                    # separate "<Mineral> (Core):" block with its own "• Hits: N" line
+                                    # instead of a "• Core Hits: N" sub-line under the base mineral.
+                                    if core_hits_val == 0:
+                                        for block_match in re.finditer(r'^(.+?) \(Core\):\n((?:[ \t]+.+\n?)*)', txt_content, re.MULTILINE):
+                                            hits_match = re.search(r'•\s*Hits:\s*(\d+)', block_match.group(2))
+                                            if hits_match:
+                                                core_hits_val += int(hits_match.group(1))
+                                    break
+                            except Exception:
+                                continue
+                    except Exception:
+                        pass
+                core_hits_display = str(core_hits_val) if core_hits_val > 0 else "—"
+
                 if total_finds_val > 0 and total_tons_val > 0:
                     try:
                         tons_per_session_val = total_tons_val / total_finds_val
@@ -9490,6 +9542,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         except Exception:
                             hits_display = str(session.get('total_finds', '')) or '—'
                         vals.append(hits_display)
+                    elif col == 'core_hits':
+                        vals.append(core_hits_display)
                     elif col == 'hit_rate':
                         vals.append(session.get('hit_rate', ''))
                     elif col == 'quality':
@@ -9527,6 +9581,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         hits_display = str(total_finds_val) if total_finds_val and int(total_finds_val) > 0 else (str(session.get('total_finds', '')) or '')
                         if hits_display:
                             self.reports_tree_tab.set(item_id, 'total_hits', hits_display)
+                    except Exception:
+                        pass
+                    # Ensure Core Hits column displays parsed/derived core_hits
+                    try:
+                        self.reports_tree_tab.set(item_id, 'core_hits', core_hits_display)
                     except Exception:
                         pass
 
@@ -10330,11 +10389,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
     def _abbreviate_material_for_stats(self, material_name: str) -> str:
         """Abbreviate long material names for Mineral Analysis table display, with localization"""
-        is_core = material_name.endswith(" (Core)")
-        base_name = material_name[:-len(" (Core)")] if is_core else material_name
-
         # First get localized name
-        localized_name = get_material(base_name)
+        localized_name = get_material(material_name)
 
         # Then abbreviate for display
         abbreviations = {
@@ -10347,8 +10403,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             'Liquid Oxygen': 'Liq Oxygen',
         }
         # Try English abbreviation first, fall back to localized name
-        result = abbreviations.get(base_name, localized_name)
-        return result
+        return abbreviations.get(material_name, localized_name)
 
     def _refresh_statistics_display(self) -> None:
         """Refresh the live statistics display"""
@@ -10466,8 +10521,17 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return "—"
 
         def _material_label(mat, display, stats_all):
+            has_core = has_ncore = False
+            if stats_all and hasattr(stats_all, 'finds'):
+                for f in stats_all.finds:
+                    if f.is_core:   has_core  = True
+                    else:           has_ncore = True
             thr = self.min_pct_map.get(mat, self.threshold.get())
-            if mat in CORE_ONLY or mat.endswith(" (Core)"):
+            if mat in CORE_ONLY:
+                return f"{display} (Core)"
+            elif has_core and has_ncore:
+                return f"{display} (Core, {thr:.1f}%)"
+            elif has_core:
                 return f"{display} (Core)"
             return f"{display} ({thr:.1f}%)"
 
@@ -10480,10 +10544,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                              if hasattr(self.session_analytics, 'material_stats_all') else None)
                 avg_all = stats_all.get_average_percentage() if stats_all else None
                 avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
-                avg_pct    = f"{stats['avg_percentage']:.1f}%" if stats and stats['avg_percentage'] > 0 else "0.0%"
-                best_pct   = f"{stats['best_percentage']:.1f}%" if stats and stats['best_percentage'] > 0 else "0.0%"
-                latest_pct = f"{stats['latest_percentage']:.1f}%" if stats and stats['latest_percentage'] > 0 else "0.0%"
+                avg_pct    = f"{stats['avg_percentage']:.1f}%" if stats and stats['avg_percentage'] else "0.0%"
+                best_pct   = f"{stats['best_percentage']:.1f}%" if stats and stats['best_percentage'] else "0.0%"
+                latest_pct = f"{stats['latest_percentage']:.1f}%" if stats and stats['latest_percentage'] else "0.0%"
                 q_hits = int(float(stats['quality_hits'])) if stats and stats.get('quality_hits') is not None else 0
+                core_hits = int(stats['core_hits']) if stats and stats.get('core_hits') is not None else 0
+                core_hits_str = str(core_hits) if core_hits > 0 else "—"
                 display_name  = self._abbreviate_material_for_stats(mat)
                 mat_label     = _material_label(mat, display_name, stats_all)
                 if not self.session_active and hasattr(self, 'last_session_data'):
@@ -10501,7 +10567,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 rows.append((mat, (
                     mat_label, tons_str, tph_str, tons_per_str,
                     avg_all_pct, avg_pct, best_pct, latest_pct,
-                    str(q_hits), _hits_str(all_hits, total_asteroids),
+                    str(q_hits), core_hits_str, _hits_str(all_hits, total_asteroids),
                     _quality_str(q_hits, all_hits)
                 )))
 
@@ -10516,6 +10582,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             mat_label    = _material_label(mat, display_name, stats_all)
             m_tph        = m_tons / elapsed_hours if elapsed_hours > 0 else 0.0
             tph_str      = f"{m_tph:.1f}" if m_tph > 0 else "—"
+            core_hits    = stats_all.get_core_hit_count() if stats_all else 0
+            core_hits_str = str(core_hits) if core_hits > 0 else "—"
             if stats_all and stats_all.get_find_count() > 0:
                 avg_all  = stats_all.get_average_percentage()
                 avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
@@ -10529,7 +10597,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             rows.append((mat, (
                 mat_label, f"{m_tons:.1f}", tph_str, "—",
                 avg_all_pct, "—", best_pct, latest_pct,
-                "0", _hits_str(all_hits, total_asteroids), "—"
+                "0", core_hits_str, _hits_str(all_hits, total_asteroids), "—"
             )))
 
         # Pass 3 — selected-but-not-yet-mined materials with prospector hits
@@ -10551,10 +10619,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 latest   = mat_stats.get_latest_percentage()
                 latest_pct = f"{latest:.1f}%" if latest and latest > 0 else "0.0%"
                 all_hits = mat_stats.get_find_count()
+                core_hits = mat_stats.get_core_hit_count()
+                core_hits_str = str(core_hits) if core_hits > 0 else "—"
                 rows.append((mat, (
                     mat_label, "—", "—", "—",
                     avg_all_pct, "—", best_pct, latest_pct,
-                    "0", _hits_str(all_hits, total_asteroids), "—"
+                    "0", core_hits_str, _hits_str(all_hits, total_asteroids), "—"
                 )))
 
         return rows
@@ -16174,8 +16244,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     filtered_summary = self.session_analytics.get_quality_summary(self.min_pct_map)
                     if filtered_summary:
                         enhanced_session_data['filtered_yields'] = {
-                            material: stats['avg_percentage'] 
+                            material: stats['avg_percentage']
                             for material, stats in filtered_summary.items()
+                            if stats['avg_percentage'] is not None
                         }
                         enhanced_session_data['threshold_settings'] = self.min_pct_map.copy()
                 except Exception as e:

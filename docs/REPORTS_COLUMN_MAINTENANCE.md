@@ -1,22 +1,23 @@
 # 📋 Reports Tab Column Maintenance Guide
 
-## ⚠️ CRITICAL: When Adding/Removing/Reordering Columns
+## ⚠️ When Adding/Removing/Reordering Columns
 
-When modifying the Reports tab columns, **ALL** of the following must be updated to prevent bugs:
+The Reports tab table (`self.reports_tree_tab` in `prospector_panel.py`) is mostly **name-driven**, not positional — most of the value-population code loops over `self.reports_tree_tab["columns"]` by name and uses `tree.set(item, 'colname', value)`, so adding a column is low-risk as long as you follow the pattern below. A few legacy/dead code paths still use hardcoded `values[N]` indices — see section 6.
 
 ---
 
-## **1. Column Definition (prospector_panel.py ~line 4600)**
+## **1. Column Definition (`_create_reports_panel`, ~line 7567)**
 
 ```python
-self.reports_tree_tab = ttk.Treeview(main_frame, columns=(
-    "date", "duration", "session_type", "ship", "system", "body", 
-    "tons", "tph", "asteroids", "materials", "hit_rate", "quality", 
-    "cargo", "prospects", "eng_materials", "comment", "enhanced"
+self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=(
+    "date", "duration", "session_type", "ship", "system", "body",
+    "tons", "tph", "tons_per", "asteroids", "materials", "total_hits",
+    "core_hits", "hit_rate", "quality", "cargo", "prospects",
+    "eng_materials", "comment", "enhanced", "_spacer"
 ), ...)
 ```
 
-**Current Order (17 columns):**
+**Current Order (21 columns, including `_spacer`):**
 0. date
 1. duration
 2. session_type
@@ -25,176 +26,133 @@ self.reports_tree_tab = ttk.Treeview(main_frame, columns=(
 5. body
 6. tons
 7. tph
-8. asteroids (Prospected)
-9. materials (Mat Types)
-10. hit_rate
-11. quality
-12. cargo
-13. prospects (Limpets)
-14. eng_materials (Engineering Materials)
-15. comment (Comment)
-16. enhanced (Detail Report)
+8. tons_per
+9. asteroids
+10. materials
+11. total_hits
+12. core_hits
+13. hit_rate
+14. quality
+15. cargo
+16. prospects
+17. eng_materials
+18. comment
+19. enhanced
+20. _spacer (always last — gives the last real column a draggable right border)
 
 ---
 
-## **2. Column Headings (~line 4610)**
+## **2. Column Headings (~line 7575)**
 
 ```python
-self.reports_tree_tab.heading("date", text="Date/Time")
-self.reports_tree_tab.heading("duration", text="Duration")
-self.reports_tree_tab.heading("session_type", text="Type")
+self.reports_tree_tab.heading("date", text=t('reports.date_time'), anchor="w")
+self.reports_tree_tab.heading("core_hits", text=t('reports.core_hits'), anchor="w")
 ...
 ```
 
-Must match column definition order!
+One `.heading()` call per column name — order of the calls doesn't matter, they're name-keyed.
 
 ---
 
-## **3. Column Widths (~line 4706)**
+## **3. Column Widths (~line 7705)**
 
 ```python
-self.reports_tree_tab.column("date", width=105, ...)
-self.reports_tree_tab.column("duration", width=80, ...)
+self.reports_tree_tab.column("core_hits", width=85, minwidth=60, stretch=False, anchor="center")
 ...
 ```
 
-Must match column definition order!
+Also name-keyed — order doesn't matter.
 
 ---
 
-## **4. Values Insert (~line 5873)**
+## **4. Column Visibility / Default Widths (`setup_column_visibility`, ~line 7729)**
 
 ```python
-item_id = self.reports_tree_tab.insert("", "end", values=(
-    session['date'],           # 0: date
-    session['duration'],       # 1: duration
-    session_type_display,      # 2: session_type
-    ship_name,                 # 3: ship
-    session['system'],         # 4: system
-    session['body'],           # 5: body
-    session['tons'],           # 6: tons
-    session['tph'],            # 7: tph
-    session['asteroids'],      # 8: asteroids
-    session['materials'],      # 9: materials
-    session['hit_rate'],       # 10: hit_rate
-    session['quality'],        # 11: quality
-    session['cargo'],          # 12: cargo
-    session['prospects'],      # 13: prospects
-    eng_materials_display,     # 14: eng_materials
-    '💬' if comment else '',   # 15: comment
-    ""                         # 16: enhanced
-))
+self.setup_column_visibility(
+    tree=self.reports_tree_tab,
+    columns=(... all real column names, no "_spacer" ...),
+    default_widths={...},
+    config_key='reports_tab'
+)
 ```
 
-**CRITICAL:** Values must be in EXACT same order as column definition!
+Add the new column name to both the `columns` tuple and `default_widths` dict here.
 
 ---
 
-## **5. CSV Fieldnames (~line 3786 and ~line 7307)**
+## **5. Values Population (`_refresh_reports_tab`-equivalent loop, ~line 9467)**
+
+This is the **safe, name-driven pattern** — follow it exactly for new columns:
 
 ```python
-fieldnames = ['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph',
-            'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 
-            'avg_quality_percent', 'total_average_yield', 'best_material', 
-            'materials_breakdown', 'material_tph_breakdown', 'prospectors_used', 
-            'engineering_materials', 'comment']
+cols = list(self.reports_tree_tab["columns"])
+vals = []
+for col in cols:
+    if col == 'date':
+        vals.append(session.get('date', ''))
+    ...
+    elif col == 'core_hits':
+        vals.append(core_hits_display)   # computed earlier in the same method
+    ...
+    else:
+        vals.append(session.get(col, ''))
+
+item_id = self.reports_tree_tab.insert("", "end", values=tuple(vals), tags=(tag,))
+
+# Explicit .set() calls afterward for columns that need guaranteed correct placement
+# regardless of tuple order (defensive, mirrors existing total_hits/tons_per/comment):
+self.reports_tree_tab.set(item_id, 'core_hits', core_hits_display)
 ```
 
-**Note:** CSV order doesn't need to match tree order (DictWriter handles mapping), but ensure consistency across all CSV write locations.
+**Do not build a raw positional tuple by hand for this tree** — always go through the `cols` loop above.
 
 ---
 
-## **6. Hardcoded Position References** ⚠️ **MOST COMMON BUG SOURCE!**
+## **6. Known Hardcoded/Legacy Position References — verify before touching**
 
-Search for these patterns and update position numbers:
+These do NOT use the name-driven pattern. They are pre-existing and mostly belong to the **separate popup window** (`_open_reports_window`, style `"ReportsWindow.Treeview"`), which has its own independent, already-drifted column set — changes to `reports_tree_tab` do not affect it and vice versa:
 
-### **Comment Column (position 15):**
-- `_edit_comment()` (~line 7095): `new_values[15] = comment_display`
-- Any code that accesses `values[15]` expecting comment
+- `_edit_comment_tab()` (~line 11218): hardcoded `column != "#13"` check — **dead code, not bound to any event**. The live double-click handler (bound at ~line 8090, `handle_double_click`) is name-driven (`cols.index('comment')`) and correct.
+- `_edit_comment()` (~line 11231): has a hardcoded `idx = 15` fallback that only triggers if `.set()` by name fails or `'comment' not in cols` — not normally reachable, but stale if it ever is (comment is now at index 18, not 15).
+- `_add_refinery_to_session_from_menu()` (~line 15493) and several other functions in the ~15,400-15,850 range using `values[2]`/`values[3]`/`values[10]`/`values[12]`/`values[13]`: these operate on the **popup window's tree** (`reports_tree`, 15-column layout: `date, duration, system, body, tons, tph, materials, tons_per, asteroids, hit_rate, quality, cargo, prospectors, comment, enhanced`), not `reports_tree_tab`. Confirm which tree a function receives (`tree` parameter, or the styling applied) before assuming a hardcoded index is stale/wrong for the *main tab*.
 
-### **Engineering Materials Column (position 14):**
-- Any code accessing `values[14]` expecting eng_materials
-
-### **Enhanced Report Column (position 16):**
-- Any code accessing `values[16]` expecting enhanced status
-
-**Search patterns to check:**
-```python
-values[14]  # Hard-coded position access
-new_values[15]  # Hard-coded position modification
-len(new_values) > 14  # Position-based validation
-```
+If you ever add a column to the **popup window's** tree, it needs its own separate updates — its column tuple, headings, and widths are defined independently (~line 2919) and are not shared with `reports_tree_tab`.
 
 ---
 
-## **7. Session Data Dictionary Keys**
+## **7. CSV (`sessions_index.csv`) — usually NOT touched**
 
-Ensure these match between:
-- Data reading (CSV/TXT parsing)
-- Tree insertion
-- Comment/edit handlers
-
+Fieldnames list (appears identically in ~7 places — search `timestamp_utc.*materials_breakdown` to find them all):
 ```python
-session_data = {
-    'date': ...,
-    'duration': ...,
-    'system': ...,
-    'body': ...,
-    'tons': ...,
-    'tph': ...,
-    'asteroids': ...,
-    'materials': ...,
-    'hit_rate': ...,
-    'quality': ...,
-    'cargo': ...,
-    'prospects': ...,
-    'engineering_materials': ...,  # Note: uses underscore
-    'comment': ...,
-    'timestamp_raw': ...
-}
+['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph',
+ 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent',
+ 'avg_quality_percent', 'total_average_yield', 'best_material',
+ 'materials_breakdown', 'material_tph_breakdown', 'prospectors_used',
+ 'engineering_materials', 'comment']
 ```
+
+**Established pattern:** stats that can be derived by re-parsing the session's TXT report (e.g. `total_finds`, `core_hits`) are **intentionally excluded from the CSV** — every CSV writer explicitly pops `total_finds` before writing (`if 'total_finds' in _r: _r.pop('total_finds', None)`), and the value is instead computed live at load time by parsing the matching `Session_*.txt` file (see `total_finds_val`/`core_hits_val` computation just before the values-population loop, ~line 9360-9430).
+
+**Follow this same pattern for any new per-session stat that already lives in the TXT report** — do not add it to the CSV fieldnames; parse it from TXT on demand instead. This sidesteps CSV migration/backward-compatibility concerns entirely.
 
 ---
 
 ## **Checklist When Adding a Column:**
 
-- [ ] Add to column definition tuple (line 4600)
-- [ ] Add heading (line 4610)
-- [ ] Add column width (line 4706)
-- [ ] Add to values insert (line 5873) in correct position
-- [ ] Add to CSV fieldnames if needed (line 3786, 7307)
-- [ ] Update ALL hardcoded position references (+1 for all positions after insertion point)
-- [ ] Update session data dictionary keys
-- [ ] Test: Create new session with comment
-- [ ] Test: Edit existing session comment
-- [ ] Test: Sort by new column
-- [ ] Test: CSV export/import
+- [ ] Add to column definition tuple (`_create_reports_panel`)
+- [ ] Add heading
+- [ ] Add column width
+- [ ] Add to `setup_column_visibility` columns tuple + default_widths
+- [ ] Add `elif col == '...':` branch in the values-population loop
+- [ ] Add a defensive `.set(item_id, '...', ...)` call after insert (optional but matches existing pattern)
+- [ ] If the value should come from the TXT report rather than CSV: add parsing logic near `total_finds_val`, do NOT add a CSV fieldname
+- [ ] Add localization strings (`reports.<column>` in both `strings_en.json` and `strings_de.json`)
+- [ ] Test: sessions with and without the new data present (old reports) both display correctly
+- [ ] Test: sort by new column
+- [ ] Test: comment edit still works (click comment column, verify correct row/column)
 
 ---
 
-## **Common Bugs After Column Changes:**
-
-1. **Comment icon appears in wrong column** → Check `_edit_comment()` position index
-2. **Values misaligned** → Check values insert order vs column definition
-3. **Sorting broken** → Check column name in sort handlers
-4. **CSV data missing** → Check fieldnames order
-5. **Old reports show wrong data** → Check backward compatibility handlers
-
----
-
-## **Testing Protocol:**
-
-After column changes, test these scenarios:
-1. Start new mining session with comment
-2. Edit existing session comment
-3. Sort by all columns
-4. Filter reports
-5. Export to CSV
-6. Rebuild CSV from files
-7. Check old reports display correctly
-
----
-
-## **Last Updated:** 2025-10-24
-**Current Column Count:** 17
-**Last Change:** Fixed comment column position after session_type addition
+## **Last Updated:** 2026-07-24
+**Current Column Count:** 21 (20 real + `_spacer`)
+**Last Change:** Added `core_hits` column (Core Hits, derived from TXT report `• Core Hits:` lines, not persisted to CSV)

@@ -427,8 +427,8 @@ class MiningChartsPanel:
         
         # Prepare data for bar chart
         materials = list(summary_data.keys())
-        avg_yields = [summary_data[mat]['avg_percentage'] for mat in materials]
-        best_yields = [summary_data[mat]['best_percentage'] for mat in materials]
+        avg_yields = [summary_data[mat]['avg_percentage'] or 0.0 for mat in materials]
+        best_yields = [summary_data[mat]['best_percentage'] or 0.0 for mat in materials]
         colors = [self._get_material_color(mat) for mat in materials]
         
         # Create grouped bar chart with distinct colors for Average vs Best
@@ -724,9 +724,9 @@ class MiningChartsPanel:
             for material_name, stats in summary_data.items():
                 writer.writerow([
                     material_name,
-                    f"{stats['avg_percentage']:.2f}",
-                    f"{stats['best_percentage']:.2f}",
-                    f"{stats['latest_percentage']:.2f}",
+                    f"{stats['avg_percentage'] or 0.0:.2f}",
+                    f"{stats['best_percentage'] or 0.0:.2f}",
+                    f"{stats['latest_percentage'] or 0.0:.2f}",
                     stats['find_count'],
                     total_asteroids
                 ])
