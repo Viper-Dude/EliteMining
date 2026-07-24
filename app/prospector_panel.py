@@ -5671,7 +5671,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                     if line.strip() and not line.startswith('  ') and ':' in line and line.strip().endswith(':'):
                                         # This is a mineral name line like "Bromellite:"
                                         current_mineral = line.strip().rstrip(':')
-                                        mineral_performance[current_mineral] = {'avg': 0, 'best': 0, 'finds': 0}
+                                        mineral_performance[current_mineral] = {'avg': 0, 'best': 0, 'finds': 0, 'core_hits': 0}
                                     elif current_mineral and '• Average:' in line:
                                         try:
                                             avg_val = float(line.split(':')[1].split('%')[0].strip())
@@ -5682,6 +5682,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                         try:
                                             best_val = float(line.split(':')[1].split('%')[0].strip())
                                             mineral_performance[current_mineral]['best'] = best_val
+                                        except:
+                                            pass
+                                    elif current_mineral and '• Core Hits:' in line:
+                                        try:
+                                            core_hits_val = int(line.split(':', 1)[1].strip())
+                                            mineral_performance[current_mineral]['core_hits'] = core_hits_val
                                         except:
                                             pass
                                     elif current_mineral and ('• Hits:' in line or '• Finds:' in line):

@@ -466,17 +466,27 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
                     avg = perf.get('avg', 0)
                     best = perf.get('best', 0)
                     hits = perf.get('finds', 0)
-                    
+                    core_hits = perf.get('core_hits', 0)
+
+                    # A mineral with only core (motherlode) hits and no surface finds
+                    # has no meaningful yield % — label it and show hit count instead
+                    is_pure_core = mineral_name.endswith(' (Core)') or (core_hits > 0 and core_hits >= hits)
+                    display_name = mineral_name if mineral_name.endswith(' (Core)') else (
+                        f"{mineral_name} (Core)" if is_pure_core else mineral_name
+                    )
+                    avg_display = "—" if is_pure_core else f"{avg:.1f}%"
+                    best_display = "—" if is_pure_core else f"{best:.1f}%"
+
                     # Draw row data
                     x_pos = table_x + 10
-                    draw.text((x_pos, y_position - 22), mineral_name, fill=TEXT_COLOR, font=body_font)
-                    
+                    draw.text((x_pos, y_position - 22), display_name, fill=TEXT_COLOR, font=body_font)
+
                     x_pos += col_widths[0]
-                    draw.text((x_pos, y_position - 22), f"{avg:.1f}%", fill=TEXT_COLOR, font=body_font)
-                    
+                    draw.text((x_pos, y_position - 22), avg_display, fill=TEXT_COLOR, font=body_font)
+
                     x_pos += col_widths[1]
-                    draw.text((x_pos, y_position - 22), f"{best:.1f}%", fill=TEXT_COLOR, font=body_font)
-                    
+                    draw.text((x_pos, y_position - 22), best_display, fill=TEXT_COLOR, font=body_font)
+
                     x_pos += col_widths[2]
                     draw.text((x_pos, y_position - 22), f"{hits}", fill=TEXT_COLOR, font=body_font)
                 
