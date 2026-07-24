@@ -2180,11 +2180,18 @@ class ReportGenerator:
 
                     for material, yield_percent in sorted_filtered:
                         # Core (motherlode) finds have no surface yield %, so show their
-                        # hit count instead of a meaningless 0.0% value
-                        is_core_material = material.endswith(' (Core)')
-                        if is_core_material:
-                            core_entry = perf_data_for_core.get(material, {}) or {}
-                            core_hits = core_entry.get('finds', 0)
+                        # hit count instead of a meaningless 0.0% value. This covers both
+                        # the legacy "<Mineral> (Core)" key format and the current merged
+                        # format where a mineral with ONLY core hits (no surface finds)
+                        # still reports under its plain name at 0.0%.
+                        core_entry = perf_data_for_core.get(material, {}) or {}
+                        core_hits = core_entry.get('core_hits', 0)
+                        total_finds = core_entry.get('finds', 0)
+                        is_pure_core = material.endswith(' (Core)') or (core_hits > 0 and core_hits >= total_finds)
+                        if is_pure_core:
+                            if not core_hits:
+                                # Legacy "(Core)" key format stores its own hit count under 'finds'
+                                core_hits = total_finds
                             color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
                             value_display = f"{core_hits}x hit" if core_hits == 1 else f"{core_hits}x hits"
                         else:
@@ -2207,7 +2214,7 @@ class ReportGenerator:
                         """
 
                     analytics_html += "</div></div>"
-                
+
                 # Show comprehensive yields (all asteroids)
                 if individual_yields:
                     analytics_html += """
@@ -2240,10 +2247,13 @@ class ReportGenerator:
                     sorted_yields = sorted(individual_yields.items(), key=lambda x: x[1], reverse=True)
 
                     for material, yield_percent in sorted_yields:
-                        is_core_material = material.endswith(' (Core)')
-                        if is_core_material:
-                            core_entry = perf_data_for_core.get(material, {}) or {}
-                            core_hits = core_entry.get('finds', 0)
+                        core_entry = perf_data_for_core.get(material, {}) or {}
+                        core_hits = core_entry.get('core_hits', 0)
+                        total_finds = core_entry.get('finds', 0)
+                        is_pure_core = material.endswith(' (Core)') or (core_hits > 0 and core_hits >= total_finds)
+                        if is_pure_core:
+                            if not core_hits:
+                                core_hits = total_finds
                             color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
                             value_display = f"{core_hits}x hit" if core_hits == 1 else f"{core_hits}x hits"
                         else:

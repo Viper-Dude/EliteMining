@@ -16144,7 +16144,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                     break
                                 if line.strip() and not line.startswith('  ') and ':' in line and line.strip().endswith(':'):
                                     current_mineral = line.strip().rstrip(':')
-                                    mineral_performance[current_mineral] = {'avg': 0, 'best': 0, 'finds': 0}
+                                    mineral_performance[current_mineral] = {'avg': 0, 'best': 0, 'finds': 0, 'core_hits': 0}
                                 elif current_mineral:
                                     if '• Average:' in line:
                                         try:
@@ -16158,6 +16158,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                             mineral_performance[current_mineral]['best'] = best_val
                                         except:
                                             pass
+                                    elif '• Core Hits:' in line:
+                                        try:
+                                            core_hits_val = int(line.split(':', 1)[1].strip())
+                                            mineral_performance[current_mineral]['core_hits'] = core_hits_val
+                                        except:
+                                            pass
                                     elif '• Hits:' in line or '• Finds:' in line:
                                         try:
                                             raw_val = line.split(':', 1)[1].strip().replace('x', '')
@@ -16165,7 +16171,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                             mineral_performance[current_mineral]['finds'] = hits_val
                                         except:
                                             pass
-                        
+
                         if mineral_performance:
                             session_data['mineral_performance'] = mineral_performance
                             print(f"DEBUG: Pre-parsed mineral_performance from TXT: {list(mineral_performance.keys())}")
@@ -16237,8 +16243,17 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 # Don't block report generation on errors here
                 print(f"Warning: Could not add derived hits/tons for HTML: {e}")
             
-            # If this is a live session or we have access to session analytics, add filtered yield data
-            if hasattr(self, 'session_analytics') and hasattr(self, 'min_pct_map'):
+            # Only trust in-memory session_analytics if it actually belongs to THIS
+            # session (matching system/body while a session is active) — otherwise
+            # it may hold stale data from a different session and silently overwrite
+            # the correct per-material stats parsed from this session's own TXT report.
+            is_current_live_session = (
+                hasattr(self, 'session_analytics') and hasattr(self, 'min_pct_map')
+                and getattr(self.session_analytics, 'session_active', False)
+                and (session_data.get('system', '') or '').strip() == self.session_system.get().strip()
+                and (session_data.get('body', '') or '').strip() == self.session_body.get().strip()
+            )
+            if is_current_live_session:
                 try:
                     # Get filtered yields (threshold-based from announcement settings)
                     filtered_summary = self.session_analytics.get_quality_summary(self.min_pct_map)
