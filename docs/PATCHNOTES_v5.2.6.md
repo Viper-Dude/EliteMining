@@ -18,6 +18,7 @@
 - Fixed the Powerplay merit rating on **Star Systems** to better match real in-game values.
 - Fixed **Ring Finder**'s Max Distance and Max Results not being remembered after restarting the app.
 
+
 ### Voiceattack Profile no update (v5.2.5)
 
 ### Reminder

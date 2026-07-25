@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.2.6"
+APP_VERSION = "v5.2.7"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -11821,8 +11821,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                       f"Continue?"):
             return
             
-        with open(self._settings_path(sel), "w", encoding="utf-8") as f:
-            json.dump(self._current_mapping(), f, indent=2)
+        path = self._settings_path(sel)
+        new_data = self._current_mapping()
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                old_data = json.load(f)
+            if "AnnouncementPresetSlot" in old_data:
+                new_data["AnnouncementPresetSlot"] = old_data["AnnouncementPresetSlot"]
+        except Exception:
+            pass
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(new_data, f, indent=2)
         self._set_status(f"Overwrote preset '{sel}'.")
 
     def _edit_selected_preset(self) -> None:
