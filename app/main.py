@@ -18476,12 +18476,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tree.heading("state",      text="State")
         tree.heading("population", text="Population")
         tree.heading("economy",    text="Economy")
+        tree.heading("powerplay",  text=t('system_finder.col_powerplay'))
         tree.column("system",     width=150)
         tree.column("security",   width=80)
         tree.column("allegiance", width=90)
         tree.column("state",      width=90)
         tree.column("population", width=100)
         tree.column("economy",    width=120)
+        tree.column("powerplay",  width=170, minwidth=100)
         if hasattr(self, 'sysfinder_results_frame'):
             self.sysfinder_results_frame.configure(text="Systems")
 
@@ -18497,12 +18499,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tree.heading("state",      text="Pad")
         tree.heading("population", text="Arrival (ls)")
         tree.heading("economy",    text="Planetary")
+        tree.heading("powerplay",  text="")
         tree.column("system",     width=130)
         tree.column("security",   width=160)
         tree.column("allegiance", width=110)
         tree.column("state",      width=45)
         tree.column("population", width=90)
         tree.column("economy",    width=70)
+        tree.column("powerplay",  width=0, minwidth=0)
         if hasattr(self, 'sysfinder_results_frame'):
             trader_type = getattr(self, 'sysfinder_trader_type', None)
             label = (trader_type.get() + " ") if trader_type else ""
