@@ -10,7 +10,6 @@
 - Fixed Low Temperature Diamonds not counted or displayed correctly in reports and cards.
 - Fixed inflated mining speed on session reports.
 - Fixed total tons and t/hr disappearing after ending a session.
-- Fixed changing a ship preset's linked announcement preset not triggering the unsaved-changes warning.
 - Various small bug fixes and improvements.
 
 ### Voiceattack Profile no update (v5.2.5)
