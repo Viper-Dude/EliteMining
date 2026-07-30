@@ -698,7 +698,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.2.7"
+APP_VERSION = "v5.2.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -2335,7 +2335,12 @@ class CargoMonitor:
                     display_name = name_localized.title()
                 else:
                     display_name = name.replace("_", " ").title()
-                
+
+                # Normalize "Low Temp. Diamonds" variant to canonical form so cargo
+                # tracking doesn't split the same material into two dict keys
+                if display_name.lower() in ('low temp. diamonds', 'low temp diamonds'):
+                    display_name = 'Low Temperature Diamonds'
+
                 if display_name and item_count > 0:
                     new_cargo[display_name] = item_count
                     
@@ -3568,6 +3573,12 @@ cargo panel forces Elite to write detailed inventory data.
                             item_name = name_localized.title()
                         else:
                             item_name = name.replace("_", " ").title()
+
+                        # Normalize "Low Temp. Diamonds" variant to canonical form so cargo
+                        # tracking doesn't split the same material into two dict keys
+                        if item_name.lower() in ('low temp. diamonds', 'low temp diamonds'):
+                            item_name = 'Low Temperature Diamonds'
+
                         item_count = item.get("Count", 0)
                         if item_name and item_count > 0:
                             new_cargo[item_name] = item_count
@@ -7206,6 +7217,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._active_preset_num = None
         self._active_preset_snapshot = None  # Snapshot of settings when preset was loaded
 
+        # Active ship preset tracking
+        self._active_ship_preset_name = None
+        self._active_ship_preset_snapshot = None  # Snapshot of settings when preset was loaded
+        self._active_ship_announcement_slot = None  # Linked announcement preset slot for the active ship preset
+
         # Basic announcement controls
         ttk.Label(frame, text=t('settings.announcement_settings'), font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
         
@@ -9222,6 +9238,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Refresh the preset list
         self._refresh_preset_list()
 
+        # Restore active ship preset from config, if its file still exists
+        try:
+            from config import load_active_ship_preset
+            active_name = load_active_ship_preset()
+            if active_name and os.path.exists(self._settings_path(active_name)):
+                with open(self._settings_path(active_name), "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self._apply_mapping(data)
+                self._active_ship_preset_name = active_name
+                self._active_ship_preset_snapshot = self._ship_get_current_snapshot()
+                self._ship_update_preset_row_highlight()
+        except Exception:
+            pass
+
         # Save sidebar sash position when it changes (only after initialization)
         def _on_sidebar_sash_moved(event):
             if not getattr(self, '_sidebar_sash_initialized', False):
@@ -10201,8 +10231,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Update status label
             times_text = t('voiceattack.time') if count == 1 else t('voiceattack.times')
             self.laser_extra_status_label.config(text=f"({t('voiceattack.will_run')} {count} {times_text})")
-            
+
             print(f"[LASER EXTRA] Saved repeat count: {count}")
+            self._ship_check_modified()
         except Exception as e:
             print(f"[LASER EXTRA] Error saving repeat count: {e}")
     
@@ -10240,8 +10271,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Always use period (.) as decimal separator for VoiceAttack compatibility
             delay_str = f"{delay:.1f}".replace(',', '.')
             _atomic_write_text(txt_path, delay_str)
-            
+
             print(f"[PROSPECTOR DELAY] Saved delay: {delay_str} seconds")
+            self._ship_check_modified()
         except Exception as e:
             print(f"[PROSPECTOR DELAY] Error saving delay: {e}")
     
@@ -10282,6 +10314,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._write_var_text(base, str(self.toggle_vars[toggle_name].get()))
             
             print(f"[TOGGLE] Auto-saved {toggle_name}: {self.toggle_vars[toggle_name].get()}")
+            self._ship_check_modified()
         except Exception as e:
             print(f"[TOGGLE] Error auto-saving {toggle_name}: {e}")
     
@@ -10300,6 +10333,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if letter:
                 self._write_var_text(fg_name, NATO.get(letter, letter))
                 print(f"[FIREGROUP] Auto-saved {tool}: {letter}")
+                self._ship_check_modified()
         except Exception as e:
             print(f"[FIREGROUP] Error auto-saving {tool}: {e}")
     
@@ -10318,6 +10352,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if v in (1, 2):
                 self._write_var_text(btn_name, "primary" if v == 1 else "secondary")
                 print(f"[FIRE BUTTON] Auto-saved {tool}: {'primary' if v == 1 else 'secondary'}")
+                self._ship_check_modified()
         except Exception as e:
             print(f"[FIRE BUTTON] Error auto-saving {tool}: {e}")
     
@@ -10336,6 +10371,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             base = os.path.splitext(filename)[0]
             self._write_var_text(base, str(delay))
             print(f"[TIMER] Auto-saved {timer_name}: {delay} seconds")
+            self._ship_check_modified()
         except Exception as e:
             print(f"[TIMER] Error auto-saving {timer_name}: {e}")
     
@@ -10354,6 +10390,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             base = os.path.splitext(filename)[0]
             self._write_var_text(base, str(delay))
             print(f"[CARGO SCOOP DELAY] Auto-saved: {delay} seconds")
+            self._ship_check_modified()
         except Exception as e:
             print(f"[CARGO SCOOP DELAY] Error auto-saving: {e}")
     
@@ -10367,6 +10404,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             delay_str = f"{delay:.1f}".replace(',', '.')
             _atomic_write_text(txt_path, delay_str)
             print(f"[THRUST UPDURATION] Saved: {delay_str} seconds")
+            self._ship_check_modified()
         except Exception as e:
             print(f"[THRUST UPDURATION] Error saving: {e}")
 
@@ -10399,6 +10437,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             delay_str = f"{delay:.1f}".replace(',', '.')
             _atomic_write_text(txt_path, delay_str)
             print(f"[THRUST CLOSED] Saved timing: {delay_str} seconds")
+            self._ship_check_modified()
         except Exception as e:
             print(f"[THRUST CLOSED] Error saving timing: {e}")
     
@@ -10433,6 +10472,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             delay_str = f"{delay:.1f}".replace(',', '.')
             _atomic_write_text(txt_path, delay_str)
             print(f"[THRUST OPEN] Saved timing: {delay_str} seconds")
+            self._ship_check_modified()
         except Exception as e:
             print(f"[THRUST OPEN] Error saving timing: {e}")
     
@@ -11127,10 +11167,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#ff8c00', font=("Segoe UI", 9))
             self.preset_list.tag_configure('evenrow', background='#252525', foreground='#ff8c00', font=("Segoe UI", 9))
             self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#ffcc00', font=("Segoe UI", 9, "bold"))
+            self.preset_list.tag_configure('active_preset', background='#5a3a0a', foreground='#ffcc00', font=("Segoe UI", 9, "bold"))
         else:
             self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6', font=("Segoe UI", 9))
             self.preset_list.tag_configure('evenrow', background='#282828', foreground='#e6e6e6', font=("Segoe UI", 9))
             self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#aaaaaa', font=("Segoe UI", 9, "bold"))
+            self.preset_list.tag_configure('active_preset', background='#2a4a6a', foreground='#ffffff', font=("Segoe UI", 9, "bold"))
     
     def _parse_preset_ship_type(self, preset_name: str) -> tuple:
         """Parse preset name to extract ship type and build variant.
@@ -11268,10 +11310,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 row_tag = 'evenrow' if row_idx % 2 == 0 else 'oddrow'
                 # Display variant (or "Default" if empty), store full name in values
                 display_text = variant if variant else "Default"
-                self.preset_list.insert(group_id, "end", text=f"      {display_text}", 
+                self.preset_list.insert(group_id, "end", text=f"      {display_text}",
                                         values=(full_name,), tags=(row_tag,))
                 row_idx += 1
-    
+
+        self._ship_update_preset_row_highlight()
+
     def _select_preset_by_name(self, preset_name: str) -> bool:
         """Find and select a preset by its full name in the hierarchical tree.
         Returns True if found, False otherwise."""
@@ -11339,6 +11383,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Add prospector delay if available
         if hasattr(self, 'prospector_delay_var'):
             preset_data["ProspectorDelay"] = self.prospector_delay_var.get()
+
+        # Add linked announcement preset slot
+        if self._active_ship_announcement_slot:
+            preset_data["AnnouncementPresetSlot"] = self._active_ship_announcement_slot
         
         # Add thrust timing values if available
         if hasattr(self, 'thrust_upduration_var'):
@@ -11404,6 +11452,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception as e:
                 print(f"[PRESET] Error loading laser extra repeat count: {e}")
         
+        # Load linked announcement preset slot
+        self._active_ship_announcement_slot = data.get("AnnouncementPresetSlot") or None
+
         # Load prospector delay if available
         if "ProspectorDelay" in data and hasattr(self, 'prospector_delay_var'):
             try:
@@ -11804,7 +11855,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._refresh_preset_list()
         # Select the newly created preset
         self._select_preset_by_name(name)
+        self._ship_set_active_preset(name)
         self._set_status(f"Saved new preset '{name}'.")
+
+    def _write_preset_file(self, name: str) -> None:
+        """Write current settings to an existing preset file"""
+        path = self._settings_path(name)
+        new_data = self._current_mapping()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(new_data, f, indent=2)
+        self._ship_set_active_preset(name)
 
     def _overwrite_selected(self) -> None:
         sel = self._get_selected_preset()
@@ -11812,26 +11872,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             from app_utils import centered_message
             centered_message(self, "No preset selected", "Choose a preset to overwrite.")
             return
-        
+
         # Confirm overwrite
         from app_utils import centered_askyesno
-        if not centered_askyesno(self, "Confirm Overwrite", 
+        if not centered_askyesno(self, "Confirm Overwrite",
                       f"This will overwrite preset '{sel}' with current settings.\n\n"
                       f"This action cannot be undone.\n\n"
                       f"Continue?"):
             return
-            
-        path = self._settings_path(sel)
-        new_data = self._current_mapping()
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                old_data = json.load(f)
-            if "AnnouncementPresetSlot" in old_data:
-                new_data["AnnouncementPresetSlot"] = old_data["AnnouncementPresetSlot"]
-        except Exception:
-            pass
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(new_data, f, indent=2)
+
+        self._write_preset_file(sel)
         self._set_status(f"Overwrote preset '{sel}'.")
 
     def _edit_selected_preset(self) -> None:
@@ -11860,6 +11910,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         old_path = self._settings_path(old_name)
         try:
             os.rename(old_path, new_path)
+            if old_name == self._active_ship_preset_name:
+                self._active_ship_preset_name = new_name
+                from config import save_active_ship_preset
+                save_active_ship_preset(new_name)
             self._refresh_preset_list()
             self._select_preset_by_name(new_name)
             self._set_status(f"Updated preset to '{new_name}'.")
@@ -12975,6 +13029,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         sel = self._get_selected_preset()
         if not sel:
             return
+
+        if self._ship_is_preset_modified():
+            result = self._show_unsaved_ship_preset_dialog()
+            if result == "yes":  # Save changes to the currently active preset
+                self._write_preset_file(self._active_ship_preset_name)
+            elif result == "no":  # Discard changes
+                pass
+            else:  # Cancel - don't switch
+                return
+
         try:
             with open(self._settings_path(sel), "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -12982,20 +13046,84 @@ class App(tk.Tk, ColumnVisibilityMixin):
             slot = data.get("AnnouncementPresetSlot")
             if slot:
                 self._ann_load_preset(slot)
+            self._ship_set_active_preset(sel)
         except Exception as e:
             messagebox.showerror("Load failed", str(e))
+
+    def _ship_get_current_snapshot(self):
+        """Get a snapshot of current ship preset settings for comparison"""
+        try:
+            return self._current_mapping()
+        except Exception:
+            return None
+
+    def _ship_is_preset_modified(self):
+        """Check if current settings differ from the loaded ship preset snapshot"""
+        if self._active_ship_preset_name is None or self._active_ship_preset_snapshot is None:
+            return False
+        current = self._ship_get_current_snapshot()
+        if current is None:
+            return False
+        return current != self._active_ship_preset_snapshot
+
+    def _ship_set_active_preset(self, name):
+        """Set the active ship preset and take a snapshot"""
+        self._active_ship_preset_name = name
+        self._active_ship_preset_snapshot = self._ship_get_current_snapshot()
+        from config import save_active_ship_preset
+        save_active_ship_preset(name)
+        self._ship_update_preset_row_highlight()
+
+    def _ship_clear_active_preset(self):
+        """Clear active ship preset tracking"""
+        self._active_ship_preset_name = None
+        self._active_ship_preset_snapshot = None
+        from config import save_active_ship_preset
+        save_active_ship_preset(None)
+        self._ship_update_preset_row_highlight()
+
+    def _ship_update_preset_row_highlight(self):
+        """Update the active ship preset's row highlight in the preset tree"""
+        if not hasattr(self, 'preset_list'):
+            return
+
+        is_modified = self._ship_is_preset_modified()
+
+        row_idx = 0
+        for group_id in self.preset_list.get_children():
+            for item_id in self.preset_list.get_children(group_id):
+                values = self.preset_list.item(item_id, "values")
+                full_name = values[0] if values else None
+                base_text = self.preset_list.item(item_id, "text")
+                display_text = base_text[:-2] if base_text.endswith(" *") else base_text
+
+                if full_name == self._active_ship_preset_name:
+                    tag = 'active_preset'
+                    self.preset_list.item(item_id, text=f"{display_text} *" if is_modified else display_text, tags=(tag,))
+                    self.after_idle(lambda i=item_id: self.preset_list.selection_remove(i) if i in self.preset_list.selection() else None)
+                else:
+                    tag = 'evenrow' if row_idx % 2 == 0 else 'oddrow'
+                    self.preset_list.item(item_id, text=display_text, tags=(tag,))
+                row_idx += 1
+
+    def _ship_check_modified(self):
+        """Check if ship preset was modified and update row highlight"""
+        self._ship_update_preset_row_highlight()
 
     def _populate_announcement_preset_submenu(self, preset_full_name: str) -> None:
         """Rebuild the Announcement Preset submenu for the right-clicked ship preset"""
         self._ann_preset_submenu.delete(0, "end")
 
         current_slot = 0
-        try:
-            with open(self._settings_path(preset_full_name), "r", encoding="utf-8") as f:
-                data = json.load(f)
-            current_slot = data.get("AnnouncementPresetSlot") or 0
-        except Exception:
-            pass
+        if preset_full_name == self._active_ship_preset_name:
+            current_slot = self._active_ship_announcement_slot or 0
+        else:
+            try:
+                with open(self._settings_path(preset_full_name), "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                current_slot = data.get("AnnouncementPresetSlot") or 0
+            except Exception:
+                pass
         self._ann_preset_menu_var.set(current_slot)
 
         cfg = self.prospector_panel._load_cfg() if hasattr(self, 'prospector_panel') else {}
@@ -13013,6 +13141,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _set_preset_announcement_link(self, preset_full_name: str, slot: Optional[int]) -> None:
         """Link or unlink an announcement preset slot to a ship preset"""
+        if preset_full_name == self._active_ship_preset_name:
+            # Active preset: update in-memory state so it's tracked like any other setting
+            self._active_ship_announcement_slot = slot
+            self._ship_check_modified()
+            if slot:
+                self._ann_load_preset(slot)
+            return
+
         path = self._settings_path(preset_full_name)
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -13033,9 +13169,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             messagebox.showerror("Update failed", str(e))
             return
 
-        if slot:
-            self._ann_load_preset(slot)
-
     def _delete_selected(self) -> None:
         sel = self._get_selected_preset()
         if not sel:
@@ -13044,6 +13177,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if centered_askyesno(self, "Delete preset", f"Delete preset '{sel}'?"):
             try:
                 os.remove(self._settings_path(sel))
+                if sel == self._active_ship_preset_name:
+                    self._ship_clear_active_preset()
                 self._refresh_preset_list()
                 self._set_status(f"Deleted preset '{sel}'.")
             except Exception as e:
@@ -15738,15 +15873,211 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         return result[0] if result[0] else "cancel"
 
+    def _show_unsaved_ship_preset_dialog(self) -> str:
+        """Show a themed dialog when closing with unsaved ship preset changes.
+
+        Returns:
+            'yes' - Save changes
+            'no' - Discard changes
+            'cancel' - Keep app open (don't close)
+        """
+        from localization import t
+        from icon_utils import get_app_icon_path
+
+        result = [None]  # Use list to allow modification in nested function
+
+        # Create themed dialog
+        dialog = tk.Toplevel(self)
+        dialog.withdraw()  # Hide initially to prevent flicker on wrong monitor
+        dialog.title(t('dialogs.unsaved_preset_title'))
+        # dialog.transient(self)  # Disabled - causes focus issues
+        try:
+            dialog.grab_set()
+        except:
+            pass
+        dialog.resizable(False, False)
+
+        # Set app icon
+        try:
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+            elif icon_path:
+                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+        except Exception:
+            pass
+
+        # Get theme colors
+        theme = self.current_theme
+        if theme == "elite_orange":
+            bg_color = "#0a0a0a"
+            fg_color = "#ff8c00"
+            fg_bright = "#ffa500"
+            btn_bg = "#1a1a1a"
+            btn_fg = "#ff8c00"
+            warning_color = "#ffcc00"
+        else:
+            bg_color = "#1e1e1e"
+            fg_color = "#e6e6e6"
+            fg_bright = "#ffffff"
+            btn_bg = "#333333"
+            btn_fg = "#ffffff"
+            warning_color = "#ffcc00"
+
+        dialog.configure(bg=bg_color)
+
+        # Main frame
+        main_frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
+        main_frame.pack(fill="both", expand=True)
+
+        # Warning icon and message row
+        msg_frame = tk.Frame(main_frame, bg=bg_color)
+        msg_frame.pack(fill="x", pady=(0, 15))
+
+        # Warning icon (using text emoji)
+        tk.Label(
+            msg_frame,
+            text="⚠️",
+            font=("Segoe UI", 24),
+            bg=bg_color,
+            fg=warning_color
+        ).pack(side="left", padx=(0, 15))
+
+        # Message text
+        msg_text_frame = tk.Frame(msg_frame, bg=bg_color)
+        msg_text_frame.pack(side="left", fill="x", expand=True)
+
+        tk.Label(
+            msg_text_frame,
+            text=t('dialogs.unsaved_preset_message').format(name=self._active_ship_preset_name),
+            font=("Segoe UI", 11, "bold"),
+            bg=bg_color,
+            fg=fg_bright,
+            wraplength=320,
+            justify="left"
+        ).pack(anchor="w")
+
+        # Options list
+        options_frame = tk.Frame(main_frame, bg=bg_color)
+        options_frame.pack(fill="x", pady=(0, 15))
+
+        options = [
+            (f"• {t('dialogs.yes')} = {t('dialogs.unsaved_preset_yes')}", fg_color),
+            (f"• {t('dialogs.no')} = {t('dialogs.unsaved_preset_no')}", fg_color),
+            (f"• {t('dialogs.cancel')} = {t('dialogs.unsaved_preset_cancel')}", fg_color),
+        ]
+
+        for opt_text, opt_color in options:
+            tk.Label(
+                options_frame,
+                text=opt_text,
+                font=("Segoe UI", 9),
+                bg=bg_color,
+                fg=opt_color
+            ).pack(anchor="w", pady=1)
+
+        # Button frame
+        btn_frame = tk.Frame(main_frame, bg=bg_color)
+        btn_frame.pack(fill="x")
+
+        def on_yes():
+            result[0] = "yes"
+            dialog.destroy()
+
+        def on_no():
+            result[0] = "no"
+            dialog.destroy()
+
+        def on_cancel():
+            result[0] = "cancel"
+            dialog.destroy()
+
+        # Buttons with consistent styling
+        btn_style = {
+            "font": ("Segoe UI", 9),
+            "width": 10,
+            "relief": "flat",
+            "cursor": "hand2",
+            "bg": btn_bg,
+            "fg": btn_fg,
+            "activebackground": fg_color,
+            "activeforeground": bg_color,
+        }
+
+        yes_btn = tk.Button(btn_frame, text=t('dialogs.yes'), command=on_yes, **btn_style)
+        yes_btn.pack(side="left", padx=(0, 10))
+
+        no_btn = tk.Button(btn_frame, text=t('dialogs.no'), command=on_no, **btn_style)
+        no_btn.pack(side="left", padx=(0, 10))
+
+        cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=on_cancel, **btn_style)
+        cancel_btn.pack(side="left")
+
+        # Handle window close button (X)
+        dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+
+        # Bind keyboard
+        dialog.bind("<Escape>", lambda e: on_cancel())
+
+        # Center dialog on main window
+        dialog.update_idletasks()
+        dialog_width = dialog.winfo_width()
+        dialog_height = dialog.winfo_height()
+        main_x = self.winfo_x()
+        main_y = self.winfo_y()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+
+        x = main_x + (main_width - dialog_width) // 2
+        y = main_y + (main_height - dialog_height) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        # Show dialog now that it's centered
+        dialog.deiconify()
+
+        # Force dialog to stay on top and have focus
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+
+        # Focus yes button
+        yes_btn.focus_set()
+
+        # Keep dialog on top while open
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except:
+                pass
+        dialog.after(100, keep_on_top)
+
+        # Wait for dialog to close
+        dialog.wait_window()
+
+        return result[0] if result[0] else "cancel"
+
     def _on_close(self) -> None:
         # Check if mining session is active
         if hasattr(self, 'prospector_panel') and self.prospector_panel.session_active:
             result = self._show_session_active_dialog()
-            
+
             if result == "yes":  # Stop and save
                 self.prospector_panel._session_stop()
             elif result == "no":  # Cancel session
                 self.prospector_panel._session_cancel()
+            else:  # Cancel - Don't close
+                return
+
+        # Check if the active ship preset has unsaved changes
+        if self._ship_is_preset_modified():
+            result = self._show_unsaved_ship_preset_dialog()
+
+            if result == "yes":  # Save changes
+                self._write_preset_file(self._active_ship_preset_name)
+            elif result == "no":  # Discard changes
+                pass
             else:  # Cancel - Don't close
                 return
         

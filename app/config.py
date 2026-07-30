@@ -746,6 +746,20 @@ def save_preset_expanded_groups(groups: list) -> None:
     cfg["preset_expanded_groups"] = groups
     _save_cfg(cfg)
 
+def load_active_ship_preset() -> Optional[str]:
+    """Load the name of the currently active ship preset"""
+    cfg = _load_cfg()
+    return cfg.get("active_ship_preset")
+
+def save_active_ship_preset(name: Optional[str]) -> None:
+    """Save the name of the currently active ship preset"""
+    cfg = _load_cfg()
+    if name:
+        cfg["active_ship_preset"] = name
+    else:
+        cfg.pop("active_ship_preset", None)
+    _save_cfg(cfg)
+
 # Layout version for migration - increment when layout changes require reset
 LAYOUT_VERSION = 3  # v4.6.4 - fixed sash initialization timing
 

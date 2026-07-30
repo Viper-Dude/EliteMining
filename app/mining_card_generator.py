@@ -471,9 +471,9 @@ def generate_mining_card(session_data, output_path, cmdr_info=None):
                     # A mineral with only core (motherlode) hits and no surface finds
                     # has no meaningful yield % — label it and show hit count instead
                     is_pure_core = mineral_name.endswith(' (Core)') or (core_hits > 0 and core_hits >= hits)
-                    display_name = mineral_name if mineral_name.endswith(' (Core)') else (
-                        f"{mineral_name} (Core)" if is_pure_core else mineral_name
-                    )
+                    base_name = mineral_name[:-len(' (Core)')] if mineral_name.endswith(' (Core)') else mineral_name
+                    base_name = base_name.replace('Low Temperature Diamonds', 'Low Temp. Diamonds')
+                    display_name = f"{base_name} (Core)" if is_pure_core else base_name
                     avg_display = "—" if is_pure_core else f"{avg:.1f}%"
                     best_display = "—" if is_pure_core else f"{best:.1f}%"
 

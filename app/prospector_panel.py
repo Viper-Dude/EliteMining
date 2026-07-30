@@ -4092,6 +4092,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         """Check if material name is a summary entry that should be filtered out"""
         return material_name.lower() in ['total cargo collected', 'total', 'cargo collected', 'total refined']
 
+    def _normalize_material_key(self, material_name: str) -> str:
+        """Collapse known name variants (e.g. "Low Temp. Diamonds") to their canonical
+        form so CSV rebuild doesn't split the same material into two entries."""
+        if material_name.lower() in ('low temp. diamonds', 'low temp diamonds'):
+            return 'Low Temperature Diamonds'
+        return material_name
+
     def _rebuild_csv_from_files(self, csv_path: str, parent_window) -> None:
         """Rebuild the CSV index from existing text files - PARSES TPH FROM TEXT"""
         print("[REBUILD] === STARTING CSV REBUILD (popup version) ===")
@@ -4234,33 +4241,35 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         if cargo_section:
                             cargo_text = cargo_section.group(1)
                             # Try to parse WITH TPH: "Platinum: 1.0t (80.3 t/hr)"
-                            material_lines_with_tph = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*\(([\d.]+)\s*t/hr\)', cargo_text, re.MULTILINE)
+                            material_lines_with_tph = re.findall(r'^([A-Za-z.\s]+):\s*([\d.]+)t\s*\(([\d.]+)\s*t/hr\)', cargo_text, re.MULTILINE)
                             if material_lines_with_tph:
                                 # Successfully parsed TPH from text file
                                 tph_pairs = []
                                 for mat, tons, tph in material_lines_with_tph:
-                                    mat_clean = mat.strip()
+                                    mat_clean = self._normalize_material_key(mat.strip())
                                     if not self._is_summary_entry(mat_clean):
-                                        materials_dict[mat_clean] = float(tons)
-                                        tph_pairs.append(f"{mat_clean}: {tph}")
+                                        is_new = mat_clean not in materials_dict
+                                        materials_dict[mat_clean] = materials_dict.get(mat_clean, 0.0) + float(tons)
+                                        if is_new:
+                                            tph_pairs.append(f"{mat_clean}: {tph}")
                                 if tph_pairs:
                                     material_tph_breakdown = ", ".join(tph_pairs)
                                     print(f"[REBUILD] ✓ Parsed TPH from text: {material_tph_breakdown}")
                             else:
                                 # No TPH in text, parse basic format
-                                material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
+                                material_lines = re.findall(r'^([A-Za-z.\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
                                 for mat, tons in material_lines:
-                                    mat_clean = mat.strip()
+                                    mat_clean = self._normalize_material_key(mat.strip())
                                     if not self._is_summary_entry(mat_clean):
-                                        materials_dict[mat_clean] = float(tons)
-                        
+                                        materials_dict[mat_clean] = materials_dict.get(mat_clean, 0.0) + float(tons)
+
                         # Then, merge with REFINED CARGO TRACKING (manually added materials during session)
                         refined_cargo_section = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
                         if refined_cargo_section:
                             refined_cargo_text = refined_cargo_section.group(1)
-                            refined_material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', refined_cargo_text, re.MULTILINE)
+                            refined_material_lines = re.findall(r'^([A-Za-z.\s]+):\s*([\d.]+)t\s*$', refined_cargo_text, re.MULTILINE)
                             for mat, tons in refined_material_lines:
-                                mat_clean = mat.strip()
+                                mat_clean = self._normalize_material_key(mat.strip())
                                 if not self._is_summary_entry(mat_clean):
                                     if mat_clean in materials_dict:
                                         # Add to existing quantity
@@ -4268,18 +4277,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                     else:
                                         # New material from refinery
                                         materials_dict[mat_clean] = float(tons)
-                        
+
                         # Fallback to REFINED MINERALS section if no cargo data found
                         if not materials_dict:
                             refined_section = re.search(r'=== REFINED MINERALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
                             if refined_section:
                                 refined_text = refined_section.group(1)
-                                material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
+                                material_lines = re.findall(r'- ([A-Za-z.\s]+) ([\d.]+)t', refined_text)
                                 for mat, tons in material_lines:
-                                    mat_clean = mat.strip()
+                                    mat_clean = self._normalize_material_key(mat.strip())
                                     if not self._is_summary_entry(mat_clean):
-                                        materials_dict[mat_clean] = float(tons)
-                        
+                                        materials_dict[mat_clean] = materials_dict.get(mat_clean, 0.0) + float(tons)
+
                         # Convert dictionary to string format
                         if materials_dict:
                             materials_breakdown = ', '.join([f"{mat}: {tons:.1f}t" for mat, tons in materials_dict.items()])
@@ -4587,33 +4596,35 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         if cargo_section:
                             cargo_text = cargo_section.group(1)
                             # Try to parse WITH TPH: "Platinum: 1.0t (80.3 t/hr)"
-                            material_lines_with_tph = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*\(([\d.]+)\s*t/hr\)', cargo_text, re.MULTILINE)
+                            material_lines_with_tph = re.findall(r'^([A-Za-z.\s]+):\s*([\d.]+)t\s*\(([\d.]+)\s*t/hr\)', cargo_text, re.MULTILINE)
                             if material_lines_with_tph:
                                 # Successfully parsed TPH from text file
                                 tph_pairs = []
                                 for mat, tons, tph in material_lines_with_tph:
-                                    mat_clean = mat.strip()
+                                    mat_clean = self._normalize_material_key(mat.strip())
                                     if not self._is_summary_entry(mat_clean):
-                                        materials_dict[mat_clean] = float(tons)
-                                        tph_pairs.append(f"{mat_clean}: {tph}")
+                                        is_new = mat_clean not in materials_dict
+                                        materials_dict[mat_clean] = materials_dict.get(mat_clean, 0.0) + float(tons)
+                                        if is_new:
+                                            tph_pairs.append(f"{mat_clean}: {tph}")
                                 if tph_pairs:
                                     material_tph_breakdown = ", ".join(tph_pairs)
                                     print(f"[REBUILD TAB] ✓ Parsed TPH from text: {material_tph_breakdown}")
                             else:
                                 # No TPH in text, parse basic format
-                                material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
+                                material_lines = re.findall(r'^([A-Za-z.\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
                                 for mat, tons in material_lines:
-                                    mat_clean = mat.strip()
+                                    mat_clean = self._normalize_material_key(mat.strip())
                                     if not self._is_summary_entry(mat_clean):
-                                        materials_dict[mat_clean] = float(tons)
-                        
+                                        materials_dict[mat_clean] = materials_dict.get(mat_clean, 0.0) + float(tons)
+
                         # Then, merge with REFINED CARGO TRACKING (manually added materials during session)
                         refined_cargo_section = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
                         if refined_cargo_section:
                             refined_cargo_text = refined_cargo_section.group(1)
-                            refined_material_lines = re.findall(r'^([A-Za-z\s]+):\s*([\d.]+)t\s*$', refined_cargo_text, re.MULTILINE)
+                            refined_material_lines = re.findall(r'^([A-Za-z.\s]+):\s*([\d.]+)t\s*$', refined_cargo_text, re.MULTILINE)
                             for mat, tons in refined_material_lines:
-                                mat_clean = mat.strip()
+                                mat_clean = self._normalize_material_key(mat.strip())
                                 if not self._is_summary_entry(mat_clean):
                                     if mat_clean in materials_dict:
                                         # Add to existing quantity
@@ -4621,22 +4632,22 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                     else:
                                         # New material from refinery
                                         materials_dict[mat_clean] = float(tons)
-                        
+
                         # Fallback to REFINED MINERALS section if no cargo data found
                         if not materials_dict:
                             refined_section = re.search(r'=== REFINED MINERALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
                             if refined_section:
                                 refined_text = refined_section.group(1)
-                                material_lines = re.findall(r'- ([A-Za-z\s]+) ([\d.]+)t', refined_text)
+                                material_lines = re.findall(r'- ([A-Za-z.\s]+) ([\d.]+)t', refined_text)
                                 for mat, tons in material_lines:
-                                    mat_clean = mat.strip()
+                                    mat_clean = self._normalize_material_key(mat.strip())
                                     if not self._is_summary_entry(mat_clean):
-                                        materials_dict[mat_clean] = float(tons)
-                        
+                                        materials_dict[mat_clean] = materials_dict.get(mat_clean, 0.0) + float(tons)
+
                         # Convert dictionary to string format
                         if materials_dict:
                             materials_breakdown = ', '.join([f"{mat}: {tons:.1f}t" for mat, tons in materials_dict.items()])
-                    
+
                     # If materials_tracked is empty but we have materials_breakdown, count the materials
                     if not materials_tracked and materials_breakdown:
                         # Count comma-separated materials in breakdown
@@ -6021,7 +6032,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         ts = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         return self._save_session_report_with_timestamp(header, lines, overall_tph, cargo_session_data, comment, ts)
     
-    def _save_session_report_with_timestamp(self, header: str, lines: List[str], overall_tph: float, cargo_session_data: dict = None, comment: str = "", timestamp: str = None) -> str:
+    def _save_session_report_with_timestamp(self, header: str, lines: List[str], overall_tph: float, cargo_session_data: dict = None, comment: str = "", timestamp: str = None, active_minutes: float = None) -> str:
         """Save session report with specified timestamp"""
         if timestamp is None:
             timestamp = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -6072,7 +6083,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 parts.append(f"Hit Rate: {hit_rate:.1f}% (asteroids with valuable minerals)")
             
             # Session efficiency
-            active_minutes = max(self._active_seconds() / 60.0, 0.1)
+            if active_minutes is None:
+                active_minutes = max(self._active_seconds() / 60.0, 0.1)
             asteroids_per_min = asteroids_count / active_minutes
             parts.append(f"Prospecting Speed: {asteroids_per_min:.1f} asteroids/minute")
             
@@ -7481,10 +7493,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             'Osmium', 'Painite', 'Palladium', 'Platinum', 'Rhodplumsite',
             'Rutile', 'Serendibite', 'Silver', 'Tritium', 'Uraninite', 'Void Opals',
         ]
-        # Localized display names for dropdown
-        self._mining_commodities_display = [get_material(m) for m in self._mining_commodities_english]
+        # Localized display names for dropdown (abbreviate long names like LTD)
+        def _display_name(m):
+            if m == 'Low Temperature Diamonds':
+                return 'Low Temp Diamonds'
+            return get_material(m)
+        self._mining_commodities_display = [_display_name(m) for m in self._mining_commodities_english]
         # Reverse map: localized display name → English key
-        self._commodity_display_to_english = {get_material(m): m for m in self._mining_commodities_english}
+        self._commodity_display_to_english = {_display_name(m): m for m in self._mining_commodities_english}
         self._source_display_to_key = {display: key for key, display in self._source_filter_options}
         source_display_values = [display for key, display in self._source_filter_options]
         
@@ -9232,7 +9248,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                 filtered.append(session)
                         elif perf_key == 'core_mining':
                             core_mats = ['alexandrite', 'benitoite', 'grandidierite', 'monazite', 'musgravite',
-                                        'rhodplumsite', 'serendibite', 'taaffeite', 'void opals', 'low temperature diamonds']
+                                        'rhodplumsite', 'serendibite', 'taaffeite', 'void opals',
+                                        'low temperature diamonds', 'low temp. diamonds', 'low temp diamonds']
                             cargo_data = session.get('cargo_raw', session.get('cargo', '')).lower()
                             if any(m in cargo_data for m in core_mats):
                                 filtered.append(session)
@@ -9278,7 +9295,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                         import re as _re
                                         for part in cargo_raw.split(';'):
                                             part = part.strip()
-                                            m = _re.match(r'^([A-Za-z\s]+):\s*([\d.]+)t', part)
+                                            m = _re.match(r'^([A-Za-z.\s]+):\s*([\d.]+)t', part)
                                             if m:
                                                 mat_name = m.group(1).strip()
                                                 mat_tons = float(m.group(2))
@@ -10441,7 +10458,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             )
             live_tons = 0.0
             live_tph  = 0.0
-            if (self.main_app and
+            if not self.session_active and hasattr(self, 'last_session_data'):
+                live_tons = sum(saved.get('tons', 0.0) for saved in self.last_session_data.values())
+                live_tph  = sum(saved.get('tph', 0.0) for saved in self.last_session_data.values())
+            elif (self.main_app and
                     hasattr(self.main_app, 'cargo_monitor') and
                     hasattr(self.main_app.cargo_monitor, 'get_live_session_tons')):
                 try:
@@ -12211,7 +12231,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             import datetime as dt
             session_timestamp = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             
-            report_path = self._save_session_report_with_timestamp(header, lines, overall_tph, cargo_session_data, session_comment, session_timestamp)
+            report_path = self._save_session_report_with_timestamp(header, lines, overall_tph, cargo_session_data, session_comment, session_timestamp, active_minutes=active_hours * 60.0)
             
             # Update CSV index with new session data (pass timestamp for consistency)
             self._update_csv_with_session(sysname, body, elapsed_txt, total_tons, overall_tph, cargo_session_data, session_comment, session_timestamp)
