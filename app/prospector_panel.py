@@ -1569,6 +1569,80 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
     def _get_csv_path(self) -> str:
         """Get the consistent path to sessions_index.csv"""
         return os.path.join(self.reports_dir, "sessions_index.csv")
+
+    def get_last_mined_lookup(self, system_names: list) -> dict:
+        """Bulk lookup of the most recent mining report per (system, body) ring.
+
+        Returns {(system, body): (display_date, timestamp_raw)} using the same
+        system/body strings and date formatting as the Reports tab, so callers
+        can match against Ring Finder's System / Planet-Ring columns and pass
+        the result straight to open_report_by_system_body_timestamp().
+        """
+        result = {}
+        if not system_names:
+            return result
+        wanted = {s.lower() for s in system_names if s}
+        csv_path = self._get_csv_path()
+        if not os.path.exists(csv_path):
+            return result
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    system = row.get('system', '')
+                    if not system or system.lower() not in wanted:
+                        continue
+                    body = row.get('body', '')
+                    timestamp_raw = row.get('timestamp_utc', '')
+                    if not timestamp_raw:
+                        continue
+                    key = (system, body)
+                    existing = result.get(key)
+                    if existing is None or timestamp_raw > existing[1]:
+                        try:
+                            if timestamp_raw.endswith('Z'):
+                                timestamp = dt.datetime.fromisoformat(timestamp_raw.replace('Z', '+00:00'))
+                                timestamp = timestamp.replace(tzinfo=dt.timezone.utc).astimezone()
+                            else:
+                                timestamp = dt.datetime.fromisoformat(timestamp_raw)
+                            display_date = timestamp.strftime("%m/%d/%y %H:%M")
+                        except Exception:
+                            display_date = timestamp_raw
+                        result[key] = (display_date, timestamp_raw)
+        except Exception as e:
+            log.error(f"Error building last-mined lookup: {e}")
+        return result
+
+    def open_report_file_by_timestamp(self, system: str, body: str, timestamp_raw: str) -> bool:
+        """Open the Session_*.txt report matching the given timestamp.
+
+        Shared by the Reports tab's open_selected() and Ring Finder's
+        "Open Mining Report" context menu item so both use identical
+        file-lookup/open behavior.
+        """
+        self._set_status(f"Looking for report: {system} - {body}")
+        try:
+            from datetime import datetime
+            timestamp = datetime.fromisoformat(timestamp_raw.replace('Z', ''))
+            filename_timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+
+            if os.path.exists(self.reports_dir):
+                for filename in os.listdir(self.reports_dir):
+                    if (filename.startswith('Session_') and
+                            filename.endswith('.txt') and
+                            filename_timestamp in filename):
+                        fpath = os.path.join(self.reports_dir, filename)
+                        self._set_status(f"Opening report: {filename}")
+                        self._open_path(fpath)
+                        return True
+
+            self._set_status(f"Report file not found for {system} - {body}")
+            self._open_path(self.reports_dir)
+            return False
+        except Exception as e:
+            self._set_status(f"Error opening report: {e}")
+            self._open_path(self.reports_dir)
+            return False
     
     def _clear_reports_cache(self):
         """Clear all cached report data to prevent stale data issues"""
@@ -7892,32 +7966,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             system = session['system']
             body = session['body']
             timestamp_raw = session['timestamp_raw']
-            
-            self._set_status(f"Looking for report: {system} - {body}")
-            
-            try:
-                # Convert timestamp to filename format
-                from datetime import datetime
-                dt = datetime.fromisoformat(timestamp_raw.replace('Z', ''))
-                filename_timestamp = dt.strftime("%Y-%m-%d_%H-%M-%S")
-                
-                # Find file with exact timestamp
-                if os.path.exists(self.reports_dir):
-                    for filename in os.listdir(self.reports_dir):
-                        if (filename.startswith('Session_') and 
-                            filename.endswith('.txt') and
-                            filename_timestamp in filename):
-                            fpath = os.path.join(self.reports_dir, filename)
-                            self._set_status(f"Opening report: {filename}")
-                            self._open_path(fpath)
-                            return
-                
-                self._set_status(f"Report file not found for {system} - {body}")
-                self._open_path(self.reports_dir)
-                        
-            except Exception as e:
-                self._set_status(f"Error opening report: {e}")
-                self._open_path(self.reports_dir)
+
+            self.open_report_file_by_timestamp(system, body, timestamp_raw)
 
         def bookmark_selected():
             """Bookmark the selected mining location from reports"""

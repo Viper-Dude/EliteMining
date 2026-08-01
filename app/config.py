@@ -124,6 +124,7 @@ def flush_config() -> None:
     if _cached_config is not None:
         _last_save_time = 0
         _save_cfg(_cached_config)
+        log.info(f"Config flushed to disk on shutdown: {CONFIG_FILE}")
 
 def update_config_value(key: str, value: Any) -> None:
     """Update a single config key without affecting other values"""

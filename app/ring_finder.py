@@ -660,7 +660,18 @@ class RingFinder(ColumnVisibilityMixin):
                                                 selectcolor=_cb_select, relief="flat")
         self.unvisited_only_cb.pack(side="left", padx=(5, 30))
         ToolTip(self.unvisited_only_cb, t('ring_finder.tooltip_unvisited'))
-        
+
+        ttk.Label(misc_inner_row, text=t('ring_finder.favourites_only') + ":", foreground=unvisited_fg).pack(side="left")
+        self.favourites_only_var = tk.BooleanVar(value=False)
+        self.favourites_only_cb = tk.Checkbutton(misc_inner_row,
+                                                variable=self.favourites_only_var,
+                                                command=self._save_filter_settings,
+                                                bg=_cb_bg,
+                                                activebackground="#2e2e2e",
+                                                selectcolor=_cb_select, relief="flat")
+        self.favourites_only_cb.pack(side="left", padx=(5, 30))
+        ToolTip(self.favourites_only_cb, t('ring_finder.tooltip_favourites'))
+
         # Create a sub-frame for right-side filters (row 1-2) that will pack tightly
         right_filters_frame_row1 = ttk.Frame(search_frame)
         right_filters_frame_row1.grid(row=1, column=2, columnspan=2, sticky="w", padx=(10, 0))
@@ -723,7 +734,7 @@ class RingFinder(ColumnVisibilityMixin):
         ttk.Label(right_filters_frame_row2, text=t('ring_finder.max_results') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
         self.max_results_var = tk.StringVar(value="50")
         max_results_combo = ttk.Combobox(right_filters_frame_row2, textvariable=self.max_results_var, width=8, state="readonly")
-        max_results_combo['values'] = ("10", "20", "30", "50", "100", t('common.all'))
+        max_results_combo['values'] = ("10", "20", "30", "50", "100", "200")
         max_results_combo.pack(side="left", padx=(0, 10))
         max_results_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         
@@ -904,6 +915,9 @@ class RingFinder(ColumnVisibilityMixin):
         style.map("RingFinder.Treeview",
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
+
+        # Disable the dotted keyboard-focus indicator ttk draws on the last-clicked cell
+        style.configure("RingFinder.Treeview", focuscolor=style.lookup("RingFinder.Treeview", "background"))
         
         # Combobox styling for orange theme - make arrow button visible
         if current_theme == "elite_orange":
@@ -931,7 +945,7 @@ class RingFinder(ColumnVisibilityMixin):
                      arrowcolor=[('readonly', '#ff8c00')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "PowerPlay", "Source", "_spacer")
+        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "PowerPlay", "Source", "Favourite", "Last Mined", "_spacer")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview", selectmode='extended')
         
         # Track column visibility and default widths
@@ -948,7 +962,9 @@ class RingFinder(ColumnVisibilityMixin):
             "Visits": 60,
             "Reserve": 110,
             "Source": 70,
-            "PowerPlay": 170
+            "PowerPlay": 170,
+            "Favourite": 150,
+            "Last Mined": 110
         }
         self.column_visible = {col: True for col in columns}  # All visible by default
         
@@ -969,14 +985,16 @@ class RingFinder(ColumnVisibilityMixin):
             "RES Site": t('ring_finder.col_res'),
             "Reserve": t('ring_finder.col_reserve'),
             "Source": t('ring_finder.col_source'),
-            "PowerPlay": t('ring_finder.col_powerplay')
+            "PowerPlay": t('ring_finder.col_powerplay'),
+            "Favourite": t('ring_finder.col_favourite'),
+            "Last Mined": t('ring_finder.col_last_mined')
         }
         
         for col in columns:
             # Left-align headers - use display name if mapped, otherwise use column name
             display_name = column_display_names.get(col, col)
             # Center-align Visits header, left-align all others
-            header_anchor = "center" if col == "Visits" else "w"
+            header_anchor = "center" if col in ("Visits", "Favourite") else "w"
             self.results_tree.heading(col, text=display_name, anchor=header_anchor, command=lambda c=col: self._sort_column(c, False))
             
             # Bind right-click on header to show column menu
@@ -1010,6 +1028,10 @@ class RingFinder(ColumnVisibilityMixin):
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "PowerPlay":
                 self.results_tree.column(col, width=column_widths.get(col, 170), minwidth=80, anchor="w", stretch=False)
+            elif col == "Favourite":
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
+            elif col == "Last Mined":
+                self.results_tree.column(col, width=column_widths[col], minwidth=80, anchor="w", stretch=False)
             elif col == "_spacer":
                 # Spacer column — always last, gives every real column a draggable right border
                 self.results_tree.heading(col, text="", anchor="w")
@@ -1154,6 +1176,18 @@ class RingFinder(ColumnVisibilityMixin):
                 if not val or val == no_data_str:
                     return (0, "")
                 return (1, val.lower())
+            data.sort(key=sort_key, reverse=reverse)
+        elif col == "Last Mined":
+            # Chronological sort on "mm/dd/yy HH:MM" display strings; blanks sort last
+            import datetime as _dt
+            def sort_key(item):
+                val = item[0]
+                if not val:
+                    return _dt.datetime.min if not reverse else _dt.datetime.max
+                try:
+                    return _dt.datetime.strptime(val, "%m/%d/%y %H:%M")
+                except Exception:
+                    return _dt.datetime.min if not reverse else _dt.datetime.max
             data.sort(key=sort_key, reverse=reverse)
         elif col == "Hotspots":
             # Hotspots column - extract number from formats like "Plat (2)" or "LTD (3), Plat (2)"
@@ -1876,7 +1910,11 @@ class RingFinder(ColumnVisibilityMixin):
         # Unvisited Only
         if hasattr(self, 'unvisited_only_var'):
             self.unvisited_only_var.set(False)
-        
+
+        # Favourites Only
+        if hasattr(self, 'favourites_only_var'):
+            self.favourites_only_var.set(False)
+
         # Overlaps Only
         if hasattr(self, 'overlaps_only_var'):
             self.overlaps_only_var.set(False)
@@ -1913,10 +1951,7 @@ class RingFinder(ColumnVisibilityMixin):
             
             # Save canonical English identifiers to settings
             max_results_value = self.max_results_var.get()
-            # Convert localized "Alle" back to English "All" for storage
-            if max_results_value == t('common.all'):
-                max_results_value = "All"
-            
+
             # Convert localized reserve level back to English for storage
             reserve_value = self.reserve_var.get()
             reserve_map_to_english = {
@@ -1937,6 +1972,7 @@ class RingFinder(ColumnVisibilityMixin):
                 "min_hotspots": self.min_hotspots_var.get(),
                 "data_source": self.data_source_var.get(),  # Save data source preference
                 "unvisited_only": self.unvisited_only_var.get(),  # Save unvisited filter
+                "favourites_only": self.favourites_only_var.get(),  # Save favourites filter
                 "reserve": reserve_english,  # Save reserve filter
                 "reference_system": self.system_var.get(),  # Save last reference system
                 "pp_power": self.pp_power_var.get() if hasattr(self, 'pp_power_var') else 'Any',
@@ -1971,8 +2007,9 @@ class RingFinder(ColumnVisibilityMixin):
                 self.distance_var.set(settings["distance"])
             if "max_results" in settings:
                 max_results_value = settings["max_results"]
-                if max_results_value == "All":
-                    max_results_value = t('common.all')
+                # "All" was replaced by a 200 cap - map old saved settings to it
+                if max_results_value in ("All", t('common.all')):
+                    max_results_value = "200"
                 self.max_results_var.set(max_results_value)
             if "min_hotspots" in settings:
                 self.min_hotspots_var.set(settings["min_hotspots"])
@@ -1982,6 +2019,8 @@ class RingFinder(ColumnVisibilityMixin):
                 self._on_data_source_changed()
             if "unvisited_only" in settings:
                 self.unvisited_only_var.set(settings.get("unvisited_only", False))
+            if "favourites_only" in settings:
+                self.favourites_only_var.set(settings.get("favourites_only", False))
             if "reserve" in settings:
                 # Convert English reserve level back to localized display
                 reserve_map_to_localized = {
@@ -2405,9 +2444,7 @@ class RingFinder(ColumnVisibilityMixin):
             confirmed_only = False
             
         max_distance = float(self.distance_var.get() or "100")
-        max_results_str = self.max_results_var.get()
-        # Handle both English "All" and localized versions (e.g., "Alle" in German)
-        max_results = None if max_results_str in ('All', t('common.all')) else int(max_results_str)
+        max_results = int(self.max_results_var.get())
         
         # Auto-enable confirmed hotspots when filtering by specific material
         if not self._is_all_minerals(specific_material):
@@ -4941,7 +4978,26 @@ class RingFinder(ColumnVisibilityMixin):
             hotspots = [h for h in hotspots
                         if _early_visit_counts.get(h.get('systemName', h.get('system', '')), 0) == 0]
             print(f"[FILTER] Unvisited Only: {len(hotspots)} systems with 0 visits")
-        
+
+        # Bulk-prefetch favourite flags for favourite indicator/filter (avoids per-row DB connections)
+        _early_favourites = self.user_db.bulk_get_favourites_for_rings(_all_systems_early) if _all_systems_early else {}
+
+        # Bulk-prefetch last-mined report dates (avoids per-row CSV scans)
+        _last_mined_lookup = {}
+        if _all_systems_early and self.prospector_panel and hasattr(self.prospector_panel, 'get_last_mined_lookup'):
+            _last_mined_lookup = self.prospector_panel.get_last_mined_lookup(_all_systems_early)
+        self._last_mined_lookup = _last_mined_lookup
+
+        # Filter for favourite rings if checkbox is enabled
+        if self.favourites_only_var.get():
+            def _is_favourite_hotspot(h):
+                sys_name = h.get('systemName', h.get('system', ''))
+                ring_name = h.get('bodyName', h.get('ring', ''))
+                norm_ring = self.user_db._normalize_body_name(ring_name, sys_name) if hasattr(self.user_db, '_normalize_body_name') else ring_name
+                return _early_favourites.get((sys_name, norm_ring), False)
+            hotspots = [h for h in hotspots if _is_favourite_hotspot(h)]
+            print(f"[FILTER] Favourites Only: {len(hotspots)} favourite rings")
+
         # Filter by Reserve level if not "All"
         reserve_filter = self.reserve_var.get()
         if reserve_filter and reserve_filter != t('ring_finder.all_reserves'):
@@ -5060,6 +5116,7 @@ class RingFinder(ColumnVisibilityMixin):
                 ),  # Green first, then top, then rest
                 float(x.get('distance', 999)),           # Then: Distance (closest first)
                 x.get('systemName', x.get('system', '')).lower(),  # Then: System name (alphabetical)
+                x.get('ls_distance') if x.get('ls_distance') is not None else 999999,  # Then: LS distance (closest first)
                 # Normalize body name for grouping - strip system prefix if present
                 (lambda body, sys: body[len(sys):].strip().lower() if body.lower().startswith(sys.lower()) else body.lower())(
                     x.get('bodyName', x.get('ring', '')), 
@@ -5310,6 +5367,13 @@ class RingFinder(ColumnVisibilityMixin):
                 else:
                     pp_str = t('common.pp_no_data')
 
+            # Favourite indicator (using pre-fetched bulk data, no per-row DB calls)
+            favourite_display = "⭐" if _early_favourites.get(_bulk_key, False) else ""
+
+            # Last Mined date (using pre-fetched bulk data, no per-row CSV scans)
+            last_mined_entry = _last_mined_lookup.get((system_name, location_display))
+            last_mined_display = last_mined_entry[0] if last_mined_entry else ""
+
             _pending_row_data.append({
                 'values': (
                     hotspot.get('distance', 'No data'),
@@ -5325,6 +5389,8 @@ class RingFinder(ColumnVisibilityMixin):
                     res_display,
                     pp_str,
                     source_display,
+                    favourite_display,
+                    last_mined_display,
                 ),
                 'tags': tags,
                 'is_green': is_green,
@@ -5435,6 +5501,7 @@ class RingFinder(ColumnVisibilityMixin):
                                    selectcolor=menu_active_bg)
         self.context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_name)
         self.context_menu.add_command(label=t('context_menu.find_in_star_systems'), command=self._find_in_star_systems)
+        self.context_menu.add_command(label=t('context_menu.mark_favourite'), command=self._toggle_favourite_selected)
         self.context_menu.add_command(label=t('context_menu.set_as_reference'), command=self._set_as_reference_system)
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara)
@@ -5454,7 +5521,8 @@ class RingFinder(ColumnVisibilityMixin):
         self.context_menu.add_command(label=t('context_menu.edit_visits'), command=self._show_edit_visits_dialog)
         self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.bookmark_location'), command=self._bookmark_selected)
-    
+        self.context_menu.add_command(label=t('context_menu.open_mining_report'), command=self._open_mining_report_selected)
+
     def _show_context_menu(self, event):
         """Show the context menu when right-clicking on results"""
         try:
@@ -5478,18 +5546,18 @@ class RingFinder(ColumnVisibilityMixin):
                 has_local_with_reserve = False
                 has_local_only = False  # Track if any entries are local-only (for Set Reserve option)
                 systems_with_missing_reserve = set()
-                
+
                 for sel_item in selected_items:
                     values = self.results_tree.item(sel_item, 'values')
                     if values and len(values) > 12:
                         source = values[12]  # Source column is index 12
                         reserve = values[7] if len(values) > 7 else ""  # Reserve column is index 7
                         system_name = values[2] if len(values) > 2 else ""  # System column
-                        
+
                         # Check for Spansh source (🌐 emoji)
                         if source and '🌐' in str(source):
                             has_spansh_rows = True
-                        
+
                         # Check for Local source (🗄️ emoji)
                         if source and '🗄️' in str(source) and '🌐' not in str(source):
                             # Local only (not Both)
@@ -5552,13 +5620,13 @@ class RingFinder(ColumnVisibilityMixin):
                     mineral = self._to_english(mineral_display)
                     is_specific_mineral = not self._is_all_minerals(mineral)
                     
-                    # Menu item index for "Find Sell Station" is 8 (after copy_system, find_in_star_systems, set_as_reference, separator, inara, edsm, spansh, separator)
+                    # Menu item index for "Find Sell Station" is 9 (after copy_system, find_in_star_systems, mark_favourite, set_as_reference, separator, inara, edsm, spansh, separator)
                     if is_specific_mineral:
-                        self.context_menu.entryconfig(8, state="normal")
+                        self.context_menu.entryconfig(9, state="normal")
                     else:
-                        self.context_menu.entryconfig(8, state="disabled")
+                        self.context_menu.entryconfig(9, state="disabled")
 
-                    # Show/hide "Save to Database" option (index 9, after separator) based on Source column
+                    # Show/hide "Save to Database" option (index 11, after separator) based on Source column
                     # Allow save in Ring Search mode if row has hotspot data
                     is_ring_search_mode = self.ring_type_only_var.get()
                     has_hotspot_data = False
@@ -5571,28 +5639,53 @@ class RingFinder(ColumnVisibilityMixin):
 
                     # Enable if Spansh rows AND (not ring search mode OR has hotspot data)
                     if has_spansh_rows and (not is_ring_search_mode or has_hotspot_data):
-                        self.context_menu.entryconfig(10, state="normal")
-                    else:
-                        self.context_menu.entryconfig(10, state="disabled")
-
-                    # Show/hide "Update Reserve Level" option (index 11) based on Local source + missing reserve
-                    if enable_update_reserve:
                         self.context_menu.entryconfig(11, state="normal")
                     else:
                         self.context_menu.entryconfig(11, state="disabled")
 
-                    # Enable/disable "Set Reserve" option (index 17) - only for local database entries
-                    if has_local_only:
-                        self.context_menu.entryconfig(17, state="normal")
+                    # Show/hide "Update Reserve Level" option (index 12) based on Local source + missing reserve
+                    if enable_update_reserve:
+                        self.context_menu.entryconfig(12, state="normal")
                     else:
-                        self.context_menu.entryconfig(17, state="disabled")
+                        self.context_menu.entryconfig(12, state="disabled")
 
-                    # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: set_as_reference, 3: separator,
-                    # 4: inara, 5: edsm, 6: spansh, 7: separator, 8: find_sell_station, 9: separator,
-                    # 10: save_to_db, 11: update_reserve, 12: separator,
-                    # 13: edit_hotspots, 14: set_overlap, 15: set_res, 16: set_reserve, 17: edit_visits
-                    # 18: separator, 19: bookmark
-                    
+                    # Enable/disable "Set Reserve" option (index 18) - only for local database entries
+                    if has_local_only:
+                        self.context_menu.entryconfig(18, state="normal")
+                    else:
+                        self.context_menu.entryconfig(18, state="disabled")
+
+                    # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: mark_favourite, 3: set_as_reference,
+                    # 4: separator, 5: inara, 6: edsm, 7: spansh, 8: separator, 9: find_sell_station, 10: separator,
+                    # 11: save_to_db, 12: update_reserve, 13: separator,
+                    # 14: edit_hotspots, 15: set_overlap, 16: set_res, 17: set_reserve, 18: edit_ring_type, 19: edit_visits
+                    # 20: separator, 21: bookmark, 22: open_mining_report
+
+                    # Enable "Open Mining Report" only when a report exists for this row (Last Mined column)
+                    has_mining_report = False
+                    if selected_items:
+                        values = self.results_tree.item(selected_items[0], 'values')
+                        if values and len(values) > 14:
+                            has_mining_report = bool(values[14])
+                    self.context_menu.entryconfig(22, state="normal" if has_mining_report else "disabled")
+
+                    # Favourite toggle only applies to rows saved in the local database
+                    has_local_row = False
+                    is_favourite_row = False
+                    if selected_items:
+                        values = self.results_tree.item(selected_items[0], 'values')
+                        if values and len(values) > 12:
+                            source = values[12]
+                            if source and '🗄️' in str(source):
+                                has_local_row = True
+                                is_favourite_row = len(values) > 13 and values[13] == "⭐"
+
+                    if has_local_row:
+                        self.context_menu.entryconfig(2, state="normal",
+                                                       label=t('context_menu.remove_favourite') if is_favourite_row else t('context_menu.mark_favourite'))
+                    else:
+                        self.context_menu.entryconfig(2, state="disabled", label=t('context_menu.mark_favourite'))
+
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             if hasattr(self, 'context_menu'):
@@ -5643,17 +5736,33 @@ class RingFinder(ColumnVisibilityMixin):
         self.parent.after(100, self.search_hotspots)
 
     def _on_double_click(self, event):
-        """Open Inara and fetch/refresh PP data when double-clicking a row's PowerPlay cell."""
+        """Handle double-click on a specific results cell.
+
+        - PowerPlay cell: open Inara and fetch/refresh PP data.
+        - Last Mined cell (if a report exists): open that mining report.
+        """
         if self.results_tree.identify_region(event.x, event.y) != "cell":
             return
         item = self.results_tree.identify_row(event.y)
         if not item:
             return
-        values = self.results_tree.item(item, 'values')
-        if not values or len(values) <= 11:
+        column = self.results_tree.identify_column(event.x)
+        try:
+            col_index = int(column.replace('#', '')) - 1
+            col_name = self.results_tree['columns'][col_index]
+        except (ValueError, IndexError):
             return
-        self.results_tree.selection_set(item)
-        self._open_inara()
+
+        values = self.results_tree.item(item, 'values')
+
+        if col_name == "PowerPlay":
+            if not values or len(values) <= 11:
+                return
+            self.results_tree.selection_set(item)
+            self._open_inara()
+        elif col_name == "Last Mined":
+            self.results_tree.selection_set(item)
+            self._open_mining_report_selected()
 
     def _open_inara(self):
         """Open selected system(s) in Inara and fetch/refresh their PP data"""
@@ -6516,6 +6625,82 @@ class RingFinder(ColumnVisibilityMixin):
         except Exception as e:
             print(f"Error bookmarking ring location: {e}")
             self.status_var.set(f"Error bookmarking location: {e}")
+
+    def _open_mining_report_selected(self):
+        """Open the most recent mining report for the selected ring (Last Mined column)."""
+        try:
+            selection = self.results_tree.selection()
+            if not selection:
+                return
+
+            values = self.results_tree.item(selection[0], 'values')
+            if not values or len(values) < 5:
+                return
+
+            system_name = values[2]  # System column
+            ring_name = values[3]    # Planet/Ring column
+
+            entry = getattr(self, '_last_mined_lookup', {}).get((system_name, ring_name))
+            if not entry:
+                self.status_var.set(f"No mining report found for {system_name} - {ring_name}")
+                return
+
+            _, timestamp_raw = entry
+            if not self.prospector_panel or not hasattr(self.prospector_panel, 'open_report_file_by_timestamp'):
+                self.status_var.set("Mining report viewer not available")
+                return
+
+            self.prospector_panel.open_report_file_by_timestamp(system_name, ring_name, timestamp_raw)
+
+        except Exception as e:
+            print(f"Error opening mining report: {e}")
+            self.status_var.set(f"Error opening mining report: {e}")
+
+    def _toggle_favourite_selected(self, mark: Optional[bool] = None):
+        """Toggle favourite flag for the selected ring(s).
+
+        Args:
+            mark: True to mark, False to unmark, None to toggle based on the
+                  first selected row's current state (single-select context menu).
+        """
+        try:
+            selection = self.results_tree.selection()
+            if not selection:
+                self.status_var.set(t('context_menu.no_selection_favourite'))
+                return
+
+            if mark is None:
+                first_values = self.results_tree.item(selection[0], 'values')
+                is_currently_favourite = len(first_values) > 13 and first_values[13] == "⭐"
+                mark = not is_currently_favourite
+
+            updated = 0
+            for item in selection:
+                values = self.results_tree.item(item, 'values')
+                if not values or len(values) < 13:
+                    continue
+                source = values[12]
+                if not source or '🗄️' not in str(source):
+                    continue  # Only local database rows can be favourited
+
+                system_name = values[2]
+                ring_name = values[3]
+                if not system_name or not ring_name:
+                    continue
+
+                if self.user_db.set_favourite(system_name, ring_name, mark):
+                    self.results_tree.set(item, "Favourite", "⭐" if mark else "")
+                    updated += 1
+
+            if updated:
+                self.status_var.set(t('context_menu.favourite_updated').format(count=updated) if mark
+                                     else t('context_menu.favourite_removed').format(count=updated))
+            else:
+                self.status_var.set(t('context_menu.no_selection_favourite'))
+
+        except Exception as e:
+            print(f"Error toggling favourite: {e}")
+            self.status_var.set(f"Error toggling favourite: {e}")
 
     def _expand_abbreviated_materials(self, hotspots_text: str) -> str:
         """Convert abbreviated materials back to full names for bookmarks and overlap tags"""

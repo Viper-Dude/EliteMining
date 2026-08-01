@@ -84,8 +84,24 @@ class UserDatabase:
             db_path = os.path.join(data_dir, "user_data.db")
             
         self.db_path = db_path
+        self._enable_wal_mode()
         self._create_tables()
         self._run_migrations()
+
+    def _enable_wal_mode(self) -> None:
+        """Switch the db file to WAL journal mode (persists in the file header).
+
+        Rollback-journal mode (the sqlite3 default) locks the whole file during
+        writes, so a search-worker query can block a main-thread connection to
+        the same file (or vice versa). WAL lets readers and a writer proceed
+        concurrently, which is what search worker threads need since every
+        method here opens its own short-lived connection.
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute('PRAGMA journal_mode=WAL')
+        except Exception as e:
+            print(f"[DB] Could not enable WAL mode: {e}")
     
     def _get_migration_version(self, migration_name: str) -> int:
         """Get the version number for a specific migration"""
@@ -1338,7 +1354,13 @@ class UserDatabase:
                     print("Added res_tag column to hotspot_data")
                 except sqlite3.OperationalError:
                     pass  # Column already exists
-                
+
+                try:
+                    conn.execute('ALTER TABLE hotspot_data ADD COLUMN favourite INTEGER DEFAULT 0')
+                    print("Added favourite column to hotspot_data")
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
+
                 conn.execute('''
                     CREATE TABLE IF NOT EXISTS visited_systems (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2557,6 +2579,81 @@ class UserDatabase:
             log.error(f"Error setting overlap tag: {e}")
             return False
     
+    def set_favourite(self, system_name: str, body_name: str, is_favourite: bool) -> bool:
+        """Set favourite flag for a ring (applies to all materials on that ring)
+
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            is_favourite: True to mark as favourite, False to unmark
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            body_name = self._normalize_body_name(body_name, system_name)
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE hotspot_data
+                    SET favourite = ?
+                    WHERE system_name = ? AND body_name = ?
+                ''', (1 if is_favourite else 0, system_name, body_name))
+
+                conn.commit()
+                return True
+        except Exception as e:
+            log.error(f"Error setting favourite: {e}")
+            return False
+
+    def get_favourite(self, system_name: str, body_name: str) -> bool:
+        """Get favourite flag for a ring
+
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+
+        Returns:
+            True if any material on this ring is marked favourite
+        """
+        try:
+            body_name = self._normalize_body_name(body_name, system_name)
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT favourite FROM hotspot_data
+                    WHERE system_name = ? AND body_name = ? AND favourite = 1
+                    LIMIT 1
+                ''', (system_name, body_name))
+                return cursor.fetchone() is not None
+        except Exception as e:
+            log.error(f"Error getting favourite: {e}")
+            return False
+
+    def bulk_get_favourites_for_rings(self, system_names: list) -> dict:
+        """Batch fetch favourite flags for all rings belonging to a list of systems.
+        Returns {(system_name, body_name): True} for rings marked favourite.
+        One DB connection instead of one per ring.
+        """
+        if not system_names:
+            return {}
+        unique_systems = list(set(system_names))
+        placeholders = ','.join('?' * len(unique_systems))
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                rows = conn.execute(
+                    f'SELECT DISTINCT system_name, body_name '
+                    f'FROM hotspot_data WHERE favourite = 1 '
+                    f'AND system_name IN ({placeholders})',
+                    unique_systems
+                ).fetchall()
+            return {(sys_name, body_name): True for sys_name, body_name in rows}
+        except Exception as e:
+            log.error(f"Error bulk getting favourites: {e}")
+            return {}
+
     def get_overlap_tag(self, system_name: str, body_name: str, material_name: str) -> Optional[str]:
         """Get overlap tag for a specific hotspot
         

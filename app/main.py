@@ -229,22 +229,32 @@ class TextOverlay:
         self._is_showing = True
         if not self._game_hidden and not getattr(self, '_sc_hidden', False) and not getattr(self, '_session_hidden', False):
             self.overlay_window.deiconify()
+            logging.debug(f"[OVERLAY] show_message: deiconified, duration={self.display_duration}ms")
+        else:
+            logging.debug(f"[OVERLAY] show_message: gated (game_hidden={self._game_hidden}, "
+                          f"sc_hidden={getattr(self, '_sc_hidden', False)}, "
+                          f"session_hidden={getattr(self, '_session_hidden', False)})")
 
         # Cancel any existing timer
         if self.fade_timer:
             self.overlay_window.after_cancel(self.fade_timer)
-            
+
         # Schedule hide after display duration
         self.fade_timer = self.overlay_window.after(self.display_duration, self._timed_hide)
         
-    def show_persistent_message(self, message: str):
-        """Display a message that stays visible until manually hidden (for cargo full prompt)"""
+    def show_persistent_message(self, message: str, max_lifetime_ms: int = 120000):
+        """Display a message that stays visible until manually hidden (for cargo full prompt).
+
+        max_lifetime_ms is a safety cap: if the caller never hides this overlay
+        (e.g. the owning dialog never fires its callback), it auto-hides instead
+        of staying stuck on screen indefinitely.
+        """
         if not self.overlay_enabled:
             return
-            
+
         if not self.overlay_window:
             self.create_overlay()
-        
+
         # Draw text BEFORE showing window to prevent flicker
         self._draw_text(message)
 
@@ -256,11 +266,16 @@ class TextOverlay:
         self._is_showing = True
         if not self._game_hidden and not getattr(self, '_sc_hidden', False) and not getattr(self, '_session_hidden', False):
             self.overlay_window.deiconify()
-        
-        # Cancel any existing timer - this message stays until manually hidden
+            logging.debug(f"[OVERLAY] show_persistent_message: deiconified, watchdog={max_lifetime_ms}ms")
+        else:
+            logging.debug(f"[OVERLAY] show_persistent_message: gated (game_hidden={self._game_hidden}, "
+                          f"sc_hidden={getattr(self, '_sc_hidden', False)}, "
+                          f"session_hidden={getattr(self, '_session_hidden', False)})")
+
+        # Cancel any existing timer, then arm the safety watchdog
         if self.fade_timer:
             self.overlay_window.after_cancel(self.fade_timer)
-            self.fade_timer = None
+        self.fade_timer = self.overlay_window.after(max_lifetime_ms, self._timed_hide)
 
     def _draw_text(self, message: str):
         """Draw text with outline on canvas"""
@@ -318,9 +333,11 @@ class TextOverlay:
         if self.overlay_window:
             self.overlay_window.withdraw()
             self._is_showing = False
+            logging.debug("[OVERLAY] hide_overlay: withdrawn")
 
     def _timed_hide(self):
-        """Called when display duration expires"""
+        """Called when display duration (or the persistent-message watchdog) expires"""
+        logging.debug("[OVERLAY] _timed_hide: auto-hide fired")
         self._is_showing = False
         if self.overlay_window:
             self.overlay_window.withdraw()
@@ -698,7 +715,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.2.8"
+APP_VERSION = "v5.2.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -2368,22 +2385,32 @@ class CargoMonitor:
             # Update cargo items
             self.cargo_items = new_cargo
             self.current_cargo = count
-            self.update_display()
-            
+
             # Update mining mission progress from cargo
             self._update_mission_progress_from_cargo()
-            
-            # Notify main app of changes
-            if self.update_callback:
-                self.update_callback()
-            
-            if hasattr(self, 'status_label'):
-                self.status_label.configure(text=f"✅ Cargo.json: {len(self.cargo_items)} items, {self.current_cargo}t")
-            
+
+            # The rest touches Tk widgets (update_display, status_label, and
+            # whatever update_callback does) — must run on the main thread.
+            # Tcl/Tk is not thread-safe and this can be reached from the
+            # background journal-monitor thread.
+            main_app = getattr(self, 'main_app_ref', None)
+            if main_app is not None and threading.current_thread() is not threading.main_thread():
+                main_app.after(0, self._finish_read_cargo_json)
+            else:
+                self._finish_read_cargo_json()
+
             return True
-            
+
         except Exception as e:
             return False
+
+    def _finish_read_cargo_json(self):
+        """UI-touching tail of read_cargo_json — must run on the main thread."""
+        self.update_display()
+        if self.update_callback:
+            self.update_callback()
+        if hasattr(self, 'status_label'):
+            self.status_label.configure(text=f"✅ Cargo.json: {len(self.cargo_items)} items, {self.current_cargo}t")
     
     def _update_mission_progress_from_cargo(self):
         """Update mining mission progress based on current cargo contents"""
@@ -3419,12 +3446,12 @@ cargo panel forces Elite to write detailed inventory data.
                 with open(self.last_journal_file, 'r', encoding='utf-8') as f:
                     f.seek(self.last_file_size)  # Start from where we left off
                     new_lines = f.readlines()
-                    
+
                 for line in new_lines:
                     line = line.strip()
                     if line:
                         self.process_journal_event(line)
-                
+
                 # Success - exit retry loop
                 return
                         
@@ -3446,7 +3473,20 @@ cargo panel forces Elite to write detailed inventory data.
                 return
     
     def process_journal_event(self, line: str):
-        """Process a single journal event"""
+        """Process a single journal event.
+
+        Dispatches to the main thread when called from the background monitor
+        thread — this method touches Tk widgets directly (cargo_text,
+        capacity_label, etc.), and Tcl/Tk is not thread-safe: calling it from
+        a non-main thread can hang or corrupt the interpreter.
+        """
+        main_app = getattr(self, 'main_app_ref', None)
+        if main_app is not None and threading.current_thread() is not threading.main_thread():
+            main_app.after(0, self._process_journal_event_impl, line)
+            return
+        self._process_journal_event_impl(line)
+
+    def _process_journal_event_impl(self, line: str):
         try:
             event = json.loads(line)
             event_type = event.get("event", "")
@@ -8993,10 +9033,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 saved_pos = load_main_sash_position()
                 
                 # Validate saved position ensures both areas have minimum width
-                if (saved_pos is not None and 
-                    saved_pos >= min_content_width and 
+                if (saved_pos is not None and
+                    saved_pos >= min_content_width and
                     saved_pos <= total_width - min_sidebar_width):
                     self.main_paned.sashpos(0, saved_pos)
+                    log.info(f"Main sash position restored: {saved_pos}")
                 else:
                     # Default: sidebar ~300px wide
                     sash_pos = total_width - 300
@@ -9004,15 +9045,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     sash_pos = max(sash_pos, min_content_width)
                     sash_pos = min(sash_pos, total_width - min_sidebar_width)
                     self.main_paned.sashpos(0, sash_pos)
-                
+                    log.info(f"Main sash position using default: {sash_pos} (saved_pos={saved_pos})")
+
                 # Mark sash as initialized - now saving is allowed
                 self._sash_initialized = True
-                
+
                 # Now set up the sidebar sash after main sash is done
                 self.after(100, _set_sidebar_sash)
-                    
+
             except Exception as e:
-                print(f"Error setting main sash: {e}")
+                log.exception(f"Error setting main sash: {e}")
         
         # Set sidebar sash AFTER main sash is set
         def _set_sidebar_sash(retry_count=0):
@@ -9039,10 +9081,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 saved_pos = load_sidebar_sash_position()
                 
                 # Validate saved position ensures both panes have minimum height
-                if (saved_pos is not None and 
-                    saved_pos >= min_presets_height and 
+                if (saved_pos is not None and
+                    saved_pos >= min_presets_height and
                     saved_pos <= total_height - min_cargo_height):
                     paned_window.sashpos(0, saved_pos)
+                    log.info(f"Sidebar sash position restored: {saved_pos}")
                 else:
                     # Default: give 60% to presets, 40% to cargo monitor
                     sash_pos = int(total_height * 0.6)
@@ -9050,10 +9093,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     sash_pos = max(sash_pos, min_presets_height)
                     sash_pos = min(sash_pos, total_height - min_cargo_height)
                     paned_window.sashpos(0, sash_pos)
-                
+                    log.info(f"Sidebar sash position using default: {sash_pos} (saved_pos={saved_pos})")
+
                 self._sidebar_sash_initialized = True
             except Exception as e:
-                print(f"Error setting sidebar sash: {e}")
+                log.exception(f"Error setting sidebar sash: {e}")
         
         # Delay to ensure window geometry is fully applied
         self.after(500, _set_initial_sash)
@@ -9067,8 +9111,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 pos = self.main_paned.sashpos(0)
                 if pos > 200:  # Only save valid positions
                     save_main_sash_position(pos)
+                    log.debug(f"Main sash position saved: {pos}")
             except Exception:
-                pass
+                log.exception("Failed to save main sash position")
         self.main_paned.bind("<ButtonRelease-1>", _on_main_sash_moved)
 
         # Create vertical paned window for split layout
@@ -9261,9 +9306,33 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 pos = paned_window.sashpos(0)
                 if pos > 100:  # Only save valid positions
                     save_sidebar_sash_position(pos)
+                    log.debug(f"Sidebar sash position saved: {pos}")
             except Exception:
-                pass
+                log.exception("Failed to save sidebar sash position")
         paned_window.bind("<ButtonRelease-1>", _on_sidebar_sash_moved)
+
+    def _save_sash_positions_now(self) -> None:
+        """Force-save current sash positions, bypassing the ButtonRelease-1 trigger.
+        Used as a shutdown safety net so a resize just before close isn't lost."""
+        try:
+            if getattr(self, '_sash_initialized', False) and hasattr(self, 'main_paned'):
+                from config import save_main_sash_position
+                pos = self.main_paned.sashpos(0)
+                if pos > 200:
+                    save_main_sash_position(pos)
+                    log.info(f"Main sash position saved on close: {pos}")
+        except Exception:
+            log.exception("Failed to save main sash position on close")
+
+        try:
+            if getattr(self, '_sidebar_sash_initialized', False) and hasattr(self, 'sidebar_paned'):
+                from config import save_sidebar_sash_position
+                pos = self.sidebar_paned.sashpos(0)
+                if pos > 100:
+                    save_sidebar_sash_position(pos)
+                    log.info(f"Sidebar sash position saved on close: {pos}")
+        except Exception:
+            log.exception("Failed to save sidebar sash position on close")
 
     def _reinitialize_sash_positions(self):
         """Re-apply saved sash positions after window geometry is fully restored.
@@ -9282,6 +9351,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     saved_pos >= min_content_width and
                     saved_pos <= total_width - min_sidebar_width):
                     self.main_paned.sashpos(0, saved_pos)
+                    log.info(f"Main sash position re-applied: {saved_pos}")
                 self._sash_initialized = True
 
             # --- Sidebar vertical sash (presets | cargo) ---
@@ -9297,10 +9367,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         saved_pos >= min_presets_height and
                         saved_pos <= total_height - min_cargo_height):
                         paned.sashpos(0, saved_pos)
+                        log.info(f"Sidebar sash position re-applied: {saved_pos}")
                     self._sidebar_sash_initialized = True
 
         except Exception as e:
-            print(f"Error reinitializing sash positions: {e}")
+            log.exception(f"Error reinitializing sash positions: {e}")
         
     def _refresh_voice_list(self):
         """Refresh the TTS voice dropdown list"""
@@ -15660,9 +15731,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.update_idletasks()
             geometry = self.geometry()
             save_window_geometry({"geometry": geometry, "zoomed": is_zoomed})
+            log.info(f"Window geometry saved before restart: {geometry} (zoomed={is_zoomed})")
         except Exception as e:
-            print(f"Error saving window geometry before restart: {e}")
-        
+            log.exception(f"Error saving window geometry before restart: {e}")
+
+        self._save_sash_positions_now()
+
         # Save any pending data before restart
         try:
             if hasattr(self, 'prospector_panel') and self.prospector_panel.session_active:
@@ -16088,9 +16162,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.update_idletasks()
             geom = self.geometry()
             save_window_geometry({"geometry": geom, "zoomed": is_zoomed})
+            log.info(f"Window geometry saved on close: {geom} (zoomed={is_zoomed})")
         except Exception:
-            pass
-        
+            log.exception("Failed to save window geometry on close")
+
+        # Safety net: sash positions normally save on <ButtonRelease-1>, but that
+        # event may never fire if the window closes mid-drag or via a resize that
+        # doesn't release over the paned widget. Capture current positions here too.
+        self._save_sash_positions_now()
+
         # Save marketplace filter settings
         try:
             cfg = _load_cfg()
