@@ -419,26 +419,31 @@ class MarketplaceAPI:
 
                 rows = cursor.fetchall()
 
-            # Batch-resolve coordinates for all systems missing them in one query
+            # Batch-resolve coordinates for all systems missing them, chunked to stay
+            # under SQLite's max-variable limit (can be as low as 999 on some builds).
             coords_cache = {}
-            missing_systems = {row["system_name"] for row in rows
-                               if row["system_x"] is None and row["system_name"]}
+            missing_systems = [row["system_name"] for row in rows
+                               if row["system_x"] is None and row["system_name"]]
             if missing_systems:
+                _CHUNK = 500
                 try:
                     from local_database import LocalSystemsDatabase
                     galaxy_db = LocalSystemsDatabase()
                     if galaxy_db.is_database_available():
                         import sqlite3 as _sqlite3
-                        placeholders = ",".join("?" for _ in missing_systems)
                         with _sqlite3.connect(str(galaxy_db.db_path)) as _gconn:
                             _gconn.row_factory = _sqlite3.Row
                             _gcur = _gconn.cursor()
-                            _gcur.execute(
-                                f"SELECT name, x, y, z FROM systems WHERE name IN ({placeholders})",
-                                list(missing_systems)
-                            )
-                            for gr in _gcur.fetchall():
-                                coords_cache[gr["name"]] = (gr["x"], gr["y"], gr["z"])
+                            unique_missing = list(set(missing_systems))
+                            for i in range(0, len(unique_missing), _CHUNK):
+                                chunk = unique_missing[i:i + _CHUNK]
+                                placeholders = ",".join("?" for _ in chunk)
+                                _gcur.execute(
+                                    f"SELECT name, x, y, z FROM systems WHERE name IN ({placeholders})",
+                                    chunk
+                                )
+                                for gr in _gcur.fetchall():
+                                    coords_cache[gr["name"]] = (gr["x"], gr["y"], gr["z"])
                 except Exception as _ce:
                     print(f"[EDDN CACHE] Batch coord lookup failed: {_ce}")
 
@@ -1222,14 +1227,16 @@ class MarketplaceAPI:
                 sys_x = result.get('systemX')
                 sys_y = result.get('systemY')
                 sys_z = result.get('systemZ')
-                
+
                 if sys_x is not None and sys_y is not None and sys_z is not None:
-                    dx = sys_x - ref_x
-                    dy = sys_y - ref_y
-                    dz = sys_z - ref_z
-                    distance = (dx**2 + dy**2 + dz**2) ** 0.5
-                    result['distance'] = distance
-            
+                    try:
+                        dx = float(sys_x) - ref_x
+                        dy = float(sys_y) - ref_y
+                        dz = float(sys_z) - ref_z
+                        result['distance'] = (dx**2 + dy**2 + dz**2) ** 0.5
+                    except (TypeError, ValueError) as e:
+                        print(f"[DISTANCE CALC] Bad coords for {result.get('systemName')}: {e}")
+
             return results
             
         except Exception as e:

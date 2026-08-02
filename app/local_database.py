@@ -353,10 +353,28 @@ class LocalSystemsDatabase:
         except:
             return False
             
-    def find_nearby_systems(self, center_x: float, center_y: float, center_z: float, 
+    def get_system_coordinates(self, system_name: str) -> Optional[Dict]:
+        """Look up a single system's coordinates by name.
+
+        Returns:
+            Dict with 'x', 'y', 'z' keys, or None if not found.
+        """
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            cursor.execute("SELECT x, y, z FROM systems WHERE name = ?", (system_name,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {'x': row[0], 'y': row[1], 'z': row[2]}
+            return None
+        except Exception:
+            return None
+
+    def find_nearby_systems(self, center_x: float, center_y: float, center_z: float,
                            max_distance: float, limit: int = 100, cache_context: str = None) -> List[Dict]:
         """Find systems within radius of center point
-        
+
         Args:
             center_x, center_y, center_z: Center coordinates
             max_distance: Maximum distance in light years

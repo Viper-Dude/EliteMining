@@ -1,15 +1,10 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-August-01
+**Release Date:** 2026-August-02
 
-## New Features & Improvements
 
-- Favourite hotspots feature — tag, view, and filter your favourite spots with one click. (right click menu)
-- Hotspot Finder now shows when you last mined each ring, with a quick way to open that report.
-- Max Results in Hotspot Finder now caps at 200 instead of "All", for faster searches.
 
-### Bug Fixes
-- Fixed: window and Cargo Monitor sidebar size now reliably restore on app restart.
-- Fixed: mining overlay could get stuck on screen with a black background if the app froze.
+### Hot Fix
+- Fixed Commodity Market galaxy-wide search hanging indefinitely when searching for Platinum with results sorted by distance
 
 
 ### Voiceattack Profile no update (v5.2.5)
