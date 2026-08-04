@@ -366,7 +366,7 @@ def format_mining_report_embed(session_data: dict) -> dict:
                 "inline": True
             },
             {
-                "name": "Prospected",
+                "name": "Limpets Used",
                 "value": str(prospectors_used),
                 "inline": True
             },
@@ -394,7 +394,7 @@ def format_mining_report_embed(session_data: dict) -> dict:
         ],
         "footer": {
             "text": "EliteMining Community - Elite Dangerous Mining Assistant",
-            "icon_url": "https://raw.githubusercontent.com/Viper-Dude/EliteMining/main/app/Images/EliteMining_Icon_64.png"
+            
         }
     }
     

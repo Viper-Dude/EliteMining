@@ -1,10 +1,9 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-August-02
+**Release Date:** 2026-August-04
 
 
-
-### Hot Fixes
-- Fixed Commodity Market galaxy-wide search hanging indefinitely when searching for Platinum with results sorted by distance
+### Bug Fix
+- Fixed the active ship preset sometimes switching back to a different preset after restarting the app
 
 
 ### Voiceattack Profile no update (v5.2.5)

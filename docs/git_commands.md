@@ -8,8 +8,7 @@ python firstrun_sim.py
 # Git Commands Reference
 
 # Git Push
-git add .
-git commit -m "v5.2.5 - Fixses
+git commit -m "v5.3.0 - Hot Fix - Commodity Market galaxy-wide search"
 git push
 
 ## Standard Commit and Push Process

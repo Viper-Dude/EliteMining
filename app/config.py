@@ -15,6 +15,9 @@ _last_save_time = 0
 _pending_save = None
 _save_throttle_seconds = 0.5  # Minimum time between saves
 
+# True when _cached_config has changes not yet written to disk (throttled save)
+_cache_dirty = False
+
 # Get the correct config file path based on execution context
 def _get_config_path() -> str:
     # Always try to use a shared config location for consistency
@@ -55,11 +58,11 @@ log = logging.getLogger("EliteMining.Config")
 def _load_cfg() -> Dict[str, Any]:
     global _last_load_time, _cached_config
     now = time.time()
-    
+
     # Only reload if more than 2 seconds have passed
-    if now - _last_load_time < 2.0 and _cached_config:
+    if (now - _last_load_time < 2.0 or _cache_dirty) and _cached_config:
         return _cached_config.copy()
-    
+
     _last_load_time = now
     if os.path.exists(CONFIG_FILE):
         try:
@@ -76,15 +79,18 @@ def _load_cfg() -> Dict[str, Any]:
     return {}
 
 def _save_cfg(cfg: Dict[str, Any]) -> None:
-    global _cached_config, _last_load_time, _last_save_time
-    
+    global _cached_config, _last_load_time, _last_save_time, _cache_dirty
+
     now = time.time()
-    
+
     # Throttle saves - if we saved less than 0.5 seconds ago, skip with DEBUG log
     if now - _last_save_time < _save_throttle_seconds:
         log.debug(f"Config save throttled (last save {now - _last_save_time:.2f}s ago)")
-        # Update cache anyway so the data isn't lost
+        # Update cache anyway so the data isn't lost, and mark it dirty so a
+        # later _load_cfg() doesn't re-read stale data from disk and clobber
+        # this unflushed change before it's actually written out.
         _cached_config = cfg.copy()
+        _cache_dirty = True
         return
 
     try:
@@ -104,7 +110,8 @@ def _save_cfg(cfg: Dict[str, Any]) -> None:
         _cached_config = cfg.copy()
         _last_load_time = now
         _last_save_time = now
-            
+        _cache_dirty = False
+
         # Only log verification if there's an issue
         if not os.path.exists(CONFIG_FILE):
             log.error(f"Config file was not created: {CONFIG_FILE}")
