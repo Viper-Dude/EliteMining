@@ -1648,7 +1648,7 @@ class CargoMonitor:
             "Tellurium": 4,
             "Yttrium": 4
         }
-        
+
         # Load saved window position
         saved_pos = load_cargo_window_position()
         self.window_x = saved_pos["x"]
@@ -1829,9 +1829,10 @@ class CargoMonitor:
                 # Update UI displays
                 self._update_system_display()
                 
-                # Update Ring Finder if it exists
-                if hasattr(self, 'ring_finder') and self.ring_finder:
-                    self.ring_finder.ref_system_var.set(most_recent_system)
+                # Update Ring Finder if it exists (only if auto-search is enabled)
+                if (hasattr(self, 'ring_finder') and self.ring_finder
+                        and getattr(self.ring_finder, 'auto_search_var', None) and self.ring_finder.auto_search_var.get()):
+                    self.ring_finder.system_var.set(most_recent_system)
         except Exception as e:
             print(f"[GAME START] Error handling LoadGame: {e}")
     
@@ -3130,7 +3131,7 @@ cargo panel forces Elite to write detailed inventory data.
             location_found = False
             scans_processed = 0
             max_scans = 50  # Limit scan events to process (performance)
-            
+
             # Look for the most recent Loadout, LoadGame, Location/FSDJump, and Scan events
             for line in reversed(lines):  # Start from the end (most recent)
                 try:
@@ -3188,9 +3189,10 @@ cargo panel forces Elite to write detailed inventory data.
                             self.current_system = system_name
                             location_found = True
                             
-                            # Update Ring Finder reference system if it exists
-                            if hasattr(self, 'ring_finder') and self.ring_finder:
-                                self.ring_finder.ref_system_var.set(system_name)
+                            # Update Ring Finder reference system if it exists (only if auto-search is enabled)
+                            if (hasattr(self, 'ring_finder') and self.ring_finder
+                                    and getattr(self.ring_finder, 'auto_search_var', None) and self.ring_finder.auto_search_var.get()):
+                                self.ring_finder.system_var.set(system_name)
                             
                             # NOTE: Do NOT update last_known_system here!
                             # Visit counting logic depends on comparing current system to last_known_system
@@ -3204,13 +3206,13 @@ cargo panel forces Elite to write detailed inventory data.
                                 except:
                                     pass
                             continue
-                    
+
                     # Process Scan events for ring metadata (new logic)
                     elif event_type == "Scan" and scans_processed < max_scans:
                         self.journal_parser.process_scan(event)
                         scans_processed += 1
                         continue
-                    
+
                     # Stop scanning once cargo and location are found
                     # (Scan events are handled by background journal catchup thread)
                     if cargo_found and location_found:
@@ -4125,7 +4127,7 @@ cargo panel forces Elite to write detailed inventory data.
                     logging.error(f"[MaterialCollected] Failed to process event: {mat_err}")
                     import traceback
                     logging.error(traceback.format_exc())
-                        
+
         except json.JSONDecodeError:
             pass  # Skip invalid JSON lines
         except Exception as e:
@@ -6135,14 +6137,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             sep_chars = 28
             new_content_parts.append("\n" + "─" * sep_chars)
             new_content_parts.append("\n")
-            new_content_parts.append(t('mining_session.engineering_materials') + " 🔩")
+            new_content_parts.append(t('mining_session.engineering_materials'))
             new_content_parts.append("\n")
             sorted_materials = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
             for i, (material_name, quantity) in enumerate(sorted_materials):
                 grade = cargo.MATERIAL_GRADES.get(material_name, 0)
                 display_name = cargo.materials_localized_names.get(material_name, material_name)[:12]
                 grade_text = f"(G{grade})"
-                line = f"{display_name:<12} {grade_text} {quantity:>3}"
+                line = f"{display_name} {grade_text} {quantity:>3}"
                 new_content_parts.append(line)
                 if i < len(sorted_materials) - 1:
                     new_content_parts.append("\n")
@@ -6241,7 +6243,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Insert header with tag
             self.integrated_cargo_text.insert(tk.END, "\n")
-            self.integrated_cargo_text.insert(tk.END, t('mining_session.engineering_materials') + " 🔩", "section_header")
+            self.integrated_cargo_text.insert(tk.END, t('mining_session.engineering_materials'), "section_header")
             self.integrated_cargo_text.insert(tk.END, "\n")
             
             # Sort materials alphabetically
@@ -6253,11 +6255,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             for i, (material_name, quantity) in enumerate(sorted_materials):
                 # Get grade for this material
                 grade = cargo.MATERIAL_GRADES.get(material_name, 0)
-                
+
                 # Use localized name for display if available, otherwise use English name
                 display_name = cargo.materials_localized_names.get(material_name, material_name)[:12]
                 grade_text = f"(G{grade})"
-                line = f"{display_name:<12} {grade_text} {quantity:>3}"
+                line = f"{display_name} {grade_text} {quantity:>3}"
                 self.integrated_cargo_text.insert(tk.END, line, "material_item")
                 
                 # Add newline for all but the last item
@@ -19489,17 +19491,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.trade_total_label.config(text=t('marketplace.copied_to_clipboard').format(system=system_name))
     
     def _populate_marketplace_system(self):
-        """Auto-populate marketplace system on startup (same as ring finder)"""
+        """Auto-populate marketplace system on startup (independent of ring finder's reference system)"""
         try:
-            if hasattr(self, 'ring_finder'):
-                self.ring_finder._auto_detect_system()
-                detected_system = self.ring_finder.system_var.get()
-                if detected_system:
-                    if hasattr(self, '_ac_marketplace_ref'):
-                        self._ac_marketplace_ref.suppress()
-                    self.marketplace_reference_system.set(detected_system)
-                    if hasattr(self, '_ac_marketplace_ref'):
-                        self._ac_marketplace_ref.unsuppress()
+            detected_system = self.get_current_system()
+            if detected_system:
+                if hasattr(self, '_ac_marketplace_ref'):
+                    self._ac_marketplace_ref.suppress()
+                self.marketplace_reference_system.set(detected_system)
+                if hasattr(self, '_ac_marketplace_ref'):
+                    self._ac_marketplace_ref.unsuppress()
         except:
             pass
     
@@ -22949,8 +22949,9 @@ Your keybinds will need to be reconfigured manually."""
             self.after(100, lambda: self._fetch_reserve_levels_for_system(system_name))
         
         # Notify all components that use current system
-        # 1. Update ring finder reference system
-        if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_var'):
+        # 1. Update ring finder reference system (only if auto-search is enabled)
+        if (hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_var')
+                and getattr(self.ring_finder, 'auto_search_var', None) and self.ring_finder.auto_search_var.get()):
             self.ring_finder.system_var.set(system_name)
             if coords:
                 self.ring_finder.current_system_coords = coords

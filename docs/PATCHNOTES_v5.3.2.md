@@ -3,11 +3,18 @@
 
 ## New Features & Improvements
 
+- Added a Comment field to Ring Finder search results, so you can write down notes on a system or ring (e.g. "watch for pirates").
+
+
 ### Bug Fix
 
 - Hotspots you manually set to 0 no longer show up in search results.
+- When Auto Search is off, the reference system in Hotspots Finder no longer updates to the current system when you start the app or jump to a new system.
+
 
 ### Voiceattack Profile no update (v5.2.5)
+
+- EliteVA (EliteAPI) updated to v5.0.12.
 
 
 ### Important Notes 

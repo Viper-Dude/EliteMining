@@ -11,10 +11,10 @@ When modifying cargo display:
    Line: ~5140 in main.py
    THIS IS WHAT USERS SEE!
 
-⚠️ 2. POPUP WINDOW (SECONDARY)
+⚠️ 2. POPUP WINDOW (SECONDARY - NOT USER-FACING)
    Method: update_display()
    Line: ~2248 in main.py
-   Rarely used, but keep in sync!
+   Not exposed to users at all - no need to keep in sync!
 
 📚 See full documentation:
    docs/CARGO_MONITOR_REFERENCE.md

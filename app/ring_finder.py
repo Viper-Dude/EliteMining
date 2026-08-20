@@ -945,7 +945,7 @@ class RingFinder(ColumnVisibilityMixin):
                      arrowcolor=[('readonly', '#ff8c00')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "PowerPlay", "Source", "Favourite", "Last Mined", "_spacer")
+        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "PowerPlay", "Source", "Favourite", "Last Mined", "Comment", "_spacer")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview", selectmode='extended')
         
         # Track column visibility and default widths
@@ -964,7 +964,8 @@ class RingFinder(ColumnVisibilityMixin):
             "Source": 70,
             "PowerPlay": 170,
             "Favourite": 150,
-            "Last Mined": 110
+            "Last Mined": 110,
+            "Comment": 150
         }
         self.column_visible = {col: True for col in columns}  # All visible by default
         
@@ -987,7 +988,8 @@ class RingFinder(ColumnVisibilityMixin):
             "Source": t('ring_finder.col_source'),
             "PowerPlay": t('ring_finder.col_powerplay'),
             "Favourite": t('ring_finder.col_favourite'),
-            "Last Mined": t('ring_finder.col_last_mined')
+            "Last Mined": t('ring_finder.col_last_mined'),
+            "Comment": t('ring_finder.col_comment')
         }
         
         for col in columns:
@@ -1032,6 +1034,8 @@ class RingFinder(ColumnVisibilityMixin):
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
             elif col == "Last Mined":
                 self.results_tree.column(col, width=column_widths[col], minwidth=80, anchor="w", stretch=False)
+            elif col == "Comment":
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "_spacer":
                 # Spacer column — always last, gives every real column a draggable right border
                 self.results_tree.heading(col, text="", anchor="w")
@@ -1057,7 +1061,8 @@ class RingFinder(ColumnVisibilityMixin):
             tree=self.results_tree,
             columns=visibility_columns,
             default_widths=self.column_default_widths,
-            config_key='ring_finder'
+            config_key='ring_finder',
+            use_displaycolumns=True
         )
 
         # Bind column resize event to save widths
@@ -4993,6 +4998,9 @@ class RingFinder(ColumnVisibilityMixin):
         # Bulk-prefetch favourite flags for favourite indicator/filter (avoids per-row DB connections)
         _early_favourites = self.user_db.bulk_get_favourites_for_rings(_all_systems_early) if _all_systems_early else {}
 
+        # Bulk-prefetch ring comments (avoids per-row DB connections)
+        _early_comments = self.user_db.bulk_get_ring_comments_for_rings(_all_systems_early) if _all_systems_early else {}
+
         # Bulk-prefetch last-mined report dates (avoids per-row CSV scans)
         _last_mined_lookup = {}
         if _all_systems_early and self.prospector_panel and hasattr(self.prospector_panel, 'get_last_mined_lookup'):
@@ -5389,6 +5397,9 @@ class RingFinder(ColumnVisibilityMixin):
             last_mined_entry = _last_mined_lookup.get((system_name, location_display))
             last_mined_display = last_mined_entry[0] if last_mined_entry else ""
 
+            # Comment indicator (using pre-fetched bulk data, no per-row DB calls)
+            comment_display = "💬" if _early_comments.get(_bulk_key) else ""
+
             _pending_row_data.append({
                 'values': (
                     hotspot.get('distance', 'No data'),
@@ -5406,6 +5417,7 @@ class RingFinder(ColumnVisibilityMixin):
                     source_display,
                     favourite_display,
                     last_mined_display,
+                    comment_display,
                 ),
                 'tags': tags,
                 'is_green': is_green,
@@ -5514,28 +5526,32 @@ class RingFinder(ColumnVisibilityMixin):
                                    activebackground=menu_active_bg, 
                                    activeforeground=menu_active_fg,
                                    selectcolor=menu_active_bg)
+        # Navigate / Lookup
         self.context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_name)
         self.context_menu.add_command(label=t('context_menu.find_in_star_systems'), command=self._find_in_star_systems)
-        self.context_menu.add_command(label=t('context_menu.mark_favourite'), command=self._toggle_favourite_selected)
-        self.context_menu.add_command(label=t('context_menu.set_as_reference'), command=self._set_as_reference_system)
-        self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara)
         self.context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm)
         self.context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh)
-        self.context_menu.add_separator()
         self.context_menu.add_command(label=t('context_menu.find_sell_station'), command=self._find_sell_station)
         self.context_menu.add_separator()
+        # Database
         self.context_menu.add_command(label=t('context_menu.save_to_local_database'), command=self._save_to_database)
-        self.context_menu.add_command(label=t('context_menu.update_reserve'), command=self._update_reserve_from_spansh)
         self.context_menu.add_separator()
+        # Ring Data
+        self.context_menu.add_command(label=t('context_menu.update_reserve'), command=self._update_reserve_from_spansh)
         self.context_menu.add_command(label=t('context_menu.edit_hotspots'), command=self._show_edit_hotspots_dialog)
         self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
         self.context_menu.add_command(label=t('context_menu.set_res'), command=self._show_res_dialog)
-        self.context_menu.add_command(label=t('context_menu.set_reserve'), command=self._show_reserve_dialog)
         self.context_menu.add_command(label=t('context_menu.edit_ring_type'), command=self._show_edit_ring_type_dialog)
         self.context_menu.add_command(label=t('context_menu.edit_visits'), command=self._show_edit_visits_dialog)
         self.context_menu.add_separator()
+        # User
+        self.context_menu.add_command(label=t('context_menu.mark_favourite'), command=self._toggle_favourite_selected)
+        self.context_menu.add_command(label=t('context_menu.set_as_reference'), command=self._set_as_reference_system)
         self.context_menu.add_command(label=t('context_menu.bookmark_location'), command=self._bookmark_selected)
+        self.context_menu.add_command(label=t('context_menu.edit_comment'), command=self._show_comment_dialog)
+        self.context_menu.add_separator()
+        # Reports
         self.context_menu.add_command(label=t('context_menu.open_mining_report'), command=self._open_mining_report_selected)
 
     def _show_context_menu(self, event):
@@ -5635,13 +5651,13 @@ class RingFinder(ColumnVisibilityMixin):
                     mineral = self._to_english(mineral_display)
                     is_specific_mineral = not self._is_all_minerals(mineral)
                     
-                    # Menu item index for "Find Sell Station" is 9 (after copy_system, find_in_star_systems, mark_favourite, set_as_reference, separator, inara, edsm, spansh, separator)
+                    # Menu item index for "Find Sell Station" is 5 (after copy_system, find_in_star_systems, inara, edsm, spansh)
                     if is_specific_mineral:
-                        self.context_menu.entryconfig(9, state="normal")
+                        self.context_menu.entryconfig(5, state="normal")
                     else:
-                        self.context_menu.entryconfig(9, state="disabled")
+                        self.context_menu.entryconfig(5, state="disabled")
 
-                    # Show/hide "Save to Database" option (index 11, after separator) based on Source column
+                    # Show/hide "Save to Database" option (index 7, after separator) based on Source column
                     # Allow save in Ring Search mode if row has hotspot data
                     is_ring_search_mode = self.ring_type_only_var.get()
                     has_hotspot_data = False
@@ -5654,27 +5670,23 @@ class RingFinder(ColumnVisibilityMixin):
 
                     # Enable if Spansh rows AND (not ring search mode OR has hotspot data)
                     if has_spansh_rows and (not is_ring_search_mode or has_hotspot_data):
-                        self.context_menu.entryconfig(11, state="normal")
+                        self.context_menu.entryconfig(7, state="normal")
                     else:
-                        self.context_menu.entryconfig(11, state="disabled")
+                        self.context_menu.entryconfig(7, state="disabled")
 
-                    # Show/hide "Update Reserve Level" option (index 12) based on Local source + missing reserve
+                    # Show/hide "Update Reserve Level" option (index 9) based on Local source + missing reserve
                     if enable_update_reserve:
-                        self.context_menu.entryconfig(12, state="normal")
+                        self.context_menu.entryconfig(9, state="normal")
                     else:
-                        self.context_menu.entryconfig(12, state="disabled")
+                        self.context_menu.entryconfig(9, state="disabled")
 
-                    # Enable/disable "Set Reserve" option (index 18) - only for local database entries
-                    if has_local_only:
-                        self.context_menu.entryconfig(18, state="normal")
-                    else:
-                        self.context_menu.entryconfig(18, state="disabled")
-
-                    # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: mark_favourite, 3: set_as_reference,
-                    # 4: separator, 5: inara, 6: edsm, 7: spansh, 8: separator, 9: find_sell_station, 10: separator,
-                    # 11: save_to_db, 12: update_reserve, 13: separator,
-                    # 14: edit_hotspots, 15: set_overlap, 16: set_res, 17: set_reserve, 18: edit_ring_type, 19: edit_visits
-                    # 20: separator, 21: bookmark, 22: open_mining_report
+                    # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: inara, 3: edsm, 4: spansh,
+                    # 5: find_sell_station, 6: separator,
+                    # 7: save_to_db, 8: separator,
+                    # 9: update_reserve, 10: edit_hotspots, 11: set_overlap, 12: set_res,
+                    # 13: edit_ring_type, 14: edit_visits, 15: separator,
+                    # 16: mark_favourite, 17: set_as_reference, 18: bookmark, 19: edit_comment, 20: separator,
+                    # 21: open_mining_report
 
                     # Enable "Open Mining Report" only when a report exists for this row (Last Mined column)
                     has_mining_report = False
@@ -5682,7 +5694,7 @@ class RingFinder(ColumnVisibilityMixin):
                         values = self.results_tree.item(selected_items[0], 'values')
                         if values and len(values) > 14:
                             has_mining_report = bool(values[14])
-                    self.context_menu.entryconfig(22, state="normal" if has_mining_report else "disabled")
+                    self.context_menu.entryconfig(21, state="normal" if has_mining_report else "disabled")
 
                     # Favourite toggle only applies to rows saved in the local database
                     has_local_row = False
@@ -5696,10 +5708,10 @@ class RingFinder(ColumnVisibilityMixin):
                                 is_favourite_row = len(values) > 13 and values[13] == "⭐"
 
                     if has_local_row:
-                        self.context_menu.entryconfig(2, state="normal",
+                        self.context_menu.entryconfig(16, state="normal",
                                                        label=t('context_menu.remove_favourite') if is_favourite_row else t('context_menu.mark_favourite'))
                     else:
-                        self.context_menu.entryconfig(2, state="disabled", label=t('context_menu.mark_favourite'))
+                        self.context_menu.entryconfig(16, state="disabled", label=t('context_menu.mark_favourite'))
 
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -5755,6 +5767,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         - PowerPlay cell: open Inara and fetch/refresh PP data.
         - Last Mined cell (if a report exists): open that mining report.
+        - Comment cell: open the comment edit dialog.
         """
         if self.results_tree.identify_region(event.x, event.y) != "cell":
             return
@@ -5764,7 +5777,7 @@ class RingFinder(ColumnVisibilityMixin):
         column = self.results_tree.identify_column(event.x)
         try:
             col_index = int(column.replace('#', '')) - 1
-            col_name = self.results_tree['columns'][col_index]
+            col_name = self.results_tree['displaycolumns'][col_index]
         except (ValueError, IndexError):
             return
 
@@ -5778,6 +5791,9 @@ class RingFinder(ColumnVisibilityMixin):
         elif col_name == "Last Mined":
             self.results_tree.selection_set(item)
             self._open_mining_report_selected()
+        elif col_name == "Comment":
+            self.results_tree.selection_set(item)
+            self._show_comment_dialog()
 
     def _open_inara(self):
         """Open selected system(s) in Inara and fetch/refresh their PP data"""
@@ -7051,49 +7067,49 @@ class RingFinder(ColumnVisibilityMixin):
             return ""
 
     def _show_edit_hotspots_dialog(self):
-        """Show dialog to edit hotspot counts for a ring"""
+        """Show dialog to edit hotspot counts and reserve level for a ring"""
         try:
             selection = self.results_tree.selection()
             if not selection:
                 self.status_var.set(t('ring_finder.no_selection'))
                 return
-            
+
             item = selection[0]
             values = self.results_tree.item(item, 'values')
             if not values or len(values) < 7:
                 self.status_var.set(t('ring_finder.invalid_selection'))
                 return
-            
+
             system_name = values[2]  # System column
             ring_name = values[3]    # Ring column
-            
+
             if not system_name or not ring_name:
                 self.status_var.set(t('ring_finder.missing_info'))
                 return
-            
+
             # Get all hotspots for this ring from database
             import sqlite3
             hotspots_data = []
             with sqlite3.connect(self.user_db.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT material_name, hotspot_count 
-                    FROM hotspot_data 
+                    SELECT material_name, hotspot_count
+                    FROM hotspot_data
                     WHERE system_name = ? AND body_name = ?
                     ORDER BY material_name
                 ''', (system_name, ring_name))
                 hotspots_data = cursor.fetchall()
-            
+
             if not hotspots_data:
                 self.status_var.set(t('ring_finder.no_hotspots_found'))
                 return
-            
+
             # Create dialog
             dialog = tk.Toplevel(self.parent)
+            dialog.withdraw()
             dialog.title(t('context_menu.edit_hotspots_title'))
             dialog.resizable(False, False)
-            dialog.transient(self.parent.winfo_toplevel())
-            
+
             # Set app icon
             try:
                 from app_utils import get_app_icon_path
@@ -7102,38 +7118,68 @@ class RingFinder(ColumnVisibilityMixin):
                     dialog.iconbitmap(icon_path)
             except:
                 pass
-            
+
             frame = ttk.Frame(dialog, padding=15)
             frame.pack(fill="both", expand=True)
-            
+
             # Header
             ttk.Label(frame, text=t('context_menu.edit_hotspots_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 5))
             ttk.Label(frame, text=f"{system_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=3, sticky="w")
             ttk.Label(frame, text=f"{ring_name}", font=("Segoe UI", 9)).grid(row=2, column=0, columnspan=3, sticky="w", pady=(0, 10))
-            
+
             # Column headers
             ttk.Label(frame, text=t('context_menu.material_header'), font=("Segoe UI", 9, "bold")).grid(row=3, column=0, sticky="w", padx=(0, 20))
             ttk.Label(frame, text=t('context_menu.count_header'), font=("Segoe UI", 9, "bold")).grid(row=3, column=1, sticky="w")
-            
+
             # Create entry fields for each material
             entry_vars = {}
+            row = 4
             for idx, (material_name, count) in enumerate(hotspots_data):
                 row = idx + 4
-                
+
                 # Material name (display formatted)
                 display_name = self._format_material_for_display(material_name)
                 ttk.Label(frame, text=display_name).grid(row=row, column=0, sticky="w", pady=2, padx=(0, 20))
-                
+
                 # Count entry
                 var = tk.StringVar(value=str(count or 0))
                 entry = ttk.Entry(frame, textvariable=var, width=8, justify="center")
                 entry.grid(row=row, column=1, sticky="w", pady=2)
                 entry_vars[material_name] = var
-            
+
+            # Reserve level section
+            reserve_row = row + 1
+            ttk.Separator(frame, orient="horizontal").grid(row=reserve_row, column=0, columnspan=3, sticky="ew", pady=(12, 10))
+            ttk.Label(frame, text=t('context_menu.reserve_level'), font=("Segoe UI", 9, "bold")).grid(row=reserve_row + 1, column=0, sticky="w", pady=5, padx=(0, 10))
+
+            reserve_var = tk.StringVar(value="None")
+            reserve_frame = tk.Frame(frame, bg="#1e1e1e")
+            reserve_frame.grid(row=reserve_row + 1, column=1, columnspan=2, sticky="w", pady=5)
+
+            rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b",
+                        "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
+
+            reserve_options = [
+                ("Pristine", "Pristine"),
+                ("Major", "Major"),
+                ("Common", "Common"),
+                ("Low", "Low"),
+                ("Depleted", "Depleted"),
+                (t('context_menu.none'), "None")
+            ]
+
+            for i, (label, value) in enumerate(reserve_options):
+                rb_row = i // 3
+                rb_col = i % 3
+                tk.Radiobutton(reserve_frame, text=label, variable=reserve_var, value=value, **rb_style).grid(row=rb_row, column=rb_col, sticky="w", padx=(0, 10), pady=2)
+
+            current_reserve = self.user_db.get_reserve_level(system_name, ring_name)
+            reserve_var.set(current_reserve if current_reserve else "None")
+
             # Buttons
             button_frame = ttk.Frame(frame)
-            button_frame.grid(row=len(hotspots_data) + 5, column=0, columnspan=3, pady=(15, 0))
-            
+            button_frame.grid(row=reserve_row + 2, column=0, columnspan=3, pady=(15, 0))
+
             def save():
                 try:
                     with sqlite3.connect(self.user_db.db_path) as conn:
@@ -7145,33 +7191,42 @@ class RingFinder(ColumnVisibilityMixin):
                                     new_count = 0
                             except ValueError:
                                 new_count = 0
-                            
+
                             cursor.execute('''
-                                UPDATE hotspot_data 
+                                UPDATE hotspot_data
                                 SET hotspot_count = ?
                                 WHERE system_name = ? AND body_name = ? AND material_name = ?
                             ''', (new_count, system_name, ring_name, material_name))
                         conn.commit()
-                    
+
+                    reserve_value = reserve_var.get()
+                    tag_value = reserve_value if reserve_value != "None" else None
+                    self.user_db.set_reserve_level(system_name, ring_name, tag_value)
+
                     self.status_var.set(t('context_menu.hotspots_updated'))
                     # Refresh the display
                     self._refresh_row_hotspots(item, system_name, ring_name)
+                    self._refresh_row_reserve(item, system_name, ring_name)
                     dialog.destroy()
                 except Exception as e:
                     self.status_var.set(f"Error: {e}")
-            
+
             ttk.Button(button_frame, text=t('save'), command=save).pack(side="left", padx=5)
             ttk.Button(button_frame, text=t('cancel'), command=dialog.destroy).pack(side="left", padx=5)
-            
-            # Center dialog
+
+            # Center dialog, then reveal
             dialog.update_idletasks()
-            x = self.parent.winfo_rootx() + (self.parent.winfo_width() - dialog.winfo_width()) // 2
-            y = self.parent.winfo_rooty() + (self.parent.winfo_height() - dialog.winfo_height()) // 2
-            dialog.geometry(f"+{x}+{y}")
-            
-            dialog.grab_set()
-            dialog.focus_set()
-            
+            from ui.dialogs import center_window
+            center_window(dialog, self.parent.winfo_toplevel())
+            dialog.deiconify()
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            try:
+                dialog.grab_set()
+            except Exception:
+                pass
+
         except Exception as e:
             print(f"Error showing edit hotspots dialog: {e}")
             import traceback
@@ -7354,6 +7409,104 @@ class RingFinder(ColumnVisibilityMixin):
                 
         except Exception as e:
             print(f"Error refreshing row visits: {e}")
+
+    def _show_comment_dialog(self):
+        """Show dialog to add/edit a comment for the selected ring (applies to the whole ring, not per material)"""
+        try:
+            selection = self.results_tree.selection()
+            if not selection:
+                self.status_var.set("No ring selected")
+                return
+
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if not values or len(values) < 4:
+                self.status_var.set("Invalid selection")
+                return
+
+            system_name = values[2]  # System column
+            ring_name = values[3]    # Planet/Ring column
+
+            if not system_name or not ring_name:
+                self.status_var.set("Cannot comment: missing system or ring info")
+                return
+
+            current_comment = self.user_db.get_ring_comment(system_name, ring_name) or ""
+
+            dialog = tk.Toplevel(self.parent)
+            dialog.withdraw()
+            dialog.title(t('context_menu.edit_comment_title'))
+            dialog.resizable(False, False)
+
+            try:
+                from app_utils import get_app_icon_path
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except:
+                pass
+
+            frame = ttk.Frame(dialog, padding=15)
+            frame.pack(fill="both", expand=True)
+
+            ttk.Label(frame, text=t('context_menu.edit_comment_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=(0, 15))
+
+            comment_text = tk.Text(frame, width=35, height=4, insertbackground="#ffffff")
+            comment_text.grid(row=2, column=0, sticky="w", pady=5)
+            if current_comment:
+                comment_text.insert("1.0", current_comment)
+            comment_text.focus_set()
+            comment_text.mark_set("insert", "end")
+
+            button_frame = ttk.Frame(frame)
+            button_frame.grid(row=3, column=0, pady=(15, 0))
+
+            def save():
+                new_comment = comment_text.get("1.0", "end-1c").strip()
+                if self.user_db.set_ring_comment(system_name, ring_name, new_comment):
+                    self.results_tree.set(item, "Comment", "💬" if new_comment.strip() else "")
+                    self.status_var.set(f"Comment updated for {system_name} - {ring_name}")
+                else:
+                    self.status_var.set("Failed to save comment")
+                dialog.destroy()
+
+            def cancel():
+                dialog.destroy()
+
+            save_btn = tk.Button(button_frame, text=t('dialogs.save'), command=save,
+                                bg="#2a5a2a", fg="#ffffff",
+                                activebackground="#3a6a3a", activeforeground="#ffffff",
+                                relief="solid", bd=1, cursor="hand2",
+                                pady=6, padx=15, font=("Segoe UI", 9))
+            save_btn.pack(side="left", padx=(0, 8))
+
+            cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
+                                  bg="#5a2a2a", fg="#ffffff",
+                                  activebackground="#6a3a3a", activeforeground="#ffffff",
+                                  relief="solid", bd=1, cursor="hand2",
+                                  pady=6, padx=15, font=("Segoe UI", 9))
+            cancel_btn.pack(side="left")
+
+            comment_text.bind("<Escape>", lambda e: cancel())
+
+            dialog.update_idletasks()
+            from ui.dialogs import center_window
+            center_window(dialog, self.parent.winfo_toplevel())
+            dialog.deiconify()
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            try:
+                dialog.grab_set()
+            except Exception:
+                pass
+
+        except Exception as e:
+            print(f"Error showing comment dialog: {e}")
+            import traceback
+            traceback.print_exc()
+            self.status_var.set(f"Error: {e}")
 
     def _show_overlap_dialog(self):
         """Show dialog to tag overlap for selected hotspot"""
@@ -7748,141 +7901,6 @@ class RingFinder(ColumnVisibilityMixin):
             traceback.print_exc()
             self.status_var.set(f"Error: {e}")
     
-    def _show_reserve_dialog(self):
-        """Show dialog to set reserve level for selected ring"""
-        try:
-            selection = self.results_tree.selection()
-            if not selection:
-                self.status_var.set("No ring selected")
-                return
-            
-            item = selection[0]
-            values = self.results_tree.item(item, 'values')
-            if not values or len(values) < 5:
-                self.status_var.set("Invalid selection")
-                return
-            
-            system_name = values[2]  # System column
-            ring_name = values[3]    # Ring column
-            
-            if not system_name or not ring_name:
-                self.status_var.set("Cannot set reserve: missing system or ring info")
-                return
-            
-            # Create dialog
-            dialog = tk.Toplevel(self.parent)
-            dialog.title(t('context_menu.set_reserve_title'))
-            dialog.resizable(False, False)
-            dialog.transient(self.parent.winfo_toplevel())
-            
-            # Set app icon
-            try:
-                from app_utils import get_app_icon_path
-                icon_path = get_app_icon_path()
-                if icon_path and icon_path.endswith('.ico'):
-                    dialog.iconbitmap(icon_path)
-            except:
-                pass
-            
-            frame = ttk.Frame(dialog, padding=15)
-            frame.pack(fill="both", expand=True)
-            
-            # Header
-            ttk.Label(frame, text=t('context_menu.set_reserve_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
-            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
-            
-            # Reserve level selection
-            ttk.Label(frame, text=t('context_menu.reserve_level')).grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
-            reserve_var = tk.StringVar(value=t('context_menu.none'))
-            
-            reserve_frame = tk.Frame(frame, bg="#1e1e1e")
-            reserve_frame.grid(row=2, column=1, sticky="w", pady=5, columnspan=2)
-            
-            # Dark themed radio buttons
-            rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
-                        "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
-            
-            # Reserve options: Pristine, Major, Common, Low, Depleted, None (2x3 grid)
-            reserve_options = [
-                ("Pristine", "Pristine"),
-                ("Major", "Major"),
-                ("Common", "Common"),
-                ("Low", "Low"),
-                ("Depleted", "Depleted"),
-                (t('context_menu.none'), "None")
-            ]
-            
-            for i, (label, value) in enumerate(reserve_options):
-                row = i // 3
-                col = i % 3
-                tk.Radiobutton(reserve_frame, text=label, variable=reserve_var, value=value, **rb_style).grid(row=row, column=col, sticky="w", padx=(0, 10), pady=2)
-            
-            # Load current reserve value
-            current_reserve = self.user_db.get_reserve_level(system_name, ring_name)
-            if current_reserve:
-                reserve_var.set(current_reserve)
-            else:
-                reserve_var.set("None")
-            
-            # Buttons
-            button_frame = ttk.Frame(frame)
-            button_frame.grid(row=4, column=0, columnspan=3, pady=(15, 0))
-            
-            def save():
-                reserve_value = reserve_var.get()
-                tag_value = reserve_value if reserve_value != "None" else None
-                
-                success = self.user_db.set_reserve_level(system_name, ring_name, tag_value)
-                if success:
-                    if tag_value:
-                        self.status_var.set(f"Reserve level set: {tag_value}")
-                    else:
-                        self.status_var.set(f"Reserve level cleared")
-                    # Refresh the current row's reserve display
-                    self._refresh_row_reserve(item, system_name, ring_name)
-                else:
-                    self.status_var.set(f"Failed to save reserve level")
-                dialog.destroy()
-            
-            def cancel():
-                dialog.destroy()
-            
-            save_btn = tk.Button(button_frame, text=t('dialogs.save'), command=save,
-                                bg="#2a5a2a", fg="#ffffff", 
-                                activebackground="#3a6a3a", activeforeground="#ffffff",
-                                relief="solid", bd=1, cursor="hand2", 
-                                pady=6, padx=15, font=("Segoe UI", 9))
-            save_btn.pack(side="left", padx=(0, 8))
-            
-            cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
-                                  bg="#5a2a2a", fg="#ffffff", 
-                                  activebackground="#6a3a3a", activeforeground="#ffffff",
-                                  relief="solid", bd=1, cursor="hand2", 
-                                  pady=6, padx=15, font=("Segoe UI", 9))
-            cancel_btn.pack(side="left")
-            
-            # Center dialog
-            dialog.update_idletasks()
-            w = dialog.winfo_width()
-            h = dialog.winfo_height()
-            parent = self.parent.winfo_toplevel()
-            px = parent.winfo_x()
-            py = parent.winfo_y()
-            pw = parent.winfo_width()
-            ph = parent.winfo_height()
-            x = px + (pw // 2) - (w // 2)
-            y = py + (ph // 2) - (h // 2)
-            dialog.geometry(f"+{x}+{y}")
-            
-            dialog.grab_set()
-            dialog.focus_set()
-            
-        except Exception as e:
-            print(f"Error showing reserve dialog: {e}")
-            import traceback
-            traceback.print_exc()
-            self.status_var.set(f"Error: {e}")
-
     def _refresh_row_res(self, item_id: str, system_name: str, ring_name: str):
         """Refresh the RES column for a specific row"""
         try:

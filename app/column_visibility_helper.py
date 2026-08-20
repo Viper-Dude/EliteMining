@@ -18,20 +18,25 @@ class ColumnVisibilityMixin:
     3. Supports multiple trees in same class by using config_key as namespace
     """
     
-    def setup_column_visibility(self, tree, columns, default_widths, config_key):
+    def setup_column_visibility(self, tree, columns, default_widths, config_key, use_displaycolumns=False):
         """
         Setup column visibility for a treeview
-        
+
         Args:
             tree: The ttk.Treeview widget
             columns: List/tuple of column identifiers
             default_widths: Dict mapping column names to default widths
             config_key: Unique key for saving preferences (e.g., 'prospector_report')
+            use_displaycolumns: If True, hide columns via the Treeview's displaycolumns
+                (fully removes them from layout) instead of width=0 (which can leave a
+                rendering sliver that bleeds into the next visible column on Windows).
+                Callers using this must resolve identify_column() results against
+                tree['displaycolumns'], not tree['columns'].
         """
         # Store per-tree data using config_key as namespace
         if not hasattr(self, '_cv_trees'):
             self._cv_trees = {}
-        
+
         # Capture original stretch values before any visibility changes
         original_stretch = {}
         for col in columns:
@@ -39,7 +44,7 @@ class ColumnVisibilityMixin:
                 original_stretch[col] = tree.column(col, 'stretch')
             except Exception:
                 original_stretch[col] = False
-        
+
         self._cv_trees[config_key] = {
             'tree': tree,
             'columns': columns,
@@ -48,6 +53,7 @@ class ColumnVisibilityMixin:
             'saved_widths': {},  # Store actual widths before hiding
             'original_stretch': original_stretch,  # Store original stretch per column
             'excluded_from_menu': set(),  # Columns hidden from the visibility menu
+            'use_displaycolumns': use_displaycolumns,
         }
         
         # Bind right-click with config_key context
@@ -145,6 +151,18 @@ class ColumnVisibilityMixin:
         finally:
             menu.grab_release()
     
+    def _cv_apply_displaycolumns(self, config_key):
+        """Rebuild the tree's displaycolumns from current visibility state (use_displaycolumns mode)."""
+        tree_data = self._cv_trees.get(config_key)
+        if not tree_data or not tree_data.get('use_displaycolumns'):
+            return
+        tree = tree_data['tree']
+        columns = tree_data['columns']
+        visible = tree_data['visible']
+        full_columns = tree['columns']
+        shown = [col for col in full_columns if col not in columns or visible.get(col, True)]
+        tree.configure(displaycolumns=shown)
+
     def _cv_toggle(self, column, config_key):
         """Toggle column visibility"""
         tree_data = self._cv_trees.get(config_key)
@@ -158,7 +176,16 @@ class ColumnVisibilityMixin:
         
         is_visible = visible.get(column, True)
         visible[column] = not is_visible
-        
+
+        if tree_data.get('use_displaycolumns'):
+            if not visible[column]:
+                current_width = tree.column(column, "width")
+                if current_width > 0:
+                    saved_widths[column] = current_width
+            self._cv_apply_displaycolumns(config_key)
+            self._cv_save_visibility(config_key)
+            return
+
         if visible[column]:
             # Show column - restore saved width or default, and original stretch
             width_to_restore = saved_widths.get(column, default_widths[column])
@@ -170,7 +197,7 @@ class ColumnVisibilityMixin:
             if current_width > 0:
                 saved_widths[column] = current_width
             tree.column(column, width=0, minwidth=0, stretch=False)
-        
+
         self._cv_save_visibility(config_key)
     
     def _cv_reset(self, config_key):
@@ -183,7 +210,17 @@ class ColumnVisibilityMixin:
         columns = tree_data['columns']
         visible = tree_data['visible']
         default_widths = tree_data['default_widths']
-        
+
+        if tree_data.get('use_displaycolumns'):
+            for col in columns:
+                visible[col] = True
+                if tree.column(col, "width") == 0:
+                    orig_stretch = tree_data.get('original_stretch', {}).get(col, False)
+                    tree.column(col, width=default_widths[col], minwidth=50, stretch=orig_stretch)
+            self._cv_apply_displaycolumns(config_key)
+            self._cv_save_visibility(config_key)
+            return
+
         for col in columns:
             visible[col] = True
             current_width = tree.column(col, "width")
@@ -191,7 +228,7 @@ class ColumnVisibilityMixin:
                 # Column was hidden, restore default width and original stretch
                 orig_stretch = tree_data.get('original_stretch', {}).get(col, False)
                 tree.column(col, width=default_widths[col], minwidth=50, stretch=orig_stretch)
-        
+
         self._cv_save_visibility(config_key)
     
     def _cv_set_excluded(self, config_key, column, exclude: bool):
@@ -229,12 +266,15 @@ class ColumnVisibilityMixin:
             if saved:
                 tree = tree_data['tree']
                 visible = tree_data['visible']
+                use_displaycolumns = tree_data.get('use_displaycolumns')
                 for col, vis in saved.items():
                     if col in visible:
                         visible[col] = vis
-                        if not vis:
+                        if not vis and not use_displaycolumns:
                             tree.column(col, width=0, minwidth=0, stretch=False)
-                
+                if use_displaycolumns:
+                    self._cv_apply_displaycolumns(config_key)
+
                 # Schedule a delayed re-application to handle cases where
                 # column widths are loaded after visibility setup
                 tree.after(100, lambda: self._cv_reapply_visibility(config_key))
@@ -249,7 +289,11 @@ class ColumnVisibilityMixin:
         
         tree = tree_data['tree']
         visible = tree_data['visible']
-        
+
+        if tree_data.get('use_displaycolumns'):
+            self._cv_apply_displaycolumns(config_key)
+            return
+
         for col, vis in visible.items():
             if not vis:
                 tree.column(col, width=0, minwidth=0, stretch=False)

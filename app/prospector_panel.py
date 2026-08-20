@@ -11380,9 +11380,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Show custom edit dialog with app logo
         new_comment = self._show_custom_comment_dialog(
-            t('dialogs.session_comment_title'), 
+            t('dialogs.session_comment_title'),
             t('dialogs.edit_session_comment'),
-            current_comment
+            current_comment,
+            use_textbox=True
         )
         
         if new_comment is not None:  # User didn't cancel
@@ -11957,24 +11958,26 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
     def _show_comment_dialog(self) -> str:
         """Show dialog to get session comment from user"""
         comment = self._show_custom_comment_dialog(
-            t('dialogs.session_comment_title'), 
+            t('dialogs.session_comment_title'),
             t('dialogs.session_comment_add'),
-            ""
+            "",
+            use_textbox=True
         )
         return comment or ""
     
-    def _show_custom_comment_dialog(self, title: str, prompt: str, initial_value: str = "") -> str:
+    def _show_custom_comment_dialog(self, title: str, prompt: str, initial_value: str = "", use_textbox: bool = False) -> str:
         """Show custom comment dialog with app logo"""
         import tkinter as tk
         from tkinter import ttk
         import os
-        
+
         # Use main_app as parent to ensure dialog appears on correct monitor
         parent_window = self.main_app if self.main_app else self.winfo_toplevel()
         dialog = tk.Toplevel(parent_window)
         dialog.withdraw()  # Hide immediately to prevent blinking on wrong monitor
         dialog.title(title)
-        dialog.geometry("400x150")
+        dialog_height = 220 if use_textbox else 150
+        dialog.geometry(f"400x{dialog_height}")
         dialog.resizable(False, False)
         dialog.configure(bg="#2d2d2d")
         
@@ -12000,8 +12003,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Get dialog dimensions
         dialog_width = 400  # Fixed from geometry setting
-        dialog_height = 150  # Fixed from geometry setting
-        
+
         # Calculate center position
         x = parent_x + (parent_width - dialog_width) // 2
         y = parent_y + (parent_height - dialog_height) // 2
@@ -12029,19 +12031,30 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         prompt_label = ttk.Label(main_frame, text=prompt, foreground="#ffffff", background="#2d2d2d")
         prompt_label.pack(pady=(0, 10))
         
-        # Entry field
-        entry_var = tk.StringVar(value=initial_value)
-        entry_field = ttk.Entry(main_frame, textvariable=entry_var, width=50)
-        entry_field.pack(pady=(0, 10), fill="x")
-        entry_field.focus_set()
-        entry_field.select_range(0, tk.END)
-        
+        # Entry field - multi-line textbox or single-line entry
+        if use_textbox:
+            entry_field = tk.Text(main_frame, width=35, height=4, insertbackground="#ffffff")
+            entry_field.pack(pady=(0, 10), fill="x")
+            if initial_value:
+                entry_field.insert("1.0", initial_value)
+            entry_field.focus_set()
+            entry_field.mark_set("insert", "end")
+        else:
+            entry_var = tk.StringVar(value=initial_value)
+            entry_field = ttk.Entry(main_frame, textvariable=entry_var, width=50)
+            entry_field.pack(pady=(0, 10), fill="x")
+            entry_field.focus_set()
+            entry_field.select_range(0, tk.END)
+
         # Button frame
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill="x")
-        
+
         def on_ok():
-            result[0] = entry_var.get()
+            if use_textbox:
+                result[0] = entry_field.get("1.0", "end-1c").strip()
+            else:
+                result[0] = entry_var.get()
             dialog.destroy()
         
         def on_cancel():
@@ -12071,7 +12084,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         dialog.bind('<Return>', on_enter)
         dialog.bind('<Escape>', on_escape)
-        entry_field.bind('<Return>', on_enter)
+        if use_textbox:
+            # Let Enter insert a newline in the textbox instead of submitting
+            entry_field.bind('<Return>', lambda event: "break")
+        else:
+            entry_field.bind('<Return>', on_enter)
         
         # Keep dialog on top while open
         def keep_on_top():

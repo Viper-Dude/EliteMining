@@ -1362,6 +1362,16 @@ class UserDatabase:
                     pass  # Column already exists
 
                 conn.execute('''
+                    CREATE TABLE IF NOT EXISTS ring_comments (
+                        system_name TEXT NOT NULL,
+                        body_name TEXT NOT NULL,
+                        comment TEXT NOT NULL,
+                        updated_at TEXT,
+                        UNIQUE(system_name, body_name)
+                    )
+                ''')
+
+                conn.execute('''
                     CREATE TABLE IF NOT EXISTS visited_systems (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         system_name TEXT NOT NULL UNIQUE,
@@ -2652,6 +2662,85 @@ class UserDatabase:
             return {(sys_name, body_name): True for sys_name, body_name in rows}
         except Exception as e:
             log.error(f"Error bulk getting favourites: {e}")
+            return {}
+
+    def set_ring_comment(self, system_name: str, body_name: str, comment: str) -> bool:
+        """Set or clear the comment for a ring (one comment per ring, not per material)
+
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+            comment: Comment text; empty/None deletes the comment
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            body_name = self._normalize_body_name(body_name, system_name)
+
+            with sqlite3.connect(self.db_path) as conn:
+                if comment and comment.strip():
+                    conn.execute('''
+                        INSERT INTO ring_comments (system_name, body_name, comment, updated_at)
+                        VALUES (?, ?, ?, datetime('now'))
+                        ON CONFLICT(system_name, body_name) DO UPDATE SET
+                            comment = excluded.comment,
+                            updated_at = excluded.updated_at
+                    ''', (system_name, body_name, comment.strip()))
+                else:
+                    conn.execute('''
+                        DELETE FROM ring_comments WHERE system_name = ? AND body_name = ?
+                    ''', (system_name, body_name))
+                conn.commit()
+                return True
+        except Exception as e:
+            log.error(f"Error setting ring comment: {e}")
+            return False
+
+    def get_ring_comment(self, system_name: str, body_name: str) -> Optional[str]:
+        """Get the comment for a ring
+
+        Args:
+            system_name: Name of the star system
+            body_name: Name of the ring body
+
+        Returns:
+            Comment text, or None if no comment is set
+        """
+        try:
+            body_name = self._normalize_body_name(body_name, system_name)
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT comment FROM ring_comments
+                    WHERE system_name = ? AND body_name = ?
+                ''', (system_name, body_name))
+                row = cursor.fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            log.error(f"Error getting ring comment: {e}")
+            return None
+
+    def bulk_get_ring_comments_for_rings(self, system_names: list) -> dict:
+        """Batch fetch comments for all rings belonging to a list of systems.
+        Returns {(system_name, body_name): comment}.
+        One DB connection instead of one per ring.
+        """
+        if not system_names:
+            return {}
+        unique_systems = list(set(system_names))
+        placeholders = ','.join('?' * len(unique_systems))
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                rows = conn.execute(
+                    f'SELECT system_name, body_name, comment '
+                    f'FROM ring_comments WHERE system_name IN ({placeholders})',
+                    unique_systems
+                ).fetchall()
+            return {(sys_name, body_name): comment for sys_name, body_name, comment in rows}
+        except Exception as e:
+            log.error(f"Error bulk getting ring comments: {e}")
             return {}
 
     def get_overlap_tag(self, system_name: str, body_name: str, material_name: str) -> Optional[str]:
