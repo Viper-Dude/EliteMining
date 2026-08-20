@@ -4,6 +4,7 @@
 ## New Features & Improvements
 
 - Added a Comment field to Ring Finder search results, so you can write down notes on a system or ring (e.g. "watch for pirates").
+- Edit Hotspots and Edit Reserve Level are now combined into one window.
 
 
 ### Bug Fix
