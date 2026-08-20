@@ -2205,6 +2205,9 @@ class RingFinder(ColumnVisibilityMixin):
                 # If a specific material filter is set, only show that material
                 if material_filter and material_name != material_filter:
                     continue
+                if count == 0:
+                    # Explicitly edited to 0 - don't show this material at all
+                    continue
                 abbr = self._abbreviate_material_for_display(material_name)
                 if count and count > 0:
                     parts.append(f"{abbr} ({count})")
@@ -4524,7 +4527,7 @@ class RingFinder(ColumnVisibilityMixin):
                             # Show ALL rings of this type (one row per ring, combining hotspot info)
                             query = f'''
                                 SELECT system_name, body_name, 
-                                       GROUP_CONCAT(material_name || ' (' || hotspot_count || ')', ', ') as material_name,
+                                       GROUP_CONCAT(CASE WHEN hotspot_count > 0 THEN material_name || ' (' || hotspot_count || ')' ELSE NULL END, ', ') as material_name,
                                        1 as hotspot_count,
                                        MAX(x_coord) as x_coord, MAX(y_coord) as y_coord, MAX(z_coord) as z_coord, MAX(coord_source) as coord_source, 
                                        MAX(ls_distance) as ls_distance, MAX(reserve_level) as reserve_level, MAX(ring_type) as ring_type, 
@@ -4611,7 +4614,15 @@ class RingFinder(ColumnVisibilityMixin):
                         # Filter by specific material using our smart material matching
                         if not self._is_all_minerals(specific_material) and not self._material_matches(specific_material, material_name):
                             continue
-                        
+
+                        # Skip hotspots explicitly edited to 0 count - not a real hotspot
+                        if not self._is_all_minerals(specific_material) and hotspot_count == 0:
+                            continue
+
+                        # All Minerals: skip rings where every material was zeroed out (GROUP_CONCAT yields NULL)
+                        if self._is_all_minerals(specific_material) and not material_name:
+                            continue
+
                         # Use ring type from database - no fallback needed
                         ring_type = ring_type_db if ring_type_db else "No data"
                         
@@ -5168,8 +5179,12 @@ class RingFinder(ColumnVisibilityMixin):
                 else:
                     # Not formatted - add count wrapper
                     hotspot_count = hotspot.get("count", 1)
-                    hotspot_display = f"{material_name} ({hotspot_count})"
-                    
+                    if hotspot_count and hotspot_count > 0:
+                        hotspot_display = f"{material_name} ({hotspot_count})"
+                    else:
+                        # Count explicitly 0 - don't show this material at all
+                        hotspot_display = ""
+
                     # Show full material names (no abbreviations)
                     hotspot_count_display = hotspot_display
             elif "EDTools" in data_source:

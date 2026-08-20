@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v5.3.1
+AppVersion=v5.3.2
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -93,7 +93,7 @@ Source: "NOTICE"; DestDir: "{app}"
 ; Offer optional desktop icon
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"
 ; VoiceAttack integration options (only shown if VA detected)
-Name: "installeliteva"; Description: "Install EliteVA v5.0.7 (VoiceAttack plugin)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
+Name: "installeliteva"; Description: "Install EliteVA v5.0.12 (VoiceAttack plugin)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
 Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.2.5)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
 
 [Icons]
@@ -562,8 +562,8 @@ begin
       end;
       if Pos('EliteVA', WizardForm.TasksList.ItemCaption[I]) > 0 then
       begin
-        { Only pre-check if EliteVA is not installed or version differs from bundled 5.0.7 }
-        WizardForm.TasksList.Checked[I] := VADetected and (ExistingVersion <> '5.0.7');
+        { Only pre-check if EliteVA is not installed or version differs from bundled 5.0.12 }
+        WizardForm.TasksList.Checked[I] := VADetected and (ExistingVersion <> '5.0.12');
       end;
     end;
   end;
