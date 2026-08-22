@@ -125,10 +125,21 @@ class UpdateChecker:
     def _is_newer_version(self, latest: str, current: str) -> bool:
         """Compare version strings"""
         try:
-            return version.parse(latest) > version.parse(current)
+            return version.parse(self._normalize(latest)) > version.parse(self._normalize(current))
         except:
             # Fallback to string comparison
             return latest > current
+
+    @staticmethod
+    def _normalize(v: str) -> str:
+        """Convert loose pre-release labels (e.g. "5.3.3 beta") to PEP 440 form
+        (e.g. "5.3.3b0") so packaging.version can parse and compare them correctly."""
+        v = v.strip()
+        for label, pep440 in (("alpha", "a0"), ("beta", "b0"), ("rc", "rc0")):
+            idx = v.lower().find(" " + label)
+            if idx != -1:
+                return v[:idx] + pep440
+        return v
     
     def _show_update_dialog(self, latest_version: str, download_url: str, parent_window):
         """Show update available dialog"""

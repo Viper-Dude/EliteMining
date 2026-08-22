@@ -6,6 +6,8 @@ Simple tooltip class with global enable/disable support.
 
 import tkinter as tk
 
+from config import scaled_font
+
 
 class ToolTip:
     """Tooltip widget that displays help text when hovering over a widget."""
@@ -101,7 +103,7 @@ class ToolTip:
             
             label = tk.Label(tw, text=self.text, justify=tk.LEFT,
                             background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                            font=("Segoe UI", "8"), wraplength=250,
+                            font=scaled_font(8), wraplength=250,
                             padx=4, pady=2)
             label.pack()
             

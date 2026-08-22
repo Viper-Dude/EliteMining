@@ -854,6 +854,8 @@
     "dark_theme": "Dunkles Design",
     "light_theme": "Helles Design",
     "orange_theme": "Oranges Design",
+    "ui_scale": "Skalierung der Oberfläche",
+    "ui_scale_desc": "Schrift und Zeilenhöhe in der ganzen App vergrößern für bessere Lesbarkeit (Neustart erforderlich)",
     "language": "Sprache",
     "auto_detect": "Automatisch vom Spiel erkennen",
     "save_settings": "Einstellungen speichern",

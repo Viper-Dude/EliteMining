@@ -74,7 +74,7 @@ def get_app_icon_path() -> str:
     return None
 from mining_statistics import SessionAnalytics
 
-from config import _load_cfg, _save_cfg, _atomic_write_text, VA_TTS_ANNOUNCEMENT, CONFIG_FILE
+from config import _load_cfg, _save_cfg, _atomic_write_text, VA_TTS_ANNOUNCEMENT, CONFIG_FILE, scaled_font, scaled_px
 import announcer
 
 # Import normalization from journal_parser for consistent material name handling
@@ -531,22 +531,22 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Title
         tk.Label(main_frame, text=f"Edit hits count for {material_name}:", 
-                bg=bg_color, fg=fg_color, font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 10))
-        
+                bg=bg_color, fg=fg_color, font=scaled_font(10, "bold")).pack(anchor="w", pady=(0, 10))
+
         # Current value
-        tk.Label(main_frame, text=f"Current: {current_value}", 
-                bg=bg_color, fg=text_color, font=("Segoe UI", 10)).pack(anchor="w", pady=(0, 3))
-        
+        tk.Label(main_frame, text=f"Current: {current_value}",
+                bg=bg_color, fg=text_color, font=scaled_font(10)).pack(anchor="w", pady=(0, 3))
+
         # Hint text
-        tk.Label(main_frame, text="(Reduce to fix accidental double prospects)", 
-                bg=bg_color, fg="#888888", font=("Segoe UI", 8, "italic")).pack(anchor="w", pady=(0, 10))
+        tk.Label(main_frame, text="(Reduce to fix accidental double prospects)",
+                bg=bg_color, fg="#888888", font=scaled_font(8, "italic")).pack(anchor="w", pady=(0, 10))
         
         # Entry frame
         entry_frame = tk.Frame(main_frame, bg=bg_color)
         entry_frame.pack(fill="x", pady=(5, 15))
         
         tk.Label(entry_frame, text="New value:", bg=bg_color, fg=text_color,
-                font=("Segoe UI", 10)).pack(side="left")
+                font=scaled_font(10)).pack(side="left")
         
         value_var = tk.StringVar(value=str(current_value))
         entry = tk.Entry(entry_frame, textvariable=value_var, width=8,
@@ -554,7 +554,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         insertbackground=text_color,
                         selectbackground="#404040",
                         selectforeground=text_color,
-                        font=("Segoe UI", 11),
+                        font=scaled_font(11),
                         relief="solid", bd=1,
                         highlightbackground=btn_border,
                         highlightthickness=1)
@@ -586,7 +586,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                           activebackground=btn_active_bg, activeforeground=btn_fg,
                           relief="solid", bd=1,
                           highlightbackground=btn_border, highlightthickness=1,
-                          font=("Segoe UI", 9))
+                          font=scaled_font(9))
         ok_btn.pack(side="left", padx=(0, 10))
         
         cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel, width=10,
@@ -594,7 +594,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                               activebackground=btn_active_bg, activeforeground=btn_fg,
                               relief="solid", bd=1,
                               highlightbackground=btn_border, highlightthickness=1,
-                              font=("Segoe UI", 9))
+                              font=scaled_font(9))
         cancel_btn.pack(side="left")
         
         # Bind Enter and Escape
@@ -713,9 +713,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Create a custom style for smaller session buttons
         style = ttk.Style()
-        style.configure("SmallDark.TButton", 
-                       font=("Segoe UI", 8),  # Smaller font size
-                       background="#444444", 
+        style.configure("SmallDark.TButton",
+                       font=scaled_font(8),  # Smaller font size
+                       background="#444444",
                        foreground="#ffffff")
         style.map("SmallDark.TButton",
                  background=[("active", "#555555")])
@@ -1921,16 +1921,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         _pp_theme = load_theme()
         _pp_bg = "#0a0a0a" if _pp_theme == "elite_orange" else "#1e1e1e"
         
-        ttk.Label(distance_ship_row, text=t('mining_session.distances'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
+        ttk.Label(distance_ship_row, text=t('mining_session.distances'), font=scaled_font(9, "bold")).pack(side="left", padx=(0, 5))
         self.distance_info_label = tk.Label(distance_ship_row, text=f"➤ {t('mining_session.sol')} --- | {t('mining_session.home')} --- | {t('mining_session.fleet_carrier')} ---",
-                                font=("Segoe UI", 9), foreground="#ffcc00", bg=_pp_bg)
+                                font=scaled_font(9), foreground="#ffcc00", bg=_pp_bg)
         self.distance_info_label.pack(side="left")
-        
+
         # Ship info on the right side of the same row
         ship_info_frame = ttk.Frame(distance_ship_row)
         ship_info_frame.pack(side="right", padx=(20, 0))
-        ttk.Label(ship_info_frame, text=t('mining_session.ship'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
-        self.ship_info_label = ttk.Label(ship_info_frame, text="", font=("Segoe UI", 9, "bold"), foreground="#ffcc00")
+        ttk.Label(ship_info_frame, text=t('mining_session.ship'), font=scaled_font(9, "bold")).pack(side="left", padx=(0, 5))
+        self.ship_info_label = ttk.Label(ship_info_frame, text="", font=scaled_font(9, "bold"), foreground="#ffcc00")
         self.ship_info_label.pack(side="left")
 
         # --- System and Location Name Entry Row ---
@@ -1941,7 +1941,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         sysbody_row.columnconfigure(2, weight=0, minsize=80)
         sysbody_row.columnconfigure(3, weight=1)
 
-        ttk.Label(sysbody_row, text=t('mining_session.system'), font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", padx=(0, 2))
+        ttk.Label(sysbody_row, text=t('mining_session.system'), font=scaled_font(9)).grid(row=0, column=0, sticky="w", padx=(0, 2))
         self.system_entry = ttk.Entry(sysbody_row, textvariable=self.session_system, width=40)
         self.system_entry.grid(row=0, column=1, sticky="w", padx=(0, 5))
         self.ToolTip(self.system_entry, t('tooltips.system_entry'))
@@ -1949,7 +1949,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.system_entry.bind('<FocusOut>', lambda e: self.system_entry.selection_clear())
         self.system_entry.bind('<Map>', lambda e: self.after(10, self.system_entry.selection_clear))
 
-        ttk.Label(sysbody_row, text=t('mining_session.planet_ring'), font=("Segoe UI", 9)).grid(row=0, column=2, sticky="w", padx=(0, 2))
+        ttk.Label(sysbody_row, text=t('mining_session.planet_ring'), font=scaled_font(9)).grid(row=0, column=2, sticky="w", padx=(0, 2))
         self.body_entry = ttk.Entry(sysbody_row, textvariable=self.session_body, width=15)
         self.body_entry.grid(row=0, column=3, sticky="w")
         self.ToolTip(self.body_entry, t('tooltips.body_entry'))
@@ -1974,7 +1974,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         prospector_pane.columnconfigure(0, weight=1)
         prospector_pane.rowconfigure(1, weight=1)
         
-        ttk.Label(prospector_pane, text=t('mining_session.prospector_reports'), font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(prospector_pane, text=t('mining_session.prospector_reports'), font=scaled_font(10, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 4))
 
         # Configure Prospector Reports Treeview style based on theme
         from config import load_theme
@@ -1997,14 +1997,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             alt_row_bg = "#282828"
         
         style.configure("ProspectorReports.Treeview",
-                       rowheight=25,
+                       rowheight=scaled_px(25),
                        borderwidth=1,
                        relief="solid",
                        bordercolor="#333333",
                        background=tree_bg,
                        foreground=tree_fg,
                        fieldbackground=tree_bg,
-                       font=("Segoe UI", 9))
+                       font=scaled_font(9))
         style.configure("ProspectorReports.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
@@ -2012,7 +2012,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                        foreground=tree_fg,
                        padding=[5, 5],
                        anchor="w",
-                       font=("Segoe UI", 9, "bold"))
+                       font=scaled_font(9, "bold"))
         style.map("ProspectorReports.Treeview",
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
@@ -2150,9 +2150,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         mineral_header_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         mineral_header_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(mineral_header_frame, text=t('mining_session.material_analysis'), font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
-        ttk.Label(mineral_header_frame, text=t('mining_session.double_click_hint'), 
-                  font=("Segoe UI", 8), foreground="#888888").grid(row=0, column=1, sticky="e")
+        ttk.Label(mineral_header_frame, text=t('mining_session.material_analysis'), font=scaled_font(10, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(mineral_header_frame, text=t('mining_session.double_click_hint'),
+                  font=scaled_font(8), foreground="#888888").grid(row=0, column=1, sticky="e")
         
         stats_frame = ttk.Frame(material_pane)
         stats_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(0, 0))
@@ -2161,14 +2161,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Configure Mineral Analysis Treeview style (theme-aware - uses same vars from ProspectorReports)
         style.configure("MineralAnalysis.Treeview",
-                       rowheight=25,
+                       rowheight=scaled_px(25),
                        borderwidth=1,
                        relief="solid",
                        bordercolor="#333333",
                        background=tree_bg,
                        foreground=tree_fg,
                        fieldbackground=tree_bg,
-                       font=("Segoe UI", 9))
+                       font=scaled_font(9))
         style.configure("MineralAnalysis.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
@@ -2176,7 +2176,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                        foreground=tree_fg,
                        padding=[5, 5],
                        anchor="w",
-                       font=("Segoe UI", 9, "bold"))
+                       font=scaled_font(9, "bold"))
         style.map("MineralAnalysis.Treeview",
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
@@ -2214,36 +2214,47 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.stats_tree.heading("quality_rate", text=t('mining_session.quality_rate'), anchor="center")
         self.stats_tree.heading("_spacer", text="", anchor="w")
 
-        self.stats_tree.column("material", width=135, minwidth=110, anchor="w", stretch=False)
-        self.stats_tree.column("tons", width=65, minwidth=50, anchor="center", stretch=False)
-        self.stats_tree.column("tph", width=65, minwidth=50, anchor="center", stretch=False)
-        self.stats_tree.column("tons_per", width=85, minwidth=60, anchor="center", stretch=False)
-        self.stats_tree.column("avg_all", width=95, minwidth=70, anchor="center", stretch=False)
-        self.stats_tree.column("avg_pct", width=130, minwidth=100, anchor="center", stretch=False)
-        self.stats_tree.column("best_pct", width=80, minwidth=60, anchor="center", stretch=False)
-        self.stats_tree.column("latest_pct", width=80, minwidth=60, anchor="center", stretch=False)
-        self.stats_tree.column("count", width=100, minwidth=80, anchor="center", stretch=False)
-        self.stats_tree.column("core_hits", width=80, minwidth=60, anchor="center", stretch=False)
-        self.stats_tree.column("all_hits", width=95, minwidth=70, anchor="center", stretch=False)
-        self.stats_tree.column("quality_rate", width=125, minwidth=100, anchor="center", stretch=False)
-        self.stats_tree.column("_spacer", width=20, minwidth=20, anchor="w", stretch=True)
+        # minwidth is derived from the actual rendered header text width (at the
+        # scaled heading font) rather than a fixed guess, so headers can never be
+        # squeezed below what their own label needs, at any UI scale or language.
+        import tkinter.font as _tkfont
+        _heading_font = _tkfont.Font(font=scaled_font(9, "bold"))
+        _base_widths = {"material": 135, "tons": 65, "tph": 65, "tons_per": 85, "avg_all": 95,
+                        "avg_pct": 130, "best_pct": 80, "latest_pct": 80, "count": 100,
+                        "core_hits": 80, "all_hits": 95, "quality_rate": 125}
+        _header_pad = scaled_px(24)  # header cell padding + sort-arrow space
+
+        def _min_for(col_name):
+            header_text = self.stats_tree.heading(col_name, "text")
+            text_width = _heading_font.measure(header_text) + _header_pad
+            return max(text_width, scaled_px(50))
+
+        _minwidths = {col: _min_for(col) for col in _base_widths}
+
+        for col_name, base_width in _base_widths.items():
+            self.stats_tree.column(col_name, width=max(scaled_px(base_width), _minwidths[col_name]),
+                                   minwidth=_minwidths[col_name], anchor="center", stretch=False)
+        self.stats_tree.column("material", anchor="w")
+        self.stats_tree.column("_spacer", width=scaled_px(20), minwidth=scaled_px(20), anchor="w", stretch=True)
 
         # Setup column visibility for material analysis
         self.setup_column_visibility(
             tree=self.stats_tree,
             columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "core_hits", "all_hits", "quality_rate"),
-            default_widths={"material": 135, "tons": 65, "tph": 65, "tons_per": 85, "avg_all": 95, "avg_pct": 130, "best_pct": 80, "latest_pct": 80, "count": 65, "core_hits": 80, "all_hits": 70, "quality_rate": 80},
+            default_widths={col: max(scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
             config_key='mineral_analysis'
         )
 
-        # Load saved column widths from config
+        # Load saved column widths from config — but never let an old (pre-scale)
+        # saved width sit below the current scaled minwidth, or headers get squeezed.
         try:
             from config import load_mineral_analysis_column_widths
             saved_widths = load_mineral_analysis_column_widths()
             if saved_widths:
                 for col_name, width in saved_widths.items():
                     try:
-                        self.stats_tree.column(col_name, width=width)
+                        current_minwidth = self.stats_tree.column(col_name, "minwidth")
+                        self.stats_tree.column(col_name, width=max(width, current_minwidth))
                     except:
                         pass
         except Exception as e:
@@ -2304,7 +2315,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         summary_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         summary_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(summary_frame, text=t('mining_session.session_summary'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(summary_frame, text=t('mining_session.session_summary'), font=scaled_font(9, "bold")).grid(row=0, column=0, sticky="w")
         self.stats_summary_label = ttk.Label(summary_frame, text=t('mining_session.no_data_yet'), foreground="#888888")
         self.stats_summary_label.grid(row=0, column=1, sticky="w", padx=(10, 0))
         
@@ -2380,11 +2391,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             activebackground=_opt_bg,
             activeforeground="#ffffff", 
             highlightthickness=0, 
-            bd=0, 
-            font=("Segoe UI", 9),
-            padx=8, 
-            pady=0, 
-            anchor="w", 
+            bd=0,
+            font=scaled_font(9),
+            padx=8,
+            pady=0,
+            anchor="w",
             relief="flat"
         )
         auto_start_cb.pack(side="left")
@@ -2409,11 +2420,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             activebackground=_opt_bg,
             activeforeground="#ffffff", 
             highlightthickness=0, 
-            bd=0, 
-            font=("Segoe UI", 9),
-            padx=8, 
-            pady=0, 
-            anchor="w", 
+            bd=0,
+            font=scaled_font(9),
+            padx=8,
+            pady=0,
+            anchor="w",
             relief="flat"
         )
         self.prompt_on_full_cb.pack(side="left", padx=(10, 0))
@@ -2447,11 +2458,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             activebackground=_opt_bg,
             activeforeground="#ffffff", 
             highlightthickness=0, 
-            bd=0, 
-            font=("Segoe UI", 9),
-            padx=8, 
-            pady=0, 
-            anchor="w", 
+            bd=0,
+            font=scaled_font(9),
+            padx=8,
+            pady=0,
+            anchor="w",
             relief="flat"
         )
         multi_session_cb.pack(side="left", padx=(10, 0))
@@ -2471,7 +2482,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         elapsed_frame.grid(row=0, column=1, sticky="ew", padx=(10, 10))
         
         ttk.Label(elapsed_frame, text=t('mining_session.elapsed') + ":").pack(side="left")
-        self.elapsed_lbl = ttk.Label(elapsed_frame, textvariable=self.session_elapsed, font=("Segoe UI", 9, "bold"))
+        self.elapsed_lbl = ttk.Label(elapsed_frame, textvariable=self.session_elapsed, font=scaled_font(9, "bold"))
         self.elapsed_lbl.pack(side="left", padx=(6, 0))
         
         # Right side: Export button (Reports moved to dedicated tab)
@@ -2952,14 +2963,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             _rpt_alt = "#282828"
         
         style.configure("Reports.Treeview",
-                       rowheight=25,
+                       rowheight=scaled_px(25),
                        borderwidth=1,
                        relief="solid",
                        bordercolor="#333333",
                        background=_rpt_bg,
                        foreground=_rpt_fg,
                        fieldbackground=_rpt_bg,
-                       font=("Segoe UI", 9))
+                       font=scaled_font(9))
         style.configure("Reports.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
@@ -2967,7 +2978,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                        foreground=_rpt_fg,
                        padding=[5, 5],
                        anchor="w",
-                       font=("Segoe UI", 9, "bold"))
+                       font=scaled_font(9, "bold"))
         style.map("Reports.Treeview",
                  background=[('selected', _rpt_sel_bg)],
                  foreground=[('selected', _rpt_sel_fg)])
@@ -3507,7 +3518,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 if item_data:
                     lines = item_data['cargo_raw'].count(';') + 1
                     max_lines = max(max_lines, min(lines, 3))
-            new_height = max_lines * 20 + 10
+            new_height = max_lines * scaled_px(20) + scaled_px(10)
             style = ttk.Style()
             style.configure("ReportsWindow.Treeview", rowheight=new_height)
             tree.configure(style="ReportsWindow.Treeview")
@@ -3746,9 +3757,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         
                         # Set row height for word wrap
                         if word_wrap_enabled.get():
-                            new_height = max_lines * 20 + 10  # 20px per line + padding
+                            new_height = max_lines * scaled_px(20) + scaled_px(10)  # 20px per line + padding
                         else:
-                            new_height = 20  # Default single line height
+                            new_height = scaled_px(20)  # Default single line height
                         style = ttk.Style()
                         style.configure("ReportsWindow.Treeview", rowheight=new_height)
                         tree.configure(style="ReportsWindow.Treeview")
@@ -5161,8 +5172,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             else:
                 prompt_text = "Enter your name for Discord posts:"
                 
-            title_label = tk.Label(main_frame, text=prompt_text, 
-                                  font=("Segoe UI", 10), 
+            title_label = tk.Label(main_frame, text=prompt_text,
+                                  font=scaled_font(10),
                                   fg="#ffffff", bg="#1e1e1e",
                                   justify="left")
             title_label.pack(pady=(0, 10))
@@ -5194,7 +5205,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Main info text
             main_text = "This will post your mining report to the\nEliteMining Community Discord server."
             main_label = tk.Label(info_frame, text=main_text,
-                                 font=("Segoe UI", 9), 
+                                 font=scaled_font(9),
                                  fg="#ffffff", bg="#2a2a2a",
                                  justify="center")
             main_label.pack(padx=15, pady=(10, 5))
@@ -5217,7 +5228,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # "Join our community" text - always show this
             link_text = "Join our community"
             link_label = tk.Label(link_frame, text=link_text,
-                                 font=("Segoe UI", 9, "underline"), 
+                                 font=scaled_font(9, "underline"),
                                  fg="#5865F2", bg="#2a2a2a",  # Discord blurple color
                                  cursor="hand2")
             if discord_logo:
@@ -5228,7 +5239,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             # Add Discord URL below the link text for clarity
             url_label = tk.Label(link_frame, text="discord.gg/5dsF3UshRR",
-                                font=("Segoe UI", 8), 
+                                font=scaled_font(8),
                                 fg="#888888", bg="#2a2a2a")
             if discord_logo:
                 url_label.pack(side="left", padx=(8, 0))
@@ -5236,7 +5247,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 url_label.pack(pady=(2, 0))
             
             # Username input
-            username_entry = tk.Entry(main_frame, font=("Segoe UI", 9), width=35,
+            username_entry = tk.Entry(main_frame, font=scaled_font(9), width=35,
                                      bg="#333333", fg="#ffffff", 
                                      insertbackground="#ffffff",
                                      relief="solid", bd=1)
@@ -5246,18 +5257,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             username_entry.select_range(0, tk.END)
             
             # Comment label
-            comment_label = tk.Label(main_frame, text="Add a comment (optional):", 
-                                   font=("Arial", 10), 
+            comment_label = tk.Label(main_frame, text="Add a comment (optional):",
+                                   font=scaled_font(10, family="Arial"),
                                    fg="#ffffff", bg="#1e1e1e")
             comment_label.pack(anchor="w", pady=(0, 5))
-            
+
             # Comment input
-            comment_entry = tk.Entry(main_frame, font=("Arial", 10), width=35,
-                                   bg="#333333", fg="#ffffff", 
+            comment_entry = tk.Entry(main_frame, font=scaled_font(10, family="Arial"), width=35,
+                                   bg="#333333", fg="#ffffff",
                                    insertbackground="#ffffff",
                                    relief="solid", bd=1)
             comment_entry.pack(pady=(0, 20))
-            
+
             # Result variable
             result = {"username": None, "comment": None}
             
@@ -5410,35 +5421,35 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             # Title
             title_label = tk.Label(main_frame, text="Add Your Info to Card",
-                                  font=("Arial", 14, "bold"), 
+                                  font=scaled_font(14, "bold", family="Arial"),
                                   fg="#FF8C00", bg="#1e1e1e")
             title_label.pack(pady=(0, 15))
-            
+
             # CMDR Name label
             cmdr_label = tk.Label(main_frame, text="CMDR Name (optional):",
-                                 font=("Arial", 10), 
+                                 font=scaled_font(10, family="Arial"),
                                  fg="#ffffff", bg="#1e1e1e")
             cmdr_label.pack(anchor="w", pady=(0, 5))
-            
+
             # CMDR Name input
-            cmdr_entry = tk.Entry(main_frame, font=("Arial", 11), width=35,
-                                 bg="#333333", fg="#ffffff", 
+            cmdr_entry = tk.Entry(main_frame, font=scaled_font(11, family="Arial"), width=35,
+                                 bg="#333333", fg="#ffffff",
                                  insertbackground="#ffffff",
                                  relief="solid", bd=1)
             cmdr_entry.pack(pady=(0, 15))
             cmdr_entry.insert(0, current_cmdr)
             cmdr_entry.focus()
             cmdr_entry.select_range(0, tk.END)
-            
+
             # Comment label
             comment_label = tk.Label(main_frame, text="Comment (optional):",
-                                   font=("Arial", 10), 
+                                   font=scaled_font(10, family="Arial"),
                                    fg="#ffffff", bg="#1e1e1e")
             comment_label.pack(anchor="w", pady=(0, 5))
-            
+
             # Comment input
-            comment_entry = tk.Entry(main_frame, font=("Arial", 10), width=35,
-                                   bg="#333333", fg="#ffffff", 
+            comment_entry = tk.Entry(main_frame, font=scaled_font(10, family="Arial"), width=35,
+                                   bg="#333333", fg="#ffffff",
                                    insertbackground="#ffffff",
                                    relief="solid", bd=1)
             comment_entry.pack(pady=(0, 20))
@@ -5468,15 +5479,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             button_frame.pack(pady=(10, 0))
             
             ok_button = tk.Button(button_frame, text="OK", command=on_ok,
-                                 font=("Arial", 10, "bold"),
+                                 font=scaled_font(10, "bold", family="Arial"),
                                  bg="#FF8C00", fg="#ffffff",
                                  activebackground="#FFA500",
                                  activeforeground="#ffffff",
                                  width=10, relief="flat", cursor="hand2")
             ok_button.pack(side="left", padx=5)
-            
+
             skip_button = tk.Button(button_frame, text="Skip", command=on_skip,
-                                   font=("Arial", 10),
+                                   font=scaled_font(10, family="Arial"),
                                    bg="#555555", fg="#ffffff",
                                    activebackground="#666666",
                                    activeforeground="#ffffff",
@@ -7069,7 +7080,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     label = tk.Label(tooltip_window, text=tooltip_text,
                                    background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=("Segoe UI", 9), justify=tk.LEFT, wraplength=300)
+                                   font=scaled_font(9), justify=tk.LEFT, wraplength=300)
                     label.pack(ipadx=5, ipady=3)
         
         def hide_tooltip(event):
@@ -7158,7 +7169,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 wrap_length = 400 if word_wrap_enabled.get() else 9999
                 label = tk.Label(tooltip_window, text=tooltip_text,
                                background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                               font=("Segoe UI", 9), justify=tk.LEFT, wraplength=wrap_length)
+                               font=scaled_font(9), justify=tk.LEFT, wraplength=wrap_length)
                 label.pack(ipadx=5, ipady=3)
         
         def hide_tooltip(event):
@@ -7235,7 +7246,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             
                             label = tk.Label(tooltip_window, text=tooltip_text,
                                            background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                           font=("Segoe UI", 9), justify=tk.LEFT, wraplength=300)
+                                           font=scaled_font(9), justify=tk.LEFT, wraplength=300)
                             label.pack(ipadx=5, ipady=3)
                 except Exception as e:
                     print(f"Tooltip error: {e}")
@@ -7254,7 +7265,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     label = tk.Label(tooltip_window, text=tooltip_text,
                                    background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=("Segoe UI", 9), justify=tk.LEFT, wraplength=300)
+                                   font=scaled_font(9), justify=tk.LEFT, wraplength=300)
                     label.pack(ipadx=5, ipady=3)
         
         def hide_tooltip(event):
@@ -7623,14 +7634,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             _tab_alt = "#282828"
         
         style.configure("ReportsTab.Treeview",
-                       rowheight=25,
+                       rowheight=scaled_px(25),
                        borderwidth=1,
                        relief="solid",
                        bordercolor="#333333",
                        background=_tab_bg,
                        foreground=_tab_fg,
                        fieldbackground=_tab_bg,
-                       font=("Segoe UI", 9))
+                       font=scaled_font(9))
         style.configure("ReportsTab.Treeview.Heading",
                        borderwidth=1,
                        relief="groove",
@@ -7638,7 +7649,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                        foreground=_tab_fg,
                        padding=[5, 5],
                        anchor="w",
-                       font=("Segoe UI", 9, "bold"))
+                       font=scaled_font(9, "bold"))
         style.map("ReportsTab.Treeview",
                  background=[('selected', _tab_sel_bg)],
                  foreground=[('selected', _tab_sel_fg)])
@@ -7798,47 +7809,59 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         
         # Configure column widths - locked at startup size, no resizing allowed
-        
-        self.reports_tree_tab.column("date", width=161, minwidth=80, stretch=False, anchor="w")
-        self.reports_tree_tab.column("duration", width=80, minwidth=50, stretch=False, anchor="w")
-        self.reports_tree_tab.column("session_type", width=90, minwidth=50, stretch=False, anchor="w")
-        self.reports_tree_tab.column("ship", width=250, minwidth=80, stretch=False, anchor="w")
-        self.reports_tree_tab.column("system", width=230, minwidth=80, stretch=False, anchor="w")
-        self.reports_tree_tab.column("body", width=125, minwidth=60, stretch=False, anchor="w")
-        self.reports_tree_tab.column("tons", width=95, minwidth=70, stretch=False, anchor="center")
-        self.reports_tree_tab.column("tph", width=60, minwidth=40, stretch=False, anchor="center")
-        self.reports_tree_tab.column("tons_per", width=110, minwidth=70, stretch=False, anchor="center")
-        self.reports_tree_tab.column("materials", width=90, minwidth=60, stretch=False, anchor="center")
-        self.reports_tree_tab.column("total_hits", width=90, minwidth=60, stretch=False, anchor="center")
-        self.reports_tree_tab.column("core_hits", width=85, minwidth=60, stretch=False, anchor="center")
-        self.reports_tree_tab.column("asteroids", width=95, minwidth=60, stretch=False, anchor="center")
-        self.reports_tree_tab.column("hit_rate", width=100, minwidth=70, stretch=False, anchor="center")
-        self.reports_tree_tab.column("quality", width=140, minwidth=90, stretch=False, anchor="center")
-        self.reports_tree_tab.column("cargo", width=350, minwidth=100, stretch=False, anchor="w")
-        self.reports_tree_tab.column("prospects", width=80, minwidth=50, stretch=False, anchor="center")
-        self.reports_tree_tab.column("eng_materials", width=250, minwidth=80, stretch=False, anchor="w")
-        self.reports_tree_tab.column("comment", width=90, minwidth=60, stretch=False, anchor="center")
-        self.reports_tree_tab.column("enhanced", width=115, minwidth=80, stretch=False, anchor="center")
+
+        # minwidth is derived from the actual rendered header text width (at the
+        # scaled heading font) rather than a fixed guess, so headers can never be
+        # squeezed below what their own label needs, at any UI scale or language.
+        import tkinter.font as _tkfont
+        _reports_heading_font = _tkfont.Font(font=scaled_font(9, "bold"))
+        _reports_base_widths = {"date": 161, "duration": 80, "session_type": 90, "ship": 250,
+                        "system": 230, "body": 125, "tons": 95, "tph": 60, "tons_per": 110,
+                        "materials": 90, "total_hits": 90, "core_hits": 85, "asteroids": 95,
+                        "hit_rate": 100, "quality": 140, "cargo": 350, "prospects": 80,
+                        "eng_materials": 250, "comment": 90, "enhanced": 115}
+        _reports_header_pad = scaled_px(24)  # header cell padding + sort-arrow space
+
+        def _reports_min_for(col_name):
+            header_text = self.reports_tree_tab.heading(col_name, "text")
+            text_width = _reports_heading_font.measure(header_text) + _reports_header_pad
+            return max(text_width, scaled_px(50))
+
+        _reports_minwidths = {col: _reports_min_for(col) for col in _reports_base_widths}
+
+        _reports_anchors = {"date": "w", "duration": "w", "session_type": "w", "ship": "w",
+                        "system": "w", "body": "w", "tons": "center", "tph": "center",
+                        "tons_per": "center", "materials": "center", "total_hits": "center",
+                        "core_hits": "center", "asteroids": "center", "hit_rate": "center",
+                        "quality": "center", "cargo": "w", "prospects": "center",
+                        "eng_materials": "w", "comment": "center", "enhanced": "center"}
+
+        for col_name, base_width in _reports_base_widths.items():
+            self.reports_tree_tab.column(col_name, width=max(scaled_px(base_width), _reports_minwidths[col_name]),
+                                   minwidth=_reports_minwidths[col_name], stretch=False,
+                                   anchor=_reports_anchors[col_name])
         # Spacer column — always last, gives every real column a draggable right border
         self.reports_tree_tab.heading("_spacer", text="", anchor="w")
-        self.reports_tree_tab.column("_spacer", width=20, minwidth=20, stretch=True, anchor="w")
+        self.reports_tree_tab.column("_spacer", width=scaled_px(20), minwidth=scaled_px(20), stretch=True, anchor="w")
 
         # Setup column visibility for reports tab
         self.setup_column_visibility(
             tree=self.reports_tree_tab,
             columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"),
-            default_widths={"date": 161, "duration": 80, "session_type": 90, "ship": 250, "system": 230, "body": 125, "tons": 80, "tph": 60, "tons_per": 85, "materials": 80, "total_hits": 80, "core_hits": 75, "asteroids": 80, "hit_rate": 90, "quality": 120, "cargo": 350, "prospects": 70, "eng_materials": 250, "comment": 80, "enhanced": 100},
+            default_widths={col: max(scaled_px(w), _reports_minwidths[col]) for col, w in _reports_base_widths.items()},
             config_key='reports_tab'
         )
 
-        # Load saved column widths from config
+        # Load saved column widths from config — but never let an old (pre-scale)
+        # saved width sit below the current scaled minwidth, or headers get squeezed.
         try:
             from config import load_mining_analysis_column_widths
             saved_widths = load_mining_analysis_column_widths()
             if saved_widths:
                 for col_name, width in saved_widths.items():
                     try:
-                        self.reports_tree_tab.column(col_name, width=width)
+                        current_minwidth = self.reports_tree_tab.column(col_name, "minwidth")
+                        self.reports_tree_tab.column(col_name, width=max(width, current_minwidth))
                     except Exception as e:
                         pass
             else:
@@ -8613,7 +8636,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     label = tk.Label(self._reports_tooltip_window, text=tooltip_text,
                                    background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=("Segoe UI", 9), justify=tk.LEFT, wraplength=300)
+                                   font=scaled_font(9), justify=tk.LEFT, wraplength=300)
                     label.pack(ipadx=5, ipady=3)
                     
                     # Track which column we're showing tooltip for
@@ -8661,7 +8684,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     label = tk.Label(self._prospector_tooltip_window, text=tooltip_text,
                                    background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=("Segoe UI", 9), justify=tk.LEFT, wraplength=300)
+                                   font=scaled_font(9), justify=tk.LEFT, wraplength=300)
                     label.pack(ipadx=5, ipady=3)
                     
                     self._current_prospector_tooltip_column = column
@@ -8717,7 +8740,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     label = tk.Label(self._mineral_tooltip_window, text=tooltip_text,
                                    background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=("Segoe UI", 9), justify=tk.LEFT, wraplength=350)
+                                   font=scaled_font(9), justify=tk.LEFT, wraplength=350)
                     label.pack(ipadx=5, ipady=3)
                     
                     self._current_mineral_tooltip_column = column
@@ -8850,7 +8873,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 return
             
             # Create an entry widget over the cell
-            entry = tk.Entry(self.reports_tree_tab, font=("Segoe UI", 9))
+            entry = tk.Entry(self.reports_tree_tab, font=scaled_font(9))
             entry.insert(0, current_comment)
             entry.select_range(0, tk.END)
             entry.place(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
@@ -9686,7 +9709,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     if item_data:
                         lines = item_data.get('cargo_raw', '').count(';') + 1
                         max_lines = max(max_lines, min(lines, 3))
-                new_height = max_lines * 20 + 10
+                new_height = max_lines * scaled_px(20) + scaled_px(10)
                 style = ttk.Style()
                 style.configure("ReportsTab.Treeview", rowheight=new_height)
                 self.reports_tree_tab.configure(style="ReportsTab.Treeview")
@@ -11190,8 +11213,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         msg_line3 = "\n\n" + t('tooltips.cargo_full_warning')
         msg = msg_line1 + msg_line2 + msg_line3
         
-        tk.Label(msg_frame, text=msg, bg=bg_color, fg=fg_color, 
-                font=("Segoe UI", 10), justify="left", wraplength=400).pack()
+        tk.Label(msg_frame, text=msg, bg=bg_color, fg=fg_color,
+                font=scaled_font(10), justify="left", wraplength=400).pack()
         
         # Buttons frame
         btn_frame = tk.Frame(dialog, bg=bg_color)
@@ -11235,13 +11258,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Yes button
         tk.Button(btn_frame, text=t('tooltips.cargo_full_yes'), command=on_yes,
-                 bg=yes_btn_bg, fg=btn_fg, font=("Segoe UI", 9, "bold"),
+                 bg=yes_btn_bg, fg=btn_fg, font=scaled_font(9, "bold"),
                  padx=20, pady=8, cursor="hand2", relief="raised", bd=2,
                  activebackground=yes_btn_active, activeforeground=btn_active_fg).pack(side="left", padx=5)
         
         # No button  
         tk.Button(btn_frame, text=t('tooltips.cargo_full_no'), command=on_no,
-                 bg=btn_bg, fg=btn_fg, font=("Segoe UI", 9),
+                 bg=btn_bg, fg=btn_fg, font=scaled_font(9),
                  padx=20, pady=8, cursor="hand2", relief="raised", bd=2,
                  activebackground=btn_active_bg, activeforeground=btn_active_fg).pack(side="left", padx=5)
         
@@ -12443,7 +12466,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Title row with help link
         title_row = ttk.Frame(main_frame)
         title_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 5))
-        ttk.Label(title_row, text=t('bookmarks.title'), font=("Segoe UI", 9, "bold")).pack(side="left")
+        ttk.Label(title_row, text=t('bookmarks.title'), font=scaled_font(9, "bold")).pack(side="left")
         from ui.help_link import create_help_link
         create_help_link(title_row, "bookmarks", t('bookmarks.help_tooltip'), self.ToolTip).pack(side="left", padx=(6, 0))
 
@@ -12508,7 +12531,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             _bm_alt = "#282828"
         
         style.configure("Bookmarks.Treeview",
-                       rowheight=25,
+                       rowheight=scaled_px(25),
                        borderwidth=1,
                        relief="solid",
                        bordercolor="#333333",
@@ -12595,7 +12618,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                 tree._header_tooltip_label = tk.Label(tree, text=tree._column_tooltips[col_id],
                                                                      background="#2a2a2a", foreground="#e0e0e0",
                                                                      relief="solid", borderwidth=1,
-                                                                     font=("Segoe UI", 9), padx=6, pady=4,
+                                                                     font=scaled_font(9), padx=6, pady=4,
                                                                      wraplength=300, justify="left")
                                 tree._header_tooltip_label.place(x=event.x + 10, y=event.y + 10)
                                 return
@@ -12617,33 +12640,51 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             print(f"Could not create column tooltip: {e}")
         
         # Configure column widths
-        self.bookmarks_tree.column("last_mined", width=100, stretch=False, anchor="center")
-        self.bookmarks_tree.column("system", width=180, stretch=False, anchor="w")
-        self.bookmarks_tree.column("body", width=120, stretch=False, anchor="w")
-        self.bookmarks_tree.column("hotspot", width=100, stretch=False, anchor="w")
-        self.bookmarks_tree.column("materials", width=200, stretch=False, anchor="w")
-        self.bookmarks_tree.column("avg_yield", width=80, stretch=False, anchor="center")
-        self.bookmarks_tree.column("overlap", width=80, stretch=False, anchor="w")
-        self.bookmarks_tree.column("res_site", width=80, stretch=False, anchor="w")
-        self.bookmarks_tree.column("rating", width=70, stretch=False, anchor="center")
-        self.bookmarks_tree.column("notes", width=60, stretch=False, anchor="center")
+
+        # minwidth is derived from the actual rendered header text width (at the
+        # scaled heading font) rather than a fixed guess, so headers can never be
+        # squeezed below what their own label needs, at any UI scale or language.
+        import tkinter.font as _tkfont
+        _bm_heading_font = _tkfont.Font(font=scaled_font(9, "bold"))
+        _bm_base_widths = {"last_mined": 100, "system": 180, "body": 120, "hotspot": 100,
+                        "materials": 200, "avg_yield": 80, "overlap": 80, "res_site": 80,
+                        "rating": 70, "notes": 60}
+        _bm_header_pad = scaled_px(24)  # header cell padding + sort-arrow space
+
+        def _bm_min_for(col_name):
+            header_text = self.bookmarks_tree.heading(col_name, "text")
+            text_width = _bm_heading_font.measure(header_text) + _bm_header_pad
+            return max(text_width, scaled_px(50))
+
+        _bm_minwidths = {col: _bm_min_for(col) for col in _bm_base_widths}
+
+        _bm_anchors = {"last_mined": "center", "system": "w", "body": "w", "hotspot": "w",
+                        "materials": "w", "avg_yield": "center", "overlap": "w", "res_site": "w",
+                        "rating": "center", "notes": "center"}
+
+        for col_name, base_width in _bm_base_widths.items():
+            self.bookmarks_tree.column(col_name, width=max(scaled_px(base_width), _bm_minwidths[col_name]),
+                                   minwidth=_bm_minwidths[col_name], stretch=False,
+                                   anchor=_bm_anchors[col_name])
 
         # Setup column visibility for bookmarks
         self.setup_column_visibility(
             tree=self.bookmarks_tree,
             columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"),
-            default_widths={"last_mined": 100, "system": 180, "body": 120, "hotspot": 100, "materials": 200, "avg_yield": 80, "overlap": 80, "res_site": 80, "rating": 70, "notes": 60},
+            default_widths={col: max(scaled_px(w), _bm_minwidths[col]) for col, w in _bm_base_widths.items()},
             config_key='bookmarks'
         )
 
-        # Load saved column widths from config
+        # Load saved column widths from config — but never let an old (pre-scale)
+        # saved width sit below the current scaled minwidth, or headers get squeezed.
         try:
             from config import load_bookmarks_column_widths
             saved_widths = load_bookmarks_column_widths()
             if saved_widths:
                 for col_name, width in saved_widths.items():
                     try:
-                        self.bookmarks_tree.column(col_name, width=width)
+                        current_minwidth = self.bookmarks_tree.column(col_name, "minwidth")
+                        self.bookmarks_tree.column(col_name, width=max(width, current_minwidth))
                     except:
                         pass
         except Exception as e:
@@ -13039,9 +13080,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         help_frame = tk.Frame(frame, bg="#3a3a2a", relief="solid", bd=1)
         help_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         
-        help_text = tk.Label(help_frame, text="ℹ " + t('bookmarks.dialog_help'), 
-                            bg="#3a3a2a", fg="#e0e0e0", 
-                            font=("Segoe UI", 8), wraplength=450, justify="left", padx=8, pady=6)
+        help_text = tk.Label(help_frame, text="ℹ " + t('bookmarks.dialog_help'),
+                            bg="#3a3a2a", fg="#e0e0e0",
+                            font=scaled_font(8), wraplength=450, justify="left", padx=8, pady=6)
         help_text.pack(fill="x")
         
         # System field
@@ -13100,7 +13141,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             bg="#2a4a2a", fg="#ffffff", 
                             activebackground="#3a5a3a", activeforeground="#ffffff",
                             relief="solid", bd=1, cursor="hand2",
-                            pady=2, padx=8, font=("Segoe UI", 8))
+                            pady=2, padx=8, font=scaled_font(8))
         today_btn.pack(side="left", padx=(0, 5))
         
         # Button to clear date
@@ -13111,11 +13152,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             bg="#4a2a2a", fg="#ffffff", 
                             activebackground="#5a3a3a", activeforeground="#ffffff",
                             relief="solid", bd=1, cursor="hand2",
-                            pady=2, padx=8, font=("Segoe UI", 8))
+                            pady=2, padx=8, font=scaled_font(8))
         clear_btn.pack(side="left")
-        
-        ttk.Label(last_mined_frame, text="  " + t('bookmarks.date_format_hint'), 
-                 foreground="#888888", font=("Segoe UI", 8)).pack(side="left")
+
+        ttk.Label(last_mined_frame, text="  " + t('bookmarks.date_format_hint'),
+                 foreground="#888888", font=scaled_font(8)).pack(side="left")
         
         # Target Material dropdown field
         ttk.Label(frame, text=t('bookmarks.overlap_minerals')).grid(row=7, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
@@ -13233,7 +13274,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         ss_listbox = tk.Listbox(ss_list_frame, width=36, height=4,
                                bg="#1e1e1e", fg="#e0e0e0", selectbackground="#0078d7",
                                selectforeground="#ffffff", relief="solid", bd=1,
-                               font=("Segoe UI", 9))
+                               font=scaled_font(9))
         ss_listbox.pack(side="left", fill="x", expand=True)
         ss_scrollbar = ttk.Scrollbar(ss_list_frame, orient="vertical", command=ss_listbox.yview)
         ss_scrollbar.pack(side="right", fill="y")
@@ -13346,15 +13387,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tk.Button(ss_btn_frame, text=t('bookmarks.add_screenshot'), command=_ss_add,
                   bg="#2a4a2a", fg="#ffffff", activebackground="#3a5a3a", activeforeground="#ffffff",
                   relief="solid", bd=1, cursor="hand2", pady=2, padx=8,
-                  font=("Segoe UI", 8)).pack(side="left", padx=(0, 5))
+                  font=scaled_font(8)).pack(side="left", padx=(0, 5))
         tk.Button(ss_btn_frame, text=t('bookmarks.view_screenshot'), command=_ss_view,
                   bg="#2a2a4a", fg="#ffffff", activebackground="#3a3a5a", activeforeground="#ffffff",
                   relief="solid", bd=1, cursor="hand2", pady=2, padx=8,
-                  font=("Segoe UI", 8)).pack(side="left", padx=(0, 5))
+                  font=scaled_font(8)).pack(side="left", padx=(0, 5))
         tk.Button(ss_btn_frame, text=t('bookmarks.remove_screenshot'), command=_ss_remove,
                   bg="#4a2a2a", fg="#ffffff", activebackground="#5a3a3a", activeforeground="#ffffff",
                   relief="solid", bd=1, cursor="hand2", pady=2, padx=8,
-                  font=("Segoe UI", 8)).pack(side="left")
+                  font=scaled_font(8)).pack(side="left")
         # ---- End screenshots section ----
 
         # Pre-load overlap/RES from database if editing existing bookmark with system/body
@@ -13531,7 +13572,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             bg="#2a5a2a", fg="#ffffff", 
                             activebackground="#3a6a3a", activeforeground="#ffffff",
                             relief="solid", bd=1, cursor="hand2", 
-                            pady=8, padx=20, font=("Segoe UI", 10, "normal"),
+                            pady=8, padx=20, font=scaled_font(10, "normal"),
                             highlightbackground="#1a3a1a", highlightcolor="#1a3a1a")
         save_btn.pack(side="left", padx=(0, 8))
         
@@ -13540,7 +13581,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                               bg="#5a2a2a", fg="#ffffff", 
                               activebackground="#6a3a3a", activeforeground="#ffffff",
                               relief="solid", bd=1, cursor="hand2", 
-                              pady=8, padx=20, font=("Segoe UI", 10, "normal"),
+                              pady=8, padx=20, font=scaled_font(10, "normal"),
                               highlightbackground="#3a1a1a", highlightcolor="#3a1a1a")
         cancel_btn.pack(side="left")
         
@@ -13765,7 +13806,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         style = ttk.Style()
         style.configure("Stats.TFrame", background=_stats_bg)
         style.configure("Stats.TLabelframe", background=_stats_bg)
-        style.configure("Stats.TLabelframe.Label", background=_stats_bg, foreground=_stats_fg, font=("Consolas", 10, "bold"))
+        style.configure("Stats.TLabelframe.Label", background=_stats_bg, foreground=_stats_fg, font=scaled_font(10, "bold", family="Consolas"))
         
         # Main frame (no scrollbar needed - layout is compact)
         main_frame = ttk.Frame(parent, style="Stats.TFrame")
@@ -13776,13 +13817,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         title_row.pack(fill="x", pady=(0, 5))
         
         # Title text (emoji already in localization)
-        title_label = tk.Label(title_row, text=t('statistics.title'), 
-                              font=("Consolas", 12, "bold"), fg="#ffffff", bg=_stats_bg)
+        title_label = tk.Label(title_row, text=t('statistics.title'),
+                              font=scaled_font(12, "bold", family="Consolas"), fg="#ffffff", bg=_stats_bg)
         title_label.pack(side="left")
-        
+
         # Info text - smaller, next to title
-        info_label = tk.Label(title_row, text="  —  " + t('statistics.info'), 
-                             font=("Segoe UI", 8, "italic"), fg="#666666", bg=_stats_bg)
+        info_label = tk.Label(title_row, text="  —  " + t('statistics.info'),
+                             font=scaled_font(8, "italic"), fg="#666666", bg=_stats_bg)
         info_label.pack(side="left", padx=(5, 0))
         
         # Statistics container
@@ -13805,7 +13846,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Overall Statistics (Left Column)
         # Add "Session Overview" header
-        session_header = tk.Label(left_column, text=t('statistics.session_overview'), font=("Consolas", 10, "bold"), 
+        session_header = tk.Label(left_column, text=t('statistics.session_overview'), font=scaled_font(10, "bold", family="Consolas"),
                                  fg="#ffaa00", bg=_stats_bg, anchor="w")
         session_header.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5), padx=(0, 10))
         
@@ -13821,12 +13862,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         for i, (label_text, key) in enumerate(stats_data):
             # Label
-            label = tk.Label(left_column, text=label_text, font=("Consolas", 10), 
+            label = tk.Label(left_column, text=label_text, font=scaled_font(10, family="Consolas"),
                            fg="#cccccc", bg=_stats_bg, anchor="w")
             label.grid(row=1+i, column=0, sticky="w", pady=2, padx=(0, 10))
-            
+
             # Value
-            value_label = tk.Label(left_column, text="0", font=("Consolas", 10, "bold"), 
+            value_label = tk.Label(left_column, text="0", font=scaled_font(10, "bold", family="Consolas"),
                                  fg="#00ff00", bg=_stats_bg, anchor="w")
             value_label.grid(row=1+i, column=1, sticky="w", pady=2)
             self.stats_labels[key] = value_label
@@ -13836,7 +13877,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         separator.grid(row=8, column=0, columnspan=2, sticky="ew", pady=8, padx=(0, 10))
         
         # Add "Best Records" header
-        best_header = tk.Label(left_column, text=t('statistics.best_records'), font=("Consolas", 10, "bold"), 
+        best_header = tk.Label(left_column, text=t('statistics.best_records'), font=scaled_font(10, "bold", family="Consolas"),
                               fg="#ffaa00", bg=_stats_bg, anchor="w")
         best_header.grid(row=9, column=0, columnspan=2, sticky="w", pady=(5, 2), padx=(0, 10))
         
@@ -13851,12 +13892,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         for i, (label_text, key) in enumerate(best_records_data):
             # Label
-            label = tk.Label(left_column, text=label_text, font=("Consolas", 10),
+            label = tk.Label(left_column, text=label_text, font=scaled_font(10, family="Consolas"),
                            fg="#cccccc", bg=_stats_bg, anchor="w")
             label.grid(row=10+i, column=0, sticky="w", pady=2, padx=(0, 10))
 
             # Value
-            value_label = tk.Label(left_column, text="0", font=("Consolas", 10, "bold"),
+            value_label = tk.Label(left_column, text="0", font=scaled_font(10, "bold", family="Consolas"),
                                  fg="#00ff00", bg=_stats_bg, anchor="w")
             value_label.grid(row=10+i, column=1, sticky="w", pady=2)
             self.stats_labels[key] = value_label
@@ -13864,7 +13905,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 self._make_stat_label_copyable(value_label, lambda w=value_label: w.cget("text"))
         
         # Records (Right Column) - Top 5 Best Systems only
-        top_systems_title = tk.Label(right_column, text=t('statistics.top_5_systems'), font=("Consolas", 10, "bold"), 
+        top_systems_title = tk.Label(right_column, text=t('statistics.top_5_systems'), font=scaled_font(10, "bold", family="Consolas"),
                                     fg="#cccccc", bg=_stats_bg, anchor="w")
         top_systems_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 1), padx=(0, 10))
         
@@ -13873,20 +13914,20 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         row_offset = 0
         for rank in range(1, 6):
             # Line 1: Rank. System | Body
-            system_label = tk.Label(right_column, text=f"{rank}. — | —", font=("Consolas", 9),
+            system_label = tk.Label(right_column, text=f"{rank}. — | —", font=scaled_font(9, family="Consolas"),
                                    fg="#ffffff", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
             system_label.grid(row=1+row_offset, column=0, columnspan=2, sticky="w", pady=(1, 0), padx=(0, 10))
             self.stats_labels[f'top_system_{rank}_line1'] = system_label
             self._make_stat_label_copyable(system_label, lambda r=rank: self._top_system_names.get(r, ""))
             
             # Line 2: Material (indented to align below system name, after "1. ")
-            material_label = tk.Label(right_column, text="—", font=("Consolas", 9), 
+            material_label = tk.Label(right_column, text="—", font=scaled_font(9, family="Consolas"),
                                      fg="#ffaa00", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
             material_label.grid(row=1+row_offset+1, column=0, columnspan=2, sticky="w", pady=0, padx=(15, 0))
             self.stats_labels[f'top_system_{rank}_line2'] = material_label
             
             # Line 3: Metrics indented (T/Asteroid, TPH)
-            metrics_label = tk.Label(right_column, text="—", font=("Consolas", 9), 
+            metrics_label = tk.Label(right_column, text="—", font=scaled_font(9, family="Consolas"),
                                     fg="#00ff00", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
             metrics_label.grid(row=1+row_offset+2, column=0, columnspan=2, sticky="w", pady=(0, 1), padx=(15, 0))
             self.stats_labels[f'top_system_{rank}_line3'] = metrics_label
@@ -16657,8 +16698,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             main_frame.pack(fill='both', expand=True)
             
             # Title
-            title_label = ttk.Label(main_frame, text="Generate Enhanced HTML Reports", 
-                                  font=("Segoe UI", 12, "bold"))
+            title_label = ttk.Label(main_frame, text="Generate Enhanced HTML Reports",
+                                  font=scaled_font(12, "bold"))
             title_label.pack(pady=(0, 10))
             
             # Date range frame

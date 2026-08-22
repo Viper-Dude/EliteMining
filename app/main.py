@@ -715,7 +715,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.3.2"
+APP_VERSION = "v5.3.3 beta"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5099,6 +5099,31 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 pass
             raise
 
+        # --- UI scale factor (applied to fonts/row heights below) ---
+        from config import load_ui_scale
+        self.ui_scale = load_ui_scale()  # 1.0 = 100%
+
+        def _scaled_font(base_size, weight="normal"):
+            size = round(base_size * self.ui_scale)
+            return ("Segoe UI", size) if weight == "normal" else ("Segoe UI", size, weight)
+
+        def _scaled_px(base_px):
+            return round(base_px * self.ui_scale)
+
+        self._scaled_font = _scaled_font
+        self._scaled_px = _scaled_px
+
+        # Scale Tk's named default fonts too — ttk.Entry/Combobox render their
+        # text via TkTextFont/TkDefaultFont regardless of style.configure(font=...)
+        if self.ui_scale != 1.0:
+            import tkinter.font as tkfont
+            for _font_name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont", "TkTooltipFont"):
+                try:
+                    _f = tkfont.nametofont(_font_name)
+                    _f.configure(size=round(_f.cget("size") * self.ui_scale))
+                except Exception:
+                    pass
+
         # --- Force clam theme for Treeview so dark styling works on Windows ---
         style = ttk.Style(self)
         try:
@@ -5145,7 +5170,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         foreground="#e0e0e0",
                         borderwidth=1,
                         relief="raised",
-                        font=("Segoe UI", 9, "normal"))
+                        font=_scaled_font(9))
         style.map("Accent.TButton",
                   background=[("active", "#3a5a3a"), ("pressed", "#1a3a1a")],
                   foreground=[("active", "#ffffff"), ("pressed", "#ffffff")],
@@ -5153,7 +5178,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Default button style
         style.configure("TButton",
-                        font=("Segoe UI", 9))
+                        font=_scaled_font(9))
 
 
         # --- Force clam theme for Notebook to allow tab styling ---
@@ -5212,22 +5237,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         style.configure("TNotebook.Tab",
                         background=accent,
                         foreground=dark_fg,
-                        padding=[8, 4],
+                        padding=[_scaled_px(8), _scaled_px(4)],
                         relief="raised",
-                        borderwidth=1)
+                        borderwidth=1,
+                        font=_scaled_font(9))
         style.map("TNotebook.Tab",
                    background=[("selected", dark_bg)],
                    foreground=[("selected", dark_fg)])
 
         # Custom dark button style
-        style.configure("Dark.TButton", background="#333333", foreground=btn_fg, font=("Segoe UI", 9, "bold"))
+        style.configure("Dark.TButton", background="#333333", foreground=btn_fg, font=_scaled_font(9, "bold"))
         style.map("Dark.TButton",
                    background=[("active", "#444444"), ("disabled", "#1a1a1a")],
                    foreground=[("disabled", "#666666")])
 
         style.configure("TCheckbutton", background=dark_bg, foreground=dark_fg)
         style.configure("TRadiobutton", background=dark_bg, foreground=dark_fg)
-        style.configure("TCombobox", fieldbackground=dark_bg, background=accent, foreground=dark_fg)
+        style.configure("TCombobox", fieldbackground=dark_bg, background=accent, foreground=dark_fg, font=_scaled_font(9))
         style.map("TCombobox", fieldbackground=[("readonly", dark_bg)], foreground=[("readonly", dark_fg)])
 
         # Apply dark theme to classic widgets too
@@ -5250,7 +5276,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         fieldbackground=dark_bg,
                         foreground=dark_fg,
                         insertcolor=dark_fg,
-                        font=("Segoe UI", 9))
+                        font=_scaled_font(9))
 
         # Global Treeview styling (theme-aware)
         style.configure("Treeview",
@@ -5258,8 +5284,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         fieldbackground=dark_bg,
                         foreground=dark_fg,
                         borderwidth=0,
-                        font=("Segoe UI", 9),
-                        rowheight=25)  # Fixed row height for consistent display across DPI settings
+                        font=_scaled_font(9),
+                        rowheight=_scaled_px(25))  # Base row height scaled by ui_scale
         style.map("Treeview",
                    background=[("selected", selection_bg)],
                    foreground=[("selected", selection_fg)])
@@ -5268,7 +5294,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         background=accent,
                         foreground=dark_fg,
                         relief="raised",
-                        font=("Segoe UI", 9, "bold"))
+                        font=_scaled_font(9, "bold"))
         style.map("Treeview.Heading",
                    background=[("active", "#333333"), ("pressed", dark_bg)],
                    foreground=[("active", dark_fg), ("pressed", dark_fg)])
@@ -5907,16 +5933,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"Could not load status bar logo: {e}")
         
         # Labels for mixed colors (white labels, yellow values)
-        self.cmdr_label_prefix = tk.Label(info_frame, text=t('status_bar.cmdr'), fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
-        self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
-        self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
-        self.system_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
-        self.visits_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
-        self.visits_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"), cursor="hand2")
-        self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
-        self.route_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
-        self.total_systems_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=("Segoe UI", 9, "bold"))
-        self.total_systems_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=("Segoe UI", 9, "bold"))
+        self.cmdr_label_prefix = tk.Label(info_frame, text=t('status_bar.cmdr'), fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.system_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.visits_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.visits_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"), cursor="hand2")
+        self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.route_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.total_systems_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.total_systems_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"))
         
         # Make visits clickable to edit
         self.visits_label_value.bind("<Button-1>", lambda e: self._show_edit_visits_dialog_for_current_system())
@@ -5938,7 +5964,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.total_systems_label_value.grid(row=0, column=10, sticky="w")
         
         # Help indicator for Tot Syst (updates on game restart)
-        self.total_systems_help = tk.Label(info_frame, text="(?)", fg="gray", bg=_info_bg, font=("Segoe UI", 9))
+        self.total_systems_help = tk.Label(info_frame, text="(?)", fg="gray", bg=_info_bg, font=self._scaled_font(9))
         self.total_systems_help.grid(row=0, column=11, sticky="w")
         ToolTip(self.total_systems_help, t('status_bar.total_systems_tooltip'))
         
@@ -6015,7 +6041,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Configure LabelFrame font to match Ship Presets title
         style = ttk.Style()
-        style.configure("Cargo.TLabelframe.Label", font=("Segoe UI", 9, "bold"))
+        style.configure("Cargo.TLabelframe.Label", font=self._scaled_font(9, "bold"))
 
         # Create a LabelFrame to provide visual border around cargo monitor
         cargo_frame = ttk.LabelFrame(parent_frame, text=t('sidebar.cargo_monitor'), padding=6, style="Cargo.TLabelframe")
@@ -6029,11 +6055,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         header_frame.columnconfigure(1, weight=1)
         
         # Title and summary in one line
-        title_label = ttk.Label(header_frame, text=t('sidebar.cargo_status'), font=("Segoe UI", 9, "bold"))
+        title_label = ttk.Label(header_frame, text=t('sidebar.cargo_status'), font=self._scaled_font(9, "bold"))
         title_label.grid(row=0, column=0, sticky="w")
 
         self.integrated_cargo_summary = ttk.Label(header_frame, text="0/200t (0%) - Empty",
-                                                 font=("Segoe UI", 9))
+                                                 font=self._scaled_font(9))
         self.integrated_cargo_summary.grid(row=0, column=1, sticky="w", padx=(6, 0))
         
         # Content area - expandable
@@ -6049,7 +6075,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             content_frame,
             bg=_cargo_bg,
             fg=_cargo_fg,
-            font=("Consolas", 9, "normal"),  # Monospace font for proper alignment
+            font=("Consolas", round(9 * self.ui_scale), "normal"),  # Monospace font for proper alignment
             relief="flat",
             bd=0,
             highlightthickness=0,
@@ -6070,7 +6096,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.integrated_status_label = ttk.Label(
             cargo_frame,
             text="",  # Hidden text but label remains functional
-            font=("Segoe UI", 7)  # Even smaller font
+            font=self._scaled_font(7)  # Even smaller font
         )
         self.integrated_status_label.grid(row=2, column=0, sticky="w")
         
@@ -6213,7 +6239,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 icon = "●"  # Filled circle for all cargo
                 
                 # Configure tag for cargo items (10pt to match materials)
-                self.integrated_cargo_text.tag_configure("cargo_item", font=("Consolas", 10, "normal"))
+                self.integrated_cargo_text.tag_configure("cargo_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
                 
                 # Simple fixed format: icon + space + name + spaces + quantity
                 name_field = f"{display_name:<12}"[:12]  # 12 characters for name
@@ -6239,7 +6265,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
             
             # Configure tag for section header (larger, bold)
-            self.integrated_cargo_text.tag_configure("section_header", font=("Consolas", 10, "bold"))
+            self.integrated_cargo_text.tag_configure("section_header", font=("Consolas", round(10 * self.ui_scale), "bold"))
             
             # Insert header with tag
             self.integrated_cargo_text.insert(tk.END, "\n")
@@ -6250,7 +6276,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             sorted_materials = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
             
             # Configure tag for material items (10pt to match header size)
-            self.integrated_cargo_text.tag_configure("material_item", font=("Consolas", 10, "normal"))
+            self.integrated_cargo_text.tag_configure("material_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
             
             for i, (material_name, quantity) in enumerate(sorted_materials):
                 # Get grade for this material
@@ -6272,7 +6298,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
         
         # Configure tag for small italic text - left aligned
-        self.integrated_cargo_text.tag_configure("small_italic", font=("Segoe UI", 8, "italic"), foreground="#888888", justify="left")
+        self.integrated_cargo_text.tag_configure("small_italic", font=self._scaled_font(8, "italic"), foreground="#888888", justify="left")
         
         # Insert refinery note with formatting - get position before inserting
         note_start_index = self.integrated_cargo_text.index(tk.INSERT)
@@ -6953,7 +6979,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         }
 
         header = ttk.Label(frame, text=t('voiceattack.assign_firegroups'),
-                           font=("Segoe UI", 11, "bold"))
+                           font=self._scaled_font(11, "bold"))
         header.grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 8))
 
         ttk.Label(frame, text=t('voiceattack.firegroup')).grid(row=1, column=1, sticky="w", padx=(0, 6))
@@ -6978,8 +7004,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 ttk.Label(frame, text="—").grid(row=row, column=1, sticky="w")
 
             if cfg["btn"] is not None:
-                tk.Radiobutton(frame, text=t('voiceattack.primary'), value=1, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), padx=4, pady=2, anchor="w").grid(row=row, column=2, sticky="w")
-                tk.Radiobutton(frame, text=t('voiceattack.secondary'), value=2, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), padx=4, pady=2, anchor="w").grid(row=row, column=3, sticky="w")
+                tk.Radiobutton(frame, text=t('voiceattack.primary'), value=1, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), padx=4, pady=2, anchor="w").grid(row=row, column=2, sticky="w")
+                tk.Radiobutton(frame, text=t('voiceattack.secondary'), value=2, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), padx=4, pady=2, anchor="w").grid(row=row, column=3, sticky="w")
                 # Auto-save on change
                 self.tool_btn[tool].trace_add("write", lambda *args, t=tool: self._save_fire_button(t))
             else:
@@ -6999,7 +7025,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         important_label = tk.Label(
             card, 
             text=t('voiceattack.important_firegroups'),
-            font=("Segoe UI", 9, "bold"), 
+            font=self._scaled_font(9, "bold"), 
             anchor="w", 
             bg=theme_bg, 
             fg="#ffcc00",
@@ -7008,7 +7034,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         )
         important_label.grid(row=0, column=0, sticky="w", padx=8, pady=(60, 8))
 
-        tip_header = tk.Label(card, text=t('voiceattack.tips_help'), font=("Segoe UI", 9, "bold"), anchor="w", bg=theme_bg, fg=theme_fg, borderwidth=0, relief="flat", highlightthickness=0)
+        tip_header = tk.Label(card, text=t('voiceattack.tips_help'), font=self._scaled_font(9, "bold"), anchor="w", bg=theme_bg, fg=theme_fg, borderwidth=0, relief="flat", highlightthickness=0)
         tip_header.grid(row=1, column=0, sticky="w", padx=8, pady=(10, 2))
 
         tips = [
@@ -7026,7 +7052,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 justify="left",
                 fg=theme_fg,
                 bg=theme_bg,
-                font=("Segoe UI", 9),
+                font=self._scaled_font(9),
             )
             lbl.grid(row=r, column=0, sticky="w", padx=16, pady=1)
             r += 1
@@ -7044,7 +7070,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Title row with help link
         settings_title_row = ttk.Frame(frame)
         settings_title_row.pack(fill="x", pady=(0, 5))
-        ttk.Label(settings_title_row, text=t('tabs.settings'), font=("Segoe UI", 9, "bold")).pack(side="left")
+        ttk.Label(settings_title_row, text=t('tabs.settings'), font=self._scaled_font(9, "bold")).pack(side="left")
         from ui.help_link import create_help_link
         create_help_link(settings_title_row, "settings-tab", t('settings.help_tooltip'), ToolTip).pack(side="left", padx=(6, 0))
 
@@ -7108,28 +7134,28 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 logo_label.pack(pady=(0, 5))
             else:
                 # Fallback to text
-                tk.Label(title_frame, text="EliteMining", font=("Segoe UI", 18, "bold"), 
+                tk.Label(title_frame, text="EliteMining", font=self._scaled_font(18, "bold"), 
                          fg="#ffcc00", bg=_about_bg).pack()
         except Exception:
             # Fallback to text on error
-            tk.Label(title_frame, text="EliteMining", font=("Segoe UI", 18, "bold"), 
+            tk.Label(title_frame, text="EliteMining", font=self._scaled_font(18, "bold"), 
                      fg="#ffcc00", bg=_about_bg).pack()
         
-        tk.Label(title_frame, text=f"Version {__version__}", font=("Segoe UI", 10), 
+        tk.Label(title_frame, text=f"Version {__version__}", font=self._scaled_font(10), 
                  fg="#888888", bg=_about_bg).pack()
         
         # Description
         tk.Label(center_frame, text=t('about.description'), 
-                 font=("Segoe UI", 11), fg="#e0e0e0", bg=_about_bg).pack(pady=(10, 20))
+                 font=self._scaled_font(11), fg="#e0e0e0", bg=_about_bg).pack(pady=(10, 20))
         
         # Separator
         tk.Frame(center_frame, height=1, bg="#444444", width=400).pack(pady=10)
         
         # Copyright and license
         tk.Label(center_frame, text=t('about.copyright'), 
-                 font=("Segoe UI", 10), fg="#e0e0e0", bg=_about_bg).pack()
+                 font=self._scaled_font(10), fg="#e0e0e0", bg=_about_bg).pack()
         tk.Label(center_frame, text=t('about.license'), 
-                 font=("Segoe UI", 9), fg="#888888", bg=_about_bg).pack()
+                 font=self._scaled_font(9), fg="#888888", bg=_about_bg).pack()
         
         # Separator
         tk.Frame(center_frame, height=1, bg="#444444", width=400).pack(pady=15)
@@ -7162,7 +7188,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                            command=lambda u=url: open_link(u),
                            bg=_btn_bg, fg=_btn_fg, activebackground=_btn_active_bg,
                            activeforeground=_btn_active_fg, relief="ridge", bd=1, 
-                           padx=12, pady=4, font=("Segoe UI", 9), cursor="hand2",
+                           padx=12, pady=4, font=self._scaled_font(9), cursor="hand2",
                            width=12, highlightbackground=_btn_border, highlightthickness=1)
             btn.pack(side="left", padx=5)
         
@@ -7173,7 +7199,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         credits_frame = tk.Frame(center_frame, bg=_about_bg)
         credits_frame.pack(pady=10)
         
-        tk.Label(credits_frame, text="Credits", font=("Segoe UI", 10, "bold"), 
+        tk.Label(credits_frame, text="Credits", font=self._scaled_font(10, "bold"), 
                  fg="#ffcc00", bg=_about_bg).pack()
         
         credits = [
@@ -7183,7 +7209,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ]
         
         for credit in credits:
-            tk.Label(credits_frame, text=f"- {credit}", font=("Segoe UI", 9), 
+            tk.Label(credits_frame, text=f"- {credit}", font=self._scaled_font(9), 
                      fg="#aaaaaa", bg=_about_bg).pack(anchor="w", padx=20)
         
         # Support/Donate section - anchored at bottom right of frame
@@ -7198,7 +7224,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             justify="left",
             fg="#cccccc",
             bg=_about_bg,
-            font=("Segoe UI", 9, "italic"),
+            font=self._scaled_font(9, "italic"),
         )
         support_text.pack(side="left")
         
@@ -7223,7 +7249,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Title row with help link
         va_title_row = ttk.Frame(frame)
         va_title_row.pack(fill="x", pady=(0, 5))
-        ttk.Label(va_title_row, text=t('tabs.voiceattack_controls'), font=("Segoe UI", 9, "bold")).pack(side="left")
+        ttk.Label(va_title_row, text=t('tabs.voiceattack_controls'), font=self._scaled_font(9, "bold")).pack(side="left")
         from ui.help_link import create_help_link
         create_help_link(va_title_row, "voiceattack-controls", t('voiceattack.help_tooltip'), ToolTip).pack(side="left", padx=(6, 0))
 
@@ -7265,7 +7291,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._active_ship_announcement_slot = None  # Linked announcement preset slot for the active ship preset
 
         # Basic announcement controls
-        ttk.Label(frame, text=t('settings.announcement_settings'), font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
+        ttk.Label(frame, text=t('settings.announcement_settings'), font=self._scaled_font(12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
         
         # Check if prospector panel is available for advanced controls
         if hasattr(self, 'prospector_panel') and self.prospector_panel:
@@ -7294,7 +7320,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 # Add announcement toggles if available
                 if hasattr(self, 'announcement_vars') and self.announcement_vars:
-                    ttk.Label(toggles_frame, text=t('settings.announcement_types'), font=("Segoe UI", 9, "bold")).pack(anchor="w")
+                    ttk.Label(toggles_frame, text=t('settings.announcement_types'), font=self._scaled_font(9, "bold")).pack(anchor="w")
                     
                     # Localized display names and help texts for announcement toggles
                     toggle_display = {
@@ -7311,7 +7337,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                                     variable=self.announcement_vars[name], 
                                                     bg=_ann_cb_bg, fg="#ffffff", selectcolor=_ann_cb_select, 
                                                     activebackground=_ann_cb_bg, activeforeground="#ffffff", 
-                                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                                     padx=4, pady=1, anchor="w")
                             checkbox.pack(anchor="w", padx=(10, 0))
                             ToolTip(checkbox, localized_help)
@@ -7332,7 +7358,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                  insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
                                  relief="solid", bd=0, highlightthickness=1,
                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                 font=("Segoe UI", 9))
+                                 font=self._scaled_font(9))
                 sp.pack(side="left", padx=(6, 4))
                 # Add mouse wheel support
                 def on_ann_threshold_scroll(event, var=self.prospector_panel.threshold):
@@ -7360,7 +7386,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
                 # Materials section label - fixed position to always stay visible
                 ttk.Label(frame, text=t('settings.select_minerals'),
-                          font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(0, 2))
+                          font=self._scaled_font(10, "bold")).grid(row=2, column=0, sticky="w", pady=(0, 2))
 
                 # Create the full material tree with functionality
                 materials_frame = ttk.Frame(frame)
@@ -7389,11 +7415,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                background=ann_bg,
                                fieldbackground=ann_bg,
                                foreground=ann_fg,
-                               font=("Segoe UI", 9),
-                               rowheight=28)  # Fixed row height for consistent spinbox placement across DPI settings
+                               font=self._scaled_font(9),
+                               rowheight=self._scaled_px(28))
                 style.configure("Announcements.Treeview.Heading",
                                foreground=ann_fg,
-                               font=("Segoe UI", 9, "bold"))
+                               font=self._scaled_font(9, "bold"))
 
                 # Material tree
                 self.ann_mat_tree = ttk.Treeview(materials_frame, columns=("announce", "material", "minpct"), show="headings", height=18, style="Announcements.Treeview")
@@ -7460,7 +7486,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
                             relief="solid", bd=0, highlightthickness=1,
                             highlightbackground="#ffffff", highlightcolor="#ffffff",
-                            font=("Segoe UI", 9)
+                            font=self._scaled_font(9)
                         )
                         # Add mouse wheel support
                         def on_ann_minpct_scroll(event, v=self._ann_minpct_vars[mat], m=mat):
@@ -7598,7 +7624,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                          bg=_preset_btn_bg, fg="#ffffff",
                                          activebackground=_preset_btn_hover, activeforeground="#ffffff",
                                          relief="raised", bd=1,
-                                         width=13, font=("Segoe UI", 9), cursor="hand2", pady=3,
+                                         width=13, font=self._scaled_font(9), cursor="hand2", pady=3,
                                          highlightbackground=_preset_btn_hl, highlightcolor=_preset_btn_hl)
                     preset_btn.pack(side="left", padx=(8, 0))
                     
@@ -7664,11 +7690,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except ImportError:
                 # Fallback if imports fail
                 ttk.Label(frame, text="Announcement settings require the Mining Session to be initialized.\nPlease restart the application if this persists.", 
-                         font=("Segoe UI", 10), foreground="orange").grid(row=1, column=0, sticky="w", padx=20, pady=20)
+                         font=self._scaled_font(10), foreground="orange").grid(row=1, column=0, sticky="w", padx=20, pady=20)
         else:
             # Simple message if prospector panel not available
             ttk.Label(frame, text="Announcement settings will be available after the Mining Session initializes.\nPlease restart the application if this persists.", 
-                     font=("Segoe UI", 10), foreground="orange").grid(row=1, column=0, sticky="w", padx=20, pady=20)
+                     font=self._scaled_font(10), foreground="orange").grid(row=1, column=0, sticky="w", padx=20, pady=20)
 
     def _ann_get_current_snapshot(self):
         """Get a snapshot of current announcement settings for comparison"""
@@ -8032,12 +8058,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Label
             tk.Label(frame, text=t('settings.enter_preset_name').format(num=num),
                     bg=bg, fg=fg,
-                    font=("Segoe UI", 10)).pack(pady=(0, 10))
+                    font=self._scaled_font(10)).pack(pady=(0, 10))
             
             # Entry field
             name_var = tk.StringVar(value=current_name)
             entry = tk.Entry(frame, textvariable=name_var, 
-                           width=25, font=("Segoe UI", 10),
+                           width=25, font=self._scaled_font(10),
                            bg="#2a2a2a", fg="#ffffff",
                            insertbackground="#ffffff")
             entry.pack(pady=5)
@@ -8073,11 +8099,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             tk.Button(btn_frame, text=t('common.save'), command=save_name,
                      bg=btn_bg, fg=btn_fg, width=8,
                      activebackground="#4a4a4a", activeforeground=btn_fg,
-                     font=("Segoe UI", 9), relief="flat").pack(side="left", padx=5)
+                     font=self._scaled_font(9), relief="flat").pack(side="left", padx=5)
             tk.Button(btn_frame, text=t('common.cancel'), command=dialog.destroy,
                      bg=btn_bg, fg=btn_fg, width=8,
                      activebackground="#4a4a4a", activeforeground=btn_fg,
-                     font=("Segoe UI", 9), relief="flat").pack(side="left", padx=5)
+                     font=self._scaled_font(9), relief="flat").pack(side="left", padx=5)
             
             # Enter key to save
             entry.bind("<Return>", lambda e: save_name())
@@ -8134,11 +8160,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Now build content in scrollable_frame instead of frame
         scrollable_frame.columnconfigure(0, weight=1)
-        ttk.Label(scrollable_frame, text=t('settings.interface_options'), font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
+        ttk.Label(scrollable_frame, text=t('settings.interface_options'), font=self._scaled_font(12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 10))
         r = 1
         
         # ========== GENERAL INTERFACE SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.general_interface'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.general_interface'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -8149,33 +8175,33 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Tooltips option
         tk.Checkbutton(scrollable_frame, text=t('settings.enable_tooltips'), variable=self.tooltips_enabled, 
                       bg=_gs_bg, fg="#ffffff", selectcolor=_gs_bg, activebackground=_gs_bg, 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground=_gs_bg, 
                       highlightcolor=_gs_bg, takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.tooltips_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # Stay on top option
         tk.Checkbutton(scrollable_frame, text=t('settings.stay_on_top'), variable=self.stay_on_top, 
                       bg=_gs_bg, fg="#ffffff", selectcolor=_gs_bg, activebackground=_gs_bg, 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground=_gs_bg, 
                       highlightcolor=_gs_bg, takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.stay_on_top_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # Theme toggle option
         theme_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         theme_frame.grid(row=r, column=0, sticky="w")
         
-        tk.Label(theme_frame, text=t('settings.theme') + ":", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left", padx=(4, 10))
+        tk.Label(theme_frame, text=t('settings.theme') + ":", bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left", padx=(4, 10))
         
         current_theme_text = "Elite Orange" if self.current_theme == "elite_orange" else "Dark Gray"
-        self.theme_label = tk.Label(theme_frame, text=current_theme_text, bg=_gs_bg, fg="#ffcc00", font=("Segoe UI", 9, "bold"))
+        self.theme_label = tk.Label(theme_frame, text=current_theme_text, bg=_gs_bg, fg="#ffcc00", font=self._scaled_font(9, "bold"))
         self.theme_label.pack(side="left", padx=(0, 15))
         
         # Button shows what you'll switch TO (opposite of current)
@@ -8199,21 +8225,55 @@ class App(tk.Tk, ColumnVisibilityMixin):
             bd=1,
             padx=8,
             pady=2,
-            font=("Segoe UI", 9),
+            font=self._scaled_font(9),
             cursor="hand2"
         )
         theme_toggle_settings.pack(side="left")
         r += 1
         
         tk.Label(scrollable_frame, text="Switch between Elite Orange and Dark Gray themes (requires restart)", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
-        
+
+        # UI scale option
+        from config import load_ui_scale, save_ui_scale
+        scale_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
+        scale_frame.grid(row=r, column=0, sticky="w")
+
+        tk.Label(scale_frame, text=t('settings.ui_scale') + ":", bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left", padx=(4, 10))
+
+        _ui_scale_options = {"100%": 1.0, "110%": 1.1, "120%": 1.2, "130%": 1.3, "150%": 1.5}
+        _ui_scale_reverse = {v: k for k, v in _ui_scale_options.items()}
+        _current_ui_scale = load_ui_scale()
+        _current_ui_scale_display = _ui_scale_reverse.get(_current_ui_scale, "100%")
+
+        self.ui_scale_var = tk.StringVar(value=_current_ui_scale_display)
+        ui_scale_combo = ttk.Combobox(scale_frame, textvariable=self.ui_scale_var, width=10,
+                                       values=list(_ui_scale_options.keys()), state="readonly")
+        ui_scale_combo.pack(side="left", padx=(0, 15))
+
+        def _on_ui_scale_change(event=None):
+            selected = self.ui_scale_var.get()
+            save_ui_scale(_ui_scale_options.get(selected, 1.0))
+
+            from app_utils import centered_askyesno
+            if centered_askyesno(scrollable_frame.winfo_toplevel(),
+                t('settings.restart_required'),
+                t('settings.restart_required_msg') + "\n\n" + t('settings.restart_now_prompt')):
+                self._restart_app()
+
+        ui_scale_combo.bind('<<ComboboxSelected>>', _on_ui_scale_change)
+        r += 1
+
+        tk.Label(scrollable_frame, text=t('settings.ui_scale_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+        r += 1
+
         # Language selector option
         lang_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         lang_frame.grid(row=r, column=0, sticky="w")
         
-        tk.Label(lang_frame, text=t('settings.language') + ":", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left", padx=(4, 10))
+        tk.Label(lang_frame, text=t('settings.language') + ":", bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left", padx=(4, 10))
         
         # Import config functions once at the start
         from config import _load_cfg as load_config_func, _save_cfg as save_config_func
@@ -8251,7 +8311,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except:
             current_lang_display = 'English'
         
-        self.lang_display_label = tk.Label(lang_frame, text=current_lang_display, bg=_gs_bg, fg="#ffcc00", font=("Segoe UI", 9, "bold"))
+        self.lang_display_label = tk.Label(lang_frame, text=current_lang_display, bg=_gs_bg, fg="#ffcc00", font=self._scaled_font(9, "bold"))
         self.lang_display_label.pack(side="left", padx=(0, 15))
         
         # Create language variable and combobox
@@ -8296,11 +8356,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
         
         tk.Label(scrollable_frame, text=t('settings.choose_language_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # ========== EDDN SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.eddn'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.eddn'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add separator
@@ -8312,17 +8372,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Checkbutton(scrollable_frame, text="✓ " + t('settings.send_eddn'), variable=self.eddn_send_enabled, 
                       command=self._on_eddn_send_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.send_eddn_desc'), 
                  wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # ========== TEXT OVERLAY DISPLAY SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.text_overlay'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.text_overlay'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -8335,12 +8395,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         text_overlay_row.grid(row=r, column=0, sticky="w")
         tk.Checkbutton(text_overlay_row, text=t('settings.enable_text_overlay'), variable=self.text_overlay_enabled, 
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).pack(side="left")
         self._sc_checkbox = tk.Checkbutton(text_overlay_row, text=t('settings.hide_overlays_in_supercruise'), variable=self.hide_overlays_in_supercruise,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
                       highlightcolor="#1e1e1e", takefocus=False)
         self._sc_checkbox.pack(side="left", padx=(8, 0))
@@ -8357,7 +8417,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._mining_session_cb = tk.Checkbutton(text_overlay_row, text=t('settings.overlay_only_mining_session'), variable=self.overlay_only_mining_session,
                       command=_on_mining_session_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
                       highlightcolor="#1e1e1e", takefocus=False)
         self._mining_session_cb.pack(side="left", padx=(8, 0))
@@ -8366,19 +8426,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._sc_checkbox.config(state="disabled", fg="#666666")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.text_overlay_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Overlay mode selection (Standard / Enhanced Prospector / Cargo Status) - all on one line
         mode_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         mode_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(mode_frame, text=t('settings.overlay_mode'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(mode_frame, text=t('settings.overlay_mode'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         
         self._overlay_standard_var = tk.IntVar(value=1 if self.overlay_mode.get() == "standard" else 0)
         self._overlay_enhanced_var = tk.IntVar(value=1 if self.overlay_mode.get() == "enhanced" else 0)
         
         _cb_kw = dict(bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
                       highlightcolor="#1e1e1e", takefocus=False)
         
@@ -8414,32 +8474,32 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
         tk.Label(scrollable_frame, text=t('settings.overlay_mode_desc'),
                  wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Text brightness slider
         transparency_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         transparency_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(transparency_frame, text=t('settings.text_brightness'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(transparency_frame, text=t('settings.text_brightness'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         _slider_trough = "#1a1a1a" if _gs_theme == "elite_orange" else "#444444"
         _slider_active = "#ff6600" if _gs_theme == "elite_orange" else "#444444"
         _slider_fg = "#ff8c00" if _gs_theme == "elite_orange" else "#ffffff"
         self.transparency_scale = tk.Scale(transparency_frame, from_=10, to=100, orient="horizontal", 
                                          variable=self.text_overlay_transparency, bg=_gs_bg, fg=_slider_fg, 
                                          activebackground=_slider_active, highlightthickness=0, length=120,
-                                         troughcolor=_slider_trough, font=("Segoe UI", 9),
+                                         troughcolor=_slider_trough, font=self._scaled_font(9),
                                          sliderrelief="flat", sliderlength=20)
         self.transparency_scale.pack(side="left", padx=(8, 0))
-        tk.Label(transparency_frame, text="%", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(transparency_frame, text="%", bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.text_brightness_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Text color selection with actual colors shown
         color_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         color_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(color_frame, text=t('settings.text_color'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(color_frame, text=t('settings.text_color'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         
         # Localized color names mapping
         color_display_names = {
@@ -8468,7 +8528,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             highlightthickness=0,
             relief="raised",
             bd=1,
-            font=("Segoe UI", 8)
+            font=self._scaled_font(8)
         )
         self.color_menu.pack(side="left", padx=(8, 0))
         
@@ -8495,17 +8555,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 foreground=text_color,
                 activebackground=color_hex,
                 activeforeground=text_color,
-                font=("Segoe UI", 9, "bold")
+                font=self._scaled_font(9, "bold")
             )
         r += 1
         tk.Label(scrollable_frame, text=t('settings.text_color_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Text size selection with localized options
         size_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         size_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(size_frame, text=t('settings.text_size'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(size_frame, text=t('settings.text_size'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         
         # Localized size options
         size_display_names = [t('settings.text_size_small'), t('settings.text_size_normal'), t('settings.text_size_large')]
@@ -8522,7 +8582,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         self.size_combo = ttk.Combobox(size_frame, textvariable=self._size_display_var, 
                                       values=size_display_names, 
-                                      state="readonly", width=12, font=("Segoe UI", 9))
+                                      state="readonly", width=12, font=self._scaled_font(9))
         self.size_combo.pack(side="left", padx=(8, 0))
         
         # Sync display var to internal var
@@ -8534,23 +8594,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         r += 1
         tk.Label(scrollable_frame, text=t('settings.text_size_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Display duration slider
         duration_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         duration_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(duration_frame, text=t('settings.display_duration'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(duration_frame, text=t('settings.display_duration'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         self.duration_scale = tk.Scale(duration_frame, from_=5, to=30, orient="horizontal", 
                                      variable=self.text_overlay_duration, bg=_gs_bg, fg=_slider_fg, 
                                      activebackground=_slider_active, highlightthickness=0, length=140,
-                                     troughcolor=_slider_trough, font=("Segoe UI", 9),
+                                     troughcolor=_slider_trough, font=self._scaled_font(9),
                                      sliderrelief="flat", sliderlength=20)
         self.duration_scale.pack(side="left", padx=(8, 0))
-        tk.Label(duration_frame, text=t('settings.seconds'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(duration_frame, text=t('settings.seconds'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.duration_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
         r += 1
         
         # Show all materials checkbox (for enhanced mode) - HIDDEN but functionality preserved
@@ -8570,7 +8630,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._apply_overlay_enabled_state()
 
         # ========== TEXT-TO-SPEECH AUDIO SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.tts_settings'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.tts_settings'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -8579,7 +8639,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
         
         # TTS Voice selection (moved from announcements panel)
-        tk.Label(scrollable_frame, text=t('settings.tts_voice'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).grid(row=r, column=0, sticky="w", pady=(4, 4))
+        tk.Label(scrollable_frame, text=t('settings.tts_voice'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).grid(row=r, column=0, sticky="w", pady=(4, 4))
         r += 1
         
         voice_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
@@ -8597,7 +8657,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.voice_choice = tk.StringVar(value="")
             
         self.voice_combo = ttk.Combobox(voice_frame, textvariable=self.voice_choice, 
-                                       state="readonly", width=35, font=("Segoe UI", 9),
+                                       state="readonly", width=35, font=self._scaled_font(9),
                                        values=voice_values)
         self.voice_combo.pack(side="left")
         
@@ -8611,7 +8671,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         test_btn = tk.Button(voice_frame, text=t('settings.test_voice'), command=_test_voice_interface,
                             bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                             activeforeground="#ffffff", relief="ridge", bd=1, 
-                            font=("Segoe UI", 8, "normal"), cursor="hand2")
+                            font=self._scaled_font(8, "normal"), cursor="hand2")
         test_btn.pack(side="left", padx=(8, 0))
         
         r += 1
@@ -8619,7 +8679,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         vol_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         vol_frame.grid(row=r, column=0, sticky="w", pady=(6, 4))
         
-        tk.Label(vol_frame, text=t('settings.tts_volume'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(vol_frame, text=t('settings.tts_volume'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         
         # Initialize voice volume variable if not exists
         if not hasattr(self, 'voice_volume'):
@@ -8640,7 +8700,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         vol_slider = tk.Scale(vol_frame, from_=0, to=100, orient="horizontal", 
                              variable=self.voice_volume, bg=_gs_bg, fg=_slider_fg,
                              activebackground=_slider_active, highlightthickness=0, 
-                             troughcolor=_slider_trough, font=("Segoe UI", 9),
+                             troughcolor=_slider_trough, font=self._scaled_font(9),
                              command=_on_volume_change, length=200,
                              sliderrelief="flat", sliderlength=20)
         vol_slider.pack(side="left", padx=(8, 0))
@@ -8665,7 +8725,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         fix_tts_btn = tk.Button(vol_frame, text="Reset Speech Recognition", command=_fix_tts_interface,
                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                activeforeground="#ffffff", relief="ridge", bd=1, 
-                               font=("Segoe UI", 8, "normal"), cursor="hand2")
+                               font=self._scaled_font(8, "normal"), cursor="hand2")
         fix_tts_btn.pack(side="left", padx=(8, 0), pady=(15, 0))
         ToolTip(fix_tts_btn, t('tooltips.fix_tts'))
         r += 1
@@ -8708,11 +8768,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         r += 1
         tk.Label(scrollable_frame, text=t('settings.tts_config_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # ========== JOURNAL FILES SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.journal_files'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.journal_files'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -8723,29 +8783,29 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Journal folder path setting
         journal_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         journal_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(journal_frame, text=t('settings.journal_location'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(journal_frame, text=t('settings.journal_location'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         
         # Initialize journal label (will be updated after prospector panel creation)
-        self.journal_lbl = tk.Label(journal_frame, text="(not set)", fg="gray", bg=_gs_bg, font=("Segoe UI", 9))
+        self.journal_lbl = tk.Label(journal_frame, text="(not set)", fg="gray", bg=_gs_bg, font=self._scaled_font(9))
         self.journal_lbl.pack(side="left", padx=(6, 0))
         
         journal_btn = tk.Button(journal_frame, text=t('settings.change'), command=self._change_journal_dir,
                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                activeforeground="#ffffff", relief="ridge", bd=1, 
-                               font=("Segoe UI", 8, "normal"), cursor="hand2")
+                               font=self._scaled_font(8, "normal"), cursor="hand2")
         journal_btn.pack(side="left", padx=(8, 0))
         ToolTip(journal_btn, t('tooltips.journal_folder'))
         
         import_btn = tk.Button(journal_frame, text=t('settings.import_history'), command=self._import_journal_history,
                               bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                               activeforeground="#ffffff", relief="ridge", bd=1,
-                              font=("Segoe UI", 8, "normal"), cursor="hand2")
+                              font=self._scaled_font(8, "normal"), cursor="hand2")
         import_btn.pack(side="left", padx=(8, 0))
         ToolTip(import_btn, t('tooltips.import_history'))
         
         r += 1
         tk.Label(scrollable_frame, text=t('settings.journal_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # Import prompt preference checkbox
@@ -8760,7 +8820,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             selectcolor="#34495e",
             activebackground="#1e1e1e",
             activeforeground="#ffffff",
-            font=("Segoe UI", 9)
+            font=self._scaled_font(9)
         )
         import_prompt_check.grid(row=r, column=0, sticky="w", pady=(0, 4))
         
@@ -8772,16 +8832,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Auto-scan journals on startup checkbox
         tk.Checkbutton(scrollable_frame, text=t('settings.auto_scan_journals'), variable=self.auto_scan_journals, 
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.auto_scan_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # ========== AUTOMATION SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.automation_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.automation_title'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add separator line
@@ -8801,27 +8861,27 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Checkbutton(scrollable_frame, text=t('settings.auto_search_hotspots'), variable=self.auto_search_enabled, 
                       command=_on_auto_search_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.auto_search_hotspots_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
         
         # Auto-switch tabs checkbox
         tk.Checkbutton(scrollable_frame, text=t('settings.auto_switch_tabs'), variable=self.auto_switch_tabs, 
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
                       highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         tk.Label(scrollable_frame, text=t('settings.auto_switch_tabs_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
         # ========== SCREENSHOTS FOLDER SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.screenshots_folder_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.screenshots_folder_title'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add separator line
@@ -8832,26 +8892,26 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Screenshots folder path setting
         screenshots_folder_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
         screenshots_folder_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(screenshots_folder_frame, text=t('settings.screenshots_folder_label'), bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(screenshots_folder_frame, text=t('settings.screenshots_folder_label'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
         
         # Create StringVar for screenshots folder path
         self.screenshots_folder_path = tk.StringVar()
         self.screenshots_folder_path.set(_load_cfg().get('screenshots_folder', os.path.join(os.path.expanduser("~"), "Pictures")))
         
         # Initialize screenshots folder label (will be updated with actual path)
-        self.screenshots_folder_lbl = tk.Label(screenshots_folder_frame, text=self.screenshots_folder_path.get(), fg="gray", bg=_gs_bg, font=("Segoe UI", 9))
+        self.screenshots_folder_lbl = tk.Label(screenshots_folder_frame, text=self.screenshots_folder_path.get(), fg="gray", bg=_gs_bg, font=self._scaled_font(9))
         self.screenshots_folder_lbl.pack(side="left", padx=(6, 0))
         
         screenshots_btn = tk.Button(screenshots_folder_frame, text=t('settings.change'), command=self._change_screenshots_folder,
                                   bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                   activeforeground="#ffffff", relief="ridge", bd=1, 
-                                  font=("Segoe UI", 8, "normal"), cursor="hand2")
+                                  font=self._scaled_font(8, "normal"), cursor="hand2")
         screenshots_btn.pack(side="left", padx=(8, 0))
         ToolTip(screenshots_btn, t('tooltips.screenshots_folder'))
         
         r += 1
         tk.Label(scrollable_frame, text=t('settings.screenshots_folder_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
         # ========== EDSM API KEY SECTION - DISABLED ==========
@@ -8913,7 +8973,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # r += 1
 
         # ========== BACKUP & RESTORE SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.backup_restore_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.backup_restore_title'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -8929,7 +8989,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                               bg="#2a3a4a", fg="#e0e0e0", 
                               activebackground="#3a4a5a", activeforeground="#ffffff",
                               relief="ridge", bd=1, padx=12, pady=4,
-                              font=("Segoe UI", 9, "normal"), cursor="hand2")
+                              font=self._scaled_font(9, "normal"), cursor="hand2")
         backup_btn.pack(side="left", padx=(0, 8))
         _backup_tooltip = t('tooltips.backup')
         print(f"[DEBUG TOOLTIP] tooltips.backup = {repr(_backup_tooltip)}")
@@ -8939,17 +8999,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                bg="#4a3a2a", fg="#e0e0e0", 
                                activebackground="#5a4a3a", activeforeground="#ffffff",
                                relief="ridge", bd=1, padx=12, pady=4,
-                               font=("Segoe UI", 9, "normal"), cursor="hand2")
+                               font=self._scaled_font(9, "normal"), cursor="hand2")
         restore_btn.pack(side="left")
         ToolTip(restore_btn, t('tooltips.restore'))
         
         r += 1
         tk.Label(scrollable_frame, text=t('settings.backup_restore_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
         # ========== VOICEATTACK PROFILE SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.va_profile_section'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.va_profile_section'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
 
         separator_va = tk.Frame(scrollable_frame, height=1, bg="#444444")
@@ -8961,16 +9021,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                   bg="#2a3a4a", fg="#e0e0e0",
                                   activebackground="#3a4a5a", activeforeground="#ffffff",
                                   relief="ridge", bd=1, padx=12, pady=4,
-                                  font=("Segoe UI", 9, "normal"), cursor="hand2")
+                                  font=self._scaled_font(9, "normal"), cursor="hand2")
         va_keybind_btn.grid(row=r, column=0, sticky="w", pady=(4, 0))
         ToolTip(va_keybind_btn, t('tooltips.va_keybind_preserve'))
         r += 1
         tk.Label(scrollable_frame, text=t('settings.va_keybind_preserve_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
         # ========== UPDATES SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.updates_title'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(scrollable_frame, text=t('settings.updates_title'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
         
         # Add a subtle separator line
@@ -8983,11 +9043,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                               bg="#2a4a2a", fg="#e0e0e0", 
                               activebackground="#3a5a3a", activeforeground="#ffffff",
                               relief="ridge", bd=1, padx=12, pady=4,
-                              font=("Segoe UI", 9, "normal"), cursor="hand2")
+                              font=self._scaled_font(9, "normal"), cursor="hand2")
         update_btn.grid(row=r, column=0, sticky="w", pady=(4, 0))
         r += 1
         tk.Label(scrollable_frame, text=t('settings.updates_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
+                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
 
@@ -9131,39 +9191,39 @@ class App(tk.Tk, ColumnVisibilityMixin):
         presets_pane.rowconfigure(3, weight=0)  # Row 3 (buttons) stays at bottom
 
         # Ship Presets title
-        presets_title = ttk.Label(presets_pane, text=t('sidebar.ship_presets'), font=("Segoe UI", 9, "bold"))
+        presets_title = ttk.Label(presets_pane, text=t('sidebar.ship_presets'), font=self._scaled_font(9, "bold"))
         presets_title.grid(row=0, column=0, sticky="w", pady=(0, 2))
-        
+
         # Set minimum height for presets pane to prevent collapse
         presets_pane.configure(height=200)
         presets_pane.grid_propagate(True)
-        
+
         # Help text for preset operations
-        help_text = ttk.Label(presets_pane, text=t('sidebar.right_click_options'), 
-                             font=("Segoe UI", 8), foreground="#666666")
+        help_text = ttk.Label(presets_pane, text=t('sidebar.right_click_options'),
+                             font=self._scaled_font(8), foreground="#666666")
         help_text.grid(row=1, column=0, sticky="w", pady=(0, 6))
-        
+
         # Configure treeview style for selection highlight (theme-aware)
         style = ttk.Style()
-        
+
         # Configure Ship Presets treeview font and row height
         if self.current_theme == "elite_orange":
             style.configure("ShipPresets.Treeview",
-                           font=("Segoe UI", 10),
+                           font=self._scaled_font(10),
                            background="#1e1e1e",
                            foreground="#ff8c00",
                            fieldbackground="#1e1e1e",
-                           rowheight=22)
+                           rowheight=self._scaled_px(22))
             style.map("ShipPresets.Treeview",
                      background=[("selected", "#ff8c00")],
                      foreground=[("selected", "#000000")])
         else:
             style.configure("ShipPresets.Treeview",
-                           font=("Segoe UI", 10),
+                           font=self._scaled_font(10),
                            background="#1e1e1e",
                            foreground="#e0e0e0",
                            fieldbackground="#1e1e1e",
-                           rowheight=22)
+                           rowheight=self._scaled_px(22))
             style.map("ShipPresets.Treeview",
                      background=[("selected", "#404040")],
                      foreground=[("selected", "#ffffff")])
@@ -9271,7 +9331,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             bd=1,
             padx=6,
             pady=1,
-            font=("Segoe UI", 8),
+            font=self._scaled_font(8),
             cursor="hand2"
         )
         self.theme_toggle_btn.pack(side="left")
@@ -9506,9 +9566,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         controls_header.grid(row=r, column=0, sticky="ew")
         controls_header.columnconfigure(1, weight=1)
         
-        ttk.Label(controls_header, text=t('voiceattack.timers'), font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(controls_header, text=t('voiceattack.timers'), font=self._scaled_font(11, "bold")).grid(row=0, column=0, sticky="w")
         tk.Label(controls_header, text=t('voiceattack.tip_stop_commands'), 
-                 fg=_toggle_tip_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).grid(row=0, column=1, sticky="")
+                 fg=_toggle_tip_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).grid(row=0, column=1, sticky="")
         r += 1
         
         # Controls toggles: Auto Honk, Headtracker, Night Vision, FSD Jump
@@ -9530,7 +9590,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             
@@ -9541,13 +9601,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ToolTip(checkbox, display_help)
             
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
         
         # ============================================================
         # CORE MINING SUB-SECTION
         # ============================================================
-        ttk.Label(scrollable_frame, text=t('voiceattack.section_core_mining'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(15, 2))
+        ttk.Label(scrollable_frame, text=t('voiceattack.section_core_mining'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(15, 2))
         r += 1
         
         # Boost Interval timer
@@ -9570,7 +9630,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                             relief="solid", bd=0, highlightthickness=1,
                             highlightbackground="#ffffff", highlightcolor="#ffffff",
-                            font=("Segoe UI", 9))
+                            font=self._scaled_font(9))
             sp.pack(side="left")
             # Add mouse wheel support for tk.Spinbox
             def on_boost_scroll(event, spinbox=sp, var=self.timer_vars[boost_timer_name], lo_val=lo, hi_val=hi):
@@ -9599,7 +9659,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # ============================================================
         # LASER MINING SUB-SECTION
         # ============================================================
-        ttk.Label(scrollable_frame, text=t('voiceattack.section_laser_mining'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(10, 2))
+        ttk.Label(scrollable_frame, text=t('voiceattack.section_laser_mining'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(10, 2))
         r += 1
         
         # Laser mining timers
@@ -9630,7 +9690,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                             relief="solid", bd=0, highlightthickness=1,
                             highlightbackground="#ffffff", highlightcolor="#ffffff",
-                            font=("Segoe UI", 9))
+                            font=self._scaled_font(9))
             sp.pack(side="left")
             # Add mouse wheel support for tk.Spinbox
             def on_spinbox_scroll(event, spinbox=sp, var=self.timer_vars[name], lo_val=lo, hi_val=hi):
@@ -9667,7 +9727,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
@@ -9677,7 +9737,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ToolTip(checkbox, display_help)
             
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
             # Repeat count spinbox (indented)
@@ -9693,7 +9753,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                          insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                                          relief="solid", bd=0, highlightthickness=1,
                                          highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                         font=("Segoe UI", 9))
+                                         font=self._scaled_font(9))
             repeat_spinbox.pack(side="left", padx=(4, 6))
             
             # Store spinbox for later trace setup
@@ -9718,12 +9778,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             repeat_spinbox.config(command=self._save_laser_extra_repeat)
             
             repeat_label = tk.Label(repeat_frame, text=f"{t('voiceattack.laser_extra_repeat_label')} [1..10]",
-                                   bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                                   bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
             repeat_label.pack(side="left")
             ToolTip(repeat_label, t('voiceattack.help_laser_extra_repeat'))
             
             self.laser_extra_status_label = tk.Label(repeat_frame, text="", fg=_help_fg, bg=_toggle_bg,
-                                                      font=("Segoe UI", 8, "italic"))
+                                                      font=self._scaled_font(8, "italic"))
             self.laser_extra_status_label.pack(side="left", padx=(10, 0))
             # NOTE: Values loaded by _import_all_from_txt at startup, not here
             r += 1
@@ -9739,7 +9799,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
@@ -9749,7 +9809,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
 
             # Continuous Pulsewave checkbox on the same row
             if "Continuous Pulsewave" in TOGGLES:
@@ -9759,14 +9819,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cp_checkbox = tk.Checkbutton(rowf, text=cp_name, variable=self.toggle_vars[cp_name],
                                              bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
                                              activebackground=_toggle_bg, activeforeground=_toggle_fg,
-                                             highlightthickness=0, bd=0, font=("Segoe UI", 9),
+                                             highlightthickness=0, bd=0, font=self._scaled_font(9),
                                              padx=4, pady=2, anchor="w")
                 cp_checkbox.pack(side="left", padx=(20, 0))
                 self.toggle_checkboxes[cp_name] = cp_checkbox
                 self.toggle_vars[cp_name].trace_add("write", lambda *args, n=cp_name: self._save_toggle(n))
                 ToolTip(cp_checkbox, cp_display_help)
                 tk.Label(rowf, text=cp_display_help, fg=_help_fg, bg=_toggle_bg,
-                         font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                         font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
 
             r += 1
         
@@ -9781,7 +9841,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
@@ -9791,7 +9851,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ToolTip(checkbox, display_help)
             
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
             # Cargo scoop delay spinbox (indented)
@@ -9818,7 +9878,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                                  insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                                                  relief="solid", bd=0, highlightthickness=1,
                                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                 font=("Segoe UI", 9))
+                                                 font=self._scaled_font(9))
                 cargoscoop_spinbox.pack(side="left", padx=(4, 6))
                 # Add mouse wheel support
                 def on_cargoscoop_scroll(event, var=self.timer_vars[cargoscoop_timer_name], lo_val=lo, hi_val=hi):
@@ -9839,7 +9899,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 cargoscoop_display_name = t(timer_translations.get(cargoscoop_timer_name, cargoscoop_timer_name))
                 cargoscoop_label = tk.Label(cargoscoop_frame, text=f"{cargoscoop_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
-                                           bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                                           bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
                 cargoscoop_label.pack(side="left")
                 
                 cargoscoop_help = t(timer_help_translations.get(cargoscoop_timer_name, cargoscoop_timer_name))
@@ -9857,7 +9917,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
@@ -9867,13 +9927,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ToolTip(checkbox, display_help)
             
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
         
         # ============================================================
         # PROSPECTOR SUB-SECTION
         # ============================================================
-        ttk.Label(scrollable_frame, text=t('voiceattack.section_prospector'), font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(10, 2))
+        ttk.Label(scrollable_frame, text=t('voiceattack.section_prospector'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(10, 2))
         r += 1
         
         # Prospector Sequence toggle
@@ -9887,7 +9947,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
@@ -9899,7 +9959,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ToolTip(checkbox, display_help)
             
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
             # Prospector cooldown time (indented)
@@ -9916,7 +9976,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                              insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                                              relief="solid", bd=0, highlightthickness=1,
                                              highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                             font=("Segoe UI", 9))
+                                             font=self._scaled_font(9))
             prospector_spinbox.pack(side="left", padx=(4, 6))
             # Add mouse wheel support - explicitly save on scroll
             def on_prospector_scroll(event, var=self.prospector_delay_var):
@@ -9934,11 +9994,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             prospector_spinbox.bind("<MouseWheel>", on_prospector_scroll)
             
             prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [1.0..6.0] seconds (default: 2.6s)",
-                                       bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                                       bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
             prospector_label.pack(side="left")
             
             tk.Label(prospector_frame, text=t('voiceattack.help_prospector_delay_short'), 
-                    fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                    fg=_help_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             
             # NOTE: Values loaded by _import_all_from_txt at startup
             r += 1
@@ -9964,7 +10024,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
@@ -9974,7 +10034,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ToolTip(checkbox, display_help)
             
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
             # Thrust Up timing controls
@@ -9992,7 +10052,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                                        insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                                                        relief="solid", bd=0, highlightthickness=1,
                                                        highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                       font=("Segoe UI", 9))
+                                                       font=self._scaled_font(9))
                 thrust_upduration_spinbox.pack(side="left", padx=(4, 6))
 
                 def on_thrust_upduration_scroll(event, var=self.thrust_upduration_var):
@@ -10010,9 +10070,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 thrust_upduration_spinbox.bind("<MouseWheel>", on_thrust_upduration_scroll)
 
                 tk.Label(thrust_upduration_frame, text=f"{t('voiceattack.thrust_upduration_label')} [0.5..3.5] seconds",
-                         bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9)).pack(side="left")
+                         bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9)).pack(side="left")
                 tk.Label(thrust_upduration_frame, text=t('voiceattack.help_thrust_upduration'),
-                         fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                         fg=_help_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
 
                 r += 1
 
@@ -10031,7 +10091,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                                     insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                                                     relief="solid", bd=0, highlightthickness=1,
                                                     highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                    font=("Segoe UI", 9))
+                                                    font=self._scaled_font(9))
                 thrust_closed_spinbox.pack(side="left", padx=(4, 6))
                 # Add mouse wheel support - explicitly save on scroll
                 def on_thrust_closed_scroll(event, var=self.thrust_closed_var):
@@ -10049,11 +10109,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 thrust_closed_spinbox.bind("<MouseWheel>", on_thrust_closed_scroll)
                 
                 thrust_closed_label = tk.Label(thrust_closed_frame, text=f"{t('voiceattack.thrust_closed_label')} [0.0..5.0] seconds",
-                                              bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                                              bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
                 thrust_closed_label.pack(side="left")
                 
                 tk.Label(thrust_closed_frame, text=t('voiceattack.help_thrust_closed'), 
-                        fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                        fg=_help_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
                 
                 # NOTE: Values loaded by _import_all_from_txt at startup
                 r += 1
@@ -10073,7 +10133,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                                   insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                                                   relief="solid", bd=0, highlightthickness=1,
                                                   highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                  font=("Segoe UI", 9))
+                                                  font=self._scaled_font(9))
                 thrust_open_spinbox.pack(side="left", padx=(4, 6))
                 # Add mouse wheel support - explicitly save on scroll
                 def on_thrust_open_scroll(event, var=self.thrust_open_var):
@@ -10091,11 +10151,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 thrust_open_spinbox.bind("<MouseWheel>", on_thrust_open_scroll)
                 
                 thrust_open_label = tk.Label(thrust_open_frame, text=f"{t('voiceattack.thrust_open_label')} [1.0..5.0] seconds",
-                                            bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                                            bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
                 thrust_open_label.pack(side="left")
                 
                 tk.Label(thrust_open_frame, text=t('voiceattack.help_thrust_open'), 
-                        fg=_help_fg, bg=_toggle_bg, font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                        fg=_help_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
                 
                 # NOTE: Values loaded by _import_all_from_txt at startup
                 r += 1
@@ -10111,7 +10171,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
@@ -10121,7 +10181,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ToolTip(checkbox, display_help)
             
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
             # Delay before targeting the prospector after launching (indented under Target Prospector)
@@ -10146,7 +10206,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                              insertbackground=_toggle_fg, selectbackground="#4a6a8a",
                                              relief="solid", bd=0, highlightthickness=1,
                                              highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                             font=("Segoe UI", 9))
+                                             font=self._scaled_font(9))
                 target_spinbox.pack(side="left", padx=(4, 6))
                 # Add mouse wheel support
                 def on_target_scroll(event, var=self.timer_vars[target_timer_name], lo_val=lo, hi_val=hi):
@@ -10166,7 +10226,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 target_display_name = t(timer_translations.get(target_timer_name, target_timer_name))
                 target_label = tk.Label(target_frame, text=f"{target_display_name} [{lo}..{hi}] {t('voiceattack.seconds')}",
-                                       bg=_toggle_bg, fg=_toggle_fg, font=("Segoe UI", 9))
+                                       bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
                 target_label.pack(side="left")
                 
                 target_help = t(timer_help_translations.get(target_timer_name, target_timer_name))
@@ -10184,7 +10244,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=("Segoe UI", 9), 
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
             self.toggle_checkboxes[name] = checkbox
@@ -10194,7 +10254,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ToolTip(checkbox, display_help)
             
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=("Segoe UI", 8, "italic")).pack(side="left", padx=(10, 0))
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
         
         # Initialize dependent toggle states AFTER import has a chance to load values
@@ -10876,22 +10936,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # System name label
             tk.Label(frame, text=t('context_menu.edit_visits_for'), 
-                    bg=bg_color, fg=fg_color, font=("Segoe UI", 9)).pack(anchor="w")
+                    bg=bg_color, fg=fg_color, font=self._scaled_font(9)).pack(anchor="w")
             
             tk.Label(frame, text=current_system, 
-                    bg=bg_color, fg=fg_color, font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 15))
+                    bg=bg_color, fg=fg_color, font=self._scaled_font(11, "bold")).pack(anchor="w", pady=(0, 15))
             
             # Visit count entry
             count_frame = tk.Frame(frame, bg=bg_color)
             count_frame.pack(fill="x", pady=5)
             
             tk.Label(count_frame, text=t('context_menu.visit_count_label'), 
-                    bg=bg_color, fg=fg_color, font=("Segoe UI", 9)).pack(side="left")
+                    bg=bg_color, fg=fg_color, font=self._scaled_font(9)).pack(side="left")
             
             count_var = tk.StringVar(value=str(current_count))
             count_entry = tk.Entry(count_frame, textvariable=count_var, width=10,
                                   bg=entry_bg, fg=entry_fg, insertbackground=fg_color,
-                                  relief="solid", bd=1, font=("Segoe UI", 10))
+                                  relief="solid", bd=1, font=self._scaled_font(10))
             count_entry.pack(side="left", padx=(10, 0))
             count_entry.select_range(0, tk.END)
             
@@ -10922,14 +10982,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 bg="#2a5a2a", fg="#ffffff", 
                                 activebackground="#3a6a3a", activeforeground="#ffffff",
                                 relief="solid", bd=1, cursor="hand2", 
-                                pady=6, padx=15, font=("Segoe UI", 9))
+                                pady=6, padx=15, font=self._scaled_font(9))
             save_btn.pack(side="right", padx=(8, 0))
             
             cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=cancel,
                                   bg="#5a2a2a", fg="#ffffff", 
                                   activebackground="#6a3a3a", activeforeground="#ffffff",
                                   relief="solid", bd=1, cursor="hand2", 
-                                  pady=6, padx=15, font=("Segoe UI", 9))
+                                  pady=6, padx=15, font=self._scaled_font(9))
             cancel_btn.pack(side="right")
             
             # Center dialog
@@ -11237,15 +11297,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _configure_preset_list_row_colors(self) -> None:
         """Configure row colors for preset list based on current theme"""
         if self.current_theme == "elite_orange":
-            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#ff8c00', font=("Segoe UI", 9))
-            self.preset_list.tag_configure('evenrow', background='#252525', foreground='#ff8c00', font=("Segoe UI", 9))
-            self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#ffcc00', font=("Segoe UI", 9, "bold"))
-            self.preset_list.tag_configure('active_preset', background='#5a3a0a', foreground='#ffcc00', font=("Segoe UI", 9, "bold"))
+            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#ff8c00', font=self._scaled_font(9))
+            self.preset_list.tag_configure('evenrow', background='#252525', foreground='#ff8c00', font=self._scaled_font(9))
+            self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#ffcc00', font=self._scaled_font(9, "bold"))
+            self.preset_list.tag_configure('active_preset', background='#5a3a0a', foreground='#ffcc00', font=self._scaled_font(9, "bold"))
         else:
-            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6', font=("Segoe UI", 9))
-            self.preset_list.tag_configure('evenrow', background='#282828', foreground='#e6e6e6', font=("Segoe UI", 9))
-            self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#aaaaaa', font=("Segoe UI", 9, "bold"))
-            self.preset_list.tag_configure('active_preset', background='#2a4a6a', foreground='#ffffff', font=("Segoe UI", 9, "bold"))
+            self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6', font=self._scaled_font(9))
+            self.preset_list.tag_configure('evenrow', background='#282828', foreground='#e6e6e6', font=self._scaled_font(9))
+            self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#aaaaaa', font=self._scaled_font(9, "bold"))
+            self.preset_list.tag_configure('active_preset', background='#2a4a6a', foreground='#ffffff', font=self._scaled_font(9, "bold"))
     
     def _parse_preset_ship_type(self, preset_name: str) -> tuple:
         """Parse preset name to extract ship type and build variant.
@@ -11620,11 +11680,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Label
         label = tk.Label(dialog, text="Enter a name for this preset:", 
-                        bg="#2c3e50", fg="#ecf0f1", font=("Segoe UI", 9))
+                        bg="#2c3e50", fg="#ecf0f1", font=self._scaled_font(9))
         label.pack(pady=(20, 10))
         
         # Entry
-        entry = tk.Entry(dialog, font=("Segoe UI", 9), width=30)
+        entry = tk.Entry(dialog, font=self._scaled_font(9), width=30)
         entry.pack(pady=5)
         if initial:
             entry.insert(0, initial)
@@ -11643,12 +11703,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.destroy()
             
         ok_btn = tk.Button(btn_frame, text=t('common.ok'), command=on_ok,
-                          bg="#27ae60", fg="white", font=("Segoe UI", 9),
+                          bg="#27ae60", fg="white", font=self._scaled_font(9),
                           width=10)
         ok_btn.pack(side=tk.LEFT, padx=5)
         
         cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
-                              bg="#e74c3c", fg="white", font=("Segoe UI", 9),
+                              bg="#e74c3c", fg="white", font=self._scaled_font(9),
                               width=10)
         cancel_btn.pack(side=tk.LEFT, padx=5)
         
@@ -11781,7 +11841,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Title
         title_label = tk.Label(dialog, text="💾 Create New Ship Preset", 
                               bg="#1e1e1e", fg="#ff8c00", 
-                              font=("Segoe UI", 12, "bold"))
+                              font=self._scaled_font(12, "bold"))
         title_label.pack(pady=(15, 15))
         
         # Ship Type selection
@@ -11789,13 +11849,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         type_frame.pack(fill="x", padx=25, pady=(0, 10))
         
         tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
-                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+                font=self._scaled_font(10)).pack(side=tk.LEFT)
         
         # Pre-select ship if provided
         default_ship = preselect_ship if preselect_ship and preselect_ship in ship_types else ship_types[0]
         ship_var = tk.StringVar(value=default_ship)
         ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
-                                  state="readonly", width=28, font=("Segoe UI", 10),
+                                  state="readonly", width=28, font=self._scaled_font(10),
                                   style="Preset.TCombobox")
         ship_combo.pack(side=tk.LEFT, padx=(15, 0))
         
@@ -11804,9 +11864,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         name_frame.pack(fill="x", padx=25, pady=10)
         
         tk.Label(name_frame, text="Build Name:", bg="#1e1e1e", fg="#ffffff", 
-                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+                font=self._scaled_font(10)).pack(side=tk.LEFT)
         
-        name_entry = tk.Entry(name_frame, font=("Segoe UI", 10), width=30,
+        name_entry = tk.Entry(name_frame, font=self._scaled_font(10), width=30,
                              bg="#2d2d2d", fg="#ffffff", insertbackground=accent_color,
                              selectbackground=accent_color, selectforeground=accent_fg,
                              relief="flat", bd=2)
@@ -11817,10 +11877,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         preview_frame.pack(fill="x", padx=25, pady=10)
         
         tk.Label(preview_frame, text="Preview:", bg="#1e1e1e", fg="#888888", 
-                font=("Segoe UI", 9)).pack(side=tk.LEFT)
+                font=self._scaled_font(9)).pack(side=tk.LEFT)
         
         preview_label = tk.Label(preview_frame, text="", bg="#1e1e1e", fg=accent_color, 
-                                font=("Segoe UI", 10, "bold"))
+                                font=self._scaled_font(10, "bold"))
         preview_label.pack(side=tk.LEFT, padx=(10, 0))
         
         def update_preview(*args):
@@ -11853,13 +11913,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.destroy()
             
         ok_btn = tk.Button(btn_frame, text="💾 Save", command=on_ok,
-                          bg=accent_color, fg=accent_fg, font=("Segoe UI", 10, "bold"),
+                          bg=accent_color, fg=accent_fg, font=self._scaled_font(10, "bold"),
                           activebackground=accent_color, activeforeground=accent_fg,
                           width=10, cursor="hand2")
         ok_btn.pack(side=tk.LEFT, padx=5)
         
         cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
-                              bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                              bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
                               activebackground="#4a4a4a", activeforeground="#ffffff",
                               width=10, cursor="hand2")
         cancel_btn.pack(side=tk.LEFT, padx=5)
@@ -12079,13 +12139,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Title
         title_label = tk.Label(dialog, text="✏️ Edit Ship Preset", 
                               bg="#1e1e1e", fg=accent_color, 
-                              font=("Segoe UI", 12, "bold"))
+                              font=self._scaled_font(12, "bold"))
         title_label.pack(pady=(15, 5))
         
         # Show current name
         orig_label = tk.Label(dialog, text=f"Current: {original_name}", 
                              bg="#1e1e1e", fg="#888888", 
-                             font=("Segoe UI", 9))
+                             font=self._scaled_font(9))
         orig_label.pack(pady=(0, 10))
         
         # Ship Type selection
@@ -12093,7 +12153,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         type_frame.pack(fill="x", padx=25, pady=(0, 10))
         
         tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
-                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+                font=self._scaled_font(10)).pack(side=tk.LEFT)
         
         # Find best match for detected ship
         ship_var = tk.StringVar()
@@ -12109,7 +12169,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 ship_var.set(ship_types[0])
         
         ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
-                                  state="readonly", width=28, font=("Segoe UI", 10),
+                                  state="readonly", width=28, font=self._scaled_font(10),
                                   style="Preset.TCombobox")
         ship_combo.pack(side=tk.LEFT, padx=(15, 0))
         
@@ -12118,9 +12178,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         name_frame.pack(fill="x", padx=25, pady=10)
         
         tk.Label(name_frame, text="Build Name:", bg="#1e1e1e", fg="#ffffff", 
-                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+                font=self._scaled_font(10)).pack(side=tk.LEFT)
         
-        name_entry = tk.Entry(name_frame, font=("Segoe UI", 10), width=30,
+        name_entry = tk.Entry(name_frame, font=self._scaled_font(10), width=30,
                              bg="#2d2d2d", fg="#ffffff", insertbackground=accent_color,
                              selectbackground=accent_color, selectforeground=accent_fg,
                              relief="flat", bd=2)
@@ -12133,10 +12193,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         preview_frame.pack(fill="x", padx=25, pady=10)
         
         tk.Label(preview_frame, text="New Name:", bg="#1e1e1e", fg="#888888", 
-                font=("Segoe UI", 9)).pack(side=tk.LEFT)
+                font=self._scaled_font(9)).pack(side=tk.LEFT)
         
         preview_label = tk.Label(preview_frame, text="", bg="#1e1e1e", fg=accent_color, 
-                                font=("Segoe UI", 10, "bold"))
+                                font=self._scaled_font(10, "bold"))
         preview_label.pack(side=tk.LEFT, padx=(10, 0))
         
         def update_preview(*args):
@@ -12169,13 +12229,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.destroy()
             
         ok_btn = tk.Button(btn_frame, text="✏️ Save", command=on_ok,
-                          bg=accent_color, fg=accent_fg, font=("Segoe UI", 10, "bold"),
+                          bg=accent_color, fg=accent_fg, font=self._scaled_font(10, "bold"),
                           activebackground=accent_color, activeforeground=accent_fg,
                           width=10, cursor="hand2")
         ok_btn.pack(side=tk.LEFT, padx=5)
         
         cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
-                              bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                              bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
                               activebackground="#4a4a4a", activeforeground="#ffffff",
                               width=10, cursor="hand2")
         cancel_btn.pack(side=tk.LEFT, padx=5)
@@ -12248,7 +12308,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Current System Display (always updated, read-only)
         row = 0
-        ttk.Label(config_frame, text=t('distance_calculator.current_system'), font=("Segoe UI", 9, "bold")).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(config_frame, text=t('distance_calculator.current_system'), font=self._scaled_font(9, "bold")).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_current_system = tk.StringVar(value="---")
         # Clear selection when current system updates (prevents auto-selection of readonly entry)
         try:
@@ -12259,7 +12319,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception:
                 pass
         current_display = tk.Entry(config_frame, textvariable=self.distance_current_system, 
-                                   bg="#2d2d2d", fg="#00ff00", font=("Segoe UI", 9, "bold"),
+                                   bg="#2d2d2d", fg="#00ff00", font=self._scaled_font(9, "bold"),
                        state="readonly", readonlybackground="#2d2d2d", takefocus=False)
         current_display.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         ToolTip(current_display, t('tooltips.current_system'))
@@ -12277,20 +12337,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Current system Sol distance label
         self.current_sol_label = tk.Label(config_frame, text="", 
-                                         font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+                                         font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
         self.current_sol_label.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
         
         # Visits count label (separate column, aligned vertically)
         self.distance_visits_label = tk.Label(config_frame, text="", 
-                                              font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
+                                              font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
         self.distance_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
         
         # Home System
         row += 1
-        ttk.Label(config_frame, text=t('distance_calculator.home_system'), font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(config_frame, text=t('distance_calculator.home_system'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_home_system = tk.StringVar(value=load_home_system())
         home_entry = tk.Entry(config_frame, textvariable=self.distance_home_system, 
-                             bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
+                             bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9),
                              insertbackground="#ffffff")
         home_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         ToolTip(home_entry, t('tooltips.home_system'))
@@ -12304,24 +12364,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
         home_info_frame.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
         
         self.distance_to_home_label = tk.Label(home_info_frame, text="", 
-                                               font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+                                               font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
         self.distance_to_home_label.pack(side="left")
         
         self.home_sol_label = tk.Label(home_info_frame, text="", 
-                                       font=("Segoe UI", 9), fg="#888888", bg="#1e1e1e", anchor="w")
+                                       font=self._scaled_font(9), fg="#888888", bg="#1e1e1e", anchor="w")
         self.home_sol_label.pack(side="left", padx=(10, 0))
         
         # Home visits label (column 4, aligned with current system visits)
         self.home_visits_label = tk.Label(config_frame, text="", 
-                                          font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
+                                          font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
         self.home_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
         
         # Fleet Carrier System (auto-detected, read-only)
         row += 1
-        ttk.Label(config_frame, text=t('distance_calculator.fleet_carrier'), font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(config_frame, text=t('distance_calculator.fleet_carrier'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_fc_system = tk.StringVar(value="")  # Will be auto-detected
         fc_entry = tk.Entry(config_frame, textvariable=self.distance_fc_system, 
-                           bg="#2d2d2d", fg="#ffaa00", font=("Segoe UI", 9),
+                           bg="#2d2d2d", fg="#ffaa00", font=self._scaled_font(9),
                            state="readonly", readonlybackground="#2d2d2d")
         fc_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         ToolTip(fc_entry, t('tooltips.fleet_carrier'))
@@ -12331,16 +12391,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         fc_info_frame.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
         
         self.distance_to_fc_label = tk.Label(fc_info_frame, text="", 
-                                             font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
+                                             font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
         self.distance_to_fc_label.pack(side="left")
         
         self.fc_sol_label = tk.Label(fc_info_frame, text="", 
-                                     font=("Segoe UI", 9), fg="#888888", bg="#1e1e1e", anchor="w")
+                                     font=self._scaled_font(9), fg="#888888", bg="#1e1e1e", anchor="w")
         self.fc_sol_label.pack(side="left", padx=(10, 0))
         
         # FC visits label (column 4, aligned with other visits)
         self.fc_visits_label = tk.Label(config_frame, text="", 
-                                        font=("Segoe UI", 9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
+                                        font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
         self.fc_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
         
         # Refresh locations button (current system + FC)
@@ -12349,7 +12409,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                command=self._distance_refresh_locations,
                                bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
                                activeforeground="#ffffff", relief="ridge", bd=1, padx=8, pady=3,
-                               font=("Segoe UI", 8, "normal"), cursor="hand2")
+                               font=self._scaled_font(8, "normal"), cursor="hand2")
         auto_fc_btn.grid(row=row, column=0, columnspan=4, pady=(8, 0))
         ToolTip(auto_fc_btn, t('tooltips.refresh_locations'))
         
@@ -12367,10 +12427,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # System A input
         row = 0
-        ttk.Label(calc_frame, text=t('distance_calculator.system_a'), font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(calc_frame, text=t('distance_calculator.system_a'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_system_a = tk.StringVar(value=saved_system_a)
         system_a_entry = tk.Entry(calc_frame, textvariable=self.distance_system_a, 
-                                  bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
+                                  bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9),
                                   insertbackground="#ffffff")
         system_a_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         system_a_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
@@ -12381,16 +12441,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         use_current_btn = tk.Button(calc_frame, text=t('distance_calculator.use_current'), command=self._distance_use_current_system,
                                    bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                    activeforeground="#ffffff", relief="ridge", bd=1, 
-                                   font=("Segoe UI", 8, "normal"), cursor="hand2", width=14)
+                                   font=self._scaled_font(8, "normal"), cursor="hand2", width=14)
         use_current_btn.grid(row=row, column=2, pady=3, padx=(5, 0), sticky="w")
         ToolTip(use_current_btn, t('tooltips.use_current'))
         
         # System B input
         row += 1
-        ttk.Label(calc_frame, text=t('distance_calculator.system_b'), font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Label(calc_frame, text=t('distance_calculator.system_b'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_system_b = tk.StringVar(value=saved_system_b)
         system_b_entry = tk.Entry(calc_frame, textvariable=self.distance_system_b, 
-                                  bg="#2d2d2d", fg="#ffffff", font=("Segoe UI", 9),
+                                  bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9),
                                   insertbackground="#ffffff")
         system_b_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
         system_b_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
@@ -12405,14 +12465,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         use_home_btn = tk.Button(buttons_frame, text=t('distance_calculator.home'), command=self._distance_use_home,
                                 bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                 activeforeground="#ffffff", relief="ridge", bd=1, 
-                                font=("Segoe UI", 8, "normal"), cursor="hand2", width=6)
+                                font=self._scaled_font(8, "normal"), cursor="hand2", width=6)
         use_home_btn.pack(side="left", padx=(0, 2))
         ToolTip(use_home_btn, t('tooltips.use_home'))
         
         use_fc_btn = tk.Button(buttons_frame, text=t('distance_calculator.fc'), command=self._distance_use_fc,
                               bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                               activeforeground="#ffffff", relief="ridge", bd=1, 
-                              font=("Segoe UI", 8, "normal"), cursor="hand2", width=4)
+                              font=self._scaled_font(8, "normal"), cursor="hand2", width=4)
         use_fc_btn.pack(side="left")
         ToolTip(use_fc_btn, t('tooltips.use_fc'))
         
@@ -12421,7 +12481,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         calc_btn = tk.Button(calc_frame, text=t('distance_calculator.calculate_distance'), command=self._calculate_distances,
                    bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                    activeforeground="#ffffff", relief="ridge", bd=1, padx=12, pady=4,
-                   font=("Segoe UI", 9, "bold"), cursor="hand2")
+                   font=self._scaled_font(9, "bold"), cursor="hand2")
         calc_btn.grid(row=row, column=0, columnspan=3, pady=(8, 3))
         ToolTip(calc_btn, t('tooltips.calculate_distance'))
 
@@ -12431,12 +12491,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Status/Loading indicator
         row += 1
         self.distance_status_label = tk.Label(calc_frame, text="", 
-                                              font=("Segoe UI", 8, "italic"), fg="#888888", bg=_dc_bg)
+                                              font=self._scaled_font(8, "italic"), fg="#888888", bg=_dc_bg)
         self.distance_status_label.grid(row=row, column=0, columnspan=2, pady=(0, 5))
         
         # EDSM API status indicator
         self.edsm_status_label = tk.Label(calc_frame, text="⚫ EDSM: checking...", 
-                                          font=("Segoe UI", 8), fg="#888888", bg=_dc_bg, anchor="e")
+                                          font=self._scaled_font(8), fg="#888888", bg=_dc_bg, anchor="e")
         self.edsm_status_label.grid(row=row, column=2, pady=(0, 5), sticky="e", padx=(5, 0))
         ToolTip(self.edsm_status_label, t('tooltips.edsm_status'))
         
@@ -12453,11 +12513,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dist_row.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         # Descriptive text (system names, gold)
         self.distance_ab_label = tk.Label(dist_row, text=f"➤ {t('distance_calculator.distance')} A ↔ B:",
-                                         font=("Segoe UI", 11, "bold"), fg="#ffcc00", bg=_dc_bg, anchor="w")
+                                         font=self._scaled_font(11, "bold"), fg="#ffcc00", bg=_dc_bg, anchor="w")
         self.distance_ab_label.pack(side="left")
         # Distance value (bright green) - sits right after the text
         self.distance_ab_value_label = tk.Label(dist_row, text="---",
-                                         font=("Segoe UI", 11, "bold"), fg="#66ff99", bg=_dc_bg, anchor="w")
+                                         font=self._scaled_font(11, "bold"), fg="#66ff99", bg=_dc_bg, anchor="w")
         self.distance_ab_value_label.pack(side="left", padx=(15, 0))
         
         # Separator
@@ -12468,42 +12528,42 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # System A Info with system name on same line (left column)
         row += 1
         self.distance_system_a_name = tk.Label(results_frame, text=t('distance_calculator.system_a_info') + " ---", 
-                                               font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
+                                               font=self._scaled_font(9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
         self.distance_system_a_name.grid(row=row, column=0, sticky="w", padx=(0, 20), pady=(5, 0))
         
         # System B Info with system name on same line (right column)
         self.distance_system_b_name = tk.Label(results_frame, text=t('distance_calculator.system_b_info') + " ---", 
-                                               font=("Segoe UI", 9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
+                                               font=self._scaled_font(9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
         self.distance_system_b_name.grid(row=row, column=1, sticky="w", pady=(5, 0))
         
         # Distance to Sol - side by side
         row += 1
         self.distance_a_sol_label = tk.Label(results_frame, text=t('distance_calculator.distance_to_sol') + " ---", 
-                                             font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
+                                             font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_a_sol_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
         
         self.distance_b_sol_label = tk.Label(results_frame, text=t('distance_calculator.distance_to_sol') + " ---", 
-                                             font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
+                                             font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_b_sol_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
         
         # Visits count - side by side
         row += 1
         self.distance_a_visits_label = tk.Label(results_frame, text=t('distance_calculator.visits') + " ---", 
-                                                font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
+                                                font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_a_visits_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
         
         self.distance_b_visits_label = tk.Label(results_frame, text=t('distance_calculator.visits') + " ---", 
-                                                font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
+                                                font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_b_visits_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
         
         # Coordinates - side by side
         row += 1
         self.distance_a_coords_label = tk.Label(results_frame, text=t('distance_calculator.coordinates') + " ---", 
-                                                font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
+                                                font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_a_coords_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
         
         self.distance_b_coords_label = tk.Label(results_frame, text=t('distance_calculator.coordinates') + " ---", 
-                                                font=("Segoe UI", 9), fg="#ffffff", bg=_dc_bg, anchor="w")
+                                                font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
         self.distance_b_coords_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
         
         results_frame.columnconfigure(0, weight=1)
@@ -13082,12 +13142,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _update_market_api_status(self, status: str):
         """Update market API status labels - called on UI thread"""
         if status == "online":
-            status_text = "🟢 Market API: Full (EDDN + Ardent + Spansh)"
-            trade_text  = "🟢 Market API: Full (Ardent + Spansh)"
+            status_text = "🟢 Market API"
+            trade_text  = "🟢 Market API"
             status_color = "#00ff00"
         else:
-            status_text = "🔴 Market API: Limited (EDDN only)"
-            trade_text  = "🔴 Market API: Limited (EDDN only)"
+            status_text = "🔴 Market API"
+            trade_text  = "🔴 Market API"
             status_color = "#ff4444"
         
         # Update both commodity tab status labels
@@ -13454,13 +13514,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Title
         title_label = tk.Label(dialog, text="📥 Import Ship Preset", 
                               bg="#1e1e1e", fg=accent_color, 
-                              font=("Segoe UI", 12, "bold"))
+                              font=self._scaled_font(12, "bold"))
         title_label.pack(pady=(15, 5))
         
         # Show original filename
         orig_label = tk.Label(dialog, text=f"Original: {original_name}", 
                              bg="#1e1e1e", fg="#888888", 
-                             font=("Segoe UI", 9))
+                             font=self._scaled_font(9))
         orig_label.pack(pady=(0, 10))
         
         # Ship Type selection
@@ -13468,7 +13528,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         type_frame.pack(fill="x", padx=25, pady=(0, 10))
         
         tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
-                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+                font=self._scaled_font(10)).pack(side=tk.LEFT)
         
         # Find best match for detected ship
         ship_var = tk.StringVar()
@@ -13484,7 +13544,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 ship_var.set(ship_types[0])
         
         ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
-                                  state="readonly", width=28, font=("Segoe UI", 10),
+                                  state="readonly", width=28, font=self._scaled_font(10),
                                   style="Preset.TCombobox")
         ship_combo.pack(side=tk.LEFT, padx=(15, 0))
         
@@ -13493,9 +13553,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         name_frame.pack(fill="x", padx=25, pady=10)
         
         tk.Label(name_frame, text="Build Name:", bg="#1e1e1e", fg="#ffffff", 
-                font=("Segoe UI", 10)).pack(side=tk.LEFT)
+                font=self._scaled_font(10)).pack(side=tk.LEFT)
         
-        name_entry = tk.Entry(name_frame, font=("Segoe UI", 10), width=30,
+        name_entry = tk.Entry(name_frame, font=self._scaled_font(10), width=30,
                              bg="#2d2d2d", fg="#ffffff", insertbackground=accent_color,
                              selectbackground=accent_color, selectforeground=accent_fg,
                              relief="flat", bd=2)
@@ -13508,10 +13568,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         preview_frame.pack(fill="x", padx=25, pady=10)
         
         tk.Label(preview_frame, text="New Name:", bg="#1e1e1e", fg="#888888", 
-                font=("Segoe UI", 9)).pack(side=tk.LEFT)
+                font=self._scaled_font(9)).pack(side=tk.LEFT)
         
         preview_label = tk.Label(preview_frame, text="", bg="#1e1e1e", fg=accent_color, 
-                                font=("Segoe UI", 10, "bold"))
+                                font=self._scaled_font(10, "bold"))
         preview_label.pack(side=tk.LEFT, padx=(10, 0))
         
         def update_preview(*args):
@@ -13544,13 +13604,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.destroy()
             
         ok_btn = tk.Button(btn_frame, text="📥 Import", command=on_ok,
-                          bg=accent_color, fg=accent_fg, font=("Segoe UI", 10, "bold"),
+                          bg=accent_color, fg=accent_fg, font=self._scaled_font(10, "bold"),
                           activebackground=accent_color, activeforeground=accent_fg,
                           width=10, cursor="hand2")
         ok_btn.pack(side=tk.LEFT, padx=5)
         
         cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
-                              bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                              bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
                               activebackground="#4a4a4a", activeforeground="#ffffff",
                               width=10, cursor="hand2")
         cancel_btn.pack(side=tk.LEFT, padx=5)
@@ -14198,7 +14258,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             text="Import Journal History?",
             bg="#2c3e50", 
             fg="#ecf0f1", 
-            font=("Segoe UI", 12, "bold")
+            font=self._scaled_font(12, "bold")
         )
         title_label.pack(pady=(20, 10))
         
@@ -14215,7 +14275,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             text=info_text,
             bg="#2c3e50",
             fg="#bdc3c7",
-            font=("Segoe UI", 10),
+            font=self._scaled_font(10),
             justify="center",
             wraplength=500  # Wrap long paths
         )
@@ -14232,7 +14292,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             selectcolor="#34495e",
             activebackground="#2c3e50",
             activeforeground="#ecf0f1",
-            font=("Segoe UI", 9)
+            font=self._scaled_font(9)
         )
         checkbox.pack(pady=10)
         
@@ -14259,7 +14319,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             command=on_import,
             bg="#27ae60",
             fg="white",
-            font=("Segoe UI", 10, "bold"),
+            font=self._scaled_font(10, "bold"),
             width=12,
             height=1,
             relief=tk.FLAT,
@@ -14274,7 +14334,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             command=on_skip,
             bg="#95a5a6",
             fg="white",
-            font=("Segoe UI", 10),
+            font=self._scaled_font(10),
             width=12,
             height=1,
             relief=tk.FLAT,
@@ -14973,7 +15033,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ttk.Label(
                 frame, 
                 text="Updating Database (one-time migration)",
-                font=("Segoe UI", 11, "bold")
+                font=self._scaled_font(11, "bold")
             ).pack(pady=(0, 15))
             
             # Status label
@@ -14981,7 +15041,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             ttk.Label(
                 frame,
                 textvariable=status_var,
-                font=("Segoe UI", 9)
+                font=self._scaled_font(9)
             ).pack(pady=(0, 10))
             
             # Progress bar
@@ -15151,9 +15211,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Show theme change message with OK button
         ttk.Label(frame, text=f"{t('dialogs.theme_changed_to')} {theme_name}.", 
-                  font=("Segoe UI", 10, "bold")).pack(pady=(0, 5))
+                  font=self._scaled_font(10, "bold")).pack(pady=(0, 5))
         ttk.Label(frame, text=t('settings.restart_message'),
-                  font=("Segoe UI", 9)).pack(pady=(0, 15))
+                  font=self._scaled_font(9)).pack(pady=(0, 15))
         
         # Button frame
         btn_frame = ttk.Frame(frame)
@@ -15268,7 +15328,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._current_lang_label = tk.Label(
                 parent_frame,
                 text=current_lang.upper(),
-                font=("Segoe UI", 9, "bold"),
+                font=self._scaled_font(9, "bold"),
                 bg="#2a4a6a",
                 fg="#ffffff",
                 padx=8,
@@ -15313,7 +15373,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._version_label = tk.Label(
             parent_frame,
             text="About",
-            font=("Segoe UI", 8),
+            font=self._scaled_font(8),
             bg=_vbtn_bg,
             fg=_vbtn_fg,
             cursor="hand2",
@@ -15387,28 +15447,28 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 logo_label = tk.Label(main_frame, image=self._about_dialog_logo, bg=_about_bg)
                 logo_label.pack(pady=(0, 5))
             else:
-                tk.Label(main_frame, text="EliteMining", font=("Segoe UI", 16, "bold"), 
+                tk.Label(main_frame, text="EliteMining", font=self._scaled_font(16, "bold"), 
                          fg="#ffcc00", bg=_about_bg).pack()
         except Exception:
-            tk.Label(main_frame, text="EliteMining", font=("Segoe UI", 16, "bold"), 
+            tk.Label(main_frame, text="EliteMining", font=self._scaled_font(16, "bold"), 
                      fg="#ffcc00", bg=_about_bg).pack()
         
         # Version
-        tk.Label(main_frame, text=f"Version {__version__}", font=("Segoe UI", 10), 
+        tk.Label(main_frame, text=f"Version {__version__}", font=self._scaled_font(10), 
                  fg="#888888", bg=_about_bg).pack(pady=(0, 10))
         
         # Description
         tk.Label(main_frame, text=t('about.description'), 
-                 font=("Segoe UI", 10), fg="#e0e0e0", bg=_about_bg).pack(pady=(0, 10))
+                 font=self._scaled_font(10), fg="#e0e0e0", bg=_about_bg).pack(pady=(0, 10))
         
         # Separator
         tk.Frame(main_frame, height=1, bg="#444444", width=350).pack(pady=8)
         
         # Copyright and license
         tk.Label(main_frame, text=t('about.copyright'), 
-                 font=("Segoe UI", 9), fg="#e0e0e0", bg=_about_bg).pack()
+                 font=self._scaled_font(9), fg="#e0e0e0", bg=_about_bg).pack()
         tk.Label(main_frame, text=t('about.license'), 
-                 font=("Segoe UI", 8), fg="#888888", bg=_about_bg).pack()
+                 font=self._scaled_font(8), fg="#888888", bg=_about_bg).pack()
         
         # Separator
         tk.Frame(main_frame, height=1, bg="#444444", width=350).pack(pady=8)
@@ -15432,7 +15492,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                            command=lambda u=url: open_link(u),
                            bg=_btn_bg, fg=_btn_fg, activebackground=_btn_active_bg,
                            activeforeground=_btn_active_fg, relief="ridge", bd=1, 
-                           padx=8, pady=2, font=("Segoe UI", 8), cursor="hand2")
+                           padx=8, pady=2, font=self._scaled_font(8), cursor="hand2")
             btn.pack(side="left", padx=3)
         
         # Row 2: Docs, Report Bug
@@ -15449,7 +15509,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                            command=lambda u=url: open_link(u),
                            bg=_btn_bg, fg=_btn_fg, activebackground=_btn_active_bg,
                            activeforeground=_btn_active_fg, relief="ridge", bd=1, 
-                           padx=8, pady=2, font=("Segoe UI", 8), cursor="hand2")
+                           padx=8, pady=2, font=self._scaled_font(8), cursor="hand2")
             btn.pack(side="left", padx=3)
         
         # Separator
@@ -15457,7 +15517,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Credits (compact)
         credits_text = "Credits: EliteVA (Somfic) • Ardent API (Iain Collins) • EDCD/EDDN"
-        tk.Label(main_frame, text=credits_text, font=("Segoe UI", 8), 
+        tk.Label(main_frame, text=credits_text, font=self._scaled_font(8), 
                  fg="#888888", bg=_about_bg, wraplength=380).pack(pady=(0, 10))
         
         # Support/Donate row
@@ -15465,7 +15525,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         support_frame.pack(pady=(5, 0))
         
         tk.Label(support_frame, text="☕ " + t('about.donation_text')[:50] + "...", 
-                 font=("Segoe UI", 8, "italic"), fg="#aaaaaa", bg=_about_bg).pack(side="left")
+                 font=self._scaled_font(8, "italic"), fg="#aaaaaa", bg=_about_bg).pack(side="left")
         
         # PayPal button with logo image
         try:
@@ -15488,7 +15548,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             paypal_btn = tk.Button(support_frame, text="PayPal", 
                                   command=lambda: webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=NZQTA4TGPDSC6"),
                                   bg="#0070ba", fg="#ffffff", activebackground="#0060aa",
-                                  relief="flat", bd=0, padx=8, pady=1, font=("Segoe UI", 8), cursor="hand2")
+                                  relief="flat", bd=0, padx=8, pady=1, font=self._scaled_font(8), cursor="hand2")
             paypal_btn.pack(side="left", padx=(10, 0))
         
         # Close button
@@ -15496,7 +15556,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                              command=dialog.destroy,
                              bg=_btn_bg, fg=_btn_fg, activebackground=_btn_active_bg,
                              activeforeground=_btn_active_fg, relief="ridge", bd=1, 
-                             padx=20, pady=3, font=("Segoe UI", 9), cursor="hand2")
+                             padx=20, pady=3, font=self._scaled_font(9), cursor="hand2")
         close_btn.pack(pady=(15, 0))
         
         # Center on parent - IMPORTANT: Always center dialogs on parent window!
@@ -15557,7 +15617,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Show popup menu with language options"""
         menu = tk.Menu(self, tearoff=0, bg="#2a2a2a", fg="#ffffff", 
                       activebackground="#4a4a4a", activeforeground="#ffffff",
-                      font=("Segoe UI", 10))
+                      font=self._scaled_font(10))
         
         from localization import get_language
         current_lang = get_language()
@@ -15641,9 +15701,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         frame.pack(fill="both", expand=True)
         
         tk.Label(frame, text=t('dialogs.language_changed'), 
-                font=("Segoe UI", 10, "bold"), bg=bg_color, fg=fg_color).pack(pady=(0, 5))
+                font=self._scaled_font(10, "bold"), bg=bg_color, fg=fg_color).pack(pady=(0, 5))
         tk.Label(frame, text=t('settings.restart_message'),
-                font=("Segoe UI", 9), bg=bg_color, fg=fg_color).pack(pady=(0, 15))
+                font=self._scaled_font(9), bg=bg_color, fg=fg_color).pack(pady=(0, 15))
         
         btn_frame = tk.Frame(frame, bg=bg_color)
         btn_frame.pack()
@@ -15668,11 +15728,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.destroy()
         
         ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=10, command=on_ok,
-                          bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                          bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
                           activebackground="#4a4a4a", activeforeground="#ffffff", cursor="hand2")
         ok_btn.pack(side="left", padx=(0, 10))
         cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), width=10, command=on_cancel,
-                              bg="#3a3a3a", fg="#ffffff", font=("Segoe UI", 10),
+                              bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
                               activebackground="#4a4a4a", activeforeground="#ffffff", cursor="hand2")
         cancel_btn.pack(side="left")
         
@@ -15831,7 +15891,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Label(
             msg_frame,
             text="⚠️",
-            font=("Segoe UI", 24),
+            font=self._scaled_font(24),
             bg=bg_color,
             fg=warning_color
         ).pack(side="left", padx=(0, 15))
@@ -15843,7 +15903,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Label(
             msg_text_frame,
             text=t('dialogs.session_active_message'),
-            font=("Segoe UI", 11, "bold"),
+            font=self._scaled_font(11, "bold"),
             bg=bg_color,
             fg=fg_bright
         ).pack(anchor="w")
@@ -15862,7 +15922,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             tk.Label(
                 options_frame,
                 text=opt_text,
-                font=("Segoe UI", 9),
+                font=self._scaled_font(9),
                 bg=bg_color,
                 fg=opt_color
             ).pack(anchor="w", pady=1)
@@ -16014,7 +16074,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Label(
             msg_frame,
             text="⚠️",
-            font=("Segoe UI", 24),
+            font=self._scaled_font(24),
             bg=bg_color,
             fg=warning_color
         ).pack(side="left", padx=(0, 15))
@@ -16026,7 +16086,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tk.Label(
             msg_text_frame,
             text=t('dialogs.unsaved_preset_message').format(name=self._active_ship_preset_name),
-            font=("Segoe UI", 11, "bold"),
+            font=self._scaled_font(11, "bold"),
             bg=bg_color,
             fg=fg_bright,
             wraplength=320,
@@ -16047,7 +16107,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             tk.Label(
                 options_frame,
                 text=opt_text,
-                font=("Segoe UI", 9),
+                font=self._scaled_font(9),
                 bg=bg_color,
                 fg=opt_color
             ).pack(anchor="w", pady=1)
@@ -16284,13 +16344,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Title
             title_label = tk.Label(dialog, text="📦 " + t('dialogs.backup_title'), 
-                                 font=("Segoe UI", 14, "bold"),
+                                 font=self._scaled_font(14, "bold"),
                                  bg="#1e1e1e", fg="#ff9800")
             title_label.pack(pady=15)
             
             # Instructions
             inst_label = tk.Label(dialog, text=t('dialogs.backup_instructions'),
-                                font=("Segoe UI", 10),
+                                font=self._scaled_font(10),
                                 bg="#1e1e1e", fg="#aaaaaa")
             inst_label.pack(pady=(0, 20))
             
@@ -16327,7 +16387,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                   selectcolor="#2a2a2a",
                                   activebackground="#2a2a2a",
                                   activeforeground="#ffffff",
-                                  font=("Segoe UI", 10, "bold"))
+                                  font=self._scaled_font(10, "bold"))
             all_cb.pack(anchor="w", pady=5)
             
             # Separator
@@ -16341,7 +16401,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                       selectcolor="#2a2a2a",
                                       activebackground="#2a2a2a",
                                       activeforeground="#ffffff",
-                                      font=("Segoe UI", 10))
+                                      font=self._scaled_font(10))
             presets_cb.pack(anchor="w", pady=2)
             
             reports_cb = tk.Checkbutton(options_frame, text="📊 " + t('dialogs.mining_reports'),
@@ -16350,7 +16410,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                       selectcolor="#2a2a2a",
                                       activebackground="#2a2a2a",
                                       activeforeground="#ffffff",
-                                      font=("Segoe UI", 10))
+                                      font=self._scaled_font(10))
             reports_cb.pack(anchor="w", pady=2)
             
             bookmarks_cb = tk.Checkbutton(options_frame, text="🔖 " + t('dialogs.mining_bookmarks'),
@@ -16359,7 +16419,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                         selectcolor="#2a2a2a",
                                         activebackground="#2a2a2a",
                                         activeforeground="#ffffff",
-                                        font=("Segoe UI", 10))
+                                        font=self._scaled_font(10))
             bookmarks_cb.pack(anchor="w", pady=2)
             
             va_profile_cb = tk.Checkbutton(options_frame, text="🎤 " + t('dialogs.voiceattack_profile'),
@@ -16368,7 +16428,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                          selectcolor="#2a2a2a",
                                          activebackground="#2a2a2a",
                                          activeforeground="#ffffff",
-                                         font=("Segoe UI", 10))
+                                         font=self._scaled_font(10))
             va_profile_cb.pack(anchor="w", pady=2)
             
             userdb_cb = tk.Checkbutton(options_frame, text="💾 " + t('dialogs.user_database'),
@@ -16377,7 +16437,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                        selectcolor="#2a2a2a",
                                        activebackground="#2a2a2a",
                                        activeforeground="#ffffff",
-                                       font=("Segoe UI", 10))
+                                       font=self._scaled_font(10))
             userdb_cb.pack(anchor="w", pady=2)
             
             journals_cb = tk.Checkbutton(options_frame, text="📝 " + t('dialogs.journal_files'),
@@ -16386,7 +16446,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                         selectcolor="#2a2a2a",
                                         activebackground="#2a2a2a",
                                         activeforeground="#ffffff",
-                                        font=("Segoe UI", 10))
+                                        font=self._scaled_font(10))
             journals_cb.pack(anchor="w", pady=2)
             
             config_cb = tk.Checkbutton(options_frame, text="🔧 " + t('dialogs.configuration'),
@@ -16395,7 +16455,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                       selectcolor="#2a2a2a",
                                       activebackground="#2a2a2a",
                                       activeforeground="#ffffff",
-                                      font=("Segoe UI", 10))
+                                      font=self._scaled_font(10))
             config_cb.pack(anchor="w", pady=2)
             
             # Buttons frame
@@ -16423,12 +16483,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 dialog.destroy()
             
             create_btn = tk.Button(btn_frame, text=t('dialogs.create_backup'), command=on_create_backup,
-                                 bg="#27ae60", fg="white", font=("Segoe UI", 10, "bold"),
+                                 bg="#27ae60", fg="white", font=self._scaled_font(10, "bold"),
                                  width=15, cursor="hand2")
             create_btn.pack(side=tk.LEFT, padx=5)
             
             cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=on_cancel,
-                                 bg="#e74c3c", fg="white", font=("Segoe UI", 10, "bold"),
+                                 bg="#e74c3c", fg="white", font=self._scaled_font(10, "bold"),
                                  width=15, cursor="hand2")
             cancel_btn.pack(side=tk.LEFT, padx=5)
             
@@ -16753,7 +16813,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Title
             title_label = tk.Label(dialog, text=t('dialogs.restore_title'), 
-                                 font=("Segoe UI", 14, "bold"),
+                                 font=self._scaled_font(14, "bold"),
                                  bg="#1e1e1e", fg="#ff9800")
             title_label.pack(pady=15)
             
@@ -16766,13 +16826,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 info_text = f"{t('dialogs.backup_file')}: {os.path.basename(backup_path)}"
                 
             info_label = tk.Label(dialog, text=info_text,
-                                font=("Segoe UI", 9),
+                                font=self._scaled_font(9),
                                 bg="#1e1e1e", fg="#aaaaaa")
             info_label.pack(pady=(0, 10))
             
             # Instructions
             inst_label = tk.Label(dialog, text=t('dialogs.restore_instructions'),
-                                font=("Segoe UI", 10),
+                                font=self._scaled_font(10),
                                 bg="#1e1e1e", fg="#aaaaaa")
             inst_label.pack(pady=(0, 20))
             
@@ -16816,7 +16876,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                   selectcolor="#2a2a2a",
                                   activebackground="#2a2a2a",
                                   activeforeground="#ffffff",
-                                  font=("Segoe UI", 10, "bold"))
+                                  font=self._scaled_font(10, "bold"))
             all_cb.pack(anchor="w", pady=5)
             
             # Separator
@@ -16831,7 +16891,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                           selectcolor="#2a2a2a",
                                           activebackground="#2a2a2a",
                                           activeforeground="#ffffff",
-                                          font=("Segoe UI", 10))
+                                          font=self._scaled_font(10))
                 presets_cb.pack(anchor="w", pady=2)
             
             if has_reports:
@@ -16841,7 +16901,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                           selectcolor="#2a2a2a",
                                           activebackground="#2a2a2a",
                                           activeforeground="#ffffff",
-                                          font=("Segoe UI", 10))
+                                          font=self._scaled_font(10))
                 reports_cb.pack(anchor="w", pady=2)
             
             if has_bookmarks:
@@ -16851,7 +16911,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                             selectcolor="#2a2a2a",
                                             activebackground="#2a2a2a",
                                             activeforeground="#ffffff",
-                                            font=("Segoe UI", 10))
+                                            font=self._scaled_font(10))
                 bookmarks_cb.pack(anchor="w", pady=2)
             
             if has_va_profile:
@@ -16861,7 +16921,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                              selectcolor="#2a2a2a",
                                              activebackground="#2a2a2a",
                                              activeforeground="#ffffff",
-                                             font=("Segoe UI", 10))
+                                             font=self._scaled_font(10))
                 va_profile_cb.pack(anchor="w", pady=2)
             
             if has_userdb:
@@ -16871,7 +16931,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                           selectcolor="#2a2a2a",
                                           activebackground="#2a2a2a",
                                           activeforeground="#ffffff",
-                                          font=("Segoe UI", 10))
+                                          font=self._scaled_font(10))
                 userdb_cb.pack(anchor="w", pady=2)
             
             if has_journals:
@@ -16881,7 +16941,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                            selectcolor="#2a2a2a",
                                            activebackground="#2a2a2a",
                                            activeforeground="#ffffff",
-                                           font=("Segoe UI", 10))
+                                           font=self._scaled_font(10))
                 journals_cb.pack(anchor="w", pady=2)
             
             if has_config:
@@ -16891,20 +16951,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                           selectcolor="#2a2a2a",
                                           activebackground="#2a2a2a",
                                           activeforeground="#ffffff",
-                                          font=("Segoe UI", 10))
+                                          font=self._scaled_font(10))
                 config_cb.pack(anchor="w", pady=2)
             
             # Warning label
             warning_label = tk.Label(dialog, 
                                    text=t('dialogs.restore_warning'),
-                                   font=("Segoe UI", 9, "bold"),
+                                   font=self._scaled_font(9, "bold"),
                                    bg="#1e1e1e", fg="#e74c3c")
             warning_label.pack(pady=(20, 5))
             
             # Restart info label
             restart_label = tk.Label(dialog, 
                                    text=t('dialogs.restart_info'),
-                                   font=("Segoe UI", 9),
+                                   font=self._scaled_font(9),
                                    bg="#1e1e1e", fg="#888888")
             restart_label.pack(pady=(0, 10))
             
@@ -16955,12 +17015,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 dialog.destroy()
             
             restore_btn = tk.Button(btn_frame, text=t('dialogs.restore_button'), command=on_restore,
-                                  bg="#27ae60", fg="white", font=("Segoe UI", 10, "bold"),
+                                  bg="#27ae60", fg="white", font=self._scaled_font(10, "bold"),
                                   width=18, cursor="hand2")
             restore_btn.pack(side=tk.LEFT, padx=10)
             
             cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=on_cancel,
-                                 bg="#e74c3c", fg="white", font=("Segoe UI", 10, "bold"),
+                                 bg="#e74c3c", fg="white", font=self._scaled_font(10, "bold"),
                                  width=18, cursor="hand2")
             cancel_btn.pack(side=tk.LEFT, padx=10)
             
@@ -17202,13 +17262,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Status label (packed right FIRST so it claims far-right space)
         self.marketplace_total_label = tk.Label(row0_frame, text=t('marketplace.enter_system_commodity'),
-                                               bg=_mkt_cb_bg, fg="gray", font=("Segoe UI", 8))
+                                               bg=_mkt_cb_bg, fg="gray", font=self._scaled_font(8))
         self.marketplace_total_label.pack(side="right", padx=(0, 5))
+
+        # Market API status indicator, packed right next (just left of the hint text)
+        self.market_mining_status_label = tk.Label(row0_frame, text="⚫ Market API",
+                                          font=self._scaled_font(8), fg="#888888", bg=_mkt_cb_bg)
+        self.market_mining_status_label.pack(side="right", padx=(0, 15))
+        ToolTip(self.market_mining_status_label, t('tooltips.market_api_status'))
+
+        # Start market API status check
+        self.after(1000, self._check_market_api_status)
 
         rb1 = tk.Radiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.marketplace_search_mode,
                       value="near_system", bg=_mkt_cb_bg, fg="#ffffff", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         rb1.pack(side="left", padx=(0, 15))
         rb1.config(takefocus=0)
         ToolTip(rb1, t('tooltips.near_system_search'))
@@ -17216,7 +17285,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         rb2 = tk.Radiobutton(row0_frame, text=t('marketplace.galaxy_wide'), variable=self.marketplace_search_mode,
                       value="galaxy_wide", bg=_mkt_cb_bg, fg="#ffffff", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         rb2.pack(side="left", padx=(0, 20))
         rb2.config(takefocus=0)
         ToolTip(rb2, t('tooltips.galaxy_wide_search'))
@@ -17226,42 +17295,52 @@ class App(tk.Tk, ColumnVisibilityMixin):
         sell_cb = tk.Checkbutton(row0_frame, text=t('marketplace.sell'), variable=self.marketplace_sell_mode,
                       command=self._on_sell_mode_toggle, bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         sell_cb.pack(side="left", padx=(0, 10))
         ToolTip(sell_cb, t('tooltips.sell_mode'))
         
         buy_cb = tk.Checkbutton(row0_frame, text=t('marketplace.buy'), variable=self.marketplace_buy_mode,
                       command=self._on_buy_mode_toggle, bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         buy_cb.pack(side="left")
         ToolTip(buy_cb, t('tooltips.buy_mode'))
         
-        # Row 1: Reference System + Commodity
-        row1_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
-        row1_frame.pack(fill="x", pady=(0, 10))
-        
-        # Fixed-width label for perfect alignment with Station: below
-        ttk.Label(row1_frame, text=t('marketplace.ref_system'), width=12).pack(side="left", padx=(0, 5))
+        # Filter grid: rows share real grid columns instead of pack()+magic-padx,
+        # so "Sort by"/"Max age" stay aligned under "Commodity"/"Station" at any UI scale.
+        filter_grid = tk.Frame(search_frame, bg=_mkt_cb_bg)
+        filter_grid.pack(fill="x", pady=(0, 10))
+        for _col in (0, 1, 2, 3, 4):
+            filter_grid.grid_columnconfigure(_col, weight=0)
+        row1_frame = filter_grid  # kept for any code below still referencing row1_frame
+
+        # Row 1 (grid row 0): Reference System + Commodity
+        ttk.Label(filter_grid, text=t('marketplace.ref_system'), width=12).grid(row=0, column=0, sticky="w", padx=(0, 5), pady=(0, 8))
         self.marketplace_reference_system = tk.StringVar(value=cfg.get('marketplace_reference_system', ''))
-        self.marketplace_ref_entry = ttk.Entry(row1_frame, textvariable=self.marketplace_reference_system, width=30)
+        # Ref System entry + "Current System" button share a sub-frame packed into
+        # column 1, so "Current System"'s width doesn't force column 2 wide and
+        # strand the checkboxes below it far from the Station dropdown.
+        ref_entry_frame = tk.Frame(filter_grid, bg=_mkt_cb_bg)
+        ref_entry_frame.grid(row=0, column=1, columnspan=2, sticky="w", pady=(0, 8))
+
+        self.marketplace_ref_entry = ttk.Entry(ref_entry_frame, textvariable=self.marketplace_reference_system, width=30)
         self.marketplace_ref_entry.pack(side="left", padx=(0, 5))
         self.marketplace_ref_entry.bind("<Return>", lambda e: self._search_marketplace())
         self.marketplace_ref_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
         # Autocomplete
         from system_autocomplete import SystemAutocomplete
         self._ac_marketplace_ref = SystemAutocomplete(self.marketplace_ref_entry, self.marketplace_reference_system, self)
-        
-        self.marketplace_use_current_btn = tk.Button(row1_frame, text=t('marketplace.use_current'), 
+
+        self.marketplace_use_current_btn = tk.Button(ref_entry_frame, text=t('marketplace.use_current'),
                                     command=self._use_current_system_marketplace,
                                     bg="#4a3a2a", fg="#e0e0e0", activebackground="#5a4a3a", activeforeground="#ffffff",
-                                    relief="ridge", bd=1, padx=6, pady=2, font=("Segoe UI", 8), cursor="hand2",
+                                    relief="ridge", bd=1, padx=6, pady=2, font=self._scaled_font(8), cursor="hand2",
                                     highlightbackground=_mkt_cb_bg, highlightcolor=_mkt_cb_bg)
-        self.marketplace_use_current_btn.pack(side="left", padx=(0, 35))
-        
+        self.marketplace_use_current_btn.pack(side="left")
+
         # Commodity label with consistent spacing
-        ttk.Label(row1_frame, text=t('marketplace.commodity')).pack(side="left", padx=(0, 8))
-        
+        ttk.Label(filter_grid, text=t('marketplace.commodity')).grid(row=0, column=3, sticky="w", padx=(0, 8), pady=(0, 8))
+
         # Commodity list with localization
         self._commodity_order = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
                              "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Haematite", "Indite",
@@ -17286,17 +17365,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         saved_commodity = cfg.get('marketplace_commodity', 'Alexandrite')
         self.marketplace_commodity = tk.StringVar(value=self._commodity_map.get(saved_commodity, saved_commodity))
         sorted_commodities = [self._commodity_map[k] for k in self._commodity_order]
-        commodity_combo = ttk.Combobox(row1_frame, textvariable=self.marketplace_commodity,
+        commodity_combo = ttk.Combobox(filter_grid, textvariable=self.marketplace_commodity,
                                      values=sorted_commodities, state="readonly", width=20)
-        commodity_combo.pack(side="left")
+        commodity_combo.grid(row=0, column=4, sticky="w", pady=(0, 8))
         commodity_combo.bind("<Return>", lambda e: self._search_marketplace())
         commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         commodity_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
-        
-        # Row 2: All filters (aligned with Row 1)
-        row2_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
-        row2_frame.pack(fill="x", pady=(0, 10))
-        
+
+        # Row 2 (grid row 1): Station type filters + Sort by (aligned with Row 1)
+        row2_frame = filter_grid
+
         # Station type localization maps
         station_type_map = get_station_types()
         self._station_type_order = ['All', 'Orbital', 'Surface', 'Fleet Carrier', 'Megaship', 'Stronghold']
@@ -17313,18 +17391,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._age_map = {k: age_options_map.get(k, k) for k in self._age_order}
         self._age_rev_map = {v: k for k, v in self._age_map.items()}
         
-        # Station label with same width as "Ref. System:" for perfect alignment
+        # Station label aligned under Ref. System (grid column 0/1)
         station_label = ttk.Label(row2_frame, text=t('marketplace.station'), width=12)
-        station_label.pack(side="left", padx=(0, 5))
+        station_label.grid(row=1, column=0, sticky="w", padx=(0, 5), pady=(0, 8))
         saved_station = cfg.get('marketplace_station_type', 'All')
         self.marketplace_station_type = tk.StringVar(value=self._station_type_map.get(saved_station, saved_station))
         station_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_station_type,
                                 values=[self._station_type_map[k] for k in self._station_type_order],
                                 state="readonly", width=12)
-        station_combo.pack(side="left", padx=(0, 15))
+        station_combo.grid(row=1, column=1, sticky="w", pady=(0, 8))
         station_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(station_combo, t('tooltips.station_type_filter'))
-        
+
         def on_station_type_change(*args):
             selected = self.marketplace_station_type.get()
             english_val = self._station_type_rev_map.get(selected, selected)
@@ -17335,31 +17413,35 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.marketplace_exclude_cb.config(state="normal")
             self._save_marketplace_preferences()
         self.marketplace_station_type.trace_add("write", on_station_type_change)
-        
+
+        # Checkboxes share grid column 2 in their own packed sub-frame
+        row2_checks_frame = tk.Frame(row2_frame, bg=_mkt_cb_bg)
+        row2_checks_frame.grid(row=1, column=2, sticky="w", padx=(15, 25), pady=(0, 8))
+
         self.marketplace_exclude_carriers = tk.BooleanVar(value=cfg.get('marketplace_exclude_carriers', True))
-        self.marketplace_exclude_cb = tk.Checkbutton(row2_frame, text=t('marketplace.exclude_carriers'), variable=self.marketplace_exclude_carriers,
+        self.marketplace_exclude_cb = tk.Checkbutton(row2_checks_frame, text=t('marketplace.exclude_carriers'), variable=self.marketplace_exclude_carriers,
                       command=self._save_marketplace_preferences,
                       bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         self.marketplace_exclude_cb.pack(side="left", padx=(0, 10))
         ToolTip(self.marketplace_exclude_cb, t('tooltips.exclude_carriers'))
         # Apply initial state if Fleet Carrier is already selected
         if self._station_type_rev_map.get(self.marketplace_station_type.get(), '') == 'Fleet Carrier':
             self.marketplace_exclude_carriers.set(False)
             self.marketplace_exclude_cb.config(state="disabled")
-        
+
         self.marketplace_large_pad_only = tk.BooleanVar(value=cfg.get('marketplace_large_pad_only', False))
-        large_pad_cb = tk.Checkbutton(row2_frame, text=t('marketplace.large_pads'), variable=self.marketplace_large_pad_only,
+        large_pad_cb = tk.Checkbutton(row2_checks_frame, text=t('marketplace.large_pads'), variable=self.marketplace_large_pad_only,
                       command=self._save_marketplace_preferences,
                       bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
-        large_pad_cb.pack(side="left", padx=(0, 30))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
+        large_pad_cb.pack(side="left")
         ToolTip(large_pad_cb, t('tooltips.large_pads'))
-        
-        # Sort by label with adjustable spacing
-        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=(0, 8))  # Aligned with Commodity above
+
+        # Sort by label aligned under Commodity (grid column 3/4)
+        ttk.Label(row2_frame, text=t('marketplace.sort_by')).grid(row=1, column=3, sticky="w", padx=(0, 8), pady=(0, 8))
         saved_sort = cfg.get('marketplace_order_by', 'Distance')
         # Determine initial sort options based on sell mode (default)
         initial_sort_order = ['Best price (highest)', 'Distance', 'Best demand', 'Last update']
@@ -17367,42 +17449,32 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.marketplace_order_combo = ttk.Combobox(row2_frame, textvariable=self.marketplace_order_by,
                                      values=[self._sort_options_map.get(k, k) for k in initial_sort_order],
                                      state="readonly", width=20)
-        self.marketplace_order_combo.pack(side="left", padx=(29, 0))  # Adjust first number to move dropdown
+        self.marketplace_order_combo.grid(row=1, column=4, sticky="w", pady=(0, 8))
         self.marketplace_order_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         self.marketplace_order_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(self.marketplace_order_combo, t('tooltips.sort_by'))
-        
-        # Row 3: Search button and Max Age
-        row3_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
-        row3_frame.pack(fill="x")
-        
-        search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'), 
+
+        # Row 3 (grid row 2): Search button and Max Age (aligned under Station / Sort by)
+        row3_frame = filter_grid
+
+        search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'),
                               command=self._search_marketplace,
                               bg="#2a4a2a", fg="#e0e0e0", 
                               activebackground="#3a5a3a", activeforeground="#ffffff",
                               relief="ridge", bd=1, padx=10, pady=4,
-                              font=("Segoe UI", 9, "bold"), cursor="hand2")
-        search_btn.pack(side="left")
-        
-        # Market API status indicator (pack FIRST on right side to claim far right position)
-        self.market_mining_status_label = tk.Label(row3_frame, text="⚫ Market API: checking...", 
-                                          font=("Segoe UI", 8), fg="#888888", bg=_mkt_cb_bg)
-        self.market_mining_status_label.pack(side="right", padx=(0, 10))
-        ToolTip(self.market_mining_status_label, t('tooltips.market_api_status'))
-        
-        # Start market API status check
-        self.after(1000, self._check_market_api_status)
-        
-        # Max Age with left padding to align under Sort by above
+                              font=self._scaled_font(9, "bold"), cursor="hand2")
+        search_btn.grid(row=2, column=0, columnspan=3, sticky="w")
+
+        # Max Age aligned under Sort by (grid column 3/4)
         _max_age_fg = "#ff8c00" if _mkt_cb_theme == "elite_orange" else "#e0e0e0"
         max_age_label = tk.Label(row3_frame, text=t('marketplace.max_age'), bg=_mkt_cb_bg, fg=_max_age_fg)
-        max_age_label.pack(side="left", padx=(399, 8))  # Left padding to align with Sort by
+        max_age_label.grid(row=2, column=3, sticky="w", padx=(0, 8))
         saved_age = cfg.get('marketplace_max_age', '8 hours')
         self.marketplace_max_age = tk.StringVar(value=self._age_map.get(saved_age, saved_age))
         age_combo = ttk.Combobox(row3_frame, textvariable=self.marketplace_max_age,
                                 values=[self._age_map[k] for k in self._age_order],
                                 state="readonly", width=10)
-        age_combo.pack(side="left", padx=(17, 0))  # Add left padding here
+        age_combo.grid(row=2, column=4, sticky="w")
         age_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())
         age_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(age_combo, t('tooltips.max_age'))
@@ -17420,23 +17492,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         _results_fg = "#ff8c00" if _mkt_cb_theme == "elite_orange" else "#ffffff"
         tk.Label(results_header, text=t('marketplace.search_results'), 
                 bg=_mkt_cb_bg, fg=_results_fg, 
-                font=("Segoe UI", 10, "bold")).pack(side="left")
+                font=self._scaled_font(10, "bold")).pack(side="left")
         
         tk.Label(results_header, text="  •  " + t('marketplace.right_click_options'),
                 bg=_mkt_cb_bg, fg="#888888",
-                font=("Segoe UI", 8)).pack(side="left")
+                font=self._scaled_font(8)).pack(side="left")
 
         tk.Label(results_header, text="  •  " + t('marketplace.fc_docking_note'),
                 bg=_mkt_cb_bg, fg="#888888",
-                font=("Segoe UI", 8)).pack(side="left")
+                font=self._scaled_font(8)).pack(side="left")
         
         # Average price label (right side, before total count)
         _avg_fg = "#ffd700"  # gold — visible on both dark and orange themes
         self.marketplace_avg_label = tk.Label(results_header, text="",
-                                              bg=_mkt_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
+                                              bg=_mkt_cb_bg, fg=_avg_fg, font=self._scaled_font(8, "bold"))
         self.marketplace_avg_label.pack(side="right", padx=(0, 10))
         self.marketplace_best_label = tk.Label(results_header, text="",
-                                               bg=_mkt_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
+                                               bg=_mkt_cb_bg, fg=_avg_fg, font=self._scaled_font(8, "bold"))
         self.marketplace_best_label.pack(side="right", padx=(0, 10))
 
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
@@ -17492,13 +17564,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Status label (packed right FIRST so it claims far-right space)
         self.trade_total_label = tk.Label(row0_frame, text=t('marketplace.enter_system_commodity'),
-                                          bg=_trade_cb_bg, fg="gray", font=("Segoe UI", 8))
+                                          bg=_trade_cb_bg, fg="gray", font=self._scaled_font(8))
         self.trade_total_label.pack(side="right", padx=(0, 5))
+
+        # Market API status indicator, packed right next (just left of the hint text)
+        self.market_trade_status_label = tk.Label(row0_frame, text="⚫ Market API",
+                                          font=self._scaled_font(8), fg="#888888", bg=_trade_cb_bg)
+        self.market_trade_status_label.pack(side="right", padx=(0, 15))
+        ToolTip(self.market_trade_status_label, t('tooltips.market_api_trade_status'))
 
         rb1 = tk.Radiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.trade_search_mode,
                       value="near_system", bg=_trade_cb_bg, fg="#ffffff", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         rb1.pack(side="left", padx=(0, 15))
         rb1.config(takefocus=0)
         ToolTip(rb1, t('tooltips.near_system_search'))
@@ -17506,7 +17584,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         rb2 = tk.Radiobutton(row0_frame, text=t('marketplace.galaxy_wide'), variable=self.trade_search_mode,
                       value="galaxy_wide", bg=_trade_cb_bg, fg="#ffffff", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         rb2.pack(side="left", padx=(0, 20))
         rb2.config(takefocus=0)
         ToolTip(rb2, t('tooltips.galaxy_wide_search'))
@@ -17516,68 +17594,77 @@ class App(tk.Tk, ColumnVisibilityMixin):
         sell_cb = tk.Checkbutton(row0_frame, text=t('marketplace.sell'), variable=self.trade_sell_mode,
                       command=self._on_trade_sell_mode_toggle, bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         sell_cb.pack(side="left", padx=(0, 10))
         ToolTip(sell_cb, t('tooltips.sell_mode'))
         
         buy_cb = tk.Checkbutton(row0_frame, text=t('marketplace.buy'), variable=self.trade_buy_mode,
                       command=self._on_trade_buy_mode_toggle, bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         buy_cb.pack(side="left")
         ToolTip(buy_cb, t('tooltips.buy_mode'))
         
-        # Row 1: Reference System + Category + Commodity
-        row1_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
-        row1_frame.pack(fill="x", pady=(0, 10))
-        
-        ttk.Label(row1_frame, text=t('marketplace.ref_system'), width=12).pack(side="left", padx=(0, 5))
+        # Filter grid: rows share real grid columns instead of pack()+magic-padx,
+        # so "Sort by"/"Max age" stay aligned under "Category"/"Station" at any UI scale.
+        filter_grid = tk.Frame(search_frame, bg=_trade_cb_bg)
+        filter_grid.pack(fill="x", pady=(0, 10))
+        for _col in (0, 1, 2, 3, 4, 5, 6):
+            filter_grid.grid_columnconfigure(_col, weight=0)
+        row1_frame = filter_grid
+
+        ttk.Label(row1_frame, text=t('marketplace.ref_system'), width=12).grid(row=0, column=0, sticky="w", padx=(0, 5), pady=(0, 8))
         self.trade_reference_system = tk.StringVar(value=cfg.get('trade_reference_system', ''))
-        self.trade_ref_entry = ttk.Entry(row1_frame, textvariable=self.trade_reference_system, width=30)
+        # Ref System entry + "Current System" button share a sub-frame packed into
+        # column 1, so "Current System"'s width doesn't force column 2 wide and
+        # strand the checkboxes below it far from the Station dropdown.
+        ref_entry_frame = tk.Frame(row1_frame, bg=_trade_cb_bg)
+        ref_entry_frame.grid(row=0, column=1, columnspan=2, sticky="w", pady=(0, 8))
+
+        self.trade_ref_entry = ttk.Entry(ref_entry_frame, textvariable=self.trade_reference_system, width=30)
         self.trade_ref_entry.pack(side="left", padx=(0, 5))
         self.trade_ref_entry.bind("<Return>", lambda e: self._search_trade_market())
         self.trade_ref_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
         # Autocomplete
         from system_autocomplete import SystemAutocomplete
         self._ac_trade_ref = SystemAutocomplete(self.trade_ref_entry, self.trade_reference_system, self)
-        
-        self.trade_use_current_btn = tk.Button(row1_frame, text=t('marketplace.use_current'), 
+
+        self.trade_use_current_btn = tk.Button(ref_entry_frame, text=t('marketplace.use_current'),
                                     command=self._use_current_system_trade,
                                     bg="#4a3a2a", fg="#e0e0e0", activebackground="#5a4a3a", activeforeground="#ffffff",
-                                    relief="ridge", bd=1, padx=6, pady=2, font=("Segoe UI", 8), cursor="hand2",
+                                    relief="ridge", bd=1, padx=6, pady=2, font=self._scaled_font(8), cursor="hand2",
                                     highlightbackground=_trade_cb_bg, highlightcolor=_trade_cb_bg)
-        self.trade_use_current_btn.pack(side="left", padx=(0, 15))
-        
+        self.trade_use_current_btn.pack(side="left")
+
         # Category dropdown
-        ttk.Label(row1_frame, text=t('marketplace.category')).pack(side="left", padx=(0, 8))
-        
+        ttk.Label(row1_frame, text=t('marketplace.category')).grid(row=0, column=3, sticky="w", padx=(0, 8), pady=(0, 8))
+
         # Get sorted category list from commodities data
         self._trade_categories = sorted(self.commodities_data.keys()) if self.commodities_data else []
         saved_category = cfg.get('trade_category', self._trade_categories[0] if self._trade_categories else 'Chemicals')
         self.trade_category = tk.StringVar(value=saved_category)
         category_combo = ttk.Combobox(row1_frame, textvariable=self.trade_category,
                                      values=self._trade_categories, state="readonly", width=18)
-        category_combo.pack(side="left", padx=(0, 15))
+        category_combo.grid(row=0, column=4, sticky="w", padx=(0, 15), pady=(0, 8))
         category_combo.bind("<<ComboboxSelected>>", self._on_trade_category_changed)
         category_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
-        
+
         # Commodity dropdown (populated based on category)
-        ttk.Label(row1_frame, text=t('marketplace.commodity')).pack(side="left", padx=(0, 8))
+        ttk.Label(row1_frame, text=t('marketplace.commodity')).grid(row=0, column=5, sticky="w", padx=(0, 8), pady=(0, 8))
         self.trade_commodity = tk.StringVar()
         self.trade_commodity_combo = ttk.Combobox(row1_frame, textvariable=self.trade_commodity,
                                                  values=[], state="readonly", width=20)
-        self.trade_commodity_combo.pack(side="left")
+        self.trade_commodity_combo.grid(row=0, column=6, sticky="w", pady=(0, 8))
         self.trade_commodity_combo.bind("<Return>", lambda e: self._search_trade_market())
         self.trade_commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_trade_preferences())
         self.trade_commodity_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
-        
+
         # Populate initial commodity list
         self._update_trade_commodity_list()
-        
-        # Row 2: All filters (same as mining tab)
-        row2_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
-        row2_frame.pack(fill="x", pady=(0, 10))
-        
+
+        # Row 2 (grid row 1): All filters (same layout as mining tab)
+        row2_frame = filter_grid
+
         # Station type
         station_type_map = get_station_types()
         self._trade_station_type_order = ['All', 'Orbital', 'Surface', 'Fleet Carrier', 'Megaship', 'Stronghold']
@@ -17595,16 +17682,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._trade_age_rev_map = {v: k for k, v in self._trade_age_map.items()}
         
         station_label = ttk.Label(row2_frame, text=t('marketplace.station'), width=12)
-        station_label.pack(side="left", padx=(0, 5))
+        station_label.grid(row=1, column=0, sticky="w", padx=(0, 5), pady=(0, 8))
         saved_station = cfg.get('trade_station_type', 'All')
         self.trade_station_type = tk.StringVar(value=self._trade_station_type_map.get(saved_station, saved_station))
         station_combo = ttk.Combobox(row2_frame, textvariable=self.trade_station_type,
                                 values=[self._trade_station_type_map[k] for k in self._trade_station_type_order],
                                 state="readonly", width=12)
-        station_combo.pack(side="left", padx=(0, 15))
+        station_combo.grid(row=1, column=1, sticky="w", pady=(0, 8))
         station_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(station_combo, t('tooltips.station_type_filter'))
-        
+
         def on_trade_station_type_change(*args):
             selected = self.trade_station_type.get()
             english_val = self._trade_station_type_rev_map.get(selected, selected)
@@ -17612,70 +17699,67 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.trade_exclude_carriers.set(False)
             self._save_trade_preferences()
         self.trade_station_type.trace_add("write", on_trade_station_type_change)
-        
+
+        # Checkboxes share grid column 2 in their own packed sub-frame
+        row2_checks_frame = tk.Frame(row2_frame, bg=_trade_cb_bg)
+        row2_checks_frame.grid(row=1, column=2, sticky="w", padx=(15, 25), pady=(0, 8))
+
         self.trade_exclude_carriers = tk.BooleanVar(value=cfg.get('trade_exclude_carriers', True))
-        exclude_cb = tk.Checkbutton(row2_frame, text=t('marketplace.exclude_carriers'), variable=self.trade_exclude_carriers,
+        exclude_cb = tk.Checkbutton(row2_checks_frame, text=t('marketplace.exclude_carriers'), variable=self.trade_exclude_carriers,
                       command=self._save_trade_preferences,
                       bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         exclude_cb.pack(side="left", padx=(0, 10))
         ToolTip(exclude_cb, t('tooltips.exclude_carriers'))
-        
+
         self.trade_large_pad_only = tk.BooleanVar(value=cfg.get('trade_large_pad_only', False))
-        large_pad_cb = tk.Checkbutton(row2_frame, text=t('marketplace.large_pads'), variable=self.trade_large_pad_only,
+        large_pad_cb = tk.Checkbutton(row2_checks_frame, text=t('marketplace.large_pads'), variable=self.trade_large_pad_only,
                       command=self._save_trade_preferences,
                       bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
-                      highlightthickness=0, bd=0, relief="flat", font=("Segoe UI", 9))
-        large_pad_cb.pack(side="left", padx=(0, 11))
+                      highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
+        large_pad_cb.pack(side="left")
         ToolTip(large_pad_cb, t('tooltips.large_pads'))
-        
-        # Sort by
-        ttk.Label(row2_frame, text=t('marketplace.sort_by')).pack(side="left", padx=(0, 8))  # Aligned with Commodity above
+
+        # Sort by aligned under Category (grid column 3/4)
+        ttk.Label(row2_frame, text=t('marketplace.sort_by')).grid(row=1, column=3, sticky="w", padx=(0, 8), pady=(0, 8))
         saved_sort = cfg.get('trade_order_by', 'Distance')
         initial_sort_order = ['Best price (highest)', 'Distance', 'Best demand', 'Last update']
         self.trade_order_by = tk.StringVar(value=self._trade_sort_options_map.get(saved_sort, saved_sort))
         self.trade_order_combo = ttk.Combobox(row2_frame, textvariable=self.trade_order_by,
                                      values=[self._trade_sort_options_map.get(k, k) for k in initial_sort_order],
                                      state="readonly", width=18)
-        self.trade_order_combo.pack(side="left", padx=(11, 0))
+        self.trade_order_combo.grid(row=1, column=4, sticky="w", pady=(0, 8))
         self.trade_order_combo.bind("<<ComboboxSelected>>", lambda e: self._save_trade_preferences())
         self.trade_order_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(self.trade_order_combo, t('tooltips.sort_by'))
-        
-        # Row 3: Search button and Max Age
-        row3_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
-        row3_frame.pack(fill="x")
-        
-        search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'), 
+
+        # Row 3 (grid row 2): Search button and Max Age (aligned under Station / Sort by)
+        row3_frame = filter_grid
+
+        search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'),
                               command=self._search_trade_market,
-                              bg="#2a4a2a", fg="#e0e0e0", 
+                              bg="#2a4a2a", fg="#e0e0e0",
                               activebackground="#3a5a3a", activeforeground="#ffffff",
                               relief="ridge", bd=1, padx=10, pady=4,
-                              font=("Segoe UI", 9, "bold"), cursor="hand2")
-        search_btn.pack(side="left")
-        
-        # Market API status indicator (pack FIRST on right side to claim far right position)
-        self.market_trade_status_label = tk.Label(row3_frame, text="⚫ Market API: checking...", 
-                                          font=("Segoe UI", 8), fg="#888888", bg=_trade_cb_bg)
-        self.market_trade_status_label.pack(side="right", padx=(0, 10))
-        ToolTip(self.market_trade_status_label, t('tooltips.market_api_trade_status'))
-        
-        # Max Age
+                              font=self._scaled_font(9, "bold"), cursor="hand2")
+        search_btn.grid(row=2, column=0, columnspan=3, sticky="w")
+
+        # Max Age aligned under Sort by (grid column 3/4)
         _max_age_fg = "#ff8c00" if _trade_cb_theme == "elite_orange" else "#e0e0e0"
         max_age_label = tk.Label(row3_frame, text=t('marketplace.max_age'), bg=_trade_cb_bg, fg=_max_age_fg)
-        max_age_label.pack(side="left", padx=(376, 0))
+        max_age_label.grid(row=2, column=3, sticky="w", padx=(0, 8))
         saved_age = cfg.get('trade_max_age', '8 hours')
         self.trade_max_age = tk.StringVar(value=self._trade_age_map.get(saved_age, saved_age))
         age_combo = ttk.Combobox(row3_frame, textvariable=self.trade_max_age,
                                 values=[self._trade_age_map[k] for k in self._trade_age_order],
                                 state="readonly", width=10)
-        age_combo.pack(side="left", padx=(12, 0))
+        age_combo.grid(row=2, column=4, sticky="w")
         age_combo.bind("<<ComboboxSelected>>", lambda e: self._save_trade_preferences())
         age_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         ToolTip(age_combo, t('tooltips.max_age'))
-        
+
         # Results section
         results_header = tk.Frame(main_container, bg=_trade_cb_bg)
         results_header.pack(fill="x", pady=(10, 0))
@@ -17683,23 +17767,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         _results_fg = "#ff8c00" if _trade_cb_theme == "elite_orange" else "#ffffff"
         tk.Label(results_header, text=t('marketplace.search_results'), 
                 bg=_trade_cb_bg, fg=_results_fg, 
-                font=("Segoe UI", 10, "bold")).pack(side="left")
+                font=self._scaled_font(10, "bold")).pack(side="left")
         
         tk.Label(results_header, text="  •  " + t('marketplace.right_click_options'),
                 bg=_trade_cb_bg, fg="#888888",
-                font=("Segoe UI", 8)).pack(side="left")
+                font=self._scaled_font(8)).pack(side="left")
 
         tk.Label(results_header, text="  •  " + t('marketplace.fc_docking_note'),
                 bg=_trade_cb_bg, fg="#888888",
-                font=("Segoe UI", 8)).pack(side="left")
+                font=self._scaled_font(8)).pack(side="left")
         
         # Average price label (right side, before total count)
         _avg_fg = "#ffd700"  # gold — visible on both dark and orange themes
         self.trade_avg_label = tk.Label(results_header, text="",
-                                        bg=_trade_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
+                                        bg=_trade_cb_bg, fg=_avg_fg, font=self._scaled_font(8, "bold"))
         self.trade_avg_label.pack(side="right", padx=(0, 10))
         self.trade_best_label = tk.Label(results_header, text="",
-                                         bg=_trade_cb_bg, fg=_avg_fg, font=("Segoe UI", 8, "bold"))
+                                         bg=_trade_cb_bg, fg=_avg_fg, font=self._scaled_font(8, "bold"))
         self.trade_best_label.pack(side="right", padx=(0, 10))
 
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
@@ -17799,7 +17883,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             bg="#4a3a2a", fg="#e0e0e0",
             activebackground="#5a4a3a", activeforeground="#ffffff",
             relief="ridge", bd=1, padx=8, pady=4,
-            font=("Segoe UI", 8, "normal"), cursor="hand2"
+            font=self._scaled_font(8, "normal"), cursor="hand2"
         )
         self.sysfinder_use_current_btn.pack(side="left", padx=(5, 0))
         
@@ -17810,14 +17894,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             bg="#2a4a2a", fg="#e0e0e0",
             activebackground="#3a5a3a", activeforeground="#ffffff",
             relief="ridge", bd=1, padx=15, pady=4,
-            font=("Segoe UI", 8, "normal"), cursor="hand2"
+            font=self._scaled_font(8, "normal"), cursor="hand2"
         )
         self.sysfinder_search_btn.pack(side="left", padx=(10, 0))
 
         # Spansh status indicator - to the right of Search button
         self.sysfinder_spansh_status_label = tk.Label(
             ref_frame, text="⚫ Spansh: checking...",
-            font=("Segoe UI", 8), fg="#888888",
+            font=self._scaled_font(8), fg="#888888",
             bg=ttk.Style().lookup('TFrame', 'background')
         )
         self.sysfinder_spansh_status_label.pack(side="right", padx=(0, 8))
@@ -17826,7 +17910,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # EDDN status indicator - to the left of Spansh
         self.sysfinder_eddn_status_label = tk.Label(
             ref_frame, text="⚫ EDDN: checking...",
-            font=("Segoe UI", 8), fg="#888888",
+            font=self._scaled_font(8), fg="#888888",
             bg=ttk.Style().lookup('TFrame', 'background')
         )
         self.sysfinder_eddn_status_label.pack(side="right", padx=(0, 4))
@@ -17935,8 +18019,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Reference system info - using multiple labels for white/yellow styling
         # Labels in white, values in yellow (like CMDR status line)
-        font_label = ("Segoe UI", 9)
-        font_value = ("Segoe UI", 9, "bold")
+        font_label = self._scaled_font(9)
+        font_value = self._scaled_font(9, "bold")
         
         # Row 0: My Power config (compact, above system info)
         from config import load_player_power
@@ -18040,7 +18124,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             bg="#2a4a2a", fg="#e0e0e0",
             activebackground="#3a5a3a", activeforeground="#ffffff",
             relief="ridge", bd=1, padx=15, pady=4,
-            font=("Segoe UI", 8, "normal"), cursor="hand2"
+            font=self._scaled_font(8, "normal"), cursor="hand2"
         )
         self.sysfinder_trader_btn.pack(side="left", padx=(10, 0))
 
@@ -18075,8 +18159,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         title_row = ttk.Frame(results_frame)
         ttk.Label(title_row, text="Systems", style="TLabelframe.Label").pack(side="left")
         ttk.Label(title_row, text=t('ring_finder.right_click_help'),
-                 font=("Segoe UI", 8), foreground="#666666").pack(side="left", padx=(10, 0))
-        self.sysfinder_status_label = ttk.Label(title_row, text="", font=("Segoe UI", 8))
+                 font=self._scaled_font(8), foreground="#666666").pack(side="left", padx=(10, 0))
+        self.sysfinder_status_label = ttk.Label(title_row, text="", font=self._scaled_font(8))
         self.sysfinder_status_label.pack(side="left", padx=(10, 0))
         results_frame.configure(labelwidget=title_row)
         
@@ -18130,15 +18214,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
             selection_fg = "#ffffff"
         
         style.configure("SystemFinder.Treeview",
-                       rowheight=25,
+                       rowheight=self._scaled_px(25),
                        background=tree_bg,
                        foreground=tree_fg,
                        fieldbackground=tree_bg,
-                       font=("Segoe UI", 9))
+                       font=self._scaled_font(9))
         style.configure("SystemFinder.Treeview.Heading",
                        background=header_bg,
                        foreground=tree_fg,
-                       font=("Segoe UI", 9, "bold"))
+                       font=self._scaled_font(9, "bold"))
         style.map("SystemFinder.Treeview",
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
@@ -18166,20 +18250,33 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     command=lambda: self._sort_sysfinder_column("powerplay", False))
 
         # Column widths
-        self.sysfinder_tree.column("system", width=150, minwidth=100)
-        self.sysfinder_tree.column("distance", width=70, minwidth=50, anchor="center")
-        self.sysfinder_tree.column("security", width=80, minwidth=60, anchor="center")
-        self.sysfinder_tree.column("allegiance", width=90, minwidth=70, anchor="center")
-        self.sysfinder_tree.column("state", width=90, minwidth=70, anchor="center")
-        self.sysfinder_tree.column("population", width=100, minwidth=70, anchor="center")
-        self.sysfinder_tree.column("economy", width=120, minwidth=80, anchor="center")
-        self.sysfinder_tree.column("powerplay", width=170, minwidth=100, anchor="center")
+        # minwidth is derived from the actual rendered header text width (at the
+        # scaled heading font) rather than a fixed guess, so headers can never be
+        # squeezed below what their own label needs, at any UI scale or language.
+        import tkinter.font as _tkfont
+        _heading_font = _tkfont.Font(font=self._scaled_font(9, "bold"))
+        _base_widths = {"system": 150, "distance": 70, "security": 80, "allegiance": 90,
+                        "state": 90, "population": 100, "economy": 120, "powerplay": 170}
+        _header_pad = self._scaled_px(24)  # header cell padding + sort-arrow space
+
+        def _min_for(col_name):
+            header_text = self.sysfinder_tree.heading(col_name, "text")
+            text_width = _heading_font.measure(header_text) + _header_pad
+            return max(text_width, self._scaled_px(50))
+
+        _minwidths = {col: _min_for(col) for col in _base_widths}
+
+        _anchors = {"system": "w", "distance": "center", "security": "center", "allegiance": "center",
+                    "state": "center", "population": "center", "economy": "center", "powerplay": "center"}
+        for col_name, base_width in _base_widths.items():
+            self.sysfinder_tree.column(col_name, width=max(self._scaled_px(base_width), _minwidths[col_name]),
+                                       minwidth=_minwidths[col_name], anchor=_anchors[col_name])
 
         # Setup column visibility for system finder
         self.setup_column_visibility(
             tree=self.sysfinder_tree,
             columns=columns,
-            default_widths={"system": 150, "distance": 70, "security": 80, "allegiance": 90, "state": 90, "population": 100, "economy": 120, "powerplay": 170},
+            default_widths={col: max(self._scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
             config_key='system_finder'
         )
         
@@ -19035,14 +19132,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Main treeview styling
         style.configure("Marketplace.Treeview",
-                       rowheight=25,
+                       rowheight=self._scaled_px(25),
                        borderwidth=1,
                        relief="solid",
                        bordercolor="#333333",
                        background=_mkt_bg,
                        foreground=_mkt_fg,
                        fieldbackground=_mkt_bg,
-                       font=("Segoe UI", 9))
+                       font=self._scaled_font(9))
         
         # Column header styling with borders
         style.configure("Marketplace.Treeview.Heading",
@@ -19052,7 +19149,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                        foreground=_mkt_fg,
                        padding=[5, 5],
                        anchor="w",
-                       font=("Segoe UI", 9, "bold"))  # Left-align all headers
+                       font=self._scaled_font(9, "bold"))  # Left-align all headers
         
         # Row selection styling
         style.map("Marketplace.Treeview",
@@ -19087,31 +19184,51 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Set column widths - Add extra padding to create visual separation
         # Using slightly increased widths and padding to create column spacing effect
-        self.marketplace_tree.column("location", width=255, minwidth=150, anchor="w", stretch=False)
-        self.marketplace_tree.column("type", width=95, minwidth=70, anchor="w", stretch=False)
-        self.marketplace_tree.column("pad", width=45, minwidth=40, anchor="w", stretch=False)
-        self.marketplace_tree.column("distance", width=70, minwidth=55, anchor="w", stretch=False)
-        self.marketplace_tree.column("ls", width=70, minwidth=50, anchor="w", stretch=False)
-        self.marketplace_tree.column("demand", width=75, minwidth=55, anchor="w", stretch=False)
-        self.marketplace_tree.column("price", width=125, minwidth=80, anchor="w", stretch=False)
-        self.marketplace_tree.column("updated", width=95, minwidth=70, anchor="w", stretch=True)
-        
+        # minwidth is derived from the actual rendered header text width (at the
+        # scaled heading font) rather than a fixed guess, so headers can never be
+        # squeezed below what their own label needs, at any UI scale or language.
+        # "demand" header text toggles between Demand/Supply at runtime, so measure
+        # both possible strings and take the larger one.
+        import tkinter.font as _tkfont
+        _heading_font = _tkfont.Font(font=self._scaled_font(9, "bold"))
+        _base_widths = {"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70,
+                        "demand": 75, "price": 125, "updated": 95}
+        _header_pad = self._scaled_px(24)  # header cell padding + sort-arrow space
+
+        def _min_for(col_name):
+            if col_name == "demand":
+                text_width = max(_heading_font.measure(t('marketplace.demand')),
+                                  _heading_font.measure(t('marketplace.supply')))
+            else:
+                header_text = self.marketplace_tree.heading(col_name, "text")
+                text_width = _heading_font.measure(header_text)
+            return max(text_width + _header_pad, self._scaled_px(50))
+
+        _minwidths = {col: _min_for(col) for col in _base_widths}
+
+        for col_name, base_width in _base_widths.items():
+            stretch = (col_name == "updated")
+            self.marketplace_tree.column(col_name, width=max(self._scaled_px(base_width), _minwidths[col_name]),
+                                         minwidth=_minwidths[col_name], anchor="w", stretch=stretch)
+
         # Setup column visibility for mining commodities
         self.setup_column_visibility(
             tree=self.marketplace_tree,
             columns=columns,
-            default_widths={"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70, "demand": 75, "price": 125, "updated": 95},
+            default_widths={col: max(self._scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
             config_key='mining_commodities'
         )
-        
-        # Load saved column widths from config
+
+        # Load saved column widths from config — but never let an old (pre-scale)
+        # saved width sit below the current scaled minwidth, or headers get squeezed.
         try:
             from config import load_commodity_market_column_widths
             saved_widths = load_commodity_market_column_widths()
             if saved_widths:
                 for col_name, width in saved_widths.items():
                     try:
-                        self.marketplace_tree.column(col_name, width=width)
+                        current_minwidth = self.marketplace_tree.column(col_name, "minwidth")
+                        self.marketplace_tree.column(col_name, width=max(width, current_minwidth))
                     except:
                         pass
         except Exception as e:
@@ -20287,31 +20404,51 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.trade_sort_reverse = False
         
         # Set column widths
-        self.trade_tree.column("location", width=255, minwidth=150, anchor="w", stretch=False)
-        self.trade_tree.column("type", width=95, minwidth=70, anchor="w", stretch=False)
-        self.trade_tree.column("pad", width=45, minwidth=40, anchor="w", stretch=False)
-        self.trade_tree.column("distance", width=70, minwidth=55, anchor="w", stretch=False)
-        self.trade_tree.column("ls", width=70, minwidth=50, anchor="w", stretch=False)
-        self.trade_tree.column("demand", width=75, minwidth=55, anchor="w", stretch=False)
-        self.trade_tree.column("price", width=125, minwidth=80, anchor="w", stretch=False)
-        self.trade_tree.column("updated", width=95, minwidth=70, anchor="w", stretch=True)
-        
+        # minwidth is derived from the actual rendered header text width (at the
+        # scaled heading font) rather than a fixed guess, so headers can never be
+        # squeezed below what their own label needs, at any UI scale or language.
+        # "demand" header text toggles between Demand/Supply at runtime, so measure
+        # both possible strings and take the larger one.
+        import tkinter.font as _tkfont
+        _heading_font = _tkfont.Font(font=self._scaled_font(9, "bold"))
+        _base_widths = {"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70,
+                        "demand": 75, "price": 125, "updated": 95}
+        _header_pad = self._scaled_px(24)  # header cell padding + sort-arrow space
+
+        def _min_for(col_name):
+            if col_name == "demand":
+                text_width = max(_heading_font.measure(t('marketplace.demand')),
+                                  _heading_font.measure(t('marketplace.supply')))
+            else:
+                header_text = self.trade_tree.heading(col_name, "text")
+                text_width = _heading_font.measure(header_text)
+            return max(text_width + _header_pad, self._scaled_px(50))
+
+        _minwidths = {col: _min_for(col) for col in _base_widths}
+
+        for col_name, base_width in _base_widths.items():
+            stretch = (col_name == "updated")
+            self.trade_tree.column(col_name, width=max(self._scaled_px(base_width), _minwidths[col_name]),
+                                   minwidth=_minwidths[col_name], anchor="w", stretch=stretch)
+
         # Setup column visibility for trade commodities
         self.setup_column_visibility(
             tree=self.trade_tree,
             columns=columns,
-            default_widths={"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70, "demand": 75, "price": 125, "updated": 95},
+            default_widths={col: max(self._scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
             config_key='trade_commodities'
         )
-        
-        # Load saved column widths from config
+
+        # Load saved column widths from config — but never let an old (pre-scale)
+        # saved width sit below the current scaled minwidth, or headers get squeezed.
         try:
             from config import load_trade_commodities_column_widths
             saved_widths = load_trade_commodities_column_widths()
             if saved_widths:
                 for col_name, width in saved_widths.items():
                     try:
-                        self.trade_tree.column(col_name, width=width)
+                        current_minwidth = self.trade_tree.column(col_name, "minwidth")
+                        self.trade_tree.column(col_name, width=max(width, current_minwidth))
                     except:
                         pass
         except Exception as e:
@@ -22051,7 +22188,7 @@ Your keybinds will need to be reconfigured manually."""
         title_label = tk.Label(
             progress_dialog,
             text="⏳ " + t(scanning_key),
-            font=("Segoe UI", 11, "bold"),
+            font=self._scaled_font(11, "bold"),
             bg=bg_color,
             fg=fg_color
         )
@@ -22061,7 +22198,7 @@ Your keybinds will need to be reconfigured manually."""
         subtitle_label = tk.Label(
             progress_dialog,
             text=t(patience_key),
-            font=("Segoe UI", 9, "italic"),
+            font=self._scaled_font(9, "italic"),
             bg=bg_color,
             fg=dim_color
         )
@@ -22094,7 +22231,7 @@ Your keybinds will need to be reconfigured manually."""
         status_label = tk.Label(
             progress_dialog,
             textvariable=status_var,
-            font=("Segoe UI", 9),
+            font=self._scaled_font(9),
             bg=bg_color,
             fg=dim_color
         )

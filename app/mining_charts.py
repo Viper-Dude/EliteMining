@@ -59,6 +59,7 @@ import csv
 import os
 from typing import Dict, List, Any, Optional
 from mining_statistics import SessionAnalytics
+from config import scaled_font
 
 # Localization
 try:
@@ -146,7 +147,7 @@ class MiningChartsPanel:
                             text=t('graphs.charts_not_available') + "\n"
                                  "Charts functionality is disabled in this build",
                             justify='center',
-                            font=('Segoe UI', 9))
+                            font=scaled_font(9))
             label.pack(expand=True)
             return
         

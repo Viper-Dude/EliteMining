@@ -9,6 +9,8 @@ from tkinter import ttk
 import logging
 from datetime import datetime, timezone
 
+from config import scaled_font
+
 log = logging.getLogger("EliteMining.FleetCarrierTab")
 
 try:
@@ -146,12 +148,12 @@ class FleetCarrierTab(tk.Frame):
         self._sv[key] = var
         return tk.Label(parent, textvariable=var,
                         bg=parent.cget("bg"), fg=fg or self.fg,
-                        font=font or ("Helvetica", 10), **kw)
+                        font=font or scaled_font(10, family="Helvetica"), **kw)
 
     def _section_header(self, parent, title_key, large=False, help_anchor=None):
         hdr = tk.Frame(parent, bg=self.hdr_bg)
         hdr.pack(fill="x", pady=(10, 2))
-        font = ("Helvetica", 13, "bold") if large else ("Helvetica", 10, "bold")
+        font = scaled_font(13, "bold", family="Helvetica") if large else scaled_font(10, "bold", family="Helvetica")
         tk.Label(hdr, text=f"  {t(title_key)}", bg=self.hdr_bg, fg=self.fg_bright,
                  font=font, anchor="w").pack(side="left", ipady=4)
         if help_anchor:
@@ -164,14 +166,14 @@ class FleetCarrierTab(tk.Frame):
         row = tk.Frame(parent, bg=self.sect_bg)
         row.pack(fill="x", padx=8, pady=1)
         tk.Label(row, text=t(label_key), bg=self.sect_bg, fg=self.fg_dim,
-                 font=("Helvetica", 9), width=22, anchor="w").pack(side="left")
+                 font=scaled_font(9, family="Helvetica"), width=22, anchor="w").pack(side="left")
         lbl = self._sv_label(row, sv_key, default, fg=value_fg or self.fg,
-                             font=("Helvetica", 9), anchor="w")
+                             font=scaled_font(9, family="Helvetica"), anchor="w")
         lbl.pack(side="left")
         if copyable:
             self._make_copyable(lbl, sv_key)
             tk.Label(row, text=t("fleet_carrier.copy_location_hint"), bg=self.sect_bg,
-                     fg=self.fg_dim, font=("Helvetica", 8, "italic"),
+                     fg=self.fg_dim, font=scaled_font(8, "italic", family="Helvetica"),
                      anchor="w").pack(side="left", padx=(12, 0))
 
     def _make_copyable(self, widget, sv_key):
@@ -242,7 +244,7 @@ class FleetCarrierTab(tk.Frame):
             help_frame,
             text=t("fleet_carrier.help_banner"),
             bg=self.hdr_bg, fg=self.fg_dim,
-            font=("Helvetica", 8), justify="left", anchor="w", wraplength=600
+            font=scaled_font(8, family="Helvetica"), justify="left", anchor="w", wraplength=600
         ).pack(fill="x", padx=10, ipady=4)
 
         self._build_status_section(sf)
@@ -254,13 +256,13 @@ class FleetCarrierTab(tk.Frame):
 
         self._no_data_lbl = tk.Label(
             sf, text=t("fleet_carrier.no_data"),
-            bg=self.bg, fg=self.fg_dim, font=("Helvetica", 11), justify="center"
+            bg=self.bg, fg=self.fg_dim, font=scaled_font(11, family="Helvetica"), justify="center"
         )
         self._no_data_lbl.pack(pady=40)
 
         self._hint_lbl = tk.Label(
             sf, text=t("fleet_carrier.stats_hint"),
-            bg=self.bg, fg=self.fg_dim, font=("Helvetica", 9), justify="center"
+            bg=self.bg, fg=self.fg_dim, font=scaled_font(9, family="Helvetica"), justify="center"
         )
         # shown only when location is known but stats not yet received
 
@@ -277,9 +279,9 @@ class FleetCarrierTab(tk.Frame):
         fuel_row = tk.Frame(sect, bg=self.sect_bg)
         fuel_row.pack(fill="x", padx=8, pady=1)
         tk.Label(fuel_row, text=t("fleet_carrier.label_fuel"), bg=self.sect_bg, fg=self.fg_dim,
-                 font=("Helvetica", 9), width=22, anchor="w").pack(side="left")
+                 font=scaled_font(9, family="Helvetica"), width=22, anchor="w").pack(side="left")
         self._fuel_text_lbl = tk.Label(fuel_row, text="-", bg=self.sect_bg,
-                                       fg=self.fg, font=("Helvetica", 9), anchor="w")
+                                       fg=self.fg, font=scaled_font(9, family="Helvetica"), anchor="w")
         self._fuel_text_lbl.pack(side="left")
 
     def _build_jump_section(self, parent):
@@ -302,17 +304,17 @@ class FleetCarrierTab(tk.Frame):
         res_row = tk.Frame(sect, bg=self.sect_bg)
         res_row.pack(fill="x", padx=8, pady=1)
         tk.Label(res_row, text=t("fleet_carrier.label_reserve_pct"), bg=self.sect_bg,
-                 fg=self.fg_dim, font=("Helvetica", 9), width=22, anchor="w").pack(side="left")
+                 fg=self.fg_dim, font=scaled_font(9, family="Helvetica"), width=22, anchor="w").pack(side="left")
         self._reserve_pct_lbl = tk.Label(res_row, text="-", bg=self.sect_bg,
-                                          fg=self.fg, font=("Helvetica", 9), anchor="w")
+                                          fg=self.fg, font=scaled_font(9, family="Helvetica"), anchor="w")
         self._reserve_pct_lbl.pack(side="left")
 
         tax_row = tk.Frame(sect, bg=self.sect_bg)
         tax_row.pack(fill="x", padx=8, pady=1)
         tk.Label(tax_row, text=t("fleet_carrier.label_tax_rates"), bg=self.sect_bg,
-                 fg=self.fg_dim, font=("Helvetica", 9), width=22, anchor="w").pack(side="left")
+                 fg=self.fg_dim, font=scaled_font(9, family="Helvetica"), width=22, anchor="w").pack(side="left")
         self._tax_lbl = tk.Label(tax_row, text="-", bg=self.sect_bg,
-                                  fg=self.fg, font=("Helvetica", 9), anchor="w")
+                                  fg=self.fg, font=scaled_font(9, family="Helvetica"), anchor="w")
         self._tax_lbl.pack(side="left")
 
     def _build_services_section(self, parent):
@@ -323,7 +325,7 @@ class FleetCarrierTab(tk.Frame):
         # Help text explaining active/inactive colors
         tk.Label(sect, text=t("fleet_carrier.services_help"),
                  bg=self.sect_bg, fg=self.fg_dim,
-                 font=("Helvetica", 8), anchor="w").pack(fill="x", padx=8, pady=(4, 0))
+                 font=scaled_font(8, family="Helvetica"), anchor="w").pack(fill="x", padx=8, pady=(4, 0))
 
         self._service_labels = {}
         grid = tk.Frame(sect, bg=self.sect_bg)
@@ -337,10 +339,10 @@ class FleetCarrierTab(tk.Frame):
             cell = tk.Frame(grid, bg=self.sect_bg)
             cell.grid(row=row_idx, column=col, sticky="w", padx=(0, 4), pady=2)
             dot = tk.Label(cell, text="\u25cf", fg=self.fg_dim, bg=self.sect_bg,
-                           font=("Helvetica", 8))
+                           font=scaled_font(8, family="Helvetica"))
             dot.pack(side="left")
             name_lbl = tk.Label(cell, text=t(f"fleet_carrier.{loc_key}"),
-                                fg=self.fg_dim, bg=self.sect_bg, font=("Helvetica", 9))
+                                fg=self.fg_dim, bg=self.sect_bg, font=scaled_font(9, family="Helvetica"))
             name_lbl.pack(side="left", padx=(5, 0))
             self._service_labels[role] = (dot, name_lbl, col)
 
@@ -479,7 +481,7 @@ class FleetCarrierTab(tk.Frame):
         if not history:
             lbl = tk.Label(self._history_frame,
                            text=f"  {t('fleet_carrier.no_jumps')}",
-                           bg=self.sect_bg, fg=self.fg_dim, font=("Helvetica", 9), anchor="w")
+                           bg=self.sect_bg, fg=self.fg_dim, font=scaled_font(9, family="Helvetica"), anchor="w")
             lbl.pack(fill="x", padx=8, pady=2)
             self._history_rows.append(lbl)
         else:
@@ -490,11 +492,11 @@ class FleetCarrierTab(tk.Frame):
                 if entry.get("exact", True) is False and ts_text != "-":
                     ts_text = f"~{ts_text}"
                 tk.Label(row, text=ts_text,
-                         bg=self.sect_bg, fg=self.fg_dim, font=("Helvetica", 9),
+                         bg=self.sect_bg, fg=self.fg_dim, font=scaled_font(9, family="Helvetica"),
                          width=20, anchor="w").pack(side="left")
                 system_name = entry.get("system", "-")
                 sys_lbl = tk.Label(row, text=system_name,
-                         bg=self.sect_bg, fg=self.fg, font=("Helvetica", 9),
+                         bg=self.sect_bg, fg=self.fg, font=scaled_font(9, family="Helvetica"),
                          anchor="w")
                 sys_lbl.pack(side="left")
                 self._make_copyable_text(sys_lbl, system_name)

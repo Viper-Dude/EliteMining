@@ -10,6 +10,8 @@ import json
 import os
 from typing import Dict, List
 
+from config import scaled_font
+
 log = logging.getLogger("EliteMining.RingGuide")
 
 
@@ -109,7 +111,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             title_frame,
             text=t('ring_guide.title'),
-            font=("Segoe UI", 12, "bold"),
+            font=scaled_font(12, "bold"),
             bg=self.bg_color,
             fg=self.fg_bright
         ).pack(side="left")
@@ -118,7 +120,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             title_frame,
             text=t('ring_guide.subtitle'),
-            font=("Segoe UI", 9),
+            font=scaled_font(9),
             bg=self.bg_color,
             fg=self.fg_dim
         ).pack(side="left", padx=(10, 0))
@@ -185,7 +187,7 @@ class RingGuideTab(tk.Frame):
         expand_label = tk.Label(
             header,
             text="[-]" if res_expanded else "[+]",
-            font=("Segoe UI", 9),
+            font=scaled_font(9),
             bg=self.header_bg,
             fg=self.fg_color
         )
@@ -195,7 +197,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             header,
             text="⚔️ " + t('ring_guide.res_title'),
-            font=("Segoe UI", 11, "bold"),
+            font=scaled_font(11, "bold"),
             bg=self.header_bg,
             fg=self.fg_bright
         ).pack(side="left", pady=8)
@@ -203,7 +205,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             header,
             text=t('ring_guide.res_subtitle'),
-            font=("Segoe UI", 9),
+            font=scaled_font(9),
             bg=self.header_bg,
             fg=self.fg_dim
         ).pack(side="left", padx=(5, 0), pady=8)
@@ -234,7 +236,7 @@ class RingGuideTab(tk.Frame):
             tk.Label(
                 row,
                 text=f"• {res_type}:",
-                font=("Segoe UI", 9, "bold"),
+                font=scaled_font(9, "bold"),
                 bg=self.section_bg,
                 fg=color,
                 width=10,
@@ -244,7 +246,7 @@ class RingGuideTab(tk.Frame):
             tk.Label(
                 row,
                 text=pirates,
-                font=("Segoe UI", 9),
+                font=scaled_font(9),
                 bg=self.section_bg,
                 fg=self.fg_color,
                 anchor="w"
@@ -253,7 +255,7 @@ class RingGuideTab(tk.Frame):
             tk.Label(
                 row,
                 text=bonus + " " + t('ring_guide.res_mining'),
-                font=("Segoe UI", 9, "bold"),
+                font=scaled_font(9, "bold"),
                 bg=self.section_bg,
                 fg=self.high_value_color
             ).pack(side="right", padx=(5, 10), pady=1)
@@ -265,7 +267,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             tip_frame,
             text="💡 " + t('ring_guide.res_tip'),
-            font=("Segoe UI", 8, "italic"),
+            font=scaled_font(8, "italic"),
             bg=self.section_bg,
             fg=self.fg_dim,
             wraplength=260,
@@ -280,7 +282,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             security_header,
             text="🛡️ " + t('ring_guide.res_security_title'),
-            font=("Segoe UI", 9, "bold"),
+            font=scaled_font(9, "bold"),
             bg=self.section_bg,
             fg=self.fg_bright,
             anchor="w"
@@ -293,7 +295,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             security_info_frame,
             text=t('ring_guide.res_security_info'),
-            font=("Segoe UI", 8),
+            font=scaled_font(8),
             bg=self.section_bg,
             fg=self.fg_color,
             wraplength=260,
@@ -308,7 +310,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             security_levels_frame,
             text=t('ring_guide.res_security_levels'),
-            font=("Segoe UI", 8),
+            font=scaled_font(8),
             bg=self.section_bg,
             fg=self.fg_color,
             wraplength=260,
@@ -323,7 +325,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             security_tip_frame,
             text="💡 " + t('ring_guide.res_security_tip'),
-            font=("Segoe UI", 8, "italic"),
+            font=scaled_font(8, "italic"),
             bg=self.section_bg,
             fg=self.fg_dim,
             wraplength=260,
@@ -338,7 +340,7 @@ class RingGuideTab(tk.Frame):
         source_label = tk.Label(
             source_frame,
             text="📖 " + t('ring_guide.res_source'),
-            font=("Segoe UI", 7),
+            font=scaled_font(7),
             bg=self.section_bg,
             fg="#4da6ff",
             cursor="hand2",
@@ -379,7 +381,7 @@ class RingGuideTab(tk.Frame):
         expand_label = tk.Label(
             header,
             text="[-]" if self._expanded[ring_type] else "[+]",
-            font=("Segoe UI", 9),
+            font=scaled_font(9),
             bg=self.header_bg,
             fg=self.fg_color
         )
@@ -390,7 +392,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             header,
             text=f"{ring_type} Ring",
-            font=("Segoe UI", 11, "bold"),
+            font=scaled_font(11, "bold"),
             bg=self.header_bg,
             fg=self.fg_bright
         ).pack(side="left", pady=8)
@@ -401,7 +403,7 @@ class RingGuideTab(tk.Frame):
         tk.Label(
             header,
             text=f"({total_minerals} minerals)",
-            font=("Segoe UI", 9),
+            font=scaled_font(9),
             bg=self.header_bg,
             fg=self.fg_dim
         ).pack(side="left", padx=(10, 0), pady=8)
@@ -500,7 +502,7 @@ class RingGuideTab(tk.Frame):
             method_label = tk.Label(
                 row_frame,
                 text=f"{label}:",
-                font=("Segoe UI", 9, "bold"),
+                font=scaled_font(9, "bold"),
                 bg=self.section_bg,
                 fg=color,
                 width=14,
@@ -517,7 +519,7 @@ class RingGuideTab(tk.Frame):
             minerals_label = tk.Label(
                 row_frame,
                 text=minerals_text,
-                font=("Segoe UI", 9),
+                font=scaled_font(9),
                 bg=self.section_bg,
                 fg=self.fg_color if minerals else self.fg_dim,
                 anchor="w",

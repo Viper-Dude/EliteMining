@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import ttk
 import webbrowser
 
-from config import load_theme
+from config import load_theme, scaled_font
 from ui.theme import get_theme_colors
 
 REPO_URL = "https://github.com/Viper-Dude/EliteMining"
@@ -25,7 +25,7 @@ def create_help_link(parent, anchor: str, tooltip_text: str = "", tooltip_class=
     Caller is responsible for packing/gridding the returned widget.
     """
     theme = get_theme_colors(load_theme())
-    link = tk.Label(parent, text="?", font=("Segoe UI", 9, "bold"),
+    link = tk.Label(parent, text="?", font=scaled_font(9, "bold"),
                      bg=bg or theme["bg"], fg=fg or theme["tip_fg"], cursor="hand2")
     link.bind("<Button-1>", lambda e: webbrowser.open(f"{REPO_URL}#{anchor}"))
     if tooltip_class and tooltip_text:

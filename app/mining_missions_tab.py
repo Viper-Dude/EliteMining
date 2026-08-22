@@ -9,6 +9,8 @@ from typing import Optional, Callable, Dict
 import logging
 from datetime import datetime, timezone
 
+from config import scaled_font
+
 log = logging.getLogger("EliteMining.MissionsTab")
 
 
@@ -84,7 +86,7 @@ class MiningMissionsTab(tk.Frame):
         tk.Label(
             header_frame,
             text=t('mining_missions.title'),
-            font=("Segoe UI", 14, "bold"),
+            font=scaled_font(14, "bold"),
             bg=self.bg_color,
             fg=self.fg_bright
         ).pack(side="left")
@@ -104,7 +106,7 @@ class MiningMissionsTab(tk.Frame):
             text="",
             bg=self.bg_color,
             fg=self.fg_color,
-            font=("Segoe UI", 9),
+            font=scaled_font(9),
             pady=4
         )
         self.status_label.pack(side="left", padx=10)
@@ -339,7 +341,7 @@ class MiningMissionsTab(tk.Frame):
             text=t('mining_missions.no_missions'),
             bg=self.bg_color,
             fg=self.fg_dim,
-            font=("Segoe UI", 12)
+            font=scaled_font(12)
         ).pack()
         
         tk.Label(
@@ -347,7 +349,7 @@ class MiningMissionsTab(tk.Frame):
             text=t('mining_missions.no_missions_hint'),
             bg=self.bg_color,
             fg=self.fg_dim,
-            font=("Segoe UI", 10)
+            font=scaled_font(10)
         ).pack()
         
         # Tip about mission types
@@ -356,7 +358,7 @@ class MiningMissionsTab(tk.Frame):
             text=t('mining_missions.tip_detection'),
             bg=self.bg_color,
             fg=self.fg_dim,
-            font=("Segoe UI", 9, "italic")
+            font=scaled_font(9, "italic")
         ).pack(pady=(20, 0))
     
     def _get_cargo_items(self) -> Dict[str, int]:
@@ -433,7 +435,7 @@ class MiningMissionsTab(tk.Frame):
             text=commodity_text,
             bg=self.accent_bg,
             fg=self.complete_color if is_complete else self.fg_bright,
-            font=("Segoe UI", 9, "bold")
+            font=scaled_font(9, "bold")
         )
         commodity_label.pack(side="left")
         
@@ -444,7 +446,7 @@ class MiningMissionsTab(tk.Frame):
             command=lambda c=commodity, ds=destination_system: self._find_hotspot(c, ds),
             bg=self.btn_bg,
             fg=self.btn_fg,
-            font=("Segoe UI", 8),
+            font=scaled_font(8),
             relief="flat",
             cursor="hand2",
             padx=5,
@@ -471,7 +473,7 @@ class MiningMissionsTab(tk.Frame):
             text=f"Delivered: {delivered}/{count}t",
             bg=self.accent_bg,
             fg=self.delivered_fg,
-            font=("Segoe UI", 8)
+            font=scaled_font(8)
         )
         delivered_label.pack(side="left")
         
@@ -504,7 +506,7 @@ class MiningMissionsTab(tk.Frame):
                 text=dest_text,
                 bg=self.accent_bg,
                 fg="#4a9eff",
-                font=("Segoe UI", 8),
+                font=scaled_font(8),
                 cursor="hand2"
             )
             dest_label.pack(side="left")
@@ -519,7 +521,7 @@ class MiningMissionsTab(tk.Frame):
             text=time_text,
             bg=self.accent_bg,
             fg="#ff6666" if "Expired" in time_text else self.fg_dim,
-            font=("Segoe UI", 8)
+            font=scaled_font(8)
         ).pack(side="right")
         
         # Row 3: Reward info on separate line
@@ -538,7 +540,7 @@ class MiningMissionsTab(tk.Frame):
                 text=reward_text,
                 bg=self.accent_bg,
                 fg="#ffcc00",
-                font=("Segoe UI", 8, "bold")
+                font=scaled_font(8, "bold")
             ).pack(side="left")
         
         # Store widget references for in-place updates

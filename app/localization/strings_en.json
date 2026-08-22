@@ -849,6 +849,8 @@
     "dark_theme": "Dark Theme",
     "light_theme": "Light Theme",
     "orange_theme": "Orange Theme",
+    "ui_scale": "UI Scale",
+    "ui_scale_desc": "Scale up fonts and row heights across the app for better readability (requires restart)",
     "language": "Language",
     "auto_detect": "Auto-detect from game",
     "save_settings": "Save Settings",

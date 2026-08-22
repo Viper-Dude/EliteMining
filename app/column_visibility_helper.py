@@ -190,7 +190,8 @@ class ColumnVisibilityMixin:
             # Show column - restore saved width or default, and original stretch
             width_to_restore = saved_widths.get(column, default_widths[column])
             orig_stretch = tree_data.get('original_stretch', {}).get(column, False)
-            tree.column(column, width=width_to_restore, minwidth=50, stretch=orig_stretch)
+            from config import scaled_px
+            tree.column(column, width=width_to_restore, minwidth=scaled_px(50), stretch=orig_stretch)
         else:
             # Hide column - save current width first, then set to 0
             current_width = tree.column(column, "width")
@@ -216,7 +217,8 @@ class ColumnVisibilityMixin:
                 visible[col] = True
                 if tree.column(col, "width") == 0:
                     orig_stretch = tree_data.get('original_stretch', {}).get(col, False)
-                    tree.column(col, width=default_widths[col], minwidth=50, stretch=orig_stretch)
+                    from config import scaled_px
+                    tree.column(col, width=default_widths[col], minwidth=scaled_px(50), stretch=orig_stretch)
             self._cv_apply_displaycolumns(config_key)
             self._cv_save_visibility(config_key)
             return

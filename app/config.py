@@ -699,6 +699,26 @@ def save_theme(theme: str) -> None:
     cfg["theme"] = theme
     _save_cfg(cfg)
 
+def load_ui_scale() -> float:
+    """Load UI scale factor applied to fonts/row heights. Default is 1.0 (100%)."""
+    cfg = _load_cfg()
+    return cfg.get("ui_scale", 1.0)
+
+def save_ui_scale(scale: float) -> None:
+    """Save UI scale factor"""
+    cfg = _load_cfg()
+    cfg["ui_scale"] = scale
+    _save_cfg(cfg)
+
+def scaled_font(base_size: int, weight: str = "normal", family: str = "Segoe UI"):
+    """Return a font tuple scaled by the configured UI scale factor"""
+    size = round(base_size * load_ui_scale())
+    return (family, size) if weight == "normal" else (family, size, weight)
+
+def scaled_px(base_px: int) -> int:
+    """Return a pixel size (e.g. rowheight) scaled by the configured UI scale factor"""
+    return round(base_px * load_ui_scale())
+
 def load_sidebar_sash_position() -> Optional[int]:
     """Load saved sidebar sash position (Ship Presets / Cargo Monitor split)"""
     cfg = _load_cfg()

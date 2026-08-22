@@ -46,6 +46,7 @@ def center_window(child, parent):
 
 def centered_yesno_dialog(parent, title, message):
     """Show a Yes/No dialog centered over parent window. Returns True for Yes, False for No."""
+    from config import scaled_font
     dialog = tk.Toplevel(parent)
     dialog.withdraw()  # Prevent flicker while we layout and center
     try:
@@ -64,7 +65,7 @@ def centered_yesno_dialog(parent, title, message):
     frame = ttk.Frame(dialog, padding=20)
     frame.pack(fill="both", expand=True)
     
-    ttk.Label(frame, text=message, font=("Segoe UI", 10)).pack(pady=(0, 15))
+    ttk.Label(frame, text=message, font=scaled_font(10)).pack(pady=(0, 15))
     
     btn_frame = ttk.Frame(frame)
     btn_frame.pack()
@@ -132,8 +133,8 @@ def centered_yesno_dialog(parent, title, message):
 
 def centered_info_dialog(parent, title, message):
     """Show an Info dialog centered over parent window with theme-aware colors. Returns when OK pressed."""
-    from config import load_theme
-    
+    from config import load_theme, scaled_font
+
     # Get theme colors
     theme = load_theme()
     if theme == "elite_orange":
@@ -168,8 +169,8 @@ def centered_info_dialog(parent, title, message):
     # dialog.transient(parent)
     
     # Message label
-    label = tk.Label(dialog, text=message, padx=20, pady=20, 
-                    bg=bg_color, fg=fg_color, font=("Segoe UI", 10),
+    label = tk.Label(dialog, text=message, padx=20, pady=20,
+                    bg=bg_color, fg=fg_color, font=scaled_font(10),
                     justify="left", wraplength=500)
     label.pack()
     
@@ -181,7 +182,7 @@ def centered_info_dialog(parent, title, message):
         dialog.destroy()
     
     ok_btn = tk.Button(btn_frame, text=_t('common.ok'), width=10, command=on_ok,
-                      bg=btn_bg, fg=btn_fg, font=("Segoe UI", 10),
+                      bg=btn_bg, fg=btn_fg, font=scaled_font(10),
                       activebackground=btn_bg, activeforeground=btn_fg,
                       cursor="hand2", relief="flat", bd=0)
     ok_btn.pack()

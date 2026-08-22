@@ -9,6 +9,8 @@ from typing import Optional, Callable
 import logging
 from datetime import datetime, timezone
 
+from config import scaled_font
+
 log = logging.getLogger("EliteMining.MissionsPanel")
 
 
@@ -56,7 +58,7 @@ class MiningMissionsPanel(ttk.Frame):
             text="▼", 
             bg=self.header_bg, 
             fg=self.fg_color,
-            font=("Segoe UI", 9),
+            font=scaled_font(9),
             cursor="hand2"
         )
         self.toggle_btn.pack(side="left", padx=(5, 2))
@@ -67,7 +69,7 @@ class MiningMissionsPanel(ttk.Frame):
             text="📋 Mining Missions (0)",
             bg=self.header_bg,
             fg=self.fg_color,
-            font=("Segoe UI", 9, "bold"),
+            font=scaled_font(9, "bold"),
             cursor="hand2"
         )
         self.header_label.pack(side="left", padx=2)
@@ -83,7 +85,7 @@ class MiningMissionsPanel(ttk.Frame):
             text="No active mining missions",
             bg=self.bg_color,
             fg="#666666",
-            font=("Segoe UI", 8, "italic")
+            font=scaled_font(8, "italic")
         )
         self.no_missions_label.pack(pady=5)
         
@@ -175,7 +177,7 @@ class MiningMissionsPanel(ttk.Frame):
             text=f"⛏️ {commodity}{wing_indicator}:",
             bg=self.bg_color,
             fg=self.fg_color,
-            font=("Segoe UI", 9, "bold")
+            font=scaled_font(9, "bold")
         )
         commodity_label.pack(side="left")
         
@@ -187,7 +189,7 @@ class MiningMissionsPanel(ttk.Frame):
             text=progress_text,
             bg=self.bg_color,
             fg="#00ff00" if collected >= count else self.fg_color,
-            font=("Segoe UI", 9)
+            font=scaled_font(9)
         )
         progress_label.pack(side="left", padx=(5, 0))
         
@@ -199,7 +201,7 @@ class MiningMissionsPanel(ttk.Frame):
                 command=lambda c=commodity: self._on_find_hotspot_click(c),
                 bg="#333333",
                 fg="#ffffff",
-                font=("Segoe UI", 8),
+                font=scaled_font(8),
                 relief="flat",
                 cursor="hand2",
                 padx=3,
@@ -235,7 +237,7 @@ class MiningMissionsPanel(ttk.Frame):
                 text=location_text,
                 bg=self.bg_color,
                 fg="#4a9eff",
-                font=("Segoe UI", 8)
+                font=scaled_font(8)
             )
             location_label.pack(side="left")
         
@@ -250,7 +252,7 @@ class MiningMissionsPanel(ttk.Frame):
             text=time_text,
             bg=self.bg_color,
             fg="#888888",
-            font=("Segoe UI", 8)
+            font=scaled_font(8)
         )
         time_label.pack(side="left")
         
@@ -261,7 +263,7 @@ class MiningMissionsPanel(ttk.Frame):
             text=reward_text,
             bg=self.bg_color,
             fg="#ffcc00",
-            font=("Segoe UI", 8)
+            font=scaled_font(8)
         )
         reward_label.pack(side="right")
     

@@ -135,10 +135,11 @@ class ToolTip:
             return
             
         try:
+            from config import scaled_font
             widget_x = self.widget.winfo_rootx()
             widget_y = self.widget.winfo_rooty()
             widget_height = self.widget.winfo_height()
-            
+
             x = widget_x + 10
             y = widget_y + widget_height + 8
 
@@ -147,10 +148,10 @@ class ToolTip:
             tw.wm_geometry(f"+{x}+{y}")
             tw.wm_attributes("-topmost", True)
             tw.lift()
-            
+
             label = tk.Label(tw, text=self.text, justify=tk.LEFT,
                             background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                            font=("Segoe UI", "8"), wraplength=250,
+                            font=scaled_font(8), wraplength=250,
                             padx=4, pady=2)
             label.pack()
             tw.update()
@@ -365,6 +366,7 @@ class RingFinder(ColumnVisibilityMixin):
         
     def setup_ui(self):
         """Create hotspot finder UI following EliteMining patterns"""
+        from config import scaled_font, scaled_px
         # Configure parent frame to expand
         self.parent.grid_columnconfigure(0, weight=1)
         self.parent.grid_rowconfigure(0, weight=1)
@@ -397,9 +399,13 @@ class RingFinder(ColumnVisibilityMixin):
         # Search section with database status
         search_header = ttk.Frame(self.scrollable_frame)
         search_header.pack(fill="x", padx=10, pady=5)
+
+        from config import load_theme as _load_theme_for_header
+        _sh_theme = _load_theme_for_header()
+        _sh_bg = "#0a0a0a" if _sh_theme == "elite_orange" else "#1e1e1e"
         
         # Search frame title and help text
-        search_title = ttk.Label(search_header, text=t('ring_finder.title'), font=("Segoe UI", 9, "bold"))
+        search_title = ttk.Label(search_header, text=t('ring_finder.title'), font=scaled_font(9, "bold"))
         search_title.pack(side="left")
 
         # Help link - opens Hotspot Finder section of README on GitHub
@@ -409,9 +415,20 @@ class RingFinder(ColumnVisibilityMixin):
 
         # Database status on the right
         self.status_var = tk.StringVar(value="Loading...")
-        status_label = ttk.Label(search_header, textvariable=self.status_var, 
-                                font=("Segoe UI", 8), foreground="#888888")
+        status_label = ttk.Label(search_header, textvariable=self.status_var,
+                                font=scaled_font(8), foreground="#888888")
         status_label.pack(side="right")
+
+        # EDDN/Spansh connectivity status, right-aligned just left of the status label
+        self.spansh_status_label = tk.Label(search_header, text="⚫ Spansh: checking...",
+                                            font=scaled_font(8), fg="#888888", bg=_sh_bg)
+        self.spansh_status_label.pack(side="right", padx=(0, 15))
+        ToolTip(self.spansh_status_label, "Spansh API status - checks connectivity to spansh.co.uk")
+
+        self.eddn_status_label = tk.Label(search_header, text="⚫ EDDN: checking...",
+                                          font=scaled_font(8), fg="#888888", bg=_sh_bg)
+        self.eddn_status_label.pack(side="right", padx=(0, 10))
+        ToolTip(self.eddn_status_label, "EDDN status - live data feed for PowerPlay and market data")
         
         # Distance info (below title on separate line) - label in white, values in yellow
         distance_header = ttk.Frame(self.scrollable_frame)
@@ -423,19 +440,19 @@ class RingFinder(ColumnVisibilityMixin):
         rf_bg = "#0a0a0a" if rf_theme == "elite_orange" else "#1e1e1e"
         rf_value_fg = "#ffcc00"  # Yellow for values in both themes
         
-        ttk.Label(distance_header, text=t('ring_finder.distances'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 5))
+        ttk.Label(distance_header, text=t('ring_finder.distances'), font=scaled_font(9, "bold")).pack(side="left", padx=(0, 5))
         
         self.distance_info_var = tk.StringVar(value="➤ Sol: --- | Home: --- | Fleet Carrier: ---")
         distance_info_label = tk.Label(distance_header, textvariable=self.distance_info_var,
-                                font=("Segoe UI", 9), foreground=rf_value_fg, bg=rf_bg)
+                                font=scaled_font(9), foreground=rf_value_fg, bg=rf_bg)
         distance_info_label.pack(side="left")
         
         # Database info on same line, right-aligned
         self.db_info_var = tk.StringVar(value=t('ring_finder.total_hotspots_in_systems').format(hotspots="...", systems="..."))
         db_info_label = tk.Label(distance_header, textvariable=self.db_info_var,
-                                font=("Segoe UI", 8, "italic"), foreground="#888888", bg=rf_bg)
+                                font=scaled_font(8, "italic"), foreground="#888888", bg=rf_bg)
         db_info_label.pack(side="right")
-        
+
         search_frame = ttk.Frame(self.scrollable_frame)
         search_frame.pack(fill="x", padx=10, pady=0)
         
@@ -473,7 +490,7 @@ class RingFinder(ColumnVisibilityMixin):
                             bg="#4a3a2a", fg="#e0e0e0", 
                             activebackground="#5a4a3a", activeforeground="#ffffff",
                             relief="ridge", bd=1, padx=8, pady=4,
-                            font=("Segoe UI", 8, "normal"), cursor="hand2")
+                            font=scaled_font(8, "normal"), cursor="hand2")
         auto_btn.pack(side="left", padx=(0, 5))
         
         # Search button - with app color scheme
@@ -481,7 +498,7 @@ class RingFinder(ColumnVisibilityMixin):
                                    bg="#2a4a2a", fg="#e0e0e0", 
                                    activebackground="#3a5a3a", activeforeground="#ffffff",
                                    relief="ridge", bd=1, padx=15, pady=4,
-                                   font=("Segoe UI", 8, "normal"), cursor="hand2")
+                                   font=scaled_font(8, "normal"), cursor="hand2")
         self.search_btn.pack(side="left", padx=(0, 5))
 
         # Auto-search checkbox
@@ -507,7 +524,7 @@ class RingFinder(ColumnVisibilityMixin):
                                            bg=_cb_bg, fg="#e0e0e0", 
                                            activebackground="#2e2e2e", activeforeground="#ffffff",
                                            selectcolor=_cb_select, relief="flat",
-                                           font=("Segoe UI", 9))
+                                           font=scaled_font(9))
         self.auto_search_cb.pack(side="left")
         
         # Tooltip for auto-search
@@ -525,7 +542,7 @@ class RingFinder(ColumnVisibilityMixin):
                                            bg=_cb_bg, fg="#e0e0e0", 
                                            activebackground="#2e2e2e", activeforeground="#ffffff",
                                            selectcolor=_cb_select, relief="flat",
-                                           font=("Segoe UI", 9))
+                                           font=scaled_font(9))
         self.auto_switch_tabs_cb.pack(side="left", padx=(18, 0))
         
         # Tooltip for auto-switch tabs
@@ -569,7 +586,7 @@ class RingFinder(ColumnVisibilityMixin):
                                           bg=_cb_bg, fg="#e0e0e0",
                                           activebackground="#2e2e2e", activeforeground="#ffffff",
                                           selectcolor=_cb_select, relief="flat",
-                                          font=("Segoe UI", 9))
+                                          font=scaled_font(9))
         # self.any_ring_cb.grid(row=1, column=1, sticky="e", padx=(130, 0), pady=5)  # Hidden - feature disabled
         # ToolTip(self.any_ring_cb, t('ring_finder.any_ring_tooltip'))
         
@@ -594,35 +611,28 @@ class RingFinder(ColumnVisibilityMixin):
         search_frame.grid_rowconfigure(3, weight=0)  # Mineral
         search_frame.grid_rowconfigure(4, weight=0)  # PowerPlay + Unvisited/Data Source
 
-        # Single container at row=4 — two internal pack rows to stay within the canvas viewport
+        # Power/Power State sit in the same grid columns as Mineral above them
+        # (row=4, column=0/1) so alignment holds at any UI scale, instead of
+        # relying on a fixed pack() padx offset tuned for one font size.
         from system_finder_api import POWER_FILTER_OPTIONS, PP_STATE_OPTIONS
-        row3_container = tk.Frame(search_frame, bg=_cb_bg)
-        row3_container.grid(row=4, column=0, columnspan=7, sticky="ew", padx=5, pady=2)
 
-        # --- Inner row 1: PowerPlay filters + Reset + Spansh status ---
-        pp_inner_row = tk.Frame(row3_container, bg=_cb_bg)
-        pp_inner_row.pack(side="top", fill="x", pady=(0, 2))
-
-        # Status labels packed RIGHT first so they claim the far-right edge
-        self.spansh_status_label = tk.Label(pp_inner_row, text="⚫ Spansh: checking...",
-                                            font=("Segoe UI", 8), fg="#888888", bg=_cb_bg)
-        self.spansh_status_label.pack(side="right", padx=(10, 0))
-        ToolTip(self.spansh_status_label, "Spansh API status - checks connectivity to spansh.co.uk")
-
-        self.eddn_status_label = tk.Label(pp_inner_row, text="⚫ EDDN: checking...",
-                                          font=("Segoe UI", 8), fg="#888888", bg=_cb_bg)
-        self.eddn_status_label.pack(side="right", padx=(10, 0))
-        ToolTip(self.eddn_status_label, "EDDN status - live data feed for PowerPlay and market data")
-
-        ttk.Label(pp_inner_row, text=t('ring_finder.pp_power') + ":").pack(side="left", padx=(0, 5))
+        ttk.Label(search_frame, text=t('ring_finder.pp_power') + ":").grid(row=4, column=0, sticky="nw", padx=5, pady=5)
         self.pp_power_var = tk.StringVar(value='Any')
-        self.pp_power_combo = ttk.Combobox(pp_inner_row, textvariable=self.pp_power_var, values=POWER_FILTER_OPTIONS, width=22, state="readonly")
-        self.pp_power_combo.pack(side="left", padx=(85, 0))
+        self.pp_power_combo = ttk.Combobox(search_frame, textvariable=self.pp_power_var, values=POWER_FILTER_OPTIONS, width=22, state="readonly")
+        self.pp_power_combo.grid(row=4, column=1, sticky="nw", padx=5, pady=5)
         self.pp_power_combo.bind('<<ComboboxSelected>>', self._save_filter_settings)
         self.pp_power_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         ToolTip(self.pp_power_combo, t('ring_finder.pp_power_tooltip'))
 
-        ttk.Label(pp_inner_row, text=t('ring_finder.pp_state') + ":").pack(side="left", padx=(10, 0))
+        # Remaining controls for this row (Power State, Reset, status labels)
+        row3_container = tk.Frame(search_frame, bg=_cb_bg)
+        row3_container.grid(row=4, column=2, columnspan=5, sticky="new", padx=5, pady=2)
+
+        # --- Inner row 1: Power State + Reset ---
+        pp_inner_row = tk.Frame(row3_container, bg=_cb_bg)
+        pp_inner_row.pack(side="top", fill="x", pady=(0, 2))
+
+        ttk.Label(pp_inner_row, text=t('ring_finder.pp_state') + ":").pack(side="left", padx=(0, 5))
         self.pp_state_var = tk.StringVar(value='Any')
         self.pp_state_combo = ttk.Combobox(pp_inner_row, textvariable=self.pp_state_var, values=PP_STATE_OPTIONS, width=18, state="readonly")
         self.pp_state_combo.pack(side="left", padx=(5, 0))
@@ -637,13 +647,16 @@ class RingFinder(ColumnVisibilityMixin):
                              bg="#3a3a3a", fg=reset_btn_fg,
                              activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
                              relief="raised", bd=1, cursor="hand2",
-                             padx=15, pady=2, font=("Segoe UI", 8, "normal"))
+                             padx=15, pady=2, font=scaled_font(8, "normal"))
         reset_btn.pack(side="left", padx=(60, 0))
         ToolTip(reset_btn, t('ring_finder.reset_filters_tooltip'))
 
-        # --- Inner row 2: Unvisited Only + Data Source ---
-        misc_inner_row = tk.Frame(row3_container, bg=_cb_bg)
-        misc_inner_row.pack(side="top", fill="x", pady=(2, 0))
+        # --- Row 2: Unvisited Only + Favourites Only + Data Source ---
+        # Gridded directly in search_frame (not row3_container) so it starts
+        # flush at column 0, aligned under "Power:" instead of under Power State.
+        search_frame.grid_rowconfigure(5, weight=0)  # Unvisited/Favourites/Data Source
+        misc_inner_row = tk.Frame(search_frame, bg=_cb_bg)
+        misc_inner_row.grid(row=5, column=0, columnspan=7, sticky="ew", padx=5, pady=(2, 5))
 
         if _cb_theme == "elite_orange":
             unvisited_fg = "#FF8C00"
@@ -672,13 +685,13 @@ class RingFinder(ColumnVisibilityMixin):
         self.favourites_only_cb.pack(side="left", padx=(5, 30))
         ToolTip(self.favourites_only_cb, t('ring_finder.tooltip_favourites'))
 
-        # Create a sub-frame for right-side filters (row 1-2) that will pack tightly
+        # Max Distance stacks directly above Max Results (same column) like before
         right_filters_frame_row1 = ttk.Frame(search_frame)
         right_filters_frame_row1.grid(row=1, column=2, columnspan=2, sticky="w", padx=(10, 0))
-        
+
         right_filters_frame_row2 = ttk.Frame(search_frame)
         right_filters_frame_row2.grid(row=2, column=2, columnspan=2, sticky="w", padx=(10, 0))
-        
+
         # Distance filter (now a dropdown) - in sub-frame with fixed label width
         ttk.Label(right_filters_frame_row1, text=t('ring_finder.max_distance') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
         self.distance_var = tk.StringVar(value="50")
@@ -686,8 +699,8 @@ class RingFinder(ColumnVisibilityMixin):
         self.distance_combo['values'] = ("10", "50", "100", "150", "200")
         self.distance_combo.pack(side="left")
         self.distance_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
-        
-        # Overlaps Only checkbox - filters to show only overlap entries
+
+        # Overlaps/RES/Ring Search checkboxes sit to the right of Max Distance
         self.overlaps_only_var = tk.BooleanVar(value=False)
         self.overlaps_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.overlaps_only'),
                                                variable=self.overlaps_only_var,
@@ -695,13 +708,10 @@ class RingFinder(ColumnVisibilityMixin):
                                                bg=_cb_bg, fg="#e0e0e0",
                                                activebackground="#2e2e2e", activeforeground="#ffffff",
                                                selectcolor=_cb_select, relief="flat",
-                                               font=("Segoe UI", 9))
-        # Dynamic padding based on language (German text is shorter after abbreviation)
-        from localization import get_language
-        _overlaps_padx = (5, 0)  # Align with Auto-Search above
-        self.overlaps_only_cb.pack(side="left", padx=_overlaps_padx)
+                                               font=scaled_font(9))
+        self.overlaps_only_cb.pack(side="left", padx=(20, 0))
         ToolTip(self.overlaps_only_cb, t('ring_finder.tooltip_overlaps'))
-        
+
         # RES Only checkbox - filters to show only RES site entries
         self.res_only_var = tk.BooleanVar(value=False)
         self.res_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.res_only'),
@@ -710,11 +720,10 @@ class RingFinder(ColumnVisibilityMixin):
                                           bg=_cb_bg, fg="#e0e0e0",
                                           activebackground="#2e2e2e", activeforeground="#ffffff",
                                           selectcolor=_cb_select, relief="flat",
-                                          font=("Segoe UI", 9))
-        _res_padx = (8, 0)  # Match spacing of Auto-Switch Tabs above
-        self.res_only_cb.pack(side="left", padx=_res_padx)
+                                          font=scaled_font(9))
+        self.res_only_cb.pack(side="left", padx=(8, 0))
         ToolTip(self.res_only_cb, t('ring_finder.tooltip_res'))
-        
+
         # Ring Type Only checkbox - searches for ring types regardless of hotspot data (Spansh only)
         self.ring_type_only_var = tk.BooleanVar(value=False)
         self.ring_type_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.ring_search_spansh'),
@@ -723,7 +732,7 @@ class RingFinder(ColumnVisibilityMixin):
                                                  bg=_cb_bg, fg="#e0e0e0",
                                                  activebackground="#2e2e2e", activeforeground="#ffffff",
                                                  selectcolor=_cb_select, relief="flat",
-                                                 font=("Segoe UI", 9))
+                                                 font=scaled_font(9))
         self.ring_type_only_cb.pack(side="left", padx=(8, 0))
         ToolTip(self.ring_type_only_cb, t('ring_finder.ring_search_spansh_tooltip'))
         
@@ -756,7 +765,7 @@ class RingFinder(ColumnVisibilityMixin):
                                                  disabledbackground="#1e1e1e", disabledforeground="#666666",
                                                  relief="solid", bd=0, highlightthickness=1,
                                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                 font=("Segoe UI", 9))
+                                                 font=scaled_font(9))
         self.min_hotspots_spinbox.pack(side="left")
         # Add mouse wheel support
         def on_min_hotspots_scroll(event):
@@ -780,7 +789,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.specific_material_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         
         # Data Source selection — second inner row of row3_container
-        ttk.Label(misc_inner_row, text=t('ring_finder.data_source'), font=("Segoe UI", 9, "bold")).pack(side="left", padx=(160, 10))
+        ttk.Label(misc_inner_row, text=t('ring_finder.data_source'), font=scaled_font(9, "bold")).pack(side="left", padx=(160, 10))
 
         # Frame for radio buttons
         source_frame = tk.Frame(misc_inner_row, bg=_cb_bg)
@@ -791,7 +800,7 @@ class RingFinder(ColumnVisibilityMixin):
         # Radio button styling
         rb_style = {"bg": _cb_bg, "fg": "#e0e0e0", "activebackground": "#2e2e2e", 
                     "activeforeground": "#ffffff", "selectcolor": _cb_select, 
-                    "relief": "flat", "font": ("Segoe UI", 9)}
+                    "relief": "flat", "font": scaled_font(9)}
         
         # Database radio button - white for dark theme, orange for orange theme
         rb_style_db = rb_style.copy()
@@ -853,17 +862,17 @@ class RingFinder(ColumnVisibilityMixin):
         # Search limitations info text (bottom of search controls)
         info_text = tk.Label(search_frame, 
                             text=f"ℹ {t('ring_finder.search_help')}  |  {t('ring_finder.no_data_help')}",
-                            fg="#cccccc", bg=_cb_bg, font=("Segoe UI", 8, "italic"), 
+                            fg="#cccccc", bg=_cb_bg, font=scaled_font(8, "italic"),
                             justify="left")
-        info_text.grid(row=5, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
+        info_text.grid(row=6, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
         
         # Results section with help text in header
         results_header = ttk.Frame(self.scrollable_frame)
         results_header.pack(fill="x", padx=10, pady=(2, 0))
         
-        ttk.Label(results_header, text=t('ring_finder.search_results'), font=("Segoe UI", 9, "bold")).pack(side="left")
-        ttk.Label(results_header, text=t('ring_finder.right_click_help'), 
-                 font=("Segoe UI", 8), foreground="#666666").pack(side="left", padx=(10, 0))
+        ttk.Label(results_header, text=t('ring_finder.search_results'), font=scaled_font(9, "bold")).pack(side="left")
+        ttk.Label(results_header, text=t('ring_finder.right_click_help'),
+                 font=scaled_font(8), foreground="#666666").pack(side="left", padx=(10, 0))
         
         results_frame = ttk.Frame(self.scrollable_frame)
         results_frame.pack(fill="both", expand=True, padx=10, pady=(2, 2))
@@ -873,7 +882,7 @@ class RingFinder(ColumnVisibilityMixin):
         tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
         
         # Configure RingFinder Treeview style based on theme
-        from config import load_theme
+        from config import load_theme, scaled_px
         current_theme = load_theme()
         style = ttk.Style()
         
@@ -892,15 +901,15 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Main treeview styling
         style.configure("RingFinder.Treeview",
-                       rowheight=25,
+                       rowheight=scaled_px(25),
                        borderwidth=1,
                        relief="solid",
                        bordercolor="#333333",
                        background=tree_bg,
                        foreground=tree_fg,
                        fieldbackground=tree_bg,
-                       font=("Segoe UI", 9))
-        
+                       font=scaled_font(9))
+
         # Column header styling with borders
         style.configure("RingFinder.Treeview.Heading",
                        borderwidth=1,
@@ -909,7 +918,7 @@ class RingFinder(ColumnVisibilityMixin):
                        foreground=tree_fg,
                        padding=[5, 5],
                        anchor="w",
-                       font=("Segoe UI", 9, "bold"))
+                       font=scaled_font(9, "bold"))
         
         # Row selection styling
         style.map("RingFinder.Treeview",
@@ -998,10 +1007,10 @@ class RingFinder(ColumnVisibilityMixin):
             # Center-align Visits header, left-align all others
             header_anchor = "center" if col in ("Visits", "Favourite") else "w"
             self.results_tree.heading(col, text=display_name, anchor=header_anchor, command=lambda c=col: self._sort_column(c, False))
-            
+
             # Bind right-click on header to show column menu
             # Note: This binds to the entire tree, we'll check if click is on header in handler
-            
+
             # Configure columns - all left-aligned for consistency
             if col == "Distance":
                 self.results_tree.column(col, width=column_widths[col], minwidth=50, anchor="w", stretch=False)
@@ -1040,8 +1049,30 @@ class RingFinder(ColumnVisibilityMixin):
                 # Spacer column — always last, gives every real column a draggable right border
                 self.results_tree.heading(col, text="", anchor="w")
                 self.results_tree.column(col, width=20, minwidth=20, anchor="w", stretch=True)
-        
-        # Load saved column widths FIRST so visibility (applied next) wins for hidden cols
+
+        # minwidth is derived from the actual rendered header text width (at the
+        # scaled heading font) rather than a fixed guess, so headers can never be
+        # squeezed below what their own label needs, at any UI scale or language.
+        import tkinter.font as _tkfont
+        _heading_font = _tkfont.Font(font=scaled_font(9, "bold"))
+        _base_widths = {col: w for col, w in self.column_default_widths.items()}
+        _header_pad = scaled_px(24)  # header cell padding + sort-arrow space
+
+        def _min_for(col_name):
+            header_text = self.results_tree.heading(col_name, "text")
+            text_width = _heading_font.measure(header_text) + _header_pad
+            return max(text_width, scaled_px(50))
+
+        _minwidths = {col: _min_for(col) for col in _base_widths}
+
+        for col_name, base_width in _base_widths.items():
+            anchor = self.results_tree.column(col_name, "anchor")
+            self.results_tree.column(col_name, width=max(scaled_px(base_width), _minwidths[col_name]),
+                                     minwidth=_minwidths[col_name], anchor=anchor, stretch=False)
+
+        # Load saved column widths FIRST so visibility (applied next) wins for hidden cols.
+        # Never let an old (pre-scale) saved width sit below the current scaled minwidth,
+        # or headers get squeezed.
         try:
             from config import load_ring_finder_column_widths
             saved_widths = load_ring_finder_column_widths()
@@ -1049,7 +1080,8 @@ class RingFinder(ColumnVisibilityMixin):
                 for col_name, width in saved_widths.items():
                     try:
                         if width > 0:
-                            self.results_tree.column(col_name, width=width)
+                            current_minwidth = self.results_tree.column(col_name, "minwidth")
+                            self.results_tree.column(col_name, width=max(width, current_minwidth))
                     except:
                         pass
         except Exception as e:
@@ -1060,7 +1092,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.setup_column_visibility(
             tree=self.results_tree,
             columns=visibility_columns,
-            default_widths=self.column_default_widths,
+            default_widths={col: max(scaled_px(w), _minwidths[col]) for col, w in self.column_default_widths.items()},
             config_key='ring_finder',
             use_displaycolumns=True
         )
@@ -1464,8 +1496,12 @@ class RingFinder(ColumnVisibilityMixin):
                 self._cv_set_excluded('ring_finder', 'PowerPlay', True)
             else:
                 if getattr(self, '_pp_hidden_for_spansh', False):
-                    restore_width = getattr(self, '_pp_spansh_hidden_width', 170)
-                    self.results_tree.column("PowerPlay", width=restore_width, minwidth=80, stretch=False)
+                    from config import scaled_font, scaled_px
+                    import tkinter.font as _tkfont
+                    _pp_header_text = self.results_tree.heading("PowerPlay", "text")
+                    _pp_minwidth = max(_tkfont.Font(font=scaled_font(9, "bold")).measure(_pp_header_text) + scaled_px(24), scaled_px(50))
+                    restore_width = getattr(self, '_pp_spansh_hidden_width', scaled_px(170))
+                    self.results_tree.column("PowerPlay", width=max(restore_width, _pp_minwidth), minwidth=_pp_minwidth, stretch=False)
                     self._pp_hidden_for_spansh = False
                 self._cv_set_excluded('ring_finder', 'PowerPlay', False)
 
@@ -6000,7 +6036,7 @@ class RingFinder(ColumnVisibilityMixin):
                 items_data.append(values)
         
         # Show progress dialog while saving
-        from config import load_theme
+        from config import load_theme, scaled_font
         from ui.dialogs import center_window
         _theme = load_theme()
         _bg = "#000000" if _theme == "elite_orange" else "#1e1e1e"
@@ -6022,7 +6058,7 @@ class RingFinder(ColumnVisibilityMixin):
         wait_frame = tk.Frame(wait_dialog, bg=_bg, padx=20, pady=15)
         wait_frame.pack(fill="both", expand=True)
         tk.Label(wait_frame, text=t('ring_finder.saving_please_wait'),
-                 bg=_bg, fg=_fg, font=("Segoe UI", 10)).pack(pady=(0, 12))
+                 bg=_bg, fg=_fg, font=scaled_font(10)).pack(pady=(0, 12))
         progress_bar = ttk.Progressbar(wait_frame, mode='indeterminate', length=260)
         progress_bar.pack(pady=(0, 5))
         progress_bar.start(12)
@@ -7069,6 +7105,7 @@ class RingFinder(ColumnVisibilityMixin):
     def _show_edit_hotspots_dialog(self):
         """Show dialog to edit hotspot counts and reserve level for a ring"""
         try:
+            from config import scaled_font
             selection = self.results_tree.selection()
             if not selection:
                 self.status_var.set(t('ring_finder.no_selection'))
@@ -7123,13 +7160,13 @@ class RingFinder(ColumnVisibilityMixin):
             frame.pack(fill="both", expand=True)
 
             # Header
-            ttk.Label(frame, text=t('context_menu.edit_hotspots_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 5))
-            ttk.Label(frame, text=f"{system_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=3, sticky="w")
-            ttk.Label(frame, text=f"{ring_name}", font=("Segoe UI", 9)).grid(row=2, column=0, columnspan=3, sticky="w", pady=(0, 10))
+            ttk.Label(frame, text=t('context_menu.edit_hotspots_for'), font=scaled_font(9, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name}", font=scaled_font(9)).grid(row=1, column=0, columnspan=3, sticky="w")
+            ttk.Label(frame, text=f"{ring_name}", font=scaled_font(9)).grid(row=2, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
             # Column headers
-            ttk.Label(frame, text=t('context_menu.material_header'), font=("Segoe UI", 9, "bold")).grid(row=3, column=0, sticky="w", padx=(0, 20))
-            ttk.Label(frame, text=t('context_menu.count_header'), font=("Segoe UI", 9, "bold")).grid(row=3, column=1, sticky="w")
+            ttk.Label(frame, text=t('context_menu.material_header'), font=scaled_font(9, "bold")).grid(row=3, column=0, sticky="w", padx=(0, 20))
+            ttk.Label(frame, text=t('context_menu.count_header'), font=scaled_font(9, "bold")).grid(row=3, column=1, sticky="w")
 
             # Create entry fields for each material
             entry_vars = {}
@@ -7150,7 +7187,7 @@ class RingFinder(ColumnVisibilityMixin):
             # Reserve level section
             reserve_row = row + 1
             ttk.Separator(frame, orient="horizontal").grid(row=reserve_row, column=0, columnspan=3, sticky="ew", pady=(12, 10))
-            ttk.Label(frame, text=t('context_menu.reserve_level'), font=("Segoe UI", 9, "bold")).grid(row=reserve_row + 1, column=0, sticky="w", pady=5, padx=(0, 10))
+            ttk.Label(frame, text=t('context_menu.reserve_level'), font=scaled_font(9, "bold")).grid(row=reserve_row + 1, column=0, sticky="w", pady=5, padx=(0, 10))
 
             reserve_var = tk.StringVar(value="None")
             reserve_frame = tk.Frame(frame, bg="#1e1e1e")
@@ -7278,7 +7315,7 @@ class RingFinder(ColumnVisibilityMixin):
                 pass
             
             # Theme colors
-            from config import load_theme
+            from config import load_theme, scaled_font
             theme = load_theme()
             if theme == "elite_orange":
                 bg_color = "#000000"
@@ -7290,31 +7327,31 @@ class RingFinder(ColumnVisibilityMixin):
                 fg_color = "#e0e0e0"
                 entry_bg = "#2b2b2b"
                 entry_fg = "#ffffff"
-            
+
             dialog.configure(bg=bg_color)
-            
+
             # Main frame
             frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=15)
             frame.pack(fill="both", expand=True)
-            
+
             # System name label
-            tk.Label(frame, text=t('context_menu.edit_visits_for'), 
-                    bg=bg_color, fg=fg_color, font=("Segoe UI", 9)).pack(anchor="w")
-            
-            tk.Label(frame, text=system_name, 
-                    bg=bg_color, fg=fg_color, font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 15))
-            
+            tk.Label(frame, text=t('context_menu.edit_visits_for'),
+                    bg=bg_color, fg=fg_color, font=scaled_font(9)).pack(anchor="w")
+
+            tk.Label(frame, text=system_name,
+                    bg=bg_color, fg=fg_color, font=scaled_font(11, "bold")).pack(anchor="w", pady=(0, 15))
+
             # Visit count entry
             count_frame = tk.Frame(frame, bg=bg_color)
             count_frame.pack(fill="x", pady=5)
-            
-            tk.Label(count_frame, text=t('context_menu.visit_count_label'), 
-                    bg=bg_color, fg=fg_color, font=("Segoe UI", 9)).pack(side="left")
-            
+
+            tk.Label(count_frame, text=t('context_menu.visit_count_label'),
+                    bg=bg_color, fg=fg_color, font=scaled_font(9)).pack(side="left")
+
             count_var = tk.StringVar(value=str(current_count))
             count_entry = tk.Entry(count_frame, textvariable=count_var, width=10,
                                   bg=entry_bg, fg=entry_fg, insertbackground=fg_color,
-                                  relief="solid", bd=1, font=("Segoe UI", 10))
+                                  relief="solid", bd=1, font=scaled_font(10))
             count_entry.pack(side="left", padx=(10, 0))
             count_entry.select_range(0, tk.END)
             
@@ -7343,15 +7380,15 @@ class RingFinder(ColumnVisibilityMixin):
             save_btn = tk.Button(btn_frame, text=t('dialogs.save'), command=save_and_close,
                                 bg="#2a5a2a", fg="#ffffff", 
                                 activebackground="#3a6a3a", activeforeground="#ffffff",
-                                relief="solid", bd=1, cursor="hand2", 
-                                pady=6, padx=15, font=("Segoe UI", 9))
+                                relief="solid", bd=1, cursor="hand2",
+                                pady=6, padx=15, font=scaled_font(9))
             save_btn.pack(side="right", padx=(8, 0))
-            
+
             cancel_btn = tk.Button(btn_frame, text=t('dialogs.cancel'), command=cancel,
-                                  bg="#5a2a2a", fg="#ffffff", 
+                                  bg="#5a2a2a", fg="#ffffff",
                                   activebackground="#6a3a3a", activeforeground="#ffffff",
-                                  relief="solid", bd=1, cursor="hand2", 
-                                  pady=6, padx=15, font=("Segoe UI", 9))
+                                  relief="solid", bd=1, cursor="hand2",
+                                  pady=6, padx=15, font=scaled_font(9))
             cancel_btn.pack(side="right")
             
             # Center dialog
@@ -7413,6 +7450,7 @@ class RingFinder(ColumnVisibilityMixin):
     def _show_comment_dialog(self):
         """Show dialog to add/edit a comment for the selected ring (applies to the whole ring, not per material)"""
         try:
+            from config import scaled_font
             selection = self.results_tree.selection()
             if not selection:
                 self.status_var.set("No ring selected")
@@ -7449,8 +7487,8 @@ class RingFinder(ColumnVisibilityMixin):
             frame = ttk.Frame(dialog, padding=15)
             frame.pack(fill="both", expand=True)
 
-            ttk.Label(frame, text=t('context_menu.edit_comment_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 5))
-            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=(0, 15))
+            ttk.Label(frame, text=t('context_menu.edit_comment_for'), font=scaled_font(9, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=scaled_font(9)).grid(row=1, column=0, sticky="w", pady=(0, 15))
 
             comment_text = tk.Text(frame, width=35, height=4, insertbackground="#ffffff")
             comment_text.grid(row=2, column=0, sticky="w", pady=5)
@@ -7478,14 +7516,14 @@ class RingFinder(ColumnVisibilityMixin):
                                 bg="#2a5a2a", fg="#ffffff",
                                 activebackground="#3a6a3a", activeforeground="#ffffff",
                                 relief="solid", bd=1, cursor="hand2",
-                                pady=6, padx=15, font=("Segoe UI", 9))
+                                pady=6, padx=15, font=scaled_font(9))
             save_btn.pack(side="left", padx=(0, 8))
 
             cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
                                   bg="#5a2a2a", fg="#ffffff",
                                   activebackground="#6a3a3a", activeforeground="#ffffff",
                                   relief="solid", bd=1, cursor="hand2",
-                                  pady=6, padx=15, font=("Segoe UI", 9))
+                                  pady=6, padx=15, font=scaled_font(9))
             cancel_btn.pack(side="left")
 
             comment_text.bind("<Escape>", lambda e: cancel())
@@ -7511,6 +7549,7 @@ class RingFinder(ColumnVisibilityMixin):
     def _show_overlap_dialog(self):
         """Show dialog to tag overlap for selected hotspot"""
         try:
+            from config import scaled_font
             selection = self.results_tree.selection()
             if not selection:
                 self.status_var.set("No ring selected")
@@ -7559,8 +7598,8 @@ class RingFinder(ColumnVisibilityMixin):
             frame.pack(fill="both", expand=True)
             
             # Header
-            ttk.Label(frame, text=t('context_menu.set_overlap_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
-            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
+            ttk.Label(frame, text=t('context_menu.set_overlap_for'), font=scaled_font(9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=scaled_font(9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
             
             # Material dropdown - use full names
             ttk.Label(frame, text=t('context_menu.mineral')).grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
@@ -7630,19 +7669,19 @@ class RingFinder(ColumnVisibilityMixin):
                 dialog.destroy()
             
             save_btn = tk.Button(button_frame, text=t('dialogs.save'), command=save,
-                                bg="#2a5a2a", fg="#ffffff", 
+                                bg="#2a5a2a", fg="#ffffff",
                                 activebackground="#3a6a3a", activeforeground="#ffffff",
-                                relief="solid", bd=1, cursor="hand2", 
-                                pady=6, padx=15, font=("Segoe UI", 9))
+                                relief="solid", bd=1, cursor="hand2",
+                                pady=6, padx=15, font=scaled_font(9))
             save_btn.pack(side="left", padx=(0, 8))
-            
+
             cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
-                                  bg="#5a2a2a", fg="#ffffff", 
+                                  bg="#5a2a2a", fg="#ffffff",
                                   activebackground="#6a3a3a", activeforeground="#ffffff",
-                                  relief="solid", bd=1, cursor="hand2", 
-                                  pady=6, padx=15, font=("Segoe UI", 9))
+                                  relief="solid", bd=1, cursor="hand2",
+                                  pady=6, padx=15, font=scaled_font(9))
             cancel_btn.pack(side="left")
-            
+
             # Center dialog
             dialog.update_idletasks()
             w = dialog.winfo_width()
@@ -7655,10 +7694,10 @@ class RingFinder(ColumnVisibilityMixin):
             x = px + (pw // 2) - (w // 2)
             y = py + (ph // 2) - (h // 2)
             dialog.geometry(f"+{x}+{y}")
-            
+
             dialog.grab_set()
             dialog.focus_set()
-            
+
         except Exception as e:
             print(f"Error showing overlap dialog: {e}")
             import traceback
@@ -7709,6 +7748,7 @@ class RingFinder(ColumnVisibilityMixin):
     def _show_res_dialog(self):
         """Show dialog to add RES site(s) for selected hotspot - supports multiple RES per material"""
         try:
+            from config import scaled_font
             selection = self.results_tree.selection()
             if not selection:
                 self.status_var.set("No ring selected")
@@ -7757,8 +7797,8 @@ class RingFinder(ColumnVisibilityMixin):
             frame.pack(fill="both", expand=True)
             
             # Header
-            ttk.Label(frame, text=t('context_menu.set_res_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
-            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
+            ttk.Label(frame, text=t('context_menu.set_res_for'), font=scaled_font(9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=scaled_font(9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
             
             # Material dropdown - use full names
             ttk.Label(frame, text=t('context_menu.mineral')).grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
@@ -7800,7 +7840,7 @@ class RingFinder(ColumnVisibilityMixin):
             tk.Checkbutton(res_frame, text="Low", variable=low_var, **cb_style).pack(side="left")
             
             # Helper label
-            ttk.Label(frame, text=t('context_menu.res_multi_hint'), font=("Segoe UI", 8, "italic"), 
+            ttk.Label(frame, text=t('context_menu.res_multi_hint'), font=scaled_font(8, "italic"),
                      foreground="#888888").grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 10))
             
             # Load current RES values when material changes
@@ -7866,19 +7906,19 @@ class RingFinder(ColumnVisibilityMixin):
                 dialog.destroy()
             
             save_btn = tk.Button(button_frame, text=t('dialogs.save'), command=save,
-                                bg="#2a5a2a", fg="#ffffff", 
+                                bg="#2a5a2a", fg="#ffffff",
                                 activebackground="#3a6a3a", activeforeground="#ffffff",
-                                relief="solid", bd=1, cursor="hand2", 
-                                pady=6, padx=15, font=("Segoe UI", 9))
+                                relief="solid", bd=1, cursor="hand2",
+                                pady=6, padx=15, font=scaled_font(9))
             save_btn.pack(side="left", padx=(0, 8))
-            
+
             cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
-                                  bg="#5a2a2a", fg="#ffffff", 
+                                  bg="#5a2a2a", fg="#ffffff",
                                   activebackground="#6a3a3a", activeforeground="#ffffff",
-                                  relief="solid", bd=1, cursor="hand2", 
-                                  pady=6, padx=15, font=("Segoe UI", 9))
+                                  relief="solid", bd=1, cursor="hand2",
+                                  pady=6, padx=15, font=scaled_font(9))
             cancel_btn.pack(side="left")
-            
+
             # Center dialog
             dialog.update_idletasks()
             w = dialog.winfo_width()
@@ -7933,6 +7973,7 @@ class RingFinder(ColumnVisibilityMixin):
     def _show_edit_ring_type_dialog(self):
         """Show dialog to set/correct ring type for selected ring"""
         try:
+            from config import scaled_font
             selection = self.results_tree.selection()
             if not selection:
                 self.status_var.set("No ring selected")
@@ -7970,8 +8011,8 @@ class RingFinder(ColumnVisibilityMixin):
             frame.pack(fill="both", expand=True)
 
             # Header
-            ttk.Label(frame, text=t('context_menu.set_ring_type_for'), font=("Segoe UI", 9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
-            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
+            ttk.Label(frame, text=t('context_menu.set_ring_type_for'), font=scaled_font(9, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+            ttk.Label(frame, text=f"{system_name} - {ring_name}", font=scaled_font(9)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 15))
 
             # Ring type selection
             ttk.Label(frame, text=t('context_menu.ring_type_label')).grid(row=2, column=0, sticky="w", pady=5, padx=(0, 10))
@@ -8032,14 +8073,14 @@ class RingFinder(ColumnVisibilityMixin):
                                 bg="#2a5a2a", fg="#ffffff",
                                 activebackground="#3a6a3a", activeforeground="#ffffff",
                                 relief="solid", bd=1, cursor="hand2",
-                                pady=6, padx=15, font=("Segoe UI", 9))
+                                pady=6, padx=15, font=scaled_font(9))
             save_btn.pack(side="left", padx=(0, 8))
 
             cancel_btn = tk.Button(button_frame, text=t('dialogs.cancel'), command=cancel,
                                   bg="#5a2a2a", fg="#ffffff",
                                   activebackground="#6a3a3a", activeforeground="#ffffff",
                                   relief="solid", bd=1, cursor="hand2",
-                                  pady=6, padx=15, font=("Segoe UI", 9))
+                                  pady=6, padx=15, font=scaled_font(9))
             cancel_btn.pack(side="left")
 
             # Center dialog
