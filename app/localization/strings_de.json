@@ -915,6 +915,7 @@
     "restart_required": "Neustart erforderlich",
     "restart_required_msg": "Diese Änderung erfordert einen Neustart.",
     "restart_message": "Bitte starten Sie EliteMining neu, um die Änderungen anzuwenden.",
+    "restart_close_prompt": "EliteMining wird jetzt geschlossen. Bitte starten Sie es erneut, um die Änderung zu übernehmen.",
     "restart_now_prompt": "Möchten Sie EliteMining jetzt neu starten?",
     "restart_now": "Jetzt neu starten",
     "restart_later": "Später",

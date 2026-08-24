@@ -117,9 +117,10 @@ class ColumnVisibilityMixin:
             select_color = "#4a4a4a"
         
         # Create menu
+        from config import scaled_font
         menu = tk.Menu(tree, tearoff=0, bg=menu_bg, fg=menu_fg,
                       activebackground=menu_active_bg, activeforeground=menu_active_fg,
-                      selectcolor=select_color)
+                      selectcolor=select_color, font=scaled_font(9))
         
         menu.add_command(label=t('ring_finder.column_visibility'), state="disabled")
         menu.add_separator()

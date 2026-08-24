@@ -5557,11 +5557,13 @@ class RingFinder(ColumnVisibilityMixin):
             menu_active_bg = MENU_COLORS["activebackground"]
             menu_active_fg = MENU_COLORS["activeforeground"]
         
+        from config import scaled_font
         self.context_menu = tk.Menu(self.parent, tearoff=0,
                                    bg=menu_bg, fg=menu_fg,
-                                   activebackground=menu_active_bg, 
+                                   activebackground=menu_active_bg,
                                    activeforeground=menu_active_fg,
-                                   selectcolor=menu_active_bg)
+                                   selectcolor=menu_active_bg,
+                                   font=scaled_font(9))
         # Navigate / Lookup
         self.context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_name)
         self.context_menu.add_command(label=t('context_menu.find_in_star_systems'), command=self._find_in_star_systems)
@@ -5662,12 +5664,14 @@ class RingFinder(ColumnVisibilityMixin):
                                     spansh_rows_with_hotspots += 1
 
                     if spansh_rows_with_hotspots > 0 or enable_update_reserve:
+                        from config import scaled_font
                         multi_menu = tk.Menu(self.parent, tearoff=0,
                                            bg=self.context_menu.cget('bg'),
                                            fg=self.context_menu.cget('fg'),
                                            activebackground=self.context_menu.cget('activebackground'),
                                            activeforeground=self.context_menu.cget('activeforeground'),
-                                           selectcolor=self.context_menu.cget('selectcolor'))
+                                           selectcolor=self.context_menu.cget('selectcolor'),
+                                           font=scaled_font(9))
 
                         if spansh_rows_with_hotspots > 0:
                             multi_menu.add_command(label=f"Save {spansh_rows_with_hotspots} Entries to Database",

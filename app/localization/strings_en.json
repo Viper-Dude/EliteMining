@@ -910,6 +910,7 @@
     "restart_required": "Restart Required",
     "restart_required_msg": "This change requires a restart to take effect.",
     "restart_message": "Please restart EliteMining to apply changes.",
+    "restart_close_prompt": "EliteMining will now close. Please start it again to apply the change.",
     "restart_now_prompt": "Would you like to restart EliteMining now?",
     "restart_now": "Restart Now",
     "restart_later": "Later",

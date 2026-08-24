@@ -715,7 +715,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.3.3 beta"
+APP_VERSION = "v5.3.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5682,6 +5682,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._splash_photo = None
             self._splash_status_var = None
         # Restore geometry and reveal main window
+        self._ui_scale_resize_ratio = 1.0
         self._restore_window_geometry()
         self.lift()
         # Now that the window has its real, restored position, it's safe to check
@@ -6427,9 +6428,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.cargo_text_overlay._session_hidden = True
                     if self.cargo_text_overlay.overlay_window:
                         self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
-                if hasattr(self, 'text_overlay') and self.text_overlay._is_showing:
+                if hasattr(self, 'text_overlay'):
                     self.text_overlay._session_hidden = True
-                    if self.text_overlay.overlay_window:
+                    if self.text_overlay._is_showing and self.text_overlay.overlay_window:
                         self.text_overlay.overlay_window.withdraw()
             else:
                 # Session is active (or setting disabled) — restore and keep overlays visible each cycle
@@ -7426,9 +7427,29 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.ann_mat_tree.heading("announce", text=t('settings.announce'))
                 self.ann_mat_tree.heading("material", text=t('settings.mineral'))
                 self.ann_mat_tree.heading("minpct", text=t('settings.minimal_pct'))
-                self.ann_mat_tree.column("announce", width=90, anchor="center", stretch=False)
-                self.ann_mat_tree.column("material", width=300, anchor="center", stretch=True)
-                self.ann_mat_tree.column("minpct", width=100, anchor="center", stretch=False)
+
+                # minwidth is derived from the actual rendered header text width (at the
+                # scaled heading font) rather than a fixed guess, so headers can never be
+                # squeezed below what their own label needs, at any UI scale or language.
+                import tkinter.font as _ann_tkfont
+                _ann_heading_font = _ann_tkfont.Font(font=self._scaled_font(9, "bold"))
+                _ann_header_pad = self._scaled_px(24)  # header cell padding + sort-arrow space
+
+                def _ann_min_for(col_name):
+                    header_text = self.ann_mat_tree.heading(col_name, "text")
+                    return _ann_heading_font.measure(header_text) + _ann_header_pad
+
+                _ann_minwidths = {
+                    "announce": _ann_min_for("announce"),
+                    "material": _ann_min_for("material"),
+                    "minpct": _ann_min_for("minpct"),
+                }
+                self.ann_mat_tree.column("announce", width=max(self._scaled_px(90), _ann_minwidths["announce"]),
+                                          minwidth=_ann_minwidths["announce"], anchor="center", stretch=False)
+                self.ann_mat_tree.column("material", width=max(self._scaled_px(300), _ann_minwidths["material"]),
+                                          minwidth=_ann_minwidths["material"], anchor="center", stretch=True)
+                self.ann_mat_tree.column("minpct", width=max(self._scaled_px(100), _ann_minwidths["minpct"]),
+                                          minwidth=_ann_minwidths["minpct"], anchor="center", stretch=False)
                 self.ann_mat_tree.grid(row=0, column=0, sticky="nsew")
                 
                 ann_scrollbar = ttk.Scrollbar(materials_frame, orient="vertical", command=self.ann_mat_tree.yview)
@@ -8242,7 +8263,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         tk.Label(scale_frame, text=t('settings.ui_scale') + ":", bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left", padx=(4, 10))
 
-        _ui_scale_options = {"100%": 1.0, "110%": 1.1, "120%": 1.2, "130%": 1.3, "150%": 1.5}
+        _ui_scale_options = {"100%": 1.0, "110%": 1.1, "120%": 1.2, "130%": 1.3, "150%": 1.5, "175%": 1.75}
         _ui_scale_reverse = {v: k for k, v in _ui_scale_options.items()}
         _current_ui_scale = load_ui_scale()
         _current_ui_scale_display = _ui_scale_reverse.get(_current_ui_scale, "100%")
@@ -8254,13 +8275,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         def _on_ui_scale_change(event=None):
             selected = self.ui_scale_var.get()
+            if selected == _current_ui_scale_display:
+                return
             save_ui_scale(_ui_scale_options.get(selected, 1.0))
 
             from app_utils import centered_askyesno
             if centered_askyesno(scrollable_frame.winfo_toplevel(),
                 t('settings.restart_required'),
                 t('settings.restart_required_msg') + "\n\n" + t('settings.restart_now_prompt')):
-                self._restart_app()
+                # Geometry was saved under the OLD scale; restart resizes to match the new one.
+                self._restart_app(geometry_ui_scale=_current_ui_scale)
 
         ui_scale_combo.bind('<<ComboboxSelected>>', _on_ui_scale_change)
         r += 1
@@ -8300,6 +8324,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Show current language as highlighted label (like Theme display)
         current_lang_display = lang_names.get(current_lang, 'English')
         # Try to load saved preference to show correct display
+        saved_lang = current_lang
         try:
             cfg = load_config_func()
             saved_lang = cfg.get('language', 'en')  # Default to English
@@ -8332,7 +8357,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         def _on_language_change(event=None):
             selected_name = self.language_var.get()
             selected_code = self._lang_name_to_code.get(selected_name, 'en')
-            
+            if selected_code == saved_lang:
+                return
+
             # Update display label
             self.lang_display_label.config(text=selected_name)
             
@@ -8346,8 +8373,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Show restart prompt with option to restart now
             from app_utils import centered_askyesno
-            if centered_askyesno(scrollable_frame.winfo_toplevel(), 
-                t('settings.restart_required'), 
+            if centered_askyesno(scrollable_frame.winfo_toplevel(),
+                t('settings.restart_required'),
                 t('settings.restart_required_msg') + "\n\n" + t('settings.restart_now_prompt')):
                 # User chose to restart now
                 self._restart_app()
@@ -9069,7 +9096,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Flag to prevent saving sash position until initial layout is complete
         self._sash_initialized = False
         self._sidebar_sash_initialized = False
-        
+        self._startup_resize_settled = False
+
         # Store sidebar reference for later sash setup
         self._sidebar_frame = sidebar
         
@@ -9087,22 +9115,34 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         return
                 
                 # Minimum widths
+                from config import load_ui_scale
+                _scale = load_ui_scale()
                 min_content_width = 600
                 min_sidebar_width = 200  # Reduced from 280 - allow narrower sidebar
-                
+                default_sidebar_width = round(300 * _scale)
+                max_sidebar_width = round(500 * _scale)
+
                 # Try to restore saved position first
                 from config import load_main_sash_position
                 saved_pos = load_main_sash_position()
-                
-                # Validate saved position ensures both areas have minimum width
+
+                # Saved position is an absolute pixel value laid out under the
+                # previous UI scale - rescale it to match a changed window size.
+                if saved_pos is not None and self._ui_scale_resize_ratio != 1.0:
+                    saved_pos = round(saved_pos * self._ui_scale_resize_ratio)
+
+                # Validate saved position ensures both areas have minimum width,
+                # and reject an oversized sidebar (e.g. stale value from a much
+                # wider/differently-scaled window) in favor of the sane default.
                 if (saved_pos is not None and
                     saved_pos >= min_content_width and
-                    saved_pos <= total_width - min_sidebar_width):
+                    saved_pos <= total_width - min_sidebar_width and
+                    total_width - saved_pos <= max_sidebar_width):
                     self.main_paned.sashpos(0, saved_pos)
                     log.info(f"Main sash position restored: {saved_pos}")
                 else:
-                    # Default: sidebar ~300px wide
-                    sash_pos = total_width - 300
+                    # Default: sidebar ~300px wide (scaled with the UI scale)
+                    sash_pos = total_width - default_sidebar_width
                     # Ensure minimums
                     sash_pos = max(sash_pos, min_content_width)
                     sash_pos = min(sash_pos, total_width - min_sidebar_width)
@@ -9141,7 +9181,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 # Try to restore saved sash position first
                 from config import load_sidebar_sash_position
                 saved_pos = load_sidebar_sash_position()
-                
+
+                # Saved position is an absolute pixel value laid out under the
+                # previous UI scale - rescale it to match a changed window size.
+                if saved_pos is not None and self._ui_scale_resize_ratio != 1.0:
+                    saved_pos = round(saved_pos * self._ui_scale_resize_ratio)
+
                 # Validate saved position ensures both panes have minimum height
                 if (saved_pos is not None and
                     saved_pos >= min_presets_height and
@@ -9158,6 +9203,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     log.info(f"Sidebar sash position using default: {sash_pos} (saved_pos={saved_pos})")
 
                 self._sidebar_sash_initialized = True
+                # From here on, treat further resizes as live user drags.
+                self.after(200, lambda: setattr(self, '_startup_resize_settled', True))
             except Exception as e:
                 log.exception(f"Error setting sidebar sash: {e}")
         
@@ -9177,6 +9224,58 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception:
                 log.exception("Failed to save main sash position")
         self.main_paned.bind("<ButtonRelease-1>", _on_main_sash_moved)
+
+        # Keep the sidebar pinned to the right during outer-window resize drags.
+        # ttk.PanedWindow stores the sash as an absolute pixel offset; while the
+        # OS window border is actively being dragged, Tk can transiently clamp
+        # that offset near 0 (sidebar appears to jump to the left) and never
+        # re-corrects itself once the drag ends. Recompute the sash from the
+        # current sidebar width shortly after each resize settles.
+        self._resize_sash_job = None
+
+        def _on_root_configure(event):
+            if event.widget is not self:
+                return
+            if not getattr(self, '_sash_initialized', False):
+                return
+            # Skip the brief window after startup/UI-scale-triggered resize where
+            # _set_initial_sash/_set_sidebar_sash already computed the correct
+            # scaled sash - this handler is only for live manual window drags.
+            if not getattr(self, '_startup_resize_settled', False):
+                return
+            if self._resize_sash_job is not None:
+                self.after_cancel(self._resize_sash_job)
+            self._resize_sash_job = self.after(150, _restore_sash_after_resize)
+
+        def _restore_sash_after_resize():
+            self._resize_sash_job = None
+            try:
+                if not self._sidebar_visible:
+                    return
+                total_width = self.main_paned.winfo_width()
+                if total_width < 400:
+                    return
+                min_content_width = 600
+                min_sidebar_width = 200
+                current_pos = self.main_paned.sashpos(0)
+                sidebar_width = total_width - current_pos
+                # Sash collapsed against the left edge - rebuild from last known sidebar width,
+                # scaled to the current UI scale (it was recorded under a possibly different one).
+                if current_pos < min_content_width:
+                    base_sidebar_width = getattr(self, '_last_sidebar_width', 300)
+                    sidebar_width = round(base_sidebar_width * self._ui_scale_resize_ratio)
+                    new_pos = total_width - sidebar_width
+                else:
+                    self._last_sidebar_width = sidebar_width
+                    return
+                new_pos = max(new_pos, min_content_width)
+                new_pos = min(new_pos, total_width - min_sidebar_width)
+                self.main_paned.sashpos(0, new_pos)
+                log.debug(f"Main sash restored after resize: {new_pos}")
+            except Exception:
+                log.exception("Failed to restore sash position after resize")
+
+        self.bind("<Configure>", _on_root_configure)
 
         # Create vertical paned window for split layout
         paned_window = ttk.PanedWindow(sidebar, orient="vertical")
@@ -9407,11 +9506,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if total_width > 400 and hasattr(self, 'main_paned'):
                 from config import load_main_sash_position
                 saved_pos = load_main_sash_position()
+                if saved_pos is not None and self._ui_scale_resize_ratio != 1.0:
+                    saved_pos = round(saved_pos * self._ui_scale_resize_ratio)
+                from config import load_ui_scale
                 min_content_width = 600
                 min_sidebar_width = 200
+                max_sidebar_width = round(500 * load_ui_scale())
                 if (saved_pos is not None and
                     saved_pos >= min_content_width and
-                    saved_pos <= total_width - min_sidebar_width):
+                    saved_pos <= total_width - min_sidebar_width and
+                    total_width - saved_pos <= max_sidebar_width):
                     self.main_paned.sashpos(0, saved_pos)
                     log.info(f"Main sash position re-applied: {saved_pos}")
                 self._sash_initialized = True
@@ -9423,6 +9527,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if total_height > 100:
                     from config import load_sidebar_sash_position
                     saved_pos = load_sidebar_sash_position()
+                    if saved_pos is not None and self._ui_scale_resize_ratio != 1.0:
+                        saved_pos = round(saved_pos * self._ui_scale_resize_ratio)
                     min_presets_height = 150
                     min_cargo_height = 120
                     if (saved_pos is not None and
@@ -14759,12 +14865,29 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 match = re.match(r'(\d+)x(\d+)\+(-?\d+)\+(-?\d+)', geom)
                 if match:
                     width, height, x, y = map(int, match.groups())
-                    
+
                     # Upgrade old default size to new default size
                     if width == OLD_DEFAULT_WIDTH and height == OLD_DEFAULT_HEIGHT:
                         print(f"[WINDOW] Upgrading old default size to new: {DEFAULT_WIDTH}x{DEFAULT_HEIGHT}")
                         width, height = DEFAULT_WIDTH, DEFAULT_HEIGHT
-                    
+
+                    # If UI scale changed since geometry was last saved, scale window size to match
+                    from config import load_ui_scale
+                    saved_scale = wcfg.get("ui_scale", 1.0)
+                    current_scale = load_ui_scale()
+                    if saved_scale and current_scale and saved_scale != current_scale:
+                        ratio = current_scale / saved_scale
+                        width = round(width * ratio)
+                        height = round(height * ratio)
+                        # Keep the window on-screen after scaling up
+                        screen_width = self.winfo_screenwidth()
+                        screen_height = self.winfo_screenheight()
+                        width = min(width, screen_width)
+                        height = min(height, screen_height)
+                        # Remember the ratio so saved sash positions (also stored
+                        # as absolute pixels) can be rescaled to match.
+                        self._ui_scale_resize_ratio = ratio
+
                     # For multi-monitor setups, allow negative and large positive coordinates
                     # Only reset if window is EXTREMELY far off-screen (likely corrupt data)
                     # Allow coordinates up to 10000 pixels in any direction for multi-monitor
@@ -15170,107 +15293,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _toggle_theme(self) -> None:
         """Toggle between Elite Orange and Dark Gray themes"""
         from config import save_theme
-        from app_utils import get_app_icon_path
-        import tkinter as tk
-        from tkinter import ttk
-        
-        # Remember old theme for cancel
-        old_theme = self.current_theme
-        
+        from app_utils import centered_askyesno
+
         # Toggle theme
         if self.current_theme == "elite_orange":
             new_theme = "dark_gray"
-            theme_name = t('dialogs.theme_dark_gray')
         else:
             new_theme = "elite_orange"
-            theme_name = t('dialogs.theme_elite_orange')
-        
-        # Save new theme
+
         save_theme(new_theme)
-        
-        # Create custom centered dialog
-        dialog = tk.Toplevel(self)
-        dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
-        dialog.title(t('dialogs.theme_changed'))
-        # dialog.transient(self)  # Disabled - causes focus issues
-        dialog.resizable(False, False)
-        
-        # Set app icon
-        try:
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                dialog.iconbitmap(icon_path)
-            elif icon_path:
-                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
-        except Exception:
-            pass
-        
-        # Dialog content
-        frame = ttk.Frame(dialog, padding=20)
-        frame.pack(fill="both", expand=True)
-        
-        # Show theme change message with OK button
-        ttk.Label(frame, text=f"{t('dialogs.theme_changed_to')} {theme_name}.", 
-                  font=self._scaled_font(10, "bold")).pack(pady=(0, 5))
-        ttk.Label(frame, text=t('settings.restart_message'),
-                  font=self._scaled_font(9)).pack(pady=(0, 15))
-        
-        # Button frame
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack()
-        
-        def on_ok():
-            dialog.destroy()
-        
-        def on_cancel():
-            # Revert theme change
-            save_theme(old_theme)
-            dialog.destroy()
-        
-        ok_btn = ttk.Button(btn_frame, text=t('common.ok'), command=on_ok, width=10)
-        ok_btn.pack(side="left", padx=(0, 10))
-        cancel_btn = ttk.Button(btn_frame, text=t('common.cancel'), command=on_cancel, width=10)
-        cancel_btn.pack(side="left")
-        ok_btn.focus_set()
-        dialog.bind("<Return>", lambda e: on_ok())
-        dialog.bind("<Escape>", lambda e: on_cancel())
-        
-        # Center dialog on main window
-        dialog.update_idletasks()
-        dialog_width = dialog.winfo_width()
-        dialog_height = dialog.winfo_height()
-        main_x = self.winfo_x()
-        main_y = self.winfo_y()
-        main_width = self.winfo_width()
-        main_height = self.winfo_height()
-        
-        x = main_x + (main_width - dialog_width) // 2
-        y = main_y + (main_height - dialog_height) // 2
-        dialog.geometry(f"+{x}+{y}")
-        dialog.deiconify()  # Show dialog after centering
-        
-        # Force dialog to stay on top and have focus
-        dialog.attributes('-topmost', True)
-        dialog.lift()
-        dialog.focus_force()
-        
-        try:
-            dialog.grab_set()  # Grab focus after showing
-        except:
-            pass
-        
-        # Keep dialog on top while open
-        def keep_on_top():
-            try:
-                if dialog.winfo_exists():
-                    dialog.lift()
-                    dialog.after(100, keep_on_top)
-            except:
-                pass
-        dialog.after(100, keep_on_top)
-        
-        dialog.wait_window()
-    
+
+        if centered_askyesno(self,
+            t('settings.restart_required'),
+            t('settings.restart_required_msg') + "\n\n" + t('settings.restart_now_prompt')):
+            self._restart_app()
+
     def _create_language_flags(self, parent_frame) -> None:
         """Create a single language flag button that shows dropdown on click"""
         from localization import get_language
@@ -15580,8 +15617,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.update_idletasks()  # Required to get accurate dimensions
             self._center_dialog_on_parent(dialog)
         """
-        # Force geometry update to get accurate dimensions
-        dialog.update()
+        # Force geometry update to get accurate dimensions (idletasks only —
+        # a full update() can let the WM briefly paint the withdrawn dialog
+        # at its default position before geometry is applied, causing a flash
+        # on multi-monitor setups)
+        dialog.update_idletasks()
         
         # Get main window position and size
         main_x = self.winfo_x()
@@ -15643,19 +15683,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             menu.grab_release()
     
     def _change_language(self, lang_code: str):
-        """Change language and prompt for restart with Cancel option"""
+        """Change language and prompt for restart"""
         from localization import get_language
-        from app_utils import get_app_icon_path
-        from config import load_theme
-        
+
         # Don't do anything if same language
         old_lang = get_language()
         if lang_code == old_lang:
             return
-        
-        # Save old flag image reference
-        old_image = self._flag_images.get(old_lang)
-        
+
         # Save to config
         try:
             cfg = _load_cfg()
@@ -15664,7 +15699,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"Error saving language setting: {e}")
             return
-        
+
         # Update the flag display with new image
         new_image = self._flag_images.get(lang_code)
         if new_image:
@@ -15672,118 +15707,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._current_lang_label.image = new_image
         else:
             self._current_lang_label.config(text=lang_code.upper())
-        
-        # Get theme colors
-        theme = load_theme()
-        if theme == "elite_orange":
-            bg_color = "#1e1e1e"
-            fg_color = "#ff9800"
-        else:
-            bg_color = "#1e1e1e"
-            fg_color = "#e6e6e6"
-        
-        # Create dialog with OK and Cancel
-        dialog = tk.Toplevel(self)
-        dialog.withdraw()
-        dialog.title(t('settings.restart_required'))
-        dialog.resizable(False, False)
-        dialog.configure(bg=bg_color)
-        # dialog.transient(self)  # Disabled - causes focus issues
-        
-        try:
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                dialog.iconbitmap(icon_path)
-        except:
-            pass
-        
-        frame = tk.Frame(dialog, bg=bg_color, padx=20, pady=20)
-        frame.pack(fill="both", expand=True)
-        
-        tk.Label(frame, text=t('dialogs.language_changed'), 
-                font=self._scaled_font(10, "bold"), bg=bg_color, fg=fg_color).pack(pady=(0, 5))
-        tk.Label(frame, text=t('settings.restart_message'),
-                font=self._scaled_font(9), bg=bg_color, fg=fg_color).pack(pady=(0, 15))
-        
-        btn_frame = tk.Frame(frame, bg=bg_color)
-        btn_frame.pack()
-        
-        def on_ok():
-            dialog.destroy()
-        
-        def on_cancel():
-            # Revert language change
-            try:
-                cfg = _load_cfg()
-                cfg['language'] = old_lang
-                _save_cfg(cfg)
-            except:
-                pass
-            # Revert flag display
-            if old_image:
-                self._current_lang_label.config(image=old_image)
-                self._current_lang_label.image = old_image
-            else:
-                self._current_lang_label.config(text=old_lang.upper())
-            dialog.destroy()
-        
-        ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=10, command=on_ok,
-                          bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
-                          activebackground="#4a4a4a", activeforeground="#ffffff", cursor="hand2")
-        ok_btn.pack(side="left", padx=(0, 10))
-        cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), width=10, command=on_cancel,
-                              bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
-                              activebackground="#4a4a4a", activeforeground="#ffffff", cursor="hand2")
-        cancel_btn.pack(side="left")
-        
-        dialog.bind("<Return>", lambda e: on_ok())
-        dialog.bind("<Escape>", lambda e: on_cancel())
-        
-        # Center on parent
-        dialog.update_idletasks()
-        dialog_width = dialog.winfo_reqwidth()
-        dialog_height = dialog.winfo_reqheight()
-        main_x = self.winfo_x()
-        main_y = self.winfo_y()
-        main_width = self.winfo_width()
-        main_height = self.winfo_height()
-        x = main_x + (main_width - dialog_width) // 2
-        y = main_y + (main_height - dialog_height) // 2
-        dialog.geometry(f"+{x}+{y}")
-        
-        dialog.deiconify()
-        
-        # Force dialog to stay on top and have focus
-        dialog.attributes('-topmost', True)
-        dialog.lift()
-        dialog.focus_force()
-        
-        try:
-            dialog.grab_set()
-        except:
-            pass
-        
-        ok_btn.focus_set()
-        
-        # Keep dialog on top while open
-        def keep_on_top():
-            try:
-                if dialog.winfo_exists():
-                    dialog.lift()
-                    dialog.after(100, keep_on_top)
-            except:
-                pass
-        dialog.after(100, keep_on_top)
-        
-        dialog.wait_window()
 
-    def _restart_app(self) -> None:
-        """Restart the application - shows message for frozen executables"""
+        from app_utils import centered_askyesno
+        if centered_askyesno(self,
+            t('settings.restart_required'),
+            t('settings.restart_required_msg') + "\n\n" + t('settings.restart_now_prompt')):
+            self._restart_app()
+
+    def _restart_app(self, geometry_ui_scale=None) -> None:
+        """Restart the application to apply a settings change.
+
+        geometry_ui_scale: if given, tag the saved geometry with this scale
+        (the scale the CURRENT window size was laid out under) instead of the
+        live one, so the next launch can detect the mismatch and resize.
+        """
         import sys
         import os
         import subprocess
-        from tkinter import messagebox
-        
+
         # Save window geometry before restart
         try:
             from config import save_window_geometry
@@ -15792,7 +15733,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.state("normal")
                 self.update_idletasks()
             geometry = self.geometry()
-            save_window_geometry({"geometry": geometry, "zoomed": is_zoomed})
+            geom_payload = {"geometry": geometry, "zoomed": is_zoomed}
+            if geometry_ui_scale is not None:
+                geom_payload["ui_scale"] = geometry_ui_scale
+            save_window_geometry(geom_payload)
             log.info(f"Window geometry saved before restart: {geometry} (zoomed={is_zoomed})")
         except Exception as e:
             log.exception(f"Error saving window geometry before restart: {e}")
@@ -15805,23 +15749,68 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.prospector_panel._session_stop()
         except Exception as e:
             print(f"Error saving session before restart: {e}")
-        
-        # Get the executable path
+
+        # Close the single-instance mutex handle so the relaunched process can acquire it.
+        # Created with bInitialOwner=False, so it's never "owned" by a thread -
+        # closing the handle (not ReleaseMutex) is what frees the name.
+        try:
+            import win32api
+            global mutex
+            if mutex:
+                win32api.CloseHandle(mutex)
+                mutex = None
+        except Exception as e:
+            print(f"Warning: Could not close single-instance mutex before restart: {e}")
+
         executable = sys.executable
-        
+        exe_dir = os.path.dirname(executable)
+        pid = os.getpid()
         if getattr(sys, 'frozen', False):
-            # For frozen executables, show restart message
-            messagebox.showinfo(
-                "Restart Required",
-                "Please restart EliteMining to apply changes.\n\n"
-                "The application will now close."
-            )
+            launch_cmd = f'"{executable}"'
         else:
-            # Running from Python script - direct restart works fine
             script = os.path.abspath(sys.argv[0])
-            subprocess.Popen([executable, script])
-        
-        # Close the current window and exit cleanly
+            launch_cmd = f'"{executable}" "{script}"'
+
+        import tempfile
+        log_path = os.path.join(tempfile.gettempdir(), "EliteMining_restart_log.txt")
+        bat_path = os.path.join(tempfile.gettempdir(), f"EliteMining_restart_{pid}.bat")
+        bat_contents = (
+            "@echo off\n"
+            f'echo [%date% %time%] restart script started, waiting for pid {pid} > "{log_path}"\n'
+            f'cd /d "{exe_dir}"\n'
+            ":wait\n"
+            f'tasklist /fi "PID eq {pid}" 2>nul | find "{pid}" >nul\n'
+            "if not errorlevel 1 (\n"
+            "  ping 127.0.0.1 -n 2 >nul\n"
+            "  goto wait\n"
+            ")\n"
+            f'echo [%date% %time%] pid {pid} gone, waiting grace period >> "{log_path}"\n'
+            "ping 127.0.0.1 -n 2 >nul\n"
+            f'echo [%date% %time%] launching: {launch_cmd} >> "{log_path}"\n'
+            f'echo [%date% %time%] PYINSTALLER_RESET_ENVIRONMENT=%PYINSTALLER_RESET_ENVIRONMENT% >> "{log_path}"\n'
+            f'{launch_cmd}\n'
+            f'echo [%date% %time%] launch exit code: %errorlevel% >> "{log_path}"\n'
+            f'del "%~f0"\n'
+        )
+        with open(bat_path, "w") as f:
+            f.write(bat_contents)
+
+        # PyInstaller onefile: the bootloader tracks internal env vars so a
+        # self-spawned child reuses this process's _MEI extraction dir instead
+        # of unpacking its own. That dir is removed once this process exits,
+        # so the relaunched exe must be told to treat itself as a fresh
+        # top-level instance and unpack into its own new temp dir.
+        # https://pyinstaller.org/en/stable/advanced-topics.html
+        restart_env = os.environ.copy()
+        restart_env['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+
+        subprocess.Popen(
+            ['cmd', '/c', bat_path],
+            cwd=exe_dir,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            env=restart_env
+        )
+
         self.destroy()
         sys.exit(0)
 
@@ -18320,10 +18309,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         menu_active_bg = getattr(self, '_sysfinder_menu_active_bg', '#ff6600')
         menu_active_fg = getattr(self, '_sysfinder_menu_active_fg', '#000000')
         
-        self.sysfinder_context_menu = tk.Menu(self, tearoff=0, 
-            bg=menu_bg, fg=menu_fg, 
+        self.sysfinder_context_menu = tk.Menu(self, tearoff=0,
+            bg=menu_bg, fg=menu_fg,
             activebackground=menu_active_bg, activeforeground=menu_active_fg,
-            selectcolor=menu_active_bg)
+            selectcolor=menu_active_bg, font=self._scaled_font(9))
         self.sysfinder_context_menu.add_command(
             label=t('system_finder.copy_system'),
             command=self._copy_sysfinder_system
@@ -19332,7 +19321,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                                bg=menu_bg, fg=menu_fg,
                                                activebackground=menu_active_bg,
                                                activeforeground=menu_active_fg,
-                                               selectcolor=menu_active_bg)
+                                               selectcolor=menu_active_bg,
+                                               font=self._scaled_font(9))
         self.marketplace_context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara_from_menu)
         self.marketplace_context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm_from_menu)
         self.marketplace_context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh_from_menu)
@@ -19361,7 +19351,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                           bg=menu_bg, fg=menu_fg,
                                           activebackground=menu_active_bg,
                                           activeforeground=menu_active_fg,
-                                          selectcolor=menu_active_bg)
+                                          selectcolor=menu_active_bg,
+                                          font=self._scaled_font(9))
         self.trade_context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara_from_trade_menu)
         self.trade_context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm_from_trade_menu)
         self.trade_context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh_from_trade_menu)
@@ -23130,34 +23121,33 @@ Your keybinds will need to be reconfigured manually."""
 
 
 if __name__ == "__main__":
-    # Single instance check - TEMPORARILY DISABLED FOR TESTING
-    # import win32event
-    # import win32api
-    # import winerror
-    
-    # mutex_name = "Global\\EliteMining_SingleInstance_Mutex"
-    # mutex = None
-    
-    # try:
-    #     mutex = win32event.CreateMutex(None, False, mutex_name)
-    #     last_error = win32api.GetLastError()
-    #     
-    #     if last_error == winerror.ERROR_ALREADY_EXISTS:
-    #         # Another instance is already running
-    #         import tkinter.messagebox as messagebox
-    #         messagebox.showerror(
-    #             "EliteMining Already Running",
-    #             "EliteMining is already running.\n\n"
-    #             "Only one instance can run at a time to prevent duplicate announcements and conflicts.\n\n"
-    #             "Please close the other instance first."
-    #         )
-    #         sys.exit(0)
-    # except Exception as e:
-    #     print(f"Warning: Could not create mutex for single instance check: {e}")
-    #     # Continue anyway - better to run than to fail completely
-    
-    print("[DEBUG] Single instance check DISABLED for testing - multiple instances allowed")
-    
+    # Single instance check - also lets the installer detect a running instance
+    # via AppMutex without the slow Restart Manager scan.
+    import win32event
+    import win32api
+    import winerror
+
+    mutex_name = "Global\\EliteMining_SingleInstance_Mutex"
+    mutex = None
+
+    try:
+        mutex = win32event.CreateMutex(None, False, mutex_name)
+        last_error = win32api.GetLastError()
+
+        if last_error == winerror.ERROR_ALREADY_EXISTS:
+            # Another instance is already running
+            import tkinter.messagebox as messagebox
+            messagebox.showerror(
+                "EliteMining Already Running",
+                "EliteMining is already running.\n\n"
+                "Only one instance can run at a time to prevent duplicate announcements and conflicts.\n\n"
+                "Please close the other instance first."
+            )
+            sys.exit(0)
+    except Exception as e:
+        print(f"Warning: Could not create mutex for single instance check: {e}")
+        # Continue anyway - better to run than to fail completely
+
     # Clean up any restart flag from previous run
     try:
         import sys

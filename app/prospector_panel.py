@@ -3712,10 +3712,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 # Get all currently selected items after potential addition
                 selected_items = tree.selection()
                 if selected_items:
-                    context_menu = tk.Menu(tree, tearoff=0, bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"], 
-                                         activebackground=MENU_COLORS["activebackground"], 
+                    context_menu = tk.Menu(tree, tearoff=0, bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
+                                         activebackground=MENU_COLORS["activebackground"],
                                          activeforeground=MENU_COLORS["activeforeground"],
-                                         selectcolor=MENU_COLORS["selectcolor"])
+                                         selectcolor=MENU_COLORS["selectcolor"],
+                                         font=scaled_font(9))
                     context_menu.add_command(label=t('context_menu.open_report_txt'), command=open_selected)
                     context_menu.add_command(label=t('context_menu.open_report_html'), command=lambda: self._open_enhanced_report_from_menu(tree))
                     context_menu.add_separator()
@@ -8243,10 +8244,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         _menu_fg = "#ffffff"
                         _menu_active_bg = "#404040"
                         _menu_active_fg = "#ffffff"
-                    context_menu = tk.Menu(self.reports_tree_tab, tearoff=0, 
+                    context_menu = tk.Menu(self.reports_tree_tab, tearoff=0,
                                           bg=_menu_bg, fg=_menu_fg,
                                           activebackground=_menu_active_bg,
-                                          activeforeground=_menu_active_fg)
+                                          activeforeground=_menu_active_fg,
+                                          font=scaled_font(9))
                     context_menu.add_command(label=t('context_menu.open_report_txt'), command=lambda: open_selected())
                     context_menu.add_command(label=t('context_menu.open_report_html'), command=lambda: self._open_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()
@@ -10944,6 +10946,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     overlay.update_cargo(self.main_app.cargo_monitor)
             except Exception:
                 pass
+
+        # Also reset the prospector/announcement overlay's session-hidden gate —
+        # it can get stuck True if session ended while no message was showing
+        # (the periodic loop only clears it reactively based on _is_showing)
+        if self.main_app and hasattr(self.main_app, 'text_overlay'):
+            try:
+                self.main_app.text_overlay._session_hidden = False
+                self.main_app.text_overlay._game_hidden = False
+            except Exception:
+                pass
         self.live_tph_var.set("")
         self.session_screenshots = []  # Initialize screenshots list for this session
         self.session_yield_data = {}  # Track yield data during session {material: [percentages]}
@@ -13366,7 +13378,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         ss_context_menu = tk.Menu(dialog, tearoff=0,
                                   bg=_ss_menu_bg, fg=_ss_menu_fg,
                                   activebackground=_ss_menu_active_bg,
-                                  activeforeground=_ss_menu_active_fg)
+                                  activeforeground=_ss_menu_active_fg,
+                                  font=scaled_font(9))
         ss_context_menu.add_command(label=t('bookmarks.view_screenshot'), command=_ss_view)
         ss_context_menu.add_command(label=t('bookmarks.open_file_location'), command=_ss_open_location)
         ss_context_menu.add_separator()
@@ -13712,10 +13725,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             _menu_fg = "#ffffff"
             _menu_active_bg = "#404040"
             _menu_active_fg = "#ffffff"
-        self.bookmark_context_menu = tk.Menu(self, tearoff=0, 
+        self.bookmark_context_menu = tk.Menu(self, tearoff=0,
                                             bg=_menu_bg, fg=_menu_fg,
                                             activebackground=_menu_active_bg,
-                                            activeforeground=_menu_active_fg)
+                                            activeforeground=_menu_active_fg,
+                                            font=scaled_font(9))
         self.bookmark_context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_to_clipboard)
         self.bookmark_context_menu.add_separator()
         self.bookmark_context_menu.add_command(label=t('context_menu.edit_bookmark'), command=self._edit_bookmark_dialog)

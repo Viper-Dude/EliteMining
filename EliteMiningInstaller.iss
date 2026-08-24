@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v5.3.3 beta
+AppVersion=v5.3.3
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -9,14 +9,10 @@ OutputBaseFilename=EliteMiningSetup
 Compression=lzma
 SolidCompression=yes
 SetupIconFile=app\Images\logo_multi.ico
-CloseApplications=force
-RestartApplications=no
 ; VA profile update notice — shown before install as a reminder to keep the profile option ticked.
 ; ENABLE  when this release includes a new VA profile:   remove the leading semicolon below
 ; DISABLE when no VA profile update in this release:     add a semicolon at the start of the line below
 InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
-; Close running EliteMining and VoiceAttack processes
-CloseApplicationsFilter=*.exe,VoiceAttack.exe,VoiceAttackEngine.exe
 
 ; Place uninstaller in app folder
 UninstallFilesDir={app}
@@ -760,10 +756,27 @@ begin
 end;
 
 { Clean up old installations before installing new version }
+function IsEliteMiningRunning: Boolean;
+begin
+  Result := CheckForMutexes('Global\EliteMining_SingleInstance_Mutex');
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
-  
+
+  { Ask the user to close EliteMining before installing; check again after they confirm. }
+  while IsEliteMiningRunning do
+  begin
+    if MsgBox('EliteMining is currently running.' + #13#10 + #13#10 +
+       'Please close it, then click OK to continue installing.',
+       mbError, MB_OKCANCEL) = IDCANCEL then
+    begin
+      Result := 'Setup was cancelled because EliteMining is still running.';
+      Exit;
+    end;
+  end;
+
   { Remove old installation directory if it exists }
   if DirExists('C:\Program Files\Elite Mining') then
   begin

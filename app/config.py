@@ -161,6 +161,12 @@ def load_window_geometry() -> Dict[str, Any]:
 
 def save_window_geometry(geom: Dict[str, Any]) -> None:
     cfg = _load_cfg()
+    geom = dict(geom)
+    # Callers that need the geometry tagged with a specific scale (e.g. the
+    # pre-restart save right before a UI-scale change) pass ui_scale explicitly.
+    # Otherwise stamp with the live scale.
+    if "ui_scale" not in geom:
+        geom["ui_scale"] = cfg.get("ui_scale", 1.0)
     cfg["window"] = geom
     _save_cfg(cfg)
 
