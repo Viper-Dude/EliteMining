@@ -765,9 +765,46 @@ begin
   Result := CheckForMutexes('Global\EliteMining_SingleInstance_Mutex');
 end;
 
+{ The PyInstaller onefile bootloader process can outlive the app window by an
+  unpredictable amount of time while it cleans up its temp extraction folder,
+  and it keeps EliteMining.exe mapped in a way that permits reads/renames even
+  though the file isn't actually free yet. Renaming it to a sibling path and
+  immediately back is the same operation Setup's own [Files] copy step relies
+  on, so it fails exactly when - and only when - the real copy would. }
+function IsExeFileLocked(const ExePath: String): Boolean;
+var
+  ProbePath: String;
+begin
+  Result := False;
+  if not FileExists(ExePath) then
+    Exit;
+  ProbePath := ExePath + '.lockcheck.tmp';
+  DeleteFile(ProbePath);
+  if RenameFile(ExePath, ProbePath) then
+    RenameFile(ProbePath, ExePath)
+  else
+    Result := True;
+end;
+
+function WaitForExeUnlock(const ExePath: String; TimeoutMs: Integer): Boolean;
+var
+  Elapsed: Integer;
+begin
+  Elapsed := 0;
+  while IsExeFileLocked(ExePath) and (Elapsed < TimeoutMs) do
+  begin
+    Sleep(250);
+    Elapsed := Elapsed + 250;
+  end;
+  Result := not IsExeFileLocked(ExePath);
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ExePath: String;
 begin
   Result := '';
+  ExePath := ExpandConstant('{app}\Configurator\EliteMining.exe');
 
   { Ask the user to close EliteMining before installing; check again after they confirm. }
   while IsEliteMiningRunning do
@@ -782,9 +819,20 @@ begin
   end;
 
   { The mutex clears the instant the window closes, but the PyInstaller onefile
-    bootloader process can briefly keep the exe file handle open a moment longer
-    during its temp-folder cleanup. Give it a beat before we start copying files. }
-  Sleep(1500);
+    bootloader process can keep the exe file locked for a few more seconds while
+    it tears down its temp extraction folder - this is a known upstream quirk
+    with unpredictable timing. Poll until the file itself is actually free,
+    prompting again if it takes unusually long (e.g. antivirus scanning it). }
+  while not WaitForExeUnlock(ExePath, 15000) do
+  begin
+    if MsgBox('EliteMining is still finishing shutdown and its file is locked.' + #13#10 + #13#10 +
+       'Please wait a moment, then click OK to try again.',
+       mbError, MB_OKCANCEL) = IDCANCEL then
+    begin
+      Result := 'Setup was cancelled because EliteMining.exe is still in use.';
+      Exit;
+    end;
+  end;
 
   { Remove old installation directory if it exists }
   if DirExists('C:\Program Files\Elite Mining') then
