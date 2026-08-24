@@ -9,6 +9,10 @@ OutputBaseFilename=EliteMiningSetup
 Compression=lzma
 SolidCompression=yes
 SetupIconFile=app\Images\logo_multi.ico
+; Disable Inno's built-in Restart Manager close-apps page (unreliable/slow with our
+; PyInstaller onefile launcher+child process). We handle detection ourselves via the
+; app's own mutex in PrepareToInstall (see [Code]).
+CloseApplications=no
 ; VA profile update notice — shown before install as a reminder to keep the profile option ticked.
 ; ENABLE  when this release includes a new VA profile:   remove the leading semicolon below
 ; DISABLE when no VA profile update in this release:     add a semicolon at the start of the line below
@@ -776,6 +780,11 @@ begin
       Exit;
     end;
   end;
+
+  { The mutex clears the instant the window closes, but the PyInstaller onefile
+    bootloader process can briefly keep the exe file handle open a moment longer
+    during its temp-folder cleanup. Give it a beat before we start copying files. }
+  Sleep(1500);
 
   { Remove old installation directory if it exists }
   if DirExists('C:\Program Files\Elite Mining') then
