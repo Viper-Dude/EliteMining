@@ -768,21 +768,29 @@ end;
 { Belt-and-braces check alongside the mutex: some older/test builds may not
   create the single-instance mutex (e.g. it was briefly disabled for testing
   in a beta build), so a live process could go undetected by IsEliteMiningRunning.
-  Renaming a running EXE out of its own folder and back fails while any process
-  still has it open for execution, giving a direct, build-independent lock test. }
+  Windows lets you RENAME a running EXE even while it's mapped for execution -
+  only DELETING it is actually blocked, since delete requires no outstanding
+  section mapping. So renaming is not a valid lock test; we back up the file
+  first (safe: DeleteFile is atomic, it either removes the file or leaves it
+  untouched) then try to delete it directly and restore the backup either way. }
 function IsExeFileLocked(const ExePath: String): Boolean;
 var
-  ProbePath: String;
+  BackupPath: String;
 begin
   Result := False;
   if not FileExists(ExePath) then
     Exit;
-  ProbePath := ExePath + '.lockcheck.tmp';
-  DeleteFile(ProbePath);
-  if RenameFile(ExePath, ProbePath) then
-    RenameFile(ProbePath, ExePath)
+  BackupPath := ExePath + '.lockcheck.bak';
+  DeleteFile(BackupPath);
+  if not FileCopy(ExePath, BackupPath, False) then
+    Exit; { couldn't even back it up - treat as inconclusive/unlocked rather than block forever }
+
+  if DeleteFile(ExePath) then
+    FileCopy(BackupPath, ExePath, False)
   else
     Result := True;
+
+  DeleteFile(BackupPath);
 end;
 
 function WaitForExeUnlock(const ExePath: String; TimeoutMs: Integer): Boolean;
