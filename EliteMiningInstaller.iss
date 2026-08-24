@@ -783,19 +783,6 @@ begin
   Result := not DeleteFile(ExePath);
 end;
 
-function WaitForExeUnlock(const ExePath: String; TimeoutMs: Integer): Boolean;
-var
-  Elapsed: Integer;
-begin
-  Elapsed := 0;
-  while IsExeFileLocked(ExePath) and (Elapsed < TimeoutMs) do
-  begin
-    Sleep(250);
-    Elapsed := Elapsed + 250;
-  end;
-  Result := not IsExeFileLocked(ExePath);
-end;
-
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ExePath: String;
@@ -803,30 +790,17 @@ begin
   Result := '';
   ExePath := ExpandConstant('{app}\Configurator\EliteMining.exe');
 
-  { Ask the user to close EliteMining before installing; check again after they confirm. }
-  while IsEliteMiningRunning do
+  { Ask the user to close EliteMining before installing. The mutex check catches
+    normal builds instantly; IsExeFileLocked is a build-independent backstop for
+    stray/test builds that might not create the mutex. Each retry re-checks both
+    right away - no silent internal wait, so the wizard never appears to freeze. }
+  while IsEliteMiningRunning or IsExeFileLocked(ExePath) do
   begin
     if MsgBox('EliteMining is currently running.' + #13#10 + #13#10 +
        'Please close it, then click OK to continue installing.',
        mbError, MB_OKCANCEL) = IDCANCEL then
     begin
       Result := 'Setup was cancelled because EliteMining is still running.';
-      Exit;
-    end;
-  end;
-
-  { The mutex clears the instant the window closes, but the PyInstaller onefile
-    bootloader process can keep the exe file locked for a few more seconds while
-    it tears down its temp extraction folder - this is a known upstream quirk
-    with unpredictable timing. Poll until the file itself is actually free,
-    prompting again if it takes unusually long (e.g. antivirus scanning it). }
-  while not WaitForExeUnlock(ExePath, 15000) do
-  begin
-    if MsgBox('EliteMining is still finishing shutdown and its file is locked.' + #13#10 + #13#10 +
-       'Please wait a moment, then click OK to try again.',
-       mbError, MB_OKCANCEL) = IDCANCEL then
-    begin
-      Result := 'Setup was cancelled because EliteMining.exe is still in use.';
       Exit;
     end;
   end;
