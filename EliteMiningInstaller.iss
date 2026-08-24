@@ -770,27 +770,17 @@ end;
   in a beta build), so a live process could go undetected by IsEliteMiningRunning.
   Windows lets you RENAME a running EXE even while it's mapped for execution -
   only DELETING it is actually blocked, since delete requires no outstanding
-  section mapping. So renaming is not a valid lock test; we back up the file
-  first (safe: DeleteFile is atomic, it either removes the file or leaves it
-  untouched) then try to delete it directly and restore the backup either way. }
+  section mapping. So renaming is not a valid lock test; we try to delete the
+  file directly instead. DeleteFile is atomic (it either removes the file or
+  leaves it untouched), and no backup/restore is needed: if it does succeed,
+  the file is gone but Setup's own [Files] copy step writes a fresh one right
+  after PrepareToInstall returns, so there's nothing to restore either way. }
 function IsExeFileLocked(const ExePath: String): Boolean;
-var
-  BackupPath: String;
 begin
   Result := False;
   if not FileExists(ExePath) then
     Exit;
-  BackupPath := ExePath + '.lockcheck.bak';
-  DeleteFile(BackupPath);
-  if not FileCopy(ExePath, BackupPath, False) then
-    Exit; { couldn't even back it up - treat as inconclusive/unlocked rather than block forever }
-
-  if DeleteFile(ExePath) then
-    FileCopy(BackupPath, ExePath, False)
-  else
-    Result := True;
-
-  DeleteFile(BackupPath);
+  Result := not DeleteFile(ExePath);
 end;
 
 function WaitForExeUnlock(const ExePath: String; TimeoutMs: Integer): Boolean;
