@@ -765,12 +765,11 @@ begin
   Result := CheckForMutexes('Global\EliteMining_SingleInstance_Mutex');
 end;
 
-{ The PyInstaller onefile bootloader process can outlive the app window by an
-  unpredictable amount of time while it cleans up its temp extraction folder,
-  and it keeps EliteMining.exe mapped in a way that permits reads/renames even
-  though the file isn't actually free yet. Renaming it to a sibling path and
-  immediately back is the same operation Setup's own [Files] copy step relies
-  on, so it fails exactly when - and only when - the real copy would. }
+{ Belt-and-braces check alongside the mutex: some older/test builds may not
+  create the single-instance mutex (e.g. it was briefly disabled for testing
+  in a beta build), so a live process could go undetected by IsEliteMiningRunning.
+  Renaming a running EXE out of its own folder and back fails while any process
+  still has it open for execution, giving a direct, build-independent lock test. }
 function IsExeFileLocked(const ExePath: String): Boolean;
 var
   ProbePath: String;
