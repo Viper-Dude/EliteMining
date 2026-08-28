@@ -178,7 +178,7 @@
     "tooltip_overlaps": "When checked, only shows rings with known overlaps\n(ignores distance limit)",
     "tooltip_res": "When checked, only shows rings with RES sites\n(Hazardous, High, Low - ignores distance limit)",
     "ring_search_spansh": "Ring Search (Spansh)",
-    "ring_search_spansh_tooltip": "Search for ring type only (ignores hotspot data)\nUseful for finding nearest ring of a specific type",
+    "ring_search_spansh_tooltip": "Search for ring type only (ignores hotspot data)\nUseful for finding nearest ring of a specific type\nSelect a Ring Type above first to enable",
     "auto_switch_tooltip": "Automatically switch tabs based on game state:\n- Switch to Mining Session when dropping into a ring\n- Switch to Hotspots Finder when entering supercruise or jumping",
     "no_selection": "No row selected",
     "select_mineral_first": "Select a specific mineral first (not 'All Minerals')",

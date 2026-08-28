@@ -5706,18 +5706,17 @@ class RingFinder(ColumnVisibilityMixin):
                     print(f"[MENU DEBUG] missing={has_local_missing_reserve}, with_reserve={has_local_with_reserve}, enable={enable_update_reserve}")
                 
                 if selection_count > 1:
-                    # Multi-select mode - show applicable options
-                    # Check if any selected rows have hotspot data for ring search mode
+                    # Multi-select mode - show applicable options.
+                    # Save is disabled outright in Ring Search mode (see single-select block below).
                     is_ring_search_mode = self.ring_type_only_var.get()
                     spansh_rows_with_hotspots = 0
 
-                    for sel_item in selected_items:
-                        values = self.results_tree.item(sel_item, 'values')
-                        if values and len(values) > 12:
-                            source = values[12]
-                            hotspots_col = values[8] if len(values) > 8 else ""
-                            if source and '🌐' in str(source):
-                                if not is_ring_search_mode or (hotspots_col and hotspots_col != "-" and hotspots_col.strip() != ""):
+                    if not is_ring_search_mode:
+                        for sel_item in selected_items:
+                            values = self.results_tree.item(sel_item, 'values')
+                            if values and len(values) > 12:
+                                source = values[12]
+                                if source and '🌐' in str(source):
                                     spansh_rows_with_hotspots += 1
 
                     if spansh_rows_with_hotspots > 0 or enable_update_reserve:
@@ -5754,26 +5753,19 @@ class RingFinder(ColumnVisibilityMixin):
                     else:
                         self.context_menu.entryconfig(5, state="disabled")
 
-                    # Show/hide "Save to Database" option (index 7, after separator) based on Source column
-                    # Allow save in Ring Search mode if row has hotspot data
+                    # Show/hide "Save to Database" option (index 7, after separator) based on Source column.
+                    # Both save options are disabled outright in Ring Search mode - that mode is for
+                    # locating rings, not for saving hotspot data (results include placeholder "-" rings).
                     is_ring_search_mode = self.ring_type_only_var.get()
-                    has_hotspot_data = False
-                    if has_spansh_rows and selected_items:
-                        values = self.results_tree.item(selected_items[0], 'values')
-                        if values and len(values) > 8:
-                            hotspots_col = values[8]  # Hotspots column is index 8
-                            # Has data if not "-" or empty
-                            has_hotspot_data = hotspots_col and hotspots_col != "-" and hotspots_col.strip() != ""
 
-                    # Enable if Spansh rows AND (not ring search mode OR has hotspot data)
-                    if has_spansh_rows and (not is_ring_search_mode or has_hotspot_data):
+                    if has_spansh_rows and not is_ring_search_mode:
                         self.context_menu.entryconfig(7, state="normal")
                     else:
                         self.context_menu.entryconfig(7, state="disabled")
 
                     # Show/hide "Save All New to Database" option (index 8) - enabled whenever any
                     # row in the full result set is Spansh-only or Both (not just the selection)
-                    has_any_new_spansh_rows = self._has_unsaved_spansh_rows()
+                    has_any_new_spansh_rows = not is_ring_search_mode and self._has_unsaved_spansh_rows()
                     self.context_menu.entryconfig(8, state="normal" if has_any_new_spansh_rows else "disabled")
 
                     # Show/hide "Update Reserve Level" option (index 10) based on Local source + missing reserve
@@ -6046,13 +6038,22 @@ class RingFinder(ColumnVisibilityMixin):
             self.status_var.set("Error: Could not access main application")
     
     def _has_unsaved_spansh_rows(self) -> bool:
-        """Check if any row in the full result set is Spansh-only or Both (i.e. has new data to save)"""
+        """Check if any row in the full result set is Spansh-only or Both (i.e. has new data to save).
+
+        In Ring Search (Spansh) mode, rows can be placeholder rings with no
+        hotspot data ("-") - those have nothing to save, so they're excluded.
+        """
+        is_ring_search_mode = self.ring_type_only_var.get()
         for item in self.results_tree.get_children():
             values = self.results_tree.item(item, 'values')
             if values and len(values) > 12:
                 source = str(values[12])
                 if '🌐' in source:
-                    return True
+                    if not is_ring_search_mode:
+                        return True
+                    hotspots_col = values[8] if len(values) > 8 else ""
+                    if hotspots_col and hotspots_col != "-" and hotspots_col.strip() != "":
+                        return True
         return False
 
     def _update_new_entries_label(self):
