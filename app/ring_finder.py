@@ -366,7 +366,7 @@ class RingFinder(ColumnVisibilityMixin):
         
     def setup_ui(self):
         """Create hotspot finder UI following EliteMining patterns"""
-        from config import scaled_font, scaled_px
+        from config import scaled_font, scaled_px, load_ui_scale
         # Configure parent frame to expand
         self.parent.grid_columnconfigure(0, weight=1)
         self.parent.grid_rowconfigure(0, weight=1)
@@ -468,8 +468,8 @@ class RingFinder(ColumnVisibilityMixin):
         # Single smart search input
         ttk.Label(search_frame, text=t('ring_finder.reference_system')).grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.system_var = tk.StringVar()
-        self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=35)
-        self.system_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        self.system_entry = ttk.Entry(search_frame, textvariable=self.system_var, width=24)
+        self.system_entry.grid(row=0, column=1, sticky="w", padx=(5, 10), pady=5)
         # Clear selection only on focus out to prevent unwanted text selection
         self.system_entry.bind('<FocusOut>', lambda e: (self.system_entry.selection_clear(), self._save_filter_settings()))
         self.system_entry.bind('<Return>', lambda e: (self._system_ac.hide(), self._save_filter_settings(), self.search_hotspots()))
@@ -481,34 +481,7 @@ class RingFinder(ColumnVisibilityMixin):
         # For compatibility, current_system_var points to the same system_var
         self.current_system_var = self.system_var
         
-        # Create frame for buttons (to pack them tightly)
-        buttons_frame = ttk.Frame(search_frame)
-        buttons_frame.grid(row=0, column=2, sticky="w", padx=(5, 0))
-        
-        # Auto-detect button (fills current system automatically) - with app color scheme
-        auto_btn = tk.Button(buttons_frame, text=t('ring_finder.use_current_system'), command=self._auto_detect_system,
-                            bg="#4a3a2a", fg="#e0e0e0", 
-                            activebackground="#5a4a3a", activeforeground="#ffffff",
-                            relief="ridge", bd=1, padx=8, pady=4,
-                            font=scaled_font(8, "normal"), cursor="hand2")
-        auto_btn.pack(side="left", padx=(0, 5))
-        
-        # Search button - with app color scheme
-        self.search_btn = tk.Button(buttons_frame, text=t('ring_finder.search'), command=self.search_hotspots,
-                                   bg="#2a4a2a", fg="#e0e0e0", 
-                                   activebackground="#3a5a3a", activeforeground="#ffffff",
-                                   relief="ridge", bd=1, padx=15, pady=4,
-                                   font=scaled_font(8, "normal"), cursor="hand2")
-        self.search_btn.pack(side="left", padx=(0, 5))
-
-        # Auto-search checkbox
-        self.auto_search_var = tk.BooleanVar(value=False)
-        
-        # Load saved auto-search state
-        auto_search_enabled = self._load_auto_search_state()
-        self.auto_search_var.set(auto_search_enabled)
-        
-        # Get theme for checkbox styling
+        # Get theme for checkbox/spinner styling
         from config import load_theme
         _cb_theme = load_theme()
         if _cb_theme == "elite_orange":
@@ -517,29 +490,65 @@ class RingFinder(ColumnVisibilityMixin):
         else:
             _cb_bg = "#1e1e1e"
             _cb_select = "#1e1e1e"
-        
-        self.auto_search_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.auto_search'), 
+
+        # Create frame for buttons (to pack them tightly)
+        buttons_frame = ttk.Frame(search_frame)
+        buttons_frame.grid(row=0, column=2, sticky="w", padx=(0, 0))
+
+        # Auto-detect button (fills current system automatically) - with app color scheme
+        auto_btn = tk.Button(buttons_frame, text=t('ring_finder.use_current_system'), command=self._auto_detect_system,
+                            bg="#4a3a2a", fg="#e0e0e0", 
+                            activebackground="#5a4a3a", activeforeground="#ffffff",
+                            relief="ridge", bd=1, padx=scaled_px(8), pady=scaled_px(4),
+                            font=scaled_font(8, "normal"), cursor="hand2")
+        auto_btn.pack(side="left", padx=(0, 5))
+
+        # Search button - with app color scheme
+        self.search_btn = tk.Button(buttons_frame, text=t('ring_finder.search'), command=self.search_hotspots,
+                                   bg="#2a4a2a", fg="#e0e0e0",
+                                   activebackground="#3a5a3a", activeforeground="#ffffff",
+                                   relief="ridge", bd=1, padx=scaled_px(15), pady=scaled_px(4),
+                                   font=scaled_font(8, "normal"), cursor="hand2")
+        self.search_btn.pack(side="left", padx=(0, 5))
+
+        # Spinner shown in a fixed-width slot so its animation never shifts
+        # Auto-Search/Auto-Switch Tabs (and their alignment with the row below)
+        _spinner_frame = tk.Frame(buttons_frame, width=scaled_px(16), height=scaled_px(24), bg=_cb_bg)
+        _spinner_frame.pack(side="left", padx=(0, 0))
+        _spinner_frame.pack_propagate(False)
+        self.search_spinner_label = tk.Label(_spinner_frame, text="", bg=_cb_bg, fg="#e0e0e0",
+                                              font=scaled_font(9))
+        self.search_spinner_label.pack(side="left", fill="both", expand=True)
+
+        # Auto-search checkbox
+        self.auto_search_var = tk.BooleanVar(value=False)
+
+        # Load saved auto-search state
+        auto_search_enabled = self._load_auto_search_state()
+        self.auto_search_var.set(auto_search_enabled)
+
+        self.auto_search_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.auto_search'),
                                            variable=self.auto_search_var,
                                            command=self._save_auto_search_state,
-                                           bg=_cb_bg, fg="#e0e0e0", 
+                                           bg=_cb_bg, fg="#e0e0e0",
                                            activebackground="#2e2e2e", activeforeground="#ffffff",
                                            selectcolor=_cb_select, relief="flat",
                                            font=scaled_font(9))
-        self.auto_search_cb.pack(side="left")
-        
+        self.auto_search_cb.pack(side="left", padx=(10, 0))
+
         # Tooltip for auto-search
         ToolTip(self.auto_search_cb, t('ring_finder.auto_search_tooltip'))
-        
+
         # Auto-switch tabs checkbox (synced with main app settings)
         self.auto_switch_tabs_var = tk.BooleanVar(value=False)
-        
+
         # Load auto-switch tabs state from main app
         self._load_auto_switch_tabs_state()
-        
-        self.auto_switch_tabs_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.auto_switch_tabs'), 
+
+        self.auto_switch_tabs_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.auto_switch_tabs'),
                                            variable=self.auto_switch_tabs_var,
                                            command=self._on_auto_switch_tabs_toggle,
-                                           bg=_cb_bg, fg="#e0e0e0", 
+                                           bg=_cb_bg, fg="#e0e0e0",
                                            activebackground="#2e2e2e", activeforeground="#ffffff",
                                            selectcolor=_cb_select, relief="flat",
                                            font=scaled_font(9))
@@ -687,20 +696,34 @@ class RingFinder(ColumnVisibilityMixin):
 
         # Max Distance stacks directly above Max Results (same column) like before
         right_filters_frame_row1 = ttk.Frame(search_frame)
-        right_filters_frame_row1.grid(row=1, column=2, columnspan=2, sticky="w", padx=(10, 0))
+        _filters_row_padx = 22  # flat, for measurement
+        right_filters_frame_row1.grid(row=1, column=2, columnspan=2, sticky="w", padx=(_filters_row_padx, 0))
 
         right_filters_frame_row2 = ttk.Frame(search_frame)
-        right_filters_frame_row2.grid(row=2, column=2, columnspan=2, sticky="w", padx=(10, 0))
+        right_filters_frame_row2.grid(row=2, column=2, columnspan=2, sticky="w", padx=(_filters_row_padx, 0))
 
-        # Distance filter (now a dropdown) - in sub-frame with fixed label width
-        ttk.Label(right_filters_frame_row1, text=t('ring_finder.max_distance') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
+        # Distance filter (now a dropdown) - fixed pixel-width label so it doesn't
+        # snap to different widths than the row above at odd UI scale percentages
+        _distance_label_frame = tk.Frame(right_filters_frame_row1, width=scaled_px(120), height=scaled_px(24), bg=_sh_bg)
+        _distance_label_frame.pack(side="left", padx=(0, 5))
+        _distance_label_frame.pack_propagate(False)
+        ttk.Label(_distance_label_frame, text=t('ring_finder.max_distance') + ":", anchor="e", font=scaled_font(9)).pack(side="right", fill="y")
         self.distance_var = tk.StringVar(value="50")
-        self.distance_combo = ttk.Combobox(right_filters_frame_row1, textvariable=self.distance_var, width=8, state="readonly")
+        _distance_combo_frame = tk.Frame(right_filters_frame_row1, width=scaled_px(70), height=scaled_px(24), bg=_sh_bg)
+        _distance_combo_frame.pack(side="left")
+        _distance_combo_frame.pack_propagate(False)
+        self.distance_combo = ttk.Combobox(_distance_combo_frame, textvariable=self.distance_var, state="readonly", font=scaled_font(9))
         self.distance_combo['values'] = ("10", "50", "100", "150", "200")
-        self.distance_combo.pack(side="left")
+        self.distance_combo.pack(side="left", fill="both", expand=True)
         self.distance_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
 
-        # Overlaps/RES/Ring Search checkboxes sit to the right of Max Distance
+        # Overlaps/RES/Ring Search checkboxes sit to the right of Max Distance.
+        # Spacer's width is set after layout (below) so Overlaps Only lines up
+        # under Auto-Search regardless of button text width / UI scale.
+        _overlaps_align_spacer = tk.Frame(right_filters_frame_row1, width=1, height=1, bg=_cb_bg)
+        _overlaps_align_spacer.pack(side="left")
+        _overlaps_align_spacer.pack_propagate(False)
+
         self.overlaps_only_var = tk.BooleanVar(value=False)
         self.overlaps_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.overlaps_only'),
                                                variable=self.overlaps_only_var,
@@ -709,7 +732,7 @@ class RingFinder(ColumnVisibilityMixin):
                                                activebackground="#2e2e2e", activeforeground="#ffffff",
                                                selectcolor=_cb_select, relief="flat",
                                                font=scaled_font(9))
-        self.overlaps_only_cb.pack(side="left", padx=(20, 0))
+        self.overlaps_only_cb.pack(side="left", padx=(scaled_px(4), 0))
         ToolTip(self.overlaps_only_cb, t('ring_finder.tooltip_overlaps'))
 
         # RES Only checkbox - filters to show only RES site entries
@@ -738,13 +761,34 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Initialize Ring Type Only state based on current ring type selection
         self._on_ring_type_changed()
-        
-        # Max Results filter - in sub-frame with fixed label width to align dropdowns
-        ttk.Label(right_filters_frame_row2, text=t('ring_finder.max_results') + ":", width=15, anchor="e").pack(side="left", padx=(0, 5))
+
+        # Align Overlaps Only under Auto-Search (and RES Only under Auto-Switch
+        # Tabs) by sizing the spacer to the actual rendered gap between the two
+        # rows, rather than a hardcoded padx - button/checkbox widths vary with
+        # UI scale and don't scale at the same rate as the fixed-width combos.
+        def _align_overlaps_row():
+            search_frame.update_idletasks()
+            target_x = buttons_frame.winfo_x() + self.auto_search_cb.winfo_x()
+            current_x = right_filters_frame_row1.winfo_x() + _overlaps_align_spacer.winfo_x()
+            # Checkbutton indicator/border offsets differ slightly between the
+            # two rows' widgets, so nudge left a hair to line up the ticked boxes.
+            gap = target_x - current_x - scaled_px(3)
+            if gap > 0:
+                _overlaps_align_spacer.configure(width=gap)
+        self.parent.after_idle(_align_overlaps_row)
+
+        # Max Results filter - fixed pixel-width label to match Max Distance above
+        _max_results_label_frame = tk.Frame(right_filters_frame_row2, width=scaled_px(120), height=scaled_px(24), bg=_sh_bg)
+        _max_results_label_frame.pack(side="left", padx=(0, 5))
+        _max_results_label_frame.pack_propagate(False)
+        ttk.Label(_max_results_label_frame, text=t('ring_finder.max_results') + ":", anchor="e", font=scaled_font(9)).pack(side="right", fill="y")
         self.max_results_var = tk.StringVar(value="50")
-        max_results_combo = ttk.Combobox(right_filters_frame_row2, textvariable=self.max_results_var, width=8, state="readonly")
+        _max_results_combo_frame = tk.Frame(right_filters_frame_row2, width=scaled_px(70), height=scaled_px(24), bg=_sh_bg)
+        _max_results_combo_frame.pack(side="left", padx=(0, 10))
+        _max_results_combo_frame.pack_propagate(False)
+        max_results_combo = ttk.Combobox(_max_results_combo_frame, textvariable=self.max_results_var, state="readonly", font=scaled_font(9))
         max_results_combo['values'] = ("10", "20", "30", "50", "100", "200")
-        max_results_combo.pack(side="left", padx=(0, 10))
+        max_results_combo.pack(side="left", fill="both", expand=True)
         max_results_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         
         # Min Hotspots filter (only active for specific materials) - in sub-frame
@@ -873,6 +917,12 @@ class RingFinder(ColumnVisibilityMixin):
         ttk.Label(results_header, text=t('ring_finder.search_results'), font=scaled_font(9, "bold")).pack(side="left")
         ttk.Label(results_header, text=t('ring_finder.right_click_help'),
                  font=scaled_font(8), foreground="#666666").pack(side="left", padx=(10, 0))
+
+        from config import load_theme as _load_theme_for_new_entries
+        _new_entries_fg = "#ff8c00" if _load_theme_for_new_entries() == "elite_orange" else "#e8b84b"
+        self.new_entries_var = tk.StringVar(value="")
+        ttk.Label(results_header, textvariable=self.new_entries_var,
+                 font=scaled_font(8, "bold"), foreground=_new_entries_fg).pack(side="right")
         
         results_frame = ttk.Frame(self.scrollable_frame)
         results_frame.pack(fill="both", expand=True, padx=10, pady=(2, 2))
@@ -1179,7 +1229,14 @@ class RingFinder(ColumnVisibilityMixin):
         # Bind right-click to show context menu (mixin will intercept and route appropriately)
         # Note: Mixin already bound Button-3 in setup_column_visibility
         # self.results_tree.bind("<Button-3>", self._show_context_menu)
-    
+
+        def _debug_align():
+            from config import load_ui_scale
+            a = self.auto_search_cb.winfo_rootx() - search_frame.winfo_rootx()
+            o = self.overlaps_only_cb.winfo_rootx() - search_frame.winfo_rootx()
+            print(f"DEBUG ui_scale={load_ui_scale()} auto_search_x={a} overlaps_x={o} diff={o-a}")
+        self.parent.after(500, _debug_align)
+
     def _sort_column(self, col, reverse):
         """Sort treeview column"""
         # Get all rows
@@ -1414,25 +1471,23 @@ class RingFinder(ColumnVisibilityMixin):
     def _stop_search_spinner(self):
         """Stop animated spinner on search button"""
         self.search_spinner_active = False
-        # Restore original button text
-        from localization import t
-        if hasattr(self, 'search_btn') and self.search_btn.winfo_exists():
-            self.search_btn.configure(text=t('ring_finder.search'))
-        
+        # Clear spinner label
+        if hasattr(self, 'search_spinner_label') and self.search_spinner_label.winfo_exists():
+            self.search_spinner_label.configure(text="")
+
         # Restore data source radio button if it was temporarily changed for auto-search
         if hasattr(self, '_saved_data_source') and self._saved_data_source:
             self.data_source_var.set(self._saved_data_source)
             self._saved_data_source = None
-    
+
     def _update_search_spinner(self):
         """Update spinner animation frame"""
         if not self.search_spinner_active:
             return
-        
+
         try:
-            from localization import t
             char = self.search_spinner_chars[self.search_spinner_index]
-            self.search_btn.configure(text=f"{char} {t('ring_finder.search')}")
+            self.search_spinner_label.configure(text=f" {char}")
             self.search_spinner_index = (self.search_spinner_index + 1) % len(self.search_spinner_chars)
             
             # Schedule next frame
@@ -5506,6 +5561,7 @@ class RingFinder(ColumnVisibilityMixin):
                     status_msg = t('ring_finder.no_rings_found')
 
         self.status_var.set(status_msg)
+        self._update_new_entries_label()
 
         if hasattr(self, '_first_new_item'):
             self.results_tree.see(self._first_new_item)
@@ -5574,6 +5630,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.context_menu.add_separator()
         # Database
         self.context_menu.add_command(label=t('context_menu.save_to_local_database'), command=self._save_to_database)
+        self.context_menu.add_command(label=t('context_menu.save_all_new_to_database'), command=self._save_all_new_to_database)
         self.context_menu.add_separator()
         # Ring Data
         self.context_menu.add_command(label=t('context_menu.update_reserve'), command=self._update_reserve_from_spansh)
@@ -5714,19 +5771,24 @@ class RingFinder(ColumnVisibilityMixin):
                     else:
                         self.context_menu.entryconfig(7, state="disabled")
 
-                    # Show/hide "Update Reserve Level" option (index 9) based on Local source + missing reserve
+                    # Show/hide "Save All New to Database" option (index 8) - enabled whenever any
+                    # row in the full result set is Spansh-only or Both (not just the selection)
+                    has_any_new_spansh_rows = self._has_unsaved_spansh_rows()
+                    self.context_menu.entryconfig(8, state="normal" if has_any_new_spansh_rows else "disabled")
+
+                    # Show/hide "Update Reserve Level" option (index 10) based on Local source + missing reserve
                     if enable_update_reserve:
-                        self.context_menu.entryconfig(9, state="normal")
+                        self.context_menu.entryconfig(10, state="normal")
                     else:
-                        self.context_menu.entryconfig(9, state="disabled")
+                        self.context_menu.entryconfig(10, state="disabled")
 
                     # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: inara, 3: edsm, 4: spansh,
                     # 5: find_sell_station, 6: separator,
-                    # 7: save_to_db, 8: separator,
-                    # 9: update_reserve, 10: edit_hotspots, 11: set_overlap, 12: set_res,
-                    # 13: edit_ring_type, 14: edit_visits, 15: separator,
-                    # 16: mark_favourite, 17: set_as_reference, 18: bookmark, 19: edit_comment, 20: separator,
-                    # 21: open_mining_report
+                    # 7: save_to_db, 8: save_all_new_to_db, 9: separator,
+                    # 10: update_reserve, 11: edit_hotspots, 12: set_overlap, 13: set_res,
+                    # 14: edit_ring_type, 15: edit_visits, 16: separator,
+                    # 17: mark_favourite, 18: set_as_reference, 19: bookmark, 20: edit_comment, 21: separator,
+                    # 22: open_mining_report
 
                     # Enable "Open Mining Report" only when a report exists for this row (Last Mined column)
                     has_mining_report = False
@@ -5734,7 +5796,7 @@ class RingFinder(ColumnVisibilityMixin):
                         values = self.results_tree.item(selected_items[0], 'values')
                         if values and len(values) > 14:
                             has_mining_report = bool(values[14])
-                    self.context_menu.entryconfig(21, state="normal" if has_mining_report else "disabled")
+                    self.context_menu.entryconfig(22, state="normal" if has_mining_report else "disabled")
 
                     # Favourite toggle only applies to rows saved in the local database
                     has_local_row = False
@@ -5748,10 +5810,10 @@ class RingFinder(ColumnVisibilityMixin):
                                 is_favourite_row = len(values) > 13 and values[13] == "⭐"
 
                     if has_local_row:
-                        self.context_menu.entryconfig(16, state="normal",
+                        self.context_menu.entryconfig(17, state="normal",
                                                        label=t('context_menu.remove_favourite') if is_favourite_row else t('context_menu.mark_favourite'))
                     else:
-                        self.context_menu.entryconfig(16, state="disabled", label=t('context_menu.mark_favourite'))
+                        self.context_menu.entryconfig(17, state="disabled", label=t('context_menu.mark_favourite'))
 
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -5983,23 +6045,83 @@ class RingFinder(ColumnVisibilityMixin):
         else:
             self.status_var.set("Error: Could not access main application")
     
+    def _has_unsaved_spansh_rows(self) -> bool:
+        """Check if any row in the full result set is Spansh-only or Both (i.e. has new data to save)"""
+        for item in self.results_tree.get_children():
+            values = self.results_tree.item(item, 'values')
+            if values and len(values) > 12:
+                source = str(values[12])
+                if '🌐' in source:
+                    return True
+        return False
+
+    def _update_new_entries_label(self):
+        """Update the 'N new / M systems not in database' hint next to the results header.
+
+        Hotspot count includes new materials from both globe-only AND "Both"
+        rows (matches what _save_to_database_worker actually processes).
+        "Systems not in database" is scoped tighter: only globe-only rows count,
+        since a "Both" row's system already has some local data saved.
+        """
+        import re
+        new_hotspots = 0
+        new_systems = set()
+        for item in self.results_tree.get_children():
+            values = self.results_tree.item(item, 'values')
+            if values and len(values) > 12:
+                source = str(values[12])
+                is_spansh = '🌐' in source
+                is_local = '🗄️' in source
+                if is_spansh:
+                    system_name = values[2] if len(values) > 2 else ""
+                    body_name = values[3] if len(values) > 3 else ""
+                    hotspots_display = values[8] if len(values) > 8 else ""
+                    if hotspots_display and hotspots_display not in ("-", "No data"):
+                        for material_name, count_str in re.findall(r'([A-Za-z\s\.]+)(?:\s*\((\d+)\))?', hotspots_display):
+                            material_name = material_name.strip()
+                            if not material_name or material_name == ',':
+                                continue
+                            count = max(int(count_str), 1) if count_str else 1
+                            material_full = self._expand_material_abbreviation(material_name)
+                            existing_data = self.user_db.get_hotspot_data(system_name, body_name, material_full)
+                            if not existing_data:
+                                new_hotspots += count
+                    if not is_local:
+                        new_systems.add(system_name)
+
+        if new_hotspots:
+            self.new_entries_var.set(
+                t('ring_finder.new_entries_hint').format(hotspots=new_hotspots, systems=len(new_systems)))
+        else:
+            self.new_entries_var.set("")
+
     def _save_to_database(self):
         """Save selected Spansh entries to local database - runs in background thread"""
         selection = self.results_tree.selection()
         if not selection:
             return
-        
-        # Classify selected items by source type
+        self._save_items_to_database(selection)
+
+    def _save_all_new_to_database(self):
+        """Save all Spansh-only/Both entries in the current results to local database, regardless of selection"""
+        all_items = self.results_tree.get_children()
+        if not all_items:
+            return
+        self._save_items_to_database(all_items)
+
+    def _save_items_to_database(self, items):
+        """Classify given treeview items by source type and save the new/updated ones to the database"""
+        # Classify items by source type
         spansh_items = []
         local_items = []
         both_items = []  # Items that exist in both (🗄️ + 🌐)
-        for item in selection:
+        for item in items:
             values = self.results_tree.item(item, 'values')
             if values and len(values) > 10:
                 source = str(values[12])  # Source column is index 12
                 has_spansh = '🌐' in source
                 has_local = '🗄️' in source
-                
+
                 if has_spansh and has_local:
                     # "Both" source - might have updated data from Spansh
                     both_items.append(item)
@@ -6009,13 +6131,13 @@ class RingFinder(ColumnVisibilityMixin):
                 elif has_local:
                     # Local-only - already saved, but could still need updates
                     local_items.append(item)
-        
+
         # Combine Spansh-only and Both items for processing (both may need saving/updating)
         items_to_process = spansh_items + both_items
-        
+
         if not items_to_process:
             if local_items:
-                # All selected rows are local-only (no Spansh data to merge)
+                # All rows are local-only (no Spansh data to merge)
                 message = t('ring_finder.already_in_database')
                 message += f"\n\n{len(local_items)} " + t('ring_finder.entries_skipped_already_saved')
                 centered_info_dialog(self.parent, t('ring_finder.already_saved_title'), message)
@@ -6024,21 +6146,24 @@ class RingFinder(ColumnVisibilityMixin):
                 message = t('ring_finder.no_spansh_results_selected')
                 centered_info_dialog(self.parent, t('ring_finder.save_failed_title'), message)
             return
-        
-        # Check if more than 150 items selected for processing
-        if len(items_to_process) > 150:
-            message = t('ring_finder.too_many_rows_selected', count=len(items_to_process))
-            centered_info_dialog(self.parent, t('ring_finder.save_limit_exceeded'), 
-                               message)
-            return
-        
+
         # Extract all data from treeview on main thread (Tkinter widgets can't be accessed from worker thread)
         items_data = []
         for item in items_to_process:
             values = self.results_tree.item(item, 'values')
             if values and len(values) >= 11:
                 items_data.append(values)
-        
+
+        # Build a coords lookup from the search results cache - Spansh already returns
+        # system_x/y/z for each body, so we can reuse it instead of re-fetching from EDSM
+        search_coords = {}
+        if self._search_cache:
+            for h in self._search_cache:
+                sys_name = h.get('systemName') or h.get('system')
+                coords = h.get('coords')
+                if sys_name and coords and coords.get('x') is not None:
+                    search_coords[sys_name.lower()] = (coords['x'], coords['y'], coords['z'])
+
         # Show progress dialog while saving
         from config import load_theme, scaled_font
         from ui.dialogs import center_window
@@ -6088,9 +6213,9 @@ class RingFinder(ColumnVisibilityMixin):
 
         # Run save operation in background thread with extracted data
         self.status_var.set(f"Saving {len(items_data)} entries to database...")
-        threading.Thread(target=self._save_to_database_worker, args=(items_data, wait_dialog, progress_bar), daemon=True).start()
-    
-    def _save_to_database_worker(self, items_data, wait_dialog=None, progress_bar=None):
+        threading.Thread(target=self._save_to_database_worker, args=(items_data, wait_dialog, progress_bar, search_coords), daemon=True).start()
+
+    def _save_to_database_worker(self, items_data, wait_dialog=None, progress_bar=None, search_coords=None):
         """Worker thread for saving to database"""
         saved_rows = 0  # Count of successfully saved rows
         new_rows = 0  # Count of new entries
@@ -6098,7 +6223,8 @@ class RingFinder(ColumnVisibilityMixin):
         skipped_count = 0
         error_count = 0
         errors = []
-        total_materials = 0  # Count of individual material entries saved
+        new_hotspot_count = 0  # Sum of hotspot counts for brand-new entries (matches the pre-save "N new hotspots" hint)
+        new_systems = set()  # Distinct systems with no prior local data (globe-only source, matches the pre-save hint)
         
         total = len(items_data)
         
@@ -6137,17 +6263,20 @@ class RingFinder(ColumnVisibilityMixin):
                 # Get coordinates - try multiple sources
                 coordinates = None
                 try:
-                    # First, try to get from the current_system_coords (reference system coords)
-                    # For Spansh results, we need to fetch coordinates for each system
-                    # Try galaxy database first
-                    system_info = self.systems_data.get(system_name.lower())
-                    if system_info and 'x' in system_info:
-                        coordinates = (system_info['x'], system_info['y'], system_info['z'])
-                    
+                    # First, use coords already returned by Spansh for this search
+                    if search_coords:
+                        coordinates = search_coords.get(system_name.lower())
+
+                    # Next, try the galaxy database cache
+                    if not coordinates:
+                        system_info = self.systems_data.get(system_name.lower())
+                        if system_info and 'x' in system_info:
+                            coordinates = (system_info['x'], system_info['y'], system_info['z'])
+
                     # If not in galaxy database, try visited systems
                     if not coordinates:
                         coordinates = self.user_db._get_coordinates_from_visited_systems(system_name)
-                    
+
                     # If still no coordinates, try to fetch from EDSM
                     if not coordinates:
                         edsm_coords = self._get_system_coords_from_edsm(system_name)
@@ -6255,14 +6384,14 @@ class RingFinder(ColumnVisibilityMixin):
                             if reserve_clean:
                                 self.user_db.bulk_update_reserve_levels(system_name, {body_name: reserve_clean})
                             
-                            total_materials += 1
                             row_saved = True  # Mark this row as successfully saved
-                            
+
                             # Track new vs updated
                             if existing_data:
                                 row_had_updates = True
                             else:
                                 row_had_new = True
+                                new_hotspot_count += hotspot_count
                         # else: data is identical, skip silently
                         
                     except Exception as e:
@@ -6275,6 +6404,8 @@ class RingFinder(ColumnVisibilityMixin):
                     # Prioritize "new" if row had any new materials
                     if row_had_new:
                         new_rows += 1
+                        if '🌐' in str(source) and '🗄️' not in str(source):
+                            new_systems.add(system_name)
                     elif row_had_updates:
                         updated_rows += 1
                 
@@ -6283,9 +6414,9 @@ class RingFinder(ColumnVisibilityMixin):
                 errors.append(f"Row error: {str(e)[:50]}")
         
         # Update UI on main thread
-        self.parent.after(0, lambda: self._save_to_database_complete(saved_rows, new_rows, updated_rows, skipped_count, error_count, errors, wait_dialog, progress_bar))
-    
-    def _save_to_database_complete(self, saved_rows, new_rows, updated_rows, skipped_count, error_count, errors, wait_dialog=None, progress_bar=None):
+        self.parent.after(0, lambda: self._save_to_database_complete(saved_rows, new_rows, updated_rows, skipped_count, error_count, errors, wait_dialog, progress_bar, new_hotspot_count, len(new_systems)))
+
+    def _save_to_database_complete(self, saved_rows, new_rows, updated_rows, skipped_count, error_count, errors, wait_dialog=None, progress_bar=None, new_hotspot_count=0, new_system_count=0):
         """Handle completion of save to database (runs on main thread)"""
         if progress_bar is not None:
             progress_bar.stop()
@@ -6297,16 +6428,8 @@ class RingFinder(ColumnVisibilityMixin):
                 pass
         # Show results
         if saved_rows > 0:
-            message = t('ring_finder.save_success').format(count=saved_rows)
-            
-            # Show breakdown of new vs updated
-            if new_rows > 0 and updated_rows > 0:
-                message += f" ({new_rows} " + t('ring_finder.new') + f", {updated_rows} " + t('ring_finder.updated') + ")"
-            elif updated_rows > 0:
-                message += f" ({updated_rows} " + t('ring_finder.updated') + ")"
-            elif new_rows > 0:
-                message += f" ({new_rows} " + t('ring_finder.new') + ")"
-            
+            message = t('ring_finder.save_success').format(count=new_hotspot_count, rows=saved_rows, systems=new_system_count)
+
             if skipped_count > 0:
                 message += f"\n⚠ " + t('ring_finder.skipped').format(count=skipped_count)
             if error_count > 0:

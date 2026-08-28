@@ -715,7 +715,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.3.3"
+APP_VERSION = "v5.3.4"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -8263,7 +8263,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         tk.Label(scale_frame, text=t('settings.ui_scale') + ":", bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left", padx=(4, 10))
 
-        _ui_scale_options = {"100%": 1.0, "110%": 1.1, "120%": 1.2, "130%": 1.3, "150%": 1.5, "175%": 1.75}
+        _ui_scale_options = {"100%": 1.0, "110%": 1.1, "120%": 1.2, "130%": 1.3, "150%": 1.5}
         _ui_scale_reverse = {v: k for k, v in _ui_scale_options.items()}
         _current_ui_scale = load_ui_scale()
         _current_ui_scale_display = _ui_scale_reverse.get(_current_ui_scale, "100%")

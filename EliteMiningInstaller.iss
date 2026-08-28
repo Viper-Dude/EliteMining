@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v5.3.3
+AppVersion=v5.3.4
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
