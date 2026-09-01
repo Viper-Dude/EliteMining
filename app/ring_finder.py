@@ -986,10 +986,10 @@ class RingFinder(ColumnVisibilityMixin):
                            foreground="#ff8c00",
                            arrowcolor="#ff8c00")
             style.map("TCombobox",
-                     fieldbackground=[('readonly', '#1e1e1e')],
-                     background=[('readonly', '#4a3000')],
-                     foreground=[('readonly', '#ff8c00')],
-                     arrowcolor=[('readonly', '#ff8c00')])
+                     fieldbackground=[('disabled', '#1e1e1e'), ('readonly', '#1e1e1e')],
+                     background=[('disabled', '#2a2a2a'), ('readonly', '#4a3000')],
+                     foreground=[('disabled', '#666666'), ('readonly', '#ff8c00')],
+                     arrowcolor=[('disabled', '#666666'), ('readonly', '#ff8c00')])
             
             # Spinbox styling for orange theme - make arrow buttons visible
             style.configure("TSpinbox",

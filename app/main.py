@@ -5254,7 +5254,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         style.configure("TCheckbutton", background=dark_bg, foreground=dark_fg)
         style.configure("TRadiobutton", background=dark_bg, foreground=dark_fg)
         style.configure("TCombobox", fieldbackground=dark_bg, background=accent, foreground=dark_fg, font=_scaled_font(9))
-        style.map("TCombobox", fieldbackground=[("readonly", dark_bg)], foreground=[("readonly", dark_fg)])
+        style.map("TCombobox",
+                   fieldbackground=[("disabled", dark_bg), ("readonly", dark_bg)],
+                   foreground=[("disabled", "#666666"), ("readonly", dark_fg)])
 
         # Apply dark theme to classic widgets too
         self.option_add("*Listbox.background", dark_bg)

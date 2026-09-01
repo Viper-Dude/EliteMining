@@ -4,11 +4,13 @@
 ## New Features & Improvements
 
 - Added 20ly and 30ly to the Max Distance dropdown on the Ring/Hotspot Finder tab so you can search within Fortified/Stronghold acquisition range
-- UI fixes
+- General UI fixes 
 
-### Voiceattack Profile no update (v5.3.5)
+### Voiceattack Profile updated to  (v5.3.5)
 
-- "Stop retracting cargo scoop during reset mining" is renamed to "Reset mining and stop retracting Cargo Scoop". This command stops or resets the mining sequence (depending on which one is running) and keeps your cargo scoop open (if enabled in the VoiceAttack control tab). Usefull when there are too many fragments to collect and you dont want the sequence to retract the cargo scoop .
+- "Stop retracting cargo scoop during reset mining" is renamed to "Stop retracting Cargo Scoop". Depending on which one is active, this command stops the mining sequence or the reset mining sequence, adjusts the power settings, and keeps your cargo scoop open (if enabled in the VoiceAttack control tab).
+
+Useful when there are too many fragments to collect and you dont want the sequence to retract the cargo scoop .
 
 - General optimizations
 
