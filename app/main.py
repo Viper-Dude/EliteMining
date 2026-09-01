@@ -715,7 +715,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.3.4"
+APP_VERSION = "v5.3.5"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -6080,7 +6080,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             relief="flat",
             bd=0,
             highlightthickness=0,
-            wrap="word",  # Enable word wrap for better text flow
+            wrap="none",  # No wrap - fixed-width columnar lines must not break
             height=6,  # Minimum height - will expand with pane
             width=45   # Width for complete cargo info
         )

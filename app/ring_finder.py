@@ -713,7 +713,7 @@ class RingFinder(ColumnVisibilityMixin):
         _distance_combo_frame.pack(side="left")
         _distance_combo_frame.pack_propagate(False)
         self.distance_combo = ttk.Combobox(_distance_combo_frame, textvariable=self.distance_var, state="readonly", font=scaled_font(9))
-        self.distance_combo['values'] = ("10", "50", "100", "150", "200")
+        self.distance_combo['values'] = ("10", "20", "30", "50", "100", "150", "200")
         self.distance_combo.pack(side="left", fill="both", expand=True)
         self.distance_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
 
@@ -1529,7 +1529,7 @@ class RingFinder(ColumnVisibilityMixin):
             self.res_only_cb.configure(state="disabled")
             # Remove 300 LY option and cap distance at 200 for Spansh
             if hasattr(self, 'distance_combo'):
-                self.distance_combo['values'] = ("10", "50", "100", "150", "200")
+                self.distance_combo['values'] = ("10", "20", "30", "50", "100", "150", "200")
                 if hasattr(self, 'distance_var') and int(self.distance_var.get() or 200) > 200:
                     self.distance_var.set("200")
         else:
@@ -1537,7 +1537,7 @@ class RingFinder(ColumnVisibilityMixin):
             self.overlaps_only_cb.configure(state="normal")
             self.res_only_cb.configure(state="normal")
             if hasattr(self, 'distance_combo'):
-                self.distance_combo['values'] = ("10", "50", "100", "150", "200")
+                self.distance_combo['values'] = ("10", "20", "30", "50", "100", "150", "200")
 
         # PP column: hide when Spansh rows can appear (Spansh-only or mixed Both), since
         # Treeview row-coloring would otherwise show PP data (always from local DB) in Spansh's blue
@@ -5806,6 +5806,14 @@ class RingFinder(ColumnVisibilityMixin):
                                                        label=t('context_menu.remove_favourite') if is_favourite_row else t('context_menu.mark_favourite'))
                     else:
                         self.context_menu.entryconfig(17, state="disabled", label=t('context_menu.mark_favourite'))
+
+                    # Edit/Add Comment label depends on whether the row already has a comment
+                    has_comment = False
+                    if selected_items:
+                        values = self.results_tree.item(selected_items[0], 'values')
+                        if values and len(values) > 15:
+                            has_comment = bool(values[15])
+                    self.context_menu.entryconfig(20, label=t('context_menu.edit_comment') if has_comment else t('context_menu.add_comment'))
 
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
