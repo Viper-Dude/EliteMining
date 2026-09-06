@@ -129,6 +129,9 @@
     "auto_search_tooltip": "Sucht automatisch beim Springen in ein neues System.\nSetzt alle Filter vor jeder Suche auf Standardwerte zurück.\n(Nur lokale Datenbank - schnell, keine API-Aufrufe)\nBei Deaktivierung bleibt das Referenzsystem wie zuletzt festgelegt - es ändert sich weder beim Programmstart noch beim Sprung.",
     "auto_switch_tabs": "Auto-Tab-Wechsel",
     "search": "Suchen",
+    "stop": "Stopp",
+    "search_stopped": "Suche gestoppt",
+    "search_stopped_partial": "Suche gestoppt - {count} Teilergebnis(se) angezeigt",
     "searching": "⏳ Suche nach Ringen...",
     "no_results": "Keine Hotspots innerhalb von {distance} LJ gefunden",
     "results_found": "{count} Ergebnisse gefunden",
@@ -219,8 +222,8 @@
     "col_powerplay": "Powerplay",
     "pp_power": "Macht",
     "pp_state": "Power-Zustand",
-    "pp_power_tooltip": "Nach kontrollierender Macht filtern. Nur für die lokale Datenbanksuche verfügbar — deaktiviert, wenn die Datenquelle auf Spansh oder Beide gesetzt ist.\n\nDie Powerplay-Spalte wird automatisch aus EDDN befüllt (Live-Daten anderer Spieler) sowie aus deinem eigenen Logbuch, sobald du durch Systeme springst.\n'Keine Daten ↗' = noch nicht im Cache — Doppelklick öffnet System auf Inara und ruft Daten automatisch ab.\n'Kein Powerplay' = bestätigt keine kontrollierende Macht.",
-    "pp_state_tooltip": "Nach Powerplay-Zustand filtern — Ausgebeutet, Befestigt, Hochburg, Expansion oder Umkämpft. Nur für die lokale Datenbanksuche verfügbar — deaktiviert, wenn die Datenquelle auf Spansh oder Beide gesetzt ist.\n\nZustandsdaten kommen von EDDN und werden automatisch aktualisiert, wenn Spieler durch Systeme springen. Die Abdeckung baut sich allmählich auf und kann Stunden bis Tage dauern, besonders in wenig besuchten Systemen.\nHinweis: EDDN-Daten werden nur empfangen und lokal gespeichert, solange diese App läuft."
+    "pp_power_tooltip": "Nach kontrollierender Macht filtern (nur lokale Datenbank). Erfordert einen bestimmten Zustand. Jeder bestimmte Zustand sucht bis zu 500 Ly — Ausgebeutet, Befestigt, Hochburg, Unbesetzt über Spansh (schnell und genau); Expansion, Umkämpft nur über den lokalen EDDN-Cache, da Spansh diese beiden Zustände nicht erfasst.\n'Kein Powerplay' = bestätigt keine kontrollierende Macht. Unbesetzte Systeme zeigen nur den Zustand, da sie per Definition von niemandem kontrolliert werden.",
+    "pp_state_tooltip": "Nach Powerplay-Zustand filtern (nur lokale Datenbank). Jeder bestimmte Zustand sucht bis zu 500 Ly — Ausgebeutet, Befestigt, Hochburg, Unbesetzt über Spansh (schnell und genau); Expansion, Umkämpft nur über den lokalen EDDN-Cache, da Spansh diese beiden Zustände nicht erfasst.\nUnbesetzte Systeme zeigen nur den Zustand, da sie per Definition von niemandem kontrolliert werden."
   },
   "sidebar": {
     "ship_presets": "Schiff-Presets (VoiceAttack)",
@@ -714,6 +717,10 @@
     "new_quantity": "Neue Menge:"
   },
   "context_menu": {
+    "export_results_csv": "Alle Ergebnisse als CSV exportieren...",
+    "export_results_success": "{count} Zeilen exportiert nach:\n{path}",
+    "export_results_failed": "Export fehlgeschlagen:\n{error}",
+    "export_open_file": "Datei öffnen",
     "open_report_txt": "Bericht öffnen (TXT)",
     "open_mining_report": "Abbaubericht öffnen",
     "open_report_html": "Detaillierten Bericht öffnen (HTML)",
@@ -1345,8 +1352,8 @@
     "pp_select_pledge": "← Wähle deine Macht oben",
     "pp_tooltip_foryou": "Deine empfohlene Powerplay-Aktion für dieses System.\nBasiert auf der kontrollierenden Macht vs. deiner gepledgten Macht (Meine Macht).\nVerstärken = System gehört deiner Macht — Mining hier bringt Befestigungs-Verdienste.\nUntergraben = System einer feindlichen Macht — Mining hier schwächt deren Kontrolle.\nErwerben   = Unbesetzt oder in Expansion — System kann für deine Macht beansprucht werden.",
     "pp_tooltip_merits": "Verdienstindikator für Mining-Aktivitäten in diesem System.\n+++ = Umkämpft — aktiv im Wettstreit\n++  = Ausgebeutet / Befestigt — Untergraben einer feindlichen Macht bringt hier einen Verdienst-Bonus\n+   = Hochburg (bereits maximal) oder Unbesetzt / Expansion — Erwerben bringt keinen Verdienst-Bonus\nBoom-BGS-Zustand fügt eine Bonusstufe zum Basiswert hinzu.\n\nWichtig: Verdienste gibt es nur, wenn du abgebautes Material im richtigen System VERKAUFST.\nVerstärken/Untergraben: Abbauen und verkaufen im selben (eigenen/feindlichen) System.\nErwerben: Verkauf im unbesetzten Zielsystem; Abbau ist innerhalb von 20 Ly möglich (wenn dein nächstes System Befestigt ist) oder 30 Ly (wenn Hochburg).\nVerkauf anderswo bringt 0 Powerplay-Verdienste für diese Fracht.",
-    "pp_power_tooltip": "Nach kontrollierender Macht filtern. Nur für die lokale Datenbanksuche verfügbar — deaktiviert, wenn die Datenquelle auf Spansh oder Beide gesetzt ist.\n\nDie Powerplay-Spalte wird automatisch aus EDDN befüllt (Live-Daten anderer Spieler) sowie aus deinem eigenen Logbuch, sobald du durch Systeme springst.\n'Keine Daten ↗' = noch nicht im Cache — Doppelklick öffnet System auf Inara und ruft Daten automatisch ab.\n'Kein Powerplay' = bestätigt keine kontrollierende Macht.",
-    "pp_state_tooltip": "Nach Powerplay-Zustand filtern — Ausgebeutet, Befestigt, Hochburg, Expansion oder Umkämpft. Nur für die lokale Datenbanksuche verfügbar — deaktiviert, wenn die Datenquelle auf Spansh oder Beide gesetzt ist.\n\nZustandsdaten kommen von EDDN und werden automatisch aktualisiert, wenn Spieler durch Systeme springen. Die Abdeckung baut sich allmählich auf und kann Stunden bis Tage dauern, besonders in wenig besuchten Systemen.\nHinweis: EDDN-Daten werden nur empfangen und lokal gespeichert, solange diese App läuft.",
+    "pp_power_tooltip": "Nach kontrollierender Macht filtern.\n\nWird eine bestimmte Macht ausgewählt (mit Zustand = Befestigt oder Hochburg), fragt die App direkt Spansh nach genauen Ergebnissen ab.\nBei 'Beliebig' zeigt die Powerplay-Spalte nur, was bereits lokal zwischengespeichert ist (von EDDN, solange die App läuft, oder aus deinem eigenen Logbuch) — viele Systeme zeigen 'Keine Daten ↗', bis sie per Doppelklick über Inara abgerufen oder live besucht wurden.\n'Kein Powerplay' = bestätigt keine kontrollierende Macht.",
+    "pp_state_tooltip": "Nach Powerplay-Zustand filtern — Ausgebeutet, Befestigt, Hochburg, Expansion oder Umkämpft.\n\nBefestigt und Hochburg werden direkt bei Spansh abgefragt, daher sind die Ergebnisse unabhängig von der Datenquelle genau und schnell.\nAndere Zustände (und 'Beliebig') nutzen ausschließlich den lokalen EDDN-Cache — die Abdeckung baut sich allmählich auf, während Spieler durch Systeme springen, und kann 'Keine Daten ↗' anzeigen, bis sie per Inara abgerufen oder live besucht wurden.",
     "eddn_status_tooltip": "EDDN-Status — Live-Datenfeed für Powerplay und Marktdaten",
     "spansh_status_tooltip": "Spansh-API-Status — prüft die Verbindung zu spansh.co.uk"
   },

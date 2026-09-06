@@ -31,7 +31,24 @@ class SystemFinderAPI:
 
     # Set from main.py after EDDN listener starts — enables local powerplay cache lookups
     EDDN_CACHE_PATH = None
-    
+
+    # Frontier's own journal/EDDN ControllingPower field abbreviates this one Power's name
+    # (unlike every other Power, which is written out in full) — and Spansh's own dataset
+    # uses that same abbreviated form too (confirmed via direct API query), not the full name
+    # our dropdown options use. EDDN-sourced values are normalized to the full name on read
+    # via this map; the reverse map below converts back to Spansh's form before sending a
+    # controlling_power filter, since sending the full name silently returns zero matches.
+    _POWER_NAME_ALIASES = {
+        'A. Lavigny-Duval': 'Arissa Lavigny-Duval',
+    }
+    _POWER_NAME_ALIASES_REVERSE = {v: k for k, v in _POWER_NAME_ALIASES.items()}
+
+    @classmethod
+    def _normalize_power_name(cls, power_name: Optional[str]) -> Optional[str]:
+        if not power_name:
+            return power_name
+        return cls._POWER_NAME_ALIASES.get(power_name, power_name)
+
     @classmethod
     def _batch_get_powerplay(cls, system_names: List[str]) -> Dict[str, Dict]:
         """
@@ -50,12 +67,158 @@ class SystemFinderAPI:
                     system_names
                 ).fetchall()
             return {
-                row[0]: {'controlling_power': row[1], 'power_state': row[2], 'updated_at': row[3]}
-                for row in rows if row[1]  # only rows where controlling_power is known
+                row[0]: {'controlling_power': cls._normalize_power_name(row[1]), 'power_state': row[2], 'updated_at': row[3]}
+                for row in rows if row[1] or row[2]  # keep rows with a known power OR state -
+                # a blank controlling_power is expected/correct for Unoccupied, not "no data"
             }
         except Exception as e:
             log.debug(f"[SYSTEM_FINDER] EDDN powerplay batch lookup error: {e}")
             return {}
+
+    @classmethod
+    def _fetch_spansh_powerplay_systems(cls, reference_system: str, max_distance: float,
+                                         power: str, pp_state: str) -> Dict[str, Dict]:
+        """
+        Query Spansh's systems-search for authoritative Fortified/Stronghold power/state data,
+        scoped to the same reference_system + max_distance as the ring search.
+        Returns {system_name: {controlling_power, power_state}}. Empty dict on any failure —
+        this is a supplementary enrichment call, never required for the search to succeed.
+        """
+        spansh_filters = cls._build_spansh_filters({'power': power, 'pp_state': pp_state})
+        if not spansh_filters:
+            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment skipped (no filters built for power={power!r}, pp_state={pp_state!r})")
+            return {}
+
+        payload = {
+            'reference_system': reference_system,
+            'size': cls.MAX_RESULTS,
+            'sort': [{'distance': {'direction': 'asc'}}],
+            'filters': spansh_filters
+        }
+
+        import time
+        print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment: querying {reference_system!r} (max {max_distance} LY) with filters={spansh_filters}")
+
+        try:
+            _t0 = time.time()
+            response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
+            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment: request took {time.time() - _t0:.1f}s")
+            response.raise_for_status()
+            data = response.json()
+            results = data.get('results', [])
+            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment: got {len(results)} raw results from Spansh")
+
+            pp_systems = {}
+            for system in results:
+                if system.get('distance', 0) > max_distance:
+                    continue
+                system_name = system.get('name', '')
+                if not system_name:
+                    continue
+                pp_systems[system_name] = {
+                    'controlling_power': cls._normalize_power_name(system.get('controlling_power', '')),
+                    'power_state': system.get('power_state', ''),
+                    'updated_at': system.get('updated_at', ''),
+                    'distance': system.get('distance', 0),
+                }
+            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment: {len(pp_systems)} within {max_distance} LY after distance filter")
+            return pp_systems
+        except Exception as e:
+            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment failed: {e}")
+            return {}
+
+    @classmethod
+    def _store_powerplay_batch(cls, pp_systems: Dict[str, Dict]) -> None:
+        """Persist Spansh-sourced Fortified/Stronghold controlling_power/power_state/updated_at
+        into the EDDN cache's system_powerplay table, same INSERT OR REPLACE pattern as the
+        Inara fetch (fetch_and_store_powerplay_from_inara). Caller has already decided which
+        entries are worth writing (newer than cache, or filling a blank) — this just persists
+        them so future searches/other tabs see it without re-fetching from Spansh every time.
+        """
+        if not cls.EDDN_CACHE_PATH or not pp_systems:
+            return
+        try:
+            with sqlite3.connect(cls.EDDN_CACHE_PATH) as conn:
+                for system_name, entry in pp_systems.items():
+                    # Preserve any 'powers' list already captured from EDDN — Spansh's
+                    # systems-search doesn't return the contesting powers list.
+                    existing = conn.execute(
+                        'SELECT powers FROM system_powerplay WHERE system_name = ?', (system_name,)
+                    ).fetchone()
+                    powers_json = existing[0] if existing else None
+                    conn.execute(
+                        'INSERT OR REPLACE INTO system_powerplay '
+                        '(system_name, controlling_power, power_state, powers, updated_at) '
+                        'VALUES (?, ?, ?, ?, ?)',
+                        (system_name, entry.get('controlling_power', ''), entry.get('power_state', ''),
+                         powers_json, entry.get('updated_at', ''))
+                    )
+                conn.commit()
+        except Exception as e:
+            log.debug(f"[POWERPLAY] Failed to persist Spansh PowerPlay batch: {e}")
+
+    @classmethod
+    def _fetch_spansh_powerplay_for_named_systems(cls, system_names: List[str], is_cancelled=None) -> Dict[str, Dict]:
+        """
+        Look up PowerPlay data straight from Spansh for a specific, already-known list of
+        systems (no power/state filter) — one /api/systems/search call per system, since
+        Spansh has no "search by name list" capability. Used to enrich Spansh-sourced ring
+        search results when no Power/PP State filter is active, so the PowerPlay column
+        isn't limited to whatever the EDDN cache happens to have for those systems.
+        Returns {system_name: {controlling_power, power_state, updated_at}} for hits only.
+        Capped at 50 systems (one request each) to avoid a request storm on large result sets —
+        this is a display enrichment, not a required part of the search.
+
+        is_cancelled: optional zero-arg callable checked before each request — lets the
+        caller (e.g. the user clicking Stop) abort this loop early instead of waiting for
+        up to 50 sequential requests to finish before the cancellation takes effect.
+        """
+        import time
+        pp_data = {}
+        last_call = 0.0
+        truncated = system_names[:50]
+        print(f"[SYSTEM_FINDER DEBUG] Spansh per-system PowerPlay lookup: {len(truncated)} systems to query (of {len(system_names)} total)")
+        for i, system_name in enumerate(truncated):
+            if is_cancelled and is_cancelled():
+                print(f"[SYSTEM_FINDER DEBUG] Spansh per-system PowerPlay lookup cancelled at {i}/{len(truncated)}")
+                break
+
+            elapsed = time.time() - last_call
+            if elapsed < 0.5:
+                time.sleep(0.5 - elapsed)
+            last_call = time.time()
+            try:
+                payload = {
+                    'reference_system': system_name,
+                    'size': 1,
+                    'sort': [{'distance': {'direction': 'asc'}}],
+                }
+                print(f"[SYSTEM_FINDER DEBUG] Spansh call {i+1}/{len(truncated)}: POST {cls.SPANSH_URL} {payload}")
+                response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
+                response.raise_for_status()
+                results = response.json().get('results', [])
+                if not results:
+                    print(f"[SYSTEM_FINDER DEBUG]   -> no results for {system_name!r}")
+                    continue
+                system = results[0]
+                if system.get('name', '') != system_name:
+                    print(f"[SYSTEM_FINDER DEBUG]   -> name mismatch: asked {system_name!r}, got {system.get('name', '')!r}, skipping")
+                    continue
+                controlling_power = cls._normalize_power_name(system.get('controlling_power', ''))
+                if not controlling_power:
+                    print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: no controlling_power")
+                    continue
+                print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: {controlling_power} / {system.get('power_state', '')}")
+                pp_data[system_name] = {
+                    'controlling_power': controlling_power,
+                    'power_state': system.get('power_state', ''),
+                    'updated_at': system.get('updated_at', ''),
+                }
+            except Exception as e:
+                print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: request failed: {e}")
+                continue
+        print(f"[SYSTEM_FINDER DEBUG] Spansh per-system PowerPlay lookup: {len(pp_data)}/{len(truncated)} systems returned PowerPlay data")
+        return pp_data
 
     @classmethod
     def _get_powerplay_from_cache(cls, system_name: str) -> Optional[Dict]:
@@ -70,7 +233,7 @@ class SystemFinderAPI:
                     (system_name,)
                 ).fetchone()
             if row and row[0]:
-                return {'controlling_power': row[0], 'power_state': row[1], 'updated_at': row[2]}
+                return {'controlling_power': cls._normalize_power_name(row[0]), 'power_state': row[1], 'updated_at': row[2]}
         except Exception as e:
             log.debug(f"[SYSTEM_FINDER] EDDN powerplay lookup error: {e}")
         return None
@@ -309,7 +472,8 @@ class SystemFinderAPI:
         # 'controlling_power' is the actual controller and is what we want to filter by.
         power = filters.get('power', 'Any')
         if power and power != 'Any':
-            spansh_filters['controlling_power'] = {'value': [power]}
+            spansh_power = cls._POWER_NAME_ALIASES_REVERSE.get(power, power)
+            spansh_filters['controlling_power'] = {'value': [spansh_power]}
 
         # Powerplay — system state. Spansh only indexes Unoccupied/Exploited/Fortified/Stronghold;
         # Expansion/Contested aren't in Spansh's dataset at all, so those are filtered from the
@@ -388,7 +552,7 @@ class SystemFinderAPI:
         if pp_power == '~none~' and (not pp_state or pp_state == 'Unoccupied'):
             spansh_state = system.get('power_state') or None
             if spansh_state and spansh_state != 'Unoccupied':
-                pp_power = system.get('controlling_power') or pp_power
+                pp_power = cls._normalize_power_name(system.get('controlling_power')) or pp_power
                 pp_state = spansh_state
                 pp_updated_at = None
 

@@ -8,9 +8,9 @@ from pathlib import Path
 from datetime import datetime
 
 # === CHANGE VERSION AND DATE HERE ===
-NEW_VERSION = "5.3.5"
-NEW_BUILD_DATE = "2026-August-31"  # Format: YYYY-MM-DD (leave empty for today's date)
-VA_PROFILE_VERSION = "5.3.5"  # Set to "" if this release does not include a VA profile update
+NEW_VERSION = "5.3.6"
+NEW_BUILD_DATE = "2026-September-05"  # Format: YYYY-MM-DD (leave empty for today's date)
+VA_PROFILE_VERSION = ""  # Set to "" if this release does not include a VA profile update
 # ====================================
 
 def main():
@@ -45,8 +45,30 @@ def main():
     content = installer_file.read_text(encoding="utf-8")
     content = re.sub(r'AppVersion=v[^\r\n]+', f'AppVersion=v{NEW_VERSION}', content)
     if VA_PROFILE_VERSION:
-        content = re.sub(r"BundledProfileVersion := '[^']+'", f"BundledProfileVersion := '{VA_PROFILE_VERSION}'", content)
-        content = re.sub(r'Install/Update VoiceAttack profile \(v[^)]+\)', f'Install/Update VoiceAttack profile (v{VA_PROFILE_VERSION})', content)
+        bundled_version = VA_PROFILE_VERSION
+    else:
+        # No profile update declared this release - derive the real bundled version from
+        # the actual .vap filename instead of leaving whatever a prior/mistaken run wrote,
+        # so BundledProfileVersion/checkbox text can't drift out of sync with what's shipped.
+        vap_dir = base_path / "Voiceattack Profile"
+        vap_files = list(vap_dir.glob("EliteMining v*-Profile.vap"))
+        if len(vap_files) == 1:
+            m = re.search(r'EliteMining v([\d.]+)-Profile\.vap', vap_files[0].name)
+            bundled_version = m.group(1) if m else None
+        else:
+            bundled_version = None
+            print(f"⚠ Could not determine bundled VA profile version ({len(vap_files)} .vap files found) - leaving BundledProfileVersion as-is")
+
+    if bundled_version:
+        content = re.sub(r"BundledProfileVersion := '[^']+'", f"BundledProfileVersion := '{bundled_version}'", content)
+        content = re.sub(r'Install/Update VoiceAttack profile \(v[^)]+\)', f'Install/Update VoiceAttack profile (v{bundled_version})', content)
+
+    if VA_PROFILE_VERSION:
+        # New profile this release - show the update notice page
+        content = re.sub(r'^;?InfoBeforeFile=', 'InfoBeforeFile=', content, flags=re.MULTILINE)
+    else:
+        # No profile update this release - suppress the update notice page
+        content = re.sub(r'^;?InfoBeforeFile=', ';InfoBeforeFile=', content, flags=re.MULTILINE)
     installer_file.write_text(content, encoding="utf-8")
     print(f"✓ Updated {installer_file.name}")
     

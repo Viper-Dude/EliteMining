@@ -9,6 +9,7 @@
 ### Voiceattack Profile updated to  (v5.3.5)
 
 - "Stop retracting cargo scoop during reset mining" is renamed to "Stop retracting Cargo Scoop". Depending on which one is active, this command stops the mining sequence or the reset mining sequence, adjusts the power settings, and keeps your cargo scoop open (if enabled in the VoiceAttack control tab).
+This is useful when there are too many fragments to collect and you don't want the sequence to retract the cargo scoop.
 
 Useful when there are too many fragments to collect and you dont want the sequence to retract the cargo scoop .
 

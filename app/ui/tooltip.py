@@ -71,7 +71,7 @@ class ToolTip:
             root_height = root_window.winfo_height()
             
             # Tooltip dimensions
-            tooltip_width = 250
+            tooltip_width = 340
             tooltip_height = 60
             
             # Check if widget is in the bottom area of the window (like the Import/Apply buttons)
@@ -103,7 +103,7 @@ class ToolTip:
             
             label = tk.Label(tw, text=self.text, justify=tk.LEFT,
                             background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                            font=scaled_font(8), wraplength=250,
+                            font=scaled_font(8), wraplength=340,
                             padx=4, pady=2)
             label.pack()
             

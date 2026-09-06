@@ -18597,7 +18597,7 @@
         </CommandAction>
       </ActionSequence>
       <Async>false</Async>
-      <Enabled>true</Enabled>
+      <Enabled>false</Enabled>
       <Description>Set Speed 75%</Description>
       <Category>Commands  - Flight Throttle</Category>
       <keyValue>0</keyValue>
@@ -18638,7 +18638,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 3</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>3</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -18997,7 +18997,7 @@
         </CommandAction>
       </ActionSequence>
       <Async>false</Async>
-      <Enabled>true</Enabled>
+      <Enabled>false</Enabled>
       <Description>Set Speed 100%</Description>
       <Category>Commands  - Flight Throttle</Category>
       <keyValue>0</keyValue>
@@ -19038,7 +19038,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 3</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>3</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>1</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -19438,7 +19438,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 3</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>3</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>1</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -57416,7 +57416,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 9</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>9</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -58382,7 +58382,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 1</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>1</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>1</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -58588,7 +58588,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 32</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>32</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>1</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -59931,7 +59931,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 0</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>0</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>1</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -60031,7 +60031,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 30</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>30</joystickButton><joystickNumber2>1</joystickNumber2><joystickButton2>26</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -60131,7 +60131,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 30</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>30</joystickButton><joystickNumber2>1</joystickNumber2><joystickButton2>25</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -60231,7 +60231,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 30</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>30</joystickButton><joystickNumber2>1</joystickNumber2><joystickButton2>24</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -60331,7 +60331,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 25</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>25</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -60938,7 +60938,7 @@
         </CommandAction>
       </ActionSequence>
       <Async>true</Async>
-      <Enabled>true</Enabled>
+      <Enabled>false</Enabled>
       <Description>Deploy Cargo Scoop</Description>
       <Category>Commands - Ship</Category>
       <keyValue>0</keyValue>
@@ -60979,7 +60979,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 9</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>9</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -61143,7 +61143,7 @@
         </CommandAction>
       </ActionSequence>
       <Async>true</Async>
-      <Enabled>true</Enabled>
+      <Enabled>false</Enabled>
       <Description>Deploy Cargo Scoop</Description>
       <Category>Commands - Ship</Category>
       <keyValue>0</keyValue>
@@ -61184,7 +61184,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 9</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>9</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>1</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -61560,7 +61560,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 26</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>26</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -61870,7 +61870,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 23</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>23</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -62145,7 +62145,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 24</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>24</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -62485,7 +62485,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 0 Button 4</JoystickValue><joystickNumber>0</joystickNumber><joystickButton>4</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>1</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -62785,7 +62785,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 22</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>22</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -62885,7 +62885,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 19</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>19</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>1</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -63055,7 +63055,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 21</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>21</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -63225,7 +63225,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 19</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>19</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -63325,7 +63325,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 16</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>16</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>1</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -64552,7 +64552,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 11</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>11</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -66008,7 +66008,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 1</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>1</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -69020,7 +69020,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 2</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>2</joystickButton><joystickNumber2>1</joystickNumber2><joystickButton2>1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -71721,7 +71721,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 5</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>5</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -73590,7 +73590,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 6</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>6</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -75881,7 +75881,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 3</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>3</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -77948,7 +77948,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 3</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>3</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>1</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -79765,7 +79765,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 8</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>8</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -81500,7 +81500,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 7</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>7</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -83268,7 +83268,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 2</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>2</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -85377,7 +85377,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 10</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>10</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -87601,7 +87601,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 4</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>4</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -88368,7 +88368,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 0 Button 6</JoystickValue><joystickNumber>0</joystickNumber><joystickButton>6</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -88712,7 +88712,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 0</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>0</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>true</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -90635,7 +90635,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 12</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>12</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -90876,7 +90876,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 11</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>11</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -91213,7 +91213,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 2</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>2</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>1</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -93198,7 +93198,7 @@
         </CommandAction>
       </ActionSequence>
       <Async>true</Async>
-      <Enabled>true</Enabled>
+      <Enabled>false</Enabled>
       <Category>Dev's commands</Category>
       <keyValue>82</keyValue>
       <keyShift>0</keyShift>
@@ -93237,7 +93237,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 1 Button 4</JoystickValue><joystickNumber>1</joystickNumber><joystickButton>4</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>1</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -93652,7 +93652,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 2</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>2</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>true</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -108702,7 +108702,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 14</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>14</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -108901,7 +108901,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 13</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>13</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>
@@ -110704,7 +110704,7 @@
       <ExternalEventsEnabled>false</ExternalEventsEnabled>
       <ExcludeExecOnRecognized>false</ExcludeExecOnRecognized>
       <ForceGrammar>false</ForceGrammar>
-    </Command>
+    <UseJoystick>true</UseJoystick><JoystickValue>Joystick 2 Button 7</JoystickValue><joystickNumber>2</joystickNumber><joystickButton>7</joystickButton><joystickNumber2>0</joystickNumber2><joystickButton2>-1</joystickButton2><JoystickButtonsReleased>false</JoystickButtonsReleased><DoubleTapInvoked>false</DoubleTapInvoked><LongTapInvoked>false</LongTapInvoked><ShortTapDelayedInvoked>false</ShortTapDelayedInvoked><KeepRepeating>false</KeepRepeating><RepeatIfKeysDown>false</RepeatIfKeysDown><RepeatIfMouseDown>false</RepeatIfMouseDown><RepeatIfJoystickDown>false</RepeatIfJoystickDown><NoOtherKeysDown>false</NoOtherKeysDown><NoOtherMouseButtonsDown>false</NoOtherMouseButtonsDown><NoOtherJoystickButtonsDown>false</NoOtherJoystickButtonsDown><UseVariableJoystickShortcut>false</UseVariableJoystickShortcut><UseVariableMouseShortcut>false</UseVariableMouseShortcut><HotkeyDoubleTapLevel>0</HotkeyDoubleTapLevel><MouseDoubleTapLevel>0</MouseDoubleTapLevel><JoystickDoubleTapLevel>0</JoystickDoubleTapLevel><HotkeyLongTapLevel>0</HotkeyLongTapLevel><MouseLongTapLevel>0</MouseLongTapLevel><JoystickLongTapLevel>0</JoystickLongTapLevel></Command>
     <Command>
       <Referrer xsi:nil="true" />
       <ExecType>3</ExecType>

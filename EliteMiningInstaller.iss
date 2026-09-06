@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v5.3.5
+AppVersion=v5.3.6
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -16,7 +16,7 @@ CloseApplications=no
 ; VA profile update notice — shown before install as a reminder to keep the profile option ticked.
 ; ENABLE  when this release includes a new VA profile:   remove the leading semicolon below
 ; DISABLE when no VA profile update in this release:     add a semicolon at the start of the line below
-InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
+;InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
 
 ; Place uninstaller in app folder
 UninstallFilesDir={app}

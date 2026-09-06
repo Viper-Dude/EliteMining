@@ -151,7 +151,7 @@ class ToolTip:
 
             label = tk.Label(tw, text=self.text, justify=tk.LEFT,
                             background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                            font=scaled_font(8), wraplength=250,
+                            font=scaled_font(8), wraplength=340,
                             padx=4, pady=2)
             label.pack()
             tw.update()
@@ -297,6 +297,24 @@ class RingFinder(ColumnVisibilityMixin):
         """Format an EDDN system_powerplay 'updated_at' timestamp as a short age suffix (e.g. '3d')."""
         from app_utils import format_relative_age
         return format_relative_age(updated_at)
+
+    def _is_newer(self, candidate: str, current: str) -> bool:
+        """True if candidate's ISO timestamp is later than current's. Unparseable/missing values lose."""
+        import datetime
+        if not candidate:
+            return False
+        if not current:
+            return True
+        try:
+            candidate_time = datetime.datetime.fromisoformat(candidate.replace('Z', '+00:00'))
+            current_time = datetime.datetime.fromisoformat(current.replace('Z', '+00:00'))
+            if candidate_time.tzinfo is None:
+                candidate_time = candidate_time.replace(tzinfo=datetime.timezone.utc)
+            if current_time.tzinfo is None:
+                current_time = current_time.replace(tzinfo=datetime.timezone.utc)
+            return candidate_time > current_time
+        except Exception:
+            return False
 
     def _sort_hotspots_display(self, hotspot_text: str) -> str:
         """Sort hotspot display string by count (descending), then alphabetically
@@ -503,8 +521,10 @@ class RingFinder(ColumnVisibilityMixin):
                             font=scaled_font(8, "normal"), cursor="hand2")
         auto_btn.pack(side="left", padx=(0, 5))
 
-        # Search button - with app color scheme
-        self.search_btn = tk.Button(buttons_frame, text=t('ring_finder.search'), command=self.search_hotspots,
+        # Search button - with app color scheme. Toggles to "Stop" while a search is
+        # running; clicking it then cancels the in-flight search instead of starting a new one.
+        self._search_in_progress = False
+        self.search_btn = tk.Button(buttons_frame, text=t('ring_finder.search'), command=self._on_search_btn_clicked,
                                    bg="#2a4a2a", fg="#e0e0e0",
                                    activebackground="#3a5a3a", activeforeground="#ffffff",
                                    relief="ridge", bd=1, padx=scaled_px(15), pady=scaled_px(4),
@@ -629,7 +649,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.pp_power_var = tk.StringVar(value='Any')
         self.pp_power_combo = ttk.Combobox(search_frame, textvariable=self.pp_power_var, values=POWER_FILTER_OPTIONS, width=22, state="readonly")
         self.pp_power_combo.grid(row=4, column=1, sticky="nw", padx=5, pady=5)
-        self.pp_power_combo.bind('<<ComboboxSelected>>', self._save_filter_settings)
+        self.pp_power_combo.bind('<<ComboboxSelected>>', self._on_pp_power_changed)
         self.pp_power_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         ToolTip(self.pp_power_combo, t('ring_finder.pp_power_tooltip'))
 
@@ -645,7 +665,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.pp_state_var = tk.StringVar(value='Any')
         self.pp_state_combo = ttk.Combobox(pp_inner_row, textvariable=self.pp_state_var, values=PP_STATE_OPTIONS, width=18, state="readonly")
         self.pp_state_combo.pack(side="left", padx=(5, 0))
-        self.pp_state_combo.bind('<<ComboboxSelected>>', self._save_filter_settings)
+        self.pp_state_combo.bind('<<ComboboxSelected>>', self._on_pp_state_changed)
         self.pp_state_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         ToolTip(self.pp_state_combo, t('ring_finder.pp_state_tooltip'))
 
@@ -1518,6 +1538,45 @@ class RingFinder(ColumnVisibilityMixin):
         
         return display_name
     
+    def _on_pp_power_changed(self, event=None):
+        """Keep Power/PP State a valid pair: picking a specific Power with State still on
+        'Any' would otherwise query Spansh for that power's entire territory (thousands of
+        systems with no state filter), which is far too slow — so auto-pick Fortified for
+        them instead of leaving an invalid/slow combination in place."""
+        if self.pp_power_var.get() != 'Any' and self.pp_state_var.get() == 'Any':
+            self.pp_state_var.set('Fortified')
+        self._sync_max_distance_for_pp_state()
+        self._save_filter_settings()
+
+    def _on_pp_state_changed(self, event=None):
+        """Mirror of _on_pp_power_changed: if the user manually resets State back to 'Any'
+        while a specific Power is still selected, reset Power too rather than leaving the
+        same invalid/slow combination in place."""
+        if self.pp_state_var.get() == 'Any' and self.pp_power_var.get() != 'Any':
+            self.pp_power_var.set('Any')
+        self._sync_max_distance_for_pp_state()
+        self._save_filter_settings()
+
+    def _sync_max_distance_for_pp_state(self):
+        """Grey out Max Distance and show the real 500 LY search radius whenever a specific
+        Power State is selected (_search_worker overrides max_distance to 500 regardless of
+        the dropdown for any state) - otherwise the dropdown would keep showing the user's
+        picked value (e.g. 200) while a different distance is actually used.
+        Only applies for Local Database - Spansh/Both already disable Power State entirely."""
+        if not hasattr(self, 'distance_combo') or not hasattr(self, 'data_source_var'):
+            return
+        if self.data_source_var.get() == 'database' and self.pp_state_var.get() != 'Any':
+            if getattr(self, '_pp_distance_override_saved', None) is None:
+                self._pp_distance_override_saved = self.distance_var.get()
+            self.distance_var.set("500")
+            self.distance_combo.configure(state="disabled")
+        else:
+            self.distance_combo.configure(state="readonly")
+            saved = getattr(self, '_pp_distance_override_saved', None)
+            if saved is not None:
+                self.distance_var.set(saved)
+                self._pp_distance_override_saved = None
+
     def _on_data_source_changed(self):
         """Handle data source radio button change - disable Overlaps/RES for non-database sources"""
         source = self.data_source_var.get()
@@ -1532,45 +1591,24 @@ class RingFinder(ColumnVisibilityMixin):
                 self.distance_combo['values'] = ("10", "20", "30", "50", "100", "150", "200")
                 if hasattr(self, 'distance_var') and int(self.distance_var.get() or 200) > 200:
                     self.distance_var.set("200")
+            # PowerPlay filtering only works against the local EDDN cache - not available
+            # for Spansh/Both, so reset and grey it out, and hide the PowerPlay column.
+            self.pp_power_var.set('Any')
+            self.pp_state_var.set('Any')
+            self.pp_power_combo.configure(state="disabled")
+            self.pp_state_combo.configure(state="disabled")
+            self._cv_set_force_hidden('ring_finder', 'PowerPlay', True)
         else:
             # Re-enable for database
             self.overlaps_only_cb.configure(state="normal")
             self.res_only_cb.configure(state="normal")
             if hasattr(self, 'distance_combo'):
                 self.distance_combo['values'] = ("10", "20", "30", "50", "100", "150", "200")
+            self.pp_power_combo.configure(state="readonly")
+            self.pp_state_combo.configure(state="readonly")
+            self._cv_set_force_hidden('ring_finder', 'PowerPlay', False)
 
-        # PP column: hide when Spansh rows can appear (Spansh-only or mixed Both), since
-        # Treeview row-coloring would otherwise show PP data (always from local DB) in Spansh's blue
-        if hasattr(self, 'results_tree'):
-            if source in ("spansh", "both"):
-                current_width = self.results_tree.column("PowerPlay", "width")
-                if current_width > 0:
-                    self._pp_spansh_hidden_width = current_width
-                    self.results_tree.column("PowerPlay", width=0, minwidth=0, stretch=False)
-                    self._pp_hidden_for_spansh = True
-                self._cv_set_excluded('ring_finder', 'PowerPlay', True)
-            else:
-                if getattr(self, '_pp_hidden_for_spansh', False):
-                    from config import scaled_font, scaled_px
-                    import tkinter.font as _tkfont
-                    _pp_header_text = self.results_tree.heading("PowerPlay", "text")
-                    _pp_minwidth = max(_tkfont.Font(font=scaled_font(9, "bold")).measure(_pp_header_text) + scaled_px(24), scaled_px(50))
-                    restore_width = getattr(self, '_pp_spansh_hidden_width', scaled_px(170))
-                    self.results_tree.column("PowerPlay", width=max(restore_width, _pp_minwidth), minwidth=_pp_minwidth, stretch=False)
-                    self._pp_hidden_for_spansh = False
-                self._cv_set_excluded('ring_finder', 'PowerPlay', False)
-
-        # Power / Power State filters: disable when Spansh rows can appear (Spansh-only or Both)
-        if hasattr(self, 'pp_power_combo') and hasattr(self, 'pp_state_combo'):
-            if source in ("spansh", "both"):
-                self.pp_power_var.set('Any')
-                self.pp_state_var.set('Any')
-                self.pp_power_combo.configure(state="disabled")
-                self.pp_state_combo.configure(state="disabled")
-            else:
-                self.pp_power_combo.configure(state="readonly")
-                self.pp_state_combo.configure(state="readonly")
-
+        self._sync_max_distance_for_pp_state()
         self._save_filter_settings()
 
     def _on_overlaps_only_changed(self):
@@ -2033,6 +2071,7 @@ class RingFinder(ColumnVisibilityMixin):
             self.pp_power_var.set('Any')
         if hasattr(self, 'pp_state_var'):
             self.pp_state_var.set('Any')
+        self._sync_max_distance_for_pp_state()
 
         # Save the reset state
         self._save_filter_settings()
@@ -2060,10 +2099,17 @@ class RingFinder(ColumnVisibilityMixin):
             }
             reserve_english = reserve_map_to_english.get(reserve_value, 'All')
             
+            # Never persist the 500 LY PowerPlay-state override - save the user's real
+            # picked distance (stashed by _sync_max_distance_for_pp_state while the
+            # override is active), not whatever the greyed-out dropdown currently shows.
+            distance_to_save = getattr(self, '_pp_distance_override_saved', None)
+            if distance_to_save is None:
+                distance_to_save = self.distance_var.get()
+
             settings = {
                 "ring_type": self._ring_type_rev_map.get(self.material_var.get(), self.material_var.get()),
                 "specific_material": self._to_english(self.specific_material_var.get()),
-                "distance": self.distance_var.get(),
+                "distance": distance_to_save,
                 "max_results": max_results_value,
                 "min_hotspots": self.min_hotspots_var.get(),
                 "data_source": self.data_source_var.get(),  # Save data source preference
@@ -2100,7 +2146,13 @@ class RingFinder(ColumnVisibilityMixin):
                 except Exception:
                     self.specific_material_var.set(settings["specific_material"])
             if "distance" in settings:
-                self.distance_var.set(settings["distance"])
+                # Guard against a stale 500 saved by an earlier bug (the PowerPlay-state
+                # override leaking into the saved distance) - fall back to a normal default
+                # rather than restoring an option that isn't even in the dropdown's values.
+                saved_distance = settings["distance"]
+                if str(saved_distance) not in ("10", "20", "30", "50", "100", "150", "200"):
+                    saved_distance = "50"
+                self.distance_var.set(saved_distance)
             if "max_results" in settings:
                 max_results_value = settings["max_results"]
                 # "All" was replaced by a 200 cap - map old saved settings to it
@@ -2133,6 +2185,12 @@ class RingFinder(ColumnVisibilityMixin):
                 self.pp_power_var.set(settings.get("pp_power", "Any"))
             if "pp_state" in settings and hasattr(self, 'pp_state_var'):
                 self.pp_state_var.set(settings.get("pp_state", "Any"))
+            # A saved combination from before Power required a real State is invalid now —
+            # normalize it the same way the live dropdown handlers would.
+            if hasattr(self, 'pp_power_var') and hasattr(self, 'pp_state_var'):
+                if self.pp_power_var.get() != 'Any' and self.pp_state_var.get() == 'Any':
+                    self.pp_state_var.set('Fortified')
+                self._sync_max_distance_for_pp_state()
             # Restore last reference system only if journal hasn't already set one
             if "reference_system" in settings and settings["reference_system"]:
                 if not self.system_var.get():
@@ -2473,9 +2531,29 @@ class RingFinder(ColumnVisibilityMixin):
         
         return abbreviations.get(res_tag, res_tag)
     
+    def _reset_search_button(self):
+        """Restore the search button to its normal "Search" label/state after a search ends."""
+        if not self.parent.winfo_exists():
+            return
+        self._search_in_progress = False
+        self.search_btn.configure(text=t('ring_finder.search'))
+
+    def _on_search_btn_clicked(self):
+        """Search button click handler. Starts a search normally; while a search is already
+        running, the button doubles as Stop — clicking it cancels the in-flight search
+        instead of starting another one."""
+        if self._search_in_progress:
+            print(f"[SEARCH] Stop clicked - cancelling search gen {self._search_generation}")
+            self._stopped_generation = self._search_generation  # Marks this as a user Stop, not a superseding search
+            self._search_generation += 1  # Any in-flight worker's generation check now fails
+            self._stop_search_spinner()
+            self._reset_search_button()
+        else:
+            self.search_hotspots()
+
     def search_hotspots(self, auto_refresh=False, highlight_body=None, highlight_system=None, highlight_bodies=None, force_database=False):
         """Search for mining hotspots using reference system as center point
-        
+
         Args:
             auto_refresh: DEPRECATED - use highlight_body instead
             highlight_body: Specific body/ring name to highlight (e.g., '1 A Ring')
@@ -2484,12 +2562,17 @@ class RingFinder(ColumnVisibilityMixin):
             highlight_bodies: List of (system, body) tuples to highlight (for multiple rapid scans)
             force_database: If True, only search local database (ignore user's data source setting)
         """
+        import traceback
+        import time as _time
+        print(f"[SEARCH] search_hotspots() called at {_time.time():.1f} (force_database={force_database}, auto_refresh={auto_refresh}) from:")
+        print(''.join(traceback.format_stack(limit=4)[:-1]))
+
         # Store force_database flag for use in search
         self._force_database = force_database
-        
+
         # Save current reference system (complete name at search time)
         self._save_filter_settings()
-        
+
         # Temporarily update UI radio button to show "Local" when force_database is active
         self._saved_data_source = None
         if force_database:
@@ -2591,8 +2674,9 @@ class RingFinder(ColumnVisibilityMixin):
             except (ValueError, AttributeError):
                 min_hotspots = 1
         
-        # Disable search button and start spinner
-        self.search_btn.configure(state="disabled")
+        # Keep search button clickable (it now doubles as a Stop button) and start spinner
+        self._search_in_progress = True
+        self.search_btn.configure(text=t('ring_finder.stop'))
         self._start_search_spinner()
         self.status_var.set(t('ring_finder.searching'))
         
@@ -2611,6 +2695,12 @@ class RingFinder(ColumnVisibilityMixin):
         # Some regions of space have limited ring data, so use large radius
         if any_ring_mode:
             max_distance = 1000.0  # Fixed 1000 LY for Any Ring mode (covers sparse regions)
+        elif pp_state_filter in ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied', 'Expansion', 'Contested'):
+            # Widen to 500 LY for any specific PowerPlay state. For the 4 Spansh-backed states
+            # this also widens the Spansh systems-search call; for Expansion/Contested (EDDN
+            # cache only, no Spansh support) it only widens the local DB query, which is cheap
+            # regardless of radius - it just means scanning more of what's already been visited.
+            max_distance = max(max_distance, 500.0)
 
         # Increment search generation to cancel any in-flight searches
         self._search_generation += 1
@@ -2626,10 +2716,12 @@ class RingFinder(ColumnVisibilityMixin):
         try:
             # Wait for database to be ready (with timeout)
             import time
+            print(f"[SEARCH] _search_worker() thread started at {time.time():.1f}")
             wait_start = time.time()
             while not self.db_ready and (time.time() - wait_start) < 5.0:
                 time.sleep(0.1)
-            
+            print(f"[SEARCH] db_ready wait finished at {time.time():.1f} (waited {time.time() - wait_start:.1f}s)")
+
             if not self.db_ready:
                 print("⚠ Database not ready, search may return incomplete results")
             
@@ -2668,13 +2760,14 @@ class RingFinder(ColumnVisibilityMixin):
                 if not reference_coords:
                     # Update UI with error message
                     self.parent.after(0, lambda: self.status_var.set(t('ring_finder.coords_not_found_warning').format(system=reference_system)))
-                    self.parent.after(0, lambda: self.search_btn.configure(state="normal"))
+                    self.parent.after(0, self._reset_search_button)
                     self.parent.after(0, self._stop_search_spinner)
                     return
             
             # Set the reference system coords for this worker thread
             self.current_system_coords = reference_coords
-            
+            print(f"[SEARCH] Coordinate resolution done at {time.time():.1f}, entering search dispatch")
+
             # Any Ring mode: Search Spansh for rings of specific type (ignoring hotspot data)
             if any_ring_mode:
                 # Use max_results if set, otherwise default to 150 for more results
@@ -2705,9 +2798,12 @@ class RingFinder(ColumnVisibilityMixin):
             else:
                 hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results, data_source=data_source, ring_type_only_active=ring_type_only)
             
-            # Apply PowerPlay filter using EDDN cache
+            # Apply PowerPlay filter using EDDN cache (local database only — Power/State
+            # combos are greyed out and reset to Any for Spansh/Both data sources)
             if pp_power != 'Any' or pp_state != 'Any':
-                hotspots = self._apply_powerplay_filter(hotspots, pp_power, pp_state)
+                hotspots = self._apply_powerplay_filter(hotspots, pp_power, pp_state, reference_system, max_distance)
+            else:
+                self._spansh_pp_enrichment = {}
 
             # Apply min hotspots filter if needed (skip for overlaps/RES only mode)
             if min_hotspots > 1 and not self._is_all_minerals(specific_material) and not overlaps_only and not res_only:
@@ -2724,16 +2820,26 @@ class RingFinder(ColumnVisibilityMixin):
             
             # Check if this search was superseded before updating UI
             if search_generation != self._search_generation:
-                print(f"[SEARCH] Search gen {search_generation} cancelled before display (current: {self._search_generation})")
+                if getattr(self, '_stopped_generation', None) == search_generation:
+                    # User clicked Stop (not superseded by a newer search) — show whatever
+                    # was collected so far instead of discarding it.
+                    print(f"[SEARCH] Search gen {search_generation} stopped by user - showing {len(hotspots)} partial result(s)")
+                    self.parent.after(0, lambda: self.status_var.set(t('ring_finder.search_stopped_partial').format(count=len(hotspots))))
+                    self.parent.after(0, self._update_results, hotspots)
+                else:
+                    print(f"[SEARCH] Search gen {search_generation} cancelled before display (current: {self._search_generation})")
                 return
             
             # EDSM FALLBACK: Smart throttling to prevent hanging
             # Small searches: Query all systems
             # Large searches: Query only first 30 systems for top results
+            import time
+            print(f"[SEARCH] Before EDSM fallback: {len(hotspots)} hotspots at {time.time():.1f}")
             if hotspots and len(hotspots) < 100:
                 self._fill_missing_metadata_edsm(hotspots)
             elif hotspots and len(hotspots) >= 100:
                 self._fill_missing_metadata_edsm(hotspots, max_systems=30)
+            print(f"[SEARCH] After EDSM fallback at {time.time():.1f}, scheduling _update_results")
             
             # Update UI in main thread
             self.parent.after(0, self._update_results, hotspots)
@@ -2746,11 +2852,12 @@ class RingFinder(ColumnVisibilityMixin):
             except:
                 pass  # Window already destroyed
         finally:
-            # Re-enable search button and stop spinner
+            # Reset search button back to "Search" and stop spinner — but only if no newer
+            # search has started in the meantime (that search's own finally will handle it).
             try:
-                if self.parent.winfo_exists():
-                    self._stop_search_spinner()
-                    self.parent.after(0, lambda: self.search_btn.configure(state="normal") if self.parent.winfo_exists() else None)
+                if self.parent.winfo_exists() and search_generation == self._search_generation:
+                    self.parent.after(0, self._stop_search_spinner)
+                    self.parent.after(0, self._reset_search_button)
             except:
                 pass  # Window already destroyed
     
@@ -2785,6 +2892,7 @@ class RingFinder(ColumnVisibilityMixin):
             
             if not systems_needing_data:
                 # All metadata complete in this result set
+                print(f"[EDSM DEBUG] No systems need EDSM lookup - all metadata complete")
                 return
             
             # Apply max_systems limit if specified (for large searches)
@@ -3542,12 +3650,44 @@ class RingFinder(ColumnVisibilityMixin):
 
         return results
 
-    def _apply_powerplay_filter(self, hotspots: List[Dict], pp_power: str, pp_state: str) -> List[Dict]:
-        """Filter hotspot results by PowerPlay controlling power and/or state using EDDN cache."""
+    def _apply_powerplay_filter(self, hotspots: List[Dict], pp_power: str, pp_state: str,
+                                 reference_system: str, max_distance: float) -> List[Dict]:
+        """Filter hotspot results by PowerPlay controlling power and/or state.
+
+        Uses the EDDN cache by default. For Exploited/Fortified/Stronghold/Unoccupied - the
+        4 states Spansh's systems-search actually supports (Expansion/Contested aren't in its
+        index at all) - also queries Spansh and merges it in, keeping whichever source has
+        the newer 'updated_at' per system — the EDDN cache alone is often sparse/stale
+        for systems the player hasn't personally visited.
+        """
         from system_finder_api import SystemFinderAPI
         system_names = list({h.get('system', h.get('systemName', '')) for h in hotspots})
         system_names = [s for s in system_names if s]
         pp_cache = SystemFinderAPI._batch_get_powerplay(system_names)
+
+        # Stashed for _update_results to reuse when building the PowerPlay column, so a
+        # matched row shows real data instead of "No data" when the EDDN cache is empty
+        # for it. Reset every search so stale results never leak in.
+        self._spansh_pp_enrichment = {}
+
+        if pp_state in ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied'):
+            # max_distance is already widened to 500 LY by _search_worker for these states
+            spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_systems(
+                reference_system, max_distance, pp_power, pp_state)
+            to_persist = {}
+            for sys_name, entry in spansh_pp.items():
+                cached = pp_cache.get(sys_name)
+                if not cached:
+                    pp_cache[sys_name] = entry
+                    self._spansh_pp_enrichment[sys_name] = entry
+                    to_persist[sys_name] = entry
+                elif self._is_newer(entry.get('updated_at'), cached.get('updated_at')):
+                    pp_cache[sys_name] = entry
+                    self._spansh_pp_enrichment[sys_name] = entry
+                    to_persist[sys_name] = entry
+            if to_persist:
+                SystemFinderAPI._store_powerplay_batch(to_persist)
+
         filtered = []
         for h in hotspots:
             sys_name = h.get('system', h.get('systemName', ''))
@@ -5073,6 +5213,8 @@ class RingFinder(ColumnVisibilityMixin):
         
     def _update_results(self, hotspots: List[Dict]):
         """Update results treeview with hotspot data"""
+        import time
+        print(f"[SEARCH] _update_results() starting NOW with {len(hotspots)} hotspots at {time.time():.1f}")
         # Store results in cache for future use (e.g., refresh after save to database)
         self._search_cache = hotspots
 
@@ -5198,6 +5340,12 @@ class RingFinder(ColumnVisibilityMixin):
         # Batch-fetch PowerPlay data for all systems from EDDN cache
         from system_finder_api import SystemFinderAPI
         _pp_data = SystemFinderAPI._batch_get_powerplay(all_system_names)
+        # Fold in Spansh Fortified/Stronghold enrichment fetched during the PP filter step
+        # (see _apply_powerplay_filter), so matched rows don't show "No data" when the
+        # EDDN cache alone has nothing for them.
+        for sys_name, entry in getattr(self, '_spansh_pp_enrichment', {}).items():
+            if sys_name not in _pp_data:
+                _pp_data[sys_name] = entry
 
         # Batch-fetch overlap and RES tags — 2 queries total instead of 2×N
         _overlap_bulk = self.user_db.bulk_get_overlaps_for_rings(all_system_names)
@@ -5463,7 +5611,7 @@ class RingFinder(ColumnVisibilityMixin):
             pp_power = pp_entry.get('controlling_power', '')
             pp_state = pp_entry.get('power_state', '')
             # Age suffix only applies to EDDN cache data (Spansh data has no matching timestamp)
-            pp_age = self._format_pp_age(pp_entry.get('updated_at')) if pp_power else ''
+            pp_age = self._format_pp_age(pp_entry.get('updated_at')) if (pp_power or pp_state) else ''
             pp_age_suffix = f" ({pp_age})" if pp_age else ''
             if pp_power == '~none~':
                 pp_str = (pp_state or t('common.pp_no_power')) + pp_age_suffix
@@ -5476,8 +5624,10 @@ class RingFinder(ColumnVisibilityMixin):
                     pp_str = f"{pp_power} / {pp_state}{pp_age_suffix}"
                 elif pp_power:
                     pp_str = f"{pp_power}{pp_age_suffix}"
-                elif hotspot.get('data_source', '').lower() == 'spansh':
-                    pp_str = ''
+                elif pp_state:
+                    # Known state with confirmed-blank controlling_power (e.g. Unoccupied) -
+                    # this is real data, not a missing lookup.
+                    pp_str = f"{pp_state}{pp_age_suffix}"
                 else:
                     pp_str = t('common.pp_no_data')
 
@@ -5648,12 +5798,31 @@ class RingFinder(ColumnVisibilityMixin):
         self.context_menu.add_separator()
         # Reports
         self.context_menu.add_command(label=t('context_menu.open_mining_report'), command=self._open_mining_report_selected)
+        self.context_menu.add_separator()
+        # Export
+        self.context_menu.add_command(label=t('context_menu.export_results_csv'), command=self._export_results_to_csv)
 
     def _show_context_menu(self, event):
         """Show the context menu when right-clicking on results"""
         try:
             # Click on row - show context menu
             item = self.results_tree.identify_row(event.y)
+            if not item:
+                # Empty space (no row under cursor) - just offer the export option,
+                # since it applies to the whole result set, not a specific row.
+                if self.results_tree.get_children():
+                    from config import scaled_font
+                    empty_menu = tk.Menu(self.parent, tearoff=0,
+                                        bg=self.context_menu.cget('bg'),
+                                        fg=self.context_menu.cget('fg'),
+                                        activebackground=self.context_menu.cget('activebackground'),
+                                        activeforeground=self.context_menu.cget('activeforeground'),
+                                        selectcolor=self.context_menu.cget('selectcolor'),
+                                        font=scaled_font(9))
+                    empty_menu.add_command(label=t('context_menu.export_results_csv'), command=self._export_results_to_csv)
+                    empty_menu.tk_popup(event.x_root, event.y_root)
+                    empty_menu.grab_release()
+                return
             if item:
                 # Check if item is already in selection (multi-select scenario)
                 current_selection = self.results_tree.selection()
@@ -5820,6 +5989,170 @@ class RingFinder(ColumnVisibilityMixin):
             if hasattr(self, 'context_menu'):
                 self.context_menu.grab_release()
     
+    def _export_results_to_csv(self):
+        """Export all current search results to a CSV file, matching the currently
+        visible columns and their display order."""
+        from tkinter import filedialog
+        import csv
+
+        all_items = self.results_tree.get_children()
+        if not all_items:
+            return
+
+        display_columns = [c for c in self.results_tree['displaycolumns'] if c != '_spacer']
+        if not display_columns:
+            return
+        headers = [self.results_tree.heading(c, 'text') for c in display_columns]
+        all_columns = self.results_tree['columns']
+        col_indices = [all_columns.index(c) for c in display_columns]
+        source_idx = all_columns.index('Source') if 'Source' in all_columns else None
+
+        def _clean_cell(col_index, value):
+            value = str(value)
+            if col_index == source_idx:
+                has_spansh = '🌐' in value
+                has_local = '🗄️' in value
+                if has_spansh and has_local:
+                    return "Spansh, Local"
+                if has_spansh:
+                    return "Spansh"
+                if has_local:
+                    return "Local"
+                return value
+            # Strip decorative symbols not meaningful outside the treeview UI
+            # (e.g. the PowerPlay "no data" hyperlink arrow, favourite star)
+            for symbol in ('↗', '⭐'):
+                value = value.replace(symbol, '')
+            return value.strip()
+
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
+        dest_path = filedialog.asksaveasfilename(
+            title=t('context_menu.export_results_csv'),
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialfile=f"ring_finder_results_{timestamp}.csv"
+        )
+        if not dest_path:
+            return
+
+        try:
+            with open(dest_path, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(headers)
+                for item in all_items:
+                    values = self.results_tree.item(item, 'values')
+                    writer.writerow([
+                        _clean_cell(i, values[i]) if i < len(values) else ''
+                        for i in col_indices
+                    ])
+            self._show_export_result_dialog(
+                t('context_menu.export_results_csv'),
+                t('context_menu.export_results_success', count=len(all_items), path=dest_path),
+                dest_path)
+        except Exception as e:
+            self._show_export_result_dialog(
+                t('context_menu.export_results_csv'),
+                t('context_menu.export_results_failed', error=e),
+                None)
+
+    def _open_path(self, path: str) -> None:
+        """Open a file with the OS default handler (cross-platform)."""
+        import subprocess
+        import sys
+        try:
+            if os.name == 'nt':
+                os.startfile(path)
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', path])
+            else:
+                subprocess.Popen(['xdg-open', path])
+        except Exception as e:
+            print(f"[EXPORT] Failed to open {path!r}: {e}")
+
+    def _show_export_result_dialog(self, title: str, message: str, opened_path: Optional[str]):
+        """Themed result dialog for the CSV export, with an Open File button when it succeeded."""
+        from config import load_theme, scaled_font
+
+        theme = load_theme()
+        if theme == "elite_orange":
+            bg_color = "#000000"
+            fg_color = "#ff8c00"
+            btn_bg = "#1a1a1a"
+            btn_fg = "#ff9900"
+        else:
+            bg_color = "#1e1e1e"
+            fg_color = "#569cd6"
+            btn_bg = "#2a3a4a"
+            btn_fg = "#e0e0e0"
+
+        main_parent = self.parent.winfo_toplevel()
+        dialog = tk.Toplevel(main_parent)
+        dialog.withdraw()
+        dialog.configure(bg=bg_color)
+
+        try:
+            from app_utils import get_app_icon_path
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+            elif icon_path:
+                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
+        except Exception:
+            pass
+
+        dialog.title(title)
+        dialog.resizable(False, False)
+
+        label = tk.Label(dialog, text=message, padx=20, pady=20,
+                          bg=bg_color, fg=fg_color, font=scaled_font(10),
+                          justify="left", wraplength=500)
+        label.pack()
+
+        btn_frame = tk.Frame(dialog, bg=bg_color)
+        btn_frame.pack(pady=(0, 15))
+
+        def on_ok():
+            dialog.destroy()
+
+        if opened_path:
+            def on_open():
+                self._open_path(opened_path)
+                dialog.destroy()
+            open_btn = tk.Button(btn_frame, text=t('context_menu.export_open_file'), width=12, command=on_open,
+                                  bg=btn_bg, fg=btn_fg, font=scaled_font(10),
+                                  activebackground=btn_bg, activeforeground=btn_fg,
+                                  cursor="hand2", relief="flat", bd=0)
+            open_btn.pack(side="left", padx=(0, 10))
+
+        ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=10, command=on_ok,
+                            bg=btn_bg, fg=btn_fg, font=scaled_font(10),
+                            activebackground=btn_bg, activeforeground=btn_fg,
+                            cursor="hand2", relief="flat", bd=0)
+        ok_btn.pack(side="left")
+
+        dialog.update_idletasks()
+        from ui.dialogs import center_window
+        center_window(dialog, main_parent)
+
+        dialog.deiconify()
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except Exception:
+            pass
+
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except Exception:
+                pass
+        dialog.after(100, keep_on_top)
+
     def _copy_system_name(self):
         """Copy the selected system name to clipboard"""
         selection = self.results_tree.selection()
@@ -6463,7 +6796,7 @@ class RingFinder(ColumnVisibilityMixin):
             
             # Trigger a fresh search to show updated data
             # Use cached Spansh results to avoid redundant API calls
-            if self.search_btn['state'] == 'normal':
+            if not self._search_in_progress:
                 self._use_cached_spansh = True  # Reuse cached Spansh results
                 self.search_hotspots()
         elif saved_rows == 0 and skipped_count == 0 and error_count == 0:
@@ -6560,13 +6893,7 @@ class RingFinder(ColumnVisibilityMixin):
         selection = self.results_tree.selection()
         if not selection:
             return
-        
-        # Cap at 50 rows to avoid API spam
-        if len(selection) > 50:
-            centered_info_dialog(self.parent, t('ring_finder.save_limit_exceeded'),
-                               t('ring_finder.too_many_systems_for_reserve', count=len(selection)))
-            return
-        
+
         # Collect unique systems from Local source with missing reserve
         systems_to_update = set()
         for item in selection:
@@ -6592,25 +6919,28 @@ class RingFinder(ColumnVisibilityMixin):
         threading.Thread(target=self._update_reserve_worker, args=(systems_to_update,), daemon=True).start()
     
     def _update_reserve_worker(self, systems_to_update):
-        """Worker thread for updating reserve levels"""
-        # Fetch reserve levels from Spansh for each system
+        """Worker thread for updating reserve levels - fetches per-system Spansh data
+        concurrently (same /api/bodies/search endpoint confirmed slow, ~24-25s/call, so
+        a large system count would take far too long run sequentially)."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         updated_count = 0
         systems_processed = 0
-        
-        for system_name in systems_to_update:
-            try:
-                # Fetch reserve levels from Spansh
-                reserve_data = self._fetch_reserve_levels_for_system(system_name)
-                
-                if reserve_data:
-                    # Update database with bulk_update_reserve_levels
-                    count = self.user_db.bulk_update_reserve_levels(system_name, reserve_data)
-                    updated_count += count
-                    systems_processed += 1
-                    
-            except Exception as e:
-                print(f"[RESERVE UPDATE] Error updating {system_name}: {e}")
-        
+
+        with ThreadPoolExecutor(max_workers=min(len(systems_to_update), 10)) as executor:
+            futures = {executor.submit(self._fetch_reserve_levels_for_system, name): name for name in systems_to_update}
+            for future in as_completed(futures):
+                system_name = futures[future]
+                try:
+                    reserve_data = future.result()
+                    if reserve_data:
+                        # Update database with bulk_update_reserve_levels
+                        count = self.user_db.bulk_update_reserve_levels(system_name, reserve_data)
+                        updated_count += count
+                        systems_processed += 1
+                except Exception as e:
+                    print(f"[RESERVE UPDATE] Error updating {system_name}: {e}")
+
         # Update UI on main thread
         self.parent.after(0, lambda: self._update_reserve_complete(updated_count, systems_processed, len(systems_to_update)))
     
@@ -7028,7 +7358,7 @@ class RingFinder(ColumnVisibilityMixin):
             self._reset_filters()
 
             # Trigger search with database only (don't query Spansh on auto-search)
-            if self.search_btn['state'] == 'normal':
+            if not self._search_in_progress:
                 self.search_hotspots(force_database=True)
                 
         except Exception as e:
@@ -7108,24 +7438,26 @@ class RingFinder(ColumnVisibilityMixin):
             
             # Get current system from prospector panel (most reliable)
             current_system = getattr(self.prospector_panel, 'last_system', None) if self.prospector_panel else None
-            
+
             if current_system:
+                # Reset filters before the very first search on app start — same as clicking
+                # "Reset Search Filters" and same as every subsequent auto-search on jump
+                # (_auto_search_new_system) already does. This includes Data Source: it stays
+                # on Local after a reset, same as the button, rather than restoring whatever
+                # was selected last session.
+                self._reset_filters()
+
                 self.status_var.set(f"Auto-search: {current_system}")
                 self.system_var.set(current_system)
                 self.last_monitored_system = current_system
-                
+
                 # Cache coordinates from startup journal scan (StarPos) if available
                 star_pos = getattr(self.prospector_panel, 'last_system_star_pos', None) if self.prospector_panel else None
                 if star_pos and len(star_pos) == 3:
                     self.systems_data[current_system.lower()] = {'x': star_pos[0], 'y': star_pos[1], 'z': star_pos[2]}
                     print(f"[RING FINDER] Cached startup coords from journal StarPos: {star_pos}")
-                
-                # Force database-only for auto-search (don't query Spansh on startup)
-                saved_data_source = self.data_source_var.get()
-                self.data_source_var.set("database")
+
                 self.search_hotspots()
-                # Restore user's data source selection
-                self.data_source_var.set(saved_data_source)
             else:
                 self.status_var.set("Auto-search: No system detected")
                 

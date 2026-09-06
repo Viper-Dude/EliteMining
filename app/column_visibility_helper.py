@@ -53,6 +53,7 @@ class ColumnVisibilityMixin:
             'saved_widths': {},  # Store actual widths before hiding
             'original_stretch': original_stretch,  # Store original stretch per column
             'excluded_from_menu': set(),  # Columns hidden from the visibility menu
+            'force_hidden': set(),  # Columns force-hidden by app logic, independent of user visibility pref
             'use_displaycolumns': use_displaycolumns,
         }
         
@@ -130,10 +131,11 @@ class ColumnVisibilityMixin:
             self._cv_menu_vars = {}
         self._cv_menu_vars[config_key] = {}
         
-        # Add checkboxes for each column (skip excluded ones)
+        # Add checkboxes for each column (skip excluded/force-hidden ones)
         excluded = tree_data.get('excluded_from_menu', set())
+        force_hidden = tree_data.get('force_hidden', set())
         for col in columns:
-            if col in excluded:
+            if col in excluded or col in force_hidden:
                 continue
             display_name = tree.heading(col, "text")
             is_visible = visible.get(col, True)
@@ -160,9 +162,25 @@ class ColumnVisibilityMixin:
         tree = tree_data['tree']
         columns = tree_data['columns']
         visible = tree_data['visible']
+        force_hidden = tree_data.get('force_hidden', set())
         full_columns = tree['columns']
-        shown = [col for col in full_columns if col not in columns or visible.get(col, True)]
+        shown = [col for col in full_columns
+                 if col not in columns or (visible.get(col, True) and col not in force_hidden)]
         tree.configure(displaycolumns=shown)
+
+    def _cv_set_force_hidden(self, config_key, column, hidden: bool):
+        """Force a column out of the display regardless of the user's saved visibility
+        preference (e.g. hiding PowerPlay when Data Source can't provide PowerPlay data).
+        Does not touch the saved 'visible' preference, so it's restored as-is when unhidden."""
+        tree_data = self._cv_trees.get(config_key)
+        if not tree_data:
+            return
+        force_hidden = tree_data.setdefault('force_hidden', set())
+        if hidden:
+            force_hidden.add(column)
+        else:
+            force_hidden.discard(column)
+        self._cv_apply_displaycolumns(config_key)
 
     def _cv_toggle(self, column, config_key):
         """Toggle column visibility"""
