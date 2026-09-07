@@ -19251,6 +19251,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.marketplace_tree.bind("<ButtonRelease-1>", save_marketplace_widths)
         # Deselect when clicking empty space
         self.marketplace_tree.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.marketplace_tree))
+        # Double-click the Powerplay cell to open Inara and fetch/refresh its data
+        self.marketplace_tree.bind("<Double-1>", lambda e: self._on_commodity_tree_double_click(e, self.marketplace_tree))
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.marketplace_tree.yview)
@@ -20481,7 +20483,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 print(f"[DEBUG] Could not save Trade Commodities column widths: {e}")
         
         self.trade_tree.bind("<ButtonRelease-1>", save_trade_widths)
-        
+        # Double-click the Powerplay cell to open Inara and fetch/refresh its data
+        self.trade_tree.bind("<Double-1>", lambda e: self._on_commodity_tree_double_click(e, self.trade_tree))
+
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.trade_tree.yview)
         self.trade_tree.configure(yscrollcommand=v_scrollbar.set)
@@ -21036,6 +21040,81 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             self.marketplace_total_label.config(text=t('marketplace.search_failed').format(error=str(e)))
             self.config(cursor="")
+
+    def _on_commodity_tree_double_click(self, event, tree):
+        """Double-click the Powerplay cell in a Commodity Market results tree (Mining or Trade)
+        to open the system on Inara and fetch/refresh its Powerplay data - same behavior as the
+        Ring Finder's PowerPlay column, reusing its Inara fetch (system_finder_api.py)."""
+        if tree.identify_region(event.x, event.y) != "cell":
+            return
+        item = tree.identify_row(event.y)
+        if not item:
+            return
+        column = tree.identify_column(event.x)
+        try:
+            col_index = int(column.replace('#', '')) - 1
+            displaycolumns = tree['displaycolumns']
+            col_name = tree['columns'][col_index] if displaycolumns == ('#all',) else displaycolumns[col_index]
+        except (ValueError, IndexError):
+            return
+        if col_name != "powerstate":
+            return
+
+        values = tree.item(item, 'values')
+        if not values or len(values) < 1:
+            return
+        location = values[0].strip()  # "System / Station"
+        system_name = location.split(' / ')[0].strip() if ' / ' in location else location
+        if not system_name:
+            return
+
+        import urllib.parse
+        import webbrowser
+        webbrowser.open(f"https://inara.cz/elite/starsystem/?search={urllib.parse.quote(system_name)}")
+
+        tree.selection_set(item)
+        label = self.marketplace_total_label if tree is self.marketplace_tree else self.trade_total_label
+        label.config(text=t('ring_finder.fetching_pp').format(system=system_name))
+        threading.Thread(target=self._fetch_commodity_pp_worker, args=(system_name, tree), daemon=True).start()
+
+    def _fetch_commodity_pp_worker(self, system_name, tree):
+        """Background fetch of a single system's Powerplay data from Inara for a Commodity
+        Market results tree, then update every matching row on the main thread."""
+        from system_finder_api import SystemFinderAPI
+        result = SystemFinderAPI.fetch_and_store_powerplay_from_inara(system_name)
+        self.after(0, lambda: self._fetch_commodity_pp_complete(system_name, result, tree))
+
+    def _fetch_commodity_pp_complete(self, system_name, result, tree):
+        """Update Powerplay cell(s) for system_name in the given tree with fetched data."""
+        label = self.marketplace_total_label if tree is self.marketplace_tree else self.trade_total_label
+        if result:
+            pp_power = result.get('controlling_power', '')
+            pp_state = result.get('power_state', '')
+            if pp_power == '~none~':
+                pp_str = pp_state or t('common.pp_no_power')
+            elif pp_power and pp_state:
+                pp_str = f"{pp_power} / {pp_state}"
+            else:
+                pp_str = pp_power or t('common.no_data')
+
+            columns = tree['columns']
+            pp_col_index = columns.index('powerstate')
+            for item in tree.get_children():
+                vals = list(tree.item(item, 'values'))
+                if not vals:
+                    continue
+                location = vals[0].strip()
+                row_system = location.split(' / ')[0].strip() if ' / ' in location else location
+                if row_system == system_name and len(vals) > pp_col_index:
+                    vals[pp_col_index] = f" {pp_str} "
+                    tree.item(item, values=vals)
+
+            if pp_power == '~none~':
+                label.config(text=t('ring_finder.pp_fetch_no_power').format(system=system_name))
+            else:
+                label.config(text=t('ring_finder.pp_fetch_success').format(system=system_name, power=pp_str))
+        else:
+            label.config(text=t('ring_finder.pp_fetch_none').format(system=system_name))
 
     def _clear_marketplace_results(self):
         """Clear marketplace results tree"""

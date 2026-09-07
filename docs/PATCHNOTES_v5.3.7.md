@@ -1,9 +1,10 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-September-06
+**Release Date:** 2026-September-07
 
 ## New Features & Improvements
 
 - Added a Powerplay column to the Commodity Market results (Mining and Trade tabs), showing the controlling power and state for each station's system.
+
 
 ### Voiceattack Profile no update (v5.3.5)
 
