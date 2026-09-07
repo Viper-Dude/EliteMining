@@ -4735,7 +4735,10 @@ class RingFinder(ColumnVisibilityMixin):
                 # Get systems within range for optimization if we have reference coordinates
                 systems_in_range = None
                 if reference_coords and max_distance < 1000:  # Only pre-filter for specific distance searches
-                    systems_in_range = self._find_systems_in_range(reference_coords, max_distance)
+                    # coord_cache is populated as a side effect here with {system: {x,y,z}} for
+                    # every system found, so the per-row loop below can reuse them instead of
+                    # re-querying galaxy_systems.db one connection at a time for each miss.
+                    systems_in_range = self._find_systems_in_range(reference_coords, max_distance, coord_out=coord_cache)
                     
                     if systems_in_range is None:
                         systems_in_range = [reference_system]
@@ -5078,8 +5081,14 @@ class RingFinder(ColumnVisibilityMixin):
             
         return None
     
-    def _find_systems_in_range(self, reference_coords: Dict, max_distance: float) -> List[str]:
-        """Find all systems within range using galaxy_systems.db spatial index"""
+    def _find_systems_in_range(self, reference_coords: Dict, max_distance: float, coord_out: Dict[str, Dict] = None) -> List[str]:
+        """Find all systems within range using galaxy_systems.db spatial index
+
+        coord_out: optional dict the caller passes in; populated here with
+        {system_name: {x, y, z}} for every system this function already looked up, so callers
+        that need coordinates for these systems (e.g. distance calculations) can reuse them
+        instead of re-querying galaxy_systems.db one system at a time.
+        """
         try:
             import sqlite3
             from pathlib import Path
@@ -5121,9 +5130,11 @@ class RingFinder(ColumnVisibilityMixin):
                 for name, x, y, z in results:
                     system_coords = {'x': x, 'y': y, 'z': z}
                     distance = self._calculate_distance(reference_coords, system_coords)
-                    
+
                     if distance <= max_distance:
                         systems_with_distances.append((name, distance))
+                        if coord_out is not None:
+                            coord_out[name] = system_coords
                 
                 # Sort by distance (closest first) before converting to name-only list
                 systems_with_distances.sort(key=lambda x: x[1])
@@ -5145,10 +5156,12 @@ class RingFinder(ColumnVisibilityMixin):
                         for system_name, x, y, z in user_cursor.fetchall():
                             system_coords = {'x': x, 'y': y, 'z': z}
                             distance = self._calculate_distance(reference_coords, system_coords)
-                            
+
                             if distance <= max_distance and system_name not in systems_in_range:
                                 systems_in_range.append(system_name)
                                 user_systems_in_range += 1
+                                if coord_out is not None:
+                                    coord_out[system_name] = system_coords
                         
                         # ALSO check hotspot_data table for systems with hotspots
                         # This ensures newly scanned hotspots are found immediately
@@ -5175,10 +5188,12 @@ class RingFinder(ColumnVisibilityMixin):
                                 continue
                             system_coords = {'x': x, 'y': y, 'z': z}
                             distance = self._calculate_distance(reference_coords, system_coords)
-                            
+
                             if distance <= max_distance:
                                 systems_in_range.append(system_name)
                                 hotspot_systems_added += 1
+                                if coord_out is not None:
+                                    coord_out[system_name] = system_coords
                         
                 except Exception:
                     pass
