@@ -476,6 +476,7 @@
     "supply": "Angebot",
     "price": "Preis",
     "updated": "Aktualisiert",
+    "powerstate": "Powerplay",
     "found_stations_top30_price": "✓ {count} Stationen gefunden",
     "found_stations_top30_distance": "✓ {count} Stationen gefunden (mit Entfernungen)",
     "found_stations_top30": "✓ {count} Stationen gefunden",

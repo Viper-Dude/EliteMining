@@ -480,6 +480,7 @@
     "supply": "Supply",
     "price": "Price",
     "updated": "Updated",
+    "powerstate": "Powerplay",
     "found_stations_top30_price": "✓ Found {count} stations",
     "found_stations_top30_distance": "✓ Found {count} stations (with distances)",
     "found_stations_top30": "✓ Found {count} stations",

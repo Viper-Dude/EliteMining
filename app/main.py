@@ -715,7 +715,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.3.6"
+APP_VERSION = "v5.3.7"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -19101,7 +19101,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         table_frame.pack(fill="both", expand=True, padx=2, pady=2)
         
         # Define columns with LS (light-seconds from star)
-        columns = ("location", "type", "pad", "distance", "ls", "demand", "price", "updated")
+        # _spacer is an always-empty trailing column (never in the visibility menu) that
+        # absorbs extra horizontal space, same as Ring Finder's results table - without it
+        # the last real column gets force-stretched and its right border isn't draggable.
+        columns = ("location", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
         
         # Configure Marketplace Treeview style (theme-aware)
         from config import load_theme
@@ -19164,15 +19167,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Define headings with sorting - explicitly set anchor to left-align header text
         numeric_columns = {"distance", "ls", "demand", "price", "updated"}
         for col in columns:
+            if col == "_spacer":
+                self.marketplace_tree.heading(col, text="", anchor="w")
+                continue
             is_numeric = col in numeric_columns
-            self.marketplace_tree.heading(col, text=self._get_column_title(col), 
+            self.marketplace_tree.heading(col, text=self._get_column_title(col),
                                          anchor="w",
                                          command=lambda c=col, n=is_numeric: self._sort_marketplace_column(c, n))
-        
+
         # Track sort state
         self.marketplace_sort_column = None
         self.marketplace_sort_reverse = False
-        
+
         # Set column widths - Add extra padding to create visual separation
         # Using slightly increased widths and padding to create column spacing effect
         # minwidth is derived from the actual rendered header text width (at the
@@ -19183,7 +19189,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         import tkinter.font as _tkfont
         _heading_font = _tkfont.Font(font=self._scaled_font(9, "bold"))
         _base_widths = {"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70,
-                        "demand": 75, "price": 125, "updated": 95}
+                        "demand": 75, "price": 125, "powerstate": 150, "updated": 95}
         _header_pad = self._scaled_px(24)  # header cell padding + sort-arrow space
 
         def _min_for(col_name):
@@ -19198,14 +19204,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         _minwidths = {col: _min_for(col) for col in _base_widths}
 
         for col_name, base_width in _base_widths.items():
-            stretch = (col_name == "updated")
             self.marketplace_tree.column(col_name, width=max(self._scaled_px(base_width), _minwidths[col_name]),
-                                         minwidth=_minwidths[col_name], anchor="w", stretch=stretch)
+                                         minwidth=_minwidths[col_name], anchor="w", stretch=False)
 
-        # Setup column visibility for mining commodities
+        # Spacer column - always last, gives every real column a draggable right border and
+        # absorbs extra width instead of force-stretching the last real column.
+        self.marketplace_tree.column("_spacer", width=self._scaled_px(20), minwidth=self._scaled_px(20), anchor="w", stretch=True)
+
+        # Setup column visibility for mining commodities (exclude _spacer from the menu)
         self.setup_column_visibility(
             tree=self.marketplace_tree,
-            columns=columns,
+            columns=tuple(c for c in columns if c != "_spacer"),
             default_widths={col: max(self._scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
             config_key='mining_commodities'
         )
@@ -19289,7 +19298,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "ls": "LS",
             "demand": t('marketplace.supply') if is_buy_mode else t('marketplace.demand'),  # Dynamic based on mode
             "price": t('marketplace.price'),
-            "updated": t('marketplace.updated')
+            "updated": t('marketplace.updated'),
+            "powerstate": t('marketplace.powerstate')
         }
         return titles.get(col, col)
     
@@ -19297,9 +19307,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Update column headers when mode changes"""
         if hasattr(self, 'marketplace_tree'):
             numeric_columns = {"distance", "ls", "demand", "price", "updated"}
-            for col in ("location", "type", "pad", "distance", "ls", "demand", "price", "updated"):
+            for col in ("location", "type", "pad", "distance", "ls", "demand", "price", "updated", "powerstate"):
                 is_numeric = col in numeric_columns
-                self.marketplace_tree.heading(col, text=self._get_column_title(col), 
+                self.marketplace_tree.heading(col, text=self._get_column_title(col),
                                             anchor="w",
                                             command=lambda c=col, n=is_numeric: self._sort_marketplace_column(c, n))
     
@@ -20379,16 +20389,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
         table_frame.pack(fill="both", expand=True, padx=5, pady=5)
         
         # Column definitions - same structure as marketplace with LS column
-        columns = ("location", "type", "pad", "distance", "ls", "demand", "price", "updated")
-        
+        # _spacer is an always-empty trailing column (never in the visibility menu) that
+        # absorbs extra horizontal space, same as Ring Finder's results table - without it
+        # the last real column gets force-stretched and its right border isn't draggable.
+        columns = ("location", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
+
         # Create separate Treeview for trade tab
         self.trade_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
-        
+
         # Define headings with sorting
         numeric_columns = {"distance", "ls", "demand", "price", "updated"}
         for col in columns:
+            if col == "_spacer":
+                self.trade_tree.heading(col, text="", anchor="w")
+                continue
             is_numeric = col in numeric_columns
-            self.trade_tree.heading(col, text=self._get_column_title(col), 
+            self.trade_tree.heading(col, text=self._get_column_title(col),
                                     anchor="w",
                                     command=lambda c=col, n=is_numeric: self._sort_trade_column(c, n))
         
@@ -20405,7 +20421,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         import tkinter.font as _tkfont
         _heading_font = _tkfont.Font(font=self._scaled_font(9, "bold"))
         _base_widths = {"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70,
-                        "demand": 75, "price": 125, "updated": 95}
+                        "demand": 75, "price": 125, "powerstate": 150, "updated": 95}
         _header_pad = self._scaled_px(24)  # header cell padding + sort-arrow space
 
         def _min_for(col_name):
@@ -20420,14 +20436,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         _minwidths = {col: _min_for(col) for col in _base_widths}
 
         for col_name, base_width in _base_widths.items():
-            stretch = (col_name == "updated")
             self.trade_tree.column(col_name, width=max(self._scaled_px(base_width), _minwidths[col_name]),
-                                   minwidth=_minwidths[col_name], anchor="w", stretch=stretch)
+                                   minwidth=_minwidths[col_name], anchor="w", stretch=False)
 
-        # Setup column visibility for trade commodities
+        # Spacer column - always last, gives every real column a draggable right border and
+        # absorbs extra width instead of force-stretching the last real column.
+        self.trade_tree.column("_spacer", width=self._scaled_px(20), minwidth=self._scaled_px(20), anchor="w", stretch=True)
+
+        # Setup column visibility for trade commodities (exclude _spacer from the menu)
         self.setup_column_visibility(
             tree=self.trade_tree,
-            columns=columns,
+            columns=tuple(c for c in columns if c != "_spacer"),
             default_widths={col: max(self._scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
             config_key='trade_commodities'
         )
@@ -20563,7 +20582,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
-        
+
+        # Bulk-fetch PowerPlay data from the local EDDN cache for all result systems in one
+        # query - local-only, no Spansh/Inara calls.
+        from system_finder_api import SystemFinderAPI
+        _trade_pp_names = list({r.get('systemName', '') for r in results if r.get('systemName')})
+        _trade_pp_data = SystemFinderAPI._batch_get_powerplay(_trade_pp_names) if _trade_pp_names else {}
+
         # Display results
         for result in results:
             # LOCATION (System + Station)
@@ -20665,7 +20690,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     updated = '-'
             else:
                 updated = '-'
-            
+
+            # POWERPLAY - local EDDN cache only, no Spansh/Inara lookups
+            pp_entry = _trade_pp_data.get(result.get('systemName', ''), {})
+            pp_power = pp_entry.get('controlling_power', '')
+            pp_state = pp_entry.get('power_state', '')
+            if pp_power == '~none~':
+                powerstate = pp_state or t('common.no_data')
+            elif pp_power and pp_state:
+                powerstate = f"{pp_power} / {pp_state}"
+            elif pp_power:
+                powerstate = pp_power
+            elif pp_state:
+                powerstate = pp_state
+            else:
+                powerstate = t('common.no_data')
+
             # Insert row with alternating row tag
             row_index = len(self.trade_tree.get_children())
             row_tag = 'oddrow' if row_index % 2 == 0 else 'evenrow'
@@ -20677,7 +20717,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 f" {ls} ",
                 f" {volume} ",
                 f" {price} ",
-                f" {updated} "
+                f" {powerstate} ",
+                f" {updated} ",
+                ""
             ), tags=(row_tag,))
     
     def _clear_trade_results(self):
@@ -21037,7 +21079,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
             # Determine mode for correct field handling
             is_buy_mode = self.marketplace_buy_mode.get()
-            
+
+            # Bulk-fetch PowerPlay data from the local EDDN cache for all result systems in one
+            # query - local-only, no Spansh/Inara calls (unlike Ring Finder's PowerPlay column).
+            from system_finder_api import SystemFinderAPI
+            _pp_system_names = list({r.get('systemName', '') for r in results if r.get('systemName')})
+            _pp_data = SystemFinderAPI._batch_get_powerplay(_pp_system_names) if _pp_system_names else {}
+
             # Populate results (sorted by distance - closest first)
             for result in results:
                 # LOCATION (System + Station) - API uses camelCase
@@ -21152,11 +21200,26 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         updated = 'Unknown'
                 else:
                     updated = 'Unknown'
-                
+
+                # POWERSTATE - local EDDN cache only, no Spansh/Inara lookups
+                pp_entry = _pp_data.get(result.get('systemName', ''), {})
+                pp_power = pp_entry.get('controlling_power', '')
+                pp_state = pp_entry.get('power_state', '')
+                if pp_power == '~none~':
+                    powerstate = pp_state or t('common.no_data')
+                elif pp_power and pp_state:
+                    powerstate = f"{pp_power} / {pp_state}"
+                elif pp_power:
+                    powerstate = pp_power
+                elif pp_state:
+                    powerstate = pp_state
+                else:
+                    powerstate = t('common.no_data')
+
                 # Insert with alternating row tags for visual separation
                 row_index = len(self.marketplace_tree.get_children())
                 tag = 'evenrow' if row_index % 2 == 0 else 'oddrow'
-                
+
                 # Add subtle visual separator using spacing
                 self.marketplace_tree.insert("", "end", values=(
                     f" {location} ",
@@ -21166,7 +21229,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     f" {ls} ",
                     f" {volume} ",
                     f" {price} ",
-                    f" {updated} "
+                    f" {powerstate} ",
+                    f" {updated} ",
+                    ""
                 ), tags=(tag,))
             
             # Update status (like hotspots finder format)
@@ -21277,19 +21342,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.marketplace_sort_column = column
                 self.marketplace_sort_reverse = False
             
-            # Get column index - column IDs, not display names
-            column_ids = ("location", "type", "pad", "distance", "ls", "demand", "price", "updated")
-            
+            # Get column index - column IDs, not display names (must match the treeview's
+            # actual column order, including the trailing _spacer)
+            column_ids = ("location", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
+
             # Map display names to column IDs
             display_to_id = {
                 "Location": "location",
-                "Station Type": "type", 
+                "Station Type": "type",
                 "Pad": "pad",
                 "Distance": "distance",
                 "LS": "ls",
                 "Demand": "demand",
                 "Price": "price",
-                "Updated": "updated"
+                "Updated": "updated",
+                "Powerplay": "powerstate"
             }
             
             # Get the column ID from display name
@@ -21345,7 +21412,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.marketplace_tree.item(item, tags=(tag,))
             
             # Update column headers to show sort direction
-            display_names = ["Location", "Station Type", "Pad", "Distance", "Demand", "Price", "Updated"]
+            display_names = ["Location", "Station Type", "Pad", "Distance", "Demand", "Price", "Updated", "Powerplay"]
             for col_name in display_names:
                 if col_name == column:
                     arrow = " ↓" if self.marketplace_sort_reverse else " ↑"
