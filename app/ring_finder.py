@@ -2796,12 +2796,18 @@ class RingFinder(ColumnVisibilityMixin):
                     hotspots = self._get_all_res_for_search(reference_system, reference_coords, specific_material)
                     print(f" DEBUG: RES Only mode - found {len(hotspots)} RES locations")
             else:
-                hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results, data_source=data_source, ring_type_only_active=ring_type_only)
+                hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results, data_source=data_source, ring_type_only_active=ring_type_only,
+                                               is_cancelled=lambda: search_generation != self._search_generation)
             
             # Apply PowerPlay filter using EDDN cache (local database only — Power/State
             # combos are greyed out and reset to Any for Spansh/Both data sources)
             if pp_power != 'Any' or pp_state != 'Any':
-                hotspots = self._apply_powerplay_filter(hotspots, pp_power, pp_state, reference_system, max_distance)
+                if search_generation != self._search_generation:
+                    print(f"[SEARCH] Search gen {search_generation} cancelled before PowerPlay filter (current: {self._search_generation})")
+                    return
+                hotspots = self._apply_powerplay_filter(
+                    hotspots, pp_power, pp_state, reference_system, max_distance,
+                    is_cancelled=lambda: search_generation != self._search_generation)
             else:
                 self._spansh_pp_enrichment = {}
 
@@ -3069,9 +3075,9 @@ class RingFinder(ColumnVisibilityMixin):
             print(f"[SPANSH] System name resolution failed: {e}")
             return None
     
-    def _search_spansh_with_filters(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int, reference_coords, ring_type_only: bool = False) -> List[Dict]:
+    def _search_spansh_with_filters(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int, reference_coords, ring_type_only: bool = False, is_cancelled=None) -> List[Dict]:
         """Search Spansh API with proper filters for hotspot fallback (EDMC approach)
-        
+
         Args:
             reference_system: Name of reference system
             material_filter: Ring type filter (All, Icy, Rocky, Metallic, Metal Rich)
@@ -3080,7 +3086,10 @@ class RingFinder(ColumnVisibilityMixin):
             max_results: Maximum number of results
             reference_coords: Reference system coordinates dict
             ring_type_only: If True, search for ring types only (ignore hotspot data)
-            
+            is_cancelled: optional zero-arg callable checked between pagination pages —
+                lets Stop end a Ring Search (which can page up to 30 requests) after the
+                current page instead of waiting for the whole sweep to finish.
+
         Returns:
             List of hotspot-format dicts compatible with _update_results
         """
@@ -3166,6 +3175,10 @@ class RingFinder(ColumnVisibilityMixin):
             # Fetch pages until we reach max_distance or run out of pages
             all_results = []
             for page_num in range(max_pages):
+                if is_cancelled and is_cancelled():
+                    print(f"[SPANSH PAGINATION] Cancelled before page {page_num}, stopping")
+                    break
+
                 # Update status message for pagination (especially for "All Minerals" searches)
                 if use_pagination and page_num > 0:
                     progress_msg = f"Fetching Spansh data... page {page_num + 1}/{max_pages}"
@@ -3651,7 +3664,7 @@ class RingFinder(ColumnVisibilityMixin):
         return results
 
     def _apply_powerplay_filter(self, hotspots: List[Dict], pp_power: str, pp_state: str,
-                                 reference_system: str, max_distance: float) -> List[Dict]:
+                                 reference_system: str, max_distance: float, is_cancelled=None) -> List[Dict]:
         """Filter hotspot results by PowerPlay controlling power and/or state.
 
         Uses the EDDN cache by default. For Exploited/Fortified/Stronghold/Unoccupied - the
@@ -3659,6 +3672,9 @@ class RingFinder(ColumnVisibilityMixin):
         index at all) - also queries Spansh and merges it in, keeping whichever source has
         the newer 'updated_at' per system — the EDDN cache alone is often sparse/stale
         for systems the player hasn't personally visited.
+
+        is_cancelled: optional zero-arg callable, passed through to the Spansh enrichment
+        call so a Stop click before that request is sent skips it instead of waiting on it.
         """
         from system_finder_api import SystemFinderAPI
         system_names = list({h.get('system', h.get('systemName', '')) for h in hotspots})
@@ -3673,7 +3689,7 @@ class RingFinder(ColumnVisibilityMixin):
         if pp_state in ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied'):
             # max_distance is already widened to 500 LY by _search_worker for these states
             spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_systems(
-                reference_system, max_distance, pp_power, pp_state)
+                reference_system, max_distance, pp_power, pp_state, is_cancelled=is_cancelled)
             to_persist = {}
             for sys_name, entry in spansh_pp.items():
                 cached = pp_cache.get(sys_name)
@@ -3701,7 +3717,7 @@ class RingFinder(ColumnVisibilityMixin):
             filtered.append(h)
         return filtered
 
-    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None, data_source: str = None, ring_type_only_active: bool = False) -> List[Dict]:
+    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None, data_source: str = None, ring_type_only_active: bool = False, is_cancelled=None) -> List[Dict]:
         """Get hotspot data based on user's data source selection"""
         
         # Get user's data source preference (or force database for auto-search)
@@ -3754,13 +3770,14 @@ class RingFinder(ColumnVisibilityMixin):
                     print(f"[SEARCH] Calling Spansh API...")
                     # Pass "Ring Type Only" mode state to Spansh search (already determined at top of function)
                     spansh_results = self._search_spansh_with_filters(
-                        reference_system, 
-                        material_filter, 
-                        specific_material, 
-                        max_distance, 
+                        reference_system,
+                        material_filter,
+                        specific_material,
+                        max_distance,
                         spansh_limit,  # Use spansh_limit (2x for Both mode, or max_results for spansh-only)
                         self.current_system_coords,
-                        ring_type_only=ring_type_only_active
+                        ring_type_only=ring_type_only_active,
+                        is_cancelled=is_cancelled
                     )
                     print(f"[SEARCH] Spansh returned {len(spansh_results)} results")
                     # Cache the Spansh results for potential reuse

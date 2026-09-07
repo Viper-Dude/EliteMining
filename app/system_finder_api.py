@@ -75,15 +75,27 @@ class SystemFinderAPI:
             log.debug(f"[SYSTEM_FINDER] EDDN powerplay batch lookup error: {e}")
             return {}
 
+    # Timeout for best-effort enrichment calls that the user can interrupt via Stop —
+    # kept short so a slow Spansh response doesn't hold up the UI past what Stop implies.
+    ENRICHMENT_TIMEOUT = 10
+
     @classmethod
     def _fetch_spansh_powerplay_systems(cls, reference_system: str, max_distance: float,
-                                         power: str, pp_state: str) -> Dict[str, Dict]:
+                                         power: str, pp_state: str, is_cancelled=None) -> Dict[str, Dict]:
         """
         Query Spansh's systems-search for authoritative Fortified/Stronghold power/state data,
         scoped to the same reference_system + max_distance as the ring search.
         Returns {system_name: {controlling_power, power_state}}. Empty dict on any failure —
         this is a supplementary enrichment call, never required for the search to succeed.
+
+        is_cancelled: optional zero-arg callable checked right before the request is sent —
+        lets the caller (e.g. the user clicking Stop) skip the call entirely if it's already
+        stale. Once the request is in flight it still runs to completion (or ENRICHMENT_TIMEOUT),
+        since a blocking HTTP call can't be aborted mid-flight from another thread.
         """
+        if is_cancelled and is_cancelled():
+            print("[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment skipped (search already cancelled)")
+            return {}
         spansh_filters = cls._build_spansh_filters({'power': power, 'pp_state': pp_state})
         if not spansh_filters:
             print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment skipped (no filters built for power={power!r}, pp_state={pp_state!r})")
@@ -101,7 +113,7 @@ class SystemFinderAPI:
 
         try:
             _t0 = time.time()
-            response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
+            response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.ENRICHMENT_TIMEOUT)
             print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment: request took {time.time() - _t0:.1f}s")
             response.raise_for_status()
             data = response.json()
