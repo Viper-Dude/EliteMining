@@ -19512,9 +19512,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self.ring_finder, 'distance_var'):
                     self.ring_finder.distance_var.set("100")
                 
-                # Set Max Results = All
+                # Set Max Results = 200 (highest available option)
                 if hasattr(self.ring_finder, 'max_results_var'):
-                    self.ring_finder.max_results_var.set("All")
+                    self.ring_finder.max_results_var.set("200")
                 
                 # Trigger search after a short delay to let UI update
                 self.after(100, self.ring_finder.search_hotspots)
