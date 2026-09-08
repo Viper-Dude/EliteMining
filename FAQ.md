@@ -173,6 +173,14 @@ The overlay can stop showing after a fresh install, a graphics settings change, 
 </details>
 
 <details>
+<summary><b>The text overlay disappears when using Lossless Scaling.</b></summary>
+
+In Lossless Scaling, set **Capture API** to **DXGI** — this restores the overlay.
+
+If you have HDR disabled on your monitor and the game looks too dark after enabling Lossless Scaling, turn on HDR support for your monitor as well.
+</details>
+
+<details>
 <summary><b>Mining announcements not working?</b></summary>
 
 Check Settings → Interface → Text-to-Speech. Test voice and volume. Enable announcement filters.

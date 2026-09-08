@@ -27,7 +27,7 @@ class EDDNListener:
     EDDN_RELAY = "tcp://eddn.edcd.io:9500"
     RECONNECT_DELAY = 30  # Seconds between reconnection attempts
     CLEANUP_INTERVAL = 3600  # Clean up old data every hour
-    MAX_DATA_AGE_HOURS = 24  # Keep data for 24 hours
+    MAX_DATA_AGE_HOURS = 72  # Keep data for 72 hours
     MAX_DB_SIZE_BYTES = 100 * 1024 * 1024  # 100MB size cap safety net
 
     # Only store these commodities — everything else is discarded at ingestion
@@ -199,7 +199,7 @@ class EDDNListener:
                     break
                 
                 # Perform cleanup
-                log.info("🧹 Running database cleanup (24h for market data; PowerPlay kept until size cap)...")
+                log.info("🧹 Running database cleanup (72h for market data; PowerPlay kept until size cap)...")
                 deleted_count = self._cleanup_old_data()
                 log.info(f"🧹 Cleanup complete: Removed {deleted_count:,} old records")
                 

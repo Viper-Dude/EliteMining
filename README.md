@@ -9,6 +9,8 @@
 
 **EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 80,000+ mining locations plus Spansh API integration for galaxy-wide ring search, overlaps, and RES sites as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
 
+💡 **Tip:** Most tables throughout the app support right-click for additional options — copying data, opening systems in Inara/EDSM/Spansh, saving to your local database, exporting results, and more context-specific actions.
+
 ---
 
 <details open>
@@ -271,6 +273,7 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 - **Overlap Tracking** – Add and find hotspot overlaps (2x, 3x) for higher yield mining locations
 - **RES Site Tracking** – Add and find Resource Extraction Sites (Hazardous, High, Low) for combat mining
 - **Pre-loaded Overlap & RES Data** – Ships with 161 known overlaps and 71 RES site locations
+- **Power/State Filter** – Filter results by controlling Power and PowerPlay state (Local Database source only). Selecting Fortified or Stronghold searches up to 500 LY via Spansh for fast, accurate territory data; other states rely on the local EDDN cache and the Max Distance setting.
 - **PowerPlay Column** – Displays the controlling power and state for each system. Fills in instantly for systems you jump into yourself, and via EDDN (live data from other commanders, stored locally while the app runs) for the rest — coverage of systems you haven't visited can take hours to days to build up. Double-click any row showing 'No data ↗' to open the system on Inara and fetch the data automatically.
 
 ### Setting & Managing Overlap/RES Data
@@ -383,6 +386,8 @@ Search for nearby star systems with detailed status information. Perfect for fin
 Where you sell your mined goods matters just as much as where you mine them.
 - **Reinforcing your own Power's system or Undermining a rival's** — you must mine and sell in that same system. Selling elsewhere earns no Powerplay merits for that cargo.
 - **Acquiring an Unoccupied system** — you sell in the Unoccupied system itself, but the goods can be mined anywhere within 20 ly of it if your nearest system is Fortified, or 30 ly if it's a Stronghold.
+
+Use the [Hotspot Finder's](#hotspot-finder) Power/State filter to locate Fortified or Stronghold systems to mine in.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/star_system.png" width="900"><br>  
 *Star Systems tab showing current system info and nearby system search with filters.*
