@@ -91,6 +91,7 @@ All standalone features **plus** voice/hotkey automation:
 **Essential:**  
 - **Windows 10/11** (64-bit)
 - **Elite Dangerous** (PC version)  
+- **500 MB free disk space** (for installation and local data cache)
 
 **For VoiceAttack Integration:**  
 - **[EliteVA (API) by Somfic](https://docs.somfic.dev/projects/eliteva)** *(included in installer)*  
