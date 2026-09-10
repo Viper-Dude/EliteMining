@@ -1542,17 +1542,25 @@ class RingFinder(ColumnVisibilityMixin):
         """Keep Power/PP State a valid pair: picking a specific Power with State still on
         'Any' would otherwise query Spansh for that power's entire territory (thousands of
         systems with no state filter), which is far too slow — so auto-pick Fortified for
-        them instead of leaving an invalid/slow combination in place."""
-        if self.pp_power_var.get() != 'Any' and self.pp_state_var.get() == 'Any':
-            self.pp_state_var.set('Fortified')
+        them instead of leaving an invalid/slow combination in place. Contested/Expansion
+        systems have no controlling power, so picking a Power while one of those is selected
+        resets State back to 'Any' instead."""
+        if self.pp_power_var.get() != 'Any':
+            if self.pp_state_var.get() in ('Contested', 'Expansion'):
+                self.pp_state_var.set('Any')
+            elif self.pp_state_var.get() == 'Any':
+                self.pp_state_var.set('Fortified')
         self._sync_max_distance_for_pp_state()
         self._save_filter_settings()
 
     def _on_pp_state_changed(self, event=None):
         """Mirror of _on_pp_power_changed: if the user manually resets State back to 'Any'
         while a specific Power is still selected, reset Power too rather than leaving the
-        same invalid/slow combination in place."""
-        if self.pp_state_var.get() == 'Any' and self.pp_power_var.get() != 'Any':
+        same invalid/slow combination in place. Contested/Expansion have no controlling
+        power, so selecting either always forces Power back to 'Any'."""
+        if self.pp_state_var.get() in ('Contested', 'Expansion'):
+            self.pp_power_var.set('Any')
+        elif self.pp_state_var.get() == 'Any' and self.pp_power_var.get() != 'Any':
             self.pp_power_var.set('Any')
         self._sync_max_distance_for_pp_state()
         self._save_filter_settings()

@@ -2,8 +2,8 @@
 Version management for Elite Mining application
 """
 
-__version__ = "5.3.7"
-__build_date__ = "2026-September-07"
+__version__ = "5.3.8"
+__build_date__ = "2026-September-10"
 __config_version__ = "4.3.7"  # Config schema version - increment when config structure changes
 
 # Update server configuration
