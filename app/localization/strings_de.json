@@ -223,7 +223,7 @@
     "pp_power": "Macht",
     "pp_state": "Power-Zustand",
     "pp_power_tooltip": "Nach kontrollierender Macht filtern (nur lokale Datenbank). Erfordert einen bestimmten Zustand. Jeder bestimmte Zustand sucht bis zu 500 Ly — Ausgebeutet, Befestigt, Hochburg, Unbesetzt über Spansh (schnell und genau); Expansion, Umkämpft nur über den lokalen EDDN-Cache, da Spansh diese beiden Zustände nicht erfasst.\n'Kein Powerplay' = bestätigt keine kontrollierende Macht. Unbesetzte Systeme zeigen nur den Zustand, da sie per Definition von niemandem kontrolliert werden.",
-    "pp_state_tooltip": "Nach Powerplay-Zustand filtern (nur lokale Datenbank). Jeder bestimmte Zustand sucht bis zu 500 Ly — Ausgebeutet, Befestigt, Hochburg, Unbesetzt über Spansh (schnell und genau); Expansion, Umkämpft nur über den lokalen EDDN-Cache, da Spansh diese beiden Zustände nicht erfasst.\nUnbesetzte Systeme zeigen nur den Zustand, da sie per Definition von niemandem kontrolliert werden."
+    "pp_state_tooltip": "Nach Powerplay-Zustand filtern (nur lokale Datenbank). Jeder bestimmte Zustand sucht bis zu 500 Ly — Ausgebeutet, Befestigt, Hochburg, Unbesetzt über Spansh (schnell und genau); Expansion, Umkämpft nur über den lokalen EDDN-Cache, da Spansh diese beiden Zustände nicht erfasst.\nUnbesetzte Systeme zeigen nur den Zustand, da sie per Definition von niemandem kontrolliert werden.\n\nAbbau für Powerplay-Meriten:\nAbbau in: Befestigtem oder Hochburg-System der eigenen Power.\nVerkauf an: Unbesetztes, Expansion- oder umkämpftes Zielsystem.\nMax. Reichweite: Unter 20 Ly (ab Befestigt) oder 30 Ly (ab Hochburg).\nWarnung: Frachter-Lagerung entfernt Waren-Markierung. Direkt mit dem Schiff transportieren."
   },
   "sidebar": {
     "ship_presets": "Schiff-Presets (VoiceAttack)",

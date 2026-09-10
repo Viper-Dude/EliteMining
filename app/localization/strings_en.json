@@ -227,7 +227,7 @@
     "pp_power": "Power",
     "pp_state": "Power State",
     "pp_power_tooltip": "Filter by controlling power (Local Database only). Requires a specific State. Any specific State searches up to 500 LY — Exploited, Fortified, Stronghold, Unoccupied via Spansh (fast and accurate); Expansion, Contested against the local EDDN cache only, since Spansh doesn't track those two states.\n'No Powerplay' = confirmed no controlling power. Unoccupied systems show only the state, since nobody controls them by definition.",
-    "pp_state_tooltip": "Filter by PowerPlay state (Local Database only). Any specific State searches up to 500 LY — Exploited, Fortified, Stronghold, Unoccupied via Spansh (fast and accurate); Expansion, Contested against the local EDDN cache only, since Spansh doesn't track those two states.\nUnoccupied systems show only the state, since nobody controls them by definition."
+    "pp_state_tooltip": "Filter by PowerPlay state (Local Database only). Any specific State searches up to 500 LY — Exploited, Fortified, Stronghold, Unoccupied via Spansh (fast and accurate); Expansion, Contested against the local EDDN cache only, since Spansh doesn't track those two states.\nUnoccupied systems show only the state, since nobody controls them by definition.\n\nMining For Powerplay Merits:\nMining in: Own Power's Fortified or Stronghold system.\nSell to: Target Unoccupied, Expansion, or Contested system.\nMax Range: Under 20 LY (from Fortified) or 30 LY (from Stronghold).\nWarning: Fleet Carrier storage wipes item tags. Transport directly by ship."
   },
   "sidebar": {
     "ship_presets": "Ship Presets (VoiceAttack)",
