@@ -4,7 +4,9 @@
 ## New Features & Improvements
 
 - Added a new "Continuous Prospector Sequence" option in VoiceAttack Controls. Turn it on to keep firing prospectors automatically without saying the command again.
-- The old single "General Timer" was replaced with separate timers for Core Mining boosting, FSD Jump Sequence, and Continuous Prospector Sequence, so each can be timed on its own.
+- The old single "General Timer" are replaced with separate timers for Core Mining boosting, FSD Jump Sequence (open system map duration), and Continuous Prospector Sequence, so each can be timed on its own.
+
+- Added a new "Open System Map" option for the FSD Jump Sequence, so you can choose whether the system map opens and closes during the sequence.
 
 ### Voiceattack Profile updated to  (v5.3.9)
 

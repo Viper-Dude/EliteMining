@@ -68,6 +68,29 @@ class SystemFinderAPI:
             return False
 
     @classmethod
+    def _spansh_pp_should_replace_cache(cls, spansh_entry: Dict, cached_entry: Optional[Dict]) -> bool:
+        """Whether Spansh's PowerPlay entry should overwrite what's cached from EDDN.
+
+        Two independent reasons to prefer Spansh, not just 'is it newer':
+        - No cache entry at all -> always take Spansh's.
+        - Cache has a real timestamp advantage (newer 'updated_at') -> take Spansh's.
+        - Cache entry has no controlling_power at all (blank, not the confirmed '~none~'
+          sentinel) despite a known power_state - EDDN's own PowerplayState events often omit
+          ControllingPower for Unoccupied systems, since Frontier doesn't always attach a
+          contesting-power hint. That's not "stale", it's incomplete, and Spansh may know the
+          power name EDDN never provided - so patch it in regardless of which updated_at wins.
+        """
+        if not cached_entry:
+            return True
+        if cls._is_newer(spansh_entry.get('updated_at'), cached_entry.get('updated_at')):
+            return True
+        cached_power = cached_entry.get('controlling_power')
+        spansh_power = spansh_entry.get('controlling_power')
+        if not cached_power and cached_power != '~none~' and spansh_power:
+            return True
+        return False
+
+    @classmethod
     def _batch_get_powerplay(cls, system_names: List[str]) -> Dict[str, Dict]:
         """
         Query local EDDN powerplay cache for a list of systems in one SQL call.
@@ -145,8 +168,12 @@ class SystemFinderAPI:
                 system_name = system.get('name', '')
                 if not system_name:
                     continue
+                # Unoccupied systems have no 'controlling_power' (there is no controller) but
+                # Spansh still reports the nearby/contesting power in the 'power' list - fall
+                # back to that so Unoccupied rows show a power name instead of just the state.
+                power = system.get('controlling_power') or (system.get('power') or [None])[0]
                 pp_systems[system_name] = {
-                    'controlling_power': cls._normalize_power_name(system.get('controlling_power', '')),
+                    'controlling_power': cls._normalize_power_name(power),
                     'power_state': system.get('power_state', ''),
                     'updated_at': system.get('updated_at', ''),
                     'distance': system.get('distance', 0),
@@ -156,6 +183,29 @@ class SystemFinderAPI:
         except Exception as e:
             print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment failed: {e}")
             return {}
+
+    # PowerPlay states Spansh's systems-search can filter on directly (Expansion/Contested
+    # aren't in its index at all - see LOCAL_ONLY_PP_STATES).
+    SPANSH_BACKED_PP_STATES = ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied')
+
+    @classmethod
+    def _fetch_spansh_powerplay_backfill(cls, reference_system: str, max_distance: float,
+                                          is_cancelled=None) -> Dict[str, Dict]:
+        """
+        Query Spansh for all 4 Spansh-backed PP states (one request each) scoped to
+        reference_system/max_distance, merging results into a single {system_name: {...}} map.
+        Used to backfill the PowerPlay column with Spansh's own data when no Power/PP State
+        filter is active, so results aren't limited to whatever the sparse EDDN cache has.
+        Empty dict on failure/cancellation for any given state - never blocks the search.
+        """
+        merged: Dict[str, Dict] = {}
+        for state in cls.SPANSH_BACKED_PP_STATES:
+            if is_cancelled and is_cancelled():
+                break
+            state_systems = cls._fetch_spansh_powerplay_systems(
+                reference_system, max_distance, 'Any', state, is_cancelled=is_cancelled)
+            merged.update(state_systems)
+        return merged
 
     @classmethod
     def _store_powerplay_batch(cls, pp_systems: Dict[str, Dict]) -> None:
@@ -234,14 +284,23 @@ class SystemFinderAPI:
                 if system.get('name', '') != system_name:
                     print(f"[SYSTEM_FINDER DEBUG]   -> name mismatch: asked {system_name!r}, got {system.get('name', '')!r}, skipping")
                     continue
-                controlling_power = cls._normalize_power_name(system.get('controlling_power', ''))
-                if not controlling_power:
-                    print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: no controlling_power")
+                # Unoccupied systems have no 'controlling_power' (there is no controller) but
+                # Spansh still reports the nearby/contesting power in the 'power' list - fall
+                # back to that so Unoccupied rows show a power name instead of just the state.
+                power = system.get('controlling_power') or (system.get('power') or [None])[0]
+                controlling_power = cls._normalize_power_name(power)
+                power_state = system.get('power_state', '')
+                if not controlling_power and power_state not in cls.SPANSH_BACKED_PP_STATES:
+                    print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: no usable PowerPlay data")
                     continue
-                print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: {controlling_power} / {system.get('power_state', '')}")
+                # Still no power at all (e.g. genuinely no PowerPlay activity nearby) — store
+                # the sentinel like every other PP write path (Inara fetch, EDDN cache).
+                if not controlling_power:
+                    controlling_power = '~none~'
+                print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: {controlling_power} / {power_state}")
                 pp_data[system_name] = {
                     'controlling_power': controlling_power,
-                    'power_state': system.get('power_state', ''),
+                    'power_state': power_state,
                     'updated_at': system.get('updated_at', ''),
                 }
             except Exception as e:
@@ -429,14 +488,30 @@ class SystemFinderAPI:
             # whichever source has the newer 'updated_at' per system - same enrichment
             # Ring Finder's _apply_powerplay_filter does, since the EDDN cache alone is
             # often sparse/stale for systems the player hasn't personally visited.
-            if pp_state in ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied'):
+            if pp_state in cls.SPANSH_BACKED_PP_STATES:
                 power_filter = filters.get('power', 'Any')
                 spansh_pp = cls._fetch_spansh_powerplay_systems(
                     reference_system, float('inf'), power_filter, pp_state, is_cancelled=is_cancelled)
                 to_persist = {}
                 for sys_name, entry in spansh_pp.items():
                     cached = pp_cache.get(sys_name)
-                    if not cached or cls._is_newer(entry.get('updated_at'), cached.get('updated_at')):
+                    if cls._spansh_pp_should_replace_cache(entry, cached):
+                        pp_cache[sys_name] = entry
+                        to_persist[sys_name] = entry
+                if to_persist:
+                    cls._store_powerplay_batch(to_persist)
+            elif pp_state == 'Any':
+                # No PP State filter active — still backfill Spansh's own Exploited/Fortified/
+                # Stronghold/Unoccupied data (the 4 states Spansh reliably indexes) for rows
+                # where the EDDN cache has nothing newer, mirroring Ring Finder's behavior.
+                spansh_pp = cls._fetch_spansh_powerplay_backfill(
+                    reference_system, float('inf'), is_cancelled=is_cancelled)
+                to_persist = {}
+                for sys_name, entry in spansh_pp.items():
+                    if sys_name not in system_names:
+                        continue
+                    cached = pp_cache.get(sys_name)
+                    if cls._spansh_pp_should_replace_cache(entry, cached):
                         pp_cache[sys_name] = entry
                         to_persist[sys_name] = entry
                 if to_persist:

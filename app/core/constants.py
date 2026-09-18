@@ -42,7 +42,8 @@ TOGGLES = {
     "Repeated Mining Cycles": ("laserminingextraToggle.txt", "Enables additional laser mining cycles."),
     # "Multi-Session Mode": ("multiSessionMode.txt", "Accumulate statistics across multiple cargo loads without resetting.")  # Removed - only available in Mining Analytics panel
     "Night Vision": ("nightvisionToggle.txt", "Auto-enables on mining start/reset. Turns off on 'Clear and Jump'."),
-    "FSD Jump Sequence": ("toggleSystem.txt", "After FSD jump: open/close system map, then auto-jump (not saved in ship presets)"),
+    "FSD Jump Sequence": ("FsdSeqToggle.txt", "After FSD jump: open/close system map, then auto-jump (not saved in ship presets)"),
+    "Open System Map": ("toggleSystem.txt", "Open/close the system map as part of the FSD Jump Sequence."),
     "Power Settings": ("powersettingsToggle.txt", "Enable = Max power to engines, disable = balance power when laser mining is completed."),
     "Prospector Sequence": ("prospectorSeq.txt", "Enable prospector sequence features (master control for Target Prospector and Thrust Up)."),
     "Continuous Prospector Sequence": ("ContProspectorSeq.txt", "Keep repeating the prospector sequence continuously."),

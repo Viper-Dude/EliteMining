@@ -9656,6 +9656,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Repeated Mining Cycles": "voiceattack.help_laser_extra",
             "Night Vision": "voiceattack.help_night_vision",
             "FSD Jump Sequence": "voiceattack.help_fsd_jump",
+            "Open System Map": "voiceattack.help_open_system_map",
             "Power Settings": "voiceattack.help_power",
             "Prospector Sequence": "voiceattack.help_prospector_sequence",
             "Continuous Prospector Sequence": "voiceattack.help_continuous_prospector_sequence",
@@ -9684,35 +9685,88 @@ class App(tk.Tk, ColumnVisibilityMixin):
                  fg=_toggle_tip_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).grid(row=0, column=1, sticky="")
         r += 1
         
-        # Controls toggles: Auto Honk, Headtracker, Night Vision, FSD Jump
-        controls_toggles = ["Auto Honk", "Headtracker Docking Control", 
-                           "Night Vision", "FSD Jump Sequence"]
-        
+        # Controls toggles: Auto Honk, Headtracker, Night Vision
+        controls_toggles = ["Auto Honk", "Headtracker Docking Control", "Night Vision"]
+
         for name in controls_toggles:
             if name not in TOGGLES:
                 continue
             _fname, helptext = TOGGLES[name]
-            
+
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
-            
+
             # Create closure for auto-save
             def make_toggle_trace(toggle_name):
                 return lambda *args: self._save_toggle(toggle_name)
-            
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
-                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
-                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
+
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name],
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg,
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9),
                                     padx=4, pady=2, anchor="w")
             checkbox.pack(side="left")
-            
+
             self.toggle_checkboxes[name] = checkbox
             self.toggle_vars[name].trace_add("write", make_toggle_trace(name))
-            
+
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
-            
+
+            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
+                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
+            r += 1
+
+        # ============================================================
+        # FSD JUMP SEQUENCE SUB-SECTION
+        # ============================================================
+        ttk.Label(scrollable_frame, text=t('voiceattack.section_fsd_jump'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(10, 2))
+        r += 1
+
+        fsd_section_toggles = ["FSD Jump Sequence"]
+
+        for name in fsd_section_toggles:
+            if name not in TOGGLES:
+                continue
+            _fname, helptext = TOGGLES[name]
+
+            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+            rowf.grid(row=r, column=0, sticky="w", pady=2)
+
+            # Create closure for auto-save
+            def make_fsd_toggle_trace(toggle_name):
+                return lambda *args: self._save_toggle(toggle_name)
+
+            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name],
+                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
+                                    activebackground=_toggle_bg, activeforeground=_toggle_fg,
+                                    highlightthickness=0, bd=0, font=self._scaled_font(9),
+                                    padx=4, pady=2, anchor="w")
+            checkbox.pack(side="left")
+
+            self.toggle_checkboxes[name] = checkbox
+            self.toggle_vars[name].trace_add("write", make_fsd_toggle_trace(name))
+            if name == "FSD Jump Sequence":
+                self.toggle_vars[name].trace_add("write", lambda *args: self._update_fsdjump_dependencies())
+
+            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
+            ToolTip(checkbox, display_help)
+
+            # Open System Map checkbox on the same row (depends on FSD Jump Sequence being enabled)
+            if name == "FSD Jump Sequence" and "Open System Map" in TOGGLES:
+                osm_name = "Open System Map"
+                _osm_fname, osm_helptext = TOGGLES[osm_name]
+                osm_display_help = t(toggle_help_translations.get(osm_name, osm_name)) if osm_name in toggle_help_translations else osm_helptext
+                osm_checkbox = tk.Checkbutton(rowf, text=osm_name, variable=self.toggle_vars[osm_name],
+                                             bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
+                                             activebackground=_toggle_bg, activeforeground=_toggle_fg,
+                                             highlightthickness=0, bd=0, font=self._scaled_font(9),
+                                             padx=4, pady=2, anchor="w")
+                osm_checkbox.pack(side="left", padx=(12, 0))
+                self.toggle_checkboxes[osm_name] = osm_checkbox
+                self.toggle_vars[osm_name].trace_add("write", lambda *args, n=osm_name: self._save_toggle(n))
+                ToolTip(osm_checkbox, osm_display_help)
+
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
                      font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
@@ -10440,6 +10494,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Import runs at 100ms, so we delay this to 150ms
         self.after(150, self._update_prospector_dependencies)
         self.after(150, lambda: self._update_pulsewave_dependency(reset_value=False))
+        self.after(150, self._update_fsdjump_dependencies)
 
     def _update_pulsewave_dependency(self, reset_value=True):
         """Enable/disable Continuous Pulsewave based on Pulse Wave Analyser state"""
@@ -10456,6 +10511,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.toggle_vars["Continuous Pulsewave"].set(0)
         except Exception as e:
             print(f"Error updating pulsewave dependency: {e}")
+
+    def _update_fsdjump_dependencies(self):
+        """Enable/disable Open System Map based on FSD Jump Sequence state"""
+        try:
+            if "FSD Jump Sequence" not in self.toggle_vars or "Open System Map" not in self.toggle_checkboxes:
+                return
+            master_enabled = self.toggle_vars["FSD Jump Sequence"].get() == 1
+            checkbox = self.toggle_checkboxes["Open System Map"]
+            checkbox.configure(state="normal" if master_enabled else "disabled")
+        except Exception as e:
+            print(f"Error updating FSD jump dependency: {e}")
 
     def _update_prospector_dependencies(self):
         """Enable/disable dependent toggles based on Prospector Sequence state"""
@@ -11683,7 +11749,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     "btn": (self.tool_btn[t].get() if t in self.tool_btn else None)}
                 for t in TOOL_ORDER
             },
-            "Toggles": {k: v.get() for k, v in self.toggle_vars.items() if k != "FSD Jump Sequence"},
+            "Toggles": {k: v.get() for k, v in self.toggle_vars.items() if k not in ("FSD Jump Sequence", "Open System Map")},
             "Announcements": announcement_settings,
             "Timers": {k: v.get() for k, v in self.timer_vars.items() if k != "FSD Jump Sequence Timer"},
         }
@@ -11723,13 +11789,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Migrate old toggle keys to new keys
             if k == "Target" or k == "Auto Deselect Target":
                 k = "Auto Deselect Prospector"
-            # Skip FSD Jump Sequence - it's not saved in presets
-            if k in self.toggle_vars and k != "FSD Jump Sequence":
+            # Skip FSD Jump Sequence / Open System Map - not saved in presets
+            if k in self.toggle_vars and k not in ("FSD Jump Sequence", "Open System Map"):
                 self.toggle_vars[k].set(int(v))
         # Toggles missing from an older preset default to off, so a discarded
         # in-memory change doesn't survive after re-loading the preset
         for k in self.toggle_vars:
-            if k != "FSD Jump Sequence" and k not in toggles_data:
+            if k not in ("FSD Jump Sequence", "Open System Map") and k not in toggles_data:
                 self.toggle_vars[k].set(0)
         
         # Handle announcements: if section exists, load it; if not, set all to disabled (0)
@@ -18264,7 +18330,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         table_frame.pack(fill="both", expand=True, padx=2, pady=2)
         
         # Define columns (faction removed - users can right-click → Inara for details)
-        columns = ("system", "distance", "security", "allegiance", "state", "population", "economy", "powerplay")
+        columns = ("system", "distance", "security", "allegiance", "state", "population", "economy", "powerplay", "_spacer")
         
         # Configure treeview style based on theme
         from config import load_theme
@@ -18319,6 +18385,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     command=lambda: self._sort_sysfinder_column("economy", False))
         self.sysfinder_tree.heading("powerplay", text=t('system_finder.col_powerplay'),
                                     command=lambda: self._sort_sysfinder_column("powerplay", False))
+        self.sysfinder_tree.heading("_spacer", text="", anchor="w")
 
         # Column widths
         # minwidth is derived from the actual rendered header text width (at the
@@ -18343,10 +18410,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.sysfinder_tree.column(col_name, width=max(self._scaled_px(base_width), _minwidths[col_name]),
                                        minwidth=_minwidths[col_name], anchor=_anchors[col_name])
 
-        # Setup column visibility for system finder
+        # Spacer column — always last, gives the real last column a draggable right border
+        self.sysfinder_tree.column("_spacer", width=self._scaled_px(20), minwidth=self._scaled_px(20),
+                                   anchor="w", stretch=True)
+
+        # Setup column visibility for system finder (exclude _spacer from menu)
+        _visibility_columns = tuple(c for c in columns if c != "_spacer")
         self.setup_column_visibility(
             tree=self.sysfinder_tree,
-            columns=columns,
+            columns=_visibility_columns,
             default_widths={col: max(self._scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
             config_key='system_finder'
         )
@@ -19067,6 +19139,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tree.heading("population", text="Population")
         tree.heading("economy",    text="Economy")
         tree.heading("powerplay",  text=t('system_finder.col_powerplay'))
+        tree.heading("_spacer",    text="")
         tree.column("system",     width=150)
         tree.column("security",   width=80)
         tree.column("allegiance", width=90)
@@ -19074,6 +19147,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tree.column("population", width=100)
         tree.column("economy",    width=120)
         tree.column("powerplay",  width=170, minwidth=100)
+        tree.column("_spacer",    width=20, minwidth=20, stretch=True)
         if hasattr(self, 'sysfinder_results_frame'):
             self.sysfinder_results_frame.configure(text="Systems")
 
@@ -19090,6 +19164,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tree.heading("population", text="Arrival (ls)")
         tree.heading("economy",    text="Planetary")
         tree.heading("powerplay",  text="")
+        tree.heading("_spacer",    text="")
         tree.column("system",     width=130)
         tree.column("security",   width=160)
         tree.column("allegiance", width=110)
@@ -19097,6 +19172,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         tree.column("population", width=90)
         tree.column("economy",    width=70)
         tree.column("powerplay",  width=0, minwidth=0)
+        tree.column("_spacer",    width=20, minwidth=20, stretch=True)
         if hasattr(self, 'sysfinder_results_frame'):
             trader_type = getattr(self, 'sysfinder_trader_type', None)
             label = (trader_type.get() + " ") if trader_type else ""
@@ -20805,7 +20881,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 f" {updated} ",
                 ""
             ), tags=(row_tag,))
-    
+
+        # Backfill/refresh PowerPlay from Spansh's own Exploited/Fortified/Stronghold/Unoccupied
+        # data - queried for every result system, not just ones missing from the EDDN cache,
+        # so a stale cached entry gets replaced whenever Spansh's is newer (mirrors Ring
+        # Finder/Star Systems' updated_at comparison).
+        if _trade_pp_names:
+            threading.Thread(target=self._backfill_commodity_pp_worker,
+                              args=(_trade_pp_names, _trade_pp_data, self.trade_tree), daemon=True).start()
+
     def _clear_trade_results(self):
         """Clear trade results table"""
         if hasattr(self, 'trade_tree'):
@@ -21196,6 +21280,48 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             label.config(text=t('ring_finder.pp_fetch_none').format(system=system_name))
 
+    def _backfill_commodity_pp_worker(self, system_names, cached_pp_data, tree):
+        """Background lookup of Spansh's own Exploited/Fortified/Stronghold/Unoccupied
+        PowerPlay data for every result system, then update rows on the main thread wherever
+        Spansh's data should replace what the EDDN cache already had (same comparison Ring
+        Finder/Star Systems use - newer updated_at, or filling a blank controlling_power)."""
+        from system_finder_api import SystemFinderAPI
+        spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_for_named_systems(system_names)
+        newer_pp = {}
+        for sys_name, entry in spansh_pp.items():
+            cached = cached_pp_data.get(sys_name)
+            if SystemFinderAPI._spansh_pp_should_replace_cache(entry, cached):
+                newer_pp[sys_name] = entry
+        if newer_pp:
+            SystemFinderAPI._store_powerplay_batch(newer_pp)
+        self.after(0, lambda: self._backfill_commodity_pp_complete(newer_pp, tree))
+
+    def _backfill_commodity_pp_complete(self, pp_data, tree):
+        """Update Powerplay cell(s) for every system in pp_data with Spansh-backfilled data."""
+        if not pp_data:
+            return
+        columns = tree['columns']
+        pp_col_index = columns.index('powerstate')
+        for item in tree.get_children():
+            vals = list(tree.item(item, 'values'))
+            if not vals or len(vals) <= pp_col_index:
+                continue
+            location = vals[0].strip()
+            row_system = location.split(' / ')[0].strip() if ' / ' in location else location
+            entry = pp_data.get(row_system)
+            if not entry:
+                continue
+            pp_power = entry.get('controlling_power', '')
+            pp_state = entry.get('power_state', '')
+            if pp_power == '~none~':
+                pp_str = pp_state or t('common.pp_no_power')
+            elif pp_power and pp_state:
+                pp_str = f"{pp_power} / {pp_state}"
+            else:
+                pp_str = pp_power or t('common.no_data')
+            vals[pp_col_index] = f" {pp_str} "
+            tree.item(item, values=vals)
+
     def _clear_marketplace_results(self):
         """Clear marketplace results tree"""
         for item in self.marketplace_tree.get_children():
@@ -21392,7 +21518,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     f" {updated} ",
                     ""
                 ), tags=(tag,))
-            
+
+            # Backfill/refresh PowerPlay from Spansh's own Exploited/Fortified/Stronghold/
+            # Unoccupied data - queried for every result system, not just ones missing from
+            # the EDDN cache, so a stale cached entry gets replaced whenever Spansh's is newer
+            # (mirrors Ring Finder/Star Systems' updated_at comparison).
+            if _pp_system_names:
+                threading.Thread(target=self._backfill_commodity_pp_worker,
+                                  args=(_pp_system_names, _pp_data, self.marketplace_tree), daemon=True).start()
+
             # Update status (like hotspots finder format)
             if results:
                 if is_buy_mode:

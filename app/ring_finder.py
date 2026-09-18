@@ -2799,7 +2799,30 @@ class RingFinder(ColumnVisibilityMixin):
                     hotspots, pp_power, pp_state, reference_system, max_distance,
                     is_cancelled=lambda: search_generation != self._search_generation)
             else:
+                # No Power/PP State filter active — still backfill the PowerPlay column with
+                # Spansh's own Exploited/Fortified/Stronghold/Unoccupied data (the 4 states
+                # Spansh reliably indexes) for rows where the EDDN cache has nothing newer,
+                # so results aren't limited to whatever the sparse EDDN cache happens to have.
                 self._spansh_pp_enrichment = {}
+                if search_generation == self._search_generation:
+                    from system_finder_api import SystemFinderAPI
+                    system_names = list({h.get('system', h.get('systemName', '')) for h in hotspots})
+                    system_names = [s for s in system_names if s]
+                    if system_names:
+                        pp_cache = SystemFinderAPI._batch_get_powerplay(system_names)
+                        spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_backfill(
+                            reference_system, max_distance,
+                            is_cancelled=lambda: search_generation != self._search_generation)
+                        to_persist = {}
+                        for sys_name, entry in spansh_pp.items():
+                            if sys_name not in system_names:
+                                continue
+                            cached = pp_cache.get(sys_name)
+                            if SystemFinderAPI._spansh_pp_should_replace_cache(entry, cached):
+                                self._spansh_pp_enrichment[sys_name] = entry
+                                to_persist[sys_name] = entry
+                        if to_persist:
+                            SystemFinderAPI._store_powerplay_batch(to_persist)
 
             # Apply min hotspots filter if needed (skip for overlaps/RES only mode)
             if min_hotspots > 1 and not self._is_all_minerals(specific_material) and not overlaps_only and not res_only:
@@ -3683,11 +3706,7 @@ class RingFinder(ColumnVisibilityMixin):
             to_persist = {}
             for sys_name, entry in spansh_pp.items():
                 cached = pp_cache.get(sys_name)
-                if not cached:
-                    pp_cache[sys_name] = entry
-                    self._spansh_pp_enrichment[sys_name] = entry
-                    to_persist[sys_name] = entry
-                elif SystemFinderAPI._is_newer(entry.get('updated_at'), cached.get('updated_at')):
+                if SystemFinderAPI._spansh_pp_should_replace_cache(entry, cached):
                     pp_cache[sys_name] = entry
                     self._spansh_pp_enrichment[sys_name] = entry
                     to_persist[sys_name] = entry
