@@ -715,7 +715,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.3.8"
+APP_VERSION = "v5.3.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -9631,9 +9631,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Duration for repeated mining cycles (per cycle)": "voiceattack.timer_laser_extra",
             "Delay before targeting the prospector after launching": "voiceattack.timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.timer_cargoscoop",
-            "Boost Interval (For Core Mining Boost sequense )": "voiceattack.timer_boost",
+            "Boost Interval (Core Mining)": "voiceattack.timer_boost",
+            "FSD Jump Sequence Timer": "voiceattack.timer_fsd_jump",
+            "Continuous Prospector Sequence Timer": "voiceattack.timer_cont_prospector_seq",
         }
-        
+
         # Timer help text translation mapping
         timer_help_translations = {
             "Duration for firing mining lasers (standard)": "voiceattack.help_timer_laser_first",
@@ -9641,7 +9643,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Duration for repeated mining cycles (per cycle)": "voiceattack.help_timer_laser_extra",
             "Delay before targeting the prospector after launching": "voiceattack.help_timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.help_timer_cargoscoop",
-            "Boost Interval (For Core Mining Boost sequense )": "voiceattack.help_timer_boost",
+            "Boost Interval (Core Mining)": "voiceattack.help_timer_boost",
+            "FSD Jump Sequence Timer": "voiceattack.help_timer_fsd_jump",
+            "Continuous Prospector Sequence Timer": "voiceattack.help_timer_cont_prospector_seq",
         }
         
         # Toggle help text translation mapping
@@ -9654,6 +9658,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "FSD Jump Sequence": "voiceattack.help_fsd_jump",
             "Power Settings": "voiceattack.help_power",
             "Prospector Sequence": "voiceattack.help_prospector_sequence",
+            "Continuous Prospector Sequence": "voiceattack.help_continuous_prospector_sequence",
             "Prospector Sound Effect": "voiceattack.help_prospector_sound",
             "Target Prospector": "voiceattack.help_target_prospector",
             "Thrust Up": "voiceattack.help_thrust_up",
@@ -9711,67 +9716,67 @@ class App(tk.Tk, ColumnVisibilityMixin):
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
                      font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
-        
-        # ============================================================
-        # CORE MINING SUB-SECTION
-        # ============================================================
-        ttk.Label(scrollable_frame, text=t('voiceattack.section_core_mining'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(15, 2))
-        r += 1
-        
-        # Boost Interval timer
-        boost_timer_name = "Boost Interval (For Core Mining Boost sequense )"
-        if boost_timer_name in TIMERS:
-            _fname, lo, hi, helptext = TIMERS[boost_timer_name]
-            
-            rowf = ttk.Frame(scrollable_frame)
-            rowf.grid(row=r, column=0, sticky="w", pady=2)
-            
-            # Create closure with captured values for auto-save
-            def make_save_boost(tn, fn, l, h):
-                return lambda: self._save_timer(tn, fn, l, h)
-            def make_trace_boost(tn, fn, l, h):
-                return lambda *args: self._save_timer(tn, fn, l, h)
-            
-            sp = tk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[boost_timer_name],
-                            command=make_save_boost(boost_timer_name, _fname, lo, hi),
-                            bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                            insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                            relief="solid", bd=0, highlightthickness=1,
-                            highlightbackground="#ffffff", highlightcolor="#ffffff",
-                            font=self._scaled_font(9))
-            sp.pack(side="left")
-            # Add mouse wheel support for tk.Spinbox
-            def on_boost_scroll(event, spinbox=sp, var=self.timer_vars[boost_timer_name], lo_val=lo, hi_val=hi):
-                try:
-                    current = int(var.get())
-                    if event.delta > 0:
-                        new_val = min(current + 1, hi_val)
-                    else:
-                        new_val = max(current - 1, lo_val)
-                    var.set(new_val)
-                except:
-                    pass
-                return "break"
-            sp.bind("<MouseWheel>", on_boost_scroll)
-            
-            self.timer_vars[boost_timer_name].trace_add("write", make_trace_boost(boost_timer_name, _fname, lo, hi))
-            
-            display_name = t(timer_translations.get(boost_timer_name, boost_timer_name))
-            label = ttk.Label(rowf, text=f"{display_name} [{lo}..{hi}] {t('voiceattack.seconds')}")
-            label.pack(side="left", padx=(6, 0))
-            
-            localized_help = t(timer_help_translations.get(boost_timer_name, boost_timer_name))
-            ToolTip(label, localized_help)
-            r += 1
-        
+
+            # FSD Jump Sequence timer (indented, not part of ship presets - matches its toggle)
+            if name == "FSD Jump Sequence" and "FSD Jump Sequence Timer" in TIMERS:
+                fsdjump_timer_name = "FSD Jump Sequence Timer"
+                fsdjump_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                fsdjump_frame.grid(row=r, column=0, sticky="w", pady=2)
+                tk.Label(fsdjump_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+
+                _fsdjump_fname, fsdjump_lo, fsdjump_hi, fsdjump_helptext = TIMERS[fsdjump_timer_name]
+
+                def make_save_fsdjump(tn, fn, l, h):
+                    return lambda: self._save_timer(tn, fn, l, h)
+                def make_trace_fsdjump(tn, fn, l, h):
+                    return lambda *args: self._save_timer(tn, fn, l, h)
+
+                fsdjump_spinbox = tk.Spinbox(fsdjump_frame, from_=fsdjump_lo, to=fsdjump_hi, width=5,
+                                              textvariable=self.timer_vars[fsdjump_timer_name],
+                                              command=make_save_fsdjump(fsdjump_timer_name, _fsdjump_fname, fsdjump_lo, fsdjump_hi),
+                                              bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                              insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                              relief="solid", bd=0, highlightthickness=1,
+                                              highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                              font=self._scaled_font(9))
+                fsdjump_spinbox.pack(side="left", padx=(4, 6))
+
+                def on_fsdjump_scroll(event, var=self.timer_vars[fsdjump_timer_name], lo_val=fsdjump_lo, hi_val=fsdjump_hi):
+                    try:
+                        current = int(var.get())
+                        if event.delta > 0:
+                            new_val = min(current + 1, hi_val)
+                        else:
+                            new_val = max(current - 1, lo_val)
+                        var.set(new_val)
+                    except:
+                        pass
+                    return "break"
+                fsdjump_spinbox.bind("<MouseWheel>", on_fsdjump_scroll)
+
+                self.timer_vars[fsdjump_timer_name].trace_add("write",
+                    make_trace_fsdjump(fsdjump_timer_name, _fsdjump_fname, fsdjump_lo, fsdjump_hi))
+
+                fsdjump_display_name = t(timer_translations.get(fsdjump_timer_name, fsdjump_timer_name))
+                fsdjump_label = tk.Label(fsdjump_frame, text=f"{fsdjump_display_name} [{fsdjump_lo}..{fsdjump_hi}] {t('voiceattack.seconds')}",
+                                          bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
+                fsdjump_label.pack(side="left")
+
+                fsdjump_help = t(timer_help_translations.get(fsdjump_timer_name, fsdjump_timer_name))
+                ToolTip(fsdjump_label, fsdjump_help)
+                tk.Label(fsdjump_frame, text=fsdjump_help, fg=_help_fg, bg=_toggle_bg,
+                         font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
+                r += 1
+
         # ============================================================
         # LASER MINING SUB-SECTION
         # ============================================================
         ttk.Label(scrollable_frame, text=t('voiceattack.section_laser_mining'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(10, 2))
         r += 1
-        
+
         # Laser mining timers
         laser_timers = [
+            "Boost Interval (Core Mining)",
             "Duration for firing mining lasers (standard)",
             "Duration for repeated mining cycles (per cycle)",
             "Pause between mining cycles for weapon recharge/cooldown",
@@ -10065,11 +10070,77 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
-            
+
+            # Continuous Prospector Sequence checkbox on the same row (compact, tooltip-only help)
+            if "Continuous Prospector Sequence" in TOGGLES:
+                cps_name = "Continuous Prospector Sequence"
+                _cps_fname, cps_helptext = TOGGLES[cps_name]
+                cps_display_help = t(toggle_help_translations.get(cps_name, cps_name)) if cps_name in toggle_help_translations else cps_helptext
+                cps_checkbox = tk.Checkbutton(rowf, text="Continuous Seq.", variable=self.toggle_vars[cps_name],
+                                             bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
+                                             activebackground=_toggle_bg, activeforeground=_toggle_fg,
+                                             highlightthickness=0, bd=0, font=self._scaled_font(9),
+                                             padx=4, pady=2, anchor="w")
+                cps_checkbox.pack(side="left", padx=(12, 0))
+                self.toggle_checkboxes[cps_name] = cps_checkbox
+                self.toggle_vars[cps_name].trace_add("write", lambda *args, n=cps_name: self._save_toggle(n))
+                ToolTip(cps_checkbox, cps_display_help)
+
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
                      font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
-            
+
+            # Continuous Prospector Sequence timer (indented, under Continuous Seq. checkbox)
+            if "Continuous Prospector Sequence Timer" in TIMERS:
+                cpst_timer_name = "Continuous Prospector Sequence Timer"
+                cpst_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                cpst_frame.grid(row=r, column=0, sticky="w", pady=2)
+                tk.Label(cpst_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+
+                _cpst_fname, cpst_lo, cpst_hi, cpst_helptext = TIMERS[cpst_timer_name]
+
+                def make_save_cpst(tn, fn, l, h):
+                    return lambda: self._save_timer(tn, fn, l, h)
+                def make_trace_cpst(tn, fn, l, h):
+                    return lambda *args: self._save_timer(tn, fn, l, h)
+
+                cpst_spinbox = tk.Spinbox(cpst_frame, from_=cpst_lo, to=cpst_hi, width=5,
+                                           textvariable=self.timer_vars[cpst_timer_name],
+                                           command=make_save_cpst(cpst_timer_name, _cpst_fname, cpst_lo, cpst_hi),
+                                           bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                           insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                           relief="solid", bd=0, highlightthickness=1,
+                                           highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                           font=self._scaled_font(9))
+                cpst_spinbox.pack(side="left", padx=(4, 6))
+
+                def on_cpst_scroll(event, var=self.timer_vars[cpst_timer_name], lo_val=cpst_lo, hi_val=cpst_hi):
+                    try:
+                        current = int(var.get())
+                        if event.delta > 0:
+                            new_val = min(current + 1, hi_val)
+                        else:
+                            new_val = max(current - 1, lo_val)
+                        var.set(new_val)
+                    except:
+                        pass
+                    return "break"
+                cpst_spinbox.bind("<MouseWheel>", on_cpst_scroll)
+
+                self.timer_vars[cpst_timer_name].trace_add("write",
+                    make_trace_cpst(cpst_timer_name, _cpst_fname, cpst_lo, cpst_hi))
+
+                cpst_display_name = t(timer_translations.get(cpst_timer_name, cpst_timer_name))
+                cpst_label = tk.Label(cpst_frame, text=f"{cpst_display_name} [{cpst_lo}..{cpst_hi}] {t('voiceattack.seconds')}",
+                                       bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
+                cpst_label.pack(side="left")
+
+                cpst_help = t(timer_help_translations.get(cpst_timer_name, cpst_timer_name))
+                ToolTip(cpst_label, cpst_help)
+                tk.Label(cpst_frame, text=cpst_help, fg=_help_fg, bg=_toggle_bg,
+                         font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
+                r += 1
+
             # Prospector cooldown time (indented)
             prospector_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             prospector_frame.grid(row=r, column=0, sticky="w", pady=2)
@@ -10396,7 +10467,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             master_enabled = self.toggle_vars["Prospector Sequence"].get() == 1
             
             # Update dependent checkboxes
-            for dependent in ["Prospector Sound Effect", "Thrust Up"]:
+            for dependent in ["Prospector Sound Effect", "Thrust Up", "Continuous Prospector Sequence"]:
                 if dependent in self.toggle_checkboxes:
                     checkbox = self.toggle_checkboxes[dependent]
                     if master_enabled:
@@ -11614,7 +11685,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             },
             "Toggles": {k: v.get() for k, v in self.toggle_vars.items() if k != "FSD Jump Sequence"},
             "Announcements": announcement_settings,
-            "Timers": {k: v.get() for k, v in self.timer_vars.items()},
+            "Timers": {k: v.get() for k, v in self.timer_vars.items() if k != "FSD Jump Sequence Timer"},
         }
         
         # Add laser mining extra repeat count if available
@@ -11647,13 +11718,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
             btn = spec.get("btn")
             if t in self.tool_btn and isinstance(btn, int) and btn in (1, 2):
                 self.tool_btn[t].set(btn)
-        for k, v in data.get("Toggles", {}).items():
+        toggles_data = data.get("Toggles", {})
+        for k, v in toggles_data.items():
             # Migrate old toggle keys to new keys
             if k == "Target" or k == "Auto Deselect Target":
                 k = "Auto Deselect Prospector"
             # Skip FSD Jump Sequence - it's not saved in presets
             if k in self.toggle_vars and k != "FSD Jump Sequence":
                 self.toggle_vars[k].set(int(v))
+        # Toggles missing from an older preset default to off, so a discarded
+        # in-memory change doesn't survive after re-loading the preset
+        for k in self.toggle_vars:
+            if k != "FSD Jump Sequence" and k not in toggles_data:
+                self.toggle_vars[k].set(0)
         
         # Handle announcements: if section exists, load it; if not, set all to disabled (0)
         # BUT exclude Core/Non-Core settings from ship presets
@@ -11675,9 +11752,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 k = "Delay before targeting the prospector after launching"
             if k == "Duration for additional laser periods (per cycle)":
                 k = "Duration for repeated mining cycles (per cycle)"
-            if k in self.timer_vars:
+            if k == "Boost Interval (For Core Mining Boost sequense )":
+                k = "Boost Interval (Core Mining)"
+            # Skip FSD Jump Sequence Timer - it's not saved in presets
+            if k in self.timer_vars and k != "FSD Jump Sequence Timer":
                 self.timer_vars[k].set(int(v))
-        
+
         # Load laser mining extra repeat count if available
         if "LaserExtraRepeatCount" in data and hasattr(self, 'laser_extra_repeat_var'):
             try:
@@ -18869,7 +18949,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 pp_power = system.get('power') or ''
                 pp_state_val = system.get('power_state') or ''
                 from app_utils import format_relative_age
-                pp_age = format_relative_age(system.get('power_updated_at')) if pp_power else ''
+                pp_age = format_relative_age(system.get('power_updated_at')) if (pp_power or pp_state_val) else ''
                 pp_age_suffix = f" ({pp_age})" if pp_age else ''
                 if pp_power == '~none~':
                     pp_str = (pp_state_val or t('common.pp_no_power')) + pp_age_suffix

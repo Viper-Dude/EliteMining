@@ -50,6 +50,24 @@ class SystemFinderAPI:
         return cls._POWER_NAME_ALIASES.get(power_name, power_name)
 
     @classmethod
+    def _is_newer(cls, candidate: str, current: str) -> bool:
+        """True if candidate's ISO timestamp is later than current's. Unparseable/missing values lose."""
+        if not candidate:
+            return False
+        if not current:
+            return True
+        try:
+            candidate_time = datetime.datetime.fromisoformat(candidate.replace('Z', '+00:00'))
+            current_time = datetime.datetime.fromisoformat(current.replace('Z', '+00:00'))
+            if candidate_time.tzinfo is None:
+                candidate_time = candidate_time.replace(tzinfo=datetime.timezone.utc)
+            if current_time.tzinfo is None:
+                current_time = current_time.replace(tzinfo=datetime.timezone.utc)
+            return candidate_time > current_time
+        except Exception:
+            return False
+
+    @classmethod
     def _batch_get_powerplay(cls, system_names: List[str]) -> Dict[str, Dict]:
         """
         Query local EDDN powerplay cache for a list of systems in one SQL call.
@@ -340,7 +358,7 @@ class SystemFinderAPI:
 
     @classmethod
     def search_systems(cls, reference_system: str, filters: Dict[str, str] = None,
-                       max_results: int = None, progress_callback=None) -> List[Dict]:
+                       max_results: int = None, progress_callback=None, is_cancelled=None) -> List[Dict]:
         """
         Search for systems using Spansh API with server-side filtering.
         
@@ -406,6 +424,23 @@ class SystemFinderAPI:
             # Batch-fetch powerplay data from local EDDN cache for all returned systems
             system_names = [s.get('name', '') for s in results if s.get('name')]
             pp_cache = cls._batch_get_powerplay(system_names)
+
+            # For the 4 Spansh-backed PP states, also query Spansh directly and merge in
+            # whichever source has the newer 'updated_at' per system - same enrichment
+            # Ring Finder's _apply_powerplay_filter does, since the EDDN cache alone is
+            # often sparse/stale for systems the player hasn't personally visited.
+            if pp_state in ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied'):
+                power_filter = filters.get('power', 'Any')
+                spansh_pp = cls._fetch_spansh_powerplay_systems(
+                    reference_system, float('inf'), power_filter, pp_state, is_cancelled=is_cancelled)
+                to_persist = {}
+                for sys_name, entry in spansh_pp.items():
+                    cached = pp_cache.get(sys_name)
+                    if not cached or cls._is_newer(entry.get('updated_at'), cached.get('updated_at')):
+                        pp_cache[sys_name] = entry
+                        to_persist[sys_name] = entry
+                if to_persist:
+                    cls._store_powerplay_batch(to_persist)
 
             # Convert Spansh format to our format
             converted = []

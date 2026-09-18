@@ -45,6 +45,7 @@ TOGGLES = {
     "FSD Jump Sequence": ("toggleSystem.txt", "After FSD jump: open/close system map, then auto-jump (not saved in ship presets)"),
     "Power Settings": ("powersettingsToggle.txt", "Enable = Max power to engines, disable = balance power when laser mining is completed."),
     "Prospector Sequence": ("prospectorSeq.txt", "Enable prospector sequence features (master control for Target Prospector and Thrust Up)."),
+    "Continuous Prospector Sequence": ("ContProspectorSeq.txt", "Keep repeating the prospector sequence continuously."),
     "Prospector Sound Effect": ("soundeffectToggle.txt", "Play sound effect when prospector sequence is ready for firing next prospector."),
     "Target Prospector": ("prospectorTarget.txt", "Automatically target the prospector after launching it."),
     "Thrust Up": ("thrustUp.txt", "Apply upward thrust when firing a prospector. Adjust timing in ((Thrust Up)) command in VA Called Commands - Misc category."),
@@ -59,7 +60,9 @@ TIMERS = {
     "Duration for repeated mining cycles (per cycle)": ("delayLaserminingExtra.txt", 1, 50, "Duration for repeated mining cycles (per cycle)."),
     "Delay before targeting the prospector after launching": ("delayTarget.txt", 1, 50, "Delay before targeting the prospector after launching."),
     "Delay before retracting cargo scoop after mining sequence": ("delayCargoscoop.txt", 1, 50, "Delay before retracting cargo scoop after mining sequence."),
-    "Boost Interval (For Core Mining Boost sequense )": ("boostintervalValue.txt", 1, 30, "Interval between boosts when scanning for cores."),
+    "Boost Interval (Core Mining)": ("boostinterval.txt", 1, 30, "Interval between boosts when scanning for cores."),
+    "FSD Jump Sequence Timer": ("FsdJumpTimer.txt", 1, 15, "Delay between opening/closing the system map and auto-jumping after an FSD jump."),
+    "Continuous Prospector Sequence Timer": ("Cont_prospector_seq.txt", 1, 30, "Pause between each cycle of the Continuous Prospector Sequence."),
 }
 
 # UI Color Schemes

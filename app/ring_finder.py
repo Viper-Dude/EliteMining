@@ -298,24 +298,6 @@ class RingFinder(ColumnVisibilityMixin):
         from app_utils import format_relative_age
         return format_relative_age(updated_at)
 
-    def _is_newer(self, candidate: str, current: str) -> bool:
-        """True if candidate's ISO timestamp is later than current's. Unparseable/missing values lose."""
-        import datetime
-        if not candidate:
-            return False
-        if not current:
-            return True
-        try:
-            candidate_time = datetime.datetime.fromisoformat(candidate.replace('Z', '+00:00'))
-            current_time = datetime.datetime.fromisoformat(current.replace('Z', '+00:00'))
-            if candidate_time.tzinfo is None:
-                candidate_time = candidate_time.replace(tzinfo=datetime.timezone.utc)
-            if current_time.tzinfo is None:
-                current_time = current_time.replace(tzinfo=datetime.timezone.utc)
-            return candidate_time > current_time
-        except Exception:
-            return False
-
     def _sort_hotspots_display(self, hotspot_text: str) -> str:
         """Sort hotspot display string by count (descending), then alphabetically
         
@@ -3705,7 +3687,7 @@ class RingFinder(ColumnVisibilityMixin):
                     pp_cache[sys_name] = entry
                     self._spansh_pp_enrichment[sys_name] = entry
                     to_persist[sys_name] = entry
-                elif self._is_newer(entry.get('updated_at'), cached.get('updated_at')):
+                elif SystemFinderAPI._is_newer(entry.get('updated_at'), cached.get('updated_at')):
                     pp_cache[sys_name] = entry
                     self._spansh_pp_enrichment[sys_name] = entry
                     to_persist[sys_name] = entry

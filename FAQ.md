@@ -125,6 +125,14 @@ Make sure your **joystick or HOTAS fire button is not bound to the same fire but
 </details>
 
 <details>
+<summary><b>My custom keybind commands got disabled after updating the VoiceAttack profile?</b></summary>
+
+If you bind app commands (like switching tabs) to a keyboard key in VoiceAttack, those commands may come back disabled after importing an updated profile — this is normal VoiceAttack behavior when it detects the same key is already used elsewhere. Just re-enable the affected commands in VoiceAttack after importing.
+
+Using a joystick/HOTAS button instead of a keyboard key for these commands avoids this issue, since joystick bindings aren't affected by profile updates.
+</details>
+
+<details>
 <summary><b>The app will not start. What should I try?</b></summary>
 
 Run the app as Administrator. Add an antivirus exclusion for the install folder. Reboot and try again.
