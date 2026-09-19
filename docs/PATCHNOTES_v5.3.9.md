@@ -1,19 +1,19 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-September-20
+**Release Date:** 2026-September-19
 
 ## New Features & Improvements
 
+- PowerPlay info now shows up more often in Hotspots Finder, Commodity Market, and Star Systems, including systems with no controlling power.
+
 ### VoiceAttack Controls
 
-- Added "Continuous Prospector Sequence". Turn it on to keep firing prospectors automatically, without repeating the voice command.
-- Split the old "General Timer" into separate timers for Core Mining boosting, FSD Jump Sequence, and Continuous Prospector Sequence. Each now has its own timing.
-- Added "Open System Map" for the FSD Jump Sequence. Choose whether the system map opens and closes during the sequence.
-- The FSD Jump Sequence now has two timers instead of one:
-  - **System Map Timer** — how long the map stays open before the next jump (used when "Open System Map" is on).
-  - **Jump Pause Timer** — the pause before the next jump when "Open System Map" is off.
-- FSD Jump Sequence timers now range from 8 to 30 seconds (was 1 to 15).
-- Moved "Auto Honk" into the FSD Jump Sequence section. Still works independently, regardless of FSD Jump Sequence.
-- FSD Jump Sequence, Open System Map, both new timers, and Auto Honk are now saved as part of ship presets.
+- Added "Continuous Prospector Sequence". Keeps firing prospectors automatically.
+- Split the old "General Timer" into separate timers for Core Mining boosting, FSD Jump Sequence, and Continuous Prospector Sequence.
+- Added "Open System Map" toggle for FSD Jump Sequence, plus two timers (8-30s):
+  - **System Map Timer** — how long the map stays open (used when Open System Map is on).
+  - **Jump Pause Timer** — pause before the next jump (used when Open System Map is off).
+- Moved "Auto Honk" next to FSD Jump Sequence in the UI; it still works on its own.
+- FSD Jump Sequence, Open System Map, both timers, and Auto Honk now save with ship presets.
 
 ### VoiceAttack Profile v5.3.9
 - Commands reorganized to match the changes above.
