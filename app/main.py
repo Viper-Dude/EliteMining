@@ -18660,14 +18660,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _fetch_sysfinder_pp_complete(self, system_name, result, quiet=False):
         """Update treeview row(s) for system_name with fetched PP data (runs on main thread)."""
         if result:
+            from app_utils import format_relative_age
             pp_power = result.get('controlling_power', '')
             pp_state = result.get('power_state', '')
+            pp_age = format_relative_age(result.get('updated_at')) if (pp_power or pp_state) else ''
+            pp_age_suffix = f" ({pp_age})" if pp_age else ''
             if pp_power == '~none~':
-                pp_str = pp_state or t('common.pp_no_power')
+                pp_str = (pp_state or t('common.pp_no_power')) + pp_age_suffix
             elif pp_power and pp_state:
-                pp_str = f"{pp_power} / {pp_state}"
+                pp_str = f"{pp_power} / {pp_state}{pp_age_suffix}"
             else:
-                pp_str = pp_power
+                pp_str = f"{pp_power}{pp_age_suffix}"
             for item in self.sysfinder_tree.get_children():
                 vals = list(self.sysfinder_tree.item(item, 'values'))
                 if vals and len(vals) > 7 and vals[0] == system_name:
@@ -21294,14 +21297,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Update Powerplay cell(s) for system_name in the given tree with fetched data."""
         label = self.marketplace_total_label if tree is self.marketplace_tree else self.trade_total_label
         if result:
+            from app_utils import format_relative_age
             pp_power = result.get('controlling_power', '')
             pp_state = result.get('power_state', '')
+            pp_age = format_relative_age(result.get('updated_at')) if (pp_power or pp_state) else ''
+            pp_age_suffix = f" ({pp_age})" if pp_age else ''
             if pp_power == '~none~':
-                pp_str = pp_state or t('common.pp_no_power')
+                pp_str = (pp_state or t('common.pp_no_power')) + pp_age_suffix
             elif pp_power and pp_state:
-                pp_str = f"{pp_power} / {pp_state}"
+                pp_str = f"{pp_power} / {pp_state}{pp_age_suffix}"
             else:
-                pp_str = pp_power or t('common.no_data')
+                pp_str = f"{pp_power}{pp_age_suffix}" if pp_power else t('common.no_data')
 
             columns = tree['columns']
             pp_col_index = columns.index('powerstate')

@@ -6909,12 +6909,14 @@ class RingFinder(ColumnVisibilityMixin):
         if result:
             pp_power = result.get('controlling_power', '')
             pp_state = result.get('power_state', '')
+            pp_age = self._format_pp_age(result.get('updated_at')) if (pp_power or pp_state) else ''
+            pp_age_suffix = f" ({pp_age})" if pp_age else ''
             if pp_power == '~none~':
-                pp_str = pp_state or t('common.pp_no_power')
+                pp_str = (pp_state or t('common.pp_no_power')) + pp_age_suffix
             elif pp_power and pp_state:
-                pp_str = f"{pp_power} / {pp_state}"
+                pp_str = f"{pp_power} / {pp_state}{pp_age_suffix}"
             else:
-                pp_str = pp_power
+                pp_str = f"{pp_power}{pp_age_suffix}"
             for item in self.results_tree.get_children():
                 vals = list(self.results_tree.item(item, 'values'))
                 if vals and len(vals) > 11 and vals[2] == system_name:

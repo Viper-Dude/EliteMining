@@ -410,7 +410,7 @@ class SystemFinderAPI:
                     (system_name, controlling_power, power_state, powers_json, timestamp)
                 )
                 conn.commit()
-            return {'controlling_power': controlling_power, 'power_state': power_state}
+            return {'controlling_power': controlling_power, 'power_state': power_state, 'updated_at': timestamp}
         except Exception as e:
             log.debug(f"[POWERPLAY] Inara fetch error for {system_name!r}: {e}")
             return None
