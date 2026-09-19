@@ -9632,7 +9632,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Delay before targeting the prospector after launching": "voiceattack.timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.timer_cargoscoop",
             "Boost Interval (Core Mining)": "voiceattack.timer_boost",
-            "FSD Jump Sequence Timer": "voiceattack.timer_fsd_jump",
+            "FSD Jump Pause Timer": "voiceattack.timer_fsd_jump_pause",
+            "FSD System Map Timer": "voiceattack.timer_fsd_system_map",
             "Continuous Prospector Sequence Timer": "voiceattack.timer_cont_prospector_seq",
         }
 
@@ -9644,7 +9645,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Delay before targeting the prospector after launching": "voiceattack.help_timer_target",
             "Delay before retracting cargo scoop after mining sequence": "voiceattack.help_timer_cargoscoop",
             "Boost Interval (Core Mining)": "voiceattack.help_timer_boost",
-            "FSD Jump Sequence Timer": "voiceattack.help_timer_fsd_jump",
+            "FSD Jump Pause Timer": "voiceattack.help_timer_fsd_jump_pause",
+            "FSD System Map Timer": "voiceattack.help_timer_fsd_system_map",
             "Continuous Prospector Sequence Timer": "voiceattack.help_timer_cont_prospector_seq",
         }
         
@@ -9685,8 +9687,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                  fg=_toggle_tip_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).grid(row=0, column=1, sticky="")
         r += 1
         
-        # Controls toggles: Auto Honk, Headtracker, Night Vision
-        controls_toggles = ["Auto Honk", "Headtracker Docking Control", "Night Vision"]
+        # Controls toggles: Headtracker, Night Vision
+        controls_toggles = ["Headtracker Docking Control", "Night Vision"]
 
         for name in controls_toggles:
             if name not in TOGGLES:
@@ -9750,7 +9752,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.toggle_vars[name].trace_add("write", lambda *args: self._update_fsdjump_dependencies())
 
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
-            ToolTip(checkbox, display_help)
+            tooltip_help = t('voiceattack.tooltip_fsd_jump') if name == "FSD Jump Sequence" else display_help
+            ToolTip(checkbox, tooltip_help)
 
             # Open System Map checkbox on the same row (depends on FSD Jump Sequence being enabled)
             if name == "FSD Jump Sequence" and "Open System Map" in TOGGLES:
@@ -9765,62 +9768,95 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 osm_checkbox.pack(side="left", padx=(12, 0))
                 self.toggle_checkboxes[osm_name] = osm_checkbox
                 self.toggle_vars[osm_name].trace_add("write", lambda *args, n=osm_name: self._save_toggle(n))
+                self.toggle_vars[osm_name].trace_add("write", lambda *args: self._update_fsdjump_dependencies())
                 ToolTip(osm_checkbox, osm_display_help)
 
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
                      font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
 
-            # FSD Jump Sequence timer (indented, not part of ship presets - matches its toggle)
-            if name == "FSD Jump Sequence" and "FSD Jump Sequence Timer" in TIMERS:
-                fsdjump_timer_name = "FSD Jump Sequence Timer"
-                fsdjump_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
-                fsdjump_frame.grid(row=r, column=0, sticky="w", pady=2)
-                tk.Label(fsdjump_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
+            # FSD Jump Sequence timers (indented, part of ship presets - matches its toggle)
+            # "FSD System Map Timer" applies when Open System Map is checked;
+            # "FSD Jump Pause Timer" applies when Open System Map is unchecked.
+            if name == "FSD Jump Sequence":
+                self.fsdjump_timer_spinboxes = {}
+                for fsdjump_timer_name in ("FSD System Map Timer", "FSD Jump Pause Timer"):
+                    if fsdjump_timer_name not in TIMERS:
+                        continue
+                    fsdjump_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                    fsdjump_frame.grid(row=r, column=0, sticky="w", pady=2)
+                    tk.Label(fsdjump_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
 
-                _fsdjump_fname, fsdjump_lo, fsdjump_hi, fsdjump_helptext = TIMERS[fsdjump_timer_name]
+                    _fsdjump_fname, fsdjump_lo, fsdjump_hi, fsdjump_helptext = TIMERS[fsdjump_timer_name]
 
-                def make_save_fsdjump(tn, fn, l, h):
-                    return lambda: self._save_timer(tn, fn, l, h)
-                def make_trace_fsdjump(tn, fn, l, h):
-                    return lambda *args: self._save_timer(tn, fn, l, h)
+                    def make_save_fsdjump(tn, fn, l, h):
+                        return lambda: self._save_timer(tn, fn, l, h)
+                    def make_trace_fsdjump(tn, fn, l, h):
+                        return lambda *args: self._save_timer(tn, fn, l, h)
 
-                fsdjump_spinbox = tk.Spinbox(fsdjump_frame, from_=fsdjump_lo, to=fsdjump_hi, width=5,
-                                              textvariable=self.timer_vars[fsdjump_timer_name],
-                                              command=make_save_fsdjump(fsdjump_timer_name, _fsdjump_fname, fsdjump_lo, fsdjump_hi),
-                                              bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                              insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                              relief="solid", bd=0, highlightthickness=1,
-                                              highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                              font=self._scaled_font(9))
-                fsdjump_spinbox.pack(side="left", padx=(4, 6))
+                    fsdjump_spinbox = tk.Spinbox(fsdjump_frame, from_=fsdjump_lo, to=fsdjump_hi, width=5,
+                                                  textvariable=self.timer_vars[fsdjump_timer_name],
+                                                  command=make_save_fsdjump(fsdjump_timer_name, _fsdjump_fname, fsdjump_lo, fsdjump_hi),
+                                                  bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
+                                                  insertbackground=_toggle_fg, selectbackground="#4a6a8a",
+                                                  disabledbackground="#1e1e1e", disabledforeground="#666666",
+                                                  relief="solid", bd=0, highlightthickness=1,
+                                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
+                                                  font=self._scaled_font(9))
+                    fsdjump_spinbox.pack(side="left", padx=(4, 6))
+                    self.fsdjump_timer_spinboxes[fsdjump_timer_name] = fsdjump_spinbox
 
-                def on_fsdjump_scroll(event, var=self.timer_vars[fsdjump_timer_name], lo_val=fsdjump_lo, hi_val=fsdjump_hi):
-                    try:
-                        current = int(var.get())
-                        if event.delta > 0:
-                            new_val = min(current + 1, hi_val)
-                        else:
-                            new_val = max(current - 1, lo_val)
-                        var.set(new_val)
-                    except:
-                        pass
-                    return "break"
-                fsdjump_spinbox.bind("<MouseWheel>", on_fsdjump_scroll)
+                    def on_fsdjump_scroll(event, var=self.timer_vars[fsdjump_timer_name], lo_val=fsdjump_lo, hi_val=fsdjump_hi):
+                        try:
+                            current = int(var.get())
+                            if event.delta > 0:
+                                new_val = min(current + 1, hi_val)
+                            else:
+                                new_val = max(current - 1, lo_val)
+                            var.set(new_val)
+                        except:
+                            pass
+                        return "break"
+                    fsdjump_spinbox.bind("<MouseWheel>", on_fsdjump_scroll)
 
-                self.timer_vars[fsdjump_timer_name].trace_add("write",
-                    make_trace_fsdjump(fsdjump_timer_name, _fsdjump_fname, fsdjump_lo, fsdjump_hi))
+                    self.timer_vars[fsdjump_timer_name].trace_add("write",
+                        make_trace_fsdjump(fsdjump_timer_name, _fsdjump_fname, fsdjump_lo, fsdjump_hi))
 
-                fsdjump_display_name = t(timer_translations.get(fsdjump_timer_name, fsdjump_timer_name))
-                fsdjump_label = tk.Label(fsdjump_frame, text=f"{fsdjump_display_name} [{fsdjump_lo}..{fsdjump_hi}] {t('voiceattack.seconds')}",
-                                          bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
-                fsdjump_label.pack(side="left")
+                    fsdjump_display_name = t(timer_translations.get(fsdjump_timer_name, fsdjump_timer_name))
+                    fsdjump_label = tk.Label(fsdjump_frame, text=f"{fsdjump_display_name} [{fsdjump_lo}..{fsdjump_hi}] {t('voiceattack.seconds')}",
+                                              bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
+                    fsdjump_label.pack(side="left")
 
-                fsdjump_help = t(timer_help_translations.get(fsdjump_timer_name, fsdjump_timer_name))
-                ToolTip(fsdjump_label, fsdjump_help)
-                tk.Label(fsdjump_frame, text=fsdjump_help, fg=_help_fg, bg=_toggle_bg,
-                         font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
-                r += 1
+                    fsdjump_help = t(timer_help_translations.get(fsdjump_timer_name, fsdjump_timer_name))
+                    ToolTip(fsdjump_label, fsdjump_help)
+                    tk.Label(fsdjump_frame, text=fsdjump_help, fg=_help_fg, bg=_toggle_bg,
+                             font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
+                    r += 1
+
+                # Auto Honk (independent of FSD Jump Sequence)
+                if "Auto Honk" in TOGGLES:
+                    honk_name = "Auto Honk"
+                    _honk_fname, honk_helptext = TOGGLES[honk_name]
+
+                    honk_rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                    honk_rowf.grid(row=r, column=0, sticky="w", pady=2)
+
+                    honk_checkbox = tk.Checkbutton(honk_rowf, text=honk_name, variable=self.toggle_vars[honk_name],
+                                            bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
+                                            activebackground=_toggle_bg, activeforeground=_toggle_fg,
+                                            highlightthickness=0, bd=0, font=self._scaled_font(9),
+                                            padx=4, pady=2, anchor="w")
+                    honk_checkbox.pack(side="left")
+
+                    self.toggle_checkboxes[honk_name] = honk_checkbox
+                    self.toggle_vars[honk_name].trace_add("write", lambda *args, n=honk_name: self._save_toggle(n))
+
+                    honk_display_help = t(toggle_help_translations.get(honk_name, honk_name)) if honk_name in toggle_help_translations else honk_helptext
+                    ToolTip(honk_checkbox, honk_display_help)
+
+                    tk.Label(honk_rowf, text=honk_display_help, fg=_help_fg, bg=_toggle_bg,
+                             font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
+                    r += 1
 
         # ============================================================
         # LASER MINING SUB-SECTION
@@ -10513,13 +10549,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"Error updating pulsewave dependency: {e}")
 
     def _update_fsdjump_dependencies(self):
-        """Enable/disable Open System Map based on FSD Jump Sequence state"""
+        """Enable/disable Open System Map and its timers based on FSD Jump Sequence / Open System Map state"""
         try:
             if "FSD Jump Sequence" not in self.toggle_vars or "Open System Map" not in self.toggle_checkboxes:
                 return
             master_enabled = self.toggle_vars["FSD Jump Sequence"].get() == 1
             checkbox = self.toggle_checkboxes["Open System Map"]
             checkbox.configure(state="normal" if master_enabled else "disabled")
+
+            osm_enabled = master_enabled and self.toggle_vars["Open System Map"].get() == 1
+            spinboxes = getattr(self, "fsdjump_timer_spinboxes", {})
+            if "FSD System Map Timer" in spinboxes:
+                spinboxes["FSD System Map Timer"].configure(state="normal" if osm_enabled else "disabled")
+            if "FSD Jump Pause Timer" in spinboxes:
+                pause_enabled = master_enabled and not osm_enabled
+                spinboxes["FSD Jump Pause Timer"].configure(state="normal" if pause_enabled else "disabled")
         except Exception as e:
             print(f"Error updating FSD jump dependency: {e}")
 
@@ -11749,9 +11793,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     "btn": (self.tool_btn[t].get() if t in self.tool_btn else None)}
                 for t in TOOL_ORDER
             },
-            "Toggles": {k: v.get() for k, v in self.toggle_vars.items() if k not in ("FSD Jump Sequence", "Open System Map")},
+            "Toggles": {k: v.get() for k, v in self.toggle_vars.items()},
             "Announcements": announcement_settings,
-            "Timers": {k: v.get() for k, v in self.timer_vars.items() if k != "FSD Jump Sequence Timer"},
+            "Timers": {k: v.get() for k, v in self.timer_vars.items()},
         }
         
         # Add laser mining extra repeat count if available
@@ -11789,13 +11833,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Migrate old toggle keys to new keys
             if k == "Target" or k == "Auto Deselect Target":
                 k = "Auto Deselect Prospector"
-            # Skip FSD Jump Sequence / Open System Map - not saved in presets
-            if k in self.toggle_vars and k not in ("FSD Jump Sequence", "Open System Map"):
+            if k in self.toggle_vars:
                 self.toggle_vars[k].set(int(v))
         # Toggles missing from an older preset default to off, so a discarded
         # in-memory change doesn't survive after re-loading the preset
         for k in self.toggle_vars:
-            if k not in ("FSD Jump Sequence", "Open System Map") and k not in toggles_data:
+            if k not in toggles_data:
                 self.toggle_vars[k].set(0)
         
         # Handle announcements: if section exists, load it; if not, set all to disabled (0)
@@ -11820,8 +11863,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 k = "Duration for repeated mining cycles (per cycle)"
             if k == "Boost Interval (For Core Mining Boost sequense )":
                 k = "Boost Interval (Core Mining)"
-            # Skip FSD Jump Sequence Timer - it's not saved in presets
-            if k in self.timer_vars and k != "FSD Jump Sequence Timer":
+            if k in self.timer_vars:
                 self.timer_vars[k].set(int(v))
 
         # Load laser mining extra repeat count if available

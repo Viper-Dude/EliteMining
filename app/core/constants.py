@@ -36,13 +36,13 @@ ANNOUNCEMENT_TOGGLES = {
 
 # Toggles and Timers
 TOGGLES = {
-    "Auto Honk": ("toggleHonk.txt", "Enable/disable automatic system honk on entering a new system."),
+    "Auto Honk": ("toggleHonk.txt", "Enable/disable automatic system honk on entering a new system. FSD Jump Sequence waits for this to finish before jumping."),
     "Cargo Scoop": ("cargoScoopToggle.txt", "Retracts the cargo scoop when laser mining is completed."),
     "Headtracker Docking Control": ("toggleHeadtracker.txt", "Enable/disable automatic headtracker docking control (toggles the F9 key)."),
     "Repeated Mining Cycles": ("laserminingextraToggle.txt", "Enables additional laser mining cycles."),
     # "Multi-Session Mode": ("multiSessionMode.txt", "Accumulate statistics across multiple cargo loads without resetting.")  # Removed - only available in Mining Analytics panel
     "Night Vision": ("nightvisionToggle.txt", "Auto-enables on mining start/reset. Turns off on 'Clear and Jump'."),
-    "FSD Jump Sequence": ("FsdSeqToggle.txt", "After FSD jump: open/close system map, then auto-jump (not saved in ship presets)"),
+    "FSD Jump Sequence": ("FsdSeqToggle.txt", "Auto-jumps to the next system after each FSD jump. Optionally opens the system map first."),
     "Open System Map": ("toggleSystem.txt", "Open/close the system map as part of the FSD Jump Sequence."),
     "Power Settings": ("powersettingsToggle.txt", "Enable = Max power to engines, disable = balance power when laser mining is completed."),
     "Prospector Sequence": ("prospectorSeq.txt", "Enable prospector sequence features (master control for Target Prospector and Thrust Up)."),
@@ -62,7 +62,8 @@ TIMERS = {
     "Delay before targeting the prospector after launching": ("delayTarget.txt", 1, 50, "Delay before targeting the prospector after launching."),
     "Delay before retracting cargo scoop after mining sequence": ("delayCargoscoop.txt", 1, 50, "Delay before retracting cargo scoop after mining sequence."),
     "Boost Interval (Core Mining)": ("boostinterval.txt", 1, 30, "Interval between boosts when scanning for cores."),
-    "FSD Jump Sequence Timer": ("FsdJumpTimer.txt", 1, 15, "Delay between opening/closing the system map and auto-jumping after an FSD jump."),
+    "FSD Jump Pause Timer": ("FsdJumpTimer.txt", 8, 30, "Pause before initiating the next FSD jump when Open System Map is disabled."),
+    "FSD System Map Timer": ("Fsd_System_map.txt", 8, 30, "How long the system map stays open before closing and initiating the next FSD jump."),
     "Continuous Prospector Sequence Timer": ("Cont_prospector_seq.txt", 1, 30, "Pause between each cycle of the Continuous Prospector Sequence."),
 }
 

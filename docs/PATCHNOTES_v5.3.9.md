@@ -3,13 +3,20 @@
 
 ## New Features & Improvements
 
-- Added a new "Continuous Prospector Sequence" option in VoiceAttack Controls. Turn it on to keep firing prospectors automatically without saying the command again.
-- The old single "General Timer" are replaced with separate timers for Core Mining boosting, FSD Jump Sequence (open system map duration), and Continuous Prospector Sequence, so each can be timed on its own.
+### VoiceAttack Controls
 
-- Added a new "Open System Map" option for the FSD Jump Sequence, so you can choose whether the system map opens and closes during the sequence.
+- Added "Continuous Prospector Sequence". Turn it on to keep firing prospectors automatically, without repeating the voice command.
+- Split the old "General Timer" into separate timers for Core Mining boosting, FSD Jump Sequence, and Continuous Prospector Sequence. Each now has its own timing.
+- Added "Open System Map" for the FSD Jump Sequence. Choose whether the system map opens and closes during the sequence.
+- The FSD Jump Sequence now has two timers instead of one:
+  - **System Map Timer** — how long the map stays open before the next jump (used when "Open System Map" is on).
+  - **Jump Pause Timer** — the pause before the next jump when "Open System Map" is off.
+- FSD Jump Sequence timers now range from 8 to 30 seconds (was 1 to 15).
+- Moved "Auto Honk" into the FSD Jump Sequence section. Still works independently, regardless of FSD Jump Sequence.
+- FSD Jump Sequence, Open System Map, both new timers, and Auto Honk are now saved as part of ship presets.
 
-### Voiceattack Profile updated to  (v5.3.9)
-
+### VoiceAttack Profile v5.3.9
+- Commands reorganized to match the changes above.
 
 ### Important Notes 
 

@@ -233,16 +233,34 @@ Control mining sequence timing and automated behaviors:
 **Timers:** Configure duration for laser periods, pauses, and delays (1-50 seconds range)
 
 **Toggles:**
-- **Auto Honk** – Scan system automatically on FSD arrival
 - **Cargo Scoop** – Auto-retract when mining completes
 - **Headtracker Docking Control** – Toggle headtracker (F9) for docking
 - **Laser Mining Extra** – Second laser period with cooldown pause
 - **Night Vision** – Auto-enable when starting mining
-- **FSD Jump Sequence** – Auto-chain jumps with system map toggle
 - **Power Settings** – Max engines during mining, balance when complete
 - **Prospector Sequence** – Auto-target prospector after launch
 - **Pulse Wave Analyser** – Auto-switch to PWA firegroup after mining
 - **Target** – Deselect prospector when mining completes
+
+**FSD Jump Sequence:**
+- **FSD Jump Sequence** – Auto-jumps to the next system after each FSD jump
+- **Open System Map** – Optionally opens/closes the system map before the jump
+- **FSD System Map Timer** (8-30s) – How long the map stays open, used when Open System Map is on
+- **FSD Jump Pause Timer** (8-30s) – Pause before the next jump, used when Open System Map is off
+- **Auto Honk** – Scan system automatically on FSD arrival; FSD Jump Sequence waits for this to finish, works independently of it
+
+All FSD Jump Sequence settings above are saved as part of ship presets.
+
+**Prospector:**
+- **Prospector Sequence** – Master control; enables Target Prospector and Thrust Up
+- **Continuous Seq.** – Keep repeating the prospector sequence automatically
+- **Continuous Prospector Sequence Timer** (1-30s) – Pause between each cycle of the Continuous Sequence
+- **Prospector cooldown time** (1.0-6.0s, default 2.6s) – Time before you can fire the next prospector
+- **Prospector Sound Effect** – Audio notification when the cooldown ends and the next limpet is ready to fire
+- **Thrust Up** – Apply upward thrust when firing a prospector
+  - **Thrust up duration** (0.5-3.5s, default 1.5s) – Duration of the upward thrust
+  - **Delay Thrust up scoop retracted/closed** (0.0-5.0s, default 1.6s) – Delay before thrust up when the cargo scoop is retracted
+  - **Delay Thrust up scoop deployed/open** (1.0-5.0s, default 3.8s) – Delay before thrust up when the cargo scoop is deployed
 
 💡 **Tip:** Use "Stop all profile commands" in VoiceAttack to interrupt any active sequence.
 
