@@ -3,7 +3,7 @@
 
 ## New Features & Improvements
 
-- PowerPlay info now shows up more often in Hotspots Finder, Commodity Market, and Star Systems, including systems with no controlling power.
+- Optimized PowerPlay info in the Hotspots Finder, Commodity Market, and Star Systems tabs.
 
 ### VoiceAttack Controls
 

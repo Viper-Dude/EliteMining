@@ -952,16 +952,16 @@ MATERIAL_TRADER_OPTIONS = ['Encoded', 'Manufactured', 'Raw']
 ELITE_POWERS = [
     "Select your pledge...", "Aisling Duval", "Archon Delaine",
     "Arissa Lavigny-Duval", "Denton Patreus", "Edmund Mahon",
-    "Felicia Winters", "Li Yong-Rui", "Pranav Antal",
-    "Yuri Grom", "Zemina Torval"
+    "Felicia Winters", "Jerome Archer", "Li Yong-Rui", "Nakato Kaine",
+    "Pranav Antal", "Yuri Grom", "Zemina Torval"
 ]
 
 # Power filter options for system search (includes Any)
 POWER_FILTER_OPTIONS = [
     'Any', 'Aisling Duval', 'Archon Delaine',
     'Arissa Lavigny-Duval', 'Denton Patreus', 'Edmund Mahon',
-    'Felicia Winters', 'Li Yong-Rui', 'Pranav Antal',
-    'Yuri Grom', 'Zemina Torval'
+    'Felicia Winters', 'Jerome Archer', 'Li Yong-Rui', 'Nakato Kaine',
+    'Pranav Antal', 'Yuri Grom', 'Zemina Torval'
 ]
 
 # Powerplay state filter options. Unoccupied/Exploited/Fortified/Stronghold are searched via
