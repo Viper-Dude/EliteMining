@@ -215,7 +215,7 @@
     "col_dist": "Abstand (LJ)",
     "col_powerplay": "PowerPlay",
     "col_updated": "Aktualisiert",
-    "col_mining_method": "Typ",
+    "col_mining_method": "Methode/Ring",
     "no_data": "Keine Daten",
     "no_data_in_system": "Kein Verkaufspreis im System",
     "pp_mode_checkbox": "Nur Preise im System (PowerPlay-Modus)",

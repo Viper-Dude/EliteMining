@@ -194,6 +194,46 @@ class RingFinder(ColumnVisibilityMixin):
                   'Rutile', 'Bauxite'],
     }
 
+    # Mining method per mineral, keyed by which ring type it's actually being mined in -
+    # some minerals (e.g. Platinum) are laser-mineable in one ring type but core-only in
+    # another, so a single static "is this mineral core or laser" flag is wrong. Ring
+    # types not listed for a mineral mean it isn't present there at all.
+    MINING_METHOD_BY_RING = {
+        'Void Opals': {'Icy': 'core'},
+        'Low Temperature Diamonds': {'Icy': 'both'},
+        'Benitoite': {'Rocky': 'core'},
+        'Serendibite': {'Metallic': 'core', 'Metal Rich': 'core', 'Rocky': 'core'},
+        'Painite': {'Metallic': 'both', 'Metal Rich': 'core'},
+        'Musgravite': {'Rocky': 'core'},
+        'Grandidierite': {'Icy': 'core'},
+        'Alexandrite': {'Icy': 'core', 'Rocky': 'core', 'Metal Rich': 'core'},
+        'Monazite': {'Metallic': 'core', 'Metal Rich': 'core', 'Rocky': 'core'},
+        'Rhodplumsite': {'Metallic': 'core', 'Metal Rich': 'core'},
+        'Platinum': {'Metallic': 'both', 'Metal Rich': 'core'},
+        'Osmium': {'Metallic': 'laser', 'Metal Rich': 'laser'},
+        'Samarium': {'Metallic': 'laser', 'Metal Rich': 'laser', 'Rocky': 'laser'},
+        'Palladium': {'Metallic': 'laser'},
+        'Gold': {'Metallic': 'laser', 'Metal Rich': 'laser'},
+        'Praseodymium': {'Metallic': 'laser', 'Metal Rich': 'laser'},
+        'Bromellite': {'Icy': 'both'},
+        'Lithium Hydroxide': {'Icy': 'laser'},
+        'Silver': {'Metallic': 'laser', 'Metal Rich': 'laser'},
+        'Methanol Monohydrate Crystals': {'Icy': 'laser'},
+        'Bertrandite': {'Metallic': 'laser', 'Metal Rich': 'laser'},
+        'Indite': {'Metallic': 'laser', 'Metal Rich': 'laser', 'Rocky': 'laser'},
+        'Gallite': {'Metallic': 'laser', 'Metal Rich': 'laser', 'Rocky': 'laser'},
+        'Coltan': {'Metal Rich': 'laser', 'Rocky': 'laser'},
+        'Water': {'Icy': 'laser'},
+        'Uraninite': {'Metal Rich': 'laser', 'Rocky': 'laser'},
+        'Liquid Oxygen': {'Icy': 'laser'},
+        'Cobalt': {'Rocky': 'laser'},
+        'Hydrogen Peroxide': {'Icy': 'laser'},
+        'Lepidolite': {'Metal Rich': 'laser', 'Rocky': 'laser'},
+        'Methane Clathrate': {'Icy': 'laser'},
+        'Rutile': {'Rocky': 'laser'},
+        'Bauxite': {'Rocky': 'laser'},
+    }
+
     def _is_all_minerals(self, value: str) -> bool:
         """Check if the given value represents 'All Minerals' (handles localized values)"""
         from localization import t
@@ -6565,6 +6605,10 @@ class RingFinder(ColumnVisibilityMixin):
         extra_candidates = [mat for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
                             if mat not in full_materials]
 
+        # Every mineral here (hotspot or "also check") comes from this one row's ring
+        # type - so mining method lookup only ever needs to consider that single type.
+        mineral_ring_types = {mat: {ring_type} for mat in full_materials + extra_candidates}
+
         # Minerals the user previously ticked in "Also check" - fetch them upfront here
         # too, so a ring-scoped rank shows them without reopening the picker each time.
         try:
@@ -6588,12 +6632,12 @@ class RingFinder(ColumnVisibilityMixin):
                 cached_results = [(mat, best, priced_rows) for mat, best, priced_rows in prefetched if mat in fetch_materials]
                 cached_results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
                 self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
-                self._show_mineral_ranking_dialog(system_name, cached_results, extra_candidates=extra_candidates)
+                self._show_mineral_ranking_dialog(system_name, cached_results, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types)
                 return
 
         self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
         self._show_ranking_wait_dialog(system_name)
-        threading.Thread(target=self._rank_minerals_worker, args=(system_name, fetch_materials, extra_candidates), daemon=True).start()
+        threading.Thread(target=self._rank_minerals_worker, args=(system_name, fetch_materials, extra_candidates, mineral_ring_types), daemon=True).start()
 
     def _rank_all_minerals_for_system(self):
         """Rank every hotspot mineral known anywhere in the selected row's system by live
@@ -6627,6 +6671,16 @@ class RingFinder(ColumnVisibilityMixin):
             self.status_var.set(t('ring_finder.no_hotspot_minerals'))
             return
 
+        # Ring type(s) each hotspot mineral was actually found in, in this system - a
+        # mineral like Platinum can be a laser-mine in one ring type and core-only in
+        # another, so mining method needs to be checked per ring type, not per mineral.
+        mineral_ring_types: Dict[str, set] = {}
+        for row in hotspot_rows:
+            mat = row.get('material_name')
+            rt = row.get('ring_type')
+            if mat and rt:
+                mineral_ring_types.setdefault(self._expand_abbreviated_materials(mat), set()).add(rt)
+
         # Non-hotspot minerals (e.g. Osmium) mineable somewhere in this system, based on
         # its known ring types - offered via the popup's "Also check" picker since
         # hotspot-based ranking can never surface them on its own.
@@ -6636,6 +6690,9 @@ class RingFinder(ColumnVisibilityMixin):
             for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
             if mat not in full_materials
         ))
+        for mat in extra_candidates:
+            mineral_ring_types[mat] = {rt for rt in ring_types_present
+                                        if mat in self.NON_HOTSPOT_RING_MINERALS.get(rt, [])}
 
         # Minerals the user previously ticked in "Also check" (e.g. always wants Osmium
         # tracked) - fetch them upfront alongside the hotspot minerals, so they're
@@ -6657,12 +6714,12 @@ class RingFinder(ColumnVisibilityMixin):
                 cached_results = [(mat, best, priced_rows) for mat, best, priced_rows in prefetched if mat in fetch_materials]
                 cached_results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
                 self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
-                self._show_mineral_ranking_dialog(system_name, cached_results, extra_candidates=extra_candidates)
+                self._show_mineral_ranking_dialog(system_name, cached_results, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types)
                 return
 
         self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
         self._show_ranking_wait_dialog(system_name)
-        threading.Thread(target=self._rank_minerals_worker, args=(system_name, fetch_materials, extra_candidates), daemon=True).start()
+        threading.Thread(target=self._rank_minerals_worker, args=(system_name, fetch_materials, extra_candidates, mineral_ring_types), daemon=True).start()
 
     def _show_ranking_wait_dialog(self, system_name: str):
         """Show a small "please wait" dialog while the mineral ranking worker fetches live prices."""
@@ -6768,7 +6825,7 @@ class RingFinder(ColumnVisibilityMixin):
         except Exception:
             return '-'
 
-    def _rank_minerals_worker(self, system_name: str, materials: List[str], extra_candidates: List[str] = None):
+    def _rank_minerals_worker(self, system_name: str, materials: List[str], extra_candidates: List[str] = None, mineral_ring_types: Dict[str, set] = None):
         """Background worker: fetch best sell price per mineral, concurrently.
 
         extra_candidates: non-hotspot minerals mineable somewhere in this system (see
@@ -6799,9 +6856,9 @@ class RingFinder(ColumnVisibilityMixin):
                 results.append((mat, best, priced_rows))
 
         results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
-        self.parent.after(0, lambda: self._show_mineral_ranking_dialog(system_name, results, extra_candidates=extra_candidates))
+        self.parent.after(0, lambda: self._show_mineral_ranking_dialog(system_name, results, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types))
 
-    def _show_mineral_ranking_dialog(self, system_name: str, results: list, modal: bool = True, extra_candidates: List[str] = None):
+    def _show_mineral_ranking_dialog(self, system_name: str, results: list, modal: bool = True, extra_candidates: List[str] = None, mineral_ring_types: Dict[str, set] = None):
         """Show a small dialog ranking hotspot minerals by best live sell price.
 
         modal=False is used by the "Auto Mineral Prices" post-jump popup - it shouldn't
@@ -6869,13 +6926,32 @@ class RingFinder(ColumnVisibilityMixin):
 
         # Ring type per mineral, from the same hotspot rows Rank Minerals parses from -
         # so a top-priced mineral that's actually core-only in this ring doesn't get mined
-        # blind with a laser.
+        # blind with a laser (e.g. Platinum is laser-mineable in Metallic but core-only
+        # in Metal Rich - a single static "is this mineral core" flag can't tell the two
+        # apart). Falls back to that static flag when the ring type isn't known.
         from report_generator import ReportGenerator
         core_materials = {mat for mat, info in ReportGenerator.MATERIAL_TPH_THRESHOLDS.items()
                           if info.get('is_core', False)}
+        ring_types_by_mat = mineral_ring_types or {}
 
         def mining_method_for(mat):
-            return t('ring_finder.mining_method_core') if mat in core_materials else t('ring_finder.mining_method_laser')
+            rts = ring_types_by_mat.get(mat, set())
+            by_rt = {rt: self.MINING_METHOD_BY_RING.get(mat, {}).get(rt) for rt in rts}
+            by_rt = {rt: method for rt, method in by_rt.items() if method}
+            if not by_rt:
+                is_core = mat in core_materials
+                return t('ring_finder.mining_method_core') if is_core else t('ring_finder.mining_method_laser')
+
+            parts = []
+            for rt, method in sorted(by_rt.items()):
+                rt_display = self._ring_type_map.get(rt, rt)
+                if method == 'both':
+                    parts.append(f"{t('ring_finder.mining_method_core')}/{rt_display}")
+                    parts.append(f"{t('ring_finder.mining_method_laser')}/{rt_display}")
+                else:
+                    method_display = t('ring_finder.mining_method_core') if method == 'core' else t('ring_finder.mining_method_laser')
+                    parts.append(f"{method_display}/{rt_display}")
+            return ", ".join(parts)
 
         # Bulk-fetch PowerPlay data from the local EDDN cache for all result systems in one
         # query - same pattern as the Commodity Market tab (main.py _search_marketplace).
@@ -9173,6 +9249,15 @@ class RingFinder(ColumnVisibilityMixin):
         if not materials:
             return
 
+        # Ring type(s) each hotspot mineral was actually found in, in this system - see
+        # _rank_all_minerals_for_system for why this matters (Platinum etc).
+        mineral_ring_types: Dict[str, set] = {}
+        for row in hotspot_rows:
+            mat = row.get('material_name')
+            rt = row.get('ring_type')
+            if mat and rt:
+                mineral_ring_types.setdefault(self._expand_abbreviated_materials(mat), set()).add(rt)
+
         # Non-hotspot minerals (e.g. Osmium) mineable somewhere in this system, based on
         # its known ring types - same "Also check" picker as "Rank Minerals in Entire
         # System", offered here too since this popup is the same system-wide scope.
@@ -9182,6 +9267,9 @@ class RingFinder(ColumnVisibilityMixin):
             for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
             if mat not in materials
         ))
+        for mat in extra_candidates:
+            mineral_ring_types[mat] = {rt for rt in ring_types_present
+                                        if mat in self.NON_HOTSPOT_RING_MINERALS.get(rt, [])}
 
         # Minerals the user previously ticked in "Also check" - fetch them upfront on
         # every jump too, so they're already in the ranked table without reopening the
@@ -9194,9 +9282,9 @@ class RingFinder(ColumnVisibilityMixin):
         preselected_extras = [mat for mat in extra_candidates if mat in always_check]
         fetch_materials = materials + preselected_extras
 
-        threading.Thread(target=self._prefetch_prices_worker, args=(system_name, fetch_materials, extra_candidates), daemon=True).start()
+        threading.Thread(target=self._prefetch_prices_worker, args=(system_name, fetch_materials, extra_candidates, mineral_ring_types), daemon=True).start()
 
-    def _prefetch_prices_worker(self, system_name: str, materials: List[str], extra_candidates: List[str] = None):
+    def _prefetch_prices_worker(self, system_name: str, materials: List[str], extra_candidates: List[str] = None, mineral_ring_types: Dict[str, set] = None):
         """Background worker: fetch and cache best sell price per mineral for a prefetched system."""
         from marketplace_api import MarketplaceAPI
         from concurrent.futures import ThreadPoolExecutor
@@ -9224,7 +9312,7 @@ class RingFinder(ColumnVisibilityMixin):
             self._prefetched_prices = {}
         self._prefetched_prices[system_name] = results
 
-        self.parent.after(0, lambda: self._show_mineral_ranking_dialog(system_name, results, modal=False, extra_candidates=extra_candidates))
+        self.parent.after(0, lambda: self._show_mineral_ranking_dialog(system_name, results, modal=False, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types))
 
     def _load_auto_search_state(self) -> bool:
         """Load auto-search enabled state from Variables folder"""

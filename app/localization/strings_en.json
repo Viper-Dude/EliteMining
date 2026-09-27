@@ -215,7 +215,7 @@
     "col_dist": "Dist (LY)",
     "col_powerplay": "PowerPlay",
     "col_updated": "Updated",
-    "col_mining_method": "Type",
+    "col_mining_method": "Method/Ring",
     "no_data": "No data",
     "no_data_in_system": "No sell price in system",
     "pp_mode_checkbox": "In-system prices only (PowerPlay mode)",
