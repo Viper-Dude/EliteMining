@@ -2171,18 +2171,23 @@ class UserDatabase:
             List of dictionaries containing hotspot data
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            # Longer busy timeout than the sqlite3 default (5s) - auto-search's own DB
+            # writes (add_hotspot_data, per row) can hold the write lock for a while when
+            # syncing a system with many rings, and this read is called right alongside
+            # it on every jump (prefetch prices). Failing fast just meant prefetch prices
+            # silently returned nothing whenever auto-search was mid-write.
+            with sqlite3.connect(self.db_path, timeout=30) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                
+
                 cursor.execute('''
-                    SELECT * FROM hotspot_data 
-                    WHERE system_name = ? 
+                    SELECT * FROM hotspot_data
+                    WHERE system_name = ?
                     ORDER BY body_name, material_name
                 ''', (system_name,))
-                
+
                 return [dict(row) for row in cursor.fetchall()]
-                
+
         except Exception as e:
             log.error(f"Error getting system hotspots: {e}")
             return []

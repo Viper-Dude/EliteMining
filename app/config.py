@@ -3,7 +3,7 @@ import sys
 import json
 import logging
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 VA_TTS_ANNOUNCEMENT = "ttsProspectorAnnouncement"
 
 # Rate limiting for config loading
@@ -250,6 +250,95 @@ def save_ring_finder_column_visibility(visibility: Dict[str, bool]) -> None:
     """Save Ring Finder table column visibility to config"""
     cfg = _load_cfg()
     cfg["ring_finder_column_visibility"] = visibility
+    _save_cfg(cfg)
+
+def load_rank_minerals_column_widths() -> Dict[str, int]:
+    """Load Rank Minerals popup table column widths from config"""
+    cfg = _load_cfg()
+    defaults = {
+        "Mineral": 130, "Price": 110, "Station": 280, "Type": 110,
+        "Dist": 80, "LS": 70, "PowerPlay": 200, "Updated": 90
+    }
+    return cfg.get("rank_minerals_column_widths", defaults)
+
+def save_rank_minerals_column_widths(widths: Dict[str, int]) -> None:
+    """Save Rank Minerals popup table column widths to config"""
+    cfg = _load_cfg()
+    cfg["rank_minerals_column_widths"] = widths
+    _save_cfg(cfg)
+
+def load_rank_minerals_window_geometry() -> Dict[str, Any]:
+    """Load Rank Minerals popup window size from config"""
+    cfg = _load_cfg()
+    return cfg.get("rank_minerals_window", {})
+
+def save_rank_minerals_window_geometry(geom: Dict[str, Any]) -> None:
+    """Save Rank Minerals popup window size to config"""
+    cfg = _load_cfg()
+    cfg["rank_minerals_window"] = geom
+    _save_cfg(cfg)
+
+def load_also_check_minerals() -> List[str]:
+    """Load the user's persisted "Also Check" mineral picks (e.g. Osmium) - so they stay
+    ticked across jumps/sessions instead of resetting every time the ranking popup opens."""
+    cfg = _load_cfg()
+    return cfg.get("also_check_minerals", [])
+
+def save_also_check_minerals(materials: List[str]) -> None:
+    """Save the user's "Also Check" mineral picks to config"""
+    cfg = _load_cfg()
+    cfg["also_check_minerals"] = materials
+    _save_cfg(cfg)
+
+def load_pp_mode() -> bool:
+    """Load the persisted PowerPlay-mode checkbox state, shared by Rank Minerals and
+    Find Best Mining System - so it stays ticked across sessions instead of resetting
+    every time either popup opens."""
+    cfg = _load_cfg()
+    return cfg.get("pp_mode", False)
+
+def save_pp_mode(enabled: bool) -> None:
+    """Save the PowerPlay-mode checkbox state to config"""
+    cfg = _load_cfg()
+    cfg["pp_mode"] = enabled
+    _save_cfg(cfg)
+
+def load_reverse_search_mineral() -> str:
+    """Load the persisted mineral filter for Find Best Mining System, English name
+    (or "" for All Minerals) - so it stays selected across sessions."""
+    cfg = _load_cfg()
+    return cfg.get("reverse_search_mineral", "")
+
+def save_reverse_search_mineral(mineral: str) -> None:
+    """Save the mineral filter for Find Best Mining System to config"""
+    cfg = _load_cfg()
+    cfg["reverse_search_mineral"] = mineral
+    _save_cfg(cfg)
+
+def load_reverse_search_column_widths() -> Dict[str, int]:
+    """Load Find Best Mining System popup table column widths from config"""
+    cfg = _load_cfg()
+    defaults = {
+        "System": 200, "Dist": 80, "Mineral": 130, "Price": 110, "Station": 260,
+        "Type": 110, "LS": 70, "PowerPlay": 200, "Updated": 90
+    }
+    return cfg.get("reverse_search_column_widths", defaults)
+
+def save_reverse_search_column_widths(widths: Dict[str, int]) -> None:
+    """Save Find Best Mining System popup table column widths to config"""
+    cfg = _load_cfg()
+    cfg["reverse_search_column_widths"] = widths
+    _save_cfg(cfg)
+
+def load_reverse_search_window_geometry() -> Dict[str, Any]:
+    """Load Find Best Mining System popup window size from config"""
+    cfg = _load_cfg()
+    return cfg.get("reverse_search_window", {})
+
+def save_reverse_search_window_geometry(geom: Dict[str, Any]) -> None:
+    """Save Find Best Mining System popup window size to config"""
+    cfg = _load_cfg()
+    cfg["reverse_search_window"] = geom
     _save_cfg(cfg)
 
 def load_column_visibility(table_key: str) -> Dict[str, bool]:

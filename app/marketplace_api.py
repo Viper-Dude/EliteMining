@@ -21,6 +21,33 @@ class MarketplaceAPI:
     # Set by main.py on boot when EDDN listener is started
     EDDN_CACHE_PATH = None
 
+    # Spansh circuit breaker - after this many consecutive failures, skip Spansh
+    # entirely for the cooldown instead of paying its 15s timeout on every mineral.
+    SPANSH_FAILURE_THRESHOLD = 2
+    SPANSH_COOLDOWN_SECONDS = 60
+    _spansh_failure_count = 0
+    _spansh_open_until = 0.0
+
+    @staticmethod
+    def _spansh_available() -> bool:
+        import time
+        if MarketplaceAPI._spansh_failure_count < MarketplaceAPI.SPANSH_FAILURE_THRESHOLD:
+            return True
+        if time.monotonic() >= MarketplaceAPI._spansh_open_until:
+            return True  # cooldown elapsed - let one call through as a probe
+        return False
+
+    @staticmethod
+    def _spansh_record_result(success: bool) -> None:
+        import time
+        if success:
+            MarketplaceAPI._spansh_failure_count = 0
+            MarketplaceAPI._spansh_open_until = 0.0
+        else:
+            MarketplaceAPI._spansh_failure_count += 1
+            if MarketplaceAPI._spansh_failure_count >= MarketplaceAPI.SPANSH_FAILURE_THRESHOLD:
+                MarketplaceAPI._spansh_open_until = time.monotonic() + MarketplaceAPI.SPANSH_COOLDOWN_SECONDS
+
     # Keep BASE_URL for any legacy callers
     PRIMARY_URL  = ARDENT_URL
     FALLBACK_URL = ARDENT_URL
@@ -92,6 +119,9 @@ class MarketplaceAPI:
         For galaxy-wide (max_distance=0) all results are kept.
         For distance-limited searches, results are filtered by distance field.
         """
+        if not MarketplaceAPI._spansh_available():
+            print("[SPANSH] Skipped - circuit breaker open (recent failures)")
+            return []
         try:
             from datetime import datetime, timedelta, timezone
 
@@ -99,6 +129,8 @@ class MarketplaceAPI:
                 commodity_normalized,
                 commodity_normalized.title(),
             )
+
+            page_errors = [0]
 
             # Parallel paginated fetch — 3 pages x 100 results
             def _fetch_page(page_num):
@@ -118,6 +150,7 @@ class MarketplaceAPI:
                     return resp.json().get("results", [])
                 except Exception as e:
                     print(f"[SPANSH] page {page_num} error: {e}")
+                    page_errors[0] += 1
                     return []
 
             with ThreadPoolExecutor(max_workers=3) as pool:
@@ -125,6 +158,8 @@ class MarketplaceAPI:
                 results = []
                 for f in futures:
                     results.extend(f.result())
+
+            MarketplaceAPI._spansh_record_result(success=page_errors[0] < 3)
 
             print(f"[SPANSH] fetched {len(results)} stations from 3 pages")
 
@@ -227,6 +262,7 @@ class MarketplaceAPI:
 
         except Exception as e:
             print(f"[SPANSH] Error fetching {commodity_normalized}: {e}")
+            MarketplaceAPI._spansh_record_result(success=False)
             return []
 
     @staticmethod
@@ -247,6 +283,9 @@ class MarketplaceAPI:
         """
         if exclude_carriers:
             return []
+        if not MarketplaceAPI._spansh_available():
+            print("[SPANSH CARRIERS] Skipped - circuit breaker open (recent failures)")
+            return []
 
         try:
             import math
@@ -257,6 +296,8 @@ class MarketplaceAPI:
 
             spansh_name = MarketplaceAPI.SPANSH_COMMODITY_MAP.get(
                 commodity_normalized, commodity_normalized.title())
+
+            page_errors = [0]
 
             def _fetch_page(page_num):
                 try:
@@ -272,6 +313,7 @@ class MarketplaceAPI:
                     resp.raise_for_status()
                     return resp.json().get("results", [])
                 except Exception:
+                    page_errors[0] += 1
                     return []
 
             with ThreadPoolExecutor(max_workers=2) as pool:
@@ -279,6 +321,8 @@ class MarketplaceAPI:
                 raw = []
                 for f in futures:
                     raw.extend(f.result())
+
+            MarketplaceAPI._spansh_record_result(success=page_errors[0] < 2)
 
             cutoff = datetime.now(timezone.utc) - timedelta(days=max_days_ago + 0.5)
 
@@ -360,6 +404,7 @@ class MarketplaceAPI:
 
         except Exception as e:
             print(f"[SPANSH CARRIERS] Error: {e}")
+            MarketplaceAPI._spansh_record_result(success=False)
             return []
 
     @staticmethod
@@ -605,6 +650,9 @@ class MarketplaceAPI:
         market_updated_at desc.  Fetches 3 pages of 100 results concurrently
         (300 total) then filters by 3-D distance from reference_system.
         """
+        if not MarketplaceAPI._spansh_available():
+            print("[SPANSH NEARBY] Skipped - circuit breaker open (recent failures)")
+            return []
         try:
             import math
             from datetime import datetime, timedelta, timezone
@@ -617,6 +665,8 @@ class MarketplaceAPI:
 
             spansh_name = MarketplaceAPI.SPANSH_COMMODITY_MAP.get(
                 commodity_normalized, commodity_normalized.title())
+
+            page_errors = [0]
 
             # Parallel paginated fetch — 3 pages x 100 results
             def _fetch_page(page_num):
@@ -634,6 +684,7 @@ class MarketplaceAPI:
                     return resp.json().get("results", [])
                 except Exception as e:
                     print(f"[SPANSH NEARBY] page {page_num} error: {e}")
+                    page_errors[0] += 1
                     return []
 
             with ThreadPoolExecutor(max_workers=3) as pool:
@@ -642,6 +693,7 @@ class MarketplaceAPI:
                 for f in futures:
                     raw_results.extend(f.result())
 
+            MarketplaceAPI._spansh_record_result(success=page_errors[0] < 3)
             print(f"[SPANSH NEARBY] fetched {len(raw_results)} stations from 3 pages")
 
             cutoff = datetime.now(timezone.utc) - timedelta(days=max_days_ago + 0.5)
@@ -748,6 +800,7 @@ class MarketplaceAPI:
 
         except Exception as e:
             print(f"[SPANSH NEARBY] Error: {e}")
+            MarketplaceAPI._spansh_record_result(success=False)
             return []
 
     @staticmethod
@@ -847,7 +900,46 @@ class MarketplaceAPI:
         merged = list(best.values()) + no_id
         print(f"[DUAL-API] After merge: {len(merged)} unique results")
         return merged
-    
+
+    @staticmethod
+    def _backfill_eddn_cache(rows: List[Dict]) -> None:
+        """Write live Ardent/Spansh search results into the local EDDN cache
+        (commodity_prices_data) so the next lookup for the same station finds it
+        locally, even if EliteMining's own EDDN listener never saw that station's
+        market broadcast live. Only tracked commodities are stored, matching what
+        the listener itself keeps.
+        """
+        if not MarketplaceAPI.EDDN_CACHE_PATH or not rows:
+            return
+        try:
+            import sqlite3, os
+            from eddn_listener import EDDNListener
+
+            if not os.path.exists(MarketplaceAPI.EDDN_CACHE_PATH):
+                return
+
+            to_write = [r for r in rows if r.get("marketId") and r.get("systemName")
+                        and r.get("commodityName", "").lower() in EDDNListener.TRACKED_COMMODITIES]
+            if not to_write:
+                return
+
+            with sqlite3.connect(MarketplaceAPI.EDDN_CACHE_PATH) as conn:
+                cursor = conn.cursor()
+                for r in to_write:
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO commodity_prices_data
+                        (system_name, system_x, system_y, system_z, station_name, station_type,
+                         commodity_name, sell_price, buy_price, demand, stock, distance_to_arrival,
+                         market_id, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (r.get("systemName"), r.get("systemX"), r.get("systemY"), r.get("systemZ"),
+                          r.get("stationName"), r.get("stationType"), r.get("commodityName", "").lower(),
+                          r.get("sellPrice", 0), r.get("buyPrice", 0), r.get("demand", 0), r.get("stock", 0),
+                          r.get("distanceToArrival"), r.get("marketId"), r.get("updatedAt")))
+                conn.commit()
+        except Exception as e:
+            print(f"[EDDN CACHE] Backfill error: {e}")
+
     @staticmethod
     def normalize_commodity_name(commodity: str) -> str:
         """
@@ -942,6 +1034,7 @@ class MarketplaceAPI:
 
             print(f"[BUYERS] nearby={len(nearby_rows)} local={len(local_rows)}")
             results = MarketplaceAPI._merge_by_freshness(nearby_rows + local_rows)
+            MarketplaceAPI._backfill_eddn_cache(results)
             return results
             
         except requests.exceptions.RequestException as e:
@@ -1020,12 +1113,17 @@ class MarketplaceAPI:
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
             for r in local_rows:
                 r["distance"] = 0
+                # Local exports endpoint is scoped to reference_system by the URL and
+                # doesn't echo systemName back - stamp it so callers filtering by exact
+                # system match (e.g. PowerPlay reinforce/undermine pricing) see these rows.
+                r["systemName"] = reference_system
                 # Local exports endpoint has buyPrice as the actual price
                 if r.get("sellPrice", 0) == 0 and r.get("buyPrice", 0) > 0:
                     r["sellPrice"] = r["buyPrice"]
 
             print(f"[SELLERS] nearby={len(nearby_rows)} local={len(local_rows)}")
             results = MarketplaceAPI._merge_by_freshness(nearby_rows + local_rows)
+            MarketplaceAPI._backfill_eddn_cache(results)
             return results
             
         except requests.exceptions.RequestException as e:
@@ -1084,6 +1182,7 @@ class MarketplaceAPI:
             rows = rows + spansh_rows + carrier_rows + eddn_rows
 
             results = MarketplaceAPI._merge_by_freshness(rows)
+            MarketplaceAPI._backfill_eddn_cache(results)
             return results
 
         except requests.exceptions.RequestException as e:
@@ -1141,6 +1240,7 @@ class MarketplaceAPI:
             rows = rows + spansh_rows + carrier_rows + eddn_rows
 
             results = MarketplaceAPI._merge_by_freshness(rows)
+            MarketplaceAPI._backfill_eddn_cache(results)
             return results
 
         except requests.exceptions.RequestException as e:

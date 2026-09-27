@@ -9,6 +9,7 @@
 - **No comments unless the WHY is non-obvious.** Don't explain what the code does. Don't add task/PR references in comments.
 - **No emojis** unless explicitly asked.
 - **Follow existing patterns.** Match the style, naming conventions, and architecture already in the codebase. Check how similar things are done before inventing a new approach.
+- **Reuse existing functions.** Before writing new logic, check if an existing function already does it (or almost does it). Call it, or extract a shared helper/add a parameter — don't copy-paste and duplicate the implementation.
 - **Git commits**: No `Co-Authored-By` trailers. Commit messages should be concise and focus on the "why".
 - **When uncertain**, ask one targeted question rather than listing options or making assumptions.
 - **Don't re-explain decisions** already made in the conversation. Move forward.

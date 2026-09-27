@@ -177,7 +177,23 @@ class RingFinder(ColumnVisibilityMixin):
     """Mining hotspot finder with EDDB API integration"""
     
     ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter (internal key)
-    
+
+    # Minerals present in each ring type but with no hotspot signal of their own (e.g.
+    # Osmium in Metal Rich) - hotspot-based ranking can never surface these on its own,
+    # since there's no hotspot row to parse. Used by the "Also check" mineral picker in
+    # the system-wide Rank Minerals popup to offer only minerals actually mineable
+    # somewhere in the target system, based on that system's known ring types.
+    NON_HOTSPOT_RING_MINERALS = {
+        'Icy': ['Lithium Hydroxide', 'Methanol Monohydrate Crystals', 'Water', 'Liquid Oxygen',
+                'Hydrogen Peroxide', 'Methane Clathrate'],
+        'Metallic': ['Platinum', 'Osmium', 'Samarium', 'Palladium', 'Gold', 'Praseodymium', 'Silver',
+                     'Bertrandite', 'Indite', 'Gallite'],
+        'Metal Rich': ['Platinum', 'Osmium', 'Samarium', 'Gold', 'Praseodymium', 'Silver', 'Bertrandite',
+                       'Indite', 'Gallite', 'Coltan', 'Uraninite', 'Lepidolite'],
+        'Rocky': ['Samarium', 'Indite', 'Gallite', 'Coltan', 'Uraninite', 'Cobalt', 'Lepidolite',
+                  'Rutile', 'Bauxite'],
+    }
+
     def _is_all_minerals(self, value: str) -> bool:
         """Check if the given value represents 'All Minerals' (handles localized values)"""
         from localization import t
@@ -531,7 +547,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         self.auto_search_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.auto_search'),
                                            variable=self.auto_search_var,
-                                           command=self._save_auto_search_state,
+                                           command=self._on_auto_search_toggle,
                                            bg=_cb_bg, fg="#e0e0e0",
                                            activebackground="#2e2e2e", activeforeground="#ffffff",
                                            selectcolor=_cb_select, relief="flat",
@@ -555,9 +571,31 @@ class RingFinder(ColumnVisibilityMixin):
                                            selectcolor=_cb_select, relief="flat",
                                            font=scaled_font(9))
         self.auto_switch_tabs_cb.pack(side="left", padx=(18, 0))
-        
+
         # Tooltip for auto-switch tabs
         ToolTip(self.auto_switch_tabs_cb, t('ring_finder.auto_switch_tooltip'))
+
+        # Prefetch sell prices on jump checkbox - independent of Auto-Search since it
+        # makes live API calls on every jump (separate cost the user should opt into).
+        self.prefetch_prices_var = tk.BooleanVar(value=False)
+        prefetch_prices_enabled = self._load_prefetch_prices_state()
+        self.prefetch_prices_var.set(prefetch_prices_enabled)
+
+        self.prefetch_prices_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.prefetch_prices'),
+                                           variable=self.prefetch_prices_var,
+                                           command=self._save_prefetch_prices_state,
+                                           bg=_cb_bg, fg="#e0e0e0",
+                                           activebackground="#2e2e2e", activeforeground="#ffffff",
+                                           selectcolor=_cb_select, relief="flat",
+                                           font=scaled_font(9))
+        self.prefetch_prices_cb.pack(side="left", padx=(18, 0))
+
+        # Tooltip for prefetch prices
+        ToolTip(self.prefetch_prices_cb, t('ring_finder.prefetch_prices_tooltip'))
+
+        # Auto Prices depends on hotspot data that Auto-Search writes to the local DB
+        # on jump - it's non-functional without Auto-Search, so keep it locked to it.
+        self._apply_auto_search_lock()
 
         # Ring Type filter
         ttk.Label(search_frame, text=t('ring_finder.ring_type')).grid(row=1, column=0, sticky="w", padx=5, pady=5)
@@ -661,6 +699,15 @@ class RingFinder(ColumnVisibilityMixin):
                              padx=15, pady=2, font=scaled_font(8, "normal"))
         reset_btn.pack(side="left", padx=(60, 0))
         ToolTip(reset_btn, t('ring_finder.reset_filters_tooltip'))
+
+        best_mining_btn = tk.Button(pp_inner_row, text=t('ring_finder.find_best_mining_system'),
+                             command=self._show_reverse_search_dialog,
+                             bg="#3a3a3a", fg=reset_btn_fg,
+                             activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
+                             relief="raised", bd=1, cursor="hand2",
+                             padx=15, pady=2, font=scaled_font(8, "normal"))
+        best_mining_btn.pack(side="left", padx=(10, 0))
+        ToolTip(best_mining_btn, t('ring_finder.find_best_mining_system_tooltip'))
 
         # --- Row 2: Unvisited Only + Favourites Only + Data Source ---
         # Gridded directly in search_frame (not row3_container) so it starts
@@ -1202,10 +1249,24 @@ class RingFinder(ColumnVisibilityMixin):
         self.results_tree.grid(row=0, column=0, sticky="nsew")
         v_scrollbar.grid(row=0, column=1, sticky="ns")
         h_scrollbar.grid(row=1, column=0, sticky="ew")
-        
+
         # Configure grid weights
         tree_frame.grid_columnconfigure(0, weight=1)
         tree_frame.grid_rowconfigure(0, weight=1)
+
+        # "Searching new system..." overlay - shown over the results tree while an
+        # auto-search jump is in flight, so stale rows from the previous system don't
+        # look like the current answer. Hidden by default (raised above the tree only
+        # while active), same grid cell as the tree so it covers it exactly.
+        self._search_overlay = tk.Frame(tree_frame, bg=tree_bg)
+        self._search_overlay_label = tk.Label(self._search_overlay, text="", bg=tree_bg, fg=tree_fg,
+                                              font=scaled_font(14, "bold"))
+        self._search_overlay_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._search_overlay.grid(row=0, column=0, sticky="nsew")
+        self._search_overlay.grid_remove()
+        self._search_overlay_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        self._search_overlay_index = 0
+        self._search_overlay_active = False
         
         # Configure style for the treeview to allow tag colors
         style = ttk.Style()
@@ -1497,7 +1558,40 @@ class RingFinder(ColumnVisibilityMixin):
                 self.parent.after(100, self._update_search_spinner)
         except:
             self.search_spinner_active = False
-    
+
+    def _show_search_overlay(self, system_name: str):
+        """Blank the results tree and show a big 'Searching new system...' spinner -
+        the small search-button spinner alone was too easy to miss when jumping,
+        making stale results from the previous system look current."""
+        if not hasattr(self, '_search_overlay'):
+            return
+        self._search_overlay_index = 0
+        self._search_overlay_active = True
+        self._search_overlay_system = system_name
+        self._search_overlay.grid()
+        self._search_overlay.tkraise()
+        self._update_search_overlay()
+
+    def _hide_search_overlay(self):
+        """Hide the searching overlay, revealing the (now updated) results tree."""
+        self._search_overlay_active = False
+        if hasattr(self, '_search_overlay') and self._search_overlay.winfo_exists():
+            self._search_overlay.grid_remove()
+
+    def _update_search_overlay(self):
+        """Advance the overlay's spinner animation frame."""
+        if not self._search_overlay_active:
+            return
+        try:
+            char = self._search_overlay_chars[self._search_overlay_index]
+            self._search_overlay_label.configure(
+                text=t('ring_finder.searching_new_system').format(system=self._search_overlay_system) + f"\n\n{char}")
+            self._search_overlay_index = (self._search_overlay_index + 1) % len(self._search_overlay_chars)
+            if hasattr(self, 'parent') and self.parent.winfo_exists():
+                self.parent.after(100, self._update_search_overlay)
+        except Exception:
+            self._search_overlay_active = False
+
     def _format_material_for_display(self, material_name: str) -> str:
         """Format material name for display in dropdown"""
         # Normalize database names to canonical English names first
@@ -2018,6 +2112,14 @@ class RingFinder(ColumnVisibilityMixin):
     
     def _reset_filters(self):
         """Reset all filters to default values"""
+        # Max Distance / Max Results - back to the 50/50 default (auto-search on jump
+        # relies on this so it always searches a fixed radius, not whatever distance
+        # was left over from a manual search).
+        if hasattr(self, 'distance_var'):
+            self.distance_var.set("50")
+        if hasattr(self, 'max_results_var'):
+            self.max_results_var.set("50")
+
         # Ring Type
         self.material_var.set(t('ring_finder.all'))
         
@@ -2527,6 +2629,7 @@ class RingFinder(ColumnVisibilityMixin):
             return
         self._search_in_progress = False
         self.search_btn.configure(text=t('ring_finder.search'))
+        self._hide_search_overlay()
 
     def _on_search_btn_clicked(self):
         """Search button click handler. Starts a search normally; while a search is already
@@ -4694,8 +4797,11 @@ class RingFinder(ColumnVisibilityMixin):
             # Track coordinates to save back to database
             coords_to_update = []
             
-            # Get reference coordinates from multiple sources FIRST
-            reference_coords = self.current_system_coords
+            # Get reference coordinates from multiple sources FIRST. Only reuse the shared
+            # self.current_system_coords cache if it was actually set for this reference_system -
+            # otherwise a caller searching a different system (e.g. Find Best Mining System's
+            # target_system) would silently inherit stale coords from the main tab's last search.
+            reference_coords = self.current_system_coords if getattr(self, '_last_search_key', '').split('_')[0] == reference_system else None
             if not reference_coords and reference_system:
                 # Try user database first - check visited_systems table (most reliable for current location)
                 with sqlite3.connect(self.user_db.db_path) as conn:
@@ -5818,6 +5924,8 @@ class RingFinder(ColumnVisibilityMixin):
         self.context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm)
         self.context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh)
         self.context_menu.add_command(label=t('context_menu.find_sell_station'), command=self._find_sell_station)
+        self.context_menu.add_command(label=t('context_menu.rank_minerals'), command=self._rank_minerals_for_system)
+        self.context_menu.add_command(label=t('context_menu.rank_minerals_system'), command=self._rank_all_minerals_for_system)
         self.context_menu.add_separator()
         # Database
         self.context_menu.add_command(label=t('context_menu.save_to_local_database'), command=self._save_to_database)
@@ -5963,34 +6071,34 @@ class RingFinder(ColumnVisibilityMixin):
                     else:
                         self.context_menu.entryconfig(5, state="disabled")
 
-                    # Show/hide "Save to Database" option (index 7, after separator) based on Source column.
+                    # Show/hide "Save to Database" option (index 9, after separator) based on Source column.
                     # Both save options are disabled outright in Ring Search mode - that mode is for
                     # locating rings, not for saving hotspot data (results include placeholder "-" rings).
                     is_ring_search_mode = self.ring_type_only_var.get()
 
                     if has_spansh_rows and not is_ring_search_mode:
-                        self.context_menu.entryconfig(7, state="normal")
+                        self.context_menu.entryconfig(9, state="normal")
                     else:
-                        self.context_menu.entryconfig(7, state="disabled")
+                        self.context_menu.entryconfig(9, state="disabled")
 
-                    # Show/hide "Save All New to Database" option (index 8) - enabled whenever any
+                    # Show/hide "Save All New to Database" option (index 10) - enabled whenever any
                     # row in the full result set is Spansh-only or Both (not just the selection)
                     has_any_new_spansh_rows = not is_ring_search_mode and self._has_unsaved_spansh_rows()
-                    self.context_menu.entryconfig(8, state="normal" if has_any_new_spansh_rows else "disabled")
+                    self.context_menu.entryconfig(10, state="normal" if has_any_new_spansh_rows else "disabled")
 
-                    # Show/hide "Update Reserve Level" option (index 10) based on Local source + missing reserve
+                    # Show/hide "Update Reserve Level" option (index 12) based on Local source + missing reserve
                     if enable_update_reserve:
-                        self.context_menu.entryconfig(10, state="normal")
+                        self.context_menu.entryconfig(12, state="normal")
                     else:
-                        self.context_menu.entryconfig(10, state="disabled")
+                        self.context_menu.entryconfig(12, state="disabled")
 
                     # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: inara, 3: edsm, 4: spansh,
-                    # 5: find_sell_station, 6: separator,
-                    # 7: save_to_db, 8: save_all_new_to_db, 9: separator,
-                    # 10: update_reserve, 11: edit_hotspots, 12: set_overlap, 13: set_res,
-                    # 14: edit_ring_type, 15: edit_visits, 16: separator,
-                    # 17: mark_favourite, 18: set_as_reference, 19: bookmark, 20: edit_comment, 21: separator,
-                    # 22: open_mining_report
+                    # 5: find_sell_station, 6: rank_minerals, 7: rank_minerals_system, 8: separator,
+                    # 9: save_to_db, 10: save_all_new_to_db, 11: separator,
+                    # 12: update_reserve, 13: edit_hotspots, 14: set_overlap, 15: set_res,
+                    # 16: edit_ring_type, 17: edit_visits, 18: separator,
+                    # 19: mark_favourite, 20: set_as_reference, 21: bookmark, 22: edit_comment, 23: separator,
+                    # 24: open_mining_report
 
                     # Enable "Open Mining Report" only when a report exists for this row (Last Mined column)
                     has_mining_report = False
@@ -5998,7 +6106,7 @@ class RingFinder(ColumnVisibilityMixin):
                         values = self.results_tree.item(selected_items[0], 'values')
                         if values and len(values) > 14:
                             has_mining_report = bool(values[14])
-                    self.context_menu.entryconfig(22, state="normal" if has_mining_report else "disabled")
+                    self.context_menu.entryconfig(24, state="normal" if has_mining_report else "disabled")
 
                     # Favourite toggle only applies to rows saved in the local database
                     has_local_row = False
@@ -6012,10 +6120,10 @@ class RingFinder(ColumnVisibilityMixin):
                                 is_favourite_row = len(values) > 13 and values[13] == "⭐"
 
                     if has_local_row:
-                        self.context_menu.entryconfig(17, state="normal",
+                        self.context_menu.entryconfig(19, state="normal",
                                                        label=t('context_menu.remove_favourite') if is_favourite_row else t('context_menu.mark_favourite'))
                     else:
-                        self.context_menu.entryconfig(17, state="disabled", label=t('context_menu.mark_favourite'))
+                        self.context_menu.entryconfig(19, state="disabled", label=t('context_menu.mark_favourite'))
 
                     # Edit/Add Comment label depends on whether the row already has a comment
                     has_comment = False
@@ -6023,7 +6131,7 @@ class RingFinder(ColumnVisibilityMixin):
                         values = self.results_tree.item(selected_items[0], 'values')
                         if values and len(values) > 15:
                             has_comment = bool(values[15])
-                    self.context_menu.entryconfig(20, label=t('context_menu.edit_comment') if has_comment else t('context_menu.add_comment'))
+                    self.context_menu.entryconfig(22, label=t('context_menu.edit_comment') if has_comment else t('context_menu.add_comment'))
 
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -6326,23 +6434,31 @@ class RingFinder(ColumnVisibilityMixin):
         # Call the implementation
         self._find_sell_station_impl()
     
-    def _find_sell_station_impl(self):
-        """Implementation of find sell station - gets system name and calls Commodity Market"""
+    def _find_sell_station_impl(self, mineral_override: str = None):
+        """Implementation of find sell station - gets system name and calls Commodity Market
+
+        Args:
+            mineral_override: If given, use this mineral instead of the filter dropdown
+                (used by the mineral-ranking popup to jump to a specific mineral).
+        """
         selection = self.results_tree.selection()
         if not selection:
             return None
-        
+
         item = selection[0]
         values = self.results_tree.item(item, 'values')
         if not values or len(values) < 3:
             return None
-        
+
         # Get system name from the selected row
         system_name = values[2]  # System is column index 2
-        
-        # Get the currently selected mineral from the dropdown (already validated in context menu)
-        mineral_display = self.specific_material_var.get()
-        mineral = self._to_english(mineral_display)
+
+        if mineral_override:
+            mineral = mineral_override
+        else:
+            # Get the currently selected mineral from the dropdown (already validated in context menu)
+            mineral_display = self.specific_material_var.get()
+            mineral = self._to_english(mineral_display)
         
         # Get main_app through prospector_panel
         main_app = getattr(self.prospector_panel, 'main_app', None) if hasattr(self, 'prospector_panel') else None
@@ -6418,7 +6534,1630 @@ class RingFinder(ColumnVisibilityMixin):
                 self.status_var.set(f"Error: {e}")
         else:
             self.status_var.set("Error: Could not access main application")
-    
+
+    def _rank_minerals_for_system(self):
+        """Rank all hotspot minerals in the selected row by live sell price."""
+        selection = self.results_tree.selection()
+        if not selection:
+            self.status_var.set(t('ring_finder.no_selection'))
+            return
+
+        item = selection[0]
+        values = self.results_tree.item(item, 'values')
+        if not values or len(values) < 9:
+            return
+
+        system_name = values[2]
+        hotspots_str = values[8]
+        ring_type_display = values[6]
+        ring_type = self._ring_type_rev_map.get(ring_type_display, ring_type_display)
+
+        materials = self._parse_materials_from_hotspots(hotspots_str)
+        if not materials:
+            self.status_var.set(t('ring_finder.no_hotspot_minerals'))
+            return
+
+        full_materials = list(dict.fromkeys(self._expand_abbreviated_materials(m) for m in materials))
+
+        # Non-hotspot minerals (e.g. Osmium) mineable in this one ring's type - same
+        # "Also check" picker as the system-wide ranking, just scoped to the single
+        # ring type already sitting in this row instead of a whole-system DB query.
+        extra_candidates = [mat for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
+                            if mat not in full_materials]
+
+        # Minerals the user previously ticked in "Also check" - fetch them upfront here
+        # too, so a ring-scoped rank shows them without reopening the picker each time.
+        try:
+            from config import load_also_check_minerals
+            always_check = set(load_also_check_minerals())
+        except Exception:
+            always_check = set()
+        preselected_extras = [mat for mat in extra_candidates if mat in always_check]
+        fetch_materials = full_materials + preselected_extras
+
+        # Reuse prefetched prices (from the "prefetch on jump" toggle) if they already
+        # cover every mineral this row needs with an actual priced hit - skips the wait
+        # dialog and live calls entirely. A prefetch miss (no price found, e.g. the jump
+        # fetch ran before Ardent/Spansh had indexed the station yet) doesn't count as
+        # "covered" - fall through to a fresh live fetch instead of showing that stale
+        # empty result forever.
+        prefetched = getattr(self, '_prefetched_prices', {}).get(system_name)
+        if prefetched is not None:
+            priced_materials = {mat for mat, best, _ in prefetched if best}
+            if set(fetch_materials).issubset(priced_materials):
+                cached_results = [(mat, best, priced_rows) for mat, best, priced_rows in prefetched if mat in fetch_materials]
+                cached_results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
+                self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
+                self._show_mineral_ranking_dialog(system_name, cached_results, extra_candidates=extra_candidates)
+                return
+
+        self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
+        self._show_ranking_wait_dialog(system_name)
+        threading.Thread(target=self._rank_minerals_worker, args=(system_name, fetch_materials, extra_candidates), daemon=True).start()
+
+    def _rank_all_minerals_for_system(self):
+        """Rank every hotspot mineral known anywhere in the selected row's system by live
+        sell price - not just the clicked ring's minerals. Same system-wide scope as the
+        Auto Prices post-jump popup (user_db.get_system_hotspots)."""
+        selection = self.results_tree.selection()
+        if not selection:
+            self.status_var.set(t('ring_finder.no_selection'))
+            return
+
+        item = selection[0]
+        values = self.results_tree.item(item, 'values')
+        if not values or len(values) < 3:
+            return
+
+        system_name = values[2]
+
+        try:
+            hotspot_rows = self.user_db.get_system_hotspots(system_name)
+        except Exception:
+            hotspot_rows = []
+        if not hotspot_rows:
+            self.status_var.set(t('ring_finder.no_hotspot_minerals'))
+            return
+
+        full_materials = list(dict.fromkeys(
+            self._expand_abbreviated_materials(row['material_name'])
+            for row in hotspot_rows if row.get('material_name')
+        ))
+        if not full_materials:
+            self.status_var.set(t('ring_finder.no_hotspot_minerals'))
+            return
+
+        # Non-hotspot minerals (e.g. Osmium) mineable somewhere in this system, based on
+        # its known ring types - offered via the popup's "Also check" picker since
+        # hotspot-based ranking can never surface them on its own.
+        ring_types_present = {row['ring_type'] for row in hotspot_rows if row.get('ring_type')}
+        extra_candidates = sorted(dict.fromkeys(
+            mat for ring_type in ring_types_present
+            for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
+            if mat not in full_materials
+        ))
+
+        # Minerals the user previously ticked in "Also check" (e.g. always wants Osmium
+        # tracked) - fetch them upfront alongside the hotspot minerals, so they're
+        # already in the ranked table without having to reopen the picker every jump.
+        try:
+            from config import load_also_check_minerals
+            always_check = set(load_also_check_minerals())
+        except Exception:
+            always_check = set()
+        preselected_extras = [mat for mat in extra_candidates if mat in always_check]
+        fetch_materials = full_materials + preselected_extras
+
+        # A prefetch miss (no price found) doesn't count as "covered" - fall through to
+        # a fresh live fetch instead of showing that stale empty result forever.
+        prefetched = getattr(self, '_prefetched_prices', {}).get(system_name)
+        if prefetched is not None:
+            priced_materials = {mat for mat, best, _ in prefetched if best}
+            if set(fetch_materials).issubset(priced_materials):
+                cached_results = [(mat, best, priced_rows) for mat, best, priced_rows in prefetched if mat in fetch_materials]
+                cached_results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
+                self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
+                self._show_mineral_ranking_dialog(system_name, cached_results, extra_candidates=extra_candidates)
+                return
+
+        self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
+        self._show_ranking_wait_dialog(system_name)
+        threading.Thread(target=self._rank_minerals_worker, args=(system_name, fetch_materials, extra_candidates), daemon=True).start()
+
+    def _show_ranking_wait_dialog(self, system_name: str):
+        """Show a small "please wait" dialog while the mineral ranking worker fetches live prices."""
+        from config import scaled_font, load_theme
+
+        current_theme = load_theme()
+        if current_theme == "elite_orange":
+            bg, fg = "#1e1e1e", "#ff8c00"
+        else:
+            bg, fg = MENU_COLORS["bg"], MENU_COLORS["fg"]
+
+        dialog = tk.Toplevel(self.parent)
+        dialog.withdraw()
+
+        try:
+            from app_utils import get_app_icon_path
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+        except Exception:
+            pass
+
+        dialog.title(t('ring_finder.rank_minerals_title'))
+        dialog.resizable(False, False)
+        dialog.configure(bg=bg)
+
+        frame = tk.Frame(dialog, bg=bg, padx=30, pady=25)
+        frame.pack(fill="both", expand=True)
+
+        tk.Label(frame, text=t('ring_finder.ranking_wait').format(system=system_name),
+                 bg=bg, fg=fg, font=scaled_font(9)).pack()
+
+        dialog.update_idletasks()
+        from ui.dialogs import center_window
+        center_window(dialog, self.parent.winfo_toplevel())
+        dialog.deiconify()
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except Exception:
+            pass
+
+        self._ranking_wait_dialog = dialog
+
+    @staticmethod
+    def _format_station_type(api_type: str) -> str:
+        """Map a raw marketplace API stationType to the same friendly label the
+        Commodity Market tab uses (main.py _search_marketplace)."""
+        if not api_type:
+            return 'Unknown'
+        if api_type == 'AsteroidBase':
+            return 'Orbital/Asteroid'
+        if api_type in ('Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Dodec'):
+            return f'Orbital/{api_type}'
+        if api_type == 'CraterOutpost':
+            return 'Surface/Crater'
+        if api_type == 'CraterPort':
+            return 'Surface/Port'
+        if api_type in ('SurfaceStation', 'SurfacePort'):
+            return 'Surface/Port'
+        if api_type == 'OnFootSettlement':
+            return 'Surface/Settlement'
+        if api_type == 'FleetCarrier':
+            return 'Carrier'
+        if api_type == 'StrongholdCarrier':
+            return 'Stronghold'
+        if api_type == 'MegaShip':
+            return 'MegaShip'
+        if api_type == 'Unknown':
+            return 'Unknown'
+        if 'Planetary' in api_type or 'Crater' in api_type or 'Ground' in api_type:
+            return 'Surface/Station'
+        if 'Space' in api_type and 'Construction' in api_type:
+            return 'Orbital/Station'
+        if 'Surface' in api_type or 'Settlement' in api_type or 'OnFoot' in api_type:
+            return 'Surface/Station'
+        if 'Carrier' in api_type or 'Drake' in api_type:
+            return 'Carrier'
+        if 'Outpost' in api_type:
+            return 'Orbital/Outpost'
+        if 'Orbital' in api_type or 'Port' in api_type or 'Station' in api_type:
+            return 'Orbital/Station'
+        return 'Orbital/Station'
+
+    @staticmethod
+    def _format_data_age(updated_at: str) -> str:
+        """Format an ISO updatedAt timestamp as a short relative age, same as the
+        Commodity Market tab uses (main.py _search_marketplace)."""
+        if not updated_at:
+            return '-'
+        try:
+            from datetime import datetime, timezone
+            updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+            total_minutes = (datetime.now(timezone.utc) - updated_time).total_seconds() / 60
+            if total_minutes < 60:
+                return f"{int(total_minutes)}m"
+            elif total_minutes < 1440:
+                return f"{int(total_minutes / 60)}h"
+            else:
+                return f"{int(total_minutes / 1440)}d"
+        except Exception:
+            return '-'
+
+    def _rank_minerals_worker(self, system_name: str, materials: List[str], extra_candidates: List[str] = None):
+        """Background worker: fetch best sell price per mineral, concurrently.
+
+        extra_candidates: non-hotspot minerals mineable somewhere in this system (see
+        NON_HOTSPOT_RING_MINERALS) - offered via the popup's "Also check" picker, not
+        fetched here. Only fetched on-demand if the user actually ticks one."""
+        from marketplace_api import MarketplaceAPI
+        from concurrent.futures import ThreadPoolExecutor
+
+        results = []
+        with ThreadPoolExecutor(max_workers=min(len(materials), 4)) as pool:
+            # search_buyers (Ardent's /imports) - stations that buy this commodity FROM
+            # the player, i.e. where a miner can actually sell it. search_sellers is the
+            # opposite direction (stations selling TO players, for buying commodities).
+            # 7-day window instead of the 2-day default - Rank Minerals/Find Best Mining
+            # System cover quieter systems than the Commodity Market tab, which keeps its
+            # own tighter filter.
+            futures = {pool.submit(MarketplaceAPI.search_buyers, mat, system_name, None, 7, False): mat for mat in materials}
+            for future in futures:
+                mat = futures[future]
+                try:
+                    rows = future.result()
+                except Exception:
+                    rows = []
+                priced_rows = [r for r in rows if r.get('sellPrice', 0) > 0]
+                best = max(priced_rows, key=lambda r: r.get('sellPrice', 0)) if priced_rows else None
+                # Keep every priced row too, so the "in-system only" toggle can re-rank
+                # against local-system stations without a second live fetch.
+                results.append((mat, best, priced_rows))
+
+        results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
+        self.parent.after(0, lambda: self._show_mineral_ranking_dialog(system_name, results, extra_candidates=extra_candidates))
+
+    def _show_mineral_ranking_dialog(self, system_name: str, results: list, modal: bool = True, extra_candidates: List[str] = None):
+        """Show a small dialog ranking hotspot minerals by best live sell price.
+
+        modal=False is used by the "Auto Mineral Prices" post-jump popup - it shouldn't
+        steal focus or stay pinned on top while the user is flying/scanning."""
+        from config import scaled_font, load_theme, scaled_px
+
+        wait_dialog = getattr(self, '_ranking_wait_dialog', None)
+        if wait_dialog is not None:
+            try:
+                if wait_dialog.winfo_exists():
+                    wait_dialog.grab_release()
+                    wait_dialog.destroy()
+            except Exception:
+                pass
+            self._ranking_wait_dialog = None
+
+        if not modal:
+            # Each jump prefetch calls this again - close the previous auto-popup first,
+            # or it stays open underneath/beside the new one and looks like the popup
+            # never refreshed for the new system.
+            self._close_auto_ranking_dialog()
+
+        self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
+
+        dialog = tk.Toplevel(self.parent)
+        dialog.withdraw()
+
+        current_theme = load_theme()
+        if current_theme == "elite_orange":
+            bg, fg = "#1e1e1e", "#ff8c00"
+        else:
+            bg, fg = MENU_COLORS["bg"], MENU_COLORS["fg"]
+
+        try:
+            from app_utils import get_app_icon_path
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+        except Exception:
+            pass
+
+        dialog.title(t('ring_finder.rank_minerals_title'))
+        dialog.resizable(True, True)
+        dialog.configure(bg=bg)
+
+        frame = tk.Frame(dialog, bg=bg, padx=15, pady=15)
+        frame.pack(fill="both", expand=True)
+
+        tk.Label(frame, text=t('ring_finder.rank_minerals_for').format(system=system_name),
+                 bg=bg, fg=fg, font=scaled_font(9, "bold")).pack(anchor="w", pady=(0, 10))
+
+        # PowerPlay mode: restrict results to stations in system_name itself - for
+        # undermining/reinforcing, the target system is the only place the player can
+        # actually sell, so a galaxy-best price elsewhere isn't actionable. Re-ranks the
+        # already-fetched priced_rows client-side, no extra live calls.
+        from config import load_pp_mode, save_pp_mode
+        pp_mode_var = tk.BooleanVar(value=load_pp_mode())
+
+        def rows_for_mode(mat, best, priced_rows):
+            if pp_mode_var.get():
+                in_system = [r for r in priced_rows if r.get('systemName', '') == system_name]
+                best_in_system = max(in_system, key=lambda r: r.get('sellPrice', 0)) if in_system else None
+                return best_in_system
+            return best
+
+        # Ring type per mineral, from the same hotspot rows Rank Minerals parses from -
+        # so a top-priced mineral that's actually core-only in this ring doesn't get mined
+        # blind with a laser.
+        from report_generator import ReportGenerator
+        core_materials = {mat for mat, info in ReportGenerator.MATERIAL_TPH_THRESHOLDS.items()
+                          if info.get('is_core', False)}
+
+        def mining_method_for(mat):
+            return t('ring_finder.mining_method_core') if mat in core_materials else t('ring_finder.mining_method_laser')
+
+        # Bulk-fetch PowerPlay data from the local EDDN cache for all result systems in one
+        # query - same pattern as the Commodity Market tab (main.py _search_marketplace).
+        from system_finder_api import SystemFinderAPI
+        pp_names = list({best.get('systemName', '') for _, best, _ in results if best and best.get('systemName')} | {system_name})
+        pp_data = SystemFinderAPI._batch_get_powerplay(pp_names) if pp_names else {}
+
+        def powerplay_str_for(sys_name):
+            pp_entry = pp_data.get(sys_name, {})
+            pp_power = pp_entry.get('controlling_power', '')
+            pp_state = pp_entry.get('power_state', '')
+            if pp_power == '~none~':
+                return pp_state or t('common.no_data')
+            elif pp_power and pp_state:
+                return f"{pp_power} / {pp_state}"
+            elif pp_power:
+                return pp_power
+            elif pp_state:
+                return pp_state
+            return t('common.no_data')
+
+        if current_theme == "elite_orange":
+            tree_bg, tree_fg, header_bg = "#1e1e1e", "#ff8c00", "#1a1a1a"
+            selection_bg, selection_fg = "#ff6600", "#000000"
+        else:
+            tree_bg, tree_fg, header_bg = "#1e1e1e", "#e6e6e6", "#2a2a2a"
+            selection_bg, selection_fg = "#0078d7", "#ffffff"
+
+        style = ttk.Style()
+        style.configure("RankMinerals.Treeview",
+                       borderwidth=1, relief="solid", bordercolor="#333333",
+                       background=tree_bg, foreground=tree_fg, fieldbackground=tree_bg,
+                       font=scaled_font(9))
+        style.configure("RankMinerals.Treeview.Heading",
+                       borderwidth=1, relief="groove", background=header_bg, foreground=tree_fg,
+                       padding=[5, 5], anchor="w", font=scaled_font(9, "bold"))
+        style.map("RankMinerals.Treeview",
+                 background=[('selected', selection_bg)],
+                 foreground=[('selected', selection_fg)])
+
+        options_row = tk.Frame(frame, bg=bg)
+        options_row.pack(fill="x", pady=(0, 8))
+
+        pp_check = tk.Checkbutton(options_row, text=t('ring_finder.pp_mode_checkbox'),
+                                  variable=pp_mode_var, bg=bg, fg=fg,
+                                  activebackground=bg, activeforeground=fg,
+                                  selectcolor=bg, font=scaled_font(9))
+        pp_check.pack(side="left")
+
+        # "Also check" picker: non-hotspot minerals mineable somewhere in this system
+        # (e.g. Osmium in a Metal Rich ring) that hotspot-based ranking can't surface on
+        # its own, since there's no hotspot row to parse for them. Only offered when the
+        # caller computed candidates (system-wide "Rank Minerals in Entire System" - the
+        # ring-scoped view and the ring type of any one row isn't known system-wide).
+        extra_checked_vars = {}
+
+        def save_also_check_selection():
+            try:
+                from config import save_also_check_minerals
+                checked = [mat for mat, var in extra_checked_vars.items() if var.get()]
+                save_also_check_minerals(checked)
+            except Exception:
+                pass
+
+        def on_extra_mineral_toggle(mat):
+            save_also_check_selection()
+            if extra_checked_vars[mat].get():
+                if not any(r[0] == mat for r in results):
+                    self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
+                    threading.Thread(target=fetch_extra_mineral, args=(mat,), daemon=True).start()
+            else:
+                results[:] = [r for r in results if r[0] != mat]
+                populate_rows()
+
+        def fetch_extra_mineral(mat):
+            from marketplace_api import MarketplaceAPI
+            try:
+                rows = MarketplaceAPI.search_buyers(mat, system_name, None, 7, False)
+            except Exception:
+                rows = []
+            priced_rows = [r for r in rows if r.get('sellPrice', 0) > 0]
+            best = max(priced_rows, key=lambda r: r.get('sellPrice', 0)) if priced_rows else None
+            self.parent.after(0, lambda: add_extra_mineral_result(mat, best, priced_rows))
+
+        def add_extra_mineral_result(mat, best, priced_rows):
+            if extra_checked_vars.get(mat) and not extra_checked_vars[mat].get():
+                return  # unchecked again before the fetch finished
+            results.append((mat, best, priced_rows))
+            results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
+            self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
+            populate_rows()
+
+        if extra_candidates:
+            already_fetched = {r[0] for r in results}
+            for mat in extra_candidates:
+                # Reflect minerals the caller already fetched upfront (previously saved
+                # "Also check" picks) as ticked, instead of showing unchecked despite
+                # already being in the ranked table below.
+                extra_checked_vars[mat] = tk.BooleanVar(value=mat in already_fetched)
+
+            def show_extra_mineral_picker():
+                # A tk.Menu with add_checkbutton closes on every click, forcing the user
+                # to reopen it after each pick - a persistent Toplevel stays open so they
+                # can tick several minerals in one go.
+                existing = getattr(dialog, '_extra_mineral_picker', None)
+                if existing is not None:
+                    try:
+                        if existing.winfo_exists():
+                            existing.lift()
+                            existing.focus_force()
+                            return
+                    except Exception:
+                        pass
+
+                picker = tk.Toplevel(dialog)
+                picker.withdraw()
+
+                try:
+                    from app_utils import get_app_icon_path
+                    icon_path = get_app_icon_path()
+                    if icon_path and icon_path.endswith('.ico'):
+                        picker.iconbitmap(icon_path)
+                except Exception:
+                    pass
+
+                picker.title(t('ring_finder.also_check_menu_title'))
+                picker.resizable(False, False)
+                picker.configure(bg=bg)
+
+                picker_frame = tk.Frame(picker, bg=bg, padx=15, pady=12)
+                picker_frame.pack(fill="both", expand=True)
+
+                # Cap the checkbox list height and scroll instead of growing unbounded -
+                # with 10+ ring-type minerals now offered, an uncapped list could spill
+                # past the ranking dialog's own bottom edge into the window behind it.
+                MAX_VISIBLE_ROWS = 8
+                ROW_HEIGHT_PX = scaled_px(26)
+                list_canvas = tk.Canvas(picker_frame, bg=bg, highlightthickness=0,
+                                        width=scaled_px(220), height=min(len(extra_candidates), MAX_VISIBLE_ROWS) * ROW_HEIGHT_PX)
+                list_canvas.pack(side="top", fill="both", expand=True)
+                list_scrollbar = ttk.Scrollbar(picker_frame, orient="vertical", command=list_canvas.yview)
+                if len(extra_candidates) > MAX_VISIBLE_ROWS:
+                    list_scrollbar.place(in_=list_canvas, relx=1.0, rely=0, relheight=1.0, anchor="ne")
+                    list_canvas.configure(yscrollcommand=list_scrollbar.set)
+
+                checklist_frame = tk.Frame(list_canvas, bg=bg)
+                list_canvas.create_window((0, 0), window=checklist_frame, anchor="nw")
+
+                for mat in extra_candidates:
+                    tk.Checkbutton(checklist_frame, text=self._format_material_for_display(mat),
+                                   variable=extra_checked_vars[mat],
+                                   command=lambda m=mat: on_extra_mineral_toggle(m),
+                                   bg=bg, fg=fg, activebackground=bg, activeforeground=fg,
+                                   selectcolor=bg, font=scaled_font(9), anchor="w"
+                                   ).pack(fill="x", anchor="w")
+
+                checklist_frame.update_idletasks()
+                list_canvas.configure(scrollregion=list_canvas.bbox("all"))
+
+                def on_mousewheel(event):
+                    if len(extra_candidates) > MAX_VISIBLE_ROWS:
+                        list_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+                list_canvas.bind("<Enter>", lambda e: list_canvas.bind_all("<MouseWheel>", on_mousewheel))
+                list_canvas.bind("<Leave>", lambda e: list_canvas.unbind_all("<MouseWheel>"))
+
+                def follow_dialog_position(event=None):
+                    try:
+                        if picker.winfo_exists():
+                            x = extra_check_btn.winfo_rootx()
+                            y = extra_check_btn.winfo_rooty() + extra_check_btn.winfo_height() + 2
+                            picker.geometry(f"+{x}+{y}")
+                    except Exception:
+                        pass
+
+                def close_picker():
+                    dialog._extra_mineral_picker = None
+                    dialog._row_menu_open = False
+                    dialog.unbind("<Configure>", follow_binding)
+                    dialog.unbind("<Button-1>", click_away_binding)
+                    try:
+                        list_canvas.unbind_all("<MouseWheel>")
+                    except Exception:
+                        pass
+                    picker.destroy()
+
+                ttk.Button(picker_frame, text=t('common.close'), command=close_picker).pack(anchor="e", pady=(10, 0))
+                picker.protocol("WM_DELETE_WINDOW", close_picker)
+
+                def on_dialog_click_away(event):
+                    # The picker is -topmost, so a click on the main ranking table (behind
+                    # it) actually still lands on the picker at that screen location - the
+                    # tree's own on_click() dismiss logic never fires. Watch clicks on the
+                    # dialog itself and close the picker if the click was outside it.
+                    try:
+                        if not picker.winfo_exists():
+                            return
+                        px, py = picker.winfo_rootx(), picker.winfo_rooty()
+                        pw, ph = picker.winfo_width(), picker.winfo_height()
+                        if not (px <= event.x_root <= px + pw and py <= event.y_root <= py + ph):
+                            close_picker()
+                    except Exception:
+                        pass
+                click_away_binding = dialog.bind('<Button-1>', on_dialog_click_away, add='+')
+
+                picker.update_idletasks()
+                follow_dialog_position()
+                picker.deiconify()
+                picker.attributes('-topmost', True)
+                picker.lift()
+                picker.focus_force()
+                # Reuses dialog's own keep_on_top() guard flag - without this, the
+                # ranking dialog's 100ms re-lift loop buries this picker right back
+                # underneath it every tick.
+                dialog._row_menu_open = True
+
+                # Stay anchored under the "+ Also Check" button as the parent dialog
+                # is moved/resized, rather than floating independently once dropped.
+                follow_binding = dialog.bind("<Configure>", follow_dialog_position, add="+")
+
+                dialog._extra_mineral_picker = picker
+
+            extra_check_btn = tk.Button(options_row, text=t('ring_finder.also_check_button'),
+                                        command=show_extra_mineral_picker,
+                                        bg="#2a2a2a", fg=fg, activebackground="#3a3a3a", activeforeground=fg,
+                                        relief="ridge", bd=1, font=scaled_font(9), cursor="hand2")
+            extra_check_btn.pack(side="left", padx=(15, 0))
+
+        tree_frame = tk.Frame(frame, bg=bg)
+        tree_frame.pack(fill="both", expand=True)
+
+        columns = ("Mineral", "RingType", "Price", "Station", "Type", "Dist", "LS", "PowerPlay", "Updated")
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=min(len(results), 8),
+                            selectmode="browse", style="RankMinerals.Treeview")
+        column_labels = {
+            "Mineral": t('ring_finder.col_mineral'),
+            "RingType": t('ring_finder.col_mining_method'),
+            "Price": t('ring_finder.col_price'),
+            "Station": t('ring_finder.col_station'),
+            "Type": t('ring_finder.col_station_type'),
+            "Dist": t('ring_finder.col_dist'),
+            "LS": t('ring_finder.col_ls'),
+            "PowerPlay": t('ring_finder.col_powerplay'),
+            "Updated": t('ring_finder.col_updated'),
+        }
+        sort_reverse = {col: False for col in columns}
+
+        def sort_by_column(col):
+            data = [(tree.set(child, col), child) for child in tree.get_children('')]
+            reverse = sort_reverse[col]
+
+            if col in ("Dist", "LS"):
+                def sort_key(item):
+                    val = item[0].replace(',', '')
+                    try:
+                        return float(val)
+                    except ValueError:
+                        return float('-inf') if reverse else float('inf')
+                data.sort(key=sort_key, reverse=reverse)
+            elif col == "Price":
+                def sort_key(item):
+                    val = item[0].replace(',', '').replace(' CR', '')
+                    try:
+                        return float(val)
+                    except ValueError:
+                        return float('-inf') if reverse else float('inf')
+                data.sort(key=sort_key, reverse=reverse)
+            else:
+                data.sort(key=lambda item: item[0].lower(), reverse=reverse)
+
+            for index, (_val, child) in enumerate(data):
+                tree.move(child, '', index)
+
+            sort_reverse[col] = not reverse
+            arrow = " ▼" if reverse else " ▲"
+            for c in columns:
+                tree.heading(c, text=column_labels[c] + (arrow if c == col else ""),
+                            command=lambda c=c: sort_by_column(c))
+
+        for col in columns:
+            tree.heading(col, text=column_labels[col], command=lambda c=col: sort_by_column(c))
+        tree.column("Mineral", width=130, minwidth=40, anchor="w", stretch=False)
+        tree.column("RingType", width=90, minwidth=40, anchor="w", stretch=False)
+        tree.column("Price", width=110, minwidth=40, anchor="w", stretch=False)
+        tree.column("Station", width=280, minwidth=40, anchor="w", stretch=False)
+        tree.column("Type", width=110, minwidth=40, anchor="w", stretch=False)
+        tree.column("Dist", width=80, minwidth=40, anchor="center", stretch=False)
+        tree.column("LS", width=70, minwidth=40, anchor="center", stretch=False)
+        tree.column("PowerPlay", width=200, minwidth=40, anchor="w", stretch=False)
+        tree.column("Updated", width=90, minwidth=40, anchor="center", stretch=False)
+
+        try:
+            from config import load_rank_minerals_column_widths
+            saved_widths = load_rank_minerals_column_widths()
+            for col_name, width in saved_widths.items():
+                try:
+                    if width > 0:
+                        current_minwidth = tree.column(col_name, "minwidth")
+                        tree.column(col_name, width=max(width, current_minwidth))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        def save_rank_minerals_widths(event=None):
+            try:
+                from config import save_rank_minerals_column_widths
+                widths = {col: tree.column(col, "width") for col in columns}
+                save_rank_minerals_column_widths(widths)
+            except Exception:
+                pass
+        tree.bind("<ButtonRelease-1>", save_rank_minerals_widths, add='+')
+
+        mineral_by_row = {}
+        system_by_row = {}
+
+        def populate_rows():
+            tree.delete(*tree.get_children())
+            mineral_by_row.clear()
+            system_by_row.clear()
+            for mat, best, priced_rows in results:
+                row_best = rows_for_mode(mat, best, priced_rows)
+                if row_best and row_best.get('sellPrice', 0) > 0:
+                    price = f"{row_best.get('sellPrice', 0):,} CR"
+                    station_system = row_best.get('systemName', '')
+                    station = f"{row_best.get('stationName', '')} ({station_system})"
+                    station_type = self._format_station_type(row_best.get('stationType'))
+                    dist = f"{row_best.get('distance', 0):.1f}" if row_best.get('distance') is not None else "-"
+                    station_ls = row_best.get('distanceToArrival')
+                    ls = f"{int(station_ls):,}" if station_ls is not None else "-"
+
+                    powerplay = powerplay_str_for(station_system)
+                    updated = self._format_data_age(row_best.get('updatedAt', ''))
+                elif pp_mode_var.get():
+                    price = t('ring_finder.no_data_in_system')
+                    station = "-"
+                    station_system = system_name
+                    station_type = "-"
+                    dist = "-"
+                    ls = "-"
+                    powerplay = powerplay_str_for(system_name)
+                    updated = "-"
+                else:
+                    price = t('ring_finder.no_data')
+                    station = "-"
+                    station_system = ""
+                    station_type = "-"
+                    dist = "-"
+                    ls = "-"
+                    powerplay = "-"
+                    updated = "-"
+                mat_display = self._format_material_for_display(mat)
+                ring_type_display = mining_method_for(mat)
+                row_id = tree.insert("", "end", values=(mat_display, ring_type_display, price, station, station_type, dist, ls, powerplay, updated))
+                mineral_by_row[row_id] = mat
+                system_by_row[row_id] = station_system
+
+        def on_pp_check_toggle():
+            save_pp_mode(pp_mode_var.get())
+            populate_rows()
+
+        populate_rows()
+        pp_check.configure(command=on_pp_check_toggle)
+
+        v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        tree.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        tree_frame.grid_columnconfigure(0, weight=1)
+        tree_frame.grid_rowconfigure(0, weight=1)
+
+        def copy_system_for_row(row_id):
+            system = system_by_row.get(row_id)
+            if system:
+                self.parent.clipboard_clear()
+                self.parent.clipboard_append(system)
+                self.parent.update_idletasks()
+                self.status_var.set(f"Copied '{system}' to clipboard")
+
+        def open_in_browser(url_template, system):
+            import urllib.parse
+            import webbrowser
+            webbrowser.open(url_template.format(urllib.parse.quote(system)))
+
+        def open_inara_and_fetch_pp(row_id, system):
+            """Open Inara and fetch/store its PowerPlay data - same as the main
+            Hotspots Finder table's PowerPlay-cell click (_open_inara/_fetch_pp_from_inara)."""
+            open_in_browser("https://inara.cz/elite/starsystem/?search={}", system)
+
+            def worker():
+                from system_finder_api import SystemFinderAPI
+                result = SystemFinderAPI.fetch_and_store_powerplay_from_inara(system)
+                self.parent.after(0, lambda: apply_pp_result(row_id, system, result))
+            threading.Thread(target=worker, daemon=True).start()
+
+        def apply_pp_result(row_id, system, result):
+            if not result or not tree.exists(row_id):
+                return
+            pp_power = result.get('controlling_power', '')
+            pp_state = result.get('power_state', '')
+            if pp_power == '~none~':
+                pp_str = pp_state or t('common.no_data')
+            elif pp_power and pp_state:
+                pp_str = f"{pp_power} / {pp_state}"
+            elif pp_power:
+                pp_str = pp_power
+            elif pp_state:
+                pp_str = pp_state
+            else:
+                pp_str = t('common.no_data')
+            vals = list(tree.item(row_id, 'values'))
+            if len(vals) > 7:
+                vals[7] = pp_str
+                tree.item(row_id, values=vals)
+
+        def close_extra_mineral_picker_if_open():
+            """Dismiss the "Also check" picker on any click in the main ranking table -
+            it's meant to be a quick add-a-mineral popup, not something left floating
+            over the table it's covering."""
+            picker = getattr(dialog, '_extra_mineral_picker', None)
+            if picker is not None:
+                try:
+                    if picker.winfo_exists():
+                        picker.event_generate('<<CloseRequest>>')
+                except Exception:
+                    pass
+
+        def on_click(event):
+            close_extra_mineral_picker_if_open()
+            row_id = tree.identify_row(event.y)
+            col = tree.identify_column(event.x)
+            if not row_id:
+                return
+            if col == "#4":  # Station column
+                tree.selection_set(row_id)
+                copy_system_for_row(row_id)
+            elif col == "#8":  # PowerPlay column - open Inara and refresh PP data, same as main table
+                tree.selection_set(row_id)
+                system = system_by_row.get(row_id, '')
+                if system:
+                    open_inara_and_fetch_pp(row_id, system)
+
+        row_menu = tk.Menu(dialog, tearoff=0,
+                           bg=MENU_COLORS["bg"] if current_theme != "elite_orange" else "#1e1e1e",
+                           fg=MENU_COLORS["fg"] if current_theme != "elite_orange" else "#ff8c00",
+                           activebackground=MENU_COLORS["activebackground"] if current_theme != "elite_orange" else "#ff6600",
+                           activeforeground=MENU_COLORS["activeforeground"] if current_theme != "elite_orange" else "#000000",
+                           font=scaled_font(9))
+        row_menu.add_command(label=t('context_menu.copy_system'),
+                             command=lambda: copy_system_for_row(tree.selection()[0]) if tree.selection() else None)
+        row_menu.add_command(label=t('context_menu.open_inara'),
+                             command=lambda: open_in_browser("https://inara.cz/elite/starsystem/?search={}", system_by_row.get(tree.selection()[0], '')) if tree.selection() else None)
+        row_menu.add_command(label=t('context_menu.open_edsm'),
+                             command=lambda: open_in_browser("https://www.edsm.net/en/system/id/0/name/{}", system_by_row.get(tree.selection()[0], '')) if tree.selection() else None)
+        row_menu.add_command(label=t('context_menu.open_spansh'),
+                             command=lambda: open_in_browser("https://spansh.co.uk/search/{}", system_by_row.get(tree.selection()[0], '')) if tree.selection() else None)
+
+        def on_right_click(event):
+            row_id = tree.identify_row(event.y)
+            if row_id and system_by_row.get(row_id):
+                tree.selection_set(row_id)
+                dialog._row_menu_open = True
+                try:
+                    row_menu.tk_popup(event.x_root, event.y_root)
+                finally:
+                    dialog._row_menu_open = False
+
+        tree.bind("<Button-1>", on_click)
+        tree.bind("<Button-3>", on_right_click)
+
+        btn_frame = tk.Frame(frame, bg=bg)
+        btn_frame.pack(fill="x", pady=(10, 0))
+
+        def open_selected():
+            selection = tree.selection()
+            if not selection:
+                return
+            mat = mineral_by_row.get(selection[0])
+            if mat:
+                self._find_sell_station_impl(mineral_override=mat)
+
+        def save_rank_minerals_geometry(event=None):
+            try:
+                from config import save_rank_minerals_window_geometry
+                save_rank_minerals_window_geometry({'width': dialog.winfo_width(), 'height': dialog.winfo_height()})
+            except Exception:
+                pass
+
+        def close_dialog():
+            save_rank_minerals_geometry()
+            dialog.destroy()
+
+        ttk.Button(btn_frame, text=t('ring_finder.find_sell_station_btn'), command=open_selected).pack(side="left")
+        ttk.Button(btn_frame, text=t('common.close'), command=close_dialog).pack(side="right")
+        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+
+        dialog.update_idletasks()
+        # Don't tie the floor to the table's full natural width (every column fixed-width,
+        # no stretch) - that made the window unshrinkable. The horizontal scrollbar above
+        # keeps the table usable below that width, so only guard against the button row.
+        dialog.minsize(500, dialog.winfo_reqheight())
+
+        try:
+            from config import load_rank_minerals_window_geometry
+            saved_geom = load_rank_minerals_window_geometry()
+            if saved_geom.get('width') and saved_geom.get('height'):
+                min_h = dialog.winfo_reqheight()
+                dialog.geometry(f"{max(saved_geom['width'], 500)}x{max(saved_geom['height'], min_h)}")
+        except Exception:
+            pass
+
+        from ui.dialogs import center_window
+        center_window(dialog, self.parent.winfo_toplevel())
+        dialog.deiconify()
+
+        dialog._row_menu_open = False
+
+        if not modal:
+            # Non-modal auto-popup: needs its own topmost flag since the main app can
+            # run with "always on top" itself - a plain lift() can't rise above another
+            # topmost window. No grab/focus_force/keep-on-top loop though, so it never
+            # fights for focus or blocks input after this one-time placement.
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            # Tracked so disabling "Auto Mineral Prices" can close it immediately.
+            self._auto_ranking_dialog = dialog
+            return
+
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except Exception:
+            pass
+
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    if not getattr(dialog, '_row_menu_open', False):
+                        dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except Exception:
+                pass
+        dialog.after(100, keep_on_top)
+
+    def _show_reverse_search_dialog(self):
+        """Show the "Find Best Mining System" dialog - pick a target (reinforcement/
+        delivery) system, search nearby mining systems, rank by each candidate's own
+        best hotspot mineral sell price (or, in PowerPlay mode, price at the target)."""
+        from config import scaled_font, load_theme
+
+        # Close any open non-modal Auto Prices popup first, so opening this dialog
+        # doesn't leave two unrelated popups stacked on screen.
+        self._close_auto_ranking_dialog()
+
+        # Hide the main Reference System autocomplete dropdown if it's open - it's a
+        # separate always-on-top Toplevel that would otherwise render behind this dialog.
+        if hasattr(self, '_system_ac'):
+            self._system_ac.hide()
+
+        current_theme = load_theme()
+        if current_theme == "elite_orange":
+            bg, fg = "#1e1e1e", "#ff8c00"
+        else:
+            bg, fg = MENU_COLORS["bg"], MENU_COLORS["fg"]
+
+        dialog = tk.Toplevel(self.parent)
+        dialog.withdraw()
+
+        try:
+            from app_utils import get_app_icon_path
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+        except Exception:
+            pass
+
+        dialog.title(t('ring_finder.reverse_search_title'))
+        dialog.resizable(True, True)
+        dialog.configure(bg=bg)
+
+        frame = tk.Frame(dialog, bg=bg, padx=15, pady=15)
+        frame.pack(fill="both", expand=True)
+        dialog._content_frame = frame
+
+        input_row = tk.Frame(frame, bg=bg)
+        input_row.pack(fill="x", pady=(0, 10))
+
+        tk.Label(input_row, text=t('ring_finder.reverse_search_target_label'),
+                 bg=bg, fg=fg, font=scaled_font(9)).pack(side="left")
+        target_var = tk.StringVar()
+        target_entry = ttk.Entry(input_row, textvariable=target_var, width=24)
+        target_entry.pack(side="left", padx=(8, 15))
+
+        from system_autocomplete import SystemAutocomplete
+        SystemAutocomplete(target_entry, target_var, dialog)
+
+        tk.Label(input_row, text=t('ring_finder.reverse_search_max_distance'),
+                 bg=bg, fg=fg, font=scaled_font(9)).pack(side="left")
+        max_dist_var = tk.StringVar(value="50")
+        max_dist_combo = ttk.Combobox(input_row, textvariable=max_dist_var, width=6, state="readonly")
+        max_dist_combo['values'] = ("10", "20", "30", "50", "100", "150", "200")
+        max_dist_combo.pack(side="left", padx=(8, 15))
+
+        second_row = tk.Frame(frame, bg=bg)
+        second_row.pack(fill="x", pady=(0, 10))
+
+        tk.Label(second_row, text=t('ring_finder.mineral'),
+                 bg=bg, fg=fg, font=scaled_font(9)).pack(side="left")
+        from config import load_reverse_search_mineral, save_reverse_search_mineral
+        available_materials = self._get_available_materials()
+        saved_mineral = load_reverse_search_mineral()
+        saved_display = next((m for m in available_materials if self._to_english(m) == saved_mineral), None) if saved_mineral else None
+        mineral_var = tk.StringVar(value=saved_display or t('ring_finder.all_minerals'))
+        mineral_combo = ttk.Combobox(second_row, textvariable=mineral_var, width=22, state="readonly")
+        mineral_combo['values'] = available_materials
+        mineral_combo.pack(side="left", padx=(8, 0))
+
+        def on_mineral_selected(event=None):
+            mineral_display = mineral_var.get()
+            if mineral_display == t('ring_finder.all_minerals'):
+                save_reverse_search_mineral("")
+            else:
+                english = self._to_english(mineral_display)
+                if english == "Low Temp Diamonds":
+                    english = "Low Temperature Diamonds"
+                save_reverse_search_mineral(english)
+        mineral_combo.bind('<<ComboboxSelected>>', on_mineral_selected)
+
+        # Off by default: this tool is general-purpose (best nearby mining system for
+        # any delivery target), so it searches a price radius around the target like the
+        # Commodity Market tab. PowerPlay reinforce/undermine/acquisition only pay out
+        # for sales made in the exact target system - turning this on restricts pricing
+        # to that exact system instead, at the cost of "No data" wherever it has no market.
+        from config import load_pp_mode, save_pp_mode
+        pp_mode_var = tk.BooleanVar(value=load_pp_mode())
+
+        def on_pp_mode_toggle():
+            # Re-rank/re-render from the already-fetched rows_by_material instead of a
+            # second live search - same "instant toggle" behavior as Rank Minerals' own
+            # PowerPlay-mode checkbox.
+            save_pp_mode(pp_mode_var.get())
+            cached = getattr(dialog, '_reverse_search_cache', None)
+            if cached is None:
+                return
+            self._rerank_reverse_search_results(cached['target_system'], cached['candidates'],
+                                                cached['rows_by_material'], cached['candidate_coords'],
+                                                cached['max_distance'], pp_mode_var.get(), dialog, status_label, search_btn)
+
+        pp_check = tk.Checkbutton(second_row, text=t('ring_finder.pp_mode_checkbox_target'),
+                                  variable=pp_mode_var, command=on_pp_mode_toggle, bg=bg, fg=fg,
+                                  activebackground=bg, activeforeground=fg,
+                                  selectcolor=bg, font=scaled_font(9))
+        pp_check.pack(side="left", padx=(15, 0))
+
+        status_label = tk.Label(frame, text="", bg=bg, fg=fg, font=scaled_font(9))
+        status_label.pack(anchor="w", pady=(0, 10))
+
+        def run_search():
+            target_system = target_var.get().strip()
+            if not target_system:
+                status_label.config(text=t('ring_finder.reverse_search_no_target'))
+                return
+            mineral_display = mineral_var.get()
+            if mineral_display == t('ring_finder.all_minerals'):
+                mineral_filter = None
+            else:
+                mineral_filter = self._to_english(mineral_display)
+                if mineral_filter == "Low Temp Diamonds":
+                    mineral_filter = "Low Temperature Diamonds"
+            status_label.config(text=t('ring_finder.reverse_search_searching').format(system=target_system))
+            search_btn.config(state="disabled")
+            self._show_reverse_search_wait_dialog(target_system)
+            threading.Thread(target=self._reverse_search_worker,
+                             args=(target_system, float(max_dist_var.get()), mineral_filter, pp_mode_var.get(), dialog, status_label, search_btn),
+                             daemon=True).start()
+
+        search_btn = ttk.Button(input_row, text=t('ring_finder.reverse_search_search_btn'), command=run_search)
+        search_btn.pack(side="left")
+
+        target_entry.bind('<Return>', lambda e: run_search())
+
+        def save_reverse_search_geometry(event=None):
+            try:
+                from config import save_reverse_search_window_geometry
+                save_reverse_search_window_geometry({'width': dialog.winfo_width(), 'height': dialog.winfo_height()})
+            except Exception:
+                pass
+
+        def close_reverse_search_dialog():
+            save_reverse_search_geometry()
+            dialog.destroy()
+        dialog.protocol("WM_DELETE_WINDOW", close_reverse_search_dialog)
+
+        dialog.update_idletasks()
+
+        try:
+            from config import load_reverse_search_window_geometry
+            saved_geom = load_reverse_search_window_geometry()
+            if saved_geom.get('width') and saved_geom.get('height'):
+                min_w, min_h = dialog.winfo_reqwidth(), dialog.winfo_reqheight()
+                dialog.geometry(f"{max(saved_geom['width'], min_w)}x{max(saved_geom['height'], min_h)}")
+        except Exception:
+            pass
+
+        from ui.dialogs import center_window
+        center_window(dialog, self.parent.winfo_toplevel())
+        dialog.deiconify()
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except Exception:
+            pass
+
+        dialog._row_menu_open = False
+        # No repeating keep-on-top loop here (unlike the modal Rank Minerals dialog) -
+        # this dialog spawns its own child popups (autocomplete listbox, combobox
+        # dropdown, wait dialog, right-click menu), and a 100ms re-lift loop fights all
+        # of them for stacking order. One-time lift on open is enough; _close_reverse_
+        # search_wait_dialog() re-lifts once after the wait popup closes.
+
+    def _reverse_search_worker(self, target_system: str, max_distance: float, mineral_filter: Optional[str],
+                               pp_mode: bool, dialog, status_label, search_btn):
+        """Background worker: find candidate mining systems near target_system, rank each
+        by its own best hotspot mineral sell price.
+
+        mineral_filter: None for all minerals, or an exact full mineral name (e.g.
+        'Painite') to restrict candidates to that one mineral's hotspots.
+        pp_mode: if True, price is only counted from stations exactly in target_system
+        (PowerPlay reinforce/undermine/acquisition only pay out there). If False, each
+        candidate is ranked by whichever fetched station is nearest to THAT candidate
+        (see _rerank_reverse_search_results) rather than simply the single best price
+        near the target - otherwise every candidate would show the same distant station."""
+        MAX_CANDIDATES = 20
+
+        try:
+            hotspots = self._get_hotspots(target_system, 'All', 'All Minerals', False,
+                                          max_distance, max_results=None, data_source='database')
+        except Exception:
+            hotspots = []
+
+        # Collect unique candidate systems (nearest first), each with its distinct hotspot minerals.
+        # 'type' can be a single material name or a combined "Mona(1), Rhod(1)" display string
+        # (the "All Minerals" view groups every hotspot in a ring into one field) - parse it the
+        # same way Rank Minerals does rather than assuming one material per row.
+        candidates = {}
+        for h in hotspots:
+            sys_name = h.get('systemName', h.get('system', ''))
+            type_field = h.get('type', h.get('material_name', ''))
+            if not sys_name or not type_field:
+                continue
+            try:
+                distance = float(h.get('distance', 999999))
+            except (TypeError, ValueError):
+                distance = 999999.0
+            entry = candidates.setdefault(sys_name, {'distance': distance, 'materials': set()})
+            for mat in self._parse_materials_from_hotspots(type_field):
+                full_mat = self._expand_abbreviated_materials(mat)
+                if mineral_filter is not None and full_mat != mineral_filter:
+                    continue
+                entry['materials'].add(full_mat)
+
+        # Drop candidates left with no materials after filtering
+        candidates = {sys_name: entry for sys_name, entry in candidates.items() if entry['materials']}
+
+        candidate_list = sorted(candidates.items(), key=lambda kv: kv[1]['distance'])[:MAX_CANDIDATES]
+
+        if not candidate_list:
+            self.parent.after(0, lambda: self._reverse_search_no_results(target_system, dialog, status_label, search_btn))
+            return
+
+        # One live fetch per unique mineral, centered on target_system - candidates near
+        # the same target share these results, so this stays cheap regardless of how
+        # many candidates there are (each search_buyers call already does a paginated
+        # Ardent+Spansh+EDDN fetch, so one per (candidate, mineral) pair was minutes-slow).
+        from marketplace_api import MarketplaceAPI
+        from concurrent.futures import ThreadPoolExecutor
+
+        rows_by_material = {}
+        unique_materials = list({mat for _, entry in candidate_list for mat in entry['materials']})
+        with ThreadPoolExecutor(max_workers=min(len(unique_materials), 4)) as pool:
+            futures = {pool.submit(MarketplaceAPI.search_buyers, mat, target_system, None, 7, False): mat
+                      for mat in unique_materials}
+            for future in futures:
+                mat = futures[future]
+                try:
+                    rows = future.result()
+                except Exception:
+                    rows = []
+                rows_by_material[mat] = [r for r in rows if r.get('sellPrice', 0) > 0]
+
+        # Candidate coordinates for local (non-PP) distance re-ranking below - local
+        # SQLite lookups, no network calls, so doing one per candidate is instant.
+        candidate_coords = {}
+        try:
+            from local_database import LocalSystemsDatabase
+            local_db = LocalSystemsDatabase()
+            if local_db.is_database_available():
+                for sys_name, _entry in candidate_list:
+                    coords = local_db.get_system_coordinates(sys_name)
+                    if coords:
+                        candidate_coords[sys_name] = coords
+        except Exception:
+            pass
+
+        dialog._reverse_search_cache = {
+            'target_system': target_system,
+            'candidates': candidate_list,
+            'rows_by_material': rows_by_material,
+            'candidate_coords': candidate_coords,
+            'max_distance': max_distance,
+        }
+        self.parent.after(0, lambda: self._rerank_reverse_search_results(
+            target_system, candidate_list, rows_by_material, candidate_coords, max_distance, pp_mode, dialog, status_label, search_btn))
+
+    def _rerank_reverse_search_results(self, target_system: str, candidate_list, rows_by_material: dict,
+                                       candidate_coords: dict, max_distance: float, pp_mode: bool, dialog, status_label, search_btn):
+        """Rank candidates by best-priced mineral from already-fetched price data, then
+        display. Called after a live search, and again (no new fetch) whenever the
+        PowerPlay-mode checkbox is toggled."""
+        def dist_from_candidate(coords, r):
+            sx, sy, sz = r.get('systemX'), r.get('systemY'), r.get('systemZ')
+            if sx is None or sy is None or sz is None:
+                return None
+            try:
+                return ((float(sx) - coords['x'])**2 + (float(sy) - coords['y'])**2
+                         + (float(sz) - coords['z'])**2) ** 0.5
+            except (TypeError, ValueError):
+                return None
+
+        def best_for(sys_name, mat):
+            priced_rows = rows_by_material.get(mat, [])
+            if pp_mode:
+                # PowerPlay reinforce/undermine/acquisition only pay out for sales made
+                # exactly in target_system.
+                priced_rows = [r for r in priced_rows if r.get('systemName', '') == target_system]
+                return max(priced_rows, key=lambda r: r.get('sellPrice', 0)) if priced_rows else None
+
+            # Outside PP mode, pick the nearest priced station to THIS candidate, capped
+            # to the same Max Distance the user searched with - a station outside that
+            # radius isn't "local" no matter how much closer it is than the target-wide
+            # best price, so it's better to show No data than a misleadingly far seller.
+            coords = candidate_coords.get(sys_name)
+            if coords is None:
+                return None
+
+            rows_with_dist = [(r, dist_from_candidate(coords, r)) for r in priced_rows]
+            rows_with_dist = [(r, d) for r, d in rows_with_dist if d is not None and d <= max_distance]
+            if not rows_with_dist:
+                return None
+            best_row, _ = min(rows_with_dist, key=lambda rd: rd[1])
+            return best_row
+
+        results = []
+        for sys_name, entry in candidate_list:
+            best_mat = None
+            best_price = None
+            for mat in entry['materials']:
+                priced = best_for(sys_name, mat)
+                if priced and (best_price is None or priced.get('sellPrice', 0) > best_price.get('sellPrice', 0)):
+                    best_mat = mat
+                    best_price = priced
+            results.append({
+                'system': sys_name,
+                'distance': entry['distance'],
+                'mineral': best_mat,
+                'best': best_price,
+            })
+
+        results.sort(key=lambda r: r['best'].get('sellPrice', 0) if r['best'] else -1, reverse=True)
+        self._show_reverse_search_results(target_system, results, pp_mode, dialog, status_label, search_btn)
+
+    def _show_reverse_search_wait_dialog(self, target_system: str):
+        """Show a small "please wait" dialog while the reverse-search worker fetches
+        candidate systems and live prices - same pattern as the Rank Minerals wait dialog."""
+        from config import scaled_font, load_theme
+
+        current_theme = load_theme()
+        if current_theme == "elite_orange":
+            bg, fg = "#1e1e1e", "#ff8c00"
+        else:
+            bg, fg = MENU_COLORS["bg"], MENU_COLORS["fg"]
+
+        dialog = tk.Toplevel(self.parent)
+        dialog.withdraw()
+
+        try:
+            from app_utils import get_app_icon_path
+            icon_path = get_app_icon_path()
+            if icon_path and icon_path.endswith('.ico'):
+                dialog.iconbitmap(icon_path)
+        except Exception:
+            pass
+
+        dialog.title(t('ring_finder.reverse_search_title'))
+        dialog.resizable(False, False)
+        dialog.configure(bg=bg)
+
+        frame = tk.Frame(dialog, bg=bg, padx=30, pady=25)
+        frame.pack(fill="both", expand=True)
+
+        tk.Label(frame, text=t('ring_finder.reverse_search_searching').format(system=target_system),
+                 bg=bg, fg=fg, font=scaled_font(9)).pack()
+
+        dialog.update_idletasks()
+        from ui.dialogs import center_window
+        center_window(dialog, self.parent.winfo_toplevel())
+        dialog.deiconify()
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except Exception:
+            pass
+
+        self._reverse_search_wait_dialog = dialog
+
+    def _close_reverse_search_wait_dialog(self, parent_dialog=None):
+        wait_dialog = getattr(self, '_reverse_search_wait_dialog', None)
+        if wait_dialog is not None:
+            try:
+                if wait_dialog.winfo_exists():
+                    wait_dialog.grab_release()
+                    wait_dialog.destroy()
+            except Exception:
+                pass
+            self._reverse_search_wait_dialog = None
+
+        # Re-lift the search dialog now that the wait popup covering it is gone.
+        if parent_dialog is not None:
+            try:
+                if parent_dialog.winfo_exists():
+                    parent_dialog.lift()
+            except Exception:
+                pass
+
+    def _reverse_search_no_results(self, target_system: str, dialog, status_label, search_btn):
+        self._close_reverse_search_wait_dialog(dialog)
+        status_label.config(text=t('ring_finder.reverse_search_no_candidates').format(system=target_system))
+        search_btn.config(state="normal")
+
+    def _show_reverse_search_results(self, target_system: str, results: list, pp_mode: bool, dialog, status_label, search_btn):
+        """Populate the reverse search dialog with a ranked results table."""
+        from config import scaled_font, load_theme
+
+        self._close_reverse_search_wait_dialog(dialog)
+        search_btn.config(state="normal")
+
+        # In PowerPlay mode, search_buyers results are restricted to stations exactly
+        # in target_system (see _reverse_search_worker) - if that system has no known
+        # market at all, every candidate legitimately comes back with no price. Say so
+        # plainly instead of leaving a table full of "No data" with no explanation.
+        if pp_mode and results and all(not r['best'] for r in results):
+            status_label.config(text=t('ring_finder.reverse_search_no_market_data').format(system=target_system))
+        else:
+            status_label.config(text=t('ring_finder.reverse_search_complete').format(count=len(results), system=target_system))
+
+        # Remove any previous results table (and its wrapping frame/scrollbar) before
+        # showing a new one - destroying only the tree left an empty tree_frame +
+        # scrollbar behind on every search, stacking up as stray boxes in the dialog.
+        old_tree_frame = getattr(dialog, '_results_tree_frame', None)
+        had_previous_results = old_tree_frame is not None
+        # Preserve the user's current window size across a PowerPlay-mode toggle re-render -
+        # only a fresh search (no previous results table yet) should reset to natural size.
+        current_width = dialog.winfo_width() if had_previous_results else None
+        current_height = dialog.winfo_height() if had_previous_results else None
+        if old_tree_frame is not None:
+            try:
+                old_tree_frame.destroy()
+            except Exception:
+                pass
+
+        current_theme = load_theme()
+        if current_theme == "elite_orange":
+            bg, fg, tree_bg, tree_fg, header_bg = "#1e1e1e", "#ff8c00", "#1e1e1e", "#ff8c00", "#1a1a1a"
+            selection_bg, selection_fg = "#ff6600", "#000000"
+        else:
+            bg, fg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], MENU_COLORS["fg"], "#1e1e1e", "#e6e6e6", "#2a2a2a"
+            selection_bg, selection_fg = "#0078d7", "#ffffff"
+
+        frame = dialog._content_frame
+
+        style = ttk.Style()
+        style.configure("ReverseSearch.Treeview",
+                       borderwidth=1, relief="solid", bordercolor="#333333",
+                       background=tree_bg, foreground=tree_fg, fieldbackground=tree_bg,
+                       font=scaled_font(9))
+        style.configure("ReverseSearch.Treeview.Heading",
+                       borderwidth=1, relief="groove", background=header_bg, foreground=tree_fg,
+                       padding=[5, 5], anchor="w", font=scaled_font(9, "bold"))
+        style.map("ReverseSearch.Treeview",
+                 background=[('selected', selection_bg)],
+                 foreground=[('selected', selection_fg)])
+
+        # Bulk-fetch PowerPlay data from the local EDDN cache for all result systems in one
+        # query - same pattern as Rank Minerals / Commodity Market.
+        from system_finder_api import SystemFinderAPI
+        pp_names = list({r['best'].get('systemName', '') for r in results if r['best'] and r['best'].get('systemName')})
+        pp_data = SystemFinderAPI._batch_get_powerplay(pp_names) if pp_names else {}
+
+        tree_frame = tk.Frame(frame, bg=bg)
+        tree_frame.pack(fill="both", expand=True, pady=(0, 10))
+
+        columns = ("System", "Dist", "Mineral", "Price", "Station", "Type", "LS", "PowerPlay", "Updated")
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=min(len(results), 10),
+                            selectmode="browse", style="ReverseSearch.Treeview")
+        column_labels = {
+            "System": t('ring_finder.col_mine_here'),
+            "Dist": t('ring_finder.col_dist'),
+            "Mineral": t('ring_finder.col_best_mineral'),
+            "Price": t('ring_finder.col_price'),
+            "Station": t('ring_finder.col_sell_here'),
+            "Type": t('ring_finder.col_station_type'),
+            "LS": t('ring_finder.col_ls'),
+            "PowerPlay": t('ring_finder.col_powerplay'),
+            "Updated": t('ring_finder.col_updated'),
+        }
+        sort_reverse = {col: False for col in columns}
+
+        def sort_by_column(col):
+            data = [(tree.set(child, col), child) for child in tree.get_children('')]
+            reverse = sort_reverse[col]
+
+            if col in ("Dist", "LS"):
+                def sort_key(item):
+                    val = item[0].replace(',', '')
+                    try:
+                        return float(val)
+                    except ValueError:
+                        return float('-inf') if reverse else float('inf')
+                data.sort(key=sort_key, reverse=reverse)
+            elif col == "Price":
+                def sort_key(item):
+                    val = item[0].replace(',', '').replace(' CR', '')
+                    try:
+                        return float(val)
+                    except ValueError:
+                        return float('-inf') if reverse else float('inf')
+                data.sort(key=sort_key, reverse=reverse)
+            else:
+                data.sort(key=lambda item: item[0].lower(), reverse=reverse)
+
+            for index, (_val, child) in enumerate(data):
+                tree.move(child, '', index)
+
+            sort_reverse[col] = not reverse
+            arrow = " ▼" if reverse else " ▲"
+            for c in columns:
+                tree.heading(c, text=column_labels[c] + (arrow if c == col else ""),
+                            command=lambda c=c: sort_by_column(c))
+
+        for col in columns:
+            tree.heading(col, text=column_labels[col], command=lambda c=col: sort_by_column(c))
+        tree.column("System", width=200, minwidth=40, anchor="w", stretch=False)
+        tree.column("Dist", width=80, minwidth=40, anchor="center", stretch=False)
+        tree.column("Mineral", width=130, minwidth=40, anchor="w", stretch=False)
+        tree.column("Price", width=110, minwidth=40, anchor="w", stretch=False)
+        tree.column("Station", width=260, minwidth=40, anchor="w", stretch=False)
+        tree.column("Type", width=110, minwidth=40, anchor="w", stretch=False)
+        tree.column("LS", width=70, minwidth=40, anchor="center", stretch=False)
+        tree.column("PowerPlay", width=200, minwidth=40, anchor="w", stretch=False)
+        tree.column("Updated", width=90, minwidth=40, anchor="center", stretch=False)
+
+        try:
+            from config import load_reverse_search_column_widths
+            saved_widths = load_reverse_search_column_widths()
+            for col_name, width in saved_widths.items():
+                try:
+                    if width > 0:
+                        current_minwidth = tree.column(col_name, "minwidth")
+                        tree.column(col_name, width=max(width, current_minwidth))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        def save_reverse_search_widths(event=None):
+            try:
+                from config import save_reverse_search_column_widths
+                widths = {col: tree.column(col, "width") for col in columns}
+                save_reverse_search_column_widths(widths)
+            except Exception:
+                pass
+        tree.bind("<ButtonRelease-1>", save_reverse_search_widths, add='+')
+
+        system_by_row = {}
+        for r in results:
+            best = r['best']
+            if best and r['mineral']:
+                price = f"{best.get('sellPrice', 0):,} CR"
+                station_system = best.get('systemName', '')
+                if pp_mode:
+                    # Always target_system in PP mode - showing it again on every row
+                    # would just repeat the System column for no reason.
+                    station = best.get('stationName', '') or "-"
+                else:
+                    # search_buyers' radius means the station can be a different system
+                    # than the one in the System column - show which one it actually is.
+                    station = f"{best.get('stationName', '')} ({station_system})" if station_system else (best.get('stationName', '') or "-")
+                station_type = self._format_station_type(best.get('stationType'))
+                station_ls = best.get('distanceToArrival')
+                ls = f"{int(station_ls):,}" if station_ls is not None else "-"
+                updated = self._format_data_age(best.get('updatedAt', ''))
+
+                pp_entry = pp_data.get(station_system, {})
+                pp_power = pp_entry.get('controlling_power', '')
+                pp_state = pp_entry.get('power_state', '')
+                if pp_power == '~none~':
+                    powerplay = pp_state or t('common.no_data')
+                elif pp_power and pp_state:
+                    powerplay = f"{pp_power} / {pp_state}"
+                elif pp_power:
+                    powerplay = pp_power
+                elif pp_state:
+                    powerplay = pp_state
+                else:
+                    powerplay = t('common.no_data')
+            else:
+                price = t('ring_finder.no_data')
+                station = "-"
+                station_type = "-"
+                ls = "-"
+                updated = "-"
+                powerplay = "-"
+            mineral_display = self._format_material_for_display(r['mineral']) if r['mineral'] else "-"
+            row_id = tree.insert("", "end", values=(
+                r['system'], f"{r['distance']:.1f}", mineral_display, price, station,
+                station_type, ls, powerplay, updated))
+            system_by_row[row_id] = r['system']
+
+        v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        tree.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        tree_frame.grid_columnconfigure(0, weight=1)
+        tree_frame.grid_rowconfigure(0, weight=1)
+        dialog._results_tree = tree
+        dialog._results_tree_frame = tree_frame
+
+        def copy_system_for_row(row_id):
+            system = system_by_row.get(row_id)
+            if system:
+                self.parent.clipboard_clear()
+                self.parent.clipboard_append(system)
+                self.parent.update_idletasks()
+                self.status_var.set(f"Copied '{system}' to clipboard")
+
+        def open_in_browser(url_template, system):
+            import urllib.parse
+            import webbrowser
+            webbrowser.open(url_template.format(urllib.parse.quote(system)))
+
+        row_menu = tk.Menu(dialog, tearoff=0,
+                           bg=MENU_COLORS["bg"] if current_theme != "elite_orange" else "#1e1e1e",
+                           fg=MENU_COLORS["fg"] if current_theme != "elite_orange" else "#ff8c00",
+                           activebackground=MENU_COLORS["activebackground"] if current_theme != "elite_orange" else "#ff6600",
+                           activeforeground=MENU_COLORS["activeforeground"] if current_theme != "elite_orange" else "#000000",
+                           font=scaled_font(9))
+        row_menu.add_command(label=t('context_menu.copy_system'),
+                             command=lambda: copy_system_for_row(tree.selection()[0]) if tree.selection() else None)
+        row_menu.add_command(label=t('context_menu.open_inara'),
+                             command=lambda: open_in_browser("https://inara.cz/elite/starsystem/?search={}", system_by_row.get(tree.selection()[0], '')) if tree.selection() else None)
+        row_menu.add_command(label=t('context_menu.open_edsm'),
+                             command=lambda: open_in_browser("https://www.edsm.net/en/system/id/0/name/{}", system_by_row.get(tree.selection()[0], '')) if tree.selection() else None)
+        row_menu.add_command(label=t('context_menu.open_spansh'),
+                             command=lambda: open_in_browser("https://spansh.co.uk/search/{}", system_by_row.get(tree.selection()[0], '')) if tree.selection() else None)
+
+        def open_inara_and_fetch_pp(row_id, system):
+            """Open Inara and fetch/store its PowerPlay data - same as the main
+            Hotspots Finder table's PowerPlay-cell click (_open_inara/_fetch_pp_from_inara)."""
+            open_in_browser("https://inara.cz/elite/starsystem/?search={}", system)
+
+            def worker():
+                from system_finder_api import SystemFinderAPI
+                result = SystemFinderAPI.fetch_and_store_powerplay_from_inara(system)
+                self.parent.after(0, lambda: apply_pp_result(row_id, system, result))
+            threading.Thread(target=worker, daemon=True).start()
+
+        def apply_pp_result(row_id, system, result):
+            if not result or not tree.exists(row_id):
+                return
+            pp_power = result.get('controlling_power', '')
+            pp_state = result.get('power_state', '')
+            if pp_power == '~none~':
+                pp_str = pp_state or t('common.no_data')
+            elif pp_power and pp_state:
+                pp_str = f"{pp_power} / {pp_state}"
+            elif pp_power:
+                pp_str = pp_power
+            elif pp_state:
+                pp_str = pp_state
+            else:
+                pp_str = t('common.no_data')
+            vals = list(tree.item(row_id, 'values'))
+            if len(vals) > 7:
+                vals[7] = pp_str
+                tree.item(row_id, values=vals)
+
+        def on_click(event):
+            row_id = tree.identify_row(event.y)
+            col = tree.identify_column(event.x)
+            if not row_id:
+                return
+            if col == "#1":  # System column
+                tree.selection_set(row_id)
+                copy_system_for_row(row_id)
+            elif col == "#8":  # PowerPlay column - open Inara and refresh PP data, same as main table
+                tree.selection_set(row_id)
+                system = system_by_row.get(row_id, '')
+                if system:
+                    open_inara_and_fetch_pp(row_id, system)
+
+        def on_right_click(event):
+            row_id = tree.identify_row(event.y)
+            if row_id and system_by_row.get(row_id):
+                tree.selection_set(row_id)
+                dialog._row_menu_open = True
+                try:
+                    row_menu.tk_popup(event.x_root, event.y_root)
+                finally:
+                    dialog._row_menu_open = False
+
+        tree.bind("<Button-1>", on_click)
+        tree.bind("<Button-3>", on_right_click)
+
+        # Don't tie the floor to the table's full natural width (every column fixed-width,
+        # no stretch) - that made the window unshrinkable. The horizontal scrollbar above
+        # keeps the table usable below that width, so only guard against the input row.
+        if had_previous_results:
+            # Re-render (e.g. PowerPlay-mode toggle) - keep whatever size the user has
+            # the window at now, don't snap back to natural/saved size.
+            dialog.update_idletasks()
+            dialog.minsize(500, dialog.winfo_reqheight())
+            dialog.geometry(f"{current_width}x{current_height}")
+        else:
+            dialog.geometry("")  # Clear any fixed size from before results were added
+            dialog.update_idletasks()
+            min_h = dialog.winfo_reqheight()
+            dialog.minsize(500, min_h)
+            try:
+                from config import load_reverse_search_window_geometry
+                saved_geom = load_reverse_search_window_geometry()
+                if saved_geom.get('width') and saved_geom.get('height'):
+                    # Floor width at 1300 - older sessions saved a narrow size back when this
+                    # branch's width could fall through to the input row's reqwidth. Height
+                    # stays natural/saved (min_h) so the window still shrinks to fit few rows.
+                    target_w = max(saved_geom['width'], 1300)
+                    target_h = max(saved_geom['height'], min_h)
+                    # Recenter on the main window - geometry("WxH") alone keeps the dialog's
+                    # current top-left, so widening it here would grow off to the right
+                    # instead of staying centered.
+                    parent_top = self.parent.winfo_toplevel()
+                    parent_top.update_idletasks()
+                    x = parent_top.winfo_x() + (parent_top.winfo_width() - target_w) // 2
+                    y = parent_top.winfo_y() + (parent_top.winfo_height() - target_h) // 2
+                    dialog.geometry(f"{target_w}x{target_h}+{x}+{y}")
+                else:
+                    # geometry("") alone doesn't widen the window to the table's full
+                    # column width (the tree's natural size doesn't propagate up through
+                    # its expanding frame) - size explicitly so all columns are visible
+                    # without the user having to drag the window wider first.
+                    tree_width = sum(tree.column(col, "width") for col in columns) + 40
+                    target_w = max(tree_width, dialog.winfo_reqwidth(), 1300)
+                    # Don't use center_window here - it recomputes size from
+                    # winfo_reqwidth/reqheight (the natural/content size), which would
+                    # silently shrink the window right back down after we just widened it.
+                    parent_top = self.parent.winfo_toplevel()
+                    parent_top.update_idletasks()
+                    x = parent_top.winfo_x() + (parent_top.winfo_width() - target_w) // 2
+                    y = parent_top.winfo_y() + (parent_top.winfo_height() - min_h) // 2
+                    dialog.geometry(f"{target_w}x{min_h}+{x}+{y}")
+            except Exception:
+                from ui.dialogs import center_window
+                center_window(dialog, self.parent.winfo_toplevel())
+
     def _has_unsaved_spansh_rows(self) -> bool:
         """Check if any row in the full result set is Spansh-only or Both (i.e. has new data to save).
 
@@ -7345,20 +9084,20 @@ class RingFinder(ColumnVisibilityMixin):
             pass
 
     def _check_journal_event_for_auto_search(self, line: str):
-        """Check journal events for FSD jumps and trigger auto-search"""
-        if not self.auto_search_var.get():
+        """Check journal events for FSD jumps and trigger auto-search / price prefetch"""
+        if not self.auto_search_var.get() and not self.prefetch_prices_var.get():
             return
-            
+
         try:
             import json
             event = json.loads(line.strip())
             event_type = event.get("event", "")
-            
+
             # Log ALL events that contain StarSystem for debugging
             if 'StarSystem' in event:
                 current_system = event.get("StarSystem")
                 print(f"[AUTO-SEARCH DEBUG] Event '{event_type}' has StarSystem: {current_system}, Last Monitored: {self.last_monitored_system}")
-            
+
             # ONLY trigger on FSDJump (jump events), NOT on Scan/SAASignalsFound!
             if event_type == "FSDJump":
                 current_system = event.get("StarSystem")
@@ -7372,10 +9111,13 @@ class RingFinder(ColumnVisibilityMixin):
                         self.systems_data[current_system.lower()] = {'x': star_pos[0], 'y': star_pos[1], 'z': star_pos[2]}
                         print(f"[AUTO-SEARCH] Cached coords from FSDJump: {star_pos}")
                     # Schedule auto-search in main thread
-                    self.parent.after(1000, lambda: self._auto_search_new_system(current_system))
+                    if self.auto_search_var.get():
+                        self.parent.after(1000, lambda: self._auto_search_new_system(current_system))
+                    if self.prefetch_prices_var.get():
+                        self.parent.after(1000, lambda: self._prefetch_prices_new_system(current_system))
                 else:
                     print(f"[AUTO-SEARCH] ✗ SAME SYSTEM: already in {current_system}")
-                    
+
         except Exception as e:
             print(f"[AUTO-SEARCH ERROR] {e}")  # Log errors instead of silent fail
 
@@ -7402,11 +9144,87 @@ class RingFinder(ColumnVisibilityMixin):
 
             # Trigger search with database only (don't query Spansh on auto-search)
             if not self._search_in_progress:
+                self._show_search_overlay(system_name)
                 self.search_hotspots(force_database=True)
                 
         except Exception as e:
             # Silent fail - let user search manually if auto-search fails
             pass
+
+    def _prefetch_prices_new_system(self, system_name: str):
+        """On jump, prefetch live sell prices for the new system's own hotspot minerals
+        (same minerals Rank Minerals would look up) so a later manual lookup is instant.
+        Debounced per system - a jump into the same system twice in a row won't re-fetch."""
+        if getattr(self, '_last_prefetched_system', None) == system_name:
+            return
+        self._last_prefetched_system = system_name
+
+        try:
+            hotspot_rows = self.user_db.get_system_hotspots(system_name)
+        except Exception:
+            hotspot_rows = []
+        if not hotspot_rows:
+            return
+
+        materials = list(dict.fromkeys(
+            self._expand_abbreviated_materials(row['material_name'])
+            for row in hotspot_rows if row.get('material_name')
+        ))
+        if not materials:
+            return
+
+        # Non-hotspot minerals (e.g. Osmium) mineable somewhere in this system, based on
+        # its known ring types - same "Also check" picker as "Rank Minerals in Entire
+        # System", offered here too since this popup is the same system-wide scope.
+        ring_types_present = {row['ring_type'] for row in hotspot_rows if row.get('ring_type')}
+        extra_candidates = sorted(dict.fromkeys(
+            mat for ring_type in ring_types_present
+            for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
+            if mat not in materials
+        ))
+
+        # Minerals the user previously ticked in "Also check" - fetch them upfront on
+        # every jump too, so they're already in the ranked table without reopening the
+        # picker each time.
+        try:
+            from config import load_also_check_minerals
+            always_check = set(load_also_check_minerals())
+        except Exception:
+            always_check = set()
+        preselected_extras = [mat for mat in extra_candidates if mat in always_check]
+        fetch_materials = materials + preselected_extras
+
+        threading.Thread(target=self._prefetch_prices_worker, args=(system_name, fetch_materials, extra_candidates), daemon=True).start()
+
+    def _prefetch_prices_worker(self, system_name: str, materials: List[str], extra_candidates: List[str] = None):
+        """Background worker: fetch and cache best sell price per mineral for a prefetched system."""
+        from marketplace_api import MarketplaceAPI
+        from concurrent.futures import ThreadPoolExecutor
+
+        results = []
+        with ThreadPoolExecutor(max_workers=min(len(materials), 4)) as pool:
+            # search_buyers (Ardent's /imports) - stations that buy this commodity FROM
+            # the player, i.e. where a miner can actually sell it.
+            # Same 7-day window as Rank Minerals/Find Best Mining System - keeping this
+            # tighter just meant a jump-triggered prefetch could cache an empty result
+            # that Rank Minerals would then reuse instead of searching again.
+            futures = {pool.submit(MarketplaceAPI.search_buyers, mat, system_name, None, 7, False): mat for mat in materials}
+            for future in futures:
+                mat = futures[future]
+                try:
+                    rows = future.result()
+                except Exception:
+                    rows = []
+                priced_rows = [r for r in rows if r.get('sellPrice', 0) > 0]
+                best = max(priced_rows, key=lambda r: r.get('sellPrice', 0)) if priced_rows else None
+                results.append((mat, best, priced_rows))
+
+        results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
+        if not hasattr(self, '_prefetched_prices'):
+            self._prefetched_prices = {}
+        self._prefetched_prices[system_name] = results
+
+        self.parent.after(0, lambda: self._show_mineral_ranking_dialog(system_name, results, modal=False, extra_candidates=extra_candidates))
 
     def _load_auto_search_state(self) -> bool:
         """Load auto-search enabled state from Variables folder"""
@@ -7434,6 +9252,59 @@ class RingFinder(ColumnVisibilityMixin):
                     main_app.auto_search_enabled.set(self.auto_search_var.get())
         except Exception as e:
             pass
+
+    def _on_auto_search_toggle(self):
+        """Auto-Search checkbox command: save state, then lock/unlock Auto Prices"""
+        self._save_auto_search_state()
+        self._apply_auto_search_lock()
+
+    def _apply_auto_search_lock(self):
+        """Auto Prices can't produce results without Auto-Search (it reads hotspot
+        data that Auto-Search writes on jump), so grey it out and untick it whenever
+        Auto-Search is off."""
+        if self.auto_search_var.get():
+            self.prefetch_prices_cb.config(state="normal")
+        else:
+            if self.prefetch_prices_var.get():
+                self.prefetch_prices_var.set(False)
+                self._save_prefetch_prices_state()
+            self.prefetch_prices_cb.config(state="disabled")
+
+    def _load_prefetch_prices_state(self) -> bool:
+        """Load prefetch-prices-on-jump enabled state from Variables folder"""
+        try:
+            prefetch_file = os.path.join(self.vars_dir, "prefetchPrices.txt")
+            if os.path.exists(prefetch_file):
+                with open(prefetch_file, 'r') as f:
+                    content = f.read().strip()
+                    return content == "1"
+        except Exception:
+            pass
+        return False  # Default to disabled
+
+    def _save_prefetch_prices_state(self):
+        """Save prefetch-prices-on-jump enabled state to Variables folder"""
+        try:
+            os.makedirs(self.vars_dir, exist_ok=True)
+            prefetch_file = os.path.join(self.vars_dir, "prefetchPrices.txt")
+            with open(prefetch_file, 'w') as f:
+                f.write("1" if self.prefetch_prices_var.get() else "0")
+        except Exception:
+            pass
+
+        if not self.prefetch_prices_var.get():
+            self._close_auto_ranking_dialog()
+
+    def _close_auto_ranking_dialog(self):
+        """Close the non-modal Auto Prices popup if one is currently open."""
+        auto_dialog = getattr(self, '_auto_ranking_dialog', None)
+        if auto_dialog is not None:
+            try:
+                if auto_dialog.winfo_exists():
+                    auto_dialog.destroy()
+            except Exception:
+                pass
+            self._auto_ranking_dialog = None
 
     def _load_auto_switch_tabs_state(self):
         """Load auto-switch tabs state from main app config"""
@@ -7464,11 +9335,15 @@ class RingFinder(ColumnVisibilityMixin):
         except Exception as e:
             print(f"[AUTO-TAB] Error syncing auto-switch tabs: {e}")
 
-    def _startup_auto_search(self, force: bool = False):
+    def _startup_auto_search(self, force: bool = False, _retries_left: int = 5):
         """Perform auto-search on startup if enabled
-        
+
         Args:
             force: If True, skip the full sync check (used when called after sync completes)
+            _retries_left: prospector_panel.last_system is populated by a background scan
+                           (main.py's _distance_refresh_locations) that can still be running
+                           when this fires - retry briefly instead of giving up on "No system
+                           detected" for what is really just a startup race.
         """
         try:
             # Check if full sync is pending - if so, wait for sync to trigger us
@@ -7478,9 +9353,16 @@ class RingFinder(ColumnVisibilityMixin):
                 if hasattr(main_app, '_needs_full_sync') and main_app._needs_full_sync():
                     print("[RING FINDER] Full sync pending - deferring auto-search")
                     return
-            
-            # Get current system from prospector panel (most reliable)
+
+            # Get current system from prospector panel (most reliable), falling back to
+            # the app's own current_system cache if that hasn't been set yet either.
             current_system = getattr(self.prospector_panel, 'last_system', None) if self.prospector_panel else None
+            if not current_system:
+                current_system = getattr(self.parent, 'current_system', None)
+
+            if not current_system and _retries_left > 0:
+                self.parent.after(300, lambda: self._startup_auto_search(force=True, _retries_left=_retries_left - 1))
+                return
 
             if current_system:
                 # Reset filters before the very first search on app start — same as clicking
@@ -7504,9 +9386,9 @@ class RingFinder(ColumnVisibilityMixin):
             else:
                 self.status_var.set("Auto-search: No system detected")
                 
-        except Exception as e:
+        except Exception:
             self.status_var.set("Auto-search: Detection failed")
-            
+
         # Clear status after 5 seconds
         self.parent.after(5000, lambda: self.status_var.set(""))
 

@@ -715,7 +715,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.4.0"
+APP_VERSION = "v5.4.1"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5630,7 +5630,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(500, self._initialize_va_variables)
         
         # Check for updates after UI is ready (automatic check once per day)
-        self.after(4000, self._check_for_updates_startup)  # Check after splash is dismissed (splash=3s)
+        self.after(4000, self._check_for_updates_startup)  # Check after splash is dismissed (splash=2s)
         
         # Full journal scan runs first (only call once!)
         # Location refresh and distance calculation happens AFTER scan completes

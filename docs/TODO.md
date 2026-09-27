@@ -38,6 +38,14 @@
   - Future: Material Finder, Route Planner, etc.
   - Reduces main tab bar clutter, groups utility features together
 
+- [ ] **Best Mineral to Mine on the text overlay** - Show the "Auto Mineral Prices" ranking
+  (ring_finder.py `_show_mineral_ranking_dialog`) on the in-game text overlay after jumping,
+  not just as a desktop popup
+  - Enable/disable via a new Settings tab toggle, separate from the existing "Auto Mineral
+    Prices" checkbox in Hotspots Finder
+  - Should NOT show while actively mining (only relevant for "what should I mine here"
+    lookup, not mid-session)
+
 ### Code Quality
 - [ ] **Auto populate cmdrs name*** In the paost to discord
 
