@@ -218,6 +218,12 @@ class UserDatabase:
             else:
                 log.info("[Migration] Zero hotspot count fix already applied")
 
+            # Clear leftover numeric density values from the reserve_level column
+            if self._get_migration_version('clear_numeric_reserve_levels') < 1:
+                log.info("[Migration] Clearing numeric reserve_level values...")
+                self._clear_numeric_reserve_levels()
+                self._set_migration_version('clear_numeric_reserve_levels', 1)
+
             self._cleanup_bundled_reference_db()
 
         except Exception as e:
@@ -1205,6 +1211,15 @@ class UserDatabase:
             import traceback
             log.error(traceback.format_exc())
     
+    def _clear_numeric_reserve_levels(self) -> None:
+        """Set reserve_level to NULL where it still holds an old numeric density value."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute("UPDATE hotspot_data SET reserve_level = NULL WHERE reserve_level GLOB '[0-9]*'")
+                log.info(f"[Migration] Cleared {cursor.rowcount} numeric reserve_level values")
+        except Exception as e:
+            log.warning(f"[Migration] Could not clear numeric reserve_level values: {e}")
+
     def _fix_zero_hotspot_count_entries(self) -> None:
         """Migration v4.8.10: Fix hotspot_count=0 entries
         
@@ -1580,6 +1595,56 @@ class UserDatabase:
         except Exception as e:
             log.error(f"Error bulk checking ring existence: {e}")
             return set()
+
+    def bulk_get_last_visit_dates(self, system_names: list) -> dict:
+        """Batch fetch last visit date (YYYY-MM-DD) per system. Unvisited systems are omitted."""
+        if not system_names:
+            return {}
+        result = {}
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                chunk_size = 500
+                for i in range(0, len(system_names), chunk_size):
+                    chunk = system_names[i:i + chunk_size]
+                    placeholders = ','.join('?' for _ in chunk)
+                    cursor.execute(
+                        f"SELECT system_name, last_visit_date FROM visited_systems WHERE system_name IN ({placeholders})",
+                        chunk
+                    )
+                    for name, last_visit in cursor.fetchall():
+                        if last_visit:
+                            result[name] = str(last_visit)[:10]
+        except Exception as e:
+            log.error(f"Error bulk fetching last visit dates: {e}")
+        return result
+
+    def bulk_get_ring_types(self, system_body_pairs: list) -> dict:
+        """Batch fetch ring types. Returns {(system_name, body_name): ring_type} keyed by the
+        pairs as passed in; rings with no stored ring type are omitted."""
+        result = {}
+        if not system_body_pairs:
+            return result
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                chunk_size = 250
+                for i in range(0, len(system_body_pairs), chunk_size):
+                    chunk = system_body_pairs[i:i + chunk_size]
+                    normalized = {(system, self._normalize_body_name(body, system)): (system, body) for system, body in chunk}
+                    placeholders = ','.join('(?,?)' for _ in normalized)
+                    cursor.execute(
+                        f"SELECT system_name, body_name, ring_type FROM hotspot_data "
+                        f"WHERE ring_type IS NOT NULL AND (system_name, body_name) IN ({placeholders})",
+                        [v for pair in normalized for v in pair]
+                    )
+                    for system, body, ring_type in cursor.fetchall():
+                        original = normalized.get((system, body))
+                        if original:
+                            result[original] = ring_type
+        except Exception as e:
+            log.error(f"Error bulk fetching ring types: {e}")
+        return result
 
     def bulk_get_visit_counts(self, system_names: list) -> dict:
         """Batch fetch visit counts for a list of system names.

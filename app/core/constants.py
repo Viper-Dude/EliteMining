@@ -98,6 +98,14 @@ def get_menu_colors(theme: str = None) -> dict:
         return MENU_COLORS_ORANGE
     return MENU_COLORS
 
+# All mineable commodities, alphabetical (Commodity Market dropdown, Bookmarks mineral filter)
+MINING_COMMODITY_ORDER = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite",
+                          "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Haematite", "Indite",
+                          "Lepidolite", "Low Temperature Diamonds", "Monazite", "Musgravite",
+                          "Osmium", "Painite", "Palladium", "Platinum", "Praseodymium",
+                          "Rhodplumsite", "Rutile", "Samarium", "Serendibite", "Silver",
+                          "Tritium", "Uraninite", "Void Opals"]
+
 # Mining Materials Database
 MINING_MATERIALS = {
     # Core materials (most common)

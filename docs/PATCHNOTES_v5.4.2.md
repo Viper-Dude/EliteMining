@@ -4,7 +4,8 @@
 
 ### Hotspots Finder
 
-**Rank Minerals by Sell Price** — Fixed Rank Minerals / Auto Prices showing the wrong mining method (e.g. Platinum as Laser) when a mineral is core-only in the ring type it's actually found in.
+***Rank Minerals by Sell Price*** — Fixed the mining method shown for some minerals (like Platinum) — it now correctly shows Core or Laser based on the actual ring type, and lists the ring type next to it.
+- Renamed the column header text from "Type"  to  "Method/Ring"
 
 
 ### Voiceattack Profile no update (v5.3.9)

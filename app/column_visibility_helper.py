@@ -8,6 +8,17 @@ from typing import Dict, Callable
 from localization import t
 
 
+def displayed_column(tree, column_id):
+    """Column name for an identify_column() result such as '#3', resolved against the
+    columns actually displayed (honours displaycolumns). None if out of range."""
+    displayed = tree['displaycolumns']
+    names = tree['columns'] if displayed in ('#all', ('#all',)) else displayed
+    try:
+        return names[int(column_id[1:]) - 1]
+    except (ValueError, IndexError):
+        return None
+
+
 class ColumnVisibilityMixin:
     """
     Mixin class to add column visibility functionality to any table.
@@ -18,7 +29,7 @@ class ColumnVisibilityMixin:
     3. Supports multiple trees in same class by using config_key as namespace
     """
     
-    def setup_column_visibility(self, tree, columns, default_widths, config_key, use_displaycolumns=False):
+    def setup_column_visibility(self, tree, columns, default_widths, config_key, use_displaycolumns=False, on_change=None):
         """
         Setup column visibility for a treeview
 
@@ -32,6 +43,8 @@ class ColumnVisibilityMixin:
                 rendering sliver that bleeds into the next visible column on Windows).
                 Callers using this must resolve identify_column() results against
                 tree['displaycolumns'], not tree['columns'].
+            on_change: Optional zero-arg callable run after the user toggles a column
+                or resets visibility (e.g. to resize the containing window).
         """
         # Store per-tree data using config_key as namespace
         if not hasattr(self, '_cv_trees'):
@@ -55,6 +68,7 @@ class ColumnVisibilityMixin:
             'excluded_from_menu': set(),  # Columns hidden from the visibility menu
             'force_hidden': set(),  # Columns force-hidden by app logic, independent of user visibility pref
             'use_displaycolumns': use_displaycolumns,
+            'on_change': on_change,
         }
         
         # Bind right-click with config_key context
@@ -90,6 +104,11 @@ class ColumnVisibilityMixin:
         if context_handler:
             context_handler(event)
     
+    @staticmethod
+    def _cv_clean_heading(text):
+        """Heading text without a trailing sort arrow (" ▲" / " ▼")."""
+        return text[:-2] if text.endswith((" ▲", " ▼")) else text
+
     def _cv_show_menu(self, event, config_key):
         """Show column visibility menu"""
         tree_data = self._cv_trees.get(config_key)
@@ -137,7 +156,7 @@ class ColumnVisibilityMixin:
         for col in columns:
             if col in excluded or col in force_hidden:
                 continue
-            display_name = tree.heading(col, "text")
+            display_name = self._cv_clean_heading(tree.heading(col, "text"))
             is_visible = visible.get(col, True)
             var = tk.BooleanVar(value=is_visible)
             self._cv_menu_vars[config_key][col] = var
@@ -149,11 +168,16 @@ class ColumnVisibilityMixin:
         menu.add_command(label=t('ring_finder.reset_to_default'), 
                         command=lambda k=config_key: self._cv_reset(k))
         
+        # Popup dialogs run a keep-on-top loop that pauses while _row_menu_open is set -
+        # without it the loop re-lifts the dialog over this menu.
+        toplevel = tree.winfo_toplevel()
+        toplevel._row_menu_open = True
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
             menu.grab_release()
-    
+            toplevel._row_menu_open = False
+
     def _cv_apply_displaycolumns(self, config_key):
         """Rebuild the tree's displaycolumns from current visibility state (use_displaycolumns mode)."""
         tree_data = self._cv_trees.get(config_key)
@@ -274,6 +298,8 @@ class ColumnVisibilityMixin:
             save_column_visibility(config_key, tree_data['visible'])
         except Exception as e:
             print(f"[DEBUG] Could not save column visibility for {config_key}: {e}")
+        if tree_data.get('on_change'):
+            tree_data['on_change']()
     
     def _cv_load_visibility(self, config_key):
         """Load column visibility preferences"""

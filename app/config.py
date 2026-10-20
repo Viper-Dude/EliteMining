@@ -341,6 +341,17 @@ def save_reverse_search_window_geometry(geom: Dict[str, Any]) -> None:
     cfg["reverse_search_window"] = geom
     _save_cfg(cfg)
 
+def load_acquisition_search_window_width() -> int:
+    """Load Find Acquisition Targets popup window width from config (0 = not saved)"""
+    cfg = _load_cfg()
+    return int(cfg.get("acquisition_search_window_width", 0) or 0)
+
+def save_acquisition_search_window_width(width: int) -> None:
+    """Save Find Acquisition Targets popup window width to config"""
+    cfg = _load_cfg()
+    cfg["acquisition_search_window_width"] = int(width)
+    _save_cfg(cfg)
+
 def load_column_visibility(table_key: str) -> Dict[str, bool]:
     """Load column visibility for any table"""
     cfg = _load_cfg()

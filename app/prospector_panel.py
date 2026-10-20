@@ -401,7 +401,7 @@ CORE_ONLY = [
 ]
 
 # -------------------- Mining Analytics Panel --------------------
-from column_visibility_helper import ColumnVisibilityMixin
+from column_visibility_helper import ColumnVisibilityMixin, displayed_column
 
 
 class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
@@ -3491,6 +3491,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             session_lookup.clear()
             session_lookup.update(new_session_lookup)
         
+        from ui.sort_indicator import apply_sort_arrow
+        _sort_col_rows = sort_col
+        def sort_col(col):
+            _sort_col_rows(col)
+            apply_sort_arrow(tree, col, not sort_dirs.get(col, False))
+
         # Set commands for all popup window columns
         tree.heading("date", command=lambda: sort_col("date"))
         tree.heading("system", command=lambda: sort_col("system"))
@@ -3509,6 +3515,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Store tree reference after everything is set up
         self.reports_tree = tree
+
+        from ui.cell_tooltip import attach_cell_tooltip
+        attach_cell_tooltip(tree, "comment", lambda item: self.reports_window_session_lookup.get(item, {}).get('comment', ''))
         
         # Apply initial word wrap state
         if word_wrap_enabled.get():
@@ -7672,7 +7681,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_reports.grid_rowconfigure(0, weight=1)
 
         # Create sortable treeview with Material Analysis columns (Ship column added - parsed from journal files)
-        self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced", "_spacer"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
+        self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "ring_type", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced", "_spacer"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
         self.reports_tree_tab.grid(row=0, column=0, sticky="nsew")
         
         # Configure row tags for alternating colors (theme-aware)
@@ -7686,6 +7695,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.reports_tree_tab.heading("ship", text=t('reports.ship'), anchor="w")
         self.reports_tree_tab.heading("system", text=t('reports.system'), anchor="w")
         self.reports_tree_tab.heading("body", text=t('reports.planet_ring'), anchor="w")
+        self.reports_tree_tab.heading("ring_type", text=t('reports.ring_type'), anchor="w")
         self.reports_tree_tab.heading("tons", text=t('reports.total_tons'), anchor="w")
         self.reports_tree_tab.heading("tph", text=t('reports.tph'), anchor="w")
         self.reports_tree_tab.heading("tons_per", text=t('reports.tons_per_asteroid'), anchor="w")
@@ -7790,11 +7800,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 self.reports_tab_session_lookup.clear()
                 self.reports_tab_session_lookup.update(new_tab_lookup)
         
+        from ui.sort_indicator import apply_sort_arrow
+        _sort_tab_col_rows = sort_tab_col
+        def sort_tab_col(col):
+            _sort_tab_col_rows(col)
+            apply_sort_arrow(self.reports_tree_tab, col, not tab_sort_dirs.get(col, False))
+
         # Set commands for all tab treeview columns
         self.reports_tree_tab.heading("date", command=lambda: sort_tab_col("date"))
         self.reports_tree_tab.heading("duration", command=lambda: sort_tab_col("duration"))
         self.reports_tree_tab.heading("system", command=lambda: sort_tab_col("system"))
         self.reports_tree_tab.heading("body", command=lambda: sort_tab_col("body"))
+        self.reports_tree_tab.heading("ring_type", command=lambda: sort_tab_col("ring_type"))
         self.reports_tree_tab.heading("tons", command=lambda: sort_tab_col("tons"))
         self.reports_tree_tab.heading("tph", command=lambda: sort_tab_col("tph"))
         self.reports_tree_tab.heading("tons_per", command=lambda: sort_tab_col("tons_per"))
@@ -7817,7 +7834,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         import tkinter.font as _tkfont
         _reports_heading_font = _tkfont.Font(font=scaled_font(9, "bold"))
         _reports_base_widths = {"date": 161, "duration": 80, "session_type": 90, "ship": 250,
-                        "system": 230, "body": 125, "tons": 95, "tph": 60, "tons_per": 110,
+                        "system": 230, "body": 125, "ring_type": 100, "tons": 95, "tph": 60, "tons_per": 110,
                         "materials": 90, "total_hits": 90, "core_hits": 85, "asteroids": 95,
                         "hit_rate": 100, "quality": 140, "cargo": 350, "prospects": 80,
                         "eng_materials": 250, "comment": 90, "enhanced": 115}
@@ -7831,7 +7848,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         _reports_minwidths = {col: _reports_min_for(col) for col in _reports_base_widths}
 
         _reports_anchors = {"date": "w", "duration": "w", "session_type": "w", "ship": "w",
-                        "system": "w", "body": "w", "tons": "center", "tph": "center",
+                        "system": "w", "body": "w", "ring_type": "w", "tons": "center", "tph": "center",
                         "tons_per": "center", "materials": "center", "total_hits": "center",
                         "core_hits": "center", "asteroids": "center", "hit_rate": "center",
                         "quality": "center", "cargo": "w", "prospects": "center",
@@ -7848,9 +7865,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Setup column visibility for reports tab
         self.setup_column_visibility(
             tree=self.reports_tree_tab,
-            columns=("date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"),
+            columns=("date", "duration", "session_type", "ship", "system", "body", "ring_type", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"),
             default_widths={col: max(scaled_px(w), _reports_minwidths[col]) for col, w in _reports_base_widths.items()},
-            config_key='reports_tab'
+            config_key='reports_tab',
+            use_displaycolumns=True
         )
 
         # Load saved column widths from config — but never let an old (pre-scale)
@@ -7876,7 +7894,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 print("[DEBUG] ButtonRelease-1 triggered on Reports Tab, attempting to save column widths...")
                 from config import save_mining_analysis_column_widths
                 widths = {}
-                for col in ["date", "duration", "session_type", "ship", "system", "body", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"]:
+                for col in ["date", "duration", "session_type", "ship", "system", "body", "ring_type", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"]:
                     try:
                         widths[col] = self.reports_tree_tab.column(col, "width")
                     except:
@@ -8021,7 +8039,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 materials = ""
                 avg_yield = ""
                 last_mined = ""
-                
+                mineral_tph = {}
+
                 if hasattr(self, 'reports_tab_session_lookup') and item in self.reports_tab_session_lookup:
                     session_data = self.reports_tab_session_lookup[item]
                     
@@ -8056,6 +8075,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         if material_names:
                             materials = ', '.join(material_names)
                     
+                    # Per-mineral T/hr ("Platinum: 12.5, Painite: 6.4")
+                    for pair in session_data.get('material_tph_breakdown', '').split(','):
+                        if ':' in pair:
+                            mat, _, val = pair.partition(':')
+                            try:
+                                mineral_tph[mat.strip()] = float(val)
+                            except ValueError:
+                                pass
+
                     # Extract yield information (tons per hour)
                     tph = session_data.get('overall_tph', session_data.get('tph', 0))
                     if tph and tph != '—':
@@ -8090,13 +8118,21 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                 except:
                                     pass
                 
+                ring_type = ''
+                try:
+                    from ring_finder import translate_ring_type
+                    ring_type = translate_ring_type(self.main_app.cargo_monitor.user_db.get_ring_type(system, body) or '')
+                except Exception:
+                    pass
+
                 # Show bookmark dialog with pre-filled data
                 self._show_bookmark_dialog({
                     'system': system,
                     'body': body,
-                    'hotspot': '',
+                    'hotspot': ring_type,
                     'materials': materials,
                     'avg_yield': avg_yield,
+                    'mineral_tph': mineral_tph,
                     'last_mined': last_mined,
                     'notes': ''
                 })
@@ -8144,21 +8180,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if not item:
                 return
             
-            # Dynamic mapping for comment and enhanced columns
-            try:
-                cols = list(self.reports_tree_tab["columns"])
-                comment_idx = cols.index('comment') if 'comment' in cols else None
-                enhanced_idx = cols.index('enhanced') if 'enhanced' in cols else None
-            except Exception:
-                comment_idx = None
-                enhanced_idx = None
+            clicked_column = displayed_column(self.reports_tree_tab, column)
 
-            if comment_idx is not None and column == f"#{comment_idx+1}":
+            if clicked_column == 'comment':
                 self._edit_comment_popup_reports(event)
                 return
-            if enhanced_idx is not None and column == f"#{enhanced_idx+1}":
+            if clicked_column == 'enhanced':
                 # Handle detailed report opening on double-click
-                column_name = cols[enhanced_idx]
+                column_name = clicked_column
                 cell_value = self.reports_tree_tab.set(item, column_name)
                 print(f"[DEBUG] Enhanced column double-clicked, cell value: {cell_value}")
                 if cell_value == "📊":  # Has detailed report
@@ -8207,6 +8236,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 self._show_header_tooltip(event, self.reports_tree_tab)
         
         self.reports_tree_tab.bind("<Enter>", show_heading_tooltip)
+
+        from ui.cell_tooltip import attach_cell_tooltip
+        attach_cell_tooltip(self.reports_tree_tab, "comment", lambda item: self.reports_tab_session_lookup.get(item, {}).get('comment', ''))
         
         # Hide tooltip when mouse leaves the tree
         def hide_tooltip(event):
@@ -8602,32 +8634,32 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             if region == "heading" and column:
                 column_tooltips = {
-                    "#1": t('tooltips.reports_datetime'),
-                    "#2": t('tooltips.reports_duration'),
-                    "#3": t('tooltips.reports_type'),
-                    "#4": t('tooltips.reports_ship'),
-                    "#5": t('tooltips.reports_system'),
-                    "#6": t('tooltips.reports_body'),
-                    "#7": t('tooltips.reports_tons'),
-                    "#8": t('tooltips.reports_tph'),
-                    "#9": t('tooltips.reports_tpa'),
-                    "#10": t('tooltips.reports_asteroids'),
-                    "#11": t('tooltips.reports_minerals'),
-                    "#12": t('tooltips.reports_hits'),
-                    "#13": t('tooltips.reports_hitrate'),
-                    "#14": t('tooltips.reports_yield'),
-                    "#15": t('tooltips.reports_minerals_detail'),
-                    "#16": t('tooltips.reports_limpets'),
-                    "#17": t('tooltips.reports_engineering'),
-                    "#18": t('tooltips.reports_notes'),
-                    "#19": t('tooltips.reports_report')
+                    "date": t('tooltips.reports_datetime'),
+                    "duration": t('tooltips.reports_duration'),
+                    "session_type": t('tooltips.reports_type'),
+                    "ship": t('tooltips.reports_ship'),
+                    "system": t('tooltips.reports_system'),
+                    "body": t('tooltips.reports_body'),
+                    "tons": t('tooltips.reports_tons'),
+                    "tph": t('tooltips.reports_tph'),
+                    "tons_per": t('tooltips.reports_tpa'),
+                    "asteroids": t('tooltips.reports_asteroids'),
+                    "materials": t('tooltips.reports_minerals'),
+                    "total_hits": t('tooltips.reports_hits'),
+                    "hit_rate": t('tooltips.reports_hitrate'),
+                    "quality": t('tooltips.reports_yield'),
+                    "cargo": t('tooltips.reports_minerals_detail'),
+                    "prospects": t('tooltips.reports_limpets'),
+                    "eng_materials": t('tooltips.reports_engineering'),
+                    "comment": t('tooltips.reports_notes'),
+                    "enhanced": t('tooltips.reports_report')
                 }
-                
-                tooltip_text = column_tooltips.get(column)
+
+                tooltip_text = column_tooltips.get(displayed_column(tree, column))
                 if tooltip_text:
                     x = event.x_root + 10
                     y = event.y_root + 10
-                    
+
                     self._reports_tooltip_window = tk.Toplevel(tree)
                     self._reports_tooltip_window.wm_overrideredirect(True)
                     self._reports_tooltip_window.wm_geometry(f"+{x}+{y}")
@@ -9214,6 +9246,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             'avg_quality_percent': quality_detailed,  # Also store as avg_quality_percent for compatibility
                             'cargo': materials_breakdown,
                             'cargo_raw': materials_breakdown_raw,  # Store original for tooltip
+                            'material_tph_breakdown': material_tph_breakdown,
                             'prospects': prospectors_used,
                             'engineering_materials': engineering_materials,  # Add engineering materials field
                             'comment': comment_from_csv,
@@ -9402,6 +9435,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Populate treeview and store session data for tooltips
             self.reports_tab_session_lookup = {}  # Store for tooltip access  
             self.reports_tab_original_sessions = sessions_data.copy()  # Store backup for sorting
+            from ring_finder import translate_ring_type
+            ring_types = {}
+            try:
+                ring_types = self.main_app.cargo_monitor.user_db.bulk_get_ring_types(
+                    list({(sess.get('system', ''), sess.get('body', '')) for sess in sessions_data}))
+            except Exception:
+                pass
             for i, session in enumerate(sessions_data):
                 # Apply alternating row tags
                 tag = "evenrow" if i % 2 == 0 else "oddrow"
@@ -9622,6 +9662,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         vals.append(session.get('system', ''))
                     elif col == 'body':
                         vals.append(session.get('body', ''))
+                    elif col == 'ring_type':
+                        vals.append(translate_ring_type(ring_types.get((session.get('system', ''), session.get('body', '')), '')))
                     elif col == 'tons':
                         vals.append(session.get('tons', ''))
                     elif col == 'tph':
@@ -12440,21 +12482,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
     def _save_bookmarks(self) -> None:
         """Save bookmarks to JSON file"""
         try:
-            # Log to file for debugging installer issues
-            log_file = os.path.join(os.path.dirname(self.bookmarks_file), "bookmarks_debug.log")
-            with open(log_file, 'a', encoding='utf-8') as log:
-                log.write(f"\n=== SAVE at {dt.datetime.now()} ===\n")
-                log.write(f"Saving to: {self.bookmarks_file}\n")
-                log.write(f"File exists before save: {os.path.exists(self.bookmarks_file)}\n")
-            
             with open(self.bookmarks_file, 'w', encoding='utf-8') as f:
                 json.dump(self.bookmarks_data, f, indent=2, ensure_ascii=False)
-            
-            # Verify and log
-            with open(log_file, 'a', encoding='utf-8') as log:
-                log.write(f"Saved {len(self.bookmarks_data)} bookmarks\n")
-                for i, bm in enumerate(self.bookmarks_data):
-                    log.write(f"  [{i}] system={bm.get('system')}, last_mined={bm.get('last_mined')}\n")
         except Exception as e:
             print(f"Error saving bookmarks: {e}")
             import traceback
@@ -12495,6 +12524,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             ("medium_yield", t('bookmarks.medium_yield')),
             ("low_yield", t('bookmarks.low_yield')),
             ("recent", t('bookmarks.recent')),
+            ("visited_recent", t('bookmarks.visited_recent')),
             ("hotspot_locations", t('bookmarks.hotspot_locations')),
             ("no_overlap", t('bookmarks.no_overlap')),
             ("overlap_2x", t('bookmarks.overlap_2x')),
@@ -12511,6 +12541,27 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         filter_combo.bind("<<ComboboxSelected>>", self._on_bookmark_filter_changed)
         filter_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
         
+        # Mineral filter
+        from core.constants import MINING_COMMODITY_ORDER
+        ttk.Label(filter_frame, text=t('bookmarks.mineral')).pack(side="left", padx=(10, 5))
+        self.bookmark_mineral_var = tk.StringVar(value=t('bookmarks.all_minerals'))
+        mineral_combo = ttk.Combobox(filter_frame, textvariable=self.bookmark_mineral_var,
+                                     values=[t('bookmarks.all_minerals')] + MINING_COMMODITY_ORDER,
+                                     state="readonly", width=22)
+        mineral_combo.pack(side="left", padx=(0, 10))
+        mineral_combo.bind("<<ComboboxSelected>>", self._on_bookmark_filter_changed)
+        mineral_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
+
+        # Ring type filter
+        ttk.Label(filter_frame, text=t('bookmarks.type')).pack(side="left", padx=(10, 5))
+        self.bookmark_ring_type_var = tk.StringVar(value=t('bookmarks.all_types'))
+        ring_type_combo = ttk.Combobox(filter_frame, textvariable=self.bookmark_ring_type_var,
+                                       values=[t('bookmarks.all_types'), "Metallic", "Icy", "Rocky", "Metal Rich"],
+                                       state="readonly", width=12)
+        ring_type_combo.pack(side="left", padx=(0, 10))
+        ring_type_combo.bind("<<ComboboxSelected>>", self._on_bookmark_filter_changed)
+        ring_type_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
+
         # Search box
         ttk.Label(filter_frame, text=t('bookmarks.search')).pack(side="left", padx=(10, 5))
         self.bookmark_search_var = tk.StringVar()
@@ -12578,7 +12629,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_bookmarks.grid_rowconfigure(0, weight=1)
 
         # Create bookmarks treeview with multiple selection enabled
-        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
+        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
         self.bookmarks_tree.grid(row=0, column=0, sticky="nsew")
         
         # Configure row tags for alternating colors (theme-aware)
@@ -12592,10 +12643,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.bookmarks_tree.focus_set()
         
         # Configure column headings
+        self.bookmarks_tree.heading("last_visited", text=t('bookmarks.last_visited'), anchor="w")
         self.bookmarks_tree.heading("last_mined", text=t('bookmarks.last_mined'), anchor="w")
         self.bookmarks_tree.heading("system", text=t('bookmarks.system'), anchor="w")
         self.bookmarks_tree.heading("body", text=t('bookmarks.location'), anchor="w")
+        self.bookmarks_tree.heading("distance", text=t('bookmarks.distance'), anchor="w")
+        self.bookmarks_tree.heading("sol_dist", text=t('bookmarks.sol_distance'), anchor="w")
         self.bookmarks_tree.heading("hotspot", text=t('bookmarks.type'), anchor="w")
+        self.bookmarks_tree.heading("reserve", text=t('bookmarks.reserve'), anchor="w")
+        self.bookmarks_tree.heading("visits", text=t('bookmarks.visits'), anchor="center")
         self.bookmarks_tree.heading("materials", text=t('bookmarks.minerals_found'), anchor="w")
         self.bookmarks_tree.heading("avg_yield", text=t('bookmarks.avg_yield'), anchor="w")
         self.bookmarks_tree.heading("overlap", text=t('bookmarks.overlap'), anchor="w")
@@ -12658,8 +12714,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # squeezed below what their own label needs, at any UI scale or language.
         import tkinter.font as _tkfont
         _bm_heading_font = _tkfont.Font(font=scaled_font(9, "bold"))
-        _bm_base_widths = {"last_mined": 100, "system": 180, "body": 120, "hotspot": 100,
-                        "materials": 200, "avg_yield": 80, "overlap": 80, "res_site": 80,
+        _bm_base_widths = {"last_visited": 100, "last_mined": 100, "system": 180, "body": 120, "distance": 90, "sol_dist": 90,
+                        "hotspot": 100, "reserve": 80,
+                        "materials": 200, "avg_yield": 80, "overlap": 80, "res_site": 80, "visits": 60,
                         "rating": 70, "notes": 60}
         _bm_header_pad = scaled_px(24)  # header cell padding + sort-arrow space
 
@@ -12670,9 +12727,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         _bm_minwidths = {col: _bm_min_for(col) for col in _bm_base_widths}
 
-        _bm_anchors = {"last_mined": "center", "system": "w", "body": "w", "hotspot": "w",
+        _bm_anchors = {"last_visited": "center", "last_mined": "center", "system": "w", "body": "w",
+                        "distance": "center", "sol_dist": "center", "hotspot": "w", "reserve": "w",
                         "materials": "w", "avg_yield": "center", "overlap": "w", "res_site": "w",
-                        "rating": "center", "notes": "center"}
+                        "visits": "center", "rating": "center", "notes": "center"}
 
         for col_name, base_width in _bm_base_widths.items():
             self.bookmarks_tree.column(col_name, width=max(scaled_px(base_width), _bm_minwidths[col_name]),
@@ -12682,7 +12740,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Setup column visibility for bookmarks
         self.setup_column_visibility(
             tree=self.bookmarks_tree,
-            columns=("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"),
+            columns=("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"),
             default_widths={col: max(scaled_px(w), _bm_minwidths[col]) for col, w in _bm_base_widths.items()},
             config_key='bookmarks'
         )
@@ -12707,7 +12765,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             try:
                 from config import save_bookmarks_column_widths
                 widths = {}
-                for col in ["last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"]:
+                for col in ["last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"]:
                     try:
                         widths[col] = self.bookmarks_tree.column(col, "width")
                     except:
@@ -12741,8 +12799,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 reverse = sort_dirs.get(col, False)
                 items = [(self.bookmarks_tree.set(item, col), item) for item in self.bookmarks_tree.get_children('')]
                 
-                # Date sorting for last_mined
-                if col == "last_mined":
+                # Date sorting for last_mined / last_visited
+                if col in ("last_mined", "last_visited"):
                     def safe_date(x):
                         try:
                             return dt.datetime.strptime(str(x), '%Y-%m-%d') if x else dt.datetime.min
@@ -12750,10 +12808,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             return dt.datetime.min
                     items.sort(key=lambda x: safe_date(x[0]), reverse=reverse)
                 # Numeric sorting for avg_yield
-                elif col == "avg_yield":
+                elif col in ("avg_yield", "distance", "sol_dist", "visits"):
                     def safe_float(x):
                         try:
-                            val = str(x).replace(" T/hr", "").strip()
+                            val = str(x).replace(" T/hr", "").replace(" LY", "").replace(",", "").strip()
                             return float(val) if val else 0.0
                         except:
                             return 0.0
@@ -12766,11 +12824,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     self.bookmarks_tree.move(item, '', index)
                 sort_dirs[col] = not reverse
                 self._bookmark_sort_col = col
+                from ui.sort_indicator import apply_sort_arrow
+                apply_sort_arrow(self.bookmarks_tree, col, reverse)
             except Exception as e:
                 print(f"Bookmark sorting error for column {col}: {e}")
 
         # Bind column headers to sorting
-        for col in ("last_mined", "system", "body", "hotspot", "materials", "avg_yield", "overlap", "res_site", "rating", "notes"):
+        for col in ("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"):
             self.bookmarks_tree.heading(col, command=lambda c=col: sort_bookmark_col(c))
 
         # Buttons frame
@@ -12812,11 +12872,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Single-click handler for Notes column
         self.bookmarks_tree.bind("<Button-1>", self._on_bookmark_single_click)
+
+        # Hover tooltip showing the note text
+        from ui.cell_tooltip import attach_cell_tooltip
+        attach_cell_tooltip(self.bookmarks_tree, "notes", self._bookmark_note_text)
         
         # Right-click context menu
         self._setup_bookmark_context_menu()
         
         # Load and display bookmarks
+        self._sync_bookmark_last_mined()
         self._refresh_bookmarks()
 
     def _on_bookmark_filter_changed(self, event=None) -> None:
@@ -12847,6 +12912,38 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         }
         return abbreviations.get(material_name, material_name[:4] if len(material_name) > 4 else material_name)
 
+    def _sync_bookmark_last_mined(self) -> None:
+        """Advance each bookmark's Last Mined to its newest mining report date."""
+        try:
+            systems = list({b.get('system', '') for b in self.bookmarks_data if b.get('system')})
+            lookup = self.get_last_mined_lookup(systems)
+            if not lookup:
+                return
+            latest = {}
+            for (system, body), (_display, ts_raw) in lookup.items():
+                try:
+                    if ts_raw.endswith('Z'):
+                        ts = dt.datetime.fromisoformat(ts_raw.replace('Z', '+00:00')).astimezone()
+                    else:
+                        ts = dt.datetime.fromisoformat(ts_raw)
+                except ValueError:
+                    continue
+                latest[(system.lower(), ' '.join(body.lower().split()))] = ts.strftime('%Y-%m-%d')
+            changed = False
+            for bookmark in self.bookmarks_data:
+                system = bookmark.get('system', '')
+                body = ' '.join(bookmark.get('body', '').lower().split())
+                if body.startswith(system.lower()):
+                    body = body[len(system):].strip()
+                report_date = latest.get((system.lower(), body)) or latest.get((system.lower(), f"{system.lower()} {body}"))
+                if report_date and report_date > bookmark.get('last_mined', ''):
+                    bookmark['last_mined'] = report_date
+                    changed = True
+            if changed:
+                self._save_bookmarks()
+        except Exception as e:
+            print(f"Bookmark last-mined sync failed: {e}")
+
     def _refresh_bookmarks(self) -> None:
         """Refresh the bookmarks display with current filter/search"""
         # Clear existing items
@@ -12858,7 +12955,43 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Convert display value to internal key for filter logic
         filter_value = self._bookmark_filter_display_to_key.get(filter_display, "all_locations") if hasattr(self, '_bookmark_filter_display_to_key') else "all_locations"
         search_text = self.bookmark_search_var.get().lower() if hasattr(self, 'bookmark_search_var') else ""
-        
+        mineral_sel = self.bookmark_mineral_var.get() if hasattr(self, 'bookmark_mineral_var') else ""
+        mineral_filter = "" if mineral_sel == t('bookmarks.all_minerals') else mineral_sel
+
+        yield_header = t('bookmarks.avg_yield_mineral').format(mineral=mineral_filter) if mineral_filter else t('bookmarks.avg_yield_best')
+        self.bookmarks_tree.heading("avg_yield", text=yield_header)
+        import tkinter.font as _tkfont
+        yield_header_width = _tkfont.Font(font=scaled_font(9, "bold")).measure(yield_header) + scaled_px(24)
+        self.bookmarks_tree.column("avg_yield", minwidth=yield_header_width,
+                                   width=max(self.bookmarks_tree.column("avg_yield", "width"), yield_header_width))
+
+        ring_type_sel = self.bookmark_ring_type_var.get() if hasattr(self, 'bookmark_ring_type_var') else ""
+        ring_type_filter = "" if ring_type_sel == t('bookmarks.all_types') else ring_type_sel
+
+        from ring_finder import translate_reserve_level
+        user_db = ring_finder = None
+        last_visit_dates, visit_counts, system_coords, current_coords = {}, {}, {}, None
+        try:
+            user_db = self.main_app.cargo_monitor.user_db
+            bookmark_systems = list({b.get('system', '') for b in self.bookmarks_data if b.get('system')})
+            last_visit_dates = user_db.bulk_get_last_visit_dates(bookmark_systems)
+            visit_counts = user_db.bulk_get_visit_counts(bookmark_systems)
+            ring_finder = self.main_app.ring_finder
+            current_system = self.main_app.get_current_system()
+
+            def _coords(system_name):
+                # Same lookup chain Ring Finder uses: session cache, galaxy DB, visited systems
+                coords = ring_finder.systems_data.get(system_name.lower()) or ring_finder._get_system_coords_from_galaxy_db(system_name)
+                if not coords:
+                    visited = user_db._get_coordinates_from_visited_systems(system_name)
+                    coords = {'x': visited[0], 'y': visited[1], 'z': visited[2]} if visited else None
+                return coords
+
+            system_coords = {name: _coords(name) for name in bookmark_systems}
+            current_coords = _coords(current_system) if current_system else None
+        except Exception:
+            pass
+
         # Filter and display bookmarks
         row_index = 0
         for bookmark in self.bookmarks_data:
@@ -12899,6 +13032,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         continue
                 else:
                     continue
+            elif filter_value == "visited_recent":
+                last_visited = last_visit_dates.get(bookmark.get('system', ''), '')
+                if not last_visited:
+                    continue
+                try:
+                    if (dt.datetime.now() - dt.datetime.strptime(last_visited, '%Y-%m-%d')).days > 30:
+                        continue
+                except ValueError:
+                    continue
             elif filter_value == "hotspot_locations":
                 hotspot = bookmark.get('hotspot', '').lower()
                 if not hotspot or hotspot == '':
@@ -12916,6 +13058,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 if overlap_type != '3x':
                     continue
             
+            if ring_type_filter and bookmark.get('hotspot', '').lower() != ring_type_filter.lower():
+                continue
+
+            if mineral_filter:
+                materials_text = bookmark.get('materials', '').lower()
+                if (mineral_filter.lower() not in materials_text and
+                        self._abbreviate_material_for_bookmark(mineral_filter).lower() not in materials_text):
+                    continue
+
             # Apply search filter
             if search_text:
                 searchable_text = f"{bookmark.get('system', '')} {bookmark.get('body', '')} {bookmark.get('hotspot', '')} {bookmark.get('materials', '')} {bookmark.get('last_mined', '')} {bookmark.get('notes', '')}".lower()
@@ -12969,16 +13120,38 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             else:
                 notes_display = ''
 
+            yield_display = bookmark.get('avg_yield', '')
+            if mineral_filter:
+                for mat, tph_val in bookmark.get('mineral_tph', {}).items():
+                    if mat.lower() == mineral_filter.lower() or self._abbreviate_material_for_bookmark(mat).lower() == self._abbreviate_material_for_bookmark(mineral_filter).lower():
+                        yield_display = f"{tph_val:.1f} T/hr"
+                        break
+
+            distance_display = sol_display = ''
+            bm_coords = system_coords.get(bookmark.get('system', ''))
+            if bm_coords:
+                sol_display = f"{ring_finder._calculate_distance(bm_coords, {'x': 0, 'y': 0, 'z': 0}):.1f}"
+                if current_coords:
+                    distance_display = f"{ring_finder._calculate_distance(bm_coords, current_coords):.1f}"
+
+            reserve_display = translate_reserve_level(user_db.get_reserve_level(bookmark.get('system', ''), bookmark.get('body', ''))) if user_db else ''
+            visits_display = visit_counts.get(bookmark.get('system', ''), 0) or ''
+
             tag = "evenrow" if row_index % 2 == 0 else "oddrow"
             self.bookmarks_tree.insert("", "end", values=(
+                last_visit_dates.get(bookmark.get('system', ''), ''),
                 bookmark.get('last_mined', ''),
                 bookmark.get('system', ''),
                 bookmark.get('body', ''),
+                distance_display,
+                sol_display,
                 bookmark.get('hotspot', ''),
+                reserve_display,
                 bookmark.get('materials', ''),
-                bookmark.get('avg_yield', ''),
+                yield_display,
                 overlap_display,
                 res_display,
+                visits_display,
                 rating_display,
                 notes_display
             ), tags=(tag,))
@@ -12994,17 +13167,17 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         try:
             reverse = not self._bookmark_sort_dirs.get(active_col, False)  # apply opposite of "next" state = current state
             items = [(self.bookmarks_tree.set(item, active_col), item) for item in self.bookmarks_tree.get_children('')]
-            if active_col == 'last_mined':
+            if active_col in ('last_mined', 'last_visited'):
                 def safe_date(x):
                     try:
                         return dt.datetime.strptime(str(x), '%Y-%m-%d') if x else dt.datetime.min
                     except:
                         return dt.datetime.min
                 items.sort(key=lambda x: safe_date(x[0]), reverse=reverse)
-            elif active_col == 'avg_yield':
+            elif active_col in ('avg_yield', 'distance', 'sol_dist', 'visits'):
                 def safe_float(x):
                     try:
-                        return float(str(x).replace(' T/hr', '').strip()) if x else 0.0
+                        return float(str(x).replace(' T/hr', '').replace(' LY', '').replace(',', '').strip()) if x else 0.0
                     except:
                         return 0.0
                 items.sort(key=lambda x: safe_float(x[0]), reverse=reverse)
@@ -13013,6 +13186,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             for index, (val, item) in enumerate(items):
                 self.bookmarks_tree.move(item, '', index)
                 self.bookmarks_tree.item(item, tags=("evenrow" if index % 2 == 0 else "oddrow",))
+            from ui.sort_indicator import apply_sort_arrow
+            apply_sort_arrow(self.bookmarks_tree, active_col, reverse)
         except Exception:
             pass
 
@@ -13023,6 +13198,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if item:  # Only edit if there's an actual item under the cursor
             self._edit_bookmark_dialog()
 
+    def _bookmark_note_text(self, item) -> str:
+        values = self.bookmarks_tree.item(item, 'values')
+        for bookmark in self.bookmarks_data:
+            if bookmark.get('system') == values[2] and bookmark.get('body') == values[3]:
+                return bookmark.get('notes', '')
+        return ""
+
     def _on_bookmark_single_click(self, event) -> None:
         """Handle single-click on bookmark tree - open edit dialog if clicking on Notes column"""
         # Identify what was clicked
@@ -13030,7 +13212,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         column = self.bookmarks_tree.identify('column', event.x, event.y)
         
         # Check if clicking on Notes column and there's a valid item
-        if item and column == '#9':  # Notes column is now the 9th column (0-indexed: #9)
+        if item and column == f"#{self.bookmarks_tree['columns'].index('notes') + 1}":
             # Select the clicked item first
             self.bookmarks_tree.selection_set(item)
             self.bookmarks_tree.focus(item)
@@ -13055,7 +13237,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return
         
         # Find the bookmark in data
-        system, body = values[1], values[2]  # Updated positions after moving last_mined to first column
+        system, body = values[2], values[3]
         bookmark_index = None
         for i, bookmark in enumerate(self.bookmarks_data):
             if bookmark.get('system') == system and bookmark.get('body') == body:
@@ -13069,7 +13251,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         """Show add/edit bookmark dialog"""
         dialog = tk.Toplevel(self)
         dialog.withdraw()
-        dialog.title(t('bookmarks.add_bookmark') if bookmark_data is None else t('bookmarks.edit_bookmark'))
+        dialog.title(t('bookmarks.add_new_bookmark') if bookmark_index is None else t('bookmarks.edit_bookmark'))
 
         # Set app icon while withdrawn (avoid visual flicker)
         try:
@@ -13489,6 +13671,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 'hotspot': hotspot_var.get().strip(),
                 'materials': materials_en,
                 'avg_yield': yield_var.get().strip(),
+                'mineral_tph': bookmark_data.get('mineral_tph', {}) if bookmark_data else {},
                 'target_material': target_mat_en,
                 'overlap_type': overlap_var.get(),
                 'res_site': res_var.get(),
@@ -13524,9 +13707,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             pending_remove.clear()
             bookmark['screenshots'] = [e['filename'] for e in screenshots_state]
 
-            print(f"[BOOKMARK SAVE DEBUG] last_mined value: '{last_mined_var.get()}'")
-            print(f"[BOOKMARK SAVE DEBUG] Full bookmark: {bookmark}")
-            
             # Sync overlap/RES to database for Ring Finder integration
             try:
                 if self.main_app and hasattr(self.main_app, 'cargo_monitor') and hasattr(self.main_app.cargo_monitor, 'user_db'):
@@ -13565,16 +13745,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if bookmark_index is not None:
                 # Edit existing bookmark
                 self.bookmarks_data[bookmark_index] = bookmark
-                print(f"[BOOKMARK DEBUG] Updated bookmark at index {bookmark_index}")
-                print(f"[BOOKMARK DEBUG] Updated data: {self.bookmarks_data[bookmark_index]}")
             else:
                 # Add new bookmark
                 self.bookmarks_data.append(bookmark)
-                print(f"[BOOKMARK DEBUG] Added new bookmark")
             
             self._save_bookmarks()
             self._refresh_bookmarks()
-            print(f"[BOOKMARK DEBUG] Refresh called, total bookmarks: {len(self.bookmarks_data)}")
             dialog.destroy()
         
         def cancel():
@@ -13650,8 +13826,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         bookmarks_to_delete = []
         for item in selection:
             values = self.bookmarks_tree.item(item, 'values')
-            if values and len(values) >= 3:
-                system, body = values[1], values[2]  # Correct column indices: system=1, body=2
+            if values and len(values) >= 4:
+                system, body = values[2], values[3]
                 bookmarks_to_delete.append((system, body))
         
         # Remove bookmarks from data (iterate in reverse to avoid index issues)
@@ -13768,11 +13944,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Get selected bookmark data
         item = selection[0]
         values = self.bookmarks_tree.item(item, 'values')
-        if not values or len(values) < 2:
+        if not values or len(values) < 3:
             return
-        
-        # System name is in column index 1 (second column)
-        system_name = values[1]
+
+        system_name = values[2]
         if system_name:
             # Copy to clipboard
             self.clipboard_clear()
@@ -15635,16 +15810,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             column = tree.identify_column(event.x)
             
             if item and column:
-                columns = tree["columns"]
-                if int(column[1:]) - 1 < len(columns):
-                    column_name = columns[int(column[1:]) - 1]
-                    
-                    # Check if mouse is over enhanced column and the cell has an icon
-                    if column_name == "enhanced":
-                        cell_value = tree.set(item, column_name)
-                        if cell_value == "✓":  # Has enhanced report
-                            tree.configure(cursor="hand2")
-                            return
+                column_name = displayed_column(tree, column)
+
+                # Check if mouse is over enhanced column and the cell has an icon
+                if column_name == "enhanced":
+                    cell_value = tree.set(item, column_name)
+                    if cell_value == "✓":  # Has enhanced report
+                        tree.configure(cursor="hand2")
+                        return
             
             # Reset cursor to default (but don't interfere with comment column)
             tree.configure(cursor="")
@@ -15662,11 +15835,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 column = tree.identify_column(event.x)
                 
                 if item and column:
-                    columns = tree["columns"]
-                    column_index = int(column[1:]) - 1
-                    if column_index < len(columns):
-                        column_name = columns[column_index]
-                        
+                    column_name = displayed_column(tree, column)
+                    if column_name:
                         # Handle clicks on comment column - open comment editor
                         if column_name == "comment":
                             self._edit_comment(tree, item)

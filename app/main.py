@@ -715,7 +715,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.4.2"
+APP_VERSION = "v5.4.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1739,6 +1739,7 @@ class CargoMonitor:
             
             # Large ships
             "anaconda": "Anaconda",
+            "anacondamkii": "Anaconda Mk II",
             "belugaliner": "Beluga Liner",
             "cutter": "Imperial Cutter",
             "dolphin": "Dolphin",
@@ -5393,7 +5394,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.tool_fg: Dict[str, tk.StringVar] = {t: tk.StringVar(value="") for t in TOOL_ORDER}
         self.tool_btn: Dict[str, tk.IntVar] = {t: tk.IntVar(value=0) for t in TOOL_ORDER if VA_VARS[t]["btn"] is not None}
         self.toggle_vars: Dict[str, tk.IntVar] = {name: tk.IntVar(value=0) for name in TOGGLES}
-        self.timer_vars: Dict[str, tk.IntVar] = {name: tk.IntVar(value=0) for name in TIMERS}
+        self.timer_vars: Dict[str, tk.Variable] = {
+            name: (tk.DoubleVar(value=0.0) if name in self._DECIMAL_TIMERS else tk.IntVar(value=0))
+            for name in TIMERS}
         
         # Additional mining control variables (initialized once, not recreated in _build_timers_tab)
         self.laser_extra_repeat_var = tk.IntVar(value=1)
@@ -5825,6 +5828,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self, 'sysfinder_ref_entry'):
                     self.sysfinder_ref_entry.selection_clear()
                 
+                if self.notebook.select() == str(getattr(self, '_bookmarks_tab', '')):
+                    self.prospector_panel._sync_bookmark_last_mined()
+                    self.prospector_panel._refresh_bookmarks()
+
                 # Sync Settings tab with ring_finder state when Settings tab is selected
                 current_tab = self.notebook.index(self.notebook.select())
                 settings_tab_index = 7  # Settings is typically index 7
@@ -5882,6 +5889,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Bookmarks tab - Mining location bookmarks
         bookmarks_tab = ttk.Frame(self.notebook, padding=8)
+        self._bookmarks_tab = bookmarks_tab
         self._build_bookmarks_tab(bookmarks_tab)
         self.notebook.add(bookmarks_tab, text=t('tabs.bookmarks'))
         
@@ -10174,6 +10182,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cps_checkbox.pack(side="left", padx=(12, 0))
                 self.toggle_checkboxes[cps_name] = cps_checkbox
                 self.toggle_vars[cps_name].trace_add("write", lambda *args, n=cps_name: self._save_toggle(n))
+                self.toggle_vars[cps_name].trace_add("write", lambda *args: self._update_prospector_dependencies())
                 ToolTip(cps_checkbox, cps_display_help)
 
             tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
@@ -10194,7 +10203,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 def make_trace_cpst(tn, fn, l, h):
                     return lambda *args: self._save_timer(tn, fn, l, h)
 
-                cpst_spinbox = tk.Spinbox(cpst_frame, from_=cpst_lo, to=cpst_hi, width=5,
+                cpst_spinbox = tk.Spinbox(cpst_frame, from_=cpst_lo, to=cpst_hi, increment=0.1, width=5,
+                                           format="%.1f",
+                                           disabledbackground="#1e1e1e", disabledforeground="#666666",
                                            textvariable=self.timer_vars[cpst_timer_name],
                                            command=make_save_cpst(cpst_timer_name, _cpst_fname, cpst_lo, cpst_hi),
                                            bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
@@ -10206,16 +10217,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
                 def on_cpst_scroll(event, var=self.timer_vars[cpst_timer_name], lo_val=cpst_lo, hi_val=cpst_hi):
                     try:
-                        current = int(var.get())
+                        current = float(var.get())
                         if event.delta > 0:
-                            new_val = min(current + 1, hi_val)
+                            new_val = min(current + 0.1, hi_val)
                         else:
-                            new_val = max(current - 1, lo_val)
-                        var.set(new_val)
+                            new_val = max(current - 0.1, lo_val)
+                        var.set(round(new_val, 1))
                     except:
                         pass
                     return "break"
                 cpst_spinbox.bind("<MouseWheel>", on_cpst_scroll)
+                self.cpst_spinbox = cpst_spinbox
 
                 self.timer_vars[cpst_timer_name].trace_add("write",
                     make_trace_cpst(cpst_timer_name, _cpst_fname, cpst_lo, cpst_hi))
@@ -10224,6 +10236,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cpst_label = tk.Label(cpst_frame, text=f"{cpst_display_name} [{cpst_lo}..{cpst_hi}] {t('voiceattack.seconds')}",
                                        bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
                 cpst_label.pack(side="left")
+                self.cpst_label = cpst_label
+                self._cpst_fg = _toggle_fg
 
                 cpst_help = t(timer_help_translations.get(cpst_timer_name, cpst_timer_name))
                 ToolTip(cpst_label, cpst_help)
@@ -10240,6 +10254,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # NOTE: Don't set up trace during build - import will load values first
             prospector_spinbox = tk.Spinbox(prospector_frame, from_=1.0, to=6.0, increment=0.1, width=5,
                                              textvariable=self.prospector_delay_var, format="%.1f",
+                                             disabledbackground="#1e1e1e", disabledforeground="#666666",
                                              command=self._save_prospector_delay,
                                              bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
                                              insertbackground=_toggle_fg, selectbackground="#4a6a8a",
@@ -10265,12 +10280,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
             prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [1.0..6.0] seconds (default: 2.6s)",
                                        bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
             prospector_label.pack(side="left")
-            
+            self.prospector_cooldown_spinbox = prospector_spinbox
+            self.prospector_cooldown_label = prospector_label
+
             tk.Label(prospector_frame, text=t('voiceattack.help_prospector_delay_short'), 
                     fg=_help_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             
             # NOTE: Values loaded by _import_all_from_txt at startup
             r += 1
+            self._update_prospector_dependencies()
         
         # Prospector dependent toggles: Prospector Sound Effect, Thrust Up (depend on Prospector Sequence)
         prospector_dependent_toggles = ["Prospector Sound Effect", "Thrust Up"]
@@ -10567,6 +10585,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"Error updating FSD jump dependency: {e}")
 
+    _DECIMAL_TIMERS = {"Continuous Prospector Sequence Timer"}
+
     def _update_prospector_dependencies(self):
         """Enable/disable dependent toggles based on Prospector Sequence state"""
         try:
@@ -10586,6 +10606,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         checkbox.configure(state="disabled")
                         # NOTE: Don't uncheck/reset values - preserve user's setting
                         # They just can't be changed while Prospector Sequence is off
+
+            if hasattr(self, 'cpst_spinbox') and hasattr(self, 'prospector_cooldown_spinbox'):
+                cont_on = master_enabled and self.toggle_vars.get("Continuous Prospector Sequence") is not None \
+                    and self.toggle_vars["Continuous Prospector Sequence"].get() == 1
+                self.cpst_spinbox.configure(state="normal" if cont_on else "disabled")
+                self.cpst_label.configure(fg=self._cpst_fg if cont_on else "#666666")
+                self.prospector_cooldown_spinbox.configure(state="normal" if master_enabled else "disabled")
+                self.prospector_cooldown_label.configure(fg=self._cpst_fg if master_enabled else "#666666")
         except Exception as e:
             print(f"Error updating prospector dependencies: {e}")
 
@@ -10785,10 +10813,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             return
         try:
             delay = self.timer_vars[timer_name].get()
+            if timer_name in self._DECIMAL_TIMERS:
+                delay = round(delay, 1)
             # Clamp to valid range
             delay = max(lo, min(hi, delay))
             self.timer_vars[timer_name].set(delay)
-            
+
             # Write to file
             base = os.path.splitext(filename)[0]
             self._write_var_text(base, str(delay))
@@ -11376,7 +11406,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 raw = self._read_var_text(base)
                 if raw is not None:
                     try:
-                        val = int(raw)
+                        val = float(raw) if name in self._DECIMAL_TIMERS else int(raw)
                         if lo <= val <= hi:
                             self.timer_vars[name].set(val)
                             found.append(fname)
@@ -11557,7 +11587,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 fname, lo, hi, _help = spec
                 base = os.path.splitext(fname)[0]
                 try:
-                    raw = int(self.timer_vars[name].get())
+                    raw = self.timer_vars[name].get()
+                    raw = round(raw, 1) if name in self._DECIMAL_TIMERS else int(raw)
                 except Exception:
                     raw = lo
                 val = max(lo, min(hi, raw))
@@ -11864,7 +11895,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if k == "Boost Interval (For Core Mining Boost sequense )":
                 k = "Boost Interval (Core Mining)"
             if k in self.timer_vars:
-                self.timer_vars[k].set(int(v))
+                self.timer_vars[k].set(float(v) if k in self._DECIMAL_TIMERS else int(v))
 
         # Load laser mining extra repeat count if available
         if "LaserExtraRepeatCount" in data and hasattr(self, 'laser_extra_repeat_var'):
@@ -17521,12 +17552,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ttk.Label(filter_grid, text=t('marketplace.commodity')).grid(row=0, column=3, sticky="w", padx=(0, 8), pady=(0, 8))
 
         # Commodity list with localization
-        self._commodity_order = ["Alexandrite", "Bauxite", "Benitoite", "Bertrandite", "Bromellite", 
-                             "Cobalt", "Coltan", "Gallite", "Gold", "Grandidierite", "Haematite", "Indite",
-                             "Lepidolite", "Low Temperature Diamonds", "Monazite", "Musgravite", 
-                             "Osmium", "Painite", "Palladium", "Platinum", "Praseodymium", 
-                             "Rhodplumsite", "Rutile", "Samarium", "Serendibite", "Silver", 
-                             "Tritium", "Uraninite", "Void Opals"]
+        from core.constants import MINING_COMMODITY_ORDER
+        self._commodity_order = list(MINING_COMMODITY_ORDER)
         
         # Helper to format commodity display names (abbreviate long names)
         def format_commodity_display(name):
@@ -19167,7 +19194,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Rearrange items
             for index, (val, item) in enumerate(items):
                 self.sysfinder_tree.move(item, '', index)
-                
+
+            from ui.sort_indicator import apply_sort_arrow
+            apply_sort_arrow(self.sysfinder_tree, column, reverse)
+
         except Exception as e:
             logging.error(f"[SYSTEM_FINDER] Sort error: {e}")
 
@@ -20759,7 +20789,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Rearrange items
         for index, (val, item) in enumerate(items):
             self.trade_tree.move(item, '', index)
-    
+
+        from ui.sort_indicator import apply_sort_arrow
+        apply_sort_arrow(self.trade_tree, col, self.trade_sort_reverse)
+
     def _display_trade_results(self, results: list):
         """Display trade search results in trade table"""
         # Clear existing results
@@ -21752,15 +21785,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tag = 'oddrow' if new_idx % 2 == 0 else 'evenrow'
                 self.marketplace_tree.item(item, tags=(tag,))
             
-            # Update column headers to show sort direction
-            display_names = ["Location", "Station Type", "Pad", "Distance", "Demand", "Price", "Updated", "Powerplay"]
-            for col_name in display_names:
-                if col_name == column:
-                    arrow = " ↓" if self.marketplace_sort_reverse else " ↑"
-                    self.marketplace_tree.heading(display_to_id[col_name], text=col_name + arrow)
-                else:
-                    self.marketplace_tree.heading(display_to_id[col_name], text=col_name)
-                    
+            from ui.sort_indicator import apply_sort_arrow
+            apply_sort_arrow(self.marketplace_tree, col_id, self.marketplace_sort_reverse)
+
         except Exception as e:
             print(f"Error sorting marketplace column: {e}")
             self.marketplace_total_label.config(text=f"❌ Sort error: {str(e)}")
