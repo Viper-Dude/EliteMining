@@ -11665,7 +11665,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Type-8 Transporter", "Type-7 Transporter", "Type-6 Transporter",
             "Viper Mk III", "Viper Mk IV",
             "Vulture",
-            "Anaconda", "Adder",  # Short names last
+            "Anaconda Mk II", "Anaconda", "Adder",  # Short names last
         ]
         
         # Try to match against known ship names
@@ -12068,6 +12068,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Alliance Chieftain",
             "Alliance Crusader",
             "Anaconda",
+            "Anaconda Mk II",
             "Asp Explorer",
             "Asp Scout",
             "Beluga Liner",
@@ -12387,6 +12388,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Adder",
             "Alliance Challenger", "Alliance Chieftain", "Alliance Crusader",
             "Anaconda",
+            "Anaconda Mk II",
             "Asp Explorer", "Asp Scout",
             "Beluga Liner",
             "Caspian Explorer",
@@ -13763,6 +13765,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Adder",
             "Alliance Challenger", "Alliance Chieftain", "Alliance Crusader",
             "Anaconda",
+            "Anaconda Mk II",
             "Asp Explorer", "Asp Scout",
             "Beluga Liner",
             "Caspian Explorer",
