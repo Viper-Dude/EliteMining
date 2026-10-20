@@ -28,7 +28,7 @@ New "PowerPlay" tick box next to the Data Source options. It only applies to Loc
 Hover over a comment (Mining Reports, Ring Finder) or a note (Bookmarks) to read the full text without opening it.
 
 ### Ships
-- Added the new Anaconda Mk II.
+- Added Support for the new Anaconda Mk II.
 
 ### Sorting arrows
 Tables now show an up or down arrow on the column you sorted by. 
