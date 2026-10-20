@@ -5,10 +5,10 @@
 
 ### Hotspots Finder
 
-#### Find Acquisition Targets (new)
+**Find Acquisition Targets (new)**
 Right-click a Fortified or Stronghold mining system and choose "Find Acquisition Targets". It lists nearby Unoccupied systems with a station buying your mineral, so you know where to sell for PowerPlay Acquisition merits. Works with any mineral, including ones without hotspots like Osmium.
 
-#### PowerPlay tick box
+**PowerPlay tick box**
 New "PowerPlay" tick box next to the Data Source options. It only applies to Local searches. Off (default) gives faster searches and shows only the PowerPlay info already saved on your PC. Tick it to also look up the latest PowerPlay info online.
 
 ### Mining Bookmarks
@@ -40,5 +40,7 @@ Tables now show an up or down arrow on the column you sorted by.
 
 ### Note
 The documentation (README on GitHub) has not been updated for this version yet. It will be updated in the near future.
+
+Remember to always check all your key and joystick bindings after every profile update.
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
