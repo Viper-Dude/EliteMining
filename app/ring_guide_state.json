@@ -1,7 +1,7 @@
 {
   "Icy": true,
-  "Metallic": false,
-  "Metal-Rich": false,
+  "Metallic": true,
+  "Metal-Rich": true,
   "Rocky": false,
   "RES Sites": true
 }
