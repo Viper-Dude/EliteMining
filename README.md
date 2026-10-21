@@ -7,9 +7,9 @@
   <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/EliteMining_Main_logo.png" alt="EliteMining Logo" width="100%">
 </p>
 
-**EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 80,000+ mining locations plus Spansh API integration for galaxy-wide ring search, overlaps, and RES sites as a standalone application. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
+**EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 80,000+ mining locations plus Spansh API integration for galaxy-wide ring search, overlaps, and RES sites as a standalone application. Built-in PowerPlay merit-mining tools help you find Fortified/Stronghold systems to mine in and nearby Unoccupied systems to sell in for Acquisition merits. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
 
-💡 **Tip:** Most tables throughout the app support right-click for additional options — copying data, opening systems in Inara/EDSM/Spansh, saving to your local database, exporting results, and more context-specific actions.
+💡 **Tip:** Most tables throughout the app support right-click for additional options — copying data, opening systems in Inara/EDSM/Spansh, saving to your local database, exporting results, and more context-specific actions. Sorted columns show an up/down arrow, and hovering a comment or note shows its full text.
 
 ---
 
@@ -254,7 +254,7 @@ All FSD Jump Sequence settings above are saved as part of ship presets.
 **Prospector:**
 - **Prospector Sequence** – Master control; enables Target Prospector and Thrust Up
 - **Continuous Seq.** – Keep repeating the prospector sequence automatically
-- **Continuous Prospector Sequence Timer** (1-30s) – Pause between each cycle of the Continuous Sequence
+- **Continuous Prospector Sequence Timer** (1-30s, decimals allowed e.g. 2.5) – Pause between each cycle of the Continuous Sequence; greyed out while Continuous Seq. is off
 - **Prospector cooldown time** (1.0-6.0s, default 2.6s) – Time before you can fire the next prospector
 - **Prospector Sound Effect** – Audio notification when the cooldown ends and the next limpet is ready to fire
 - **Thrust Up** – Apply upward thrust when firing a prospector
@@ -294,6 +294,10 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 - **Pre-loaded Overlap & RES Data** – Ships with 161 known overlaps and 71 RES site locations
 - **Power/State Filter** – Filter results by controlling Power and PowerPlay state (Local Database source only). Selecting Fortified or Stronghold searches up to 500 LY via Spansh for fast, accurate territory data; other states rely on the local EDDN cache and the Max Distance setting.
 - **PowerPlay Column** – Displays the controlling power and state for each system. Fills in instantly for systems you jump into yourself, and via EDDN (live data from other commanders, stored locally while the app runs) for the rest — coverage of systems you haven't visited can take hours to days to build up. Double-click any row showing 'No data ↗' to open the system on Inara and fetch the data automatically.
+- **PowerPlay Tick Box** – Next to the Data Source options (Local searches only). Off (default) searches faster and shows only the PowerPlay info already saved on your PC. Tick it to also look up the latest PowerPlay info online from Spansh.
+- **Rank Minerals** – Right-click a ring and choose "Rank Minerals in This Ring", or "Rank Minerals in Entire System", to see the best sell prices for the hotspot minerals nearby. Use "+ add" to include minerals without hotspots (e.g. Osmium).
+- **Find Acquisition Targets** – Right-click a Fortified or Stronghold system to list nearby Unoccupied systems with a station buying your mineral, for PowerPlay Acquisition merits (search radius 20 Ly for Fortified, 30 Ly for Stronghold). Works with any mineral, including ones without hotspots like Osmium.
+- **Auto Prices** – Requires Auto-Search. After a jump to a system with known hotspots, automatically fetches live sell prices and opens the Best Mineral to Mine window without stealing focus.
 
 ### Setting & Managing Overlap/RES Data
 - **Set Overlap** – Right-click any ring to set hotspot overlaps (2x, 3x) for specific minerals
@@ -306,6 +310,15 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="900"><br>  
 *Hotspot Finder showing search results with minerals filters and distance calculations.*
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acqusition_targets.png" width="900"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acqusition_targets_results.png" width="900"><br>  
+*Find Acquisition Targets from the right-click menu and its results.*
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/rank_minerals_ring.png" width="900"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/rank_minerals_ring_add.png" width="900"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/rank_minerals_system.png" width="900"><br>  
+*Rank Minerals in a ring or in the entire system.*
 
 [Back to Top](#top)
 
@@ -526,6 +539,7 @@ Monitor your fleet carrier status at a glance — populated automatically from y
 #### Reports 
 <img src="Screenshot/mining-reports.png" width="900"><br>  
 *Detailed mining statistics and summaries.*  
+- **Ring Type** column next to Planet/Ring (blank if the ring isn't in your saved ring data)
 
 #### Detailed HTML Reports  
 *HTML reports with charts and statistics.*  
@@ -579,6 +593,14 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 #### Bookmarks  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_bookmarks.png" width="900"><br>  
 *Save, search, and manage mining spots.*  
+- **Last Visited** column (sortable) with a filter for systems visited in the last 30 days
+- **Mineral** dropdown to show only bookmarks containing a chosen mineral
+- **Type** dropdown to filter by ring type (Metallic, Icy, Rocky, Metal Rich)
+- New columns: distance from current system, distance to Sol, Reserve level and Visits
+- **Last Mined** updates automatically from your mining reports
+- Bookmarking from a mining report fills in the Ring Type
+- **T/hr** shows the session total, or the rate for the chosen Mineral (bookmarks made from a report; older bookmarks keep their old value)
+- Hover a note to read the full text
 
 #### Comprehensive Analytics  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_statistic.png" width="900"><br>  
@@ -589,7 +611,7 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 #### Ship Presets & Cargo Monitor Sidebar
 *The Ship Presets and Cargo Monitor panels are always visible on the right side of the app.*
 
-- **Ship Presets** — double-click a preset to apply it to VoiceAttack; right-click for save, edit, duplicate, rename, export/import, and delete options.
+- **Ship Presets** — double-click a preset to apply it to VoiceAttack; right-click for save, edit, duplicate, rename, export/import, and delete options. Includes the Anaconda Mk II.
 - **Cargo Monitor** — live cargo hold status, updated in real time while mining.
 - **Hide/Show Sidebar** — right-click the tab bar at the top of the app to toggle the sidebar and reclaim screen space.
 
