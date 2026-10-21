@@ -4861,6 +4861,8 @@ class RingFinder(ColumnVisibilityMixin):
             # target_system) would silently inherit stale coords from the main tab's last search.
             reference_coords = self.current_system_coords if getattr(self, '_last_search_key', '').split('_')[0] == reference_system else None
             if not reference_coords and reference_system:
+                reference_coords = self.systems_data.get(reference_system.lower())
+            if not reference_coords and reference_system:
                 # Try user database first - check visited_systems table (most reliable for current location)
                 with sqlite3.connect(self.user_db.db_path) as conn:
                     cursor = conn.cursor()

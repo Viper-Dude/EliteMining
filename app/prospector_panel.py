@@ -9923,8 +9923,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 # Update system from events that contain StarSystem data
                 if evt.get("StarSystem"):
                     self.last_system = evt.get("StarSystem")
+                    self.last_system_star_pos = evt.get("StarPos")
                     self.session_system.set(self.last_system)
-                    
+
                     # Get coordinates if available
                     coords = None
                     if "StarPos" in evt:
@@ -9962,6 +9963,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         self.app.distance_fc_system.set(carrier_system)
                     
                     # ALSO UPDATE PLAYER'S CURRENT SYSTEM since CarrierLocation indicates where the player is
+                    if carrier_system != self.last_system:
+                        self.last_system_star_pos = None
                     self.last_system = carrier_system
                     self.session_system.set(self.last_system)
                     
@@ -10104,9 +10107,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     # Update system info if available
                     if evt.get("StarSystem"):
+                        if evt.get("StarSystem") != self.last_system:
+                            self.last_system_star_pos = None
                         self.last_system = evt.get("StarSystem")
                         self.session_system.set(self.last_system)
-                    
+
                     # SupercruiseExit is already handled above (both startup and real-time)
                     
                     # For other supercruise events, clear docked context if Status.json doesn't show we're at a destination
