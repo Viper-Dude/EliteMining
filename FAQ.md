@@ -177,7 +177,11 @@ If you scan a ring and discover new hotspots but they don't appear in the Hotspo
 <details>
 <summary><b>The mining text overlay is not showing in game.</b></summary>
 
-The overlay can stop showing after a fresh install, a graphics settings change, or a driver update. Simply restart EliteMining — it will reposition the overlay correctly on startup.
+The overlay can stop showing after a fresh install, a graphics settings change, or a driver update.
+
+If the Cargo Monitor overlay disappears, fully or partly, turn it off and on again in the text overlay settings. This brings it back without restarting the app.
+
+If that doesn't help, restart EliteMining — it will reposition the overlay correctly on startup.
 </details>
 
 <details>
