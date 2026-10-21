@@ -24,6 +24,7 @@
 - [EliteMining App](#elitemining-app)
   - [Text Overlay](#text-overlay)
 - [Hotspot Finder](#hotspot-finder)
+- [PowerPlay Merit Mining](#powerplay-merit-mining)
 - [Commodity Market](#commodity-market)
 - [Mining Missions](#mining-missions)
 - [Ring Mining Reference](#ring-mining-reference)
@@ -324,6 +325,21 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 
 ---
 
+## PowerPlay Merit Mining
+
+Where you sell your mined goods matters just as much as where you mine them.
+- **Reinforcing your own Power's system or Undermining a rival's** — you must mine and sell in that same system. Selling elsewhere earns no Powerplay merits for that cargo.
+- **Acquiring an Unoccupied system** — you sell in the Unoccupied system itself, but the goods can be mined anywhere within 20 ly of it if your nearest system is Fortified, or 30 ly if it's a Stronghold.
+
+How the app helps (all in the [Hotspot Finder](#hotspot-finder)):
+1. **Power/State filter** – find Fortified or Stronghold systems to mine in.
+2. **Rank Minerals / Auto Prices** – see the best sell prices for your minerals.
+3. **Find Acquisition Targets** – right-click a Fortified or Stronghold system to list nearby Unoccupied systems buying your mineral.
+
+[Back to Top](#top)
+
+---
+
 ## Commodity Market
 
 The Commodity Market helps you find the best prices for mining commodities and trade goods using real-time market data from the Ardent API, with automatic distance calculations to help you maximize profits.
@@ -412,14 +428,6 @@ Search for nearby star systems with detailed status information. Perfect for fin
   - "Use Current" button fills reference system instantly
 
 **Note:** The Elite Dangerous journal does not report the Unoccupied Powerplay state. The app infers this state when no controlling Power is present and updates it automatically when newer EDDN data becomes available.
-
-### Powerplay Merits and Mining
-
-Where you sell your mined goods matters just as much as where you mine them.
-- **Reinforcing your own Power's system or Undermining a rival's** — you must mine and sell in that same system. Selling elsewhere earns no Powerplay merits for that cargo.
-- **Acquiring an Unoccupied system** — you sell in the Unoccupied system itself, but the goods can be mined anywhere within 20 ly of it if your nearest system is Fortified, or 30 ly if it's a Stronghold.
-
-Use the [Hotspot Finder's](#hotspot-finder) Power/State filter to locate Fortified or Stronghold systems to mine in.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/star_system.png" width="900"><br>  
 *Star Systems tab showing current system info and nearby system search with filters.*
