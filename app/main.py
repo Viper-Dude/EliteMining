@@ -640,6 +640,29 @@ class CargoTextOverlay:
         elif self.overlay_window:
             self.overlay_window.wm_attributes("-alpha", 0)
 
+    def reinstate(self):
+        """Tear down and rebuild the overlay window from scratch (recovers a lost/buried overlay)."""
+        if self.overlay_window:
+            try:
+                self.overlay_window.destroy()
+            except Exception:
+                pass
+        self.overlay_window = None
+        self._outline_items = []
+        self._game_hidden = False
+        self._sc_hidden = False
+        self._session_hidden = False
+        if self.overlay_enabled:
+            self.create_overlay()
+
+    def _ensure_alive(self):
+        """Rebuild the window if Tk lost it."""
+        try:
+            if not self.overlay_window.winfo_exists():
+                raise tk.TclError("window gone")
+        except tk.TclError:
+            self.reinstate()
+
     def set_transparency(self, transparency_percent: int):
         self.transparency = transparency_percent / 100.0
 
@@ -660,6 +683,8 @@ class CargoTextOverlay:
             return
         if not self.overlay_window:
             self.create_overlay()
+        else:
+            self._ensure_alive()
 
         lines = []
         cargo = cargo_monitor
@@ -14858,6 +14883,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
         elif enabled and hasattr(self, 'cargo_text_overlay') and self.cargo_show_in_overlay.get():
             self.cargo_text_overlay.set_enabled(True)
+            self.cargo_text_overlay.reinstate()
+            self.cargo_text_overlay.update_cargo(self.cargo_monitor)
         self._apply_overlay_enabled_state()
         self._save_text_overlay_preference()
         
@@ -15045,6 +15072,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Called when cargo monitor overlay checkbox is toggled"""
         enabled = bool(self.cargo_show_in_overlay.get())
         self.cargo_text_overlay.set_enabled(enabled)
+        if enabled:
+            self.cargo_text_overlay.reinstate()
+            self.cargo_text_overlay.update_cargo(self.cargo_monitor)
         self._save_cargo_preferences()
 
     def _reapply_cargo_overlay_state(self) -> None:
