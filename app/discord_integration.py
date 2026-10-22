@@ -312,14 +312,14 @@ def format_mining_report_embed(session_data: dict) -> dict:
     perf_lines = []
     for name, stats in mineral_perf_stats.items():
         details = []
-        tons = stats.get('tons')
-        if tons is not None:
-            details.append(f"{tons:.1f}t")
+        mineral_tons = stats.get('tons')
+        if mineral_tons is not None:
+            details.append(f"{mineral_tons:.1f}t")
         tons_per_hit = stats.get('tons_per_hit')
         hits = stats.get('hits')
-        if tons_per_hit is None and hits and tons is not None:
+        if tons_per_hit is None and hits and mineral_tons is not None:
             try:
-                tons_per_hit = tons / hits
+                tons_per_hit = mineral_tons / hits
             except Exception:
                 tons_per_hit = None
         if tons_per_hit is not None:
@@ -338,7 +338,7 @@ def format_mining_report_embed(session_data: dict) -> dict:
         "title": f"Elite Mining Report - {system}",
         "description": description,
         "color": 0x00ff00 if tons_value > 0 else 0xff6600,  # Green if successful, orange if no mining
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now().astimezone().isoformat(),
         "fields": [
             {
                 "name": "Duration",

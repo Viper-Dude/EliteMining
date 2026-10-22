@@ -5971,48 +5971,66 @@ class RingFinder(ColumnVisibilityMixin):
             menu_active_fg = MENU_COLORS["activeforeground"]
         
         from config import scaled_font
-        self.context_menu = tk.Menu(self.parent, tearoff=0,
-                                   bg=menu_bg, fg=menu_fg,
-                                   activebackground=menu_active_bg,
-                                   activeforeground=menu_active_fg,
-                                   selectcolor=menu_active_bg,
-                                   font=scaled_font(9))
+        def _styled_menu(master):
+            return tk.Menu(master, tearoff=0,
+                           bg=menu_bg, fg=menu_fg,
+                           activebackground=menu_active_bg,
+                           activeforeground=menu_active_fg,
+                           selectcolor=menu_active_bg,
+                           font=scaled_font(9))
+
+        self.context_menu = _styled_menu(self.parent)
+        self._ctx_idx = {}
+
+        def add(key, label_key, command):
+            self.context_menu.add_command(label=t(label_key), command=command)
+            self._ctx_idx[key] = self.context_menu.index('end')
+
+        def add_submenu(label_key, items):
+            sub = _styled_menu(self.context_menu)
+            for label_key_i, command in items:
+                sub.add_command(label=t(label_key_i), command=command)
+            self.context_menu.add_cascade(label=t(label_key) + "  ▸", menu=sub)
+
         # Navigate / Lookup
-        self.context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_name)
-        self.context_menu.add_command(label=t('context_menu.find_in_star_systems'), command=self._find_in_star_systems)
-        self.context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara)
-        self.context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm)
-        self.context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh)
-        self.context_menu.add_command(label=t('context_menu.find_sell_station'), command=self._find_sell_station)
-        self.context_menu.add_command(label=t('context_menu.rank_minerals'), command=self._rank_minerals_for_system)
-        self.context_menu.add_command(label=t('context_menu.rank_minerals_system'), command=self._rank_all_minerals_for_system)
+        add('copy_system', 'context_menu.copy_system', self._copy_system_name)
+        add('find_in_star_systems', 'context_menu.find_in_star_systems', self._find_in_star_systems)
+        add_submenu('context_menu.submenu_open_in', [
+            ('context_menu.open_inara', self._open_inara),
+            ('context_menu.open_edsm', self._open_edsm),
+            ('context_menu.open_spansh', self._open_spansh),
+        ])
+        # Market
+        add('find_sell_station', 'context_menu.find_sell_station', self._find_sell_station)
+        add_submenu('context_menu.submenu_rank_minerals', [
+            ('context_menu.rank_minerals', self._rank_minerals_for_system),
+            ('context_menu.rank_minerals_system', self._rank_all_minerals_for_system),
+        ])
         self.context_menu.add_separator()
         # Database
-        self.context_menu.add_command(label=t('context_menu.save_to_local_database'), command=self._save_to_database)
-        self.context_menu.add_command(label=t('context_menu.save_all_new_to_database'), command=self._save_all_new_to_database)
+        add('save', 'context_menu.save_to_local_database', self._save_to_database)
+        add('save_all_new', 'context_menu.save_all_new_to_database', self._save_all_new_to_database)
         self.context_menu.add_separator()
         # Ring Data
-        self.context_menu.add_command(label=t('context_menu.update_reserve'), command=self._update_reserve_from_spansh)
-        self.context_menu.add_command(label=t('context_menu.edit_hotspots'), command=self._show_edit_hotspots_dialog)
-        self.context_menu.add_command(label=t('context_menu.set_overlap'), command=self._show_overlap_dialog)
-        self.context_menu.add_command(label=t('context_menu.set_res'), command=self._show_res_dialog)
-        self.context_menu.add_command(label=t('context_menu.edit_ring_type'), command=self._show_edit_ring_type_dialog)
-        self.context_menu.add_command(label=t('context_menu.edit_visits'), command=self._show_edit_visits_dialog)
+        add('update_reserve', 'context_menu.update_reserve', self._update_reserve_from_spansh)
+        add_submenu('context_menu.submenu_edit_ring_data', [
+            ('context_menu.edit_hotspots', self._show_edit_hotspots_dialog),
+            ('context_menu.set_overlap', self._show_overlap_dialog),
+            ('context_menu.set_res', self._show_res_dialog),
+            ('context_menu.edit_ring_type', self._show_edit_ring_type_dialog),
+            ('context_menu.edit_visits', self._show_edit_visits_dialog),
+        ])
         self.context_menu.add_separator()
         # User
-        self.context_menu.add_command(label=t('context_menu.mark_favourite'), command=self._toggle_favourite_selected)
-        self.context_menu.add_command(label=t('context_menu.set_as_reference'), command=self._set_as_reference_system)
-        self.context_menu.add_command(label=t('context_menu.bookmark_location'), command=self._bookmark_selected)
-        self.context_menu.add_command(label=t('context_menu.edit_comment'), command=self._show_comment_dialog)
+        add('favourite', 'context_menu.mark_favourite', self._toggle_favourite_selected)
+        add('set_reference', 'context_menu.set_as_reference', self._set_as_reference_system)
+        add('bookmark', 'context_menu.bookmark_location', self._bookmark_selected)
+        add('comment', 'context_menu.edit_comment', self._show_comment_dialog)
         self.context_menu.add_separator()
-        # Reports
-        self.context_menu.add_command(label=t('context_menu.open_mining_report'), command=self._open_mining_report_selected)
-        self.context_menu.add_separator()
-        # PowerPlay
-        self.context_menu.add_command(label=t('context_menu.find_acquisition_targets'), command=self._find_acquisition_targets_for_system)
-        self.context_menu.add_separator()
-        # Export
-        self.context_menu.add_command(label=t('context_menu.export_results_csv'), command=self._export_results_to_csv)
+        # Reports / PowerPlay / Export
+        add('mining_report', 'context_menu.open_mining_report', self._open_mining_report_selected)
+        add('acquisition', 'context_menu.find_acquisition_targets', self._find_acquisition_targets_for_system)
+        add('export', 'context_menu.export_results_csv', self._export_results_to_csv)
 
     def _show_context_menu(self, event):
         """Show the context menu when right-clicking on results"""
@@ -6111,12 +6129,12 @@ class RingFinder(ColumnVisibilityMixin):
                                            font=scaled_font(9))
 
                         if spansh_rows_with_hotspots > 0:
-                            multi_menu.add_command(label=f"Save {spansh_rows_with_hotspots} Entries to Database",
+                            multi_menu.add_command(label=t('context_menu.save_n_entries').format(count=spansh_rows_with_hotspots),
                                                  command=self._save_to_database)
 
                         if enable_update_reserve:
                             system_count = len(systems_with_missing_reserve)
-                            multi_menu.add_command(label=f"Update Reserve Level ({system_count} system{'s' if system_count != 1 else ''})",
+                            multi_menu.add_command(label=t('context_menu.update_reserve_system' if system_count == 1 else 'context_menu.update_reserve_systems').format(count=system_count),
                                                  command=self._update_reserve_from_spansh)
 
                         multi_menu.tk_popup(event.x_root, event.y_root)
@@ -6128,11 +6146,10 @@ class RingFinder(ColumnVisibilityMixin):
                     mineral = self._to_english(mineral_display)
                     is_specific_mineral = not self._is_all_minerals(mineral)
                     
-                    # Menu item index for "Find Sell Station" is 5 (after copy_system, find_in_star_systems, inara, edsm, spansh)
                     if is_specific_mineral:
-                        self.context_menu.entryconfig(5, state="normal")
+                        self.context_menu.entryconfig(self._ctx_idx['find_sell_station'], state="normal")
                     else:
-                        self.context_menu.entryconfig(5, state="disabled")
+                        self.context_menu.entryconfig(self._ctx_idx['find_sell_station'], state="disabled")
 
                     # Show/hide "Save to Database" option (index 9, after separator) based on Source column.
                     # Both save options are disabled outright in Ring Search mode - that mode is for
@@ -6140,28 +6157,20 @@ class RingFinder(ColumnVisibilityMixin):
                     is_ring_search_mode = self.ring_type_only_var.get()
 
                     if has_spansh_rows and not is_ring_search_mode:
-                        self.context_menu.entryconfig(9, state="normal")
+                        self.context_menu.entryconfig(self._ctx_idx['save'], state="normal")
                     else:
-                        self.context_menu.entryconfig(9, state="disabled")
+                        self.context_menu.entryconfig(self._ctx_idx['save'], state="disabled")
 
                     # Show/hide "Save All New to Database" option (index 10) - enabled whenever any
                     # row in the full result set is Spansh-only or Both (not just the selection)
                     has_any_new_spansh_rows = not is_ring_search_mode and self._has_unsaved_spansh_rows()
-                    self.context_menu.entryconfig(10, state="normal" if has_any_new_spansh_rows else "disabled")
+                    self.context_menu.entryconfig(self._ctx_idx['save_all_new'], state="normal" if has_any_new_spansh_rows else "disabled")
 
                     # Show/hide "Update Reserve Level" option (index 12) based on Local source + missing reserve
                     if enable_update_reserve:
-                        self.context_menu.entryconfig(12, state="normal")
+                        self.context_menu.entryconfig(self._ctx_idx['update_reserve'], state="normal")
                     else:
-                        self.context_menu.entryconfig(12, state="disabled")
-
-                    # Note: Menu items: 0: copy_system, 1: find_in_star_systems, 2: inara, 3: edsm, 4: spansh,
-                    # 5: find_sell_station, 6: rank_minerals, 7: rank_minerals_system, 8: separator,
-                    # 9: save_to_db, 10: save_all_new_to_db, 11: separator,
-                    # 12: update_reserve, 13: edit_hotspots, 14: set_overlap, 15: set_res,
-                    # 16: edit_ring_type, 17: edit_visits, 18: separator,
-                    # 19: mark_favourite, 20: set_as_reference, 21: bookmark, 22: edit_comment, 23: separator,
-                    # 24: open_mining_report
+                        self.context_menu.entryconfig(self._ctx_idx['update_reserve'], state="disabled")
 
                     # Enable "Open Mining Report" only when a report exists for this row (Last Mined column)
                     has_mining_report = False
@@ -6169,7 +6178,7 @@ class RingFinder(ColumnVisibilityMixin):
                         values = self.results_tree.item(selected_items[0], 'values')
                         if values and len(values) > 14:
                             has_mining_report = bool(values[14])
-                    self.context_menu.entryconfig(24, state="normal" if has_mining_report else "disabled")
+                    self.context_menu.entryconfig(self._ctx_idx['mining_report'], state="normal" if has_mining_report else "disabled")
 
                     # Favourite toggle only applies to rows saved in the local database
                     has_local_row = False
@@ -6183,10 +6192,10 @@ class RingFinder(ColumnVisibilityMixin):
                                 is_favourite_row = len(values) > 13 and values[13] == "⭐"
 
                     if has_local_row:
-                        self.context_menu.entryconfig(19, state="normal",
+                        self.context_menu.entryconfig(self._ctx_idx['favourite'], state="normal",
                                                        label=t('context_menu.remove_favourite') if is_favourite_row else t('context_menu.mark_favourite'))
                     else:
-                        self.context_menu.entryconfig(19, state="disabled", label=t('context_menu.mark_favourite'))
+                        self.context_menu.entryconfig(self._ctx_idx['favourite'], state="disabled", label=t('context_menu.mark_favourite'))
 
                     # Edit/Add Comment label depends on whether the row already has a comment
                     has_comment = False
@@ -6194,7 +6203,7 @@ class RingFinder(ColumnVisibilityMixin):
                         values = self.results_tree.item(selected_items[0], 'values')
                         if values and len(values) > 15:
                             has_comment = bool(values[15])
-                    self.context_menu.entryconfig(22, label=t('context_menu.edit_comment') if has_comment else t('context_menu.add_comment'))
+                    self.context_menu.entryconfig(self._ctx_idx['comment'], label=t('context_menu.edit_comment') if has_comment else t('context_menu.add_comment'))
 
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:

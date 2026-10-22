@@ -740,7 +740,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.4.4"
+APP_VERSION = "v5.4.5"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -9409,7 +9409,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                   activebackground=menu_colors["activebackground"],
                                   activeforeground=menu_colors["activeforeground"],
                                   selectcolor=menu_colors["selectcolor"])
-        self._preset_menu.add_cascade(label=t('context_menu.announcement_preset'), menu=self._ann_preset_submenu)
+        self._preset_menu.add_cascade(label=t('context_menu.announcement_preset') + "  ▸", menu=self._ann_preset_submenu)
         self._ann_preset_menu_var = tk.IntVar(value=0)
         self._preset_menu.add_separator()
         self._preset_menu.add_command(label=t('context_menu.expand_all'), command=self._expand_all_preset_groups)

@@ -10,6 +10,7 @@
 - **No emojis** unless explicitly asked.
 - **Follow existing patterns.** Match the style, naming conventions, and architecture already in the codebase. Check how similar things are done before inventing a new approach.
 - **Reuse existing functions.** Before writing new logic, check if an existing function already does it (or almost does it). Call it, or extract a shared helper/add a parameter — don't copy-paste and duplicate the implementation. This applies across tabs and modules, not just within one file (e.g. distance/coordinate lookups already exist in `ring_finder.py`).
+- **Patch notes** (`docs/PATCHNOTES_v*.md`): one short, precise sentence per change, plain English from the player's view. No technical or dev language (no EDDN, API, cache, database, function names).
 - **Git commits**: No `Co-Authored-By` trailers. Commit messages should be concise and focus on the "why".
 - **When uncertain**, ask one targeted question rather than listing options or making assumptions.
 - **Don't re-explain decisions** already made in the conversation. Move forward.

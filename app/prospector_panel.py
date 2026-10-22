@@ -5661,47 +5661,68 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             from tkinter import messagebox
             messagebox.showerror("Error", f"Failed to create mining card: {e}")
 
+    def _get_card_path(self, session) -> str:
+        """Expected Cards/ PNG path for a session (file may not exist)"""
+        from path_utils import get_reports_dir
+        import datetime
+
+        system = session.get('system', 'Unknown')
+        body = session.get('body', 'Unknown')
+        file_path = session.get('file_path', '')
+
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        if file_path and os.path.exists(file_path):
+            filename = os.path.basename(file_path)
+            if filename.startswith('Session_'):
+                parts = filename.replace('.txt', '').split('_')
+                if len(parts) >= 3:
+                    timestamp = f"{parts[1]}_{parts[2]}"
+
+        card_filename = f"Session_{timestamp}_{system.replace(' ', '_')}_{body.replace(' ', '_')}_Card.png"
+        return os.path.join(get_reports_dir(), "Cards", card_filename)
+
+    def _selected_report_card_exists(self) -> bool:
+        selected = self.reports_tree_tab.selection()
+        session = self.reports_tab_session_lookup.get(selected[0]) if len(selected) == 1 else None
+        return bool(session) and os.path.exists(self._get_card_path(session))
+
+    def _update_card_button(self) -> None:
+        key = 'reports.open_mining_card' if self._selected_report_card_exists() else 'reports.mining_card'
+        self._card_btn.configure(text=t(key))
+
+    def _on_mining_card_button(self) -> None:
+        if self._selected_report_card_exists():
+            self._open_mining_card_from_report()
+        else:
+            self._create_mining_card_from_report()
+            self._update_card_button()
+
+    def _open_mining_card_from_report(self):
+        """Open the saved mining card PNG for the selected report"""
+        selected = self.reports_tree_tab.selection()
+        session = self.reports_tab_session_lookup.get(selected[0]) if selected else None
+        card_path = self._get_card_path(session) if session else None
+        if card_path and os.path.exists(card_path):
+            os.startfile(card_path)
+
     def _generate_mining_card(self, session, cmdr_info=None):
         """Generate mining card PNG from session data"""
         try:
             from mining_card_generator import create_card_from_session
-            from path_utils import get_reports_dir
             import subprocess
-            import datetime
-            
-            # Create Cards directory
-            cards_dir = os.path.join(get_reports_dir(), "Cards")
-            os.makedirs(cards_dir, exist_ok=True)
-            
+
             # Parse session data to extract needed info
             system = session.get('system', 'Unknown')
             body = session.get('body', 'Unknown')
             duration = session.get('duration', 'Unknown')
             ship = session.get('ship', None)
             session_type_from_session = session.get('session_type', '')
-            
-            # Get filename or create one from session data
             file_path = session.get('file_path', '')
-            if file_path and os.path.exists(file_path):
-                # Extract timestamp from filename
-                filename = os.path.basename(file_path)
-                if filename.startswith('Session_') and '_' in filename:
-                    parts = filename.replace('.txt', '').split('_')
-                    if len(parts) >= 3:
-                        timestamp = f"{parts[1]}_{parts[2]}"
-                    else:
-                        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                else:
-                    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            else:
-                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            
-            # Build card filename
-            clean_system = system.replace(' ', '_')
-            clean_body = body.replace(' ', '_')
-            card_filename = f"Session_{timestamp}_{clean_system}_{clean_body}_Card.png"
-            card_path = os.path.join(cards_dir, card_filename)
-            
+
+            card_path = self._get_card_path(session)
+            os.makedirs(os.path.dirname(card_path), exist_ok=True)
+            card_filename = os.path.basename(card_path)
+
             # Parse materials from report file
             materials_mined = {}
             total_tons = 0
@@ -7575,7 +7596,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self._source_filter_options = [
             ("all", t('reports.all')),
             ("by_commodity", t('reports.by_commodity')),
-            ("high_value_materials", t('reports.high_value_materials')),
             ("with_engineering_mats", t('reports.with_engineering_mats')),
             ("by_system", t('reports.by_system')),
             ("by_ship", t('reports.by_ship')),
@@ -7603,7 +7623,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         initial_source = t('reports.all')
         self._source_filter_var = tk.StringVar(value=initial_source)
         source_combo = ttk.Combobox(filter_frame, textvariable=self._source_filter_var,
-                                    values=source_display_values, state="readonly", width=28)
+                                    values=source_display_values, state="readonly", width=18)
         source_combo.pack(side="left", padx=(0, 5))
         source_combo.bind("<<ComboboxSelected>>", self._on_filter_changed)
         self.ToolTip(source_combo, t('reports.tooltip_source_filter'))
@@ -7611,8 +7631,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Dynamic sub-dropdown for By System / By Ship (hidden by default)
         self._sub_filter_var = tk.StringVar()
         self._sub_filter_combo = ttk.Combobox(filter_frame, textvariable=self._sub_filter_var,
-                                               state="readonly", width=32)
+                                               state="normal", width=32)
+        self._sub_filter_all = []
+        self._sub_filter_last = ''
+        self._sub_suggest_popup = None
+        self._sub_suggest_list = None
+        self._sub_filter_combo.bind("<Down>", lambda e: self._on_sub_suggest_move(e, 1))
+        self._sub_filter_combo.bind("<Up>", lambda e: self._on_sub_suggest_move(e, -1))
+        self._sub_filter_combo.bind("<FocusOut>", lambda e: self._sub_filter_combo.after(200, self._hide_sub_suggestions))
         self._sub_filter_combo.bind("<<ComboboxSelected>>", self._on_sub_filter_changed)
+        self._sub_filter_combo.bind("<KeyRelease>", self._on_sub_filter_typed)
+        self._sub_filter_combo.bind("<Return>", self._on_sub_filter_commit)
+        self._sub_filter_combo.bind("<Escape>", self._on_sub_filter_reset)
         self.ToolTip(self._sub_filter_combo, t('reports.tooltip_sub_filter'))
         
         # Hint text on a new line below filters
@@ -7925,7 +7955,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Add buttons at the bottom
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=5, column=0, columnspan=2, pady=(8, 0), sticky="ew")
-        
+        self._reports_summary_label = ttk.Label(button_frame, text="", foreground="#888888")
+        self._reports_summary_label.pack(side="right", padx=(10, 5))
+
         # CSV file path for button commands
         csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
         
@@ -7983,13 +8015,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Mining Card button (orange accent)
         card_btn = tk.Button(button_frame, text=t('reports.mining_card'), 
-                            command=self._create_mining_card_from_report, 
-                            bg="#ff6600", fg="#ffffff", 
-                            activebackground="#cc5500", activeforeground="#ffffff", 
-                            relief="solid", bd=1, 
+                            command=self._on_mining_card_button,
+                            bg="#ff6600", fg="#ffffff",
+                            activebackground="#cc5500", activeforeground="#ffffff",
+                            relief="solid", bd=1,
                             highlightbackground="#666666", highlightcolor="#666666")
         card_btn.pack(side="left", padx=(0, 5))
         self.ToolTip(card_btn, t('tooltips.mining_card'))
+        self._card_btn = card_btn
+        self.reports_tree_tab.bind("<<TreeviewSelect>>", lambda e: self._update_card_button(), add='+')
         
         # Add double-click functionality for opening report files
         def open_selected():
@@ -8290,7 +8324,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     context_menu.add_command(label=t('context_menu.copy_system'), command=lambda: copy_system_name_tab())
                     context_menu.add_separator()
                     context_menu.add_command(label=t('context_menu.share_discord'), command=lambda: self._share_selected_to_discord())
-                    context_menu.add_command(label=t('context_menu.create_mining_card'), command=lambda: self._create_mining_card_from_report())
+                    _sel = self.reports_tree_tab.selection()
+                    _sel_session = self.reports_tab_session_lookup.get(_sel[0]) if len(_sel) == 1 else None
+                    if _sel_session and os.path.exists(self._get_card_path(_sel_session)):
+                        context_menu.add_command(label=t('context_menu.open_mining_card'), command=lambda: self._open_mining_card_from_report())
+                        context_menu.add_command(label=t('context_menu.regenerate_mining_card'), command=lambda: self._create_mining_card_from_report())
+                    else:
+                        context_menu.add_command(label=t('context_menu.create_mining_card'), command=lambda: self._create_mining_card_from_report())
                     context_menu.add_separator()
                     context_menu.add_command(label=t('context_menu.delete_report_screenshots'), command=lambda: self._delete_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()  # Add separator for safety
@@ -8812,21 +8852,24 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         if source_key == 'by_commodity':
             commodities = getattr(self, '_mining_commodities_display', [])
-            self._sub_filter_combo.configure(values=commodities)
+            self._set_sub_filter_values(commodities)
             if commodities and self._sub_filter_var.get() not in commodities:
                 self._sub_filter_var.set(commodities[0])
+            self._sub_filter_last = self._sub_filter_var.get()
             self._sub_filter_combo.pack(side="left", padx=(5, 0))
         elif source_key == 'by_system':
             systems = self._get_unique_systems_from_csv()
-            self._sub_filter_combo.configure(values=systems)
+            self._set_sub_filter_values(systems)
             if systems and self._sub_filter_var.get() not in systems:
                 self._sub_filter_var.set(systems[0])
+            self._sub_filter_last = self._sub_filter_var.get()
             self._sub_filter_combo.pack(side="left", padx=(5, 0))
         elif source_key == 'by_ship':
             ships = self._get_unique_ships_from_csv()
-            self._sub_filter_combo.configure(values=ships)
+            self._set_sub_filter_values(ships)
             if ships and self._sub_filter_var.get() not in ships:
                 self._sub_filter_var.set(ships[0])
+            self._sub_filter_last = self._sub_filter_var.get()
             self._sub_filter_combo.pack(side="left", padx=(5, 0))
         else:
             self._sub_filter_combo.pack_forget()
@@ -8842,7 +8885,110 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         """Handle sub-filter dropdown change (By System / By Ship value selection)"""
         if event and hasattr(event, 'widget'):
             event.widget.selection_clear()
+        self._sub_filter_last = self._sub_filter_var.get()
+        self._set_sub_filter_values(self._sub_filter_all)
         self._refresh_reports_tab()
+
+    def _set_sub_filter_values(self, values) -> None:
+        self._sub_filter_all = list(values)
+        self._sub_filter_combo.configure(values=self._sub_filter_all)
+
+    def _on_sub_filter_typed(self, event=None) -> None:
+        """Narrow the dropdown list to entries containing the typed text"""
+        if event and event.keysym in ('Return', 'Escape', 'Tab', 'Up', 'Down', 'Left', 'Right'):
+            return
+        text = self._sub_filter_var.get().strip().lower()
+        matches = [v for v in self._sub_filter_all if text in v.lower()] if text else self._sub_filter_all
+        self._sub_filter_combo.configure(values=matches)
+        self._show_sub_suggestions(matches if text else [])
+
+    def _show_sub_suggestions(self, matches) -> None:
+        """Focus-free suggestion list under the sub-filter field (ttk popdown would steal typing focus)"""
+        if not matches:
+            self._hide_sub_suggestions()
+            return
+        combo = self._sub_filter_combo
+        if self._sub_suggest_popup is None:
+            from config import load_theme
+            if load_theme() == "elite_orange":
+                bg, fg, sel_bg, sel_fg = "#1e1e1e", "#ff8c00", "#ff6600", "#000000"
+            else:
+                bg, fg, sel_bg, sel_fg = "#2d2d2d", "#ffffff", "#404040", "#ffffff"
+            popup = tk.Toplevel(combo)
+            popup.withdraw()
+            popup.overrideredirect(True)
+            popup.attributes('-topmost', True)
+            lb = tk.Listbox(popup, bg=bg, fg=fg, selectbackground=sel_bg, selectforeground=sel_fg,
+                            activestyle='none', exportselection=False, highlightthickness=0,
+                            borderwidth=1, relief='solid', font=scaled_font(9))
+            lb.pack(fill='both', expand=True)
+            lb.bind('<ButtonRelease-1>', self._on_sub_suggest_click)
+            self._sub_suggest_popup, self._sub_suggest_list = popup, lb
+        popup, lb = self._sub_suggest_popup, self._sub_suggest_list
+        lb.delete(0, 'end')
+        for m in matches:
+            lb.insert('end', m)
+        lb.selection_set(0)
+        lb.configure(height=min(len(matches), 10))
+        popup.update_idletasks()
+        popup.geometry(f"{combo.winfo_width()}x{lb.winfo_reqheight()}+{combo.winfo_rootx()}+{combo.winfo_rooty() + combo.winfo_height()}")
+        popup.deiconify()
+        popup.lift()
+
+    def _hide_sub_suggestions(self) -> None:
+        if self._sub_suggest_popup is not None:
+            self._sub_suggest_popup.withdraw()
+
+    def _sub_suggestions_visible(self) -> bool:
+        return self._sub_suggest_popup is not None and self._sub_suggest_popup.state() == 'normal'
+
+    def _on_sub_suggest_move(self, event, step):
+        if not self._sub_suggestions_visible():
+            return None
+        lb = self._sub_suggest_list
+        cur = lb.curselection()
+        idx = max(0, min(lb.size() - 1, (cur[0] if cur else -1) + step))
+        lb.selection_clear(0, 'end')
+        lb.selection_set(idx)
+        lb.see(idx)
+        return "break"
+
+    def _on_sub_suggest_click(self, event) -> None:
+        lb = self._sub_suggest_list
+        self._choose_sub_suggestion(lb.get(lb.nearest(event.y)))
+
+    def _choose_sub_suggestion(self, value) -> None:
+        self._sub_filter_var.set(value)
+        self._hide_sub_suggestions()
+        self._on_sub_filter_changed(None)
+        self._sub_filter_combo.icursor('end')
+
+    def _on_sub_filter_commit(self, event=None):
+        """Apply typed/pasted text: exact match, else first entry containing it"""
+        if self._sub_suggestions_visible():
+            cur = self._sub_suggest_list.curselection()
+            if cur:
+                self._choose_sub_suggestion(self._sub_suggest_list.get(cur[0]))
+                return "break"
+        text = self._sub_filter_var.get().strip().lower()
+        choice = next((v for v in self._sub_filter_all if v.lower() == text), None)
+        if choice is None:
+            choice = next((v for v in self._sub_filter_all if text in v.lower()), None)
+        if choice is None:
+            self._on_sub_filter_reset()
+            return "break"
+        self._sub_filter_var.set(choice)
+        self._on_sub_filter_changed(event)
+        self._sub_filter_combo.icursor('end')
+        return "break"
+
+    def _on_sub_filter_reset(self, event=None) -> None:
+        """Discard uncommitted text and restore the full list"""
+        self._hide_sub_suggestions()
+        if self._sub_filter_last and self._sub_filter_var.get() != self._sub_filter_last:
+            self._sub_filter_var.set(self._sub_filter_last)
+        self._set_sub_filter_values(self._sub_filter_all)
+        self._sub_filter_combo.selection_clear()
 
     def _get_unique_systems_from_csv(self) -> list:
         """Get sorted list of unique systems from session CSV"""
@@ -9412,10 +9558,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                                     primary_material = mat_name
                                     if primary_material.lower() == selected.lower():
                                         filtered.append(session)
-                        elif source_key == 'high_value_materials':
-                            hv = ['platinum', 'osmium', 'painite', 'rhodplumsite', 'benitoite', 'monazite', 'musgravite']
-                            if any(m in cargo_data for m in hv):
-                                filtered.append(session)
                         elif source_key == 'with_engineering_mats':
                             eng_data = session.get('engineering_materials', '').strip()
                             if eng_data and eng_data != '—':
@@ -9764,8 +9906,39 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             except Exception:
                 pass
 
+            self._update_reports_summary()
+
         except Exception as e:
             print(f"Failed to refresh reports tab: {e}")
+
+    def _update_reports_summary(self) -> None:
+        """Totals for the rows currently shown in the Reports tab"""
+        tree = self.reports_tree_tab
+        count = 0
+        total_tons = 0.0
+        total_hours = 0.0
+        best_tph = 0.0
+        for item in tree.get_children(''):
+            count += 1
+            try:
+                total_tons += float(str(tree.set(item, 'tons')).replace(',', ''))
+            except ValueError:
+                pass
+            try:
+                h, m, s = (int(p) for p in tree.set(item, 'duration').split(':'))
+                total_hours += (h * 3600 + m * 60 + s) / 3600
+            except ValueError:
+                pass
+            try:
+                best_tph = max(best_tph, float(str(tree.set(item, 'tph')).replace(',', '')))
+            except ValueError:
+                pass
+        if not count:
+            self._reports_summary_label.configure(text='')
+            return
+        avg_tph = total_tons / total_hours if total_hours > 0 else 0.0
+        self._reports_summary_label.configure(text=t('reports.summary_line').format(
+            count=count, tons=f"{total_tons:,.0f}", avg=f"{avg_tph:.0f}", best=f"{best_tph:.0f}"))
 
     # --- Polling ---
     def _enable_realtime_mode(self) -> None:
