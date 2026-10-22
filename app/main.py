@@ -677,7 +677,7 @@ class CargoTextOverlay:
             self._outline_items = []
 
     # -- cargo data update --------------------------------------------------
-    def update_cargo(self, cargo_monitor):
+    def update_cargo(self, cargo_monitor, tph=None):
         """Build text from cargo_monitor data and redraw."""
         if not self.overlay_enabled:
             return
@@ -693,6 +693,9 @@ class CargoTextOverlay:
         header = f"CARGO STATUS  {cargo.current_cargo}/{cargo.max_cargo}t  ({pct:.0f}%)"
         header_len = len(header)
         lines.append(header)
+
+        if tph and tph > 0:
+            lines.append(f"TPH {tph:.0f}".ljust(header_len))
 
         if cargo.cargo_items:
             sorted_items = sorted(cargo.cargo_items.items(),
@@ -5525,6 +5528,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.overlay_only_game_focused = tk.BooleanVar(value=True)
         self.hide_overlays_in_supercruise = tk.BooleanVar(value=False)
         self.overlay_only_mining_session = tk.BooleanVar(value=False)
+        self.overlay_show_tph = tk.BooleanVar(value=True)
         self._in_supercruise = False  # Track current supercruise state
 
         self._load_cargo_preferences()
@@ -6485,10 +6489,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Update cargo text overlay data (respects _game_hidden — won't deiconify if hidden)
         try:
             if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled and self.text_overlay_enabled.get():
-                self.cargo_text_overlay.update_cargo(self.cargo_monitor)
+                tph = None
+                if self.overlay_show_tph.get() and self.prospector_panel and self.prospector_panel.session_active:
+                    tph = getattr(self.prospector_panel, 'live_tph', 0.0)
+                self.cargo_text_overlay.update_cargo(self.cargo_monitor, tph)
         except Exception:
             pass
-        
+
         # Schedule next update
         self.after(2000, self._periodic_integrated_cargo_update)  # Every 2 seconds
     
@@ -8489,6 +8496,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
         tk.Label(scrollable_frame, text=t('settings.text_overlay_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+        r += 1
+        tk.Checkbutton(scrollable_frame, text=t('settings.overlay_show_tph'), variable=self.overlay_show_tph,
+                      command=self._save_cargo_preferences,
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
+                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
         r += 1
         
         # Overlay mode selection (Standard / Enhanced Prospector / Cargo Status) - all on one line
@@ -14991,6 +15005,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.overlay_only_game_focused.set(cfg.get("overlay_only_game_focused", True))
         self.hide_overlays_in_supercruise.set(cfg.get("hide_overlays_in_supercruise", False))
         self.overlay_only_mining_session.set(cfg.get("overlay_only_mining_session", False))
+        self.overlay_show_tph.set(cfg.get("overlay_show_tph", True))
         # Apply saved cargo overlay state
         self.cargo_text_overlay.set_enabled(cfg.get("cargo_show_in_overlay", True))
     
@@ -15006,7 +15021,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "cargo_show_in_overlay": bool(self.cargo_show_in_overlay.get()),
             "overlay_only_game_focused": bool(self.overlay_only_game_focused.get()),
             "hide_overlays_in_supercruise": bool(self.hide_overlays_in_supercruise.get()),
-            "overlay_only_mining_session": bool(self.overlay_only_mining_session.get())
+            "overlay_only_mining_session": bool(self.overlay_only_mining_session.get()),
+            "overlay_show_tph": bool(self.overlay_show_tph.get())
         }
         update_config_values(updates)
     

@@ -4,6 +4,10 @@
 ## New Features & Improvements
 
 
+### Text Overlay
+
+- **New:** The cargo overlay now shows your tons per hour during a mining session. You can turn it off in Settings.
+
 ### Discord Sharing
 
 - **Fixed:** The Discord mining card now shows the correct Total Mined instead of only the last mineral's tons.

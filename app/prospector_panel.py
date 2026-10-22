@@ -9998,6 +9998,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             live_tph = live_tons / hours
                 except:
                     pass
+            self.live_tph = live_tph if self.session_active else 0.0
             if total_asteroids > 0 or live_tons > 0:
                 if live_tons > 0:
                     summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
@@ -10769,6 +10770,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             live_tph = live_tons / hours
                 except Exception:
                     pass
+            self.live_tph = live_tph if self.session_active else 0.0
             if total_asteroids > 0 or live_tons > 0:
                 if live_tons > 0:
                     base_text = (f"Asteroids scanned: {total_asteroids} | "

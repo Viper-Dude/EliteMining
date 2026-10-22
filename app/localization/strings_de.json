@@ -999,6 +999,7 @@
     "overlay_only_game_focused": "Nur wenn Spiel fokussiert",
     "hide_overlays_in_supercruise": "Im Supercruise ausblenden",
     "overlay_only_mining_session": "Nur während Bergbau-Sitzung",
+    "overlay_show_tph": "Tonnen pro Stunde im Fracht-Overlay anzeigen",
     "text_brightness": "Texthelligkeit:",
     "text_brightness_desc": "Texthelligkeit/Transparenz anpassen",
     "text_color": "Textfarbe:",
