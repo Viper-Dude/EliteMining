@@ -137,3 +137,12 @@ docs/MINING_PRICE_OPTIMIZATION_PLAN.md
 app/Images/My_Avatar.jpg
 app/Images/Spacemate_banner.jpg
 app/Images/bot_avatar.jpg
+
+# Scratch API captures and build output
+/daedalus.json
+/hip_search.json
+/out_query.json
+/sol_system.json
+/sparse_search.json
+tools/obj/
+tools/bin/
