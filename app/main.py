@@ -695,7 +695,8 @@ class CargoTextOverlay:
         lines.append(header)
 
         if tph and tph > 0:
-            lines.append(f"TPH {tph:.0f}".ljust(header_len))
+            tph_prefix, tph_suffix = t('settings.overlay_tph_line').split('{tph}')
+            lines.append(f"{tph_prefix:<17}{tph:>4.0f}{tph_suffix}".ljust(header_len))
 
         if cargo.cargo_items:
             sorted_items = sorted(cargo.cargo_items.items(),
@@ -743,7 +744,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.4.5"
+APP_VERSION = "v5.4.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
