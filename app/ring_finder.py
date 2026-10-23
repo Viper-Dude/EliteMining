@@ -239,12 +239,14 @@ class RingFinder(ColumnVisibilityMixin):
         from localization import t
         return value == RingFinder.ALL_MINERALS or value == t('ring_finder.all_minerals')
     
-    def _deselect_on_empty_click(self, event) -> None:
+    def _deselect_on_empty_click(self, event):
         """Deselect all items when clicking on empty space in the results treeview"""
         item = self.results_tree.identify_row(event.y)
         if not item:
             # Clicked on empty space - deselect all
             self.results_tree.selection_remove(*self.results_tree.selection())
+            return
+        return self._on_density_click(event)
     
     def _select_all_results(self, event=None) -> str:
         """Select all items in the results treeview (Ctrl+A)"""
@@ -1100,7 +1102,7 @@ class RingFinder(ColumnVisibilityMixin):
                      arrowcolor=[('readonly', '#ff8c00')])
         
         # Results treeview with enhanced columns including source
-        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "PowerPlay", "Source", "Favourite", "Last Mined", "Comment", "_spacer")
+        columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "PowerPlay", "Source", "Favourite", "Last Mined", "Comment", "Density", "_spacer")
         self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview", selectmode='extended')
         
         # Track column visibility and default widths
@@ -1120,7 +1122,8 @@ class RingFinder(ColumnVisibilityMixin):
             "PowerPlay": 170,
             "Favourite": 150,
             "Last Mined": 110,
-            "Comment": 150
+            "Comment": 150,
+            "Density": 100
         }
         self.column_visible = {col: True for col in columns}  # All visible by default
         
@@ -1144,7 +1147,8 @@ class RingFinder(ColumnVisibilityMixin):
             "PowerPlay": t('ring_finder.col_powerplay'),
             "Favourite": t('ring_finder.col_favourite'),
             "Last Mined": t('ring_finder.col_last_mined'),
-            "Comment": t('ring_finder.col_comment')
+            "Comment": t('ring_finder.col_comment'),
+            "Density": t('ring_finder.col_density')
         }
         
         for col in columns:
@@ -1190,6 +1194,8 @@ class RingFinder(ColumnVisibilityMixin):
             elif col == "Last Mined":
                 self.results_tree.column(col, width=column_widths[col], minwidth=80, anchor="w", stretch=False)
             elif col == "Comment":
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
+            elif col == "Density":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "_spacer":
                 # Spacer column — always last, gives every real column a draggable right border
@@ -1384,6 +1390,10 @@ class RingFinder(ColumnVisibilityMixin):
                     return (0, "")
                 return (1, val.lower())
             data.sort(key=sort_key, reverse=reverse)
+        elif col == "Density":
+            # Unset sorts lowest, then Low < Medium < High < Very Dense
+            density_order = {self._density_label(k): i + 1 for i, k in enumerate(self.DENSITY_KEYS)}
+            data.sort(key=lambda item: density_order.get(item[0], 0), reverse=reverse)
         elif col == "Last Mined":
             # Chronological sort on "mm/dd/yy HH:MM" display strings; blanks sort last
             import datetime as _dt
@@ -5440,6 +5450,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         # Bulk-prefetch ring comments (avoids per-row DB connections)
         _early_comments = self.user_db.bulk_get_ring_comments_for_rings(_all_systems_early) if _all_systems_early else {}
+        _early_density = self.user_db.bulk_get_ring_density_for_rings(_all_systems_early) if _all_systems_early else {}
 
         # Bulk-prefetch last-mined report dates (avoids per-row CSV scans)
         _last_mined_lookup = {}
@@ -5866,6 +5877,7 @@ class RingFinder(ColumnVisibilityMixin):
                     favourite_display,
                     last_mined_display,
                     comment_display,
+                    self._density_label(_early_density.get(_bulk_key)),
                 ),
                 'tags': tags,
                 'is_green': is_green,
@@ -6026,11 +6038,46 @@ class RingFinder(ColumnVisibilityMixin):
         add('set_reference', 'context_menu.set_as_reference', self._set_as_reference_system)
         add('bookmark', 'context_menu.bookmark_location', self._bookmark_selected)
         add('comment', 'context_menu.edit_comment', self._show_comment_dialog)
+        self.context_menu.add_cascade(label=t('context_menu.set_density') + "  ▸", menu=self._build_density_menu(self.context_menu))
+        self._ctx_idx['density'] = self.context_menu.index('end')
         self.context_menu.add_separator()
         # Reports / PowerPlay / Export
         add('mining_report', 'context_menu.open_mining_report', self._open_mining_report_selected)
         add('acquisition', 'context_menu.find_acquisition_targets', self._find_acquisition_targets_for_system)
         add('export', 'context_menu.export_results_csv', self._export_results_to_csv)
+
+    DENSITY_KEYS = ('low', 'medium', 'high', 'very_dense')
+
+    def _density_label(self, key) -> str:
+        return t(f'ring_finder.density_{key}') if key in self.DENSITY_KEYS else ""
+
+    def _build_density_menu(self, master):
+        from config import scaled_font
+        menu = tk.Menu(master, tearoff=0,
+                       bg=self.context_menu.cget('bg'),
+                       fg=self.context_menu.cget('fg'),
+                       activebackground=self.context_menu.cget('activebackground'),
+                       activeforeground=self.context_menu.cget('activeforeground'),
+                       selectcolor=self.context_menu.cget('selectcolor'),
+                       font=scaled_font(9))
+        for key in self.DENSITY_KEYS:
+            menu.add_command(label=self._density_label(key), command=lambda k=key: self._set_density_selected(k))
+        menu.add_separator()
+        menu.add_command(label=t('ring_finder.density_clear'), command=lambda: self._set_density_selected(''))
+        return menu
+
+    def _set_density_selected(self, key):
+        selection = self.results_tree.selection()
+        if not selection:
+            return
+        item = selection[0]
+        values = self.results_tree.item(item, 'values')
+        if not values or len(values) < 4 or not values[2] or not values[3]:
+            return
+        if self.user_db.set_ring_density(values[2], values[3], key):
+            self.results_tree.set(item, "Density", self._density_label(key))
+        else:
+            self.status_var.set("Failed to save density")
 
     def _show_context_menu(self, event):
         """Show the context menu when right-clicking on results"""
@@ -6456,6 +6503,28 @@ class RingFinder(ColumnVisibilityMixin):
         elif col_name == "Comment":
             self.results_tree.selection_set(item)
             self._show_comment_dialog()
+
+    def _on_density_click(self, event):
+        """Single left-click on a Density cell opens the density popup."""
+        if self.results_tree.identify_region(event.x, event.y) != "cell":
+            return
+        item = self.results_tree.identify_row(event.y)
+        if not item:
+            return
+        try:
+            col_name = self.results_tree['displaycolumns'][int(self.results_tree.identify_column(event.x).replace('#', '')) - 1]
+        except (ValueError, IndexError):
+            return
+        if col_name != "Density":
+            return
+        self.results_tree.selection_set(item)
+        self.results_tree.focus(item)
+        menu = self._build_density_menu(self.parent)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+        return "break"
 
     def _open_inara(self):
         """Open selected system(s) in Inara and fetch/refresh their PP data"""

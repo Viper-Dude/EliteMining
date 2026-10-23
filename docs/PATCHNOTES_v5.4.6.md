@@ -8,6 +8,10 @@
 
 - **Changed:** The cargo overlay's tons per hour line now reads "Total ... t/hr" and lines up with the mineral tonnages.
 
+### Ring Finder & Bookmarks
+
+- **New:** A Density column lets you mark a ring as Low, Medium, High or Very Dense by clicking the cell, from the right-click menu, or in the bookmark dialog.
+
 ### Sidebar
 
 - **New:** A button at the bottom of the window now shows and hides the sidebar.

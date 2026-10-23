@@ -12809,7 +12809,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_bookmarks.grid_rowconfigure(0, weight=1)
 
         # Create bookmarks treeview with multiple selection enabled
-        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
+        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "density", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
         self.bookmarks_tree.grid(row=0, column=0, sticky="nsew")
         
         # Configure row tags for alternating colors (theme-aware)
@@ -12831,6 +12831,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.bookmarks_tree.heading("sol_dist", text=t('bookmarks.sol_distance'), anchor="w")
         self.bookmarks_tree.heading("hotspot", text=t('bookmarks.type'), anchor="w")
         self.bookmarks_tree.heading("reserve", text=t('bookmarks.reserve'), anchor="w")
+        self.bookmarks_tree.heading("density", text=t('ring_finder.col_density'), anchor="w")
         self.bookmarks_tree.heading("visits", text=t('bookmarks.visits'), anchor="center")
         self.bookmarks_tree.heading("materials", text=t('bookmarks.minerals_found'), anchor="w")
         self.bookmarks_tree.heading("avg_yield", text=t('bookmarks.avg_yield'), anchor="w")
@@ -12895,7 +12896,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         import tkinter.font as _tkfont
         _bm_heading_font = _tkfont.Font(font=scaled_font(9, "bold"))
         _bm_base_widths = {"last_visited": 100, "last_mined": 100, "system": 180, "body": 120, "distance": 90, "sol_dist": 90,
-                        "hotspot": 100, "reserve": 80,
+                        "hotspot": 100, "reserve": 80, "density": 90,
                         "materials": 200, "avg_yield": 80, "overlap": 80, "res_site": 80, "visits": 60,
                         "rating": 70, "notes": 60}
         _bm_header_pad = scaled_px(24)  # header cell padding + sort-arrow space
@@ -12908,7 +12909,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         _bm_minwidths = {col: _bm_min_for(col) for col in _bm_base_widths}
 
         _bm_anchors = {"last_visited": "center", "last_mined": "center", "system": "w", "body": "w",
-                        "distance": "center", "sol_dist": "center", "hotspot": "w", "reserve": "w",
+                        "distance": "center", "sol_dist": "center", "hotspot": "w", "reserve": "w", "density": "w",
                         "materials": "w", "avg_yield": "center", "overlap": "w", "res_site": "w",
                         "visits": "center", "rating": "center", "notes": "center"}
 
@@ -12920,7 +12921,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Setup column visibility for bookmarks
         self.setup_column_visibility(
             tree=self.bookmarks_tree,
-            columns=("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"),
+            columns=("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "density", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"),
             default_widths={col: max(scaled_px(w), _bm_minwidths[col]) for col, w in _bm_base_widths.items()},
             config_key='bookmarks'
         )
@@ -12945,7 +12946,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             try:
                 from config import save_bookmarks_column_widths
                 widths = {}
-                for col in ["last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"]:
+                for col in ["last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "density", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"]:
                     try:
                         widths[col] = self.bookmarks_tree.column(col, "width")
                     except:
@@ -13010,7 +13011,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 print(f"Bookmark sorting error for column {col}: {e}")
 
         # Bind column headers to sorting
-        for col in ("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"):
+        for col in ("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "density", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"):
             self.bookmarks_tree.heading(col, command=lambda c=col: sort_bookmark_col(c))
 
         # Buttons frame
@@ -13150,12 +13151,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         from ring_finder import translate_reserve_level
         user_db = ring_finder = None
-        last_visit_dates, visit_counts, system_coords, current_coords = {}, {}, {}, None
+        last_visit_dates, visit_counts, density_lookup, system_coords, current_coords = {}, {}, {}, {}, None
         try:
             user_db = self.main_app.cargo_monitor.user_db
             bookmark_systems = list({b.get('system', '') for b in self.bookmarks_data if b.get('system')})
             last_visit_dates = user_db.bulk_get_last_visit_dates(bookmark_systems)
             visit_counts = user_db.bulk_get_visit_counts(bookmark_systems)
+            density_lookup = user_db.bulk_get_ring_density_for_rings(bookmark_systems)
             ring_finder = self.main_app.ring_finder
             current_system = self.main_app.get_current_system()
 
@@ -13316,6 +13318,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
             reserve_display = translate_reserve_level(user_db.get_reserve_level(bookmark.get('system', ''), bookmark.get('body', ''))) if user_db else ''
             visits_display = visit_counts.get(bookmark.get('system', ''), 0) or ''
+            _bm_sys, _bm_body = bookmark.get('system', ''), bookmark.get('body', '')
+            density_key = density_lookup.get((_bm_sys, user_db._normalize_body_name(_bm_body, _bm_sys))) if user_db else None
+            density_display = t(f'ring_finder.density_{density_key}') if density_key else ''
 
             tag = "evenrow" if row_index % 2 == 0 else "oddrow"
             self.bookmarks_tree.insert("", "end", values=(
@@ -13327,6 +13332,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 sol_display,
                 bookmark.get('hotspot', ''),
                 reserve_display,
+                density_display,
                 bookmark.get('materials', ''),
                 yield_display,
                 overlap_display,
@@ -13478,8 +13484,21 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         hotspot_combo['values'] = ("", t('ring_finder.metallic'), t('ring_finder.rocky'), t('ring_finder.icy'), t('ring_finder.metal_rich'))
         hotspot_combo.grid(row=3, column=1, sticky="w", pady=(0, 5))
         
+        # Density dropdown - stored per ring in the user database (shared with Ring Finder)
+        ttk.Label(frame, text=t('ring_finder.col_density')).grid(row=4, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        _density_user_db = self.main_app.cargo_monitor.user_db if self.main_app and hasattr(self.main_app, 'cargo_monitor') else None
+        _density_displays = {k: t(f'ring_finder.density_{k}') for k in ('low', 'medium', 'high', 'very_dense')}
+        _density_by_display = {v: k for k, v in _density_displays.items()}
+        _current_density = ''
+        if bookmark_data and _density_user_db:
+            _current_density = _density_user_db.get_ring_density(bookmark_data.get('system', ''), bookmark_data.get('body', '')) or ''
+        density_var = tk.StringVar(value=_density_displays.get(_current_density, ''))
+        density_combo = ttk.Combobox(frame, textvariable=density_var, width=32, state="readonly")
+        density_combo['values'] = ("",) + tuple(_density_displays.values())
+        density_combo.grid(row=4, column=1, sticky="w", pady=(0, 5))
+
         # Materials field - convert stored English names to localized display names
-        ttk.Label(frame, text=t('bookmarks.minerals_found_label')).grid(row=4, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.minerals_found_label')).grid(row=5, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         stored_materials = bookmark_data.get('materials', '') if bookmark_data else ''
         # Convert each mineral name to localized version
         if stored_materials:
@@ -13490,19 +13509,19 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             display_materials = ''
         materials_var = tk.StringVar(value=display_materials)
         materials_entry = ttk.Entry(frame, textvariable=materials_var, width=35)
-        materials_entry.grid(row=4, column=1, sticky="w", pady=(0, 5))
+        materials_entry.grid(row=5, column=1, sticky="w", pady=(0, 5))
         
         # Average Yield field
-        ttk.Label(frame, text=t('bookmarks.average_yield')).grid(row=5, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.average_yield')).grid(row=6, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         yield_var = tk.StringVar(value=bookmark_data.get('avg_yield', '') if bookmark_data else '')
         yield_entry = ttk.Entry(frame, textvariable=yield_var, width=35)
-        yield_entry.grid(row=5, column=1, sticky="w", pady=(0, 5))
+        yield_entry.grid(row=6, column=1, sticky="w", pady=(0, 5))
         
         # Last Mined Date field
-        ttk.Label(frame, text=t('bookmarks.last_mined') + ":").grid(row=6, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.last_mined') + ":").grid(row=7, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         last_mined_var = tk.StringVar(value=bookmark_data.get('last_mined', '') if bookmark_data else '')
         last_mined_frame = ttk.Frame(frame)
-        last_mined_frame.grid(row=6, column=1, sticky="w", pady=(0, 5))
+        last_mined_frame.grid(row=7, column=1, sticky="w", pady=(0, 5))
         
         last_mined_entry = ttk.Entry(last_mined_frame, textvariable=last_mined_var, width=15)
         last_mined_entry.pack(side="left", padx=(0, 5))
@@ -13533,7 +13552,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                  foreground="#888888", font=scaled_font(8)).pack(side="left")
         
         # Target Material dropdown field
-        ttk.Label(frame, text=t('bookmarks.overlap_minerals')).grid(row=7, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.overlap_minerals')).grid(row=8, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         
         # English names for internal storage
         target_materials_en = ['', 'Alexandrite', 'Benitoite', 'Bromellite', 'Grandidierite', 'Low-Temperature Diamonds', 
@@ -13552,24 +13571,24 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         target_material_combo = ttk.Combobox(frame, textvariable=target_material_var, width=32, state="readonly")
         target_material_combo['values'] = tuple(target_materials_display)
-        target_material_combo.grid(row=7, column=1, sticky="w", pady=(0, 5))
+        target_material_combo.grid(row=8, column=1, sticky="w", pady=(0, 5))
         
         # Overlap field
-        ttk.Label(frame, text=t('bookmarks.overlap_type_label')).grid(row=8, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.overlap_type_label')).grid(row=9, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         overlap_var = tk.StringVar(value=bookmark_data.get('overlap_type', '') if bookmark_data else '')
         overlap_combo = ttk.Combobox(frame, textvariable=overlap_var, width=32, state="readonly")
         overlap_combo['values'] = ('', '2x', '3x')
-        overlap_combo.grid(row=8, column=1, sticky="w", pady=(0, 5))
+        overlap_combo.grid(row=9, column=1, sticky="w", pady=(0, 5))
         
         # RES Site field
-        ttk.Label(frame, text=t('bookmarks.res_site_label')).grid(row=9, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.res_site_label')).grid(row=10, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         res_var = tk.StringVar(value=bookmark_data.get('res_site', '') if bookmark_data else '')
         res_combo = ttk.Combobox(frame, textvariable=res_var, width=32, state="readonly")
         res_combo['values'] = ('', 'Hazardous', 'High', 'Normal', 'Low')
-        res_combo.grid(row=9, column=1, sticky="w", pady=(0, 5))
+        res_combo.grid(row=10, column=1, sticky="w", pady=(0, 5))
         
         # RES Minerals dropdown field (separate from Overlap Minerals)
-        ttk.Label(frame, text=t('bookmarks.res_minerals')).grid(row=10, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.res_minerals')).grid(row=11, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         
         # Get current RES material value and convert to display name
         current_res_value = bookmark_data.get('res_material', '') if bookmark_data else ''
@@ -13578,22 +13597,22 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         res_material_combo = ttk.Combobox(frame, textvariable=res_material_var, width=32, state="readonly")
         res_material_combo['values'] = tuple(target_materials_display)  # Same materials list
-        res_material_combo.grid(row=10, column=1, sticky="w", pady=(0, 5))
+        res_material_combo.grid(row=11, column=1, sticky="w", pady=(0, 5))
         
         # Rating field (1-5 stars)
-        ttk.Label(frame, text=t('bookmarks.rating_label')).grid(row=11, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.rating_label')).grid(row=12, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
         rating_var = tk.IntVar(value=bookmark_data.get('rating', 0) if bookmark_data else 0)
         rating_frame = ttk.Frame(frame)
-        rating_frame.grid(row=11, column=1, sticky="w", pady=(0, 5))
+        rating_frame.grid(row=12, column=1, sticky="w", pady=(0, 5))
         rating_combo = ttk.Combobox(rating_frame, textvariable=rating_var, width=10, state="readonly")
         rating_combo['values'] = (0, 1, 2, 3, 4, 5)
         rating_combo.pack(side="left")
         ttk.Label(rating_frame, text="  " + t('bookmarks.rating_hint')).pack(side="left")
         
         # Notes field
-        ttk.Label(frame, text=t('bookmarks.notes_label')).grid(row=12, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.notes_label')).grid(row=13, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
         notes_text = tk.Text(frame, width=35, height=4, insertbackground="#ffffff")  # White cursor for visibility
-        notes_text.grid(row=12, column=1, sticky="w", pady=(0, 10))
+        notes_text.grid(row=13, column=1, sticky="w", pady=(0, 10))
         if bookmark_data:
             notes_text.insert("1.0", bookmark_data.get('notes', ''))
 
@@ -13638,9 +13657,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         _build_existing_screenshot_state()
 
-        ttk.Label(frame, text=t('bookmarks.screenshots_label')).grid(row=13, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
+        ttk.Label(frame, text=t('bookmarks.screenshots_label')).grid(row=14, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
         ss_outer = ttk.Frame(frame)
-        ss_outer.grid(row=13, column=1, sticky="w", pady=(0, 5))
+        ss_outer.grid(row=14, column=1, sticky="w", pady=(0, 5))
 
         # Listbox + scrollbar
         ss_list_frame = ttk.Frame(ss_outer)
@@ -13820,7 +13839,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Buttons
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=14, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=15, column=0, columnspan=2, pady=(10, 0))
         
         def save_bookmark():
             system = system_var.get().strip()
@@ -13886,6 +13905,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     print(f"[SCREENSHOT] Failed to delete {remove_path}: {e}")
             pending_remove.clear()
             bookmark['screenshots'] = [e['filename'] for e in screenshots_state]
+
+            try:
+                if _density_user_db:
+                    _density_user_db.set_ring_density(system, body, _density_by_display.get(density_var.get(), ''))
+            except Exception as e:
+                print(f"Error saving density: {e}")
 
             # Sync overlap/RES to database for Ring Finder integration
             try:
