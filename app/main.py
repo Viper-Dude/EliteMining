@@ -5935,6 +5935,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Actions row (global)
         actions = ttk.Frame(content_frame)
         actions.grid(row=1, column=0, sticky="w", pady=(8, 0))
+        self._content_frame = content_frame
 
         # Create the sidebar (Ship Presets + Cargo Monitor)
         self._create_main_sidebar()
@@ -5954,24 +5955,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         info_frame = tk.Frame(actions, bg=_info_bg)
         info_frame.grid(row=0, column=2, sticky="e", padx=(10, 5))
 
-        # EliteMining logo (resized to fit status bar)
-        try:
-            from PIL import Image, ImageTk
-            from path_utils import get_images_dir
-            logo_path = os.path.join(get_images_dir(), "EliteMining_txt_logo_transp_resize.png")
-            if os.path.exists(logo_path):
-                logo_img = Image.open(logo_path)
-                # Resize to fit status bar height (smaller to avoid stretched look)
-                target_height = 16
-                aspect_ratio = logo_img.width / logo_img.height
-                target_width = int(target_height * aspect_ratio)
-                logo_img = logo_img.resize((target_width, target_height), Image.LANCZOS)
-                self._status_logo = ImageTk.PhotoImage(logo_img)
-                logo_label = tk.Label(info_frame, image=self._status_logo, bg=_info_bg)
-                logo_label.grid(row=0, column=0, sticky="e", padx=(0, 6))
-        except Exception as e:
-            print(f"Could not load status bar logo: {e}")
-        
         # Labels for mixed colors (white labels, yellow values)
         self.cmdr_label_prefix = tk.Label(info_frame, text=t('status_bar.cmdr'), fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
         self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"))
@@ -6016,18 +5999,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         sb = ttk.Label(self, textvariable=self.status, relief=tk.SUNKEN, anchor="w")
         sb.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 6))
 
-        # Sidebar show/hide - right-click menu on the notebook tab bar (always accessible,
-        # no persistent button needed so it can't be affected by the sidebar being hidden)
         self._sidebar_visible = True
-        from core.constants import get_menu_colors
-        _tab_menu_colors = get_menu_colors(self.current_theme)
-        self._sidebar_tab_menu = tk.Menu(self, tearoff=0,
-                                  bg=_tab_menu_colors["bg"], fg=_tab_menu_colors["fg"],
-                                  activebackground=_tab_menu_colors["activebackground"],
-                                  activeforeground=_tab_menu_colors["activeforeground"],
-                                  selectcolor=_tab_menu_colors["selectcolor"])
-        self._sidebar_tab_menu.add_command(label=t('sidebar.hide_sidebar'), command=self._toggle_sidebar_visibility)
-        self.notebook.bind("<Button-3>", self._show_sidebar_tab_menu)
 
         # Import existing values from VoiceAttack profile
         self.after(100, self._import_all_from_txt)
@@ -9310,7 +9282,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 sidebar_width = total_width - current_pos
                 # Sash collapsed against the left edge - rebuild from last known sidebar width,
                 # scaled to the current UI scale (it was recorded under a possibly different one).
-                if current_pos < min_content_width:
+                if current_pos < min_content_width or sidebar_width < min_sidebar_width:
                     base_sidebar_width = getattr(self, '_last_sidebar_width', 300)
                     sidebar_width = round(base_sidebar_width * self._ui_scale_resize_ratio)
                     new_pos = total_width - sidebar_width
@@ -9456,8 +9428,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._create_integrated_cargo_monitor(cargo_pane)
 
         # Theme toggle button below cargo monitor (styled to match current theme)
-        theme_btn_frame = ttk.Frame(sidebar)
-        theme_btn_frame.grid(row=1, column=0, sticky="e", pady=(6, 6))
+        theme_btn_frame = ttk.Frame(self._content_frame)
+        theme_btn_frame.grid(row=1, column=0, sticky="e", pady=(8, 0))
 
         # Get theme-appropriate colors (subtle styling)
         if self.current_theme == "elite_orange":
@@ -9483,6 +9455,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
             cursor="hand2"
         )
         self.theme_toggle_btn.pack(side="left")
+
+        self.sidebar_toggle_btn = tk.Button(
+            theme_btn_frame,
+            text=t('sidebar.sidebar_btn'),
+            command=self._toggle_sidebar_visibility,
+            bg=_tbtn_bg,
+            fg=_tbtn_fg,
+            activebackground=_tbtn_active_bg,
+            activeforeground=_tbtn_active_fg,
+            relief="solid",
+            bd=1,
+            padx=6,
+            pady=1,
+            font=self._scaled_font(8),
+            cursor="hand2"
+        )
+        self.sidebar_toggle_btn.pack(side="left", before=self.theme_toggle_btn, padx=(0, 6))
 
         # Language flag buttons (next to theme button)
         self._create_language_flags(theme_btn_frame)
@@ -15530,15 +15519,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 pass
             # Continue startup even if migration fails
 
-    def _show_sidebar_tab_menu(self, event) -> None:
-        """Show the Hide/Show Sidebar context menu when right-clicking the tab bar"""
-        label = t('sidebar.hide_sidebar') if self._sidebar_visible else t('sidebar.show_sidebar')
-        self._sidebar_tab_menu.entryconfig(0, label=label)
-        try:
-            self._sidebar_tab_menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            self._sidebar_tab_menu.grab_release()
-
     def _toggle_sidebar_visibility(self) -> None:
         """Show or hide the Ship Presets + Cargo Monitor sidebar column"""
         if self._sidebar_visible:
@@ -15556,7 +15536,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if pos:
                 def _restore_sash():
                     self.main_paned.update_idletasks()
-                    self.main_paned.sashpos(0, pos)
+                    total_width = self.main_paned.winfo_width()
+                    new_pos = pos
+                    if total_width >= 400 and not (600 <= pos <= total_width - 200):
+                        sidebar_width = round(getattr(self, '_last_sidebar_width', 300) * self._ui_scale_resize_ratio)
+                        new_pos = min(max(total_width - sidebar_width, 600), total_width - 200)
+                    self.main_paned.sashpos(0, new_pos)
                 self.after(50, _restore_sash)
             self._sidebar_visible = True
 

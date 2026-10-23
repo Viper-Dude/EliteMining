@@ -193,6 +193,12 @@ If you have HDR disabled on your monitor and the game looks too dark after enabl
 </details>
 
 <details>
+<summary><b>The sidebar (Ship Presets) has disappeared.</b></summary>
+
+Click the **Sidebar** button at the bottom of the window, next to the theme button, to hide it, then click it again to show it. This brings the sidebar back at its normal width.
+</details>
+
+<details>
 <summary><b>Mining announcements not working?</b></summary>
 
 Check Settings → Interface → Text-to-Speech. Test voice and volume. Enable announcement filters.

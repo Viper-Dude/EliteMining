@@ -621,10 +621,7 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 - **Ship Presets** — double-click a preset to apply it to VoiceAttack; right-click for save, edit, duplicate, rename, export/import, and delete options. Includes the Anaconda Mk II.
 - **Cargo Monitor** — live cargo hold status, updated in real time while mining.
-- **Hide/Show Sidebar** — right-click the tab bar at the top of the app to toggle the sidebar and reclaim screen space.
-
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/sidebar.png" width="900"><br>
-*Right-click the tab bar to hide or show the sidebar.*
+- **Hide/Show Sidebar** — click the **Sidebar** button at the bottom of the app to toggle the sidebar and reclaim screen space.
 
 ---
 
