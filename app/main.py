@@ -215,7 +215,7 @@ class TextOverlay:
         
         # Hide initially
         self.overlay_window.withdraw()
-        
+
         # Apply current color and brightness settings
         # self._update_text_color() # No text item yet
         
@@ -243,7 +243,7 @@ class TextOverlay:
         self._is_showing = True
         if not self._game_hidden and not getattr(self, '_sc_hidden', False) and not getattr(self, '_session_hidden', False):
             self._show_on_top()
-            logging.info(f"[OVERLAY] show_message: deiconified, duration={self.display_duration}ms")
+            logging.info(f"[OVERLAY] show_message: deiconified, duration={self.display_duration}ms, {self._window_diag()}")
         else:
             logging.info(f"[OVERLAY] show_message: gated (game_hidden={self._game_hidden}, "
                           f"sc_hidden={getattr(self, '_sc_hidden', False)}, "
@@ -353,17 +353,20 @@ class TextOverlay:
     def hide_overlay(self):
         """Hide the overlay window"""
         if self.overlay_window:
-            self.overlay_window.withdraw()
+            self._hide_window()
             self._is_showing = False
-            logging.debug("[OVERLAY] hide_overlay: withdrawn")
+            logging.debug("[OVERLAY] hide_overlay: hidden")
+
+    def _hide_window(self):
+        self.overlay_window.withdraw()
 
     def _timed_hide(self):
         """Called when display duration (or the persistent-message watchdog) expires"""
         logging.debug("[OVERLAY] _timed_hide: auto-hide fired")
         self._is_showing = False
         if self.overlay_window:
-            self.overlay_window.withdraw()
-            
+            self._hide_window()
+
     def reinstate(self):
         """Tear down and rebuild the overlay window and clear stuck hide flags (recovers a lost/buried overlay)."""
         logging.info(f"[OVERLAY] text overlay reinstate (was game_hidden={self._game_hidden}, "
@@ -391,6 +394,20 @@ class TextOverlay:
                 raise tk.TclError("window gone")
         except tk.TclError:
             self.reinstate()
+
+    def _window_diag(self) -> str:
+        try:
+            import ctypes, ctypes.wintypes
+            self.overlay_window.update_idletasks()
+            hwnd = int(self.overlay_window.wm_frame(), 16)
+            rect = ctypes.wintypes.RECT()
+            ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+            return (f"viewable={self.overlay_window.winfo_viewable()} alpha={self.overlay_window.wm_attributes('-alpha')} "
+                    f"topmost={self.overlay_window.wm_attributes('-topmost')} "
+                    f"win32_visible={bool(ctypes.windll.user32.IsWindowVisible(hwnd))} "
+                    f"rect=({rect.left},{rect.top},{rect.right},{rect.bottom})")
+        except Exception as e:
+            return f"diag failed: {e}"
 
     def _show_on_top(self):
         self.overlay_window.deiconify()
@@ -6484,7 +6501,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             self.text_overlay._show_on_top()
                     else:
                         if not self.text_overlay._game_hidden and self.text_overlay._is_showing and self.text_overlay.overlay_window:
-                            self.text_overlay.overlay_window.withdraw()
+                            self.text_overlay._hide_window()
                         self.text_overlay._game_hidden = True
             else:
                 # Setting disabled — still require the game to be running
@@ -6502,7 +6519,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     elif not self.text_overlay._game_hidden:
                         self.text_overlay._game_hidden = True
                         if self.text_overlay._is_showing and self.text_overlay.overlay_window:
-                            self.text_overlay.overlay_window.withdraw()
+                            self.text_overlay._hide_window()
         except Exception:
             pass
         
@@ -6516,7 +6533,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self, 'text_overlay') and self.text_overlay._is_showing and self.text_overlay.overlay_window:
                     if not getattr(self.text_overlay, '_sc_hidden', False):
                         self.text_overlay._sc_hidden = True
-                        self.text_overlay.overlay_window.withdraw()
+                        self.text_overlay._hide_window()
             else:
                 # Restore overlays when leaving supercruise
                 if hasattr(self, 'cargo_text_overlay') and getattr(self.cargo_text_overlay, '_sc_hidden', False):
@@ -6526,7 +6543,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self, 'text_overlay') and getattr(self.text_overlay, '_sc_hidden', False):
                     self.text_overlay._sc_hidden = False
                     if self.text_overlay._is_showing and not self.text_overlay._game_hidden:
-                        self.text_overlay.overlay_window.deiconify()
+                        self.text_overlay._show_on_top()
         except Exception:
             pass
         
@@ -6542,7 +6559,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self, 'text_overlay'):
                     self.text_overlay._session_hidden = True
                     if self.text_overlay._is_showing and self.text_overlay.overlay_window:
-                        self.text_overlay.overlay_window.withdraw()
+                        self.text_overlay._hide_window()
             else:
                 # Session is active (or setting disabled) — restore and keep overlays visible each cycle
                 if hasattr(self, 'cargo_text_overlay'):
@@ -6554,7 +6571,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.text_overlay._session_hidden = False
                     if self.text_overlay._is_showing and not self.text_overlay._game_hidden and not getattr(self.text_overlay, '_sc_hidden', False):
                         if self.text_overlay.overlay_window:
-                            self.text_overlay.overlay_window.deiconify()
+                            self.text_overlay._show_on_top()
         except Exception:
             pass
         
