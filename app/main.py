@@ -744,7 +744,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.4.6"
+APP_VERSION = "v5.4.7"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5359,7 +5359,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.columnconfigure(0, weight=2, minsize=300)   # Dashboard content (tabs) - balanced
         self.columnconfigure(1, weight=1, minsize=250)   # Ship Presets sidebar - narrower
         self.rowconfigure(0, weight=1)
-        self.rowconfigure(1, weight=0)      # Status bar
+        self.rowconfigure(1, weight=0)      # CMDR info / buttons row
+        self.rowconfigure(2, weight=0)      # Status bar
 
         # Resolve installation folder (VA or standalone)
         self.va_root = detect_va_folder_interactive(self)
@@ -5934,18 +5935,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # About tab removed - now accessible via version button in sidebar
 
         # Actions row (global)
-        actions = ttk.Frame(content_frame)
-        actions.grid(row=1, column=0, sticky="w", pady=(8, 0))
-        self._content_frame = content_frame
+        actions = ttk.Frame(self)
+        actions.grid(row=1, column=0, columnspan=2, sticky="ew", padx=(10, 10), pady=(4, 0))
+        self._actions_frame = actions
 
         # Create the sidebar (Ship Presets + Cargo Monitor)
         self._create_main_sidebar()
 
         # Configure column weights for proper spacing
-        actions.grid_columnconfigure(0, weight=0)  # Left side fixed
+        actions.grid_columnconfigure(0, weight=0)  # Info frame fixed (left)
         actions.grid_columnconfigure(1, weight=1)  # Expandable space in middle
-        actions.grid_columnconfigure(2, weight=0)  # Info frame fixed
-        actions.grid_columnconfigure(3, weight=0)  # Theme button fixed
+        actions.grid_columnconfigure(2, weight=0)  # Buttons fixed (right)
 
         # CMDR/System info container (right side) - uses frame for mixed colors
         # Use black background for orange theme
@@ -5954,7 +5954,25 @@ class App(tk.Tk, ColumnVisibilityMixin):
         _info_bg = "#000000" if _info_theme == "elite_orange" else "#1e1e1e"
 
         info_frame = tk.Frame(actions, bg=_info_bg)
-        info_frame.grid(row=0, column=2, sticky="e", padx=(10, 5))
+        info_frame.grid(row=0, column=0, sticky="w")
+
+        # EliteMining logo (resized to fit status bar)
+        try:
+            from PIL import Image, ImageTk
+            from path_utils import get_images_dir
+            logo_path = os.path.join(get_images_dir(), "EliteMining_txt_logo_transp_resize.png")
+            if os.path.exists(logo_path):
+                logo_img = Image.open(logo_path)
+                # Resize to fit status bar height (smaller to avoid stretched look)
+                target_height = 16
+                aspect_ratio = logo_img.width / logo_img.height
+                target_width = int(target_height * aspect_ratio)
+                logo_img = logo_img.resize((target_width, target_height), Image.LANCZOS)
+                self._status_logo = ImageTk.PhotoImage(logo_img)
+                logo_label = tk.Label(info_frame, image=self._status_logo, bg=_info_bg)
+                logo_label.grid(row=0, column=0, sticky="e", padx=(0, 6))
+        except Exception as e:
+            print(f"Could not load status bar logo: {e}")
 
         # Labels for mixed colors (white labels, yellow values)
         self.cmdr_label_prefix = tk.Label(info_frame, text=t('status_bar.cmdr'), fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
@@ -5998,7 +6016,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Status bar - span both columns
         self.status = tk.StringVar(value=f"{APP_TITLE} {APP_VERSION} | Installation: {self.va_root}")
         sb = ttk.Label(self, textvariable=self.status, relief=tk.SUNKEN, anchor="w")
-        sb.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 6))
+        sb.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 6))
 
         self._sidebar_visible = True
 
@@ -6058,7 +6076,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Create a LabelFrame to provide visual border around cargo monitor
         cargo_frame = ttk.LabelFrame(parent_frame, text=t('sidebar.cargo_monitor'), padding=6, style="Cargo.TLabelframe")
-        cargo_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=(2, 0))  # sticky="nsew" - expand in all directions
+        cargo_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=(2, round(6 * self.ui_scale)))  # sticky="nsew" - expand in all directions
+        self._cargo_frame = cargo_frame
         cargo_frame.columnconfigure(0, weight=1)
         cargo_frame.rowconfigure(1, weight=1)  # Content row expands
         
@@ -9429,8 +9448,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._create_integrated_cargo_monitor(cargo_pane)
 
         # Theme toggle button below cargo monitor (styled to match current theme)
-        theme_btn_frame = ttk.Frame(self._content_frame)
-        theme_btn_frame.grid(row=1, column=0, sticky="e", pady=(8, 0))
+        theme_btn_frame = ttk.Frame(self._actions_frame)
+        theme_btn_frame.grid(row=0, column=2, sticky="e")
 
         # Get theme-appropriate colors (subtle styling)
         if self.current_theme == "elite_orange":

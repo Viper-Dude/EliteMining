@@ -924,7 +924,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.specific_material_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         
         # Data Source selection — second inner row of row3_container
-        ttk.Label(misc_inner_row, text=t('ring_finder.data_source'), font=scaled_font(9, "bold")).pack(side="left", padx=(160, 10))
+        ttk.Label(misc_inner_row, text=t('ring_finder.data_source'), font=scaled_font(9, "bold")).pack(side="left", padx=(8, 10))
 
         # Frame for radio buttons
         source_frame = tk.Frame(misc_inner_row, bg=_cb_bg)
@@ -956,11 +956,19 @@ class RingFinder(ColumnVisibilityMixin):
                       value="spansh", command=self._on_data_source_changed, **rb_style_spansh)
         self.data_source_spansh_rb.pack(side="left", padx=(0, 15))
         
+        self.auto_save_var = tk.BooleanVar(value=False)
+        self.auto_save_cb = tk.Checkbutton(source_frame, text=t('ring_finder.auto_save'), variable=self.auto_save_var,
+                      command=self._save_filter_settings, **rb_style)
+        self.auto_save_cb.pack(side="left", padx=(0, 15))
+        self.auto_save_cb.configure(state="disabled")  # enabled by _on_data_source_changed for Spansh/Both
+        ToolTip(self.auto_save_cb, t('ring_finder.auto_save_tooltip'))
+
         self.data_source_both_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_both'), variable=self.data_source_var,
                       value="both", command=self._on_data_source_changed, **rb_style)
         self.data_source_both_rb.pack(side="left", padx=(0, 15))
 
         self.spansh_pp_var = tk.BooleanVar(value=False)
+        self._spansh_pp_stashed = False
         self.spansh_pp_cb = tk.Checkbutton(source_frame, text=t('ring_finder.spansh_pp_lookup'), variable=self.spansh_pp_var,
                       command=self._save_filter_settings, **rb_style)
         self.spansh_pp_cb.pack(side="left")
@@ -1743,9 +1751,16 @@ class RingFinder(ColumnVisibilityMixin):
             self.pp_power_combo.configure(state="disabled")
             self.pp_state_combo.configure(state="disabled")
             self._cv_set_force_hidden('ring_finder', 'PowerPlay', True)
+            if str(self.spansh_pp_cb.cget('state')) != 'disabled':
+                self._spansh_pp_stashed = self.spansh_pp_var.get()
+            self.spansh_pp_var.set(False)
             self.spansh_pp_cb.configure(state="disabled")
+            self.auto_save_cb.configure(state="normal")
         else:
             # Re-enable for database
+            self.auto_save_cb.configure(state="disabled")
+            if str(self.spansh_pp_cb.cget('state')) == 'disabled':
+                self.spansh_pp_var.set(self._spansh_pp_stashed)
             self.spansh_pp_cb.configure(state="normal")
             self.overlaps_only_cb.configure(state="normal")
             self.res_only_cb.configure(state="normal")
@@ -2274,7 +2289,8 @@ class RingFinder(ColumnVisibilityMixin):
                 "reference_system": self.system_var.get(),  # Save last reference system
                 "pp_power": self.pp_power_var.get() if hasattr(self, 'pp_power_var') else 'Any',
                 "pp_state": self.pp_state_var.get() if hasattr(self, 'pp_state_var') else 'Any',
-                "spansh_pp_lookup": self.spansh_pp_var.get()
+                "spansh_pp_lookup": self._spansh_pp_stashed if str(self.spansh_pp_cb.cget('state')) == 'disabled' else self.spansh_pp_var.get(),
+                "auto_save_new": self.auto_save_var.get()
             }
             
             save_ring_finder_filters(settings)
@@ -2318,6 +2334,7 @@ class RingFinder(ColumnVisibilityMixin):
             if "min_hotspots" in settings:
                 self.min_hotspots_var.set(settings["min_hotspots"])
             self.spansh_pp_var.set(settings.get("spansh_pp_lookup", False))
+            self.auto_save_var.set(settings.get("auto_save_new", False))
             if "data_source" in settings:
                 # Restore data source preference (default to "both" if not saved)
                 self.data_source_var.set(settings.get("data_source", "both"))
@@ -5932,6 +5949,9 @@ class RingFinder(ColumnVisibilityMixin):
         self.status_var.set(status_msg)
         self._update_new_entries_label()
 
+        if self.auto_save_var.get() and self.data_source_var.get() in ("spansh", "both"):
+            self._save_items_to_database(self.results_tree.get_children(), new_only=True)
+
         if hasattr(self, '_first_new_item'):
             self.results_tree.see(self._first_new_item)
             delattr(self, '_first_new_item')
@@ -8902,8 +8922,11 @@ class RingFinder(ColumnVisibilityMixin):
             return
         self._save_items_to_database(all_items)
 
-    def _save_items_to_database(self, items):
-        """Classify given treeview items by source type and save the new/updated ones to the database"""
+    def _save_items_to_database(self, items, new_only=False):
+        """Classify given treeview items by source type and save the new/updated ones to the database.
+
+        new_only (auto-save): silent, inserts only hotspots not yet in the database, never updates existing ones.
+        """
         # Classify items by source type
         spansh_items = []
         local_items = []
@@ -8929,6 +8952,8 @@ class RingFinder(ColumnVisibilityMixin):
         items_to_process = spansh_items + both_items
 
         if not items_to_process:
+            if new_only:
+                return
             if local_items:
                 # All rows are local-only (no Spansh data to merge)
                 message = t('ring_finder.already_in_database')
@@ -8956,6 +8981,10 @@ class RingFinder(ColumnVisibilityMixin):
                 coords = h.get('coords')
                 if sys_name and coords and coords.get('x') is not None:
                     search_coords[sys_name.lower()] = (coords['x'], coords['y'], coords['z'])
+
+        if new_only:
+            threading.Thread(target=self._save_to_database_worker, args=(items_data, None, None, search_coords, True), daemon=True).start()
+            return
 
         # Show progress dialog while saving
         from config import load_theme, scaled_font
@@ -9008,7 +9037,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.status_var.set(f"Saving {len(items_data)} entries to database...")
         threading.Thread(target=self._save_to_database_worker, args=(items_data, wait_dialog, progress_bar, search_coords), daemon=True).start()
 
-    def _save_to_database_worker(self, items_data, wait_dialog=None, progress_bar=None, search_coords=None):
+    def _save_to_database_worker(self, items_data, wait_dialog=None, progress_bar=None, search_coords=None, new_only=False):
         """Worker thread for saving to database"""
         saved_rows = 0  # Count of successfully saved rows
         new_rows = 0  # Count of new entries
@@ -9071,7 +9100,7 @@ class RingFinder(ColumnVisibilityMixin):
                         coordinates = self.user_db._get_coordinates_from_visited_systems(system_name)
 
                     # If still no coordinates, try to fetch from EDSM
-                    if not coordinates:
+                    if not coordinates and not new_only:
                         edsm_coords = self._get_system_coords_from_edsm(system_name)
                         if edsm_coords and 'x' in edsm_coords:
                             coordinates = (edsm_coords['x'], edsm_coords['y'], edsm_coords['z'])
@@ -9131,7 +9160,9 @@ class RingFinder(ColumnVisibilityMixin):
                         
                         # Check if entry already exists and if we need to update it
                         existing_data = self.user_db.get_hotspot_data(system_name, body_name, material_full)
-                        
+                        if new_only and existing_data:
+                            continue
+
                         needs_update = False
                         if existing_data:
                             # ONLY update hotspot_count if NEW count is HIGHER (don't downgrade)
@@ -9207,7 +9238,18 @@ class RingFinder(ColumnVisibilityMixin):
                 errors.append(f"Row error: {str(e)[:50]}")
         
         # Update UI on main thread
+        if new_only:
+            self.parent.after(0, lambda: self._auto_save_complete(new_hotspot_count))
+            return
         self.parent.after(0, lambda: self._save_to_database_complete(saved_rows, new_rows, updated_rows, skipped_count, error_count, errors, wait_dialog, progress_bar, new_hotspot_count, len(new_systems)))
+
+    def _auto_save_complete(self, new_hotspot_count):
+        if new_hotspot_count > 0:
+            self.status_var.set(t('ring_finder.auto_saved').format(count=new_hotspot_count))
+            self.new_entries_var.set("")
+            self._update_database_info()
+            if hasattr(self, 'local_db') and hasattr(self.local_db, 'clear_cache'):
+                self.local_db.clear_cache()
 
     def _save_to_database_complete(self, saved_rows, new_rows, updated_rows, skipped_count, error_count, errors, wait_dialog=None, progress_bar=None, new_hotspot_count=0, new_system_count=0):
         """Handle completion of save to database (runs on main thread)"""

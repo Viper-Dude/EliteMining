@@ -283,6 +283,7 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 - **Data Source Selection** – Choose between Database (your scans), Spansh (Spansh data), or Both for best results
 - **Min Hotspots Filter** – Filter results to show only rings with X or more hotspots (1-20 range, available when specific mineral selected)
 - **Save to Local Database** – Right-click Spansh results to save them to your personal database for offline access (max 50 rows)
+- **Auto-Save Tick Box** – Next to the Data Source options (Spansh and Both only). Off by default. Tick it to automatically save new hotspots from Spansh searches to your local database; entries you already have are never changed.
 - **Update Reserve Level** – Right-click local entries with missing reserve data to fetch and update from Spansh
 - **Auto-Search** – Automatically searches for hotspots when jumping to new systems and auto-refreshes results when scanning rings (remembers preference across restarts)
 - **Pre-loaded Database** – 80,000+ hotspots with mineral type, ring type, reserve level, etc.

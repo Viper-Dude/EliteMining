@@ -7558,6 +7558,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             ("last_7_days", t('reports.last_7_days')),
             ("last_30_days", t('reports.last_30_days')),
             ("last_90_days", t('reports.last_90_days')),
+            ("last_180_days", t('reports.last_180_days')),
+            ("this_year", t('reports.this_year')),
         ]
         self._time_display_to_key = {display: key for key, display in self._time_filter_options}
         time_display_values = [display for key, display in self._time_filter_options]
@@ -7644,11 +7646,24 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self._sub_filter_combo.bind("<Return>", self._on_sub_filter_commit)
         self._sub_filter_combo.bind("<Escape>", self._on_sub_filter_reset)
         self.ToolTip(self._sub_filter_combo, t('reports.tooltip_sub_filter'))
-        
+
+        # --- SEARCH box (right-aligned) ---
+        self._reports_page_size = 100
+        self._reports_limit = self._reports_page_size
+        self._search_var = tk.StringVar()
+        self._search_label = ttk.Label(filter_frame, text=t('reports.search_label'))
+        self._search_label.pack(side="left", padx=(10, 3))
+        search_entry = ttk.Entry(filter_frame, textvariable=self._search_var, width=22)
+        search_entry.pack(side="left")
+        search_entry.bind("<KeyRelease>", self._on_search_changed)
+        self.ToolTip(search_entry, t('reports.tooltip_search'))
+
         # Hint text on a new line below filters
         hint_frame = ttk.Frame(main_frame)
-        hint_frame.grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 2))
+        hint_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 2))
         ttk.Label(hint_frame, text=t('reports.right_click_options'), foreground="gray").pack(side="left")
+        self._reports_showing_label = ttk.Label(hint_frame, text="", foreground="#888888")
+        self._reports_load_more_btn = ttk.Button(hint_frame, text=t('reports.load_more'), width=14, command=self._load_more_reports)
 
         # Spacing between filter and table
         ttk.Frame(main_frame, height=6).grid(row=2, column=0, columnspan=2)
@@ -7833,6 +7848,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         from ui.sort_indicator import apply_sort_arrow
         _sort_tab_col_rows = sort_tab_col
         def sort_tab_col(col):
+            if len(self.reports_tree_tab.get_children('')) < len(getattr(self, '_reports_filtered_sessions', ())):
+                # Sort must cover every report, not just the loaded page
+                self._reports_limit = None
+                self._refresh_reports_tab()
             _sort_tab_col_rows(col)
             apply_sort_arrow(self.reports_tree_tab, col, not tab_sort_dirs.get(col, False))
 
@@ -8856,25 +8875,26 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if commodities and self._sub_filter_var.get() not in commodities:
                 self._sub_filter_var.set(commodities[0])
             self._sub_filter_last = self._sub_filter_var.get()
-            self._sub_filter_combo.pack(side="left", padx=(5, 0))
+            self._sub_filter_combo.pack(side="left", padx=(5, 0), before=self._search_label)
         elif source_key == 'by_system':
             systems = self._get_unique_systems_from_csv()
             self._set_sub_filter_values(systems)
             if systems and self._sub_filter_var.get() not in systems:
                 self._sub_filter_var.set(systems[0])
             self._sub_filter_last = self._sub_filter_var.get()
-            self._sub_filter_combo.pack(side="left", padx=(5, 0))
+            self._sub_filter_combo.pack(side="left", padx=(5, 0), before=self._search_label)
         elif source_key == 'by_ship':
             ships = self._get_unique_ships_from_csv()
             self._set_sub_filter_values(ships)
             if ships and self._sub_filter_var.get() not in ships:
                 self._sub_filter_var.set(ships[0])
             self._sub_filter_last = self._sub_filter_var.get()
-            self._sub_filter_combo.pack(side="left", padx=(5, 0))
+            self._sub_filter_combo.pack(side="left", padx=(5, 0), before=self._search_label)
         else:
             self._sub_filter_combo.pack_forget()
             self._sub_filter_var.set('')
-        
+
+        self._reports_limit = self._reports_page_size
         self._refresh_reports_tab()
 
     def _on_date_filter_changed(self, event=None) -> None:
@@ -8887,6 +8907,21 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             event.widget.selection_clear()
         self._sub_filter_last = self._sub_filter_var.get()
         self._set_sub_filter_values(self._sub_filter_all)
+        self._reports_limit = self._reports_page_size
+        self._refresh_reports_tab()
+
+    def _on_search_changed(self, event=None) -> None:
+        if getattr(self, '_search_after_id', None):
+            self.after_cancel(self._search_after_id)
+        self._search_after_id = self.after(250, self._apply_search)
+
+    def _apply_search(self) -> None:
+        self._search_after_id = None
+        self._reports_limit = self._reports_page_size
+        self._refresh_reports_tab()
+
+    def _load_more_reports(self) -> None:
+        self._reports_limit += self._reports_page_size
         self._refresh_reports_tab()
 
     def _set_sub_filter_values(self, values) -> None:
@@ -9448,12 +9483,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if time_key != 'all_time':
                 time_cutoffs = {
                     'last_1_day': 1, 'last_2_days': 2, 'last_3_days': 3,
-                    'last_7_days': 7, 'last_30_days': 30, 'last_90_days': 90
+                    'last_7_days': 7, 'last_30_days': 30, 'last_90_days': 90, 'last_180_days': 180
                 }
                 days = time_cutoffs.get(time_key)
-                if days:
+                if days or time_key == 'this_year':
                     now = datetime.now()
-                    cutoff = now - timedelta(days=days)
+                    cutoff = datetime(now.year, 1, 1) if time_key == 'this_year' else now - timedelta(days=days)
                     filtered = []
                     for session in sessions_data:
                         try:
@@ -9574,9 +9609,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         continue
                 sessions_data = filtered
             
-            # Populate treeview and store session data for tooltips
-            self.reports_tab_session_lookup = {}  # Store for tooltip access  
-            self.reports_tab_original_sessions = sessions_data.copy()  # Store backup for sorting
             from ring_finder import translate_ring_type
             ring_types = {}
             try:
@@ -9584,6 +9616,29 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     list({(sess.get('system', ''), sess.get('body', '')) for sess in sessions_data}))
             except Exception:
                 pass
+
+            # --- SEARCH filter (date, system, ring, ring type, ship, type, minerals, eng. materials, comment) ---
+            search_text = self._search_var.get().strip().lower() if hasattr(self, '_search_var') else ''
+            if search_text:
+                sessions_data = [
+                    s for s in sessions_data
+                    if search_text in ' '.join((
+                        s.get('date', ''), s.get('system', ''), s.get('body', ''), s.get('_ship_display', ''),
+                        s.get('cargo_raw', ''), s.get('engineering_materials', ''), s.get('comment', ''),
+                        'Multi' if 'Multi' in self._extract_session_type_from_data(
+                            {**s, 'file_path': s.get('_ship_file_path', '')}) else 'Single',
+                        translate_ring_type(ring_types.get((s.get('system', ''), s.get('body', '')), '')),
+                    )).lower()]
+
+            # Totals cover every filtered row; only the newest N are shown in the tree
+            self._reports_filtered_sessions = sessions_data
+            total_filtered = len(sessions_data)
+            if self._reports_limit is not None:
+                sessions_data = sessions_data[:self._reports_limit]
+
+            # Populate treeview and store session data for tooltips
+            self.reports_tab_session_lookup = {}  # Store for tooltip access
+            self.reports_tab_original_sessions = sessions_data.copy()  # Store backup for sorting
             for i, session in enumerate(sessions_data):
                 # Apply alternating row tags
                 tag = "evenrow" if i % 2 == 0 else "oddrow"
@@ -9907,30 +9962,40 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 pass
 
             self._update_reports_summary()
+            self._update_reports_paging(len(sessions_data), total_filtered)
 
         except Exception as e:
             print(f"Failed to refresh reports tab: {e}")
 
+    def _update_reports_paging(self, shown: int, total: int) -> None:
+        """Show 'Showing N of M' + Load more only while rows are hidden"""
+        if shown < total:
+            self._reports_showing_label.configure(text=t('reports.showing_of').format(shown=shown, total=total))
+            self._reports_load_more_btn.pack(side="right")
+            self._reports_showing_label.pack(side="right", padx=(10, 8))
+        else:
+            self._reports_showing_label.pack_forget()
+            self._reports_load_more_btn.pack_forget()
+
     def _update_reports_summary(self) -> None:
-        """Totals for the rows currently shown in the Reports tab"""
-        tree = self.reports_tree_tab
+        """Totals for all rows matching the current filters (not just the loaded page)"""
         count = 0
         total_tons = 0.0
         total_hours = 0.0
         best_tph = 0.0
-        for item in tree.get_children(''):
+        for session in getattr(self, '_reports_filtered_sessions', []):
             count += 1
             try:
-                total_tons += float(str(tree.set(item, 'tons')).replace(',', ''))
+                total_tons += float(str(session.get('tons', '')).replace(',', ''))
             except ValueError:
                 pass
             try:
-                h, m, s = (int(p) for p in tree.set(item, 'duration').split(':'))
+                h, m, s = (int(p) for p in str(session.get('duration', '')).split(':'))
                 total_hours += (h * 3600 + m * 60 + s) / 3600
             except ValueError:
                 pass
             try:
-                best_tph = max(best_tph, float(str(tree.set(item, 'tph')).replace(',', '')))
+                best_tph = max(best_tph, float(str(session.get('tph', '')).replace(',', '')))
             except ValueError:
                 pass
         if not count:
