@@ -6629,7 +6629,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         cfg = _load_cfg()
         overlay_mode = cfg.get("overlay_mode", "standard")
         show_all = cfg.get("prospector_show_all", False)
-        
+        log.info(f"[OVERLAY] prospector overlay request: mode={overlay_mode}, show_all={show_all}, "
+                 f"overlay_enabled={getattr(self.text_overlay, 'overlay_enabled', None)}")
+
+        try:
+            self._dispatch_prospector_overlay(overlay_mode, show_all, standard_msg, panel_summary, materials_txt, content_txt, core_material)
+        except Exception:
+            log.exception("[OVERLAY] prospector overlay failed")
+
+    def _dispatch_prospector_overlay(self, overlay_mode, show_all, standard_msg, panel_summary, materials_txt, content_txt, core_material):
         if overlay_mode == "enhanced":
             # ENHANCED MODE: Always show overlay with game-style format
             # Pass materials and content separately to formatter
@@ -10327,7 +10335,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                 self.last_system or self.session_system.get() or ""
                             )
                             self.session_body.set(body_display)
-                            
+                            if self.main_app and self.last_body_type == "PlanetaryRing":
+                                self.main_app.after(500, self.main_app.refresh_overlays)
+
                             # Note: Auto-switch to Mining Session happens on prospector launch, not ring entry
                 
                 # Handle SupercruiseEntry - auto-switch to Hotspots Finder

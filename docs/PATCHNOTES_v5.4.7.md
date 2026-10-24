@@ -18,6 +18,7 @@
 ### Voiceattack Profile updated to v5.4.7
 
 - **Fixed:** When Thrust Up was not selected in the VA controlls tab, the firegroup change could switch to the wrong firegroup.
+- If your Prospector fire group (FG) is different from your mining laser or MVR fire group, the Reset Mining command now keeps the laser fire group instead of switching to the Prospector fire group. It only switches to the Prospector fire group when a prospector is launched, which is handy if you need to manually extend the mining lasers after the mining sequence has finished.
 
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

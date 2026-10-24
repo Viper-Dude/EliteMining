@@ -107,6 +107,18 @@ set_translate_func(t)
 from path_utils import get_ship_presets_dir, get_reports_dir
 
 
+def _foreground_window_title() -> str:
+    try:
+        import ctypes
+        hwnd = ctypes.windll.user32.GetForegroundWindow()
+        length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+        buf = ctypes.create_unicode_buffer(length + 1)
+        ctypes.windll.user32.GetWindowTextW(hwnd, buf, length + 1)
+        return buf.value
+    except Exception:
+        return ""
+
+
 def is_game_focused() -> bool:
     """Check if Elite Dangerous game client is the active foreground window."""
     try:
@@ -214,7 +226,9 @@ class TextOverlay:
             
         if not self.overlay_window:
             self.create_overlay()
-        
+        else:
+            self._ensure_alive()
+
         # Draw text BEFORE showing window to prevent flicker
         self._draw_text(message)
 
@@ -228,10 +242,10 @@ class TextOverlay:
         # Always show message — events come from journal files regardless of which app has focus.
         self._is_showing = True
         if not self._game_hidden and not getattr(self, '_sc_hidden', False) and not getattr(self, '_session_hidden', False):
-            self.overlay_window.deiconify()
-            logging.debug(f"[OVERLAY] show_message: deiconified, duration={self.display_duration}ms")
+            self._show_on_top()
+            logging.info(f"[OVERLAY] show_message: deiconified, duration={self.display_duration}ms")
         else:
-            logging.debug(f"[OVERLAY] show_message: gated (game_hidden={self._game_hidden}, "
+            logging.info(f"[OVERLAY] show_message: gated (game_hidden={self._game_hidden}, "
                           f"sc_hidden={getattr(self, '_sc_hidden', False)}, "
                           f"session_hidden={getattr(self, '_session_hidden', False)})")
 
@@ -254,6 +268,8 @@ class TextOverlay:
 
         if not self.overlay_window:
             self.create_overlay()
+        else:
+            self._ensure_alive()
 
         # Draw text BEFORE showing window to prevent flicker
         self._draw_text(message)
@@ -265,10 +281,10 @@ class TextOverlay:
         # Show window AFTER text is ready — always show persistent messages.
         self._is_showing = True
         if not self._game_hidden and not getattr(self, '_sc_hidden', False) and not getattr(self, '_session_hidden', False):
-            self.overlay_window.deiconify()
-            logging.debug(f"[OVERLAY] show_persistent_message: deiconified, watchdog={max_lifetime_ms}ms")
+            self._show_on_top()
+            logging.info(f"[OVERLAY] show_persistent_message: deiconified, watchdog={max_lifetime_ms}ms")
         else:
-            logging.debug(f"[OVERLAY] show_persistent_message: gated (game_hidden={self._game_hidden}, "
+            logging.info(f"[OVERLAY] show_persistent_message: gated (game_hidden={self._game_hidden}, "
                           f"sc_hidden={getattr(self, '_sc_hidden', False)}, "
                           f"session_hidden={getattr(self, '_session_hidden', False)})")
 
@@ -299,7 +315,8 @@ class TextOverlay:
                     font=font_spec,
                     fill="black",
                     anchor="nw",
-                    justify="left"
+                    justify="left",
+                    width=700
                 ))
             self.text_item = self.canvas.create_text(
                 base_x, base_y,
@@ -307,7 +324,8 @@ class TextOverlay:
                 font=font_spec,
                 fill=text_color,
                 anchor="nw",
-                justify="left"
+                justify="left",
+                width=700
             )
     
     def _fit_window_to_content(self):
@@ -318,6 +336,10 @@ class TextOverlay:
         x_pos = gx + 20
         y_pos = gy + 100
         bbox = self.canvas.bbox("all") if hasattr(self, 'canvas') else None
+        if (gx, gy, gw) != getattr(self, '_last_logged_pos', None):
+            self._last_logged_pos = (gx, gy, gw)
+            logging.info(f"[OVERLAY] text overlay position: game rect origin=({gx},{gy}) width={gw}, "
+                         f"window at ({x_pos},{y_pos}), font_size={self.font_size}, bbox={bbox}")
         if bbox:
             window_width = max(400, bbox[2] + 30)
             window_height = max(60, bbox[3] + 20)
@@ -342,12 +364,47 @@ class TextOverlay:
         if self.overlay_window:
             self.overlay_window.withdraw()
             
+    def reinstate(self):
+        """Tear down and rebuild the overlay window and clear stuck hide flags (recovers a lost/buried overlay)."""
+        logging.info(f"[OVERLAY] text overlay reinstate (was game_hidden={self._game_hidden}, "
+                     f"sc_hidden={getattr(self, '_sc_hidden', False)}, session_hidden={getattr(self, '_session_hidden', False)}, "
+                     f"showing={self._is_showing})")
+        if self.overlay_window:
+            try:
+                self.overlay_window.destroy()
+            except Exception:
+                pass
+        self.overlay_window = None
+        self.fade_timer = None
+        self._outline_items = []
+        self._is_showing = False
+        self._game_hidden = False
+        self._sc_hidden = False
+        self._session_hidden = False
+        if self.overlay_enabled:
+            self.create_overlay()
+
+    def _ensure_alive(self):
+        """Rebuild the window if Tk lost it."""
+        try:
+            if not self.overlay_window.winfo_exists():
+                raise tk.TclError("window gone")
+        except tk.TclError:
+            self.reinstate()
+
+    def _show_on_top(self):
+        self.overlay_window.deiconify()
+        self.overlay_window.wm_attributes("-topmost", True)
+        self.overlay_window.lift()
+
     def set_enabled(self, enabled: bool):
         """Enable or disable the text overlay"""
         self.overlay_enabled = enabled
-        if not enabled and self.overlay_window:
+        if enabled:
+            self.reinstate()
+        elif self.overlay_window:
             self.hide_overlay()
-            
+
     def set_transparency(self, transparency_percent: int):
         """Set text brightness (10-100%)"""
         self.transparency = transparency_percent / 100.0
@@ -642,6 +699,8 @@ class CargoTextOverlay:
 
     def reinstate(self):
         """Tear down and rebuild the overlay window from scratch (recovers a lost/buried overlay)."""
+        logging.info(f"[OVERLAY] cargo overlay reinstate (was game_hidden={self._game_hidden}, "
+                     f"sc_hidden={getattr(self, '_sc_hidden', False)}, session_hidden={getattr(self, '_session_hidden', False)})")
         if self.overlay_window:
             try:
                 self.overlay_window.destroy()
@@ -6372,6 +6431,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except:
             pass
     
+    def refresh_overlays(self):
+        """Rebuild the cargo overlay and re-assert topmost on both overlays (recovers one the game window buried)."""
+        log.info("[OVERLAY] refresh_overlays")
+        try:
+            if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled and self.text_overlay_enabled.get():
+                self.cargo_text_overlay.reinstate()
+                self.cargo_text_overlay.update_cargo(self.cargo_monitor)
+            for ov in (getattr(self, 'cargo_text_overlay', None), getattr(self, 'text_overlay', None)):
+                if ov and ov.overlay_window:
+                    ov.overlay_window.wm_attributes("-topmost", False)
+                    ov.overlay_window.wm_attributes("-topmost", True)
+                    ov.overlay_window.lift()
+        except Exception as e:
+            log.debug(f"refresh_overlays: {e}")
+
     def _periodic_integrated_cargo_update(self):
         """Periodically update the integrated cargo display"""
         try:
@@ -6383,6 +6457,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             if self.overlay_only_game_focused.get():
                 game_active = is_game_focused()
+                if game_active != getattr(self, '_prev_game_active', True):
+                    log.info(f"[OVERLAY] game focus {'regained' if game_active else 'lost'}"
+                             + ("" if game_active else f" (foreground: '{_foreground_window_title()}')"))
+                if game_active and getattr(self, '_prev_game_active', True) is False:
+                    self.after(0, self.refresh_overlays)
+                self._prev_game_active = game_active
                 # Cargo overlay
                 if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled and self.text_overlay_enabled.get():
                     if game_active:
@@ -6401,7 +6481,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if game_active:
                         self.text_overlay._game_hidden = False
                         if self.text_overlay._is_showing and self.text_overlay.overlay_window and not getattr(self.text_overlay, '_session_hidden', False) and not getattr(self.text_overlay, '_sc_hidden', False):
-                            self.text_overlay.overlay_window.deiconify()
+                            self.text_overlay._show_on_top()
                     else:
                         if not self.text_overlay._game_hidden and self.text_overlay._is_showing and self.text_overlay.overlay_window:
                             self.text_overlay.overlay_window.withdraw()
