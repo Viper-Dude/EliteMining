@@ -215,6 +215,7 @@ class TextOverlay:
         
         # Hide initially
         self.overlay_window.withdraw()
+        self._reveal_delayed = True
 
         # Apply current color and brightness settings
         # self._update_text_color() # No text item yet
@@ -410,9 +411,22 @@ class TextOverlay:
             return f"diag failed: {e}"
 
     def _show_on_top(self):
-        self.overlay_window.deiconify()
-        self.overlay_window.wm_attributes("-topmost", True)
-        self.overlay_window.lift()
+        # First show after creation: reveal after a short delay so the window's first-draw outline isn't visible
+        delayed = getattr(self, '_reveal_delayed', False)
+        window = self.overlay_window
+        if delayed:
+            self._reveal_delayed = False
+            window.wm_attributes("-alpha", 0)
+        window.deiconify()
+        window.wm_attributes("-topmost", True)
+        window.lift()
+        if delayed:
+            def _reveal():
+                try:
+                    window.wm_attributes("-alpha", 1)
+                except tk.TclError:
+                    pass
+            window.after(60, _reveal)
 
     def set_enabled(self, enabled: bool):
         """Enable or disable the text overlay"""
