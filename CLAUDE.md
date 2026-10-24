@@ -133,6 +133,14 @@ Use `centered_info_dialog` / `centered_yesno_dialog` from `ui/dialogs.py` for st
 
 ---
 
+## Logs
+
+- **Installed build**: `%LOCALAPPDATA%\EliteMining\logs\elitemining_<timestamp>.log` (one file per session, from `logging_setup.py`).
+- **Dev run** (`python app/main.py`): `~\EliteMining.log` (rotates at 512KB to `.log.1`, so search `.log.1` too).
+- Only INFO and above is written; overlay diagnostics are tagged `[OVERLAY]`.
+
+---
+
 ## Build & Release
 
 ```powershell
