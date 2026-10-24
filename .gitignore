@@ -54,6 +54,8 @@ app/journal_scan_state.json
 
 # User database (runtime data, not for repo)
 app/data/user_data.db
+app/data/user_data.db-shm
+app/data/user_data.db-wal
 app/data/marketplace_cache.db
 
 # API Keys and sensitive data
