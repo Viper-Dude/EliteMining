@@ -229,6 +229,11 @@ class TextOverlay:
             self.create_overlay()
         else:
             self._ensure_alive()
+            if not self._is_showing:
+                # A long-lived hidden window can stay "visible" to Windows yet draw nothing; start each message on a fresh one
+                flags = (self._game_hidden, getattr(self, '_sc_hidden', False), getattr(self, '_session_hidden', False))
+                self.reinstate()
+                self._game_hidden, self._sc_hidden, self._session_hidden = flags
 
         # Draw text BEFORE showing window to prevent flicker
         self._draw_text(message)
@@ -424,8 +429,11 @@ class TextOverlay:
             def _reveal():
                 try:
                     window.wm_attributes("-alpha", 1)
-                except tk.TclError:
-                    pass
+                    window.wm_attributes("-topmost", True)
+                    window.lift()
+                    logging.info(f"[OVERLAY] text overlay revealed, {self._window_diag()}")
+                except tk.TclError as e:
+                    logging.info(f"[OVERLAY] text overlay reveal failed: {e}")
             window.after(60, _reveal)
 
     def set_enabled(self, enabled: bool):
@@ -834,7 +842,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.4.7"
+APP_VERSION = "v5.4.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -6469,6 +6477,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled and self.text_overlay_enabled.get():
                 self.cargo_text_overlay.reinstate()
                 self.cargo_text_overlay.update_cargo(self.cargo_monitor)
+            if hasattr(self, 'text_overlay') and self.text_overlay.overlay_enabled and not self.text_overlay._is_showing:
+                self.text_overlay.reinstate()
             for ov in (getattr(self, 'cargo_text_overlay', None), getattr(self, 'text_overlay', None)):
                 if ov and ov.overlay_window:
                     ov.overlay_window.wm_attributes("-topmost", False)
@@ -6682,7 +6692,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Handle changes detected in Variables folder"""
         print("[VARS WATCHER] Changes detected - refreshing values from VoiceAttack")
         self._import_all_from_txt()
-    
+        self._ship_check_modified()
+
     # =========================================================================
     # VoiceAttack Command Watcher
     # =========================================================================

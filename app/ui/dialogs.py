@@ -44,8 +44,9 @@ def center_window(child, parent):
     child.geometry(f"{cw}x{ch}+{x}+{y}")
 
 
-def centered_yesno_dialog(parent, title, message):
-    """Show a Yes/No dialog centered over parent window. Returns True for Yes, False for No."""
+def centered_yesno_dialog(parent, title, message, allow_cancel=False):
+    """Show a Yes/No dialog centered over parent window. Returns True for Yes, False for No.
+    With allow_cancel, adds a Cancel button (also Escape/close) that returns None."""
     from config import scaled_font
     dialog = tk.Toplevel(parent)
     dialog.withdraw()  # Prevent flicker while we layout and center
@@ -82,10 +83,17 @@ def centered_yesno_dialog(parent, title, message):
     yes_btn.pack(side=tk.LEFT, padx=(0, 10))
     no_btn = ttk.Button(btn_frame, text=_t('common.no'), width=10, command=on_no)
     no_btn.pack(side=tk.LEFT)
-    
+
+    def on_cancel():
+        result['value'] = None
+        dialog.destroy()
+    if allow_cancel:
+        ttk.Button(btn_frame, text=_t('common.cancel'), width=10, command=on_cancel).pack(side=tk.LEFT, padx=(10, 0))
+        dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+
     # Keyboard bindings
     dialog.bind("<Return>", lambda e: on_yes())
-    dialog.bind("<Escape>", lambda e: on_no())
+    dialog.bind("<Escape>", lambda e: on_cancel() if allow_cancel else on_no())
     
     # Center on parent window manually
     dialog.update_idletasks()
