@@ -3,18 +3,17 @@
 
 ## New Features & Improvements
 
-### General Settings - Text Overlay
-- **Improved:** Text Overlay settings are now grouped into General, Appearance, Prospector & Cargo and Auto Prices
+### Auto Prices Overlay
+- **New:** Auto Prices can now show on the in-game text overlay instead of a popup window (right-click the Auto Prices checkbox). The overlay lists every mineral with price, station, landing pad, distance and demand, shown only while in supercruise
 - **New:** Auto Prices has its own display duration slider
-- **Improved:** Tons per hour is now always shown in the cargo overlay
+- **New:** Right-click the Auto Prices checkbox to switch "In-system prices only" on or off without opening the table
 
 ### Hotspots Finder
-- **New:** Auto Prices can now show on the in-game text overlay instead of a popup window (right-click the Auto Prices checkbox)
-- **New:** The overlay lists every mineral with price, station, landing pad, distance and demand, shown only while in supercruise
-- **New:** Right-click the Auto Prices checkbox to switch "In-system prices only" on or off without opening the table
 - **Improved:** Auto Prices now shows its results faster after a jump
 - **Improved:** All table columns and headers are now left-aligned
 
+### General Settings - Text Overlay
+- **Improved:** Text Overlay settings are now grouped into General, Appearance, Prospector & Cargo and Auto Prices
 
 ## Fixes
 
