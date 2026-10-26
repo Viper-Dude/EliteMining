@@ -6555,11 +6555,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self, 'text_overlay') and self.text_overlay.overlay_enabled:
                     if game_active:
                         self.text_overlay._game_hidden = False
-                        if self.text_overlay._is_showing and self.text_overlay.overlay_window and not getattr(self.text_overlay, '_session_hidden', False) and not getattr(self.text_overlay, '_sc_hidden', False):
-                            self.text_overlay._show_on_top()
                     else:
+                        # Drop the message: re-showing a withdrawn window renders it oversized/offscreen, and
+                        # leaving _is_showing set made the next message reuse that broken window
                         if not self.text_overlay._game_hidden and self.text_overlay._is_showing and self.text_overlay.overlay_window:
                             self.text_overlay._hide_window()
+                            self.text_overlay._is_showing = False
                         self.text_overlay._game_hidden = True
             else:
                 # Setting disabled — still require the game to be running
