@@ -6515,8 +6515,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         log.info("[OVERLAY] refresh_overlays")
         try:
             if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled and self.text_overlay_enabled.get():
-                self.cargo_text_overlay.reinstate()
-                self.cargo_text_overlay.update_cargo(self.cargo_monitor)
+                cov = self.cargo_text_overlay
+                sc_hidden, session_hidden = getattr(cov, '_sc_hidden', False), getattr(cov, '_session_hidden', False)
+                cov.reinstate()
+                cov._sc_hidden, cov._session_hidden = sc_hidden, session_hidden
+                cov.update_cargo(self.cargo_monitor)
             if hasattr(self, 'text_overlay') and self.text_overlay.overlay_enabled and not self.text_overlay._is_showing:
                 self.text_overlay.reinstate()
             for ov in (getattr(self, 'cargo_text_overlay', None), getattr(self, 'text_overlay', None)):
@@ -6534,6 +6537,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             pass  # Silently handle any update errors
         
+        # Journal replay misses supercruise if no entry event is in the current session, so seed it once from Status.json
+        if not getattr(self, '_sc_seeded', False):
+            self._sc_seeded = True
+            try:
+                with open(self.cargo_monitor.status_json_path, 'r', encoding='utf-8') as f:
+                    self._in_supercruise = bool(json.load(f).get("Flags", 0) & 16)
+                log.info(f"[OVERLAY] supercruise seeded from Status.json: {self._in_supercruise}")
+            except Exception as e:
+                log.info(f"[OVERLAY] supercruise seed failed: {e}")
+
         # Check game focus FIRST — set _game_hidden flags before any overlay updates
         try:
             if self.overlay_only_game_focused.get():
