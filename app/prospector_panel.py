@@ -10158,7 +10158,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             # Auto-start session on first prospector limpet launch
             if ev == "LaunchDrone" and evt.get("Type") == "Prospector":
-                if self.session_active and self.session_paused:
+                if self.auto_start_on_prospector and self.session_active and self.session_paused:
                     print(f"[AUTO-RESUME] Prospector launched - resuming paused session")
                     self.after(100, self._toggle_pause_resume)
                 elif self.auto_start_on_prospector and not self.session_active:

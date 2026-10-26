@@ -23,6 +23,9 @@
 ### General Settings - Text Overlay
 - **Fixed:** "Only when game in focus" will now be saved to config and remembered at app restart
 
+### Mining Session
+- **Fixed:** A paused session now only resumes automatically when Auto-Start is ticked
+
 ### Hotspots Finder
 - **Fixed:** Missing ring details (ring type and distance) are now filled in correctly
 
