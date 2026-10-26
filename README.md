@@ -647,7 +647,7 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 > **Only during Mining Session:** Enable "Only during Mining Session" to show overlays only while a mining session is active. When no session is running, overlays stay hidden to keep your screen clean.
 
-> **Auto Prices on the overlay:** In the Hotspots Finder, right-click the Auto Prices checkbox and tick "Show on overlay" (also available in the General Settings tab) to see the best sell prices on the text overlay after a jump instead of in a window. It appears only while you're in supercruise, ignores "Hide in Supercruise", stays for its own display duration (10–60 seconds), and needs "Enable Text Overlay" to be on. If the text overlay is off, the Best Mineral to Mine window is used instead.
+> **Auto Prices on the overlay:** In the Hotspots Finder, right-click the Auto Prices checkbox and tick "Show on overlay" (also available in the General Settings tab) to see the best sell prices on the text overlay after a jump instead of in a window. It appears only while you're in supercruise, ignores "Hide in Supercruise", stays for its own display duration (10–60 seconds), and needs "Enable Text Overlay" to be on. If the text overlay is off, the Best Mineral to Mine window is used instead. To also see prices for minerals that have no hotspot in the system or ring, add them with the "+ Also Check" button in the Best Mineral to Mine window.
 
 <img src="Screenshot/txt_overlay_auto_prices.png" width="900"><br>
 *Auto Prices on the text overlay: best sell price, demand, station and distance for each mineral.*
