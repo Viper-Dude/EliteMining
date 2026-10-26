@@ -8,6 +8,9 @@
 - **New:** Auto Prices has its own display duration slider
 - **New:** Right-click the Auto Prices checkbox to switch "In-system prices only" on or off without opening the table
 
+### Mining Session
+- **New:** A paused session now resumes automatically when you launch a prospector limpet, if Auto-Start is ticked
+
 ### Hotspots Finder
 - **Improved:** Auto Prices now shows its results faster after a jump
 - **Improved:** All table columns and headers are now left-aligned
@@ -22,9 +25,6 @@
 
 ### General Settings - Text Overlay
 - **Fixed:** "Only when game in focus" will now be saved to config and remembered at app restart
-
-### Mining Session
-- **Fixed:** A paused session now only resumes automatically when Auto-Start is ticked
 
 ### Hotspots Finder
 - **Fixed:** Missing ring details (ring type and distance) are now filled in correctly
