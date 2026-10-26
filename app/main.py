@@ -226,6 +226,27 @@ class TextOverlay:
         if not self.overlay_enabled:
             return
         self._sc_exempt = ignore_sc_hide
+        self._prepare_window(message, wrap_width)
+
+        # Always show message — events come from journal files regardless of which app has focus.
+        self._is_showing = True
+        if not self._game_hidden and (ignore_sc_hide or not getattr(self, '_sc_hidden', False)) and not getattr(self, '_session_hidden', False):
+            self._show_on_top()
+            logging.info(f"[OVERLAY] show_message: deiconified, duration={self.display_duration}ms, {self._window_diag()}")
+        else:
+            logging.info(f"[OVERLAY] show_message: gated (game_hidden={self._game_hidden}, "
+                          f"sc_hidden={getattr(self, '_sc_hidden', False)}, "
+                          f"session_hidden={getattr(self, '_session_hidden', False)})")
+
+        # Cancel any existing timer
+        if self.fade_timer:
+            self.overlay_window.after_cancel(self.fade_timer)
+
+        # Schedule hide after display duration
+        self.fade_timer = self.overlay_window.after(duration_ms or self.display_duration, self._timed_hide)
+
+    def _prepare_window(self, message: str, wrap_width: int):
+        """Get a fresh, correctly sized window with the message drawn on it, ready to show"""
         self._wrap_width = wrap_width
 
         if not self.overlay_window:
@@ -265,23 +286,6 @@ class TextOverlay:
         # CRITICAL: Reposition window every time before showing (Windows can reset position)
         self._set_window_position()
 
-        # Always show message — events come from journal files regardless of which app has focus.
-        self._is_showing = True
-        if not self._game_hidden and (ignore_sc_hide or not getattr(self, '_sc_hidden', False)) and not getattr(self, '_session_hidden', False):
-            self._show_on_top()
-            logging.info(f"[OVERLAY] show_message: deiconified, duration={self.display_duration}ms, {self._window_diag()}")
-        else:
-            logging.info(f"[OVERLAY] show_message: gated (game_hidden={self._game_hidden}, "
-                          f"sc_hidden={getattr(self, '_sc_hidden', False)}, "
-                          f"session_hidden={getattr(self, '_session_hidden', False)})")
-
-        # Cancel any existing timer
-        if self.fade_timer:
-            self.overlay_window.after_cancel(self.fade_timer)
-
-        # Schedule hide after display duration
-        self.fade_timer = self.overlay_window.after(duration_ms or self.display_duration, self._timed_hide)
-
     def show_persistent_message(self, message: str, max_lifetime_ms: int = 120000):
         """Display a message that stays visible until manually hidden (for cargo full prompt).
 
@@ -292,17 +296,7 @@ class TextOverlay:
         if not self.overlay_enabled:
             return
 
-        if not self.overlay_window:
-            self.create_overlay()
-        else:
-            self._ensure_alive()
-
-        # Draw text BEFORE showing window to prevent flicker
-        self._draw_text(message)
-
-        # Force canvas to compute bbox so we can size the window correctly
-        self.canvas.update_idletasks()
-        self._fit_window_to_content()
+        self._prepare_window(message, 700)
 
         # Show window AFTER text is ready — always show persistent messages.
         self._is_showing = True
@@ -6598,6 +6592,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         self.text_overlay._game_hidden = True
                         if self.text_overlay._is_showing and self.text_overlay.overlay_window:
                             self.text_overlay._hide_window()
+                            self.text_overlay._is_showing = False
         except Exception:
             pass
         

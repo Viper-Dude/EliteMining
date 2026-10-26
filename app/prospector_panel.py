@@ -11460,16 +11460,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[DEBUG] Could not play warning sound: {e}")
         
-        # Show persistent overlay notification (stays until dialog is closed)
-        overlay_shown = False
-        if self.text_overlay:
-            try:
-                # Show persistent notification that won't auto-hide
-                self.text_overlay.show_persistent_message("Cargo Full - End session before unloading cargo!")
-                overlay_shown = True
-            except Exception as e:
-                print(f"[DEBUG] Error showing cargo full overlay: {e}")
-        
         # Create a non-modal dialog that doesn't block TTS announcements
         import tkinter as tk
         from tkinter import ttk
@@ -11537,12 +11527,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Clear dialog guard FIRST before any other operations
             self._dialog_in_progress = False
             print("[CARGO FULL] User chose Yes - dialog guard cleared")
-            # Hide persistent overlay
-            if overlay_shown and self.text_overlay:
-                try:
-                    self.text_overlay.hide_overlay()
-                except:
-                    pass
             # Release grab before destroying to prevent orphaned grab state
             try:
                 dialog.grab_release()
@@ -11556,12 +11540,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Clear dialog guard
             self._dialog_in_progress = False
             print("[CARGO FULL] User chose No - dialog guard cleared")
-            # Hide persistent overlay
-            if overlay_shown and self.text_overlay:
-                try:
-                    self.text_overlay.hide_overlay()
-                except:
-                    pass
             # Release grab before destroying to prevent orphaned grab state
             try:
                 dialog.grab_release()
