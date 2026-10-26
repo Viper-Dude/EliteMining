@@ -248,6 +248,20 @@ class TextOverlay:
         self.canvas.update_idletasks()
         self._fit_window_to_content()
 
+        # A window whose final size differs from the size it was created at renders enlarged/clipped,
+        # so rebuild it at the needed size (e.g. the wide Auto Prices table) instead of resizing it
+        desired = (max(750, self._fit_size[0]), max(300, self._fit_size[1]))
+        if desired != getattr(self, '_base_size', (750, 300)):
+            self._base_size = desired
+            flags = (self._game_hidden, getattr(self, '_sc_hidden', False), getattr(self, '_session_hidden', False))
+            self.reinstate()
+            self._game_hidden, self._sc_hidden, self._session_hidden = flags
+            if not self.overlay_window:
+                self.create_overlay()
+            self._draw_text(message)
+            self.canvas.update_idletasks()
+            self._fit_window_to_content()
+
         # CRITICAL: Reposition window every time before showing (Windows can reset position)
         self._set_window_position()
 
@@ -359,9 +373,12 @@ class TextOverlay:
         else:
             window_width = 750
             window_height = 300
+        self._fit_size = (window_width, window_height)
         self.overlay_window.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
         if hasattr(self, 'canvas'):
             self.canvas.config(width=window_width, height=window_height)
+        logging.info(f"[OVERLAY] fit: bbox={bbox} -> {window_width}x{window_height}+{x_pos}+{y_pos}, "
+                     f"wrap={getattr(self, '_wrap_width', 700)}, font_size={self.font_size}")
 
     def hide_overlay(self):
         """Hide the overlay window"""
@@ -415,10 +432,16 @@ class TextOverlay:
             hwnd = int(self.overlay_window.wm_frame(), 16)
             rect = ctypes.wintypes.RECT()
             ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+            try:
+                extra = (f" canvas={self.canvas.winfo_width()}x{self.canvas.winfo_height()} "
+                         f"view_origin=({self.canvas.canvasx(0):.0f},{self.canvas.canvasy(0):.0f}) "
+                         f"dpi={ctypes.windll.user32.GetDpiForWindow(hwnd)}")
+            except Exception:
+                extra = ""
             return (f"viewable={self.overlay_window.winfo_viewable()} alpha={self.overlay_window.wm_attributes('-alpha')} "
                     f"topmost={self.overlay_window.wm_attributes('-topmost')} "
                     f"win32_visible={bool(ctypes.windll.user32.IsWindowVisible(hwnd))} "
-                    f"rect=({rect.left},{rect.top},{rect.right},{rect.bottom})")
+                    f"rect=({rect.left},{rect.top},{rect.right},{rect.bottom})" + extra)
         except Exception as e:
             return f"diag failed: {e}"
 
@@ -524,8 +547,7 @@ class TextOverlay:
             return
         
         gx, gy, gw = get_game_monitor_offset()
-        window_width = 750
-        window_height = 300
+        window_width, window_height = getattr(self, '_base_size', (750, 300))
         x_pos = gx + 20
         y_pos = gy + 100
         

@@ -4,7 +4,6 @@
 ## New Features & Improvements
 
 ### General Settings - Text Overlay
-- **Fixed:** "Only when game in focus" will now be saved to config and remebered at app restart
 - **Improved:** Text Overlay settings are now grouped into General, Appearance, Prospector & Cargo and Auto Prices
 - **New:** Auto Prices has its own display duration slider
 - **Improved:** Tons per hour is now always shown in the cargo overlay
@@ -15,6 +14,13 @@
 - **New:** Right-click the Auto Prices checkbox to switch "In-system prices only" on or off without opening the table
 - **Improved:** Auto Prices now shows its results faster after a jump
 - **Improved:** All table columns and headers are now left-aligned
+
+## Fixes
+
+### General Settings - Text Overlay
+- **Fixed:** "Only when game in focus" will now be saved to config and remembered at app restart
+
+### Hotspots Finder
 - **Fixed:** Missing ring details (ring type and distance) are now filled in correctly
 
 ### Voiceattack Profile no update (v5.4.7)

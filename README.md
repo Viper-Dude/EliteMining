@@ -299,7 +299,7 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 - **PowerPlay Tick Box** – Next to the Data Source options (Local searches only). Off (default) searches faster and shows only the PowerPlay info already saved on your PC. Tick it to also look up the latest PowerPlay info online from Spansh.
 - **Rank Minerals** – Right-click a ring and choose "Rank Minerals in This Ring", or "Rank Minerals in Entire System", to see the best sell prices for the hotspot minerals nearby. Use "+ add" to include minerals without hotspots (e.g. Osmium).
 - **Find Acquisition Targets** – Right-click a Fortified or Stronghold system to list nearby Unoccupied systems with a station buying your mineral, for PowerPlay Acquisition merits (search radius 20 Ly for Fortified, 30 Ly for Stronghold). Works with any mineral, including ones without hotspots like Osmium.
-- **Auto Prices** – Requires Auto-Search. After a jump to a system with known hotspots, automatically fetches live sell prices and opens the Best Mineral to Mine window without stealing focus.
+- **Auto Prices** – Requires Auto-Search. After a jump to a system with known hotspots, automatically fetches live sell prices and opens the Best Mineral to Mine window without stealing focus. Right-click the Auto Prices checkbox to show the results on the in-game text overlay instead (all minerals with price, station, landing pad, distance and demand, while you're in supercruise) and to switch "In-system prices only" on or off.
 
 ### Setting & Managing Overlap/RES Data
 - **Set Overlap** – Right-click any ring to set hotspot overlaps (2x, 3x) for specific minerals
@@ -646,6 +646,11 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 > **Hide in Supercruise:** Enable "Hide in Supercruise" in the General Settings tab to automatically hide all text overlays (including cargo status) while in supercruise. Overlays are instantly restored when you drop out of supercruise.
 
 > **Only during Mining Session:** Enable "Only during Mining Session" to show overlays only while a mining session is active. When no session is running, overlays stay hidden to keep your screen clean.
+
+> **Auto Prices on the overlay:** In the Hotspots Finder, right-click the Auto Prices checkbox and tick "Show on overlay" (also available in the General Settings tab) to see the best sell prices on the text overlay after a jump instead of in a window. It appears only while you're in supercruise, ignores "Hide in Supercruise", stays for its own display duration (10–60 seconds), and needs "Enable Text Overlay" to be on. If the text overlay is off, the Best Mineral to Mine window is used instead.
+
+<img src="Screenshot/txt_overlay_auto_prices.png" width="900"><br>
+*Auto Prices on the text overlay: best sell price, demand, station and distance for each mineral.*
 
 <img src="Screenshot/txt_overlay_settings.png" width="900"><br>
 *Text overlay settings in the General Settings tab.*

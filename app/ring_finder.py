@@ -10046,7 +10046,7 @@ class RingFinder(ColumnVisibilityMixin):
             dist_text = f"  {dist:.1f} LY" if dist is not None else ""
             demand = row.get('demand')
             demand_text = f"  {t('ring_finder.col_demand')} {demand:,}" if isinstance(demand, (int, float)) else ""
-            lines.append(f"{self._format_material_for_display(mat).upper()}  {row['sellPrice']:,} CR  {station}{dist_text}{demand_text}")
+            lines.append(f"{self._format_material_for_display(mat).upper()}  {row['sellPrice']:,} CR{demand_text}  {station}{dist_text}")
         if not ranked:
             lines.append(t('ring_finder.no_data_in_system') if in_system_only else t('ring_finder.no_data'))
         return "\n".join(lines)
