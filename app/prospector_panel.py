@@ -10166,6 +10166,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     # Auto-switch to Mining Session tab when launching prospector (same as entering ring)
                     self._auto_switch_to_mining_tab()
 
+            if ev == "FSDJump" and self.main_app:
+                # A hyperspace jump arrives in supercruise without a SupercruiseEntry event
+                self.main_app._in_supercruise = True
+
             if ev in ("Location", "FSDJump"):
                 # Update system from events that contain StarSystem data
                 if evt.get("StarSystem"):

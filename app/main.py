@@ -763,7 +763,13 @@ class CargoTextOverlay:
                 self.create_overlay()
             # Don't show here — let update_cargo() show it once data is ready
         elif self.overlay_window:
-            self.overlay_window.wm_attributes("-alpha", 0)
+            # Destroy rather than alpha-hide: a hidden leftover window can reappear or render oversized
+            try:
+                self.overlay_window.destroy()
+            except Exception:
+                pass
+            self.overlay_window = None
+            self._outline_items = []
 
     def reinstate(self):
         """Tear down and rebuild the overlay window from scratch (recovers a lost/buried overlay)."""
@@ -6588,6 +6594,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_window:
                     if not getattr(self.cargo_text_overlay, '_sc_hidden', False):
                         self.cargo_text_overlay._sc_hidden = True
+                        log.info("[OVERLAY] cargo hidden for supercruise")
                         self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
                 if hasattr(self, 'text_overlay') and self.text_overlay._is_showing and self.text_overlay.overlay_window \
                         and not getattr(self.text_overlay, '_sc_exempt', False):
@@ -15116,8 +15123,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         enabled = bool(self.text_overlay_enabled.get())
         self.text_overlay.set_enabled(enabled)
         # Master toggle: also hide cargo overlay when text overlay is disabled
-        if not enabled and hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_window:
-            self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
+        if not enabled and hasattr(self, 'cargo_text_overlay'):
+            self.cargo_text_overlay.set_enabled(False)
         elif enabled and hasattr(self, 'cargo_text_overlay') and self.cargo_show_in_overlay.get():
             self.cargo_text_overlay.set_enabled(True)
             self.cargo_text_overlay.reinstate()
@@ -15307,7 +15314,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _on_cargo_overlay_toggle(self, *args) -> None:
         """Called when cargo monitor overlay checkbox is toggled"""
-        enabled = bool(self.cargo_show_in_overlay.get())
+        enabled = bool(self.cargo_show_in_overlay.get()) and bool(self.text_overlay_enabled.get())
         self.cargo_text_overlay.set_enabled(enabled)
         if enabled:
             self.cargo_text_overlay.reinstate()
