@@ -735,12 +735,6 @@ Configure how many times the laser mining extra sequence runs:
 |---------------|--------|
 | Load announcement 1-6 | Load announcement preset |
 
-### Settings
-| Voice Command | Action |
-|---------------|--------|
-| Import settings | Import settings from game |
-| Apply settings | Apply settings to game |
-
 ### Overlay Control
 | Voice Command | Action |
 |---------------|--------|

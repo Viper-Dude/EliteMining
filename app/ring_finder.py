@@ -10042,8 +10042,12 @@ class RingFinder(ColumnVisibilityMixin):
             pad = self._format_pad_size(row.get('maxLandingPadSize'))
             if pad != '?':
                 station += f" [{pad}]"
-            dist = row.get('distance')
-            dist_text = f"  {dist:.1f} LY" if dist is not None else ""
+            if in_system_only:
+                ls = row.get('distanceToArrival')
+                dist_text = f"  {ls:,.0f} LS" if ls else ""
+            else:
+                dist = row.get('distance')
+                dist_text = f"  {dist:.1f} LY" if dist is not None else ""
             demand = row.get('demand')
             demand_text = f"  {t('ring_finder.col_demand')} {demand:,}" if isinstance(demand, (int, float)) else ""
             lines.append(f"{self._format_material_for_display(mat).upper()}  {row['sellPrice']:,} CR{demand_text}  {station}{dist_text}")

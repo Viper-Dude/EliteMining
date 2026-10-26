@@ -15,6 +15,7 @@
 - **Improved:** Auto Prices now shows its results faster after a jump
 - **Improved:** All table columns and headers are now left-aligned
 
+
 ## Fixes
 
 ### General Settings - Text Overlay
@@ -23,7 +24,7 @@
 ### Hotspots Finder
 - **Fixed:** Missing ring details (ring type and distance) are now filled in correctly
 
-### Voiceattack Profile no update (v5.4.7)
-
+## Voiceattack Profile no update (v5.4.7)
+- **Info:** New VoiceAttack commands for many of the new features, such as Auto Prices on the overlay, will be added in a future update
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

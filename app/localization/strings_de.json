@@ -163,7 +163,7 @@
     "prefetch_prices_tooltip": "Beim Sprung in ein System mit bekannten Hotspots werden automatisch Live-Verkaufspreise abgerufen\nund das Fenster 'Bestes Mineral zum Abbauen' erscheint (nicht aufdringlich, stiehlt keinen Fokus).\nWird bei Systemen ohne Hotspot-Daten stillschweigend übersprungen. Erzeugt Live-API-Aufrufe bei jedem passenden Sprung.\n\nRechtsklick für Optionen:\n- Im Overlay anzeigen: zeigt alle Mineralien (Preis, Station, Landeplatz, Entfernung, Nachfrage) im Text-Overlay im Spiel statt in einem Popup. Wird nach einem Sprung 20 Sekunden lang angezeigt, nur solange du im Supercruise bist. Ignoriert die Einstellung 'Im Supercruise ausblenden'. Erfordert aktiviertes Text-Overlay, sonst wird das Popup verwendet.\n- Nur Preise im System: verwendet nur Stationen im Zielsystem des Sprungs (PowerPlay-Modus). Gleiche Einstellung wie im Mineralien-Ranking und bei Bestes Abbausystem finden.",
     "prefetch_prices_hint": "(Rechtsklick)",
     "prices_overlay": "Im Overlay anzeigen",
-    "prices_overlay_header": "BESTE PREISE - {system}",
+    "prices_overlay_header": "BESTE PREISE - VON {system}",
     "prices_overlay_header_in_system": "BESTE PREISE - {system} (NUR IM SYSTEM)",
     "search": "Suchen",
     "stop": "Stopp",
