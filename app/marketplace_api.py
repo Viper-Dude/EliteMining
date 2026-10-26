@@ -1031,30 +1031,20 @@ class MarketplaceAPI:
             print(f"[BUYERS] nearby path: {nearby_path} params: {nearby_params}")
 
             # Run Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
-            import time as _time
-
-            def _timed(label, fn, *args):
-                _t = _time.time()
-                try:
-                    return fn(*args)
-                finally:
-                    print(f"[BUYERS TIMING] {commodity_normalized} {label}: {_time.time() - _t:.2f}s")
-
-            _t_all = _time.time()
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(_timed, "ardent", MarketplaceAPI._fetch_ardent, nearby_path, nearby_params)
+                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params)
                 _fut_spansh = _pool.submit(
-                    _timed, "spansh", MarketplaceAPI._fetch_spansh_nearby,
+                    MarketplaceAPI._fetch_spansh_nearby,
                     commodity_normalized, reference_system, "buying_commodities",
                     500, max_days_ago, exclude_carriers, 500
                 )
                 _fut_carriers = _pool.submit(
-                    _timed, "carriers", MarketplaceAPI._fetch_spansh_carriers,
+                    MarketplaceAPI._fetch_spansh_carriers,
                     commodity_normalized, reference_system, "buying_commodities",
                     500, max_days_ago, exclude_carriers
                 )
                 _fut_eddn = _pool.submit(
-                    _timed, "eddn", MarketplaceAPI._fetch_eddn_cache,
+                    MarketplaceAPI._fetch_eddn_cache,
                     commodity_normalized, reference_system, "buying_commodities",
                     500, max_days_ago, exclude_carriers
                 )
@@ -1063,7 +1053,6 @@ class MarketplaceAPI:
                 carrier_rows = _fut_carriers.result()
                 eddn_rows    = _fut_eddn.result()
             nearby_rows = nearby_rows + spansh_rows + carrier_rows + eddn_rows
-            print(f"[BUYERS TIMING] {commodity_normalized} parallel batch total: {_time.time() - _t_all:.2f}s")
 
             # --- Local system imports (both APIs in parallel) ---
             local_path = f"/system/name/{system_encoded}/commodities/imports"
@@ -1073,7 +1062,7 @@ class MarketplaceAPI:
             # Same response for every commodity in this system - fetch once, filter per commodity
             local_rows_raw = _short_cached(
                 ("ardent_local", reference_system, max_days_ago),
-                lambda: _timed("ardent local", MarketplaceAPI._fetch_ardent, local_path, local_params))
+                lambda: MarketplaceAPI._fetch_ardent(local_path, local_params))
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
             for r in local_rows:
                 r["distance"] = 0
