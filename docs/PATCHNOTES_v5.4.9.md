@@ -12,6 +12,9 @@
 - **Improved:** Auto Prices now shows its results faster after a jump
 - **Improved:** All table columns and headers are now left-aligned
 
+### Mining Session
+- **Improved:** A paused mining session now resumes automatically when you launch a prospector
+
 ### General Settings - Text Overlay
 - **Improved:** Text Overlay settings are now grouped into General, Appearance, Prospector & Cargo and Auto Prices
 
