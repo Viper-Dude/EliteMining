@@ -635,6 +635,15 @@ class RingFinder(ColumnVisibilityMixin):
         # Tooltip for prefetch prices
         ToolTip(self.prefetch_prices_cb, t('ring_finder.prefetch_prices_tooltip'))
 
+        # Show Auto Prices on the in-game text overlay instead of the popup window.
+        # Set from the right-click menu on the Auto Prices checkbox (and General Settings).
+        self.prices_overlay_var = tk.BooleanVar(value=self._load_prices_overlay_state())
+        prices_hint = tk.Label(buttons_frame, text=t('ring_finder.prefetch_prices_hint'),
+                               bg=_cb_bg, fg="#888888", font=scaled_font(8))
+        prices_hint.pack(side="left", padx=(0, 0))
+        self.prefetch_prices_cb.bind("<Button-3>", self._show_auto_prices_menu)
+        prices_hint.bind("<Button-3>", self._show_auto_prices_menu)
+
         # Auto Prices depends on hotspot data that Auto-Search writes to the local DB
         # on jump - it's non-functional without Auto-Search, so keep it locked to it.
         self._apply_auto_search_lock()
@@ -1162,9 +1171,7 @@ class RingFinder(ColumnVisibilityMixin):
         for col in columns:
             # Left-align headers - use display name if mapped, otherwise use column name
             display_name = column_display_names.get(col, col)
-            # Center-align Visits header, left-align all others
-            header_anchor = "center" if col in ("Visits", "Favourite") else "w"
-            self.results_tree.heading(col, text=display_name, anchor=header_anchor, command=lambda c=col: self._sort_column(c, self.sort_reverse.get(c, False)))
+            self.results_tree.heading(col, text=display_name, anchor="w", command=lambda c=col: self._sort_column(c, self.sort_reverse.get(c, False)))
 
             # Bind right-click on header to show column menu
             # Note: This binds to the entire tree, we'll check if click is on header in handler
@@ -1185,7 +1192,7 @@ class RingFinder(ColumnVisibilityMixin):
             elif col == "RES Site":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Visits":
-                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "LS":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Sol Dist":
@@ -1198,7 +1205,7 @@ class RingFinder(ColumnVisibilityMixin):
             elif col == "PowerPlay":
                 self.results_tree.column(col, width=column_widths.get(col, 170), minwidth=80, anchor="w", stretch=False)
             elif col == "Favourite":
-                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Last Mined":
                 self.results_tree.column(col, width=column_widths[col], minwidth=80, anchor="w", stretch=False)
             elif col == "Comment":
@@ -2942,6 +2949,7 @@ class RingFinder(ColumnVisibilityMixin):
             
             # Set the reference system coords for this worker thread
             self.current_system_coords = reference_coords
+            print(f"[SEARCH-DEBUG] ref='{reference_system}' coords={reference_coords} systems_data={self.systems_data.get(reference_system.lower())}")
             print(f"[SEARCH] Coordinate resolution done at {time.time():.1f}, entering search dispatch")
 
             # Any Ring mode: Search Spansh for rings of specific type (ignoring hotspot data)
@@ -7386,18 +7394,18 @@ class RingFinder(ColumnVisibilityMixin):
                             command=lambda c=c: sort_by_column(c))
 
         for col in columns:
-            tree.heading(col, text=column_labels[col], command=lambda c=col: sort_by_column(c))
+            tree.heading(col, text=column_labels[col], anchor="w", command=lambda c=col: sort_by_column(c))
         tree.column("Mineral", width=130, minwidth=40, anchor="w", stretch=False)
         tree.column("RingType", width=90, minwidth=40, anchor="w", stretch=False)
         tree.column("Price", width=110, minwidth=40, anchor="w", stretch=False)
         tree.column("Station", width=280, minwidth=40, anchor="w", stretch=False)
         tree.column("Type", width=110, minwidth=40, anchor="w", stretch=False)
-        tree.column("Pad", width=50, minwidth=40, anchor="center", stretch=False)
-        tree.column("Dist", width=80, minwidth=40, anchor="center", stretch=False)
-        tree.column("LS", width=70, minwidth=40, anchor="center", stretch=False)
-        tree.column("Demand", width=90, minwidth=40, anchor="e", stretch=False)
+        tree.column("Pad", width=50, minwidth=40, anchor="w", stretch=False)
+        tree.column("Dist", width=80, minwidth=40, anchor="w", stretch=False)
+        tree.column("LS", width=70, minwidth=40, anchor="w", stretch=False)
+        tree.column("Demand", width=90, minwidth=40, anchor="w", stretch=False)
         tree.column("PowerPlay", width=200, minwidth=40, anchor="w", stretch=False)
-        tree.column("Updated", width=90, minwidth=40, anchor="center", stretch=False)
+        tree.column("Updated", width=90, minwidth=40, anchor="w", stretch=False)
 
         try:
             from config import load_rank_minerals_column_widths
@@ -8200,16 +8208,16 @@ class RingFinder(ColumnVisibilityMixin):
                             command=lambda c=c: sort_by_column(c))
 
         for col in columns:
-            tree.heading(col, text=column_labels[col], command=lambda c=col: sort_by_column(c))
+            tree.heading(col, text=column_labels[col], anchor="w", command=lambda c=col: sort_by_column(c))
         tree.column("System", width=200, minwidth=40, anchor="w", stretch=False)
-        tree.column("Dist", width=80, minwidth=40, anchor="center", stretch=False)
+        tree.column("Dist", width=80, minwidth=40, anchor="w", stretch=False)
         tree.column("Mineral", width=130, minwidth=40, anchor="w", stretch=False)
         tree.column("Price", width=110, minwidth=40, anchor="w", stretch=False)
         tree.column("Station", width=260, minwidth=40, anchor="w", stretch=False)
         tree.column("Type", width=110, minwidth=40, anchor="w", stretch=False)
-        tree.column("LS", width=70, minwidth=40, anchor="center", stretch=False)
+        tree.column("LS", width=70, minwidth=40, anchor="w", stretch=False)
         tree.column("PowerPlay", width=200, minwidth=40, anchor="w", stretch=False)
-        tree.column("Updated", width=90, minwidth=40, anchor="center", stretch=False)
+        tree.column("Updated", width=90, minwidth=40, anchor="w", stretch=False)
 
         try:
             from config import load_reverse_search_column_widths
@@ -8722,19 +8730,19 @@ class RingFinder(ColumnVisibilityMixin):
             "Updated": t('ring_finder.col_updated'),
         }
         for col in columns:
-            tree.heading(col, text=column_labels[col])
+            tree.heading(col, text=column_labels[col], anchor="w")
         default_widths = {"System": 200, "Station": 200, "Type": 120, "Pad": 50, "Dist": 80, "Power": 150,
                           "Mineral": 110, "Demand": 90, "Price": 120, "Updated": 80}
         tree.column("System", width=default_widths["System"], minwidth=40, anchor="w", stretch=False)
         tree.column("Station", width=default_widths["Station"], minwidth=40, anchor="w", stretch=False)
         tree.column("Type", width=default_widths["Type"], minwidth=40, anchor="w", stretch=False)
-        tree.column("Pad", width=default_widths["Pad"], minwidth=40, anchor="center", stretch=False)
-        tree.column("Dist", width=default_widths["Dist"], minwidth=40, anchor="center", stretch=False)
+        tree.column("Pad", width=default_widths["Pad"], minwidth=40, anchor="w", stretch=False)
+        tree.column("Dist", width=default_widths["Dist"], minwidth=40, anchor="w", stretch=False)
         tree.column("Power", width=default_widths["Power"], minwidth=40, anchor="w", stretch=False)
         tree.column("Mineral", width=default_widths["Mineral"], minwidth=40, anchor="w", stretch=False)
-        tree.column("Demand", width=default_widths["Demand"], minwidth=40, anchor="e", stretch=False)
+        tree.column("Demand", width=default_widths["Demand"], minwidth=40, anchor="w", stretch=False)
         tree.column("Price", width=default_widths["Price"], minwidth=40, anchor="w", stretch=False)
-        tree.column("Updated", width=default_widths["Updated"], minwidth=40, anchor="center", stretch=False)
+        tree.column("Updated", width=default_widths["Updated"], minwidth=40, anchor="w", stretch=False)
 
         # Right-click on the header toggles columns (same mixin as the main Ring Finder
         # table); right-click on a row is routed to this dialog's own row menu below.
@@ -9811,6 +9819,15 @@ class RingFinder(ColumnVisibilityMixin):
                 current_system = event.get("StarSystem")
                 print(f"[AUTO-SEARCH DEBUG] Event '{event_type}' has StarSystem: {current_system}, Last Monitored: {self.last_monitored_system}")
 
+            # Track supercruise from the jump arrival until the next drop - FSDJump has no
+            # SupercruiseEntry event, and the Auto Prices overlay is only meant for that window
+            if event_type == "FSDJump":
+                self._in_sc_since_jump = True
+            elif event_type in ("SupercruiseExit", "Location"):
+                self._in_sc_since_jump = False
+                if getattr(self, '_prices_overlay_active', False):
+                    self._hide_prices_overlay()
+
             # ONLY trigger on FSDJump (jump events), NOT on Scan/SAASignalsFound!
             if event_type == "FSDJump":
                 current_system = event.get("StarSystem")
@@ -9927,7 +9944,7 @@ class RingFinder(ColumnVisibilityMixin):
         from concurrent.futures import ThreadPoolExecutor
 
         results = []
-        with ThreadPoolExecutor(max_workers=min(len(materials), 4)) as pool:
+        with ThreadPoolExecutor(max_workers=len(materials)) as pool:
             # search_buyers (Ardent's /imports) - stations that buy this commodity FROM
             # the player, i.e. where a miner can actually sell it.
             # Same 7-day window as Rank Minerals/Find Best Mining System - keeping this
@@ -9949,7 +9966,108 @@ class RingFinder(ColumnVisibilityMixin):
             self._prefetched_prices = {}
         self._prefetched_prices[system_name] = results
 
-        self.parent.after(0, lambda: self._show_mineral_ranking_dialog(system_name, results, modal=False, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types))
+        self.parent.after(0, lambda: self._present_auto_prices(system_name, results, extra_candidates, mineral_ring_types))
+
+    def _present_auto_prices(self, system_name: str, results: list, extra_candidates, mineral_ring_types):
+        """Show prefetched prices on the text overlay if chosen and available, else in the popup"""
+        text_overlay = None
+        if self.prices_overlay_var.get():
+            main_app = getattr(getattr(self, 'prospector_panel', None), 'main_app', None)
+            text_overlay = getattr(main_app, 'text_overlay', None)
+        if text_overlay is not None and text_overlay.overlay_enabled:
+            self._close_auto_ranking_dialog()
+            self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
+            # Only while still in supercruise after the jump - if the user already dropped, skip
+            if getattr(self, '_in_sc_since_jump', False):
+                duration_var = getattr(main_app, 'auto_prices_overlay_duration', None)
+                duration_ms = int(duration_var.get() if duration_var is not None else 20) * 1000
+                self._prices_overlay_active = True
+                text_overlay.show_message(self._build_prices_overlay_text(system_name, results), duration_ms=duration_ms, ignore_sc_hide=True, wrap_width=1300)
+                self.parent.after(duration_ms, lambda: setattr(self, '_prices_overlay_active', False))
+            return
+        self._show_mineral_ranking_dialog(system_name, results, modal=False, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types)
+
+    def _show_auto_prices_menu(self, event):
+        """Right-click menu on the Auto Prices checkbox: show on overlay, and in-system prices
+        only (shared PowerPlay-mode setting)"""
+        from config import load_pp_mode, save_pp_mode
+        in_system_var = tk.BooleanVar(value=load_pp_mode())
+
+        def on_toggle():
+            save_pp_mode(in_system_var.get())
+            main_app = getattr(getattr(self, 'prospector_panel', None), 'main_app', None)
+            settings_var = getattr(main_app, 'auto_prices_in_system', None)
+            if settings_var is not None and settings_var.get() != in_system_var.get():
+                settings_var.set(in_system_var.get())
+
+        menu = tk.Menu(self.parent, tearoff=0,
+                       bg=self.context_menu.cget('bg'), fg=self.context_menu.cget('fg'),
+                       activebackground=self.context_menu.cget('activebackground'),
+                       activeforeground=self.context_menu.cget('activeforeground'),
+                       selectcolor=self.context_menu.cget('activebackground'))
+        menu.add_checkbutton(label=t('ring_finder.prices_overlay'), variable=self.prices_overlay_var,
+                             command=self._save_prices_overlay_state)
+        menu.add_checkbutton(label=t('settings.overlay_auto_prices_in_system'), variable=in_system_var, command=on_toggle)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _hide_prices_overlay(self):
+        """Hide the Auto Prices overlay message early (e.g. on dropping out of supercruise)"""
+        self._prices_overlay_active = False
+        main_app = getattr(getattr(self, 'prospector_panel', None), 'main_app', None)
+        text_overlay = getattr(main_app, 'text_overlay', None)
+        if text_overlay is not None:
+            text_overlay.hide_overlay()
+
+    def _build_prices_overlay_text(self, system_name: str, results: list) -> str:
+        """All minerals by best sell price, one line each, honouring the in-system-only setting"""
+        from config import load_pp_mode
+        in_system_only = load_pp_mode()
+        header_key = 'ring_finder.prices_overlay_header_in_system' if in_system_only else 'ring_finder.prices_overlay_header'
+        lines = [t(header_key).format(system=system_name.upper())]
+        ranked = []
+        for mat, best, priced_rows in results:
+            if in_system_only:
+                in_system = [r for r in priced_rows if r.get('systemName', '') == system_name]
+                best = max(in_system, key=lambda r: r.get('sellPrice', 0)) if in_system else None
+            if best and best.get('sellPrice', 0) > 0:
+                ranked.append((mat, best))
+        ranked.sort(key=lambda item: item[1].get('sellPrice', 0), reverse=True)
+        for mat, row in ranked:
+            station = row.get('stationName', '')
+            if row.get('systemName', '') != system_name:
+                station += f" ({row.get('systemName', '')})"
+            pad = self._format_pad_size(row.get('maxLandingPadSize'))
+            if pad != '?':
+                station += f" [{pad}]"
+            dist = row.get('distance')
+            dist_text = f"  {dist:.1f} LY" if dist is not None else ""
+            demand = row.get('demand')
+            demand_text = f"  {t('ring_finder.col_demand')} {demand:,}" if isinstance(demand, (int, float)) else ""
+            lines.append(f"{self._format_material_for_display(mat).upper()}  {row['sellPrice']:,} CR  {station}{dist_text}{demand_text}")
+        if not ranked:
+            lines.append(t('ring_finder.no_data_in_system') if in_system_only else t('ring_finder.no_data'))
+        return "\n".join(lines)
+
+    def _load_prices_overlay_state(self) -> bool:
+        """Load Auto Prices 'show on overlay' state from config"""
+        try:
+            from config import _load_cfg
+            return bool(_load_cfg().get("auto_prices_overlay", False))
+        except Exception:
+            return False
+
+    def _save_prices_overlay_state(self):
+        """Save Auto Prices 'show on overlay' state via the main app (shared with General Settings)"""
+        main_app = getattr(getattr(self, 'prospector_panel', None), 'main_app', None)
+        enabled = self.prices_overlay_var.get()
+        if main_app and hasattr(main_app, 'auto_prices_overlay'):
+            main_app.auto_prices_overlay.set(1 if enabled else 0)
+        else:
+            from config import update_config_value
+            update_config_value("auto_prices_overlay", enabled)
 
     def _load_auto_search_state(self) -> bool:
         """Load auto-search enabled state from Variables folder"""

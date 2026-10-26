@@ -2201,17 +2201,17 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.stats_tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.stats_tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
         self.stats_tree.heading("material", text=t('mining_session.mineral_thr'), anchor="w")
-        self.stats_tree.heading("tons", text=t('mining_session.tons'), anchor="center")
-        self.stats_tree.heading("tph", text=t('mining_session.tph'), anchor="center")
-        self.stats_tree.heading("tons_per", text=t('mining_session.t_ast'), anchor="center")
-        self.stats_tree.heading("avg_all", text=t('mining_session.avg_all'), anchor="center")
-        self.stats_tree.heading("avg_pct", text=t('mining_session.avg_thr'), anchor="center")
-        self.stats_tree.heading("best_pct", text=t('mining_session.best_pct'), anchor="center")
-        self.stats_tree.heading("latest_pct", text=t('mining_session.latest_pct'), anchor="center")
-        self.stats_tree.heading("count", text=t('mining_session.hits'), anchor="center")
-        self.stats_tree.heading("core_hits", text=t('mining_session.core_hits'), anchor="center")
-        self.stats_tree.heading("all_hits", text=t('mining_session.all_hits'), anchor="center")
-        self.stats_tree.heading("quality_rate", text=t('mining_session.quality_rate'), anchor="center")
+        self.stats_tree.heading("tons", text=t('mining_session.tons'), anchor="w")
+        self.stats_tree.heading("tph", text=t('mining_session.tph'), anchor="w")
+        self.stats_tree.heading("tons_per", text=t('mining_session.t_ast'), anchor="w")
+        self.stats_tree.heading("avg_all", text=t('mining_session.avg_all'), anchor="w")
+        self.stats_tree.heading("avg_pct", text=t('mining_session.avg_thr'), anchor="w")
+        self.stats_tree.heading("best_pct", text=t('mining_session.best_pct'), anchor="w")
+        self.stats_tree.heading("latest_pct", text=t('mining_session.latest_pct'), anchor="w")
+        self.stats_tree.heading("count", text=t('mining_session.hits'), anchor="w")
+        self.stats_tree.heading("core_hits", text=t('mining_session.core_hits'), anchor="w")
+        self.stats_tree.heading("all_hits", text=t('mining_session.all_hits'), anchor="w")
+        self.stats_tree.heading("quality_rate", text=t('mining_session.quality_rate'), anchor="w")
         self.stats_tree.heading("_spacer", text="", anchor="w")
 
         # minwidth is derived from the actual rendered header text width (at the
@@ -2233,7 +2233,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         for col_name, base_width in _base_widths.items():
             self.stats_tree.column(col_name, width=max(scaled_px(base_width), _minwidths[col_name]),
-                                   minwidth=_minwidths[col_name], anchor="center", stretch=False)
+                                   minwidth=_minwidths[col_name], anchor="w", stretch=False)
         self.stats_tree.column("material", anchor="w")
         self.stats_tree.column("_spacer", width=scaled_px(20), minwidth=scaled_px(20), anchor="w", stretch=True)
 
@@ -3043,26 +3043,26 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Configure column widths and alignment (optimized for 1100px window)
         # Left-align text columns
         tree.column("date", width=145, minwidth=135, anchor="w")
-        tree.column("duration", width=80, minwidth=70, anchor="center")
+        tree.column("duration", width=80, minwidth=70, anchor="w")
         tree.column("system", width=105, minwidth=85, anchor="w")
-        tree.column("body", width=155, minwidth=120, anchor="center")
+        tree.column("body", width=155, minwidth=120, anchor="w")
         
         # Center-align short data columns
-        tree.column("asteroids", width=80, minwidth=70, anchor="center")
-        tree.column("materials", width=80, minwidth=70, anchor="center")
-        tree.column("tons_per", width=85, minwidth=60, anchor="center")
-        tree.column("hit_rate", width=90, minwidth=80, anchor="center")
-        tree.column("quality", width=120, minwidth=100, anchor="center")
+        tree.column("asteroids", width=80, minwidth=70, anchor="w")
+        tree.column("materials", width=80, minwidth=70, anchor="w")
+        tree.column("tons_per", width=85, minwidth=60, anchor="w")
+        tree.column("hit_rate", width=90, minwidth=80, anchor="w")
+        tree.column("quality", width=120, minwidth=100, anchor="w")
         
         # Right-align numeric currency-like columns
-        tree.column("tons", width=75, minwidth=65, anchor="e")
-        tree.column("tph", width=60, minwidth=50, anchor="e")
+        tree.column("tons", width=75, minwidth=65, anchor="w")
+        tree.column("tph", width=60, minwidth=50, anchor="w")
         
         # New cargo columns - wider since we use full material names
         tree.column("cargo", width=300, minwidth=250, anchor="w", stretch=False)
-        tree.column("prospectors", width=80, minwidth=70, anchor="center", stretch=False)
+        tree.column("prospectors", width=80, minwidth=70, anchor="w", stretch=False)
         tree.column("comment", width=200, minwidth=150, anchor="w", stretch=True)
-        tree.column("enhanced", width=100, minwidth=80, anchor="center", stretch=False)
+        tree.column("enhanced", width=100, minwidth=80, anchor="w", stretch=False)
 
         # Load saved column widths from config
         try:
@@ -7905,11 +7905,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         _reports_minwidths = {col: _reports_min_for(col) for col in _reports_base_widths}
 
         _reports_anchors = {"date": "w", "duration": "w", "session_type": "w", "ship": "w",
-                        "system": "w", "body": "w", "ring_type": "w", "tons": "center", "tph": "center",
-                        "tons_per": "center", "materials": "center", "total_hits": "center",
-                        "core_hits": "center", "asteroids": "center", "hit_rate": "center",
-                        "quality": "center", "cargo": "w", "prospects": "center",
-                        "eng_materials": "w", "comment": "center", "enhanced": "center"}
+                        "system": "w", "body": "w", "ring_type": "w", "tons": "w", "tph": "w",
+                        "tons_per": "w", "materials": "w", "total_hits": "w",
+                        "core_hits": "w", "asteroids": "w", "hit_rate": "w",
+                        "quality": "w", "cargo": "w", "prospects": "w",
+                        "eng_materials": "w", "comment": "w", "enhanced": "w"}
 
         for col_name, base_width in _reports_base_widths.items():
             self.reports_tree_tab.column(col_name, width=max(scaled_px(base_width), _reports_minwidths[col_name]),
@@ -12920,13 +12920,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.bookmarks_tree.heading("hotspot", text=t('bookmarks.type'), anchor="w")
         self.bookmarks_tree.heading("reserve", text=t('bookmarks.reserve'), anchor="w")
         self.bookmarks_tree.heading("density", text=t('ring_finder.col_density'), anchor="w")
-        self.bookmarks_tree.heading("visits", text=t('bookmarks.visits'), anchor="center")
+        self.bookmarks_tree.heading("visits", text=t('bookmarks.visits'), anchor="w")
         self.bookmarks_tree.heading("materials", text=t('bookmarks.minerals_found'), anchor="w")
         self.bookmarks_tree.heading("avg_yield", text=t('bookmarks.avg_yield'), anchor="w")
         self.bookmarks_tree.heading("overlap", text=t('bookmarks.overlap'), anchor="w")
         self.bookmarks_tree.heading("res_site", text=t('bookmarks.res_site'), anchor="w")
-        self.bookmarks_tree.heading("rating", text=t('bookmarks.rating'), anchor="center")
-        self.bookmarks_tree.heading("notes", text=t('bookmarks.notes'), anchor="center")
+        self.bookmarks_tree.heading("rating", text=t('bookmarks.rating'), anchor="w")
+        self.bookmarks_tree.heading("notes", text=t('bookmarks.notes'), anchor="w")
         
         # Add tooltip to avg_yield column header (hover over the column header itself)
         # Create an invisible label over the column header area for tooltip
@@ -12996,10 +12996,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         _bm_minwidths = {col: _bm_min_for(col) for col in _bm_base_widths}
 
-        _bm_anchors = {"last_visited": "center", "last_mined": "center", "system": "w", "body": "w",
-                        "distance": "center", "sol_dist": "center", "hotspot": "w", "reserve": "w", "density": "w",
-                        "materials": "w", "avg_yield": "center", "overlap": "w", "res_site": "w",
-                        "visits": "center", "rating": "center", "notes": "center"}
+        _bm_anchors = {"last_visited": "w", "last_mined": "w", "system": "w", "body": "w",
+                        "distance": "w", "sol_dist": "w", "hotspot": "w", "reserve": "w", "density": "w",
+                        "materials": "w", "avg_yield": "w", "overlap": "w", "res_site": "w",
+                        "visits": "w", "rating": "w", "notes": "w"}
 
         for col_name, base_width in _bm_base_widths.items():
             self.bookmarks_tree.column(col_name, width=max(scaled_px(base_width), _bm_minwidths[col_name]),
@@ -17207,17 +17207,17 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             columns = ('select', 'date', 'system', 'tonnage', 'tph')
             session_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=15)
             
-            session_tree.heading('select', text='Select')
-            session_tree.heading('date', text='Date')
-            session_tree.heading('system', text='System')
-            session_tree.heading('tonnage', text='Tonnage')
-            session_tree.heading('tph', text='TPH')
+            session_tree.heading('select', text='Select', anchor='w')
+            session_tree.heading('date', text='Date', anchor='w')
+            session_tree.heading('system', text='System', anchor='w')
+            session_tree.heading('tonnage', text='Tonnage', anchor='w')
+            session_tree.heading('tph', text='TPH', anchor='w')
             
-            session_tree.column('select', width=60, anchor='center')
+            session_tree.column('select', width=60, anchor='w')
             session_tree.column('date', width=100)
             session_tree.column('system', width=150)
-            session_tree.column('tonnage', width=80, anchor='center')
-            session_tree.column('tph', width=80, anchor='center')
+            session_tree.column('tonnage', width=80, anchor='w')
+            session_tree.column('tph', width=80, anchor='w')
             
             # Scrollbar
             scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=session_tree.yview)

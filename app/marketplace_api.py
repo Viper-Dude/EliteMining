@@ -11,6 +11,34 @@ from typing import List, Dict, Optional
 
 _system_coords_cache: Dict[str, object] = {}  # module-level coord cache
 
+import threading as _threading
+import time as _time_mod
+
+_SHORT_CACHE_TTL = 300  # seconds
+_short_cache: Dict[tuple, tuple] = {}  # key -> (timestamp, value)
+_short_cache_guard = _threading.Lock()
+_short_cache_key_locks: Dict[tuple, object] = {}
+
+
+def _short_cached(key: tuple, fetch):
+    """Return fetch() result, reused for _SHORT_CACHE_TTL seconds. Concurrent callers
+    with the same key wait for one fetch instead of each issuing the same request."""
+    with _short_cache_guard:
+        hit = _short_cache.get(key)
+        if hit and _time_mod.time() - hit[0] < _SHORT_CACHE_TTL:
+            return hit[1]
+        key_lock = _short_cache_key_locks.setdefault(key, _threading.Lock())
+    with key_lock:
+        with _short_cache_guard:
+            hit = _short_cache.get(key)
+            if hit and _time_mod.time() - hit[0] < _SHORT_CACHE_TTL:
+                return hit[1]
+        value = fetch()
+        if value:
+            with _short_cache_guard:
+                _short_cache[key] = (_time_mod.time(), value)
+        return value
+
 
 class MarketplaceAPI:
     """Market data: Ardent Insight + Spansh + EDDN cache, merged by freshness."""
@@ -687,14 +715,18 @@ class MarketplaceAPI:
                     page_errors[0] += 1
                     return []
 
-            with ThreadPoolExecutor(max_workers=3) as pool:
-                futures = [pool.submit(_fetch_page, p) for p in range(3)]
-                raw_results = []
-                for f in futures:
-                    raw_results.extend(f.result())
+            def _fetch_all_pages():
+                with ThreadPoolExecutor(max_workers=3) as pool:
+                    futures = [pool.submit(_fetch_page, p) for p in range(3)]
+                    pages = []
+                    for f in futures:
+                        pages.extend(f.result())
+                MarketplaceAPI._spansh_record_result(success=page_errors[0] < 3)
+                print(f"[SPANSH NEARBY] fetched {len(pages)} stations from 3 pages")
+                return pages
 
-            MarketplaceAPI._spansh_record_result(success=page_errors[0] < 3)
-            print(f"[SPANSH NEARBY] fetched {len(raw_results)} stations from 3 pages")
+            # Query has no reference system, so consecutive jumps can share the raw rows
+            raw_results = _short_cached(("spansh_nearby", filter_type, spansh_name), _fetch_all_pages)
 
             cutoff = datetime.now(timezone.utc) - timedelta(days=max_days_ago + 0.5)
 
@@ -999,20 +1031,30 @@ class MarketplaceAPI:
             print(f"[BUYERS] nearby path: {nearby_path} params: {nearby_params}")
 
             # Run Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
+            import time as _time
+
+            def _timed(label, fn, *args):
+                _t = _time.time()
+                try:
+                    return fn(*args)
+                finally:
+                    print(f"[BUYERS TIMING] {commodity_normalized} {label}: {_time.time() - _t:.2f}s")
+
+            _t_all = _time.time()
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params)
+                _fut_both   = _pool.submit(_timed, "ardent", MarketplaceAPI._fetch_ardent, nearby_path, nearby_params)
                 _fut_spansh = _pool.submit(
-                    MarketplaceAPI._fetch_spansh_nearby,
+                    _timed, "spansh", MarketplaceAPI._fetch_spansh_nearby,
                     commodity_normalized, reference_system, "buying_commodities",
                     500, max_days_ago, exclude_carriers, 500
                 )
                 _fut_carriers = _pool.submit(
-                    MarketplaceAPI._fetch_spansh_carriers,
+                    _timed, "carriers", MarketplaceAPI._fetch_spansh_carriers,
                     commodity_normalized, reference_system, "buying_commodities",
                     500, max_days_ago, exclude_carriers
                 )
                 _fut_eddn = _pool.submit(
-                    MarketplaceAPI._fetch_eddn_cache,
+                    _timed, "eddn", MarketplaceAPI._fetch_eddn_cache,
                     commodity_normalized, reference_system, "buying_commodities",
                     500, max_days_ago, exclude_carriers
                 )
@@ -1021,13 +1063,17 @@ class MarketplaceAPI:
                 carrier_rows = _fut_carriers.result()
                 eddn_rows    = _fut_eddn.result()
             nearby_rows = nearby_rows + spansh_rows + carrier_rows + eddn_rows
+            print(f"[BUYERS TIMING] {commodity_normalized} parallel batch total: {_time.time() - _t_all:.2f}s")
 
             # --- Local system imports (both APIs in parallel) ---
             local_path = f"/system/name/{system_encoded}/commodities/imports"
             local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
 
             print(f"[BUYERS] local path: {local_path}")
-            local_rows_raw = MarketplaceAPI._fetch_ardent(local_path, local_params)
+            # Same response for every commodity in this system - fetch once, filter per commodity
+            local_rows_raw = _short_cached(
+                ("ardent_local", reference_system, max_days_ago),
+                lambda: _timed("ardent local", MarketplaceAPI._fetch_ardent, local_path, local_params))
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
             for r in local_rows:
                 r["distance"] = 0

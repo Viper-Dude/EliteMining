@@ -220,11 +220,14 @@ class TextOverlay:
         # Apply current color and brightness settings
         # self._update_text_color() # No text item yet
         
-    def show_message(self, message: str):
-        """Display a message in the overlay"""
+    def show_message(self, message: str, duration_ms: int = None, ignore_sc_hide: bool = False, wrap_width: int = 700):
+        """Display a message in the overlay (duration_ms overrides the default display time;
+        ignore_sc_hide keeps it visible even if "Hide overlays in supercruise" is on)"""
         if not self.overlay_enabled:
             return
-            
+        self._sc_exempt = ignore_sc_hide
+        self._wrap_width = wrap_width
+
         if not self.overlay_window:
             self.create_overlay()
         else:
@@ -234,6 +237,9 @@ class TextOverlay:
                 flags = (self._game_hidden, getattr(self, '_sc_hidden', False), getattr(self, '_session_hidden', False))
                 self.reinstate()
                 self._game_hidden, self._sc_hidden, self._session_hidden = flags
+            if not self.overlay_window:
+                # reinstate() only rebuilds the window while the overlay is enabled
+                self.create_overlay()
 
         # Draw text BEFORE showing window to prevent flicker
         self._draw_text(message)
@@ -247,7 +253,7 @@ class TextOverlay:
 
         # Always show message — events come from journal files regardless of which app has focus.
         self._is_showing = True
-        if not self._game_hidden and not getattr(self, '_sc_hidden', False) and not getattr(self, '_session_hidden', False):
+        if not self._game_hidden and (ignore_sc_hide or not getattr(self, '_sc_hidden', False)) and not getattr(self, '_session_hidden', False):
             self._show_on_top()
             logging.info(f"[OVERLAY] show_message: deiconified, duration={self.display_duration}ms, {self._window_diag()}")
         else:
@@ -260,8 +266,8 @@ class TextOverlay:
             self.overlay_window.after_cancel(self.fade_timer)
 
         # Schedule hide after display duration
-        self.fade_timer = self.overlay_window.after(self.display_duration, self._timed_hide)
-        
+        self.fade_timer = self.overlay_window.after(duration_ms or self.display_duration, self._timed_hide)
+
     def show_persistent_message(self, message: str, max_lifetime_ms: int = 120000):
         """Display a message that stays visible until manually hidden (for cargo full prompt).
 
@@ -303,14 +309,15 @@ class TextOverlay:
         """Draw text with outline on canvas"""
         font_spec = ("Consolas", self.font_size, "normal")
         text_color = self._get_current_color()
+        wrap_width = getattr(self, '_wrap_width', 700)
         base_x, base_y = 2, 2
         offsets = [(-1, -1), (1, -1), (-1, 1), (1, 1), (0, 1), (0, -1), (1, 0), (-1, 0)]
 
         if hasattr(self, '_outline_items') and self._outline_items:
             # Update existing items — avoids delete-all flicker on subsequent updates
             for item in self._outline_items:
-                self.canvas.itemconfig(item, text=message, font=font_spec)
-            self.canvas.itemconfig(self.text_item, text=message, font=font_spec, fill=text_color)
+                self.canvas.itemconfig(item, text=message, font=font_spec, width=wrap_width)
+            self.canvas.itemconfig(self.text_item, text=message, font=font_spec, fill=text_color, width=wrap_width)
         else:
             # First time: create all items
             self._outline_items = []
@@ -322,7 +329,7 @@ class TextOverlay:
                     fill="black",
                     anchor="nw",
                     justify="left",
-                    width=700
+                    width=wrap_width
                 ))
             self.text_item = self.canvas.create_text(
                 base_x, base_y,
@@ -331,7 +338,7 @@ class TextOverlay:
                 fill=text_color,
                 anchor="nw",
                 justify="left",
-                width=700
+                width=wrap_width
             )
     
     def _fit_window_to_content(self):
@@ -842,7 +849,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.4.8"
+APP_VERSION = "v5.4.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5569,7 +5576,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.auto_switch_tabs = tk.IntVar(value=1)  # Default enabled
         self._load_auto_switch_tabs_preference()
         self.auto_switch_tabs.trace('w', self._on_auto_switch_tabs_toggle)
-        
+
+        # Show Ring Finder Auto Prices on the text overlay (syncs with ring_finder)
+        self.auto_prices_overlay = tk.IntVar(value=1 if _load_cfg().get("auto_prices_overlay", False) else 0)
+        self.auto_prices_overlay.trace('w', self._on_auto_prices_overlay_toggle)
+        self.auto_prices_overlay_duration = tk.IntVar(value=int(_load_cfg().get("auto_prices_overlay_duration", 20)))
+        self.auto_prices_overlay_duration.trace('w', self._on_auto_prices_overlay_duration_change)
+
         # Auto-start session on first prospector launch
         self.auto_start_session = tk.IntVar(value=1)  # Default enabled
         self._load_auto_start_preference()
@@ -5628,7 +5641,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.overlay_only_game_focused = tk.BooleanVar(value=True)
         self.hide_overlays_in_supercruise = tk.BooleanVar(value=False)
         self.overlay_only_mining_session = tk.BooleanVar(value=False)
-        self.overlay_show_tph = tk.BooleanVar(value=True)
         self._in_supercruise = False  # Track current supercruise state
 
         self._load_cargo_preferences()
@@ -6554,7 +6566,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if not getattr(self.cargo_text_overlay, '_sc_hidden', False):
                         self.cargo_text_overlay._sc_hidden = True
                         self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
-                if hasattr(self, 'text_overlay') and self.text_overlay._is_showing and self.text_overlay.overlay_window:
+                if hasattr(self, 'text_overlay') and self.text_overlay._is_showing and self.text_overlay.overlay_window \
+                        and not getattr(self.text_overlay, '_sc_exempt', False):
                     if not getattr(self.text_overlay, '_sc_hidden', False):
                         self.text_overlay._sc_hidden = True
                         self.text_overlay._hide_window()
@@ -6603,7 +6616,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled and self.text_overlay_enabled.get():
                 tph = None
-                if self.overlay_show_tph.get() and self.prospector_panel and self.prospector_panel.session_active:
+                if self.prospector_panel and self.prospector_panel.session_active:
                     tph = getattr(self.prospector_panel, 'live_tph', 0.0)
                 self.cargo_text_overlay.update_cargo(self.cargo_monitor, tph)
         except Exception:
@@ -8573,13 +8586,51 @@ class App(tk.Tk, ColumnVisibilityMixin):
         separator2.grid(row=r, column=0, sticky="ew", pady=(0, 8))
         r += 1
         
-        # Text overlay enable/disable + Hide in Supercruise on same row
+        _sub_fg = "#ff8c00" if _gs_theme == "elite_orange" else "#cccccc"
+        _slider_trough = "#1a1a1a" if _gs_theme == "elite_orange" else "#444444"
+        _slider_active = "#ff6600" if _gs_theme == "elite_orange" else "#444444"
+        _slider_fg = "#ff8c00" if _gs_theme == "elite_orange" else "#ffffff"
+        _cb_kw = dict(bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
+                      highlightcolor="#1e1e1e", takefocus=False)
+        _label_w = 30  # label width in characters - keeps every label/control pair in the groups below aligned
+
+        def _sub_heading(row, text):
+            tk.Label(scrollable_frame, text=text, bg=_gs_bg, fg=_sub_fg,
+                     font=self._scaled_font(9, "bold")).grid(row=row, column=0, sticky="w", pady=(10, 2))
+
+        def _labelled_row(row, label_text, indent=0):
+            frame = tk.Frame(scrollable_frame, bg=_gs_bg)
+            frame.grid(row=row, column=0, sticky="w", padx=(indent, 0), pady=(4, 0))
+            tk.Label(frame, text=label_text, width=_label_w, anchor="w", bg=_gs_bg, fg="#ffffff",
+                     font=self._scaled_font(9)).pack(side="left")
+            return frame
+
+        def _slider_row(row, label_text, variable, from_, to, unit, indent=0):
+            frame = _labelled_row(row, label_text, indent)
+            scale = tk.Scale(frame, from_=from_, to=to, orient="horizontal", variable=variable, bg=_gs_bg,
+                             fg=_slider_fg, activebackground=_slider_active, highlightthickness=0, length=140,
+                             troughcolor=_slider_trough, font=self._scaled_font(9),
+                             sliderrelief="flat", sliderlength=20)
+            scale.pack(side="left")
+            tk.Label(frame, text=unit, bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
+            return scale
+
+        def _desc(row, text):
+            tk.Label(scrollable_frame, text=text, wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+                     font=self._scaled_font(8, "italic")).grid(row=row, column=0, sticky="w", pady=(0, 6))
+
+        # ----- General: applies to every overlay -----
+        _sub_heading(r, t('settings.overlay_group_general'))
+        r += 1
+        # Text overlay enable/disable + Hide in Supercruise + mining session + game focus on one row
         text_overlay_row = tk.Frame(scrollable_frame, bg=_gs_bg)
         text_overlay_row.grid(row=r, column=0, sticky="w")
-        tk.Checkbutton(text_overlay_row, text=t('settings.enable_text_overlay'), variable=self.text_overlay_enabled, 
-                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
-                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
+        tk.Checkbutton(text_overlay_row, text=t('settings.enable_text_overlay'), variable=self.text_overlay_enabled,
+                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
+                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
+                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
                       highlightcolor="#1e1e1e", takefocus=False).pack(side="left")
         self._sc_checkbox = tk.Checkbutton(text_overlay_row, text=t('settings.hide_overlays_in_supercruise'), variable=self.hide_overlays_in_supercruise,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
@@ -8587,7 +8638,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
                       highlightcolor="#1e1e1e", takefocus=False)
         self._sc_checkbox.pack(side="left", padx=(8, 0))
-        
+
         def _on_mining_session_toggle(*a):
             if self.overlay_only_mining_session.get():
                 self.hide_overlays_in_supercruise.set(False)
@@ -8596,7 +8647,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if bool(self.text_overlay_enabled.get()):
                     self._sc_checkbox.config(state="normal", fg="#ffffff")
             self._save_cargo_preferences()
-        
+
         self._mining_session_cb = tk.Checkbutton(text_overlay_row, text=t('settings.overlay_only_mining_session'), variable=self.overlay_only_mining_session,
                       command=_on_mining_session_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
@@ -8604,93 +8655,25 @@ class App(tk.Tk, ColumnVisibilityMixin):
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
                       highlightcolor="#1e1e1e", takefocus=False)
         self._mining_session_cb.pack(side="left", padx=(8, 0))
+        _focused_cb = tk.Checkbutton(text_overlay_row, text=t('settings.overlay_only_game_focused'), variable=self.overlay_only_game_focused,
+                      command=self._save_cargo_preferences, **_cb_kw)
+        _focused_cb.pack(side="left", padx=(8, 0))
         # Apply initial state — grey out supercruise checkbox if mining session is already enabled
         if self.overlay_only_mining_session.get():
             self._sc_checkbox.config(state="disabled", fg="#666666")
         r += 1
-        tk.Label(scrollable_frame, text=t('settings.text_overlay_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+        _desc(r, t('settings.text_overlay_desc'))
         r += 1
-        tk.Checkbutton(scrollable_frame, text=t('settings.overlay_show_tph'), variable=self.overlay_show_tph,
-                      command=self._save_cargo_preferences,
-                      bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
-                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
-                      highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
+
+        # ----- Appearance: brightness, color, size -----
+        _sub_heading(r, t('settings.overlay_group_appearance'))
         r += 1
-        
-        # Overlay mode selection (Standard / Enhanced Prospector / Cargo Status) - all on one line
-        mode_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        mode_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(mode_frame, text=t('settings.overlay_mode'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
-        
-        self._overlay_standard_var = tk.IntVar(value=1 if self.overlay_mode.get() == "standard" else 0)
-        self._overlay_enhanced_var = tk.IntVar(value=1 if self.overlay_mode.get() == "enhanced" else 0)
-        
-        _cb_kw = dict(bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
-                      activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
-                      padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
-                      highlightcolor="#1e1e1e", takefocus=False)
-        
-        def _on_standard_cb(*a):
-            if self._overlay_standard_var.get():
-                self._overlay_enhanced_var.set(0)
-                self.overlay_mode.set("standard")
-            else:
-                if not self._overlay_enhanced_var.get():
-                    self._overlay_standard_var.set(1)
-        
-        def _on_enhanced_cb(*a):
-            if self._overlay_enhanced_var.get():
-                self._overlay_standard_var.set(0)
-                self.overlay_mode.set("enhanced")
-            else:
-                if not self._overlay_standard_var.get():
-                    self._overlay_enhanced_var.set(1)
-        
-        _std_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_standard'), variable=self._overlay_standard_var,
-                      command=_on_standard_cb, **_cb_kw)
-        _std_cb.pack(side="left", padx=(8, 0))
-        _enh_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_enhanced'), variable=self._overlay_enhanced_var,
-                      command=_on_enhanced_cb, **_cb_kw)
-        _enh_cb.pack(side="left", padx=(8, 0))
-        _cargo_cb = tk.Checkbutton(mode_frame, text=t('settings.cargo_overlay'), variable=self.cargo_show_in_overlay,
-                      **_cb_kw)
-        _cargo_cb.pack(side="left", padx=(8, 0))
-        _focused_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_only_game_focused'), variable=self.overlay_only_game_focused,
-                      **_cb_kw)
-        _focused_cb.pack(side="left", padx=(8, 0))
-        self._overlay_mode_cbs = [_std_cb, _enh_cb, _cargo_cb, _focused_cb]
+        self.transparency_scale = _slider_row(r, t('settings.text_brightness'), self.text_overlay_transparency, 10, 100, "%")
         r += 1
-        tk.Label(scrollable_frame, text=t('settings.overlay_mode_desc'),
-                 wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
-        r += 1
-        
-        # Text brightness slider
-        transparency_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        transparency_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(transparency_frame, text=t('settings.text_brightness'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
-        _slider_trough = "#1a1a1a" if _gs_theme == "elite_orange" else "#444444"
-        _slider_active = "#ff6600" if _gs_theme == "elite_orange" else "#444444"
-        _slider_fg = "#ff8c00" if _gs_theme == "elite_orange" else "#ffffff"
-        self.transparency_scale = tk.Scale(transparency_frame, from_=10, to=100, orient="horizontal", 
-                                         variable=self.text_overlay_transparency, bg=_gs_bg, fg=_slider_fg, 
-                                         activebackground=_slider_active, highlightthickness=0, length=120,
-                                         troughcolor=_slider_trough, font=self._scaled_font(9),
-                                         sliderrelief="flat", sliderlength=20)
-        self.transparency_scale.pack(side="left", padx=(8, 0))
-        tk.Label(transparency_frame, text="%", bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
-        r += 1
-        tk.Label(scrollable_frame, text=t('settings.text_brightness_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
-        r += 1
-        
+
         # Text color selection with actual colors shown
-        color_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        color_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(color_frame, text=t('settings.text_color'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
-        
+        color_frame = _labelled_row(r, t('settings.text_color'))
+
         # Localized color names mapping
         color_display_names = {
             "White": t('settings.color_white'),
@@ -8703,16 +8686,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "Magenta": t('settings.color_magenta')
         }
         self._color_display_to_internal = {v: k for k, v in color_display_names.items()}
-        
+
         # Create display variable with localized name
         current_color_display = color_display_names.get(self.text_overlay_color.get(), t('settings.color_white'))
         self._color_display_var = tk.StringVar(value=current_color_display)
-        
+
         # Create custom OptionMenu with colored options
         self.color_menu = tk.OptionMenu(color_frame, self._color_display_var, *color_display_names.values())
         self.color_menu.configure(
-            bg=_gs_bg, 
-            fg="#ffffff", 
+            bg=_gs_bg,
+            fg="#ffffff",
             activebackground="#444444",
             activeforeground="#ffffff",
             highlightthickness=0,
@@ -8720,24 +8703,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
             bd=1,
             font=self._scaled_font(8)
         )
-        self.color_menu.pack(side="left", padx=(8, 0))
-        
+        self.color_menu.pack(side="left")
+
         # Style the dropdown menu items with their actual colors
         menu = self.color_menu['menu']
-        menu.configure(bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"], 
+        menu.configure(bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
                       activebackground=MENU_COLORS["activebackground"])
-        
+
         # Clear existing items and add colored ones with localized labels
         menu.delete(0, 'end')
         for internal_name, color_hex in self.color_options.items():
             display_name = color_display_names.get(internal_name, internal_name)
             # For very light colors, use black text for readability
             text_color = "#000000" if internal_name in ["White", "Yellow", "Light Gray", "Light Green", "Light Blue", "Cyan"] else "#000000"
-            
+
             def set_color(disp=display_name, internal=internal_name):
                 self._color_display_var.set(disp)
                 self.text_overlay_color.set(internal)
-            
+
             menu.add_command(
                 label=display_name,
                 command=set_color,
@@ -8748,15 +8731,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 font=self._scaled_font(9, "bold")
             )
         r += 1
-        tk.Label(scrollable_frame, text=t('settings.text_color_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
-        r += 1
-        
+
         # Text size selection with localized options
-        size_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        size_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(size_frame, text=t('settings.text_size'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
-        
+        size_frame = _labelled_row(r, t('settings.text_size'))
+
         # Localized size options
         size_display_names = [t('settings.text_size_small'), t('settings.text_size_normal'), t('settings.text_size_large')]
         self._size_display_to_internal = {
@@ -8765,44 +8743,105 @@ class App(tk.Tk, ColumnVisibilityMixin):
             t('settings.text_size_large'): "Large"
         }
         self._size_internal_to_display = {v: k for k, v in self._size_display_to_internal.items()}
-        
+
         # Convert current value to display name
         current_size_display = self._size_internal_to_display.get(self.text_overlay_size.get(), t('settings.text_size_normal'))
         self._size_display_var = tk.StringVar(value=current_size_display)
-        
-        self.size_combo = ttk.Combobox(size_frame, textvariable=self._size_display_var, 
-                                      values=size_display_names, 
+
+        self.size_combo = ttk.Combobox(size_frame, textvariable=self._size_display_var,
+                                      values=size_display_names,
                                       state="readonly", width=12, font=self._scaled_font(9))
-        self.size_combo.pack(side="left", padx=(8, 0))
-        
+        self.size_combo.pack(side="left")
+
         # Sync display var to internal var
         def _on_size_change(event=None):
             display_val = self._size_display_var.get()
             internal_val = self._size_display_to_internal.get(display_val, "Normal")
             self.text_overlay_size.set(internal_val)
         self.size_combo.bind('<<ComboboxSelected>>', _on_size_change)
-        
         r += 1
-        tk.Label(scrollable_frame, text=t('settings.text_size_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+        _desc(r, t('settings.overlay_appearance_desc'))
         r += 1
-        
+
+        # ----- Prospector & Cargo overlay -----
+        _sub_heading(r, t('settings.overlay_group_prospector_cargo'))
+        r += 1
+        # Overlay mode selection (Standard / Enhanced Prospector / Cargo Status) - all on one line
+        mode_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
+        mode_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
+        tk.Label(mode_frame, text=t('settings.overlay_mode'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
+
+        self._overlay_standard_var = tk.IntVar(value=1 if self.overlay_mode.get() == "standard" else 0)
+        self._overlay_enhanced_var = tk.IntVar(value=1 if self.overlay_mode.get() == "enhanced" else 0)
+
+        def _on_standard_cb(*a):
+            if self._overlay_standard_var.get():
+                self._overlay_enhanced_var.set(0)
+                self.overlay_mode.set("standard")
+            else:
+                if not self._overlay_enhanced_var.get():
+                    self._overlay_standard_var.set(1)
+
+        def _on_enhanced_cb(*a):
+            if self._overlay_enhanced_var.get():
+                self._overlay_standard_var.set(0)
+                self.overlay_mode.set("enhanced")
+            else:
+                if not self._overlay_standard_var.get():
+                    self._overlay_enhanced_var.set(1)
+
+        _std_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_standard'), variable=self._overlay_standard_var,
+                      command=_on_standard_cb, **_cb_kw)
+        _std_cb.pack(side="left", padx=(8, 0))
+        _enh_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_enhanced'), variable=self._overlay_enhanced_var,
+                      command=_on_enhanced_cb, **_cb_kw)
+        _enh_cb.pack(side="left", padx=(8, 0))
+        _cargo_cb = tk.Checkbutton(mode_frame, text=t('settings.cargo_overlay'), variable=self.cargo_show_in_overlay,
+                      **_cb_kw)
+        _cargo_cb.pack(side="left", padx=(8, 0))
+        self._overlay_mode_cbs = [_std_cb, _enh_cb, _cargo_cb, _focused_cb]
+        r += 1
+        _desc(r, t('settings.overlay_mode_desc'))
+        r += 1
         # Display duration slider
-        duration_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        duration_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        tk.Label(duration_frame, text=t('settings.display_duration'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
-        self.duration_scale = tk.Scale(duration_frame, from_=5, to=30, orient="horizontal", 
-                                     variable=self.text_overlay_duration, bg=_gs_bg, fg=_slider_fg, 
-                                     activebackground=_slider_active, highlightthickness=0, length=140,
-                                     troughcolor=_slider_trough, font=self._scaled_font(9),
-                                     sliderrelief="flat", sliderlength=20)
-        self.duration_scale.pack(side="left", padx=(8, 0))
-        tk.Label(duration_frame, text=t('settings.seconds'), bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
+        self.duration_scale = _slider_row(r, t('settings.display_duration'), self.text_overlay_duration, 5, 30, t('settings.seconds'))
         r += 1
-        tk.Label(scrollable_frame, text=t('settings.duration_desc'), wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-                 font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 6))
+        _desc(r, t('settings.duration_desc'))
         r += 1
-        
+
+        # ----- Auto Prices overlay (Ring Finder) -----
+        _sub_heading(r, t('settings.overlay_group_auto_prices'))
+        r += 1
+        self._auto_prices_overlay_cb = tk.Checkbutton(scrollable_frame, text=t('settings.overlay_show_auto_prices'),
+                                                      variable=self.auto_prices_overlay, **_cb_kw)
+        self._auto_prices_overlay_cb.grid(row=r, column=0, sticky="w")
+        r += 1
+        # Same saved setting as "In-system prices only" in Rank Minerals / Find Best Mining System
+        from config import load_pp_mode, save_pp_mode
+        self.auto_prices_in_system = tk.BooleanVar(value=load_pp_mode())
+        _in_system_cb = tk.Checkbutton(scrollable_frame, text=t('settings.overlay_auto_prices_in_system'), variable=self.auto_prices_in_system,
+                      command=lambda: save_pp_mode(self.auto_prices_in_system.get()), **_cb_kw)
+        _in_system_cb.grid(row=r, column=0, sticky="w")
+        self._auto_prices_in_system_cb = _in_system_cb
+        # The setting is also changed from the Ring Finder menu and the Rank Minerals / Find Best
+        # dialogs - re-read it whenever this tab is shown so the checkbox never shows a stale value
+        _in_system_cb.bind("<Map>", lambda e: self.auto_prices_in_system.set(load_pp_mode()))
+        r += 1
+        self.auto_prices_duration_scale = _slider_row(r, t('settings.overlay_auto_prices_duration'),
+                                                      self.auto_prices_overlay_duration, 10, 60, t('settings.seconds'), indent=24)
+
+        def _apply_auto_prices_duration_state(*a):
+            # Only meaningful when Auto Prices is shown on the overlay and the text overlay is on
+            enabled = bool(self.auto_prices_overlay.get()) and bool(self.text_overlay_enabled.get())
+            self.auto_prices_duration_scale.config(state="normal" if enabled else "disabled")
+            for child in self.auto_prices_duration_scale.master.winfo_children():
+                if isinstance(child, tk.Label):
+                    child.config(fg="#ffffff" if enabled else "#666666")
+        self._apply_auto_prices_duration_state = _apply_auto_prices_duration_state
+        self.auto_prices_overlay.trace('w', _apply_auto_prices_duration_state)
+        _apply_auto_prices_duration_state()
+        r += 1
+
         # Show all materials checkbox (for enhanced mode) - HIDDEN but functionality preserved
         # tk.Checkbutton(scrollable_frame, text="Enhanced Mode: Show All Materials (uncheck to only show materials above threshold)",
         #               variable=self.prospector_show_all,
@@ -14353,6 +14392,26 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if hasattr(self.ring_finder, 'auto_switch_tabs_var'):
                 self.ring_finder.auto_switch_tabs_var.set(enabled)
     
+    def _on_auto_prices_overlay_toggle(self, *args) -> None:
+        """Save Auto Prices overlay preference and sync the Ring Finder checkbox"""
+        from config import update_config_value
+        enabled = bool(self.auto_prices_overlay.get())
+        update_config_value("auto_prices_overlay", enabled)
+        ring_finder = getattr(self, 'ring_finder', None)
+        if ring_finder and hasattr(ring_finder, 'prices_overlay_var') and ring_finder.prices_overlay_var.get() != enabled:
+            ring_finder.prices_overlay_var.set(enabled)
+
+    def _on_auto_prices_overlay_duration_change(self, *args) -> None:
+        """Save how long the Auto Prices overlay stays on screen"""
+        from config import update_config_value
+        duration = int(self.auto_prices_overlay_duration.get())
+        update_config_value("auto_prices_overlay_duration", duration)
+
+        # Show a preview message if overlay is enabled to test duration
+        if self.text_overlay.overlay_enabled:
+            self.text_overlay.show_message(t('settings.auto_prices_duration_preview').format(seconds=duration),
+                                           duration_ms=duration * 1000, ignore_sc_hide=True)
+
     def switch_to_tab(self, tab_name: str) -> None:
         """Switch to a specific tab by name
         
@@ -15002,6 +15061,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if hasattr(self, '_mining_session_cb'):
             self._mining_session_cb.config(state=state, fg=fg)
 
+        if hasattr(self, '_auto_prices_overlay_cb'):
+            self._auto_prices_overlay_cb.config(state=state, fg=fg)
+        if hasattr(self, '_auto_prices_in_system_cb'):
+            self._auto_prices_in_system_cb.config(state=state, fg=fg)
+
         if hasattr(self, '_sc_checkbox'):
             if not enabled:
                 self._sc_checkbox.config(state="disabled", fg="#666666")
@@ -15018,6 +15082,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.color_menu.config(state=state)
         if hasattr(self, 'size_combo'):
             self.size_combo.config(state="readonly" if enabled else "disabled")
+        if hasattr(self, '_apply_auto_prices_duration_state'):
+            self._apply_auto_prices_duration_state()
 
     def _on_text_overlay_toggle(self, *args) -> None:
         """Called when text overlay checkbox is toggled (master toggle for all overlays)"""
@@ -15136,7 +15202,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.overlay_only_game_focused.set(cfg.get("overlay_only_game_focused", True))
         self.hide_overlays_in_supercruise.set(cfg.get("hide_overlays_in_supercruise", False))
         self.overlay_only_mining_session.set(cfg.get("overlay_only_mining_session", False))
-        self.overlay_show_tph.set(cfg.get("overlay_show_tph", True))
         # Apply saved cargo overlay state
         self.cargo_text_overlay.set_enabled(cfg.get("cargo_show_in_overlay", True))
     
@@ -15152,8 +15217,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "cargo_show_in_overlay": bool(self.cargo_show_in_overlay.get()),
             "overlay_only_game_focused": bool(self.overlay_only_game_focused.get()),
             "hide_overlays_in_supercruise": bool(self.hide_overlays_in_supercruise.get()),
-            "overlay_only_mining_session": bool(self.overlay_only_mining_session.get()),
-            "overlay_show_tph": bool(self.overlay_show_tph.get())
+            "overlay_only_mining_session": bool(self.overlay_only_mining_session.get())
         }
         update_config_values(updates)
     
@@ -18631,6 +18695,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_tree.heading("powerplay", text=t('system_finder.col_powerplay'),
                                     command=lambda: self._sort_sysfinder_column("powerplay", False))
         self.sysfinder_tree.heading("_spacer", text="", anchor="w")
+        for _c in columns:
+            self.sysfinder_tree.heading(_c, anchor="w")
 
         # Column widths
         # minwidth is derived from the actual rendered header text width (at the
@@ -18649,8 +18715,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         _minwidths = {col: _min_for(col) for col in _base_widths}
 
-        _anchors = {"system": "w", "distance": "center", "security": "center", "allegiance": "center",
-                    "state": "center", "population": "center", "economy": "center", "powerplay": "center"}
+        _anchors = {col: "w" for col in _base_widths}
         for col_name, base_width in _base_widths.items():
             self.sysfinder_tree.column(col_name, width=max(self._scaled_px(base_width), _minwidths[col_name]),
                                        minwidth=_minwidths[col_name], anchor=_anchors[col_name])

@@ -133,6 +133,13 @@ Use `centered_info_dialog` / `centered_yesno_dialog` from `ui/dialogs.py` for st
 
 ---
 
+## UI Conventions
+
+- **Tables**: all columns and headers are left-aligned (a Treeview can't pad cells, so right-aligned numbers touch the next column). Exception: the two Announcement material tables stay centered.
+- **Overlays**: "Enable Text Overlay" is the master switch for every overlay, including Auto Prices (off = Auto Prices uses the popup).
+
+---
+
 ## Logs
 
 - **Installed build**: `%LOCALAPPDATA%\EliteMining\logs\elitemining_<timestamp>.log` (one file per session, from `logging_setup.py`).

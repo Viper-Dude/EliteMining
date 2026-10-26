@@ -213,13 +213,6 @@ class EDSMIntegration:
             conn = sqlite3.connect(self.user_db_path)
             cursor = conn.cursor()
             
-            # Calculate density if we have the data
-            density = self._calculate_density(
-                metadata.get("inner_radius"),
-                metadata.get("outer_radius"),
-                metadata.get("ring_mass")
-            )
-            
             # Try to match ring names flexibly:
             # DB has: "1 A Ring", EDSM has: "Macua 1 A Ring"
             # Extract the short form (body number + ring letter)
@@ -236,8 +229,7 @@ class EDSMIntegration:
                     ls_distance = ?,
                     inner_radius = ?,
                     outer_radius = ?,
-                    ring_mass = ?,
-                    density = ?
+                    ring_mass = ?
                 WHERE system_name = ?
                   AND body_name = ?
                   AND (ring_type IS NULL OR ls_distance IS NULL)
@@ -247,7 +239,6 @@ class EDSMIntegration:
                 metadata.get("inner_radius"),
                 metadata.get("outer_radius"),
                 metadata.get("ring_mass"),
-                density,
                 system_name,
                 short_ring_name
             ))
