@@ -14632,6 +14632,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     else:
                         # Route has systems - will be updated by FSDTarget event
                         print(f"[jumpsleft] NavRoute updated ({len(route)} systems)")
+            except json.JSONDecodeError:
+                # Game truncates the file before rewriting it; the next change event has the real data
+                pass
             except Exception as e:
                 log.error(f"Error reading NavRoute.json: {e}")
             return

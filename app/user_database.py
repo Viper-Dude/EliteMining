@@ -153,7 +153,7 @@ class UserDatabase:
                 self._apply_overlap_data_from_csv()
                 self._set_migration_version('overlap_csv', 3)
             else:
-                log.info("[Migration] Overlap CSV already applied (version 3)")
+                log.debug("[Migration] Overlap CSV already applied (version 3)")
             
             # v4.7.2: Apply RES site data from CSV file (version 3 - added new RES sites)
             if self._get_migration_version('res_csv') < 3:
@@ -162,7 +162,7 @@ class UserDatabase:
                 self._apply_res_data_from_csv()
                 self._set_migration_version('res_csv', 3)
             else:
-                log.info("[Migration] RES CSV already applied (version 3)")
+                log.debug("[Migration] RES CSV already applied (version 3)")
             
             # v4.7.2 / v5.2.5: Merge hotspot data from bundled install database (one-time migration)
             # Both keys point at the same bundled file - run once and mark both, so a db that
@@ -174,7 +174,7 @@ class UserDatabase:
                 self._set_migration_version('hotspot_merge_v472', 1)
                 self._set_migration_version('hotspot_merge_v525', 1)
             else:
-                log.info("[Migration] Hotspot merge already applied")
+                log.debug("[Migration] Hotspot merge already applied")
             
             # v4.7.6: Fix corrupted body_name entries where body_name has wrong system prefix
             # e.g., system_name="Palliyan" but body_name="HIP 54072 A 1 A Ring"
@@ -184,7 +184,7 @@ class UserDatabase:
                 self._fix_body_name_prefix_corruption()
                 self._set_migration_version('fix_body_name_prefix_v476', 1)
             else:
-                log.info("[Migration] Body name prefix fix v4.7.6 already applied")
+                log.debug("[Migration] Body name prefix fix v4.7.6 already applied")
             
             # v4.7.7: Normalize multi-star system names and backfill coordinates
             # e.g., system="HIP 39383 BC", body="3 A Ring" -> system="HIP 39383", body="BC 3 A Ring"
@@ -194,7 +194,7 @@ class UserDatabase:
                 self._normalize_multistar_system_names()
                 self._set_migration_version('normalize_multistar_systems', 1)
             else:
-                log.info("[Migration] Multi-star system normalization already applied")
+                log.debug("[Migration] Multi-star system normalization already applied")
             
             # v4.8.8: Add reserve_level column and migrate data from density column
             # The density column was being used to store reserve level text (Pristine, Major, etc.)
@@ -205,7 +205,7 @@ class UserDatabase:
                 self._add_reserve_level_column()
                 self._set_migration_version('add_reserve_level_column', 1)
             else:
-                log.info("[Migration] Reserve level column already added")
+                log.debug("[Migration] Reserve level column already added")
             
             # v4.8.10: Fix hotspot_count=0 entries created by bugs in earlier versions
             # - Delete placeholder "Unknown" material entries with count=0
@@ -216,7 +216,7 @@ class UserDatabase:
                 self._fix_zero_hotspot_count_entries()
                 self._set_migration_version('fix_zero_hotspot_count', 1)
             else:
-                log.info("[Migration] Zero hotspot count fix already applied")
+                log.debug("[Migration] Zero hotspot count fix already applied")
 
             # Clear leftover numeric density values from the reserve_level column
             if self._get_migration_version('clear_numeric_reserve_levels') < 1:
@@ -373,7 +373,7 @@ class UserDatabase:
                 
                 if not updates_needed:
                     print("[MIGRATION v4.4.6] No non-English material names found - database is clean")
-                    log.info("[Migration v4.4.6] No non-English material names found - database is clean")
+                    log.debug("[Migration v4.4.6] No non-English material names found - database is clean")
                     return  # No migration needed
                 
                 print(f"[MIGRATION v4.4.6] Found {len(updates_needed)} material names to normalize:")

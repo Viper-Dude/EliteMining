@@ -84,7 +84,7 @@ class EDSMDistanceCalculator:
                     "showCoordinates": 1
                 }
                 
-                logger.info(f"Querying EDSM for system: {system_name}")
+                logger.debug(f"Querying EDSM for system: {system_name}")
                 response = requests.get(self.api_base_url, params=params, timeout=self.timeout, headers=self.headers)
                 
                 # Retry on server errors (5xx) - EDSM is likely slow/overloaded
@@ -130,7 +130,7 @@ class EDSMDistanceCalculator:
                     "timestamp": time.time()
                 }
                 
-                logger.info(f"Successfully retrieved coordinates for {result['name']}")
+                logger.debug(f"Successfully retrieved coordinates for {result['name']}")
                 return result
                 
             except requests.exceptions.Timeout:

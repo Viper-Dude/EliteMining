@@ -337,7 +337,7 @@ class JournalParser:
         # Sort by modification time (oldest first) for chronological processing
         files.sort(key=os.path.getmtime)
         
-        log.info(f"Found {len(files)} journal files")
+        log.debug(f"Found {len(files)} journal files")
         return files
     
     def parse_journal_file(self, file_path: str) -> Generator[Dict[str, Any], None, None]:
