@@ -21,6 +21,7 @@
 - [Installation](#installation)
   - [Enable VoiceAttack Plugins](#enable-voiceattack-plugins)
 - [VoiceAttack Controls](#voiceattack-controls)
+  - [Voice Feedback](#voice-feedback-new)
 - [EliteMining App](#elitemining-app)
   - [Text Overlay](#text-overlay)
 - [Hotspot Finder](#hotspot-finder)
@@ -267,6 +268,12 @@ All FSD Jump Sequence settings above are saved as part of ship presets.
 💡 **Tip:** Use "Stop all profile commands" in VoiceAttack to interrupt any active sequence.
 
 💡 **Reset interrupted / out-of-sync sequences:** If a mining sequence is interrupted and a toggle ends up in the wrong state (e.g. lasers won't fire when they should), use the **"Stop and Reset"** command (also recognised: *"Stop and reset all profile commands"*, *"Stop all"*, *"Reset all"*) to clear every sequence flag and return the profile to a clean baseline.
+
+### Voice Feedback (New)
+
+Plays a sound or spoken voice for mining events, such as starting or resetting the mining sequence. Pick a sound set and a female or male voice per event, or use a computer voice instead. More voices and functions will be added in future updates.
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voice_feedback.png" width="900"><br>
 
 [Back to Top](#top)
 

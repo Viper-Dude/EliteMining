@@ -748,7 +748,7 @@ class RingFinder(ColumnVisibilityMixin):
                              activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
                              relief="raised", bd=1, cursor="hand2",
                              padx=15, pady=2, font=scaled_font(8, "normal"))
-        reset_btn.pack(side="left", padx=(60, 0))
+        reset_btn.pack(side="left", padx=(15, 0))
         ToolTip(reset_btn, t('ring_finder.reset_filters_tooltip'))
 
         best_mining_btn = tk.Button(pp_inner_row, text=t('ring_finder.find_best_mining_system'),
@@ -2122,6 +2122,8 @@ class RingFinder(ColumnVisibilityMixin):
                 self.min_hotspots_var.trace_add('write', lambda *args: self._save_filter_settings())
             except Exception as e:
                 print(f"Warning: Could not setup filter settings: {e}")
+            finally:
+                self._filters_loaded = True
 
         # Called from a background thread before mainloop may have started -
         # winfo_exists() can raise "main thread is not in main loop" here, so skip
@@ -2258,6 +2260,9 @@ class RingFinder(ColumnVisibilityMixin):
     
     def _save_filter_settings(self, event=None):
         """Save current filter settings to config"""
+        # Saves before the startup load would overwrite stored values with widget defaults
+        if not getattr(self, '_filters_loaded', False):
+            return
         try:
             from config import save_ring_finder_filters
             

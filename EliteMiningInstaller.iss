@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v5.4.9
+AppVersion=v5.5.0
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -16,7 +16,7 @@ CloseApplications=no
 ; VA profile update notice — shown before install as a reminder to keep the profile option ticked.
 ; ENABLE  when this release includes a new VA profile:   remove the leading semicolon below
 ; DISABLE when no VA profile update in this release:     add a semicolon at the start of the line below
-;InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
+InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
 
 ; Place uninstaller in app folder
 UninstallFilesDir={app}
@@ -40,6 +40,7 @@ Source: "app\Images\*";    DestDir: "{app}\app\Images";    Flags: recursesubdirs
 Source: "app\localization\*.json";  DestDir: "{app}\app\localization";  Flags: ignoreversion
 ; VoiceAttack-specific files (only installed if VA detected)
 Source: "app\Ship Presets\*";  DestDir: "{app}\app\Ship Presets";  Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "*.py,*.pyc,__pycache__"; Check: IsVADetected
+Source: "app\Sound_Packs\Sound_packs_For_install\*";  DestDir: "{app}\app\Sound_Packs";  Flags: recursesubdirs createallsubdirs ignoreversion; Check: IsVADetected
 ; Reports folder intentionally excluded - users must earn their reports by mining! 😉
 
 ; New Configurator executable
@@ -94,7 +95,7 @@ Source: "NOTICE"; DestDir: "{app}"
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"
 ; VoiceAttack integration options (only shown if VA detected)
 Name: "installeliteva"; Description: "Install EliteVA v5.0.12 (VoiceAttack plugin)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
-Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.4.7)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
+Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.5.0)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
 
 [Icons]
 ; Start Menu shortcut
@@ -422,7 +423,7 @@ var
 begin
   ExistingEliteAPIPath := '';
   ProfileNeedsUpdate := False;
-  BundledProfileVersion := '5.4.7';
+  BundledProfileVersion := '5.5.0';
   
   { DISABLED - plugin not used }
   { InstallPlugin := VADetected; }

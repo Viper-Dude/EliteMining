@@ -187,6 +187,7 @@ python app/create_release.py
 - `_atomic_write_text()` for all variable writes (VoiceAttack polls continuously)
 - `VA_VARS` dict maps tools to variable files; complete mapping in `main.py`
 - Distribution must include `LICENSE.txt` with MIT attribution for EliteVA plugin
+- Voice Feedback sounds: the app writes `soundPath_<event>.txt` (wav path, `none`, or `tts`); the `((Play Feedback Sound))` command in the `.vap` reads it, and for `tts` writes the event name to `soundTrigger.txt` for the app to speak. Changing this contract means editing and re-exporting the profile. Events come from `Sound_Packs/<pack>/<pack>_<Female|Male>/*.wav`; `Sound_Packs/Voice_files.xlsx` is a dev-only sheet excluded from builds.
 
 ---
 

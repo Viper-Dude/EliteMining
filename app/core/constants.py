@@ -53,7 +53,18 @@ TOGGLES = {
     "Pulse Wave Analyser": ("Pulsewavetoggle.txt", "Switch back to the Pulse Wave Analyser firegroup when laser mining is completed."),
     "Continuous Pulsewave": ("continousePulsewave.txt", "Enable continuous Pulse Wave Analyser mode."),
     "Auto Deselect Prospector": ("targetToggle.txt", "Deselect prospector when laser mining is completed."),
+    "Voice Feedback": ("voiceFeedbackToggle.txt", "Enable/disable spoken feedback from VoiceAttack."),
 }
+
+PRESET_EXCLUDED_TOGGLES = {"Voice Feedback"}
+
+SOUND_EVENT_CATEGORIES = {
+    "starting_mining_seq": "mining",
+    "reset_mining_seq": "mining",
+    "reset_mining_seq_completed": "mining",
+    "cargo_scoop_not_retracted": "mining",
+}
+SOUND_CATEGORY_ORDER = ["mining", "other"]
 
 TIMERS = {
     "Duration for firing mining lasers (standard)": ("delayLaserMining.txt", 1, 50, "Duration for firing mining lasers (standard mining)."),
