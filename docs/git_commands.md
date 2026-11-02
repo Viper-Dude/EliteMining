@@ -8,7 +8,8 @@ python firstrun_sim.py
 # Git Commands Reference
 
 # Git Push
-git commit -m "v5.3.0 - Hot Fix - Commodity Market galaxy-wide search"
+git add -A
+git commit -m "v5.5.1 - main logo update"
 git push
 
 ## Standard Commit and Push Process
@@ -18,7 +19,7 @@ git push
 git add .
 
 # 2. Commit with descriptive message
-git commit -m "Your commit message here"
+git commit -m "updated logo"
 
 # 3. Push to remote repository
 git push
