@@ -14,13 +14,17 @@
 ### Mining
 - Prospector times and last visited dates now use your local time.
 
+### General
+- Updated the EliteMining startup splash image and main logo.
+- Fixed the update message wrongly appearing when you are already on the latest version.
+
 ### VoiceAttack Profile updated to v5.5.1
 
 - Updated profile plays the new Voice Feedback event sounds set in the Voice Feedback UI.
 - General adjustments and optimization of commands
 
 
-#### Important Notes
+### Important Notes
 
 - Remember to always check all your key and joystick bindings after every profile update.
 
