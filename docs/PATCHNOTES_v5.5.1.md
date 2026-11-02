@@ -9,7 +9,6 @@
 - Added voice set checkboxes to pick one voice for a whole section at once.
 - Added Reset buttons to return a section, or all events, to the default voices.
 - Voice Feedback controls are now greyed out while Voice Feedback is turned off.
-- Starting a new announcement now cuts off the one that is still playing.
 - The Prospector delay between launching a prospector (cooldown time) can now be set as low as 0.0 seconds.
 
 ### Mining
@@ -18,6 +17,7 @@
 ### VoiceAttack Profile updated to v5.5.1
 
 - Updated profile plays the new Voice Feedback event sounds set in the Voice Feedback UI.
+- General adjustments and optimization of commands
 
 
 #### Important Notes
