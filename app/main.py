@@ -5197,9 +5197,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 # Use module-level app_dir (local 'app_dir' assigned later in __init__ shadows the global)
                 _app_dir = globals()['app_dir']
                 if getattr(sys, 'frozen', False):
-                    _splash_img_path = os.path.join(os.path.dirname(_app_dir), "app", "Images", "EliteMining_splash.png")
+                    _splash_img_path = os.path.join(os.path.dirname(_app_dir), "app", "Images", "EliteMining_splash_new.png")
                 else:
-                    _splash_img_path = os.path.join(_app_dir, "Images", "EliteMining_splash.png")
+                    _splash_img_path = os.path.join(_app_dir, "Images", "EliteMining_splash_new.png")
                 _pil_img = Image.open(_splash_img_path)
                 _max_w, _max_h = 800, 600
                 _pil_img.thumbnail((_max_w, _max_h), Image.LANCZOS)
