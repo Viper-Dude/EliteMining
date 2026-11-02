@@ -60,11 +60,25 @@ PRESET_EXCLUDED_TOGGLES = {"Voice Feedback"}
 
 SOUND_EVENT_CATEGORIES = {
     "starting_mining_seq": "mining",
-    "reset_mining_seq": "mining",
-    "reset_mining_seq_completed": "mining",
-    "cargo_scoop_not_retracted": "mining",
+    "mining_sequence_reset_initiated": "mining",
+    "mining_sequence_reset_complete": "mining",
+    "cargo_scoop_retraction_aborted": "mining",
+    "executing_clear_and_vector_protocol": "ship",
+    "retracting_scoop_setting_power": "mining",
+    "seismic_charge_system_online": "mining",
+    "sub_surface_displacement_system_online": "mining",
+    "continuous_pulse_wave_scanning_initiated": "mining",
+    "prospector_sequence_initiated": "mining",
+    "core_scanning_initiated": "mining",
+    "core_scanning_terminated": "mining",
+    "all_profile_commands_stopped_and_reset": "mining",
+    "pulse_wave_scanning_terminated": "mining",
+    "continuous_boost_initiated": "ship",
+    "continuous_boost_terminated": "ship",
+    "weapons_activated": "ship",
+    "requesting_docking_clearance": "ship",
 }
-SOUND_CATEGORY_ORDER = ["mining", "other"]
+SOUND_CATEGORY_ORDER = ["mining", "ship", "other"]
 
 TIMERS = {
     "Duration for firing mining lasers (standard)": ("delayLaserMining.txt", 1, 50, "Duration for firing mining lasers (standard mining)."),

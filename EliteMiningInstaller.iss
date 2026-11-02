@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v5.5.0
+AppVersion=v5.5.1
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -32,6 +32,8 @@ Type: files; Name: "{app}\LICENSE.txt"
 ; The app handles profile version detection and keybind preservation
 ; v4.7.6+: Clean EliteAPI folder completely to ensure fresh install of all files (only if user confirmed)
 Type: filesandordirs; Name: "{app}\..\EliteAPI\*"; Check: ShouldInstallEliteAPI
+; Remove old sound packs so stale/renamed event wavs don't linger. Revisit if custom user voices are ever supported.
+Type: filesandordirs; Name: "{app}\app\Sound_Packs"; Check: IsVADetected
 
 [Files]
 ; Only include specific file types from needed subfolders (exclude .py files)
@@ -95,7 +97,7 @@ Source: "NOTICE"; DestDir: "{app}"
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"
 ; VoiceAttack integration options (only shown if VA detected)
 Name: "installeliteva"; Description: "Install EliteVA v5.0.12 (VoiceAttack plugin)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
-Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.5.0)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
+Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.5.1)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
 
 [Icons]
 ; Start Menu shortcut
@@ -423,7 +425,7 @@ var
 begin
   ExistingEliteAPIPath := '';
   ProfileNeedsUpdate := False;
-  BundledProfileVersion := '5.5.0';
+  BundledProfileVersion := '5.5.1';
   
   { DISABLED - plugin not used }
   { InstallPlugin := VADetected; }
@@ -699,6 +701,10 @@ begin
         Log('Successfully cleaned EliteAPI folder');
     end;
   end;
+
+  { VoiceAttack keeps replaced sound files loaded until it restarts }
+  if (CurStep = ssPostInstall) and IsVADetected and (not WizardSilent) then
+    MsgBox('Sound files were updated. Please restart VoiceAttack so it uses the new sounds.', mbInformation, MB_OK);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;

@@ -10662,7 +10662,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
     def _summaries_from_event(self, evt: Dict[str, Any]) -> Tuple[str, str, str, str, str, bool]:
         t = evt.get("timestamp")
         try:
-            time_str = dt.datetime.fromisoformat(t.replace("Z", "+00:00")).strftime("%H:%M:%S") if t else "--:--:--"
+            time_str = dt.datetime.fromisoformat(t.replace("Z", "+00:00")).astimezone().strftime("%H:%M:%S") if t else "--:--:--"
         except Exception:
             time_str = "--:--:--"
 

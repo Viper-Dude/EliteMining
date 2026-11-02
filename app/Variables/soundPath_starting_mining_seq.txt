@@ -1,1 +1,1 @@
-d:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\app\Sound_Packs\British_01\British_01_Female\starting_mining_seq.wav
+d:\My Apps Work Folder\Elitemining Working folder\Releases\EliteMining-Dev\app\Sound_Packs\US_01\US_01_Male\starting_mining_seq.wav

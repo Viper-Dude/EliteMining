@@ -64,6 +64,15 @@ def calculate_ring_density(mass: float, inner_radius: float, outer_radius: float
         return None
 
 
+def _local_date(ts: str) -> str:
+    if ts.endswith('Z'):
+        try:
+            return datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone().strftime('%Y-%m-%d')
+        except ValueError:
+            pass
+    return ts[:10]
+
+
 class UserDatabase:
     """Manages user-specific data including hotspots and visited systems"""
     
@@ -1624,7 +1633,7 @@ class UserDatabase:
                     )
                     for name, last_visit in cursor.fetchall():
                         if last_visit:
-                            result[name] = str(last_visit)[:10]
+                            result[name] = _local_date(str(last_visit))
         except Exception as e:
             log.error(f"Error bulk fetching last visit dates: {e}")
         return result
@@ -2524,8 +2533,7 @@ class UserDatabase:
         
         try:
             # Parse the date and format it nicely
-            date_obj = datetime.fromisoformat(last_visit.replace('Z', '+00:00'))
-            date_str = date_obj.strftime('%Y-%m-%d')
+            date_str = _local_date(last_visit)
             
             if visit_count == 1:
                 return f"Yes ({date_str})"

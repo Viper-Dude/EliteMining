@@ -219,6 +219,16 @@ def _apply_item_voice(voice, volume=None):
     except Exception as e:
         print(f"[ANNOUNCER] Could not apply voice '{voice}': {e}")
 
+_stop_generation = 0
+
+def stop():
+    """Cut off current speech and drop anything queued"""
+    global _stop_generation
+    with _tts_lock:
+        _stop_generation += 1
+        _speech_queue.clear()
+    winsound.PlaySound(None, winsound.SND_PURGE)
+
 def say(text: str, voice: str = None, volume: int = None):
     """Queue text for TTS speech with memory leak prevention; voice overrides the selected voice for this item"""
     global _speech_queue, _is_speaking
@@ -310,8 +320,11 @@ def _render_boosted(text: str, volume: int) -> bytes:
 def _speak_item(text: str, volume: int):
     """Speak one queued item boosted; falls back to normal SAPI playback if rendering fails"""
     pythoncom.CoInitialize()
+    generation = _stop_generation
     try:
-        winsound.PlaySound(_render_boosted(text, volume), winsound.SND_MEMORY)
+        audio = _render_boosted(text, volume)
+        if generation == _stop_generation:
+            winsound.PlaySound(audio, winsound.SND_MEMORY)
     except Exception as e:
         print(f"[ANNOUNCER] Boosted speech failed, using normal playback: {e}")
         try:

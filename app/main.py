@@ -873,7 +873,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.5.0"
+APP_VERSION = "v5.5.1"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -7539,10 +7539,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         vf_title_row.grid(row=r, column=0, sticky="w", pady=(10, 2))
         ttk.Label(vf_title_row, text=t('voiceattack.section_voice_feedback'), font=self._scaled_font(10, "bold")).pack(side="left")
         from ui.help_link import create_help_link
-        create_help_link(vf_title_row, "voice-feedback-new", t('voiceattack.voice_feedback_help_tooltip'), ToolTip).pack(side="left", padx=(6, 0))
-        r += 1
-
-        ttk.Label(scrollable_frame, text=t('voiceattack.voice_feedback_new_note'), font=self._scaled_font(9)).grid(row=r, column=0, sticky="w", pady=(0, 4))
+        create_help_link(vf_title_row, "voice-feedback", t('voiceattack.voice_feedback_help_tooltip'), ToolTip).pack(side="left", padx=(6, 0))
         r += 1
 
         for name in ["Voice Feedback"]:
@@ -7568,6 +7565,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                      font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
 
+        self._vf_controls = []
+        self._vf_tts_syncs = []
         _sl_trough = "#1a1a1a" if self.current_theme == "elite_orange" else "#444444"
         _sl_active = "#ff6600" if self.current_theme == "elite_orange" else "#444444"
         for label_key, var_name, lo, hi, default in (
@@ -7590,13 +7589,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
                              sliderrelief="flat", sliderlength=20,
                              command=lambda v: self._write_sound_levels())
             scale.pack(side="left", padx=(8, 0))
+            self._vf_controls.append((scale, "normal"))
             if var_name == 'sound_balance':
                 ToolTip(scale, t('voiceattack.sound_balance_tip'))
                 scale.bind("<Double-Button-1>", lambda e: (self.sound_balance.set(0), self._write_sound_levels()))
             r += 1
         self._write_sound_levels()
 
-        ttk.Label(scrollable_frame, text=t('voiceattack.section_sound_events'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(10, 2))
+        _evhead = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+        _evhead.grid(row=r, column=0, sticky="w", pady=(10, 2))
+        ttk.Label(_evhead, text=t('voiceattack.section_sound_events'), font=self._scaled_font(10, "bold")).pack(side="left")
+        _reset_all_btn = ttk.Button(_evhead, text=t('voiceattack.sound_reset_all'), style="Small.TButton",
+                                    command=lambda: self._reset_sound_events())
+        _reset_all_btn.pack(side="left", padx=(12, 0))
+        self._vf_controls.append((_reset_all_btn, "normal"))
+        r += 1
+        ttk.Label(scrollable_frame, text=t('voiceattack.voice_set_hint'), font=self._scaled_font(8)).grid(row=r, column=0, sticky="w", pady=(0, 2))
         r += 1
         _cfg = _load_cfg()
         _saved_events = _cfg.get("sound_events", {})
@@ -7609,6 +7617,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sound_event_vars = {}
         self.sound_event_tts_vars = {}
         self.sound_event_names = {}
+        self.sound_event_combos = {}
+        self._sound_event_packs = {}
+        _set_labels = sorted(self._sound_label_map) + [_tts_label, _off_label]
+        self._voice_set_active = {c: l for c, l in _cfg.get("sound_voice_sets", {}).items() if l in _set_labels}
+        self._voice_set_vars = {}
         _last_category = None
         _ordered_events = sorted(self.sound_event_options.items(),
                                  key=lambda kv: SOUND_CATEGORY_ORDER.index(SOUND_EVENT_CATEGORIES.get(kv[0], "other")))
@@ -7619,13 +7632,38 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 ttk.Label(scrollable_frame, text=t(f'voiceattack.sound_category_{_category}'),
                           font=self._scaled_font(9, "bold")).grid(row=r, column=0, sticky="w", pady=(6, 2))
                 r += 1
-            name = t(f'voiceattack.sound_event_{event}')
+                if _set_labels:
+                    setf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+                    setf.grid(row=r, column=0, sticky="w", pady=(0, 4))
+                    tk.Label(setf, text=t('voiceattack.voice_set'), bg=_toggle_bg, fg=_toggle_fg,
+                             font=self._scaled_font(9)).pack(side="left", padx=(4, 8))
+                    for label in _set_labels:
+                        sv = tk.BooleanVar(value=(label == self._voice_set_active.get(_category)))
+                        self._voice_set_vars[(_category, label)] = sv
+                        _set_cb = tk.Checkbutton(setf, text=label, variable=sv,
+                                       command=lambda c=_category, l=label: self._on_voice_set_toggle(c, l),
+                                       bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
+                                       activebackground=_toggle_bg, activeforeground=_toggle_fg,
+                                       highlightthickness=0, bd=0, font=self._scaled_font(9),
+                                       padx=4, pady=2, anchor="w")
+                        self._vf_controls.append((_set_cb, "normal"))
+                        _set_cb.pack(side="left", padx=(0, 6))
+                    _reset_btn = ttk.Button(setf, text=t('voiceattack.sound_reset'), style="Small.TButton",
+                                            command=lambda c=_category: self._reset_sound_events(c))
+                    _reset_btn.pack(side="left", padx=(8, 0))
+                    self._vf_controls.append((_reset_btn, "normal"))
+                    r += 1
+            name =t(f'voiceattack.sound_event_{event}')
             if name.endswith(f'sound_event_{event}'):
                 name = event.replace('_', ' ').capitalize()
             self.sound_event_names[event] = name
+            self._sound_event_packs[event] = packs
             saved = _saved_events.get(event)
             default = next((p for p in packs if p.endswith(f" {_default_voice}")), packs[0])
-            if saved == "":
+            _active = self._voice_set_active.get(_category, "")
+            if _active:
+                initial = _active if _active in packs or _active == _tts_label else _off_label
+            elif saved == "":
                 initial = _off_label
             elif saved == "tts":
                 initial = _tts_label
@@ -7642,17 +7680,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
                      font=self._scaled_font(9), width=34, anchor="w").pack(side="left", padx=(4, 0))
             event_combo = ttk.Combobox(rowf, textvariable=var, values=[_off_label, _tts_label] + packs,
                                        state="readonly", width=22)
+            self.sound_event_combos[event] = event_combo
             event_combo.pack(side="left", padx=(8, 0))
             event_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
-            ttk.Button(rowf, text=t('voiceattack.sound_event_test'), style="Small.TButton", width=5,
-                       command=lambda e=event: self._test_sound_event(e)).pack(side="left", padx=(8, 0))
+            event_combo.bind("<<ComboboxSelected>>", lambda e, c=_category: self._clear_voice_set(c), add='+')
+            _test_btn = ttk.Button(rowf, text=t('voiceattack.sound_event_test'), style="Small.TButton", width=5,
+                                   command=lambda e=event: self._test_sound_event(e))
+            _test_btn.pack(side="left", padx=(8, 0))
+            self._vf_controls.append((_test_btn, "normal"))
+            self._vf_controls.append((event_combo, "readonly"))
             voice_combo = ttk.Combobox(rowf, textvariable=voice_var, values=_tts_voices, state="readonly", width=30)
             voice_combo.pack(side="left", padx=(8, 0))
             voice_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
 
             def _sync_tts_widgets(*args, v=var, vc=voice_combo):
-                vc.configure(state="readonly" if v.get() == _tts_label else "disabled")
+                vc.configure(state="readonly" if v.get() == _tts_label and self.toggle_vars["Voice Feedback"].get() else "disabled")
             var.trace_add("write", _sync_tts_widgets)
+            self._vf_tts_syncs.append(_sync_tts_widgets)
             _sync_tts_widgets()
             for tv in (var, voice_var):
                 tv.trace_add("write", lambda *args: self._save_sound_events())
@@ -7666,6 +7710,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             val = 1 if _cfg.get(key) else 0
             self.toggle_vars[name].set(val)
             self._write_var_text(os.path.splitext(TOGGLES[name][0])[0], str(val))
+        self.toggle_vars["Voice Feedback"].trace_add("write", lambda *args: self._sync_voice_feedback_enabled())
+        self._sync_voice_feedback_enabled()
 
     def _build_bookmarks_tab(self, frame: ttk.Frame) -> None:
         """Build the Bookmarks tab - Mining location bookmarks"""
@@ -10649,7 +10695,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Use existing variable (initialized in __init__)
             # NOTE: Don't set up trace during build - import will load values first
-            prospector_spinbox = tk.Spinbox(prospector_frame, from_=1.0, to=6.0, increment=0.1, width=5,
+            prospector_spinbox = tk.Spinbox(prospector_frame, from_=0.0, to=6.0, increment=0.1, width=5,
                                              textvariable=self.prospector_delay_var, format="%.1f",
                                              disabledbackground="#1e1e1e", disabledforeground="#666666",
                                              command=self._save_prospector_delay,
@@ -10666,7 +10712,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if event.delta > 0:
                         new_val = min(current + 0.1, 6.0)
                     else:
-                        new_val = max(current - 0.1, 2.0)
+                        new_val = max(current - 0.1, 0.0)
                     var.set(round(new_val, 1))
                     self._save_prospector_delay()  # Save on scroll
                 except:
@@ -10674,7 +10720,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 return "break"
             prospector_spinbox.bind("<MouseWheel>", on_prospector_scroll)
             
-            prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [1.0..6.0] seconds (default: 2.6s)",
+            prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [0.0..6.0] seconds (default: 2.6s)",
                                        bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
             prospector_label.pack(side="left")
             self.prospector_cooldown_spinbox = prospector_spinbox
@@ -11132,7 +11178,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 with open(txt_path, 'r', encoding='utf-8') as f:
                     delay = float(f.read().strip())
                     # Clamp to valid range
-                    delay = max(1.0, min(6.0, delay))
+                    delay = max(0.0, min(6.0, delay))
                     self.prospector_delay_var.set(delay)
                     print(f"[PROSPECTOR DELAY] Loaded delay: {delay:.1f} seconds")
             else:
@@ -11177,6 +11223,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _test_sound_event(self, event: str) -> None:
         """Play/speak the current choice for an event using the volume/balance sliders"""
+        announcer.stop()
         if self.sound_event_vars[event].get() == t('voiceattack.sound_event_tts'):
             self._speak_sound_event(event)
             return
@@ -11232,13 +11279,90 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"[SOUND TRIGGER] {e}")
         self.after(300, self._poll_sound_trigger)
 
+    def _sync_voice_feedback_enabled(self) -> None:
+        """Grey out the volume, balance and sound event controls while Voice Feedback is off"""
+        enabled = bool(self.toggle_vars["Voice Feedback"].get())
+        for widget, on_state in self._vf_controls:
+            widget.configure(state=on_state if enabled else "disabled")
+        for sync in self._vf_tts_syncs:
+            sync()
+
+    def _on_voice_set_toggle(self, category: str, label: str) -> None:
+        """Voice set checkboxes are exclusive per section; none ticked = custom per-event choices"""
+        from config import update_config_value
+        active = label if self._voice_set_vars[(category, label)].get() else ""
+        if active:
+            self._voice_set_active[category] = active
+        else:
+            self._voice_set_active.pop(category, None)
+        for (cat, other), sv in self._voice_set_vars.items():
+            if cat == category:
+                sv.set(other == active)
+        update_config_value("sound_voice_sets", dict(self._voice_set_active))
+        off_label = t('voiceattack.sound_event_off')
+        tts_label = t('voiceattack.sound_event_tts')
+        custom = _load_cfg().get("sound_events", {})
+        for event, var in self.sound_event_vars.items():
+            if SOUND_EVENT_CATEGORIES.get(event, "other") != category:
+                continue
+            packs = self._sound_event_packs[event]
+            if active:
+                value = active if active in packs or active == tts_label else off_label
+            else:
+                saved = custom.get(event)
+                value = off_label if saved == "" else tts_label if saved == "tts" else saved if saved in packs else packs[0]
+            var.set(value)
+        self._save_sound_events()
+
+    def _clear_voice_set(self, category: str) -> None:
+        """Editing a dropdown makes the section custom: untick its voice set and keep the rows as they are"""
+        if category not in self._voice_set_active:
+            return
+        from config import update_config_value
+        del self._voice_set_active[category]
+        for (cat, _label), sv in self._voice_set_vars.items():
+            if cat == category:
+                sv.set(False)
+        update_config_value("sound_voice_sets", dict(self._voice_set_active))
+        self._save_sound_events()
+
+    def _reset_sound_events(self, category: str = None) -> None:
+        """Reset a section (or all) to the default voice for every event and untick its voice set"""
+        if not centered_yesno_dialog(self.parent.winfo_toplevel(), t('voiceattack.sound_reset_title'),
+                                     t('voiceattack.sound_reset_confirm')):
+            return
+        from config import update_config_value
+        default_tts = _load_cfg().get("tts_voice") or ""
+        for event, var in self.sound_event_vars.items():
+            if category and SOUND_EVENT_CATEGORIES.get(event, "other") != category:
+                continue
+            packs = self._sound_event_packs[event]
+            var.set(next((p for p in packs if p.endswith(" Female")), packs[0]))
+            if default_tts:
+                self.sound_event_tts_vars[event].set(default_tts)
+        for cat in ([category] if category else list(self._voice_set_active)):
+            self._voice_set_active.pop(cat, None)
+        for (cat, _label), sv in self._voice_set_vars.items():
+            if not category or cat == category:
+                sv.set(False)
+        update_config_value("sound_voice_sets", dict(self._voice_set_active))
+        self._save_sound_events()
+
     def _save_sound_events(self) -> None:
         """Persist per-event choice ("" = Off, "tts", or "<pack> <voice>") and TTS voice, and write the path variables"""
         from config import update_config_value
         off_label = t('voiceattack.sound_event_off')
         tts_label = t('voiceattack.sound_event_tts')
-        update_config_value("sound_events", {e: ("" if v.get() == off_label else "tts" if v.get() == tts_label else v.get())
-                                             for e, v in self.sound_event_vars.items()})
+        active = getattr(self, '_voice_set_active', {})
+        existing = _load_cfg().get("sound_events", {})
+        events = {}
+        for e, v in self.sound_event_vars.items():
+            if SOUND_EVENT_CATEGORIES.get(e, "other") in active:
+                if e in existing:
+                    events[e] = existing[e]
+            else:
+                events[e] = "" if v.get() == off_label else "tts" if v.get() == tts_label else v.get()
+        update_config_value("sound_events", events)
         update_config_value("sound_event_tts", {e: vv.get() for e, vv in self.sound_event_tts_vars.items()})
         self._write_sound_event_paths()
 
@@ -11984,8 +12108,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if raw is not None:
                     try:
                         delay = float(raw)
-                        # Clamp to valid range (1.0-6.0)
-                        delay = max(1.0, min(6.0, delay))
+                        # Clamp to valid range (0.0-6.0)
+                        delay = max(0.0, min(6.0, delay))
                         self.prospector_delay_var.set(delay)
                         found.append(f"{prospector_delay_file}.txt")
                         print(f"[IMPORT] Loaded prospector delay: {delay:.1f}s")
@@ -12437,8 +12561,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if "ProspectorDelay" in data and hasattr(self, 'prospector_delay_var'):
             try:
                 delay = float(data["ProspectorDelay"])
-                # Clamp to valid range (1.0-6.0)
-                delay = max(1.0, min(6.0, delay))
+                # Clamp to valid range (0.0-6.0)
+                delay = max(0.0, min(6.0, delay))
                 self.prospector_delay_var.set(delay)
                 self._save_prospector_delay()
                 print(f"[PRESET] Loaded prospector delay: {delay:.1f}s")
