@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add -A
-git commit -m "v5.5.1 - main logo update"
+git commit -m "v5.5.2 - logo and splash update"
 git push
 
 ## Standard Commit and Push Process

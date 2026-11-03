@@ -353,24 +353,25 @@ class ReleaseBuilder:
             return result
     
     def resize_splash_image(self):
-        """Resize EliteMining_splash.png to max 800x460 before building"""
-        self.print_step(0, "Resizing Splash Image")
-        splash_path = self.script_dir / "Images" / "EliteMining_splash.png"
-        if not splash_path.exists():
-            print(f"⚠️  Splash image not found: {splash_path} — skipping")
-            return
-        try:
-            from PIL import Image
-            img = Image.open(splash_path)
-            orig_size = img.size
-            img.thumbnail((800, 460), Image.LANCZOS)
-            if img.size != orig_size:
-                img.save(splash_path)
-                print(f"✅ Resized splash: {orig_size} → {img.size}")
-            else:
-                print(f"✅ Splash already fits ({orig_size}) — no resize needed")
-        except Exception as e:
-            print(f"⚠️  Could not resize splash image: {e}")
+        """Resize splash and main logo images to max 1600x900 before building"""
+        self.print_step(0, "Resizing Splash/Logo Images")
+        for name in ("EliteMining_splash.png", "EliteMining_Main_logo.png"):
+            img_path = self.script_dir / "Images" / name
+            if not img_path.exists():
+                print(f"⚠️  Image not found: {img_path} — skipping")
+                continue
+            try:
+                from PIL import Image
+                img = Image.open(img_path)
+                orig_size = img.size
+                img.thumbnail((1600, 900), Image.LANCZOS)
+                if img.size != orig_size:
+                    img.save(img_path, optimize=True)
+                    print(f"✅ Resized {name}: {orig_size} → {img.size}")
+                else:
+                    print(f"✅ {name} already fits ({orig_size}) — no resize needed")
+            except Exception as e:
+                print(f"⚠️  Could not resize {name}: {e}")
 
     def build_release(self):
         """Main method to build the complete release"""
