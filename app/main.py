@@ -5201,7 +5201,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 else:
                     _splash_img_path = os.path.join(_app_dir, "Images", "EliteMining_splash.png")
                 _pil_img = Image.open(_splash_img_path)
-                _max_w, _max_h = 1100, 650
+                _max_w, _max_h = 950, 560
                 _pil_img.thumbnail((_max_w, _max_h), Image.LANCZOS)
                 _sw, _sh = _pil_img.size
                 self._splash_photo = ImageTk.PhotoImage(_pil_img)

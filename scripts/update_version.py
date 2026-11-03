@@ -9,8 +9,9 @@ from datetime import datetime
 
 # === CHANGE VERSION AND DATE HERE ===
 NEW_VERSION = "5.5.2"
-NEW_BUILD_DATE = "2026-November-02"  # Format: YYYY-MM-DD (leave empty for today's date)
+NEW_BUILD_DATE = ""  # Format: YYYY-Month-DD (leave empty for today's date)
 VA_PROFILE_VERSION = "5.5.1"  # Set to "" if this release does not include a VA profile update
+SOUND_PACK_VERSION = "5.5.1"  # Release that last changed the sound files; only change when sounds change
 # ====================================
 
 def main():
@@ -22,7 +23,7 @@ def main():
     installer_file = base_path / "EliteMiningInstaller.iss"
     
     # Use provided date or today's date
-    build_date = NEW_BUILD_DATE if NEW_BUILD_DATE else datetime.now().strftime("%Y-%m-%d")
+    build_date = NEW_BUILD_DATE if NEW_BUILD_DATE else datetime.now().strftime("%Y-%B-%d")
     
     print(f"Updating to version: {NEW_VERSION}")
     print(f"Build date: {build_date}")
@@ -69,6 +70,7 @@ def main():
     else:
         # No profile update this release - suppress the update notice page
         content = re.sub(r'^;?InfoBeforeFile=', ';InfoBeforeFile=', content, flags=re.MULTILINE)
+    content = re.sub(r"(function BundledSoundVersion: String;\r?\nbegin\r?\n  Result := ')[^']+(')", lambda m: m.group(1) + SOUND_PACK_VERSION + m.group(2), content)
     installer_file.write_text(content, encoding="utf-8")
     print(f"✓ Updated {installer_file.name}")
     

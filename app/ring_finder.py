@@ -1137,7 +1137,7 @@ class RingFinder(ColumnVisibilityMixin):
             "Reserve": 110,
             "Source": 70,
             "PowerPlay": 170,
-            "Favourite": 150,
+            "Favourite": 70,
             "Last Mined": 110,
             "Comment": 150,
             "Density": 100
@@ -1171,7 +1171,7 @@ class RingFinder(ColumnVisibilityMixin):
         for col in columns:
             # Left-align headers - use display name if mapped, otherwise use column name
             display_name = column_display_names.get(col, col)
-            self.results_tree.heading(col, text=display_name, anchor="w", command=lambda c=col: self._sort_column(c, self.sort_reverse.get(c, False)))
+            self.results_tree.heading(col, text=display_name, anchor="center" if col == "Favourite" else "w", command=lambda c=col: self._sort_column(c, self.sort_reverse.get(c, False)))
 
             # Bind right-click on header to show column menu
             # Note: This binds to the entire tree, we'll check if click is on header in handler
@@ -1205,7 +1205,7 @@ class RingFinder(ColumnVisibilityMixin):
             elif col == "PowerPlay":
                 self.results_tree.column(col, width=column_widths.get(col, 170), minwidth=80, anchor="w", stretch=False)
             elif col == "Favourite":
-                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
             elif col == "Last Mined":
                 self.results_tree.column(col, width=column_widths[col], minwidth=80, anchor="w", stretch=False)
             elif col == "Comment":
@@ -2891,6 +2891,7 @@ class RingFinder(ColumnVisibilityMixin):
             max_distance = max(max_distance, 500.0)
 
         # Favourites Only: favourites live in the local DB; show all regardless of distance/result limits
+        self._favourites_search = self.favourites_only_var.get()
         if self.favourites_only_var.get():
             max_distance = 200000.0
             max_results = None
@@ -4989,6 +4990,13 @@ class RingFinder(ColumnVisibilityMixin):
                         if reference_system not in systems_in_range:
                             systems_in_range.append(reference_system)
                 
+                # Favourites Only: search exactly the systems that hold favourite rings (no radius pre-filter)
+                if getattr(self, '_favourites_search', False):
+                    cursor.execute('SELECT DISTINCT system_name FROM hotspot_data WHERE favourite = 1')
+                    systems_in_range = [row[0] for row in cursor.fetchall()]
+                    if not systems_in_range:
+                        return []
+
                 # Build optimized query based on whether we have a system filter
                 if systems_in_range:
                     # SQLite has a limit of 999 variables per query, so batch if needed

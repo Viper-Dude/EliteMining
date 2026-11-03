@@ -353,9 +353,9 @@ class ReleaseBuilder:
             return result
     
     def resize_splash_image(self):
-        """Resize splash and main logo images to max 1600x900 before building"""
+        """Resize splash (max 1200x675) and main logo (max 1600x900) before building"""
         self.print_step(0, "Resizing Splash/Logo Images")
-        for name in ("EliteMining_splash.png", "EliteMining_Main_logo.png"):
+        for name, max_size in (("EliteMining_splash.png", (1200, 675)), ("EliteMining_Main_logo.png", (1600, 900))):
             img_path = self.script_dir / "Images" / name
             if not img_path.exists():
                 print(f"⚠️  Image not found: {img_path} — skipping")
@@ -364,7 +364,7 @@ class ReleaseBuilder:
                 from PIL import Image
                 img = Image.open(img_path)
                 orig_size = img.size
-                img.thumbnail((1600, 900), Image.LANCZOS)
+                img.thumbnail(max_size, Image.LANCZOS)
                 if img.size != orig_size:
                     img.save(img_path, optimize=True)
                     print(f"✅ Resized {name}: {orig_size} → {img.size}")

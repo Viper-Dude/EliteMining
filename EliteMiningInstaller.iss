@@ -33,7 +33,7 @@ Type: files; Name: "{app}\LICENSE.txt"
 ; v4.7.6+: Clean EliteAPI folder completely to ensure fresh install of all files (only if user confirmed)
 Type: filesandordirs; Name: "{app}\..\EliteAPI\*"; Check: ShouldInstallEliteAPI
 ; Remove old sound packs so stale/renamed event wavs don't linger. Revisit if custom user voices are ever supported.
-Type: filesandordirs; Name: "{app}\app\Sound_Packs"; Check: IsVADetected
+Type: filesandordirs; Name: "{app}\app\Sound_Packs"; Check: IsVADetected and SoundsNeedUpdate
 
 [Files]
 ; Only include specific file types from needed subfolders (exclude .py files)
@@ -42,7 +42,7 @@ Source: "app\Images\*";    DestDir: "{app}\app\Images";    Flags: recursesubdirs
 Source: "app\localization\*.json";  DestDir: "{app}\app\localization";  Flags: ignoreversion
 ; VoiceAttack-specific files (only installed if VA detected)
 Source: "app\Ship Presets\*";  DestDir: "{app}\app\Ship Presets";  Flags: recursesubdirs createallsubdirs onlyifdoesntexist; Excludes: "*.py,*.pyc,__pycache__"; Check: IsVADetected
-Source: "app\Sound_Packs\Sound_packs_For_install\*";  DestDir: "{app}\app\Sound_Packs";  Flags: recursesubdirs createallsubdirs ignoreversion; Check: IsVADetected
+Source: "app\Sound_Packs\Sound_packs_For_install\*";  DestDir: "{app}\app\Sound_Packs";  Flags: recursesubdirs createallsubdirs ignoreversion; Check: IsVADetected and SoundsNeedUpdate
 ; Reports folder intentionally excluded - users must earn their reports by mining! 😉
 
 ; New Configurator executable
@@ -146,6 +146,20 @@ var
 function IsVADetected: Boolean;
 begin
   Result := VADetected;
+end;
+
+function BundledSoundVersion: String;
+begin
+  Result := '5.5.1';
+end;
+
+function SoundsNeedUpdate: Boolean;
+var
+  InstalledSoundVersion: AnsiString;
+begin
+  Result := True;
+  if LoadStringFromFile(ExpandConstant('{app}\app\Sound_Packs\sound_version.txt'), InstalledSoundVersion) then
+    Result := Trim(String(InstalledSoundVersion)) <> BundledSoundVersion;
 end;
 
 function BoolToStr(Value: Boolean): String;
@@ -703,8 +717,12 @@ begin
   end;
 
   { VoiceAttack keeps replaced sound files loaded until it restarts }
-  if (CurStep = ssPostInstall) and IsVADetected and (not WizardSilent) then
-    MsgBox('Sound files were updated. Please restart VoiceAttack so it uses the new sounds.', mbInformation, MB_OK);
+  if (CurStep = ssPostInstall) and IsVADetected and SoundsNeedUpdate then
+  begin
+    SaveStringToFile(ExpandConstant('{app}\app\Sound_Packs\sound_version.txt'), BundledSoundVersion, False);
+    if not WizardSilent then
+      MsgBox('Sound files were updated. Please restart VoiceAttack so it uses the new sounds.', mbInformation, MB_OK);
+  end;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
