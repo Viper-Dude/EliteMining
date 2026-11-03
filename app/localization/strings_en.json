@@ -108,7 +108,7 @@
     "unvisited_only": "Unvisited Only",
     "tooltip_unvisited": "Show only systems you haven't visited yet (0 visits)",
     "favourites_only": "Favourites Only",
-    "tooltip_favourites": "Show only rings you've marked as favourite",
+    "tooltip_favourites": "Show only rings you've marked as favourite. All favourites are shown; Max Distance and Max Results are ignored",
     "data_source": "Data Source:",
     "data_source_database": "Local",
     "data_source_spansh": "Spansh",

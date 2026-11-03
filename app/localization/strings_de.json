@@ -108,7 +108,7 @@
     "unvisited_only": "Nur Unbesucht",
     "tooltip_unvisited": "Nur Systeme anzeigen, die Sie noch nicht besucht haben (0 Besuche)",
     "favourites_only": "Nur Favoriten",
-    "tooltip_favourites": "Nur Ringe anzeigen, die Sie als Favorit markiert haben",
+    "tooltip_favourites": "Nur Ringe anzeigen, die Sie als Favorit markiert haben. Alle Favoriten werden angezeigt; Max. Entfernung und Max. Ergebnisse werden ignoriert",
     "data_source": "Datenquelle:",
     "data_source_database": "Lokal",
     "data_source_spansh": "Spansh",

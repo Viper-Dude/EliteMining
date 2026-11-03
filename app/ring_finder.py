@@ -2890,6 +2890,12 @@ class RingFinder(ColumnVisibilityMixin):
             # regardless of radius - it just means scanning more of what's already been visited.
             max_distance = max(max_distance, 500.0)
 
+        # Favourites Only: favourites live in the local DB; show all regardless of distance/result limits
+        if self.favourites_only_var.get():
+            max_distance = 200000.0
+            max_results = None
+            data_source = "database"
+
         # Increment search generation to cancel any in-flight searches
         self._search_generation += 1
         current_generation = self._search_generation
