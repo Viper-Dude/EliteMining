@@ -787,7 +787,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.favourites_only_var = tk.BooleanVar(value=False)
         self.favourites_only_cb = tk.Checkbutton(misc_inner_row,
                                                 variable=self.favourites_only_var,
-                                                command=self._save_filter_settings,
+                                                command=self._on_favourites_only_changed,
                                                 bg=_cb_bg,
                                                 activebackground="#2e2e2e",
                                                 selectcolor=_cb_select, relief="flat")
@@ -886,10 +886,10 @@ class RingFinder(ColumnVisibilityMixin):
         _max_results_combo_frame = tk.Frame(right_filters_frame_row2, width=scaled_px(70), height=scaled_px(24), bg=_sh_bg)
         _max_results_combo_frame.pack(side="left", padx=(0, 10))
         _max_results_combo_frame.pack_propagate(False)
-        max_results_combo = ttk.Combobox(_max_results_combo_frame, textvariable=self.max_results_var, state="readonly", font=scaled_font(9))
-        max_results_combo['values'] = ("10", "20", "30", "50", "100", "200")
-        max_results_combo.pack(side="left", fill="both", expand=True)
-        max_results_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
+        self.max_results_combo = ttk.Combobox(_max_results_combo_frame, textvariable=self.max_results_var, state="readonly", font=scaled_font(9))
+        self.max_results_combo['values'] = ("10", "20", "30", "50", "100", "200")
+        self.max_results_combo.pack(side="left", fill="both", expand=True)
+        self.max_results_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         
         # Min Hotspots filter (only active for specific materials) - in sub-frame
         ttk.Label(right_filters_frame_row2, text=t('ring_finder.min_hotspots') + ":", width=12, anchor="e").pack(side="left", padx=(0, 5))
@@ -1171,7 +1171,7 @@ class RingFinder(ColumnVisibilityMixin):
         for col in columns:
             # Left-align headers - use display name if mapped, otherwise use column name
             display_name = column_display_names.get(col, col)
-            self.results_tree.heading(col, text=display_name, anchor="center" if col == "Favourite" else "w", command=lambda c=col: self._sort_column(c, self.sort_reverse.get(c, False)))
+            self.results_tree.heading(col, text=display_name, anchor="center" if col in ("Favourite", "Source", "Visits") else "w", command=lambda c=col: self._sort_column(c, self.sort_reverse.get(c, False)))
 
             # Bind right-click on header to show column menu
             # Note: This binds to the entire tree, we'll check if click is on header in handler
@@ -1192,13 +1192,13 @@ class RingFinder(ColumnVisibilityMixin):
             elif col == "RES Site":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Visits":
-                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
             elif col == "LS":
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Sol Dist":
                 self.results_tree.column(col, width=column_widths[col], minwidth=50, anchor="w", stretch=False)
             elif col == "Source":
-                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
             elif col == "Reserve":
                 # Reserve column - visible and showing reserve level
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
@@ -1572,6 +1572,22 @@ class RingFinder(ColumnVisibilityMixin):
             if hasattr(self, 'ring_type_only_cb'):
                 self.ring_type_only_cb.configure(state="normal")
     
+    def _update_favourites_only_controls(self):
+        """Max Distance / Max Results are ignored in Favourites Only mode, so grey them out."""
+        if self.favourites_only_var.get():
+            self.distance_combo.configure(state="disabled")
+            self.max_results_combo.configure(state="disabled")
+            return
+        self.max_results_combo.configure(state="readonly")
+        distance_locked = self.any_ring_var.get() or (
+            self.data_source_var.get() == 'database' and self.pp_state_var.get() != 'Any')
+        if not distance_locked:
+            self.distance_combo.configure(state="readonly")
+
+    def _on_favourites_only_changed(self):
+        self._update_favourites_only_controls()
+        self._save_filter_settings()
+
     def _on_any_ring_changed(self):
         """Handle Any Ring checkbox change - enables Spansh search mode"""
         if self.any_ring_var.get():
@@ -2227,6 +2243,7 @@ class RingFinder(ColumnVisibilityMixin):
         # Favourites Only
         if hasattr(self, 'favourites_only_var'):
             self.favourites_only_var.set(False)
+            self._update_favourites_only_controls()
 
         # Overlaps Only
         if hasattr(self, 'overlaps_only_var'):
@@ -2355,6 +2372,7 @@ class RingFinder(ColumnVisibilityMixin):
                 self.unvisited_only_var.set(settings.get("unvisited_only", False))
             if "favourites_only" in settings:
                 self.favourites_only_var.set(settings.get("favourites_only", False))
+                self._update_favourites_only_controls()
             if "reserve" in settings:
                 # Convert English reserve level back to localized display
                 reserve_map_to_localized = {
