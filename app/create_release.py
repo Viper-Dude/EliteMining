@@ -353,9 +353,9 @@ class ReleaseBuilder:
             return result
     
     def resize_splash_image(self):
-        """Resize EliteMining_splash_new.png to max 800x460 before building"""
+        """Resize EliteMining_splash.png to max 800x460 before building"""
         self.print_step(0, "Resizing Splash Image")
-        splash_path = self.script_dir / "Images" / "EliteMining_splash_new.png"
+        splash_path = self.script_dir / "Images" / "EliteMining_splash.png"
         if not splash_path.exists():
             print(f"⚠️  Splash image not found: {splash_path} — skipping")
             return
