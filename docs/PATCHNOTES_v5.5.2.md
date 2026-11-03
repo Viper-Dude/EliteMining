@@ -10,11 +10,16 @@
 - The Favourite column is now called Fav, with the star centered.
 - The Source and Visits columns are now centered.
 
-### VoiceAttack Profile no updated (v5.5.1)
+### VoiceAttack Profile update to v5.5.2
+- **Fixed:** Cargo scoop do not retract if prospector sequence  is running.
 
 ### General
 
 - The VoiceAttack restart message during install now only appears when the sound files actually changed.
 - Updated the startup splash image.
+
+### Important Notes
+
+- Remember to always check all your key and joystick bindings after every profile update.
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
