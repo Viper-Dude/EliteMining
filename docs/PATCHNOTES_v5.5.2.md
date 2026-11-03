@@ -10,6 +10,8 @@
 - The Favourite column is now called Fav, with the star centered.
 - The Source and Visits columns are now centered.
 
+### VoiceAttack Profile no updated (v5.5.1)
+
 ### General
 
 - The VoiceAttack restart message during install now only appears when the sound files actually changed.
