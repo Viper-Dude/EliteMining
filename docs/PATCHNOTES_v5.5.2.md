@@ -6,7 +6,9 @@
 ### Ring Finder
 
 - Favourites Only now shows your favourite rings in every system, not just the one you are in.
+- Max Distance and Max Results are now greyed out while Favourites Only is on.
 - The Favourite column is now called Fav, with the star centered.
+- The Source and Visits columns are now centered.
 
 ### General
 
