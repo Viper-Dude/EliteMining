@@ -315,7 +315,7 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 - **Bookmarks** – Overlap and RES data saved in bookmarks also syncs to the Ring Finder database
 - Data is stored locally and appears in all future searches
 
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/edit_ring_data.png" width="600"><br>  
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/edit_ring_data.png" width="400"><br>  
 *Edit Ring Data, opened from the right-click menu.*
 
 Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.
