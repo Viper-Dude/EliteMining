@@ -6090,21 +6090,13 @@ class RingFinder(ColumnVisibilityMixin):
         self.context_menu.add_separator()
         # Ring Data
         add('update_reserve', 'context_menu.update_reserve', self._update_reserve_from_spansh)
-        add_submenu('context_menu.submenu_edit_ring_data', [
-            ('context_menu.edit_hotspots', self._show_edit_hotspots_dialog),
-            ('context_menu.set_overlap', self._show_overlap_dialog),
-            ('context_menu.set_res', self._show_res_dialog),
-            ('context_menu.edit_ring_type', self._show_edit_ring_type_dialog),
-            ('context_menu.edit_visits', self._show_edit_visits_dialog),
-        ])
+        add('edit_ring_data', 'context_menu.submenu_edit_ring_data', self._show_edit_ring_data_dialog)
         self.context_menu.add_separator()
         # User
         add('favourite', 'context_menu.mark_favourite', self._toggle_favourite_selected)
         add('set_reference', 'context_menu.set_as_reference', self._set_as_reference_system)
         add('bookmark', 'context_menu.bookmark_location', self._bookmark_selected)
         add('comment', 'context_menu.edit_comment', self._show_comment_dialog)
-        self.context_menu.add_cascade(label=t('context_menu.set_density') + "  ▸", menu=self._build_density_menu(self.context_menu))
-        self._ctx_idx['density'] = self.context_menu.index('end')
         self.context_menu.add_separator()
         # Reports / PowerPlay / Export
         add('mining_report', 'context_menu.open_mining_report', self._open_mining_report_selected)
@@ -6302,6 +6294,8 @@ class RingFinder(ColumnVisibilityMixin):
                             if source and '🗄️' in str(source):
                                 has_local_row = True
                                 is_favourite_row = len(values) > 13 and values[13] == "⭐"
+
+                    self.context_menu.entryconfig(self._ctx_idx['edit_ring_data'], state="normal" if has_local_row else "disabled")
 
                     if has_local_row:
                         self.context_menu.entryconfig(self._ctx_idx['favourite'], state="normal",
@@ -10378,6 +10372,236 @@ class RingFinder(ColumnVisibilityMixin):
         except Exception as e:
             print(f"Error getting RES display: {e}")
             return ""
+
+    def _show_edit_ring_data_dialog(self):
+        """Single dialog to edit hotspots, reserve, overlap, RES, ring type, visits and density for a ring"""
+        try:
+            import sqlite3
+            from config import load_theme, scaled_font
+            selection = self.results_tree.selection()
+            if not selection:
+                self.status_var.set(t('ring_finder.no_selection'))
+                return
+
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if not values or len(values) < 9 or not values[2] or not values[3]:
+                self.status_var.set(t('ring_finder.invalid_selection'))
+                return
+
+            system_name = values[2]
+            ring_name = values[3]
+
+            with sqlite3.connect(self.user_db.db_path) as conn:
+                hotspots_data = conn.execute('''
+                    SELECT material_name, hotspot_count FROM hotspot_data
+                    WHERE system_name = ? AND body_name = ? ORDER BY material_name
+                ''', (system_name, ring_name)).fetchall()
+
+            full_materials = [self._expand_abbreviated_materials(m) for m in self._parse_materials_from_hotspots(values[8])]
+
+            if load_theme() == "elite_orange":
+                bg, fg, entry_bg, entry_fg = "#000000", "#ff8c00", "#1a1a1a", "#ffffff"
+            else:
+                bg, fg, entry_bg, entry_fg = "#1e1e1e", "#e0e0e0", "#2b2b2b", "#ffffff"
+
+            dialog = tk.Toplevel(self.parent)
+            dialog.withdraw()
+            dialog.title(t('context_menu.edit_ring_data_title'))
+            dialog.resizable(False, False)
+            dialog.configure(bg=bg)
+            try:
+                from app_utils import get_app_icon_path
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except Exception:
+                pass
+
+            frame = tk.Frame(dialog, bg=bg, padx=18, pady=14)
+            frame.pack(fill="both", expand=True)
+            cb_style = {"bg": bg, "fg": fg, "activebackground": entry_bg, "activeforeground": "#ffffff",
+                        "selectcolor": entry_bg, "relief": "flat"}
+
+            def label(parent, text, bold=False, **grid):
+                lbl = tk.Label(parent, text=text, bg=bg, fg=fg, font=scaled_font(9, "bold" if bold else "normal"))
+                lbl.grid(sticky="w", **grid)
+                return lbl
+
+            def entry(parent, var, width):
+                return tk.Entry(parent, textvariable=var, width=width, bg=entry_bg, fg=entry_fg,
+                                insertbackground=fg, relief="solid", bd=1, font=scaled_font(10))
+
+            def separator(row):
+                tk.Frame(frame, bg=entry_bg, height=1).grid(row=row, column=0, columnspan=2, sticky="ew", pady=10)
+
+            label(frame, t('context_menu.edit_ring_data_for'), bold=True, row=0, column=0, columnspan=2)
+            label(frame, f"{system_name} - {ring_name}", row=1, column=0, columnspan=2, pady=(0, 6))
+            row = 2
+
+            # Hotspot counts + reserve
+            count_vars = {}
+            reserve_var = tk.StringVar()
+            current_reserve = self.user_db.get_reserve_level(system_name, ring_name) or "None"
+            if hotspots_data:
+                separator(row); row += 1
+                label(frame, t('context_menu.material_header'), bold=True, row=row, column=0, padx=(0, 20))
+                label(frame, t('context_menu.count_header'), bold=True, row=row, column=1)
+                row += 1
+                for material_name, count in hotspots_data:
+                    label(frame, self._format_material_for_display(material_name), row=row, column=0, padx=(0, 20), pady=1)
+                    var = tk.StringVar(value=str(count or 0))
+                    entry(frame, var, 8).grid(row=row, column=1, sticky="w", pady=1)
+                    count_vars[material_name] = (var, str(count or 0))
+                    row += 1
+                label(frame, t('context_menu.reserve_level'), row=row, column=0, pady=(8, 0))
+                reserve_var.set(current_reserve)
+                ttk.Combobox(frame, textvariable=reserve_var, width=12, state="readonly",
+                             values=["Pristine", "Major", "Common", "Low", "Depleted", "None"]).grid(row=row, column=1, sticky="w", pady=(8, 0))
+                row += 1
+
+            # Overlap + RES per material
+            overlap_vars = {}
+            res_vars = {}
+            if full_materials:
+                separator(row); row += 1
+                grid = tk.Frame(frame, bg=bg)
+                grid.grid(row=row, column=0, columnspan=2, sticky="w")
+                row += 1
+                label(grid, t('context_menu.material_header'), bold=True, row=0, column=0, padx=(0, 15))
+                label(grid, t('context_menu.overlap_label'), bold=True, row=0, column=1, padx=(0, 15))
+                label(grid, t('context_menu.res_type'), bold=True, row=0, column=2, columnspan=4)
+                res_options = [("Haz", "Hazardous"), ("High", "High"), ("Normal", "Normal"), ("Low", "Low")]
+                for i, mat in enumerate(full_materials, start=1):
+                    label(grid, mat, row=i, column=0, padx=(0, 15), pady=1)
+                    ov_tag = self.user_db.get_overlap_tag(system_name, ring_name, mat) or "None"
+                    ov_var = tk.StringVar(value=ov_tag)
+                    ttk.Combobox(grid, textvariable=ov_var, width=6, state="readonly",
+                                 values=["None", "2x", "3x"]).grid(row=i, column=1, sticky="w", padx=(0, 15), pady=1)
+                    overlap_vars[mat] = (ov_var, ov_tag)
+                    current_res = {s.strip().lower() for s in (self.user_db.get_res_tag(system_name, ring_name, mat) or "").split(',') if s.strip()}
+                    flags = {}
+                    for j, (text, tag) in enumerate(res_options):
+                        on = tag.lower() in current_res or (tag == "Hazardous" and "haz" in current_res)
+                        flags[tag] = tk.BooleanVar(value=on)
+                        tk.Checkbutton(grid, text=text, variable=flags[tag], **cb_style).grid(row=i, column=2 + j, sticky="w")
+                    res_vars[mat] = (flags, {tag for tag, v in flags.items() if v.get()})
+
+            # Ring type, visits, density
+            separator(row); row += 1
+            ring_type_var = tk.StringVar(value=self.user_db.get_ring_type(system_name, ring_name) or "None")
+            initial_ring_type = ring_type_var.get()
+            label(frame, t('context_menu.ring_type_label'), row=row, column=0, pady=2)
+            ttk.Combobox(frame, textvariable=ring_type_var, width=12, state="readonly",
+                         values=["Metallic", "Rocky", "Icy", "Metal Rich", "None"]).grid(row=row, column=1, sticky="w", pady=2)
+            row += 1
+
+            visit_data = self.user_db.is_system_visited(system_name)
+            initial_visits = str(visit_data.get('visit_count', 0) if visit_data else 0)
+            visits_var = tk.StringVar(value=initial_visits)
+            label(frame, t('context_menu.visit_count_label'), row=row, column=0, pady=2)
+            entry(frame, visits_var, 8).grid(row=row, column=1, sticky="w", pady=2)
+            row += 1
+
+            none_label = t('context_menu.none')
+            density_labels = {key: self._density_label(key) for key in self.DENSITY_KEYS}
+            initial_density = self.user_db.get_ring_density(system_name, ring_name) or ''
+            density_var = tk.StringVar(value=density_labels.get(initial_density, none_label))
+            label(frame, t('context_menu.density_label'), row=row, column=0, pady=2)
+            ttk.Combobox(frame, textvariable=density_var, width=12, state="readonly",
+                         values=list(density_labels.values()) + [none_label]).grid(row=row, column=1, sticky="w", pady=2)
+            row += 1
+
+            btn_frame = tk.Frame(frame, bg=bg)
+            btn_frame.grid(row=row, column=0, columnspan=2, sticky="e", pady=(16, 0))
+
+            def save():
+                try:
+                    if count_vars:
+                        changed = []
+                        for material_name, (var, initial) in count_vars.items():
+                            try:
+                                new_count = max(0, int(var.get()))
+                            except ValueError:
+                                new_count = 0
+                            if str(new_count) != initial:
+                                changed.append((new_count, system_name, ring_name, material_name))
+                        if changed:
+                            with sqlite3.connect(self.user_db.db_path) as conn:
+                                conn.executemany('''
+                                    UPDATE hotspot_data SET hotspot_count = ?
+                                    WHERE system_name = ? AND body_name = ? AND material_name = ?
+                                ''', changed)
+                                conn.commit()
+                            self._refresh_row_hotspots(item, system_name, ring_name)
+                        if reserve_var.get() != current_reserve:
+                            self.user_db.set_reserve_level(system_name, ring_name, None if reserve_var.get() == "None" else reserve_var.get())
+                            self._refresh_row_reserve(item, system_name, ring_name)
+
+                    overlap_changed = False
+                    for mat, (var, initial) in overlap_vars.items():
+                        if var.get() != initial:
+                            self.user_db.set_overlap_tag(system_name, ring_name, mat, None if var.get() == "None" else var.get())
+                            overlap_changed = True
+                    if overlap_changed:
+                        self._refresh_row_overlap(item, system_name, ring_name)
+
+                    res_changed = False
+                    for mat, (flags, initial) in res_vars.items():
+                        selected = {tag for tag, v in flags.items() if v.get()}
+                        if selected != initial:
+                            ordered = [tag for tag in ("Hazardous", "High", "Normal", "Low") if tag in selected]
+                            self.user_db.set_res_tag(system_name, ring_name, mat, ", ".join(ordered) if ordered else None)
+                            res_changed = True
+                    if res_changed:
+                        self._refresh_row_res(item, system_name, ring_name)
+
+                    if ring_type_var.get() != initial_ring_type:
+                        self.user_db.set_ring_type(system_name, ring_name, None if ring_type_var.get() == "None" else ring_type_var.get())
+                        self._refresh_row_ring_type(item, system_name, ring_name)
+
+                    try:
+                        new_visits = max(0, int(visits_var.get()))
+                    except ValueError:
+                        new_visits = int(initial_visits)
+                    if str(new_visits) != initial_visits and self.user_db.update_visit_count(system_name, new_visits):
+                        self._refresh_row_visits(item, system_name)
+
+                    new_density = next((k for k, lbl in density_labels.items() if lbl == density_var.get()), '')
+                    if new_density != initial_density:
+                        if self.user_db.set_ring_density(system_name, ring_name, new_density):
+                            self.results_tree.set(item, "Density", self._density_label(new_density))
+
+                    self.status_var.set(t('context_menu.ring_data_updated'))
+                    dialog.destroy()
+                except Exception as e:
+                    self.status_var.set(f"Error: {e}")
+
+            tk.Button(btn_frame, text=t('dialogs.save'), command=save, bg="#2a5a2a", fg="#ffffff",
+                      activebackground="#3a6a3a", activeforeground="#ffffff", relief="solid", bd=1,
+                      cursor="hand2", pady=6, padx=15, font=scaled_font(9)).pack(side="left", padx=(0, 8))
+            tk.Button(btn_frame, text=t('dialogs.cancel'), command=dialog.destroy, bg="#5a2a2a", fg="#ffffff",
+                      activebackground="#6a3a3a", activeforeground="#ffffff", relief="solid", bd=1,
+                      cursor="hand2", pady=6, padx=15, font=scaled_font(9)).pack(side="left")
+            dialog.bind('<Escape>', lambda e: dialog.destroy())
+
+            dialog.update_idletasks()
+            from ui.dialogs import center_window
+            center_window(dialog, self.parent.winfo_toplevel())
+            dialog.deiconify()
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            try:
+                dialog.grab_set()
+            except Exception:
+                pass
+
+        except Exception as e:
+            print(f"Error showing edit ring data dialog: {e}")
+            import traceback
+            traceback.print_exc()
+            self.status_var.set(f"Error: {e}")
 
     def _show_edit_hotspots_dialog(self):
         """Show dialog to edit hotspot counts and reserve level for a ring"""

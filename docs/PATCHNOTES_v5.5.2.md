@@ -1,24 +1,17 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-November-03
+**Release Date:** 2026-November-04
 
 ## New Features & Improvements
 
-### Ring Finder
+- Hotspots Finder: the right-click "Edit Ring Data" now opens one window where you can edit hotspots, reserve, overlap, RES, ring type, visits and density together.
+- Hotspots Finder: "Edit Ring Data" is only available for rings saved to your local database.
 
-- Favourites Only now shows your favourite rings in every system, not just the one you are in.
-- Max Distance and Max Results are now greyed out while Favourites Only is on.
-- The Favourite column is now called Fav, with the star centered.
-- The Source and Visits columns are now centered.
 
-### VoiceAttack Profile update to v5.5.2
-- **Fixed:** Cargo scoop do not retract if prospector sequence  is running.
+### Voiceattack Profile Update to v5.5.3
+**Fixed:** Reset mining sequence and Retract scoop and set power commands now set correct power. (Introduced in v5.5.2)
 
-### General
 
-- The VoiceAttack restart message during install now only appears when the sound files actually changed.
-- Updated the startup splash image.
-
-### Important Notes
+### Important Notes 
 
 - Remember to always check all your key and joystick bindings after every profile update.
 

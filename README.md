@@ -310,11 +310,13 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 - **Auto Prices** – Requires Auto-Search. After a jump to a system with known hotspots, automatically fetches live sell prices and opens the Best Mineral to Mine window without stealing focus. Right-click the Auto Prices checkbox to show the results on the in-game text overlay instead (all minerals with price, station, landing pad, distance and demand, while you're in supercruise) and to switch "In-system prices only" on or off.
 
 ### Setting & Managing Overlap/RES Data
-- **Set Overlap** – Right-click any ring to set hotspot overlaps (2x, 3x) for specific minerals
-- **Set RES** – Right-click any ring to set Resource Extraction Sites (Hazardous, High, Low)
-- **Remove Overlap/RES** – Select "None" in the Set Overlap/RES dialog to remove existing entries
+- **Edit Ring Data** – Right-click a ring saved in your local database to set hotspot counts, reserve level, overlaps (2x, 3x), RES sites (Hazardous, High, Normal, Low), ring type, visit count and density
+- **Remove Overlap/RES** – Select "None" for overlap, or untick the RES boxes, to remove existing entries
 - **Bookmarks** – Overlap and RES data saved in bookmarks also syncs to the Ring Finder database
 - Data is stored locally and appears in all future searches
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/edit_ring_data.png" width="600"><br>  
+*Edit Ring Data, opened from the right-click menu.*
 
 Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.
 
