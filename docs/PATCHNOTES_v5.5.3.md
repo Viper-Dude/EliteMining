@@ -8,7 +8,7 @@
 
 
 ### Voiceattack Profile Update to v5.5.3
-**Fixed** Reset mining sequence and Retract scoop and set power commands now set correct power. (Introduced in v5.5.2)
+**Fixed:** "Reset mining sequence" and "Retract scoop and set power commands" now set correct power. (Bug was Introduced in v5.5.2)
 
 
 ### Important Notes 
