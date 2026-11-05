@@ -361,7 +361,6 @@
     "prompt_when_full": "Prompt when full",
     "multi_session": "Multi-Session",
     "auto_end": "Auto-end",
-    "auto_saved_comment": "Auto-saved",
     "session_summary": "Session Summary:",
     "no_data_yet": "No data yet",
     "start_session": "Start Session",

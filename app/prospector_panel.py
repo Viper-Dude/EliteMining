@@ -12597,7 +12597,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Use main_app as parent to ensure dialog appears on correct monitor
             main_parent = self.main_app if self.main_app else self.winfo_toplevel()
             if silent:
-                session_comment = t('mining_session.auto_saved_comment')
+                pass
             elif centered_yesno_dialog(
                 main_parent,
                 t('dialogs.session_comment_title'),
