@@ -60,6 +60,7 @@ Full-featured mining companion with GUI controls:
 - **Engineering materials tracking** – Monitor raw materials by grade
 - **Auto-start mining session** – Automatically begins tracking when you fire your first prospector limpet
 - **Auto-resume mining session** – A paused session resumes automatically when you launch a prospector limpet
+- **Auto-end mining session** – Automatically ends and saves the session when you enter supercruise or jump, skipping the refinery and comment prompts (anything still in the refinery is not counted). Sessions with no mined cargo are discarded. Combined with Auto-start, the app can run in the background and start and stop sessions on its own. For fully silent operation, also turn off Prompt when full. Not available in Multi-Session mode
 - **Auto-Switch Tabs** – Automatically switches to Mining Session when you fire a prospector, returns to Hotspots Finder after session ends
 - **Cargo full notification** – Prompts you to end session when cargo hold is 100% full and idle for 1 minute
 - Session tracking & history  

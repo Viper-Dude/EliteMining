@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add -A
-git commit -m "v5.5.3 - Edit Ring Data update and VA profile"
+git commit -m "v5.5.4 - Added Auto-End function to mining session"
 git push
 
 ## Standard Commit and Push Process

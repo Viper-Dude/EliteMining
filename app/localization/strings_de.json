@@ -356,6 +356,8 @@
     "auto_start": "Auto-Start",
     "prompt_when_full": "Nachfrage bei voll",
     "multi_session": "Multi-Sitzung",
+    "auto_end": "Auto-Ende",
+    "auto_saved_comment": "Automatisch gespeichert",
     "session_summary": "Sitzungsübersicht:",
     "no_data_yet": "Noch keine Daten",
     "start_session": "Sitzung starten",
@@ -1387,6 +1389,7 @@
     "cancel_session": "Aktuelle Sitzung ohne Speichern abbrechen",
     "auto_start": "Sitzung automatisch starten wenn erste Prospektor-Drohne abgefeuert wird\n(Funktioniert nur wenn keine Sitzung aktiv ist)",
     "prompt_full": "Aufforderung zur Sitzungsbeendigung wenn Fracht 100% voll ist\nund 1 Minute inaktiv (keine Änderungen) war\nDenken Sie daran, die Sitzung VOR dem Entladen zu beenden!",
+    "auto_end": "Sitzung automatisch beenden und speichern beim Eintritt in den Supercruise oder bei einem Sprung\nÜberspringt Raffinerie- und Kommentar-Dialog. Sitzungen ohne abgebaute Fracht werden verworfen\n(Nicht verfügbar im Multi-Sitzung-Modus)\nFür völlig stillen Betrieb \"Nachfrage bei voll\" deaktivieren",
     "multi_session": "Statistiken über mehrere Frachtladungen akkumulieren\nStats werden nicht zurückgesetzt bis Sie die Sitzung manuell beenden",
     
     "cargo_full_title": "Fracht voll - Sitzung beenden?",

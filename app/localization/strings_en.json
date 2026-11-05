@@ -360,6 +360,8 @@
     "auto_start": "Auto-start",
     "prompt_when_full": "Prompt when full",
     "multi_session": "Multi-Session",
+    "auto_end": "Auto-end",
+    "auto_saved_comment": "Auto-saved",
     "session_summary": "Session Summary:",
     "no_data_yet": "No data yet",
     "start_session": "Start Session",
@@ -1379,6 +1381,7 @@
     "cancel_session": "Cancel the current session without saving",
     "auto_start": "Automatically start session when first prospector limpet is fired\n(Only works when no session is active)",
     "prompt_full": "Show prompt to end session when cargo is 100% full\nand has been idle (no changes) for 1 minute\nRemember to end session BEFORE unloading cargo!",
+    "auto_end": "Automatically end and save the session when you enter supercruise or jump\nSkips the refinery and comment dialogs. Sessions with no mined cargo are discarded\n(Not available in Multi-Session mode)\nFor fully silent operation, turn off Prompt when full",
     "multi_session": "Accumulate statistics across multiple cargo loads\nStats won't reset until you manually end the session",
     
     "cargo_full_title": "Cargo Full - End Session?",

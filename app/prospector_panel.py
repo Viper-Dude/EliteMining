@@ -839,6 +839,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             print(f"[DEBUG] Error loading auto-start file: {e}")
             pass
         
+        self.auto_end_session = False
+        try:
+            auto_end_file = os.path.join(self.vars_dir, "autoEndSession.txt")
+            if os.path.exists(auto_end_file):
+                with open(auto_end_file, 'r') as f:
+                    self.auto_end_session = f.read().strip() == "1"
+        except Exception:
+            pass
+
         # Prompt when cargo full - load from toggle file
         self.prompt_on_cargo_full = False
         self.cargo_full_start_time = None  # Track when cargo became full
@@ -2403,7 +2412,32 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         auto_start_cb.config(command=self._on_auto_start_checkbox_toggle)  # Now add callback
         print(f"[DEBUG] Auto-start checkbox created and value set to: {auto_start_ui_value}")
         self.ToolTip(auto_start_cb, t('tooltips.auto_start'))
-        
+
+        self.auto_end_var = tk.IntVar(value=1 if self.auto_end_session else 0)
+        auto_end_cb = tk.Checkbutton(
+            options_frame,
+            text=t('mining_session.auto_end'),
+            variable=self.auto_end_var,
+            command=self._on_auto_end_checkbox_toggle,
+            bg=_opt_bg,
+            fg="#ffffff",
+            selectcolor=_opt_select,
+            activebackground=_opt_bg,
+            activeforeground="#ffffff",
+            highlightthickness=0,
+            bd=0,
+            font=scaled_font(9),
+            padx=8,
+            pady=0,
+            anchor="w",
+            relief="flat"
+        )
+        auto_end_cb.pack(side="left", padx=(10, 0))
+        self.auto_end_cb = auto_end_cb
+        if self.multi_session_mode:
+            auto_end_cb.config(state="disabled", fg="#666666")
+        self.ToolTip(auto_end_cb, t('tooltips.auto_end'))
+
         # Prompt when cargo full checkbox - preserve user's saved setting
         # If both multi-session and prompt-when-full are enabled, we'll disable prompt UI but keep the setting
         initial_prompt_value = 1 if self.prompt_on_cargo_full else 0
@@ -10169,6 +10203,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     # Auto-switch to Mining Session tab when launching prospector (same as entering ring)
                     self._auto_switch_to_mining_tab()
 
+            if (ev in ("SupercruiseEntry", "FSDJump") and self.auto_end_session and self.session_active
+                    and not self.multi_session_mode and not self.startup_processing):
+                self.after(100, lambda: self._session_stop(silent=True))
+
             if ev == "FSDJump" and self.main_app:
                 # A hyperspace jump arrives in supercruise without a SupercruiseEntry event
                 self.main_app._in_supercruise = True
@@ -11317,6 +11355,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         self._set_status(f"Auto-start session on first prospector {'enabled' if enabled else 'disabled'}")
 
+    def _on_auto_end_checkbox_toggle(self) -> None:
+        enabled = bool(self.auto_end_var.get())
+        self.auto_end_session = enabled
+        try:
+            with open(os.path.join(self.vars_dir, "autoEndSession.txt"), 'w') as f:
+                f.write("1" if enabled else "0")
+        except Exception:
+            pass
+        self._set_status(f"Auto-end session {'enabled' if enabled else 'disabled'}")
+
     def _on_prompt_on_full_checkbox_toggle(self) -> None:
         """Called when prompt on cargo full checkbox in Mining Analytics tab is toggled"""
         import traceback
@@ -11346,6 +11394,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         enabled = bool(self.multi_session_var.get())
         self.multi_session_mode = enabled
         
+        self.auto_end_cb.config(state="disabled" if enabled else "normal", fg="#666666" if enabled else "#ffffff")
+
         # Handle UI interaction between multi-session and prompt-when-full
         if enabled:
             # Disable the prompt checkbox widget and uncheck it (incompatible features)
@@ -11494,6 +11544,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         parent_window = self.main_app if self.main_app else self.winfo_toplevel()
         dialog = tk.Toplevel(parent_window)
         dialog.withdraw()  # CRITICAL: Hide immediately to prevent blinking on wrong monitor
+        self._cargo_full_dialog = dialog
         dialog.title(t('tooltips.cargo_full_title'))
         dialog.configure(bg=bg_color)
         dialog.resizable(False, False)
@@ -12422,13 +12473,29 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         return result[0]  # Return None if cancelled, actual value if OK
     
-    def _session_stop(self) -> None:
+    def _session_stop(self, silent: bool = False) -> None:
         if not self.session_active or not self.session_start:
             return
 
+        if silent:
+            stale_dialog = getattr(self, '_cargo_full_dialog', None)
+            if stale_dialog is not None:
+                try:
+                    stale_dialog.grab_release()
+                    stale_dialog.destroy()
+                except Exception:
+                    pass
+                self._cargo_full_dialog = None
+                self._dialog_in_progress = False
+            cm = getattr(self.main_app, 'cargo_monitor', None)
+            live = cm.get_live_session_materials() if cm and hasattr(cm, 'get_live_session_materials') else {}
+            if sum(live.values()) < 1:
+                self._session_cancel()
+                return
+
         # Ask about refinery materials first so Cancel can return to the running session untouched
         add_refinery = False
-        if (self.main_app and hasattr(self.main_app, 'cargo_monitor')
+        if (not silent and self.main_app and hasattr(self.main_app, 'cargo_monitor')
                 and not bool(self.multi_session_var.get())):
             from main import centered_yesno_dialog
             add_refinery = centered_yesno_dialog(
@@ -12529,13 +12596,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Ask if user wants to add a comment
             # Use main_app as parent to ensure dialog appears on correct monitor
             main_parent = self.main_app if self.main_app else self.winfo_toplevel()
-            add_comment = centered_yesno_dialog(
+            if silent:
+                session_comment = t('mining_session.auto_saved_comment')
+            elif centered_yesno_dialog(
                 main_parent,
                 t('dialogs.session_comment_title'),
                 t('dialogs.session_comment_question')
-            )
-            
-            if add_comment:
+            ):
                 session_comment = self._show_comment_dialog()
             
             # NOTE: session_totals from MiningRefined events is NOT used for totals
