@@ -60,7 +60,7 @@ Full-featured mining companion with GUI controls:
 - **Engineering materials tracking** – Monitor raw materials by grade
 - **Auto-start mining session** – Automatically begins tracking when you fire your first prospector limpet
 - **Auto-resume mining session** – A paused session resumes automatically when you launch a prospector limpet
-- **Auto-end mining session** – Automatically ends and saves the session when you enter supercruise or jump, skipping the refinery and comment prompts (anything still in the refinery is not counted). Sessions with no mined cargo are discarded. Combined with Auto-start, the app can run in the background and start and stop sessions on its own. For fully silent operation, also turn off Prompt when full. Not available in Multi-Session mode
+- **Auto-end mining session** – Automatically ends and saves the session when you enter supercruise or jump
 - **Auto-Switch Tabs** – Automatically switches to Mining Session when you fire a prospector, returns to Hotspots Finder after session ends
 - **Cargo full notification** – Prompts you to end session when cargo hold is 100% full and idle for 1 minute
 - Session tracking & history  
@@ -555,6 +555,16 @@ Monitor your fleet carrier status at a glance — populated automatically from y
 
 <img src="Screenshot/dashboard-graphs_material_comparison.png" width="900"><br>  
 *Minerals collection comparisons.*  
+
+#### Session Options
+Tick these under the Start / End buttons:
+- **Auto-start** – Starts a session when you fire your first prospector limpet. If a session is paused, firing a prospector resumes it.
+- **Auto-end** – Ends and saves the session when you enter supercruise or jump. The refinery and comment questions are skipped, and anything still in your refinery is not counted. Sessions with nothing mined are discarded. Not available with Multi-Session.
+- **Prompt when full** – Asks if you want to end the session when your cargo hold has been 100% full and idle for 1 minute. Turn this off if you want Auto-end to run with no pop-ups. Not available with Multi-Session.
+- **Multi-Session** – Keeps one session running across several cargo loads (mine, sell, return) and reports them as one. The session only ends when you press End.
+- **Auto-Switch Tabs** – Switches to the Mining Session tab when you fire a prospector and back to Hotspots Finder after the session ends.
+
+For a fully hands-free setup, tick **Auto-start** and **Auto-end** and turn off **Prompt when full**. Sessions then start and save by themselves.
 
 #### Reports 
 <img src="Screenshot/mining-reports.png" width="900"><br>  
