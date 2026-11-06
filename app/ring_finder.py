@@ -5519,6 +5519,7 @@ class RingFinder(ColumnVisibilityMixin):
         if _all_systems_early and self.prospector_panel and hasattr(self.prospector_panel, 'get_last_mined_lookup'):
             _last_mined_lookup = self.prospector_panel.get_last_mined_lookup(_all_systems_early)
         self._last_mined_lookup = _last_mined_lookup
+        _last_mined_overrides = self.user_db.bulk_get_ring_last_mined()
 
         # Filter for favourite rings if checkbox is enabled
         if self.favourites_only_var.get():
@@ -5916,7 +5917,7 @@ class RingFinder(ColumnVisibilityMixin):
 
             # Last Mined date (using pre-fetched bulk data, no per-row CSV scans)
             last_mined_entry = _last_mined_lookup.get((system_name, location_display))
-            last_mined_display = last_mined_entry[0] if last_mined_entry else ""
+            last_mined_display = _last_mined_overrides.get(_bulk_key) or (last_mined_entry[0] if last_mined_entry else "")
 
             # Comment indicator (using pre-fetched bulk data, no per-row DB calls)
             comment_display = "💬" if _early_comments.get(_bulk_key) else ""
@@ -6556,12 +6557,14 @@ class RingFinder(ColumnVisibilityMixin):
                 return
             self.results_tree.selection_set(item)
             self._open_inara()
-        elif col_name == "Last Mined":
-            self.results_tree.selection_set(item)
-            self._open_mining_report_selected()
         elif col_name == "Comment":
             self.results_tree.selection_set(item)
             self._show_comment_dialog()
+        elif col_name in ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits",
+                          "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "Last Mined"):
+            if values and len(values) > 12 and '🗄️' in str(values[12]):
+                self.results_tree.selection_set(item)
+                self._show_edit_ring_data_dialog()
 
     def _on_density_click(self, event):
         """Single left-click on a Density cell opens the density popup."""
@@ -10512,11 +10515,25 @@ class RingFinder(ColumnVisibilityMixin):
                          values=list(density_labels.values()) + [none_label]).grid(row=row, column=1, sticky="w", pady=2)
             row += 1
 
+            last_mined_fmt = "%m/%d/%y %H:%M"
+            initial_last_mined = self.results_tree.set(item, "Last Mined")
+            last_mined_var = tk.StringVar(value=initial_last_mined)
+            label(frame, t('context_menu.last_mined_label'), row=row, column=0, pady=2)
+            entry(frame, last_mined_var, 16).grid(row=row, column=1, sticky="w", pady=2)
+            row += 1
+
             btn_frame = tk.Frame(frame, bg=bg)
             btn_frame.grid(row=row, column=0, columnspan=2, sticky="e", pady=(16, 0))
 
             def save():
                 try:
+                    new_last_mined = last_mined_var.get().strip()
+                    if new_last_mined != initial_last_mined and new_last_mined:
+                        try:
+                            datetime.datetime.strptime(new_last_mined, last_mined_fmt)
+                        except ValueError:
+                            self.status_var.set(t('context_menu.last_mined_invalid'))
+                            return
                     if count_vars:
                         changed = []
                         for material_name, (var, initial) in count_vars.items():
@@ -10571,6 +10588,13 @@ class RingFinder(ColumnVisibilityMixin):
                     if new_density != initial_density:
                         if self.user_db.set_ring_density(system_name, ring_name, new_density):
                             self.results_tree.set(item, "Density", self._density_label(new_density))
+
+                    if new_last_mined != initial_last_mined:
+                        self.user_db.set_ring_last_mined(system_name, ring_name, new_last_mined)
+                        if not new_last_mined:
+                            entry_ = getattr(self, '_last_mined_lookup', {}).get((system_name, ring_name))
+                            new_last_mined = entry_[0] if entry_ else ""
+                        self.results_tree.set(item, "Last Mined", new_last_mined)
 
                     self.status_var.set(t('context_menu.ring_data_updated'))
                     dialog.destroy()

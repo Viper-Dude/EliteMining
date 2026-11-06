@@ -1406,6 +1406,15 @@ class UserDatabase:
                 ''')
 
                 conn.execute('''
+                    CREATE TABLE IF NOT EXISTS ring_last_mined (
+                        system_name TEXT NOT NULL,
+                        body_name TEXT NOT NULL,
+                        last_mined TEXT NOT NULL,
+                        UNIQUE(system_name, body_name)
+                    )
+                ''')
+
+                conn.execute('''
                     CREATE TABLE IF NOT EXISTS visited_systems (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         system_name TEXT NOT NULL UNIQUE,
@@ -2866,6 +2875,48 @@ class UserDatabase:
         except Exception as e:
             log.error(f"Error getting ring density: {e}")
             return None
+
+    def set_ring_last_mined(self, system_name: str, body_name: str, last_mined: str) -> bool:
+        """Set or clear a manual Last Mined override for a ring; empty clears it"""
+        try:
+            body_name = self._normalize_body_name(body_name, system_name)
+            with sqlite3.connect(self.db_path) as conn:
+                if last_mined:
+                    conn.execute('''
+                        INSERT INTO ring_last_mined (system_name, body_name, last_mined)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(system_name, body_name) DO UPDATE SET last_mined = excluded.last_mined
+                    ''', (system_name, body_name, last_mined))
+                else:
+                    conn.execute('DELETE FROM ring_last_mined WHERE system_name = ? AND body_name = ?',
+                                 (system_name, body_name))
+                conn.commit()
+                return True
+        except Exception as e:
+            log.error(f"Error setting ring last mined: {e}")
+            return False
+
+    def get_ring_last_mined(self, system_name: str, body_name: str) -> Optional[str]:
+        """Get the manual Last Mined override for a ring, or None"""
+        try:
+            body_name = self._normalize_body_name(body_name, system_name)
+            with sqlite3.connect(self.db_path) as conn:
+                row = conn.execute('SELECT last_mined FROM ring_last_mined WHERE system_name = ? AND body_name = ?',
+                                   (system_name, body_name)).fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            log.error(f"Error getting ring last mined: {e}")
+            return None
+
+    def bulk_get_ring_last_mined(self) -> dict:
+        """Returns {(system_name, body_name): last_mined} for all manual overrides."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                return {(r[0], r[1]): r[2] for r in conn.execute(
+                    'SELECT system_name, body_name, last_mined FROM ring_last_mined')}
+        except Exception as e:
+            log.error(f"Error bulk getting ring last mined: {e}")
+            return {}
 
     def bulk_get_ring_density_for_rings(self, system_names: list) -> dict:
         """Batch fetch density keys. Returns {(system_name, body_name): density}."""

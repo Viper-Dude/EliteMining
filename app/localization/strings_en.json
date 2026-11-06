@@ -940,6 +940,8 @@
     "edit_ring_data_title": "Edit Ring Data",
     "edit_ring_data_for": "Edit ring data for:",
     "density_label": "Density:",
+    "last_mined_label": "Last Mined (MM/DD/YY HH:MM):",
+    "last_mined_invalid": "Last Mined must be MM/DD/YY HH:MM, e.g. 05/14/26 18:30",
     "ring_data_updated": "Ring data updated",
     "set_overlap_title": "Set Overlap",
     "set_res_title": "Set RES Site",

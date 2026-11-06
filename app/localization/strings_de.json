@@ -945,6 +945,8 @@
     "edit_ring_data_title": "Ringdaten bearbeiten",
     "edit_ring_data_for": "Ringdaten bearbeiten für:",
     "density_label": "Dichte:",
+    "last_mined_label": "Zuletzt abgebaut (MM/TT/JJ HH:MM):",
+    "last_mined_invalid": "Zuletzt abgebaut muss MM/TT/JJ HH:MM sein, z.B. 05/14/26 18:30",
     "ring_data_updated": "Ringdaten aktualisiert",
     "set_overlap_title": "Überlappung setzen",
     "set_res_title": "RES-Standort setzen",
