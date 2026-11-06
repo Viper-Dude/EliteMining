@@ -16,7 +16,7 @@ CloseApplications=no
 ; VA profile update notice — shown before install as a reminder to keep the profile option ticked.
 ; ENABLE  when this release includes a new VA profile:   remove the leading semicolon below
 ; DISABLE when no VA profile update in this release:     add a semicolon at the start of the line below
-;InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
+InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
 
 ; Place uninstaller in app folder
 UninstallFilesDir={app}
@@ -97,7 +97,7 @@ Source: "NOTICE"; DestDir: "{app}"
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"
 ; VoiceAttack integration options (only shown if VA detected)
 Name: "installeliteva"; Description: "Install EliteVA v5.0.12 (VoiceAttack plugin)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
-Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.5.3)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
+Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.5.5)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
 
 [Icons]
 ; Start Menu shortcut
@@ -439,7 +439,7 @@ var
 begin
   ExistingEliteAPIPath := '';
   ProfileNeedsUpdate := False;
-  BundledProfileVersion := '5.5.3';
+  BundledProfileVersion := '5.5.5';
   
   { DISABLED - plugin not used }
   { InstallPlugin := VADetected; }

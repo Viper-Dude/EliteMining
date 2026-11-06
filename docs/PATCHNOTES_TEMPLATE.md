@@ -9,7 +9,7 @@
 
 
 
-#### Important Notes 
+### Important Notes 
 
 - Remember to always check all your key and joystick bindings after every profile update.
 
