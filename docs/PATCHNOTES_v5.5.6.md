@@ -25,7 +25,7 @@
 - "+ Also Check" is now "+ Add Minerals".
 
 ### Voiceattack Profile update to v5.5.6
-- General optimisations.
+- General optimizations. 
 
 
 ### Important Notes 
