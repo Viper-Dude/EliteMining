@@ -806,15 +806,26 @@ def save_distance_calculator_systems(system_a: str, system_b: str) -> None:
 
 # Theme settings
 def load_theme() -> str:
-    """Load current theme setting. Default is 'elite_orange'."""
+    """Load current theme setting. Default is 'modern'.
+
+    One-time migration: users who had another theme saved before Modern became the default are
+    switched to Modern once (they can switch back; their choice is then kept)."""
     cfg = _load_cfg()
-    return cfg.get("theme", "elite_orange")
+    if not cfg.get("theme_modern_default_applied") and cfg:
+        if cfg.get("theme") not in (None, "modern"):
+            cfg["theme"] = "modern"
+        cfg["theme_modern_default_applied"] = True
+        _save_cfg(cfg)
+        flush_config()
+    return cfg.get("theme", "modern")
 
 def save_theme(theme: str) -> None:
-    """Save theme setting"""
+    """Save theme setting (an explicit choice, so the one-time Modern migration never reruns)"""
     cfg = _load_cfg()
     cfg["theme"] = theme
+    cfg["theme_modern_default_applied"] = True
     _save_cfg(cfg)
+    flush_config()  # the app restarts right after a theme change; don't leave it in the throttle window
 
 def load_ui_scale() -> float:
     """Load UI scale factor applied to fonts/row heights. Default is 1.0 (100%)."""

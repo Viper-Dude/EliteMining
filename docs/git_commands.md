@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add -A
-git commit -m "v5.5.5- fix(ui/va): update ring edit triggers, last mined date, and VA scoop logic"
+git commit -m "v5.5.6- Ring finder,marked place  (mutiple prices) and modern theme"
 git push
 
 ## Standard Commit and Push Process

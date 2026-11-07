@@ -5976,8 +5976,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Theme toggle button - will be placed in actions row below
         from config import load_theme
         _current_theme = load_theme()
-        # Button shows what you'll switch TO (opposite of current)
-        _theme_btn_text = t('sidebar.' + self._THEME_STR_KEYS[next_theme(_current_theme)])
+        _theme_btn_text = t('sidebar.' + self._THEME_STR_KEYS.get(_current_theme, "dark_theme")) + " ▾"
         # Style button to match current theme
         if _current_theme == "elite_orange":
             _btn_bg, _btn_fg = "#1a1a1a", "#ff8c00"
@@ -6166,10 +6165,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             _ind_frame = tk.Frame(actions, bg=_info_bg)
             _ind_frame.grid(row=0, column=1, sticky="e", padx=(0, 12))
             self._footer_eddn_label = tk.Label(_ind_frame, text="\u26ab EDDN: checking...", fg="#888888",
-                                               bg=_info_bg, font=self._scaled_font(9))
+                                               bg=_info_bg, font=self._scaled_font(8))
             self._footer_eddn_label.pack(side="left", padx=(0, 14))
             self._footer_spansh_label = tk.Label(_ind_frame, text="\u26ab Spansh: checking...", fg="#888888",
-                                                 bg=_info_bg, font=self._scaled_font(9))
+                                                 bg=_info_bg, font=self._scaled_font(8))
             self._footer_spansh_label.pack(side="left")
         
         # Load CMDR name in background
@@ -6184,7 +6183,27 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         if self.current_theme == "modern":
             self.after(600, self._modern_recolor_all)
-            self.bind_all("<<NotebookTabChanged>>", lambda e: self.after(50, self._modern_recolor_all), add="+")
+            _recolor_pending = []
+            _recolored_tabs = set()
+
+            def _recolor_tab(e):
+                # Only recolor the newly selected tab (full-app walk on every switch was laggy), debounced
+                if _recolor_pending:
+                    return
+                try:
+                    tab = e.widget.nametowidget(e.widget.select())
+                except Exception:
+                    tab = None
+                if tab is not None:
+                    if str(tab) in _recolored_tabs:
+                        return
+                    _recolored_tabs.add(str(tab))
+
+                def _run():
+                    _recolor_pending.clear()
+                    self._modern_recolor_all(tab)
+                _recolor_pending.append(self.after(50, _run))
+            self.bind_all("<<NotebookTabChanged>>", _recolor_tab, add="+")
 
             def _recolor_new_popup(e):
                 # Popups are built after the startup pass; recolor each one as it first appears
@@ -6343,15 +6362,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         cargo = self.cargo_monitor
         percentage = (cargo.current_cargo / cargo.max_cargo * 100) if cargo.max_cargo > 0 else 0
         
-        status_color = ""
-        if percentage > 95:
-            status_color = " 🔴"
-        elif percentage > 85:
-            status_color = " 🟡"
-        elif percentage > 50:
-            status_color = " 🟢"
-            
-        summary_text = f"{cargo.current_cargo}/{cargo.max_cargo}t ({percentage:.0f}%){status_color}"
+        summary_text = f"{cargo.current_cargo}/{cargo.max_cargo}t ({percentage:.0f}%)"
         self.integrated_cargo_summary.configure(text=summary_text)
         if hasattr(self, '_cargo_bar'):
             self._cargo_bar['value'] = min(percentage, 100)
@@ -8830,8 +8841,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.theme_label = tk.Label(theme_frame, text=current_theme_text, bg=_gs_bg, fg="#ffcc00", font=self._scaled_font(9, "bold"))
         self.theme_label.pack(side="left", padx=(0, 15))
         
-        # Button shows what you'll switch TO (opposite of current)
-        _settings_theme_btn_text = t('settings.' + self._THEME_STR_KEYS[next_theme(_gs_theme)])
+        _settings_theme_btn_text = t('settings.' + self._THEME_STR_KEYS.get(_gs_theme, "dark_theme")) + " ▾"
         # Style to match current theme
         if _gs_theme == "elite_orange":
             _sbtn_bg, _sbtn_fg = "#1a1a1a", "#ff8c00"
@@ -8845,7 +8855,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         theme_toggle_settings = tk.Button(
             theme_frame,
             text=_settings_theme_btn_text,
-            command=self._toggle_theme,
+            command=lambda: self._show_theme_menu(theme_toggle_settings),
             bg=_sbtn_bg,
             fg=_sbtn_fg,
             activebackground=_sbtn_active_bg,
@@ -9950,7 +9960,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.theme_toggle_btn = tk.Button(
             theme_btn_frame,
             text=self._theme_btn_config["text"],
-            command=self._toggle_theme,
+            command=lambda: self._show_theme_menu(self.theme_toggle_btn),
             bg=_tbtn_bg,
             fg=_tbtn_fg,
             activebackground=_tbtn_active_bg,
@@ -16449,7 +16459,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Mirror a connection status into the Modern footer (no-op in other themes)."""
         label = getattr(self, '_footer_' + kind + '_label', None)
         if label is not None:
-            label.config(text=text, fg=color)
+            label.config(text=text, fg={'#00ff00': '#4FB87A', '#ff4444': '#C06060'}.get(color, color))
 
     _THEME_STR_KEYS = {"elite_orange": "orange_theme", "dark_gray": "dark_theme", "modern": "modern_theme"}
 
@@ -16507,11 +16517,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         style.configure("Modern.Cargo.Horizontal.TProgressbar", troughcolor="#2A3038", background=accent,
                         bordercolor=bg, lightcolor=accent, darkcolor=accent, thickness=_scaled_px(8))
         for _orient in ("Vertical", "Horizontal"):
-            style.configure(_orient + ".TScrollbar", background=bg, troughcolor=bg, bordercolor=bg,
-                            lightcolor=bg, darkcolor=bg, arrowcolor=fg)
-            style.configure(_orient + ".Scrollbar.thumb", background="#3A424C")
-            style.map(_orient + ".TScrollbar", background=[("active", bg)])
-            style.map(_orient + ".Scrollbar.thumb", background=[("active", accent)])
+            style.configure(_orient + ".TScrollbar", background="#323941", troughcolor=panel, bordercolor=panel,
+                            lightcolor="#323941", darkcolor="#323941", arrowcolor=fg)
+            style.configure(_orient + ".Scrollbar.thumb", background="#323941")
+            style.map(_orient + ".TScrollbar", background=[("active", "#434B55")],
+                      lightcolor=[("active", "#434B55")], darkcolor=[("active", "#434B55")])
+            style.map(_orient + ".Scrollbar.thumb", background=[("active", "#434B55")])
 
         # Subtle borders instead of clam's bright light/dark edges
         for _name in ("TFrame", "TNotebook", "Treeview", "Treeview.Heading", "TEntry", "TCombobox"):
@@ -16564,12 +16575,34 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             log.warning(f"Modern rounded frame failed: {e}")
 
-    def _toggle_theme(self) -> None:
-        """Cycle between Elite Orange, Dark Gray and Modern themes"""
+    def _show_theme_menu(self, button) -> None:
+        """Pop up a menu listing all themes above/below the clicked button"""
+        from ui.theme import THEME_ORDER
+        tc = self.theme_colors
+        menu = tk.Menu(self, tearoff=0, bg=tc["bg_accent"], fg=tc["fg"],
+                       activebackground=tc["selection_bg"], activeforeground=tc["selection_fg"],
+                       bd=0, relief="flat", font=self._scaled_font(9))
+        for name in THEME_ORDER:
+            label = t('sidebar.' + self._THEME_STR_KEYS[name])
+            if name == self.current_theme:
+                label = "✓ " + label
+            menu.add_command(label=label, command=lambda n=name: self._toggle_theme(n))
+        x = button.winfo_rootx()
+        y = button.winfo_rooty() - menu.yposition(tk.END) - 30 if button.winfo_rooty() > 300 else button.winfo_rooty() + button.winfo_height()
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
+
+    def _toggle_theme(self, new_theme=None) -> None:
+        """Switch to the chosen theme (or cycle to the next one)"""
         from config import save_theme
         from app_utils import centered_askyesno
 
-        new_theme = next_theme(self.current_theme)
+        if new_theme is None:
+            new_theme = next_theme(self.current_theme)
+        if new_theme == self.current_theme:
+            return
 
         save_theme(new_theme)
 

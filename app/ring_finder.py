@@ -447,11 +447,20 @@ class RingFinder(ColumnVisibilityMixin):
         )
         
         canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
+        if _modern_canvas:
+            def _page_scroll_set(first, last):
+                scrollbar.set(first, last)
+                if float(first) <= 0.0 and float(last) >= 1.0:
+                    scrollbar.grid_remove()
+                else:
+                    scrollbar.grid()
+            canvas.configure(yscrollcommand=_page_scroll_set)
+        else:
+            canvas.configure(yscrollcommand=scrollbar.set)
+
         # Bind canvas resize to make scrollable frame fill width
         canvas.bind('<Configure>', self._on_canvas_configure)
-        
+
         canvas.grid(row=0, column=0, sticky="nsew")
         scrollbar.grid(row=0, column=1, sticky="ns")
         
