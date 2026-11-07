@@ -306,8 +306,8 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 - **Power/State Filter** – Filter results by controlling Power and PowerPlay state (Local Database source only). Selecting Fortified or Stronghold searches up to 500 LY via Spansh for fast, accurate territory data; other states rely on the local EDDN cache and the Max Distance setting.
 - **PowerPlay Column** – Displays the controlling power and state for each system. Fills in instantly for systems you jump into yourself, and via EDDN (live data from other commanders, stored locally while the app runs) for the rest — coverage of systems you haven't visited can take hours to days to build up. Double-click any row showing 'No data ↗' to open the system on Inara and fetch the data automatically.
 - **PowerPlay Tick Box** – Next to the Data Source options (Local searches only). Off (default) searches faster and shows only the PowerPlay info already saved on your PC. Tick it to also look up the latest PowerPlay info online from Spansh.
-- **Rank Minerals** – Right-click a ring and choose "Rank Minerals in This Ring", or "Rank Minerals in Entire System", to see the best sell prices for the hotspot minerals nearby. Use "+ add" to include minerals without hotspots (e.g. Osmium).
-- **Best Minerals to Mine** – Right-click a Fortified or Stronghold system to list nearby Unoccupied systems with a station buying your mineral, for PowerPlay Acquisition merits (search radius 20 Ly for Fortified, 30 Ly for Stronghold). Works with any mineral, including ones without hotspots like Osmium.
+- **Best Minerals to Mine** – Right-click a ring or system and choose "Best Minerals to Mine" to see the best sell prices for the hotspot minerals nearby. Use "+ add" to include minerals without hotspots (e.g. Osmium).
+- **Find Acquisition Systems** – Right-click a Fortified or Stronghold system to list nearby Unoccupied systems with a station buying your mineral, for PowerPlay Acquisition merits (search radius 20 Ly for Fortified, 30 Ly for Stronghold). Works with any mineral, including ones without hotspots like Osmium.
 - **Auto Prices** – Requires Auto-Search. After a jump to a system with known hotspots, automatically fetches live sell prices and opens the Best Mineral to Mine window without stealing focus. Right-click the Auto Prices checkbox to show the results on the in-game text overlay instead (all minerals with price, station, landing pad, distance and demand, while you're in supercruise) and to switch "In-system prices only" on or off.
 
 ### Setting & Managing Overlap/RES Data
@@ -326,12 +326,12 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acqusition_targets.png" width="900"><br>  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acqusition_targets_results.png" width="900"><br>  
-*Best Minerals to Mine from the right-click menu and its results.*
+*Find Acquisition Systems from the right-click menu and its results.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/rank_minerals_ring.png" width="900"><br>  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/rank_minerals_ring_add.png" width="900"><br>  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/rank_minerals_system.png" width="900"><br>  
-*Rank Minerals in a ring or in the entire system.*
+*Best Minerals to Mine for a ring or the entire system.*
 
 [Back to Top](#top)
 
@@ -345,8 +345,8 @@ Where you sell your mined goods matters just as much as where you mine them.
 
 How the app helps (all in the [Hotspot Finder](#hotspot-finder)):
 1. **Power/State filter** – find Fortified or Stronghold systems to mine in.
-2. **Rank Minerals / Auto Prices** – see the best sell prices for your minerals.
-3. **Best Minerals to Mine** – right-click a Fortified or Stronghold system to list nearby Unoccupied systems buying your mineral.
+2. **Best Minerals to Mine / Auto Prices** – see the best sell prices for your minerals.
+3. **Find Acquisition Systems** – right-click a Fortified or Stronghold system to list nearby Unoccupied systems buying your mineral.
 
 [Back to Top](#top)
 
