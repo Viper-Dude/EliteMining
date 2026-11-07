@@ -5463,6 +5463,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         if self.current_theme == "modern":
             self._apply_modern_styles(style, theme, _scaled_font, _scaled_px)
+            try:
+                from ui.modern_widgets import install_modern_buttons
+                install_modern_buttons()
+            except Exception:
+                log.exception("Modern button install failed")
 
         self.title(f"{APP_TITLE} — {APP_VERSION}")
         self.resizable(True, True)
@@ -16321,13 +16326,57 @@ class App(tk.Tk, ColumnVisibilityMixin):
     _MODERN_COLOR_OPTIONS = ("bg", "activebackground", "selectcolor", "troughcolor", "highlightbackground",
                              "buttonbackground", "disabledbackground", "readonlybackground")
 
+    _MODERN_TREE_TAG_REMAP = {"#1e1e1e": "#1D2228", "#252525": "#232A31", "#282828": "#232A31",
+                              "#2a2a2a": "#232A31", "#2d2d2d": "#232A31"}
+
+    def _modern_restyle_trees(self, trees) -> None:
+        """Treeview colors live in ttk styles, so restyle each distinct style used by a tree once."""
+        style = ttk.Style()
+        seen = set()
+        for tree in trees:
+            name = str(tree.cget("style")) or "Treeview"
+            if name not in seen:
+                seen.add(name)
+                try:
+                    style.configure(name, background="#1D2228", fieldbackground="#1D2228", foreground="#E6EAF0",
+                                    bordercolor="#343B44", lightcolor="#343B44", darkcolor="#343B44")
+                    style.configure(name + ".Heading", background="#14171B", foreground="#E6EAF0",
+                                    relief="groove", borderwidth=1,
+                                    bordercolor="#343B44", lightcolor="#343B44", darkcolor="#343B44")
+                    style.map(name, background=[("selected", "#4A3520")], foreground=[("selected", "#FFFFFF")])
+                except tk.TclError:
+                    pass
+            for tag in ("oddrow", "evenrow", "oddrow_spansh", "evenrow_spansh"):
+                try:
+                    cur = str(tree.tag_configure(tag, "background")).lower()
+                except (tk.TclError, AttributeError):
+                    continue
+                new = self._MODERN_TREE_TAG_REMAP.get(cur)
+                if new:
+                    try:
+                        tree.tag_configure(tag, background=new)
+                    except tk.TclError:
+                        pass
+
     def _modern_recolor_all(self) -> None:
         """Modern theme: remap leftover hardcoded dark-gray backgrounds on classic tk widgets
         (tabs/dialogs that still use inline colors) to the Modern palette. Exact-match only."""
+        trees = []
+
         def walk(widget):
             for child in widget.winfo_children():
                 try:
                     cls = child.winfo_class()
+                    if cls == "Treeview":
+                        trees.append(child)
+                    if cls in ("Spinbox", "Entry"):
+                        for opt, old, new in (("highlightbackground", "#ffffff", "#343B44"),
+                                              ("highlightcolor", "#ffffff", "#FF9A32")):
+                            try:
+                                if str(child.cget(opt)).lower() == old:
+                                    child.configure(**{opt: new})
+                            except tk.TclError:
+                                pass
                     if cls in self._MODERN_RECOLOR_CLASSES:
                         content = cls in self._MODERN_CONTENT_CLASSES
                         for opt in self._MODERN_COLOR_OPTIONS:
@@ -16345,6 +16394,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     continue
         try:
             walk(self)
+            self._modern_restyle_trees(trees)
         except Exception:
             log.exception("Modern recolor failed")
 
@@ -16387,8 +16437,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         style.configure("Treeview", background=theme["tree_bg"], fieldbackground=theme["tree_bg"],
                         foreground=fg, borderwidth=0, rowheight=_scaled_px(26))
-        style.configure("Treeview.Heading", background=bg, foreground=fg, relief="flat",
-                        borderwidth=0, padding=(_scaled_px(6), _scaled_px(5)), font=_scaled_font(9, "bold"))
+        style.configure("Treeview.Heading", background=bg, foreground=fg, relief="groove",
+                        borderwidth=1, padding=(_scaled_px(6), _scaled_px(5)), font=_scaled_font(9, "bold"))
         style.map("Treeview.Heading", background=[("active", theme["btn_bg_hover"])])
         style.configure("TCombobox", fieldbackground=panel, background=theme["btn_bg"], foreground=fg,
                         bordercolor=border, lightcolor=border, darkcolor=border, arrowcolor=fg)
@@ -16421,6 +16471,26 @@ class App(tk.Tk, ColumnVisibilityMixin):
             style.configure(_name, bordercolor=border, lightcolor=border, darkcolor=border)
         style.configure("TLabelframe", background=bg, bordercolor=border, lightcolor=border, darkcolor=border)
         style.configure("TLabelframe.Label", background=bg, foreground=fg)
+
+        # Rounded ttk buttons (neutral + accent), 9-slice images per state
+        try:
+            from ui.modern_widgets import make_pill_image
+            self._modern_btn_imgs = {
+                "n": make_pill_image(theme["btn_bg"], border), "a": make_pill_image(theme["btn_bg_hover"], accent),
+                "p": make_pill_image("#1D2228", accent), "d": make_pill_image(panel, border),
+                "an": make_pill_image(accent, accent), "aa": make_pill_image("#FFB05A", "#FFB05A"),
+                "ap": make_pill_image("#E88A28", "#E88A28"),
+            }
+            im = self._modern_btn_imgs
+            style.element_create("Modern.Button.bg", "image", im["n"], ("disabled", im["d"]), ("pressed", im["p"]),
+                                 ("active", im["a"]), border=(6, 6, 6, 6), padding=(0, 0, 0, 0), sticky="nswe")
+            style.element_create("Modern.AccentButton.bg", "image", im["an"], ("pressed", im["ap"]),
+                                 ("active", im["aa"]), border=(6, 6, 6, 6), padding=(0, 0, 0, 0), sticky="nswe")
+            for _sname, _el in (("TButton", "Modern.Button.bg"), ("Accent.TButton", "Modern.AccentButton.bg")):
+                style.layout(_sname, [(_el, {"sticky": "nswe", "children": [
+                    ("Button.padding", {"sticky": "nswe", "children": [("Button.label", {"sticky": "nswe"})]})]})])
+        except Exception as e:
+            log.warning(f"Modern rounded ttk buttons failed: {e}")
 
         # Rounded LabelFrame border (9-slice image, transparent outside the corners)
         try:

@@ -66,7 +66,7 @@ class RoundedButton(tk.Canvas):
 
     def _redraw(self):
         self.delete("all")
-        w = self._font.measure(self._text) + 2 * self._padx
+        w = max(self._font.measure(self._text) + 2 * self._padx, getattr(self, "_min_w", 0))
         h = self._font.metrics("linespace") + 2 * self._pady
         self.configure_canvas(width=w, height=h)
         fill, fg, outline = self._colors()
@@ -156,3 +156,110 @@ class RoundedProgressBar(tk.Canvas):
 
     def __getitem__(self, key):
         return self._value if key == "value" else tk.Canvas.__getitem__(self, key)
+
+
+def make_pill_image(fill, outline, size=24, radius=6, scale=4):
+    """9-slice rounded rectangle (transparent corners) for ttk image elements."""
+    from PIL import Image, ImageDraw, ImageTk
+
+    def rgb(h):
+        h = h.lstrip("#")
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    big = size * scale
+    mask = Image.new("L", (big, big), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, big - 1, big - 1), radius=radius * scale, fill=255)
+    inner = Image.new("L", (big, big), 0)
+    ImageDraw.Draw(inner).rounded_rectangle((scale, scale, big - 1 - scale, big - 1 - scale),
+                                            radius=radius * scale - scale, fill=255)
+    img = Image.new("RGBA", (big, big), rgb(outline) + (255,))
+    img.paste(rgb(fill) + (255,), mask=inner)
+    img.putalpha(mask)
+    return ImageTk.PhotoImage(img.resize((size, size), Image.LANCZOS))
+
+
+_NEUTRAL_FILLS = {"#333333", "#2a2a2a", "#3a3a3a", "#1a1a1a", "#444444", "#2d2d2d", "#252525", "#1e1e1e",
+                  "#2a3a4a", "#4a3a2a", "#3a4a5a", "#404040", "#555555", "#2e2e2e", "#222222", "#000000",
+                  "#0a0a0a", "#3d3d3d", "#353535", "#14171b", "#1d2228", "#262c34", "#4a4a4a"}
+
+
+def _blend(c1, c2, t):
+    a = [int(c1.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)]
+    b = [int(c2.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)]
+    return "#%02x%02x%02x" % tuple(round(x + (y - x) * t) for x, y in zip(a, b))
+
+
+class ModernButton(RoundedButton):
+    """Drop-in for tk.Button in the Modern theme: rounded, keeps semantic fill colors (green/red/...),
+    neutral grays become the Modern button color. Unsupported tk.Button options are ignored."""
+
+    def __init__(self, parent, text="", command=None, font=None, bg=None, fg=None, width=None,
+                 padx=None, pady=None, state="normal", cursor=None, **_ignored):
+        self._fill = None
+        self._fg_override = None
+        self._set_colors(bg, fg)
+        super().__init__(parent, text=text, command=command, font=font,
+                         padx=max(8, int(padx)) if padx else 12, pady=max(3, int(pady)) if pady else 4)
+        if width:
+            self._min_w = int(width) * self._font.measure("0")
+        self._state = state if state in ("normal", "disabled") else "normal"
+        self._redraw()
+
+    def _set_colors(self, bg, fg):
+        if bg is not None:
+            b = str(bg).lower()
+            self._fill = None if (b in _NEUTRAL_FILLS or not b.startswith("#") or len(b) != 7) else b
+        if fg is not None and str(fg).startswith("#") and len(str(fg)) == 7:
+            self._fg_override = str(fg)
+
+    def _colors(self):
+        c = self._c
+        if self._fill:
+            if self._state == "disabled":
+                f = _blend(self._fill, c["bg"], 0.55)
+                return f, c["btn_fg_disabled"], f
+            f = _blend(self._fill, "#FFFFFF", 0.15) if self._hover else self._fill
+            return f, "#FFFFFF", f
+        fill, fg, outline = RoundedButton._colors(self)
+        if self._fg_override and self._state != "disabled":
+            fg = self._fg_override
+        return fill, fg, outline
+
+    def configure(self, cnf=None, **kw):
+        if cnf:
+            kw.update(cnf)
+        self._set_colors(kw.get("bg"), kw.get("fg"))
+        allowed = {k: v for k, v in kw.items() if k in ("text", "command", "state", "font")}
+        if "cursor" in kw:
+            tk.Canvas.configure(self, cursor=kw["cursor"])
+        RoundedButton.configure(self, **allowed)
+        self._redraw()
+
+    config = configure
+
+    def cget(self, key):
+        if key in ("bg", "background"):
+            return self._fill or self._c["btn_bg"]
+        if key == "command":
+            return self._command
+        return RoundedButton.cget(self, key)
+
+    def invoke(self):
+        if self._state == "normal" and self._command:
+            return self._command()
+
+    def flash(self):
+        pass
+
+
+_OrigTkButton = tk.Button
+
+
+def install_modern_buttons():
+    """Make every tk.Button created from now on a ModernButton (image/textvariable buttons stay native)."""
+    def factory(master=None, cnf=None, **kw):
+        if cnf:
+            kw.update(cnf)
+        if any(k in kw for k in ("image", "textvariable", "bitmap")):
+            return _OrigTkButton(master, **kw)
+        return ModernButton(master, **kw)
+    tk.Button = factory
