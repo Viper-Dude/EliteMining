@@ -6183,6 +6183,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.after(600, self._modern_recolor_all)
             self.bind_all("<<NotebookTabChanged>>", lambda e: self.after(50, self._modern_recolor_all), add="+")
 
+            def _recolor_new_popup(e):
+                # Popups are built after the startup pass; recolor each one as it first appears
+                w = e.widget
+                if w.winfo_class() == "Toplevel" and w is not self and not getattr(w, "_modern_recolored", False):
+                    w._modern_recolored = True
+                    try:
+                        for opt in ("bg",):
+                            if str(w.cget(opt)).lower() in self._MODERN_REMAP:
+                                w.configure(bg=self._MODERN_REMAP[str(w.cget(opt)).lower()])
+                    except tk.TclError:
+                        pass
+                    w.after_idle(lambda: self._modern_recolor_all(w))
+            self.bind_all("<Map>", _recolor_new_popup, add="+")
+
         # Import existing values from VoiceAttack profile
         self.after(100, self._import_all_from_txt)
         # Set up tracing AFTER loading from .txt files
@@ -12623,13 +12637,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         return preset_data
 
     def _apply_mapping(self, data: Dict[str, Any]) -> None:
-        for t, spec in data.get("Firegroups", {}).items():
+        for tool, spec in data.get("Firegroups", {}).items():
             fg = spec.get("fg")
-            if isinstance(fg, str) and fg in FIREGROUPS and t in self.tool_fg:
-                self.tool_fg[t].set(fg)
+            if isinstance(fg, str) and fg in FIREGROUPS and tool in self.tool_fg:
+                self.tool_fg[tool].set(fg)
             btn = spec.get("btn")
-            if t in self.tool_btn and isinstance(btn, int) and btn in (1, 2):
-                self.tool_btn[t].set(btn)
+            if tool in self.tool_btn and isinstance(btn, int) and btn in (1, 2):
+                self.tool_btn[tool].set(btn)
         toggles_data = data.get("Toggles", {})
         for k, v in toggles_data.items():
             # Migrate old toggle keys to new keys
@@ -16358,7 +16372,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     except tk.TclError:
                         pass
 
-    def _modern_recolor_all(self) -> None:
+    def _modern_recolor_all(self, root=None) -> None:
         """Modern theme: remap leftover hardcoded dark-gray backgrounds on classic tk widgets
         (tabs/dialogs that still use inline colors) to the Modern palette. Exact-match only."""
         trees = []
@@ -16369,8 +16383,30 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     cls = child.winfo_class()
                     if cls == "Treeview":
                         trees.append(child)
-                    if cls in ("Spinbox", "Entry"):
+                    if cls == "Labelframe":
+                        try:
+                            child.configure(relief="flat", bd=0, highlightthickness=1,
+                                            highlightbackground="#343B44", highlightcolor="#343B44")
+                        except tk.TclError:
+                            pass
+                    if cls == "TLabel":
+                        try:
+                            if str(child.cget("background")).lower() in self._MODERN_REMAP:
+                                try:
+                                    _pbg = str(child.master.cget("bg"))
+                                except (tk.TclError, AttributeError):
+                                    _pbg = "#14171B"
+                                child.configure(background=_pbg)
+                        except tk.TclError:
+                            pass
+                    if cls == "Scale":
+                        try:
+                            child.configure(troughcolor="#2A3038", activebackground="#FF9A32", bd=0)
+                        except tk.TclError:
+                            pass
+                    if cls in ("Spinbox", "Entry", "Text", "Listbox"):
                         for opt, old, new in (("highlightbackground", "#ffffff", "#343B44"),
+                                              ("highlightbackground", "#000000", "#343B44"),
                                               ("highlightcolor", "#ffffff", "#FF9A32")):
                             try:
                                 if str(child.cget(opt)).lower() == old:
@@ -16393,7 +16429,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 except tk.TclError:
                     continue
         try:
-            walk(self)
+            walk(root or self)
             self._modern_restyle_trees(trees)
         except Exception:
             log.exception("Modern recolor failed")

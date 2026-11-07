@@ -204,9 +204,17 @@ class ModernButton(RoundedButton):
         self._state = state if state in ("normal", "disabled") else "normal"
         self._redraw()
 
+    # Bright legacy accent colors softened to sit with the Modern palette ("" = use the neutral button color)
+    _SOFTEN = {"#4a9eff": "#3B6EA8", "#ff6b6b": "#B04A4A", "#4caf50": "#2E7D4F", "#666666": ""}
+
     def _set_colors(self, bg, fg):
         if bg is not None:
             b = str(bg).lower()
+            b = self._SOFTEN.get(b, b)
+            if b == "":
+                self._fill = None
+                b = None
+        if bg is not None and b is not None:
             self._fill = None if (b in _NEUTRAL_FILLS or not b.startswith("#") or len(b) != 7) else b
         if fg is not None and str(fg).startswith("#") and len(str(fg)) == 7:
             self._fg_override = str(fg)

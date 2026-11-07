@@ -901,7 +901,7 @@ class RingFinder(ColumnVisibilityMixin):
         _max_results_label_frame.pack(side="left", padx=(0, 5))
         _max_results_label_frame.pack_propagate(False)
         ttk.Label(_max_results_label_frame, text=t('ring_finder.max_results') + ":", anchor="e", font=scaled_font(9)).pack(side="right", fill="y")
-        self.max_results_var = tk.StringVar(value="50")
+        self.max_results_var = tk.StringVar(value="100")
         _max_results_combo_frame = tk.Frame(right_filters_frame_row2, width=scaled_px(70), height=scaled_px(24), bg=_sh_bg)
         _max_results_combo_frame.pack(side="left", padx=(0, 10))
         _max_results_combo_frame.pack_propagate(False)
@@ -2271,7 +2271,7 @@ class RingFinder(ColumnVisibilityMixin):
         if hasattr(self, 'distance_var'):
             self.distance_var.set("50")
         if hasattr(self, 'max_results_var'):
-            self.max_results_var.set("50")
+            self.max_results_var.set("100")
 
         # Ring Type
         self.material_var.set(t('ring_finder.all'))
@@ -2844,7 +2844,7 @@ class RingFinder(ColumnVisibilityMixin):
             bool(self.overlaps_only_var.get()),
             bool(self.res_only_var.get()),
             bool(self.ring_type_only_var.get()),
-            self.max_results_var.get() != "50",
+            self.max_results_var.get() != "100",
         )
         return sum(checks)
 
