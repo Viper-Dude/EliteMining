@@ -22,7 +22,12 @@ class RoundedButton(tk.Canvas):
         self._hover = False
         self._pressed = False
         self._font = tkfont.Font(font=font) if font else tkfont.Font(family="Segoe UI", size=9)
-        super().__init__(parent, bg=self._parent_bg(parent), highlightthickness=0, bd=0, cursor="hand2")
+        super().__init__(parent, bg=self._parent_bg(parent), highlightthickness=0, bd=0, cursor="hand2",
+                         takefocus=1)
+        self._focused = False
+        self.bind("<FocusIn>", lambda e: self._set_focus(True))
+        self.bind("<FocusOut>", lambda e: self._set_focus(False))
+        self.bind("<space>", self._on_space)
         self.bind("<Enter>", lambda e: self._set_hover(True))
         self.bind("<Leave>", lambda e: self._set_hover(False))
         self.bind("<ButtonPress-1>", self._on_press)
@@ -41,6 +46,15 @@ class RoundedButton(tk.Canvas):
     def _set_hover(self, value):
         self._hover = value
         self._redraw()
+
+    def _set_focus(self, value):
+        self._focused = value
+        self._redraw()
+
+    def _on_space(self, _e):
+        if self._state == "normal" and self._command:
+            self._command()
+        return "break"
 
     def _on_press(self, _e):
         if self._state == "normal":
@@ -74,6 +88,8 @@ class RoundedButton(tk.Canvas):
         x0, y0, x1, y1 = 1, 1, w - 1, h - 1
         pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1, x1 - r, y1,
                x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
+        if self._focused and self._state == "normal":
+            outline = self._c["fg"] if self._primary else self._c["accent"]
         self.create_polygon(pts, smooth=True, fill=fill, outline=outline)
         self.create_text(w // 2, h // 2, text=self._text, fill=fg, font=self._font)
 
@@ -188,6 +204,27 @@ def _blend(c1, c2, t):
     return "#%02x%02x%02x" % tuple(round(x + (y - x) * t) for x, y in zip(a, b))
 
 
+# Primary-action labels (letters only, lowercase): EN + DE
+_SEARCH_WORDS = {"search", "suchen", "calculatedistance", "entfernungberechnen"}
+
+
+def _letters(text):
+    return "".join(ch for ch in str(text) if ch.isalpha()).lower()
+
+
+def _is_search_label(text):
+    return _letters(text) in _SEARCH_WORDS
+
+
+def _is_green(color):
+    r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+    return g > r + 15 and g > b + 15
+
+
+# Green stays only for positive/confirm actions; any other green helper button turns neutral.
+_KEEP_GREEN = {"start", "save", "ok", "gotit", "selectall", "addbookmark", "applytosession"}
+
+
 class ModernButton(RoundedButton):
     """Drop-in for tk.Button in the Modern theme: rounded, keeps semantic fill colors (green/red/...),
     neutral grays become the Modern button color. Unsupported tk.Button options are ignored."""
@@ -202,6 +239,19 @@ class ModernButton(RoundedButton):
         if width:
             self._min_w = int(width) * self._font.measure("0")
         self._state = state if state in ("normal", "disabled") else "normal"
+        self._apply_search_style()
+
+    def _apply_search_style(self):
+        """Search buttons are the primary action: orange fill + bold, like the Hotspots Finder one."""
+        if self._fill and _is_green(self._fill) and _letters(self._text) not in _KEEP_GREEN:
+            self._fill = None
+        primary = _is_search_label(self._text)
+        if primary:
+            # No emoji on the primary button: drop any leading symbols/spaces from the label
+            self._text = self._text.lstrip("".join(ch for ch in self._text if not ch.isalnum())).strip()
+        if primary != self._primary or (primary and not self._font.actual("weight") == "bold"):
+            self._primary = primary
+            self._font.configure(weight="bold" if primary else "normal")
         self._redraw()
 
     # Bright legacy accent colors softened to sit with the Modern palette ("" = use the neutral button color)
@@ -221,6 +271,8 @@ class ModernButton(RoundedButton):
 
     def _colors(self):
         c = self._c
+        if self._primary:
+            return RoundedButton._colors(self)
         if self._fill:
             if self._state == "disabled":
                 f = _blend(self._fill, c["bg"], 0.55)
@@ -240,7 +292,7 @@ class ModernButton(RoundedButton):
         if "cursor" in kw:
             tk.Canvas.configure(self, cursor=kw["cursor"])
         RoundedButton.configure(self, **allowed)
-        self._redraw()
+        self._apply_search_style()
 
     config = configure
 
@@ -264,6 +316,14 @@ _OrigTkButton = tk.Button
 
 def install_modern_buttons():
     """Make every tk.Button created from now on a ModernButton (image/textvariable buttons stay native)."""
+    try:
+        from localization import t
+        for key in ("mining_session.start", "dialogs.save", "common.ok", "refinery_dialog.apply_to_session",
+                    "dialogs.got_it", "settings.select_all", "bookmarks.add_bookmark"):
+            _KEEP_GREEN.add(_letters(t(key)))
+    except Exception:
+        pass
+
     def factory(master=None, cnf=None, **kw):
         if cnf:
             kw.update(cnf)

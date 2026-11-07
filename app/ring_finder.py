@@ -430,7 +430,11 @@ class RingFinder(ColumnVisibilityMixin):
         self.parent.grid_rowconfigure(0, weight=1)
         
         # Main container with scrollable frame
-        canvas = tk.Canvas(self.parent, bg='#2b2b2b')
+        from config import load_theme as _lt_canvas
+        _modern_canvas = _lt_canvas() == "modern"
+        # Modern: no default highlight border (it draws a bright line around the page)
+        canvas = tk.Canvas(self.parent, bg='#14171B' if _modern_canvas else '#2b2b2b',
+                           **({"highlightthickness": 0} if _modern_canvas else {}))
         scrollbar = ttk.Scrollbar(self.parent, orient="vertical", command=canvas.yview)
         self.scrollable_frame = ttk.Frame(canvas)
         
@@ -495,7 +499,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Distance info (below title on separate line) - label in white, values in yellow
         distance_header = ttk.Frame(self.scrollable_frame)
-        distance_header.pack(fill="x", padx=10, pady=(0, 5))
+        distance_header.pack(fill="x", padx=10, pady=((10, 5) if _modern_canvas else (0, 5)))
         
         # Get theme colors
         from config import load_theme

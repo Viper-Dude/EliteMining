@@ -6101,6 +6101,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         _info_theme = load_theme()
         _info_bg = "#000000" if _info_theme == "elite_orange" else ("#14171B" if _info_theme == "modern" else "#1e1e1e")
         _info_val = "#FF9A32" if _info_theme == "modern" else "#ffcc00"
+        # Modern: labels regular weight, only the values bold
+        _info_lbl_font = self._scaled_font(9) if _info_theme == "modern" else self._scaled_font(9, "bold")
 
         info_frame = tk.Frame(actions, bg=_info_bg)
         info_frame.grid(row=0, column=0, sticky="w")
@@ -6110,7 +6112,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             from PIL import Image, ImageTk
             from path_utils import get_images_dir
             logo_path = os.path.join(get_images_dir(), "EliteMining_txt_logo_transp_resize.png")
-            if os.path.exists(logo_path):
+            if os.path.exists(logo_path) and _info_theme != "modern":  # Modern footer starts at the CMDR text
                 logo_img = Image.open(logo_path)
                 # Resize to fit status bar height (smaller to avoid stretched look)
                 target_height = 16
@@ -6124,15 +6126,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"Could not load status bar logo: {e}")
 
         # Labels for mixed colors (white labels, yellow values)
-        self.cmdr_label_prefix = tk.Label(info_frame, text=t('status_bar.cmdr'), fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.cmdr_label_prefix = tk.Label(info_frame, text=t('status_bar.cmdr'), fg="white", bg=_info_bg, font=_info_lbl_font)
         self.cmdr_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
-        self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=_info_lbl_font)
         self.system_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
-        self.visits_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.visits_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=_info_lbl_font)
         self.visits_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"), cursor="hand2")
-        self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=_info_lbl_font)
         self.route_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
-        self.total_systems_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.total_systems_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=_info_lbl_font)
         self.total_systems_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
         
         # Make visits clickable to edit
@@ -16384,6 +16386,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     cls = child.winfo_class()
                     if cls == "Treeview":
                         trees.append(child)
+                    if cls in ("Label", "TLabel"):
+                        # Yellow value text becomes the Modern orange accent (exact yellows only)
+                        for opt in ("fg", "foreground"):
+                            try:
+                                if str(child.cget(opt)).lower() in ("#ffcc00", "#ffd700"):
+                                    child.configure(**{opt: "#FF9A32"})
+                            except tk.TclError:
+                                pass
                     if cls == "Labelframe":
                         try:
                             child.configure(relief="flat", bd=0, highlightthickness=1,
