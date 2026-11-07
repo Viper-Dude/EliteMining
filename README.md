@@ -326,7 +326,7 @@ Automatically imports hotspots from your Elite Dangerous journal files and conti
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acqusition_targets.png" width="900"><br>  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acqusition_targets_results.png" width="900"><br>  
-*Find Acquisition Systems from the right-click menu and its results.*
+*Best Minerals to Mine from the right-click menu and its results.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/rank_minerals_ring.png" width="900"><br>  
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/rank_minerals_ring_add.png" width="900"><br>  
