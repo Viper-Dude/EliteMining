@@ -103,7 +103,10 @@ class MultiMineralTab:
                     "pad": t('marketplace.pad'), "distance": t('marketplace.distance'),
                     "ls": "LS", "demand": t('marketplace.demand'), "price": t('marketplace.price'),
                     "powerstate": t('marketplace.powerstate'), "updated": t('marketplace.updated')}
-        self.tree.heading("#0", text=t('marketplace.multi_col_mineral'), anchor="w")
+        self.tree.heading("#0", text=t('marketplace.multi_col_mineral'), anchor="w",
+                          command=lambda: self._sort("#0"))
+        self._sort_col = None
+        self._sort_rev = False
         import tkinter.font as tkfont
         heading_font = tkfont.Font(font=app._scaled_font(9, "bold"))
         header_pad = app._scaled_px(24)  # header cell padding + sort-arrow space
@@ -121,7 +124,7 @@ class MultiMineralTab:
                 self.tree.column(c, width=app._scaled_px(20), stretch=True)
                 continue
             anchor = "center" if c == "pad" else "w"
-            self.tree.heading(c, text=headings[c], anchor=anchor)
+            self.tree.heading(c, text=headings[c], anchor=anchor, command=lambda col=c: self._sort(col))
             self.tree.column(c, width=max(app._scaled_px(widths[c]), min_for(c)), minwidth=min_for(c),
                              stretch=False, anchor=anchor)
         app.setup_column_visibility(
@@ -149,6 +152,70 @@ class MultiMineralTab:
         self.tree.configure(yscrollcommand=vsb.set)
         self.tree.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
+
+    # Station rows hold location/pad/distance/LS/powerplay; their mineral rows hold mineral/demand/price/age.
+    _PAD_ORDER = {"?": 0, "S": 1, "M": 2, "L": 3}
+
+    @staticmethod
+    def _num(text, default=float("inf")):
+        try:
+            return float(str(text).replace(",", "").replace("CR", "").strip())
+        except ValueError:
+            return default
+
+    @staticmethod
+    def _age_minutes(text):
+        text = str(text).strip()
+        try:
+            return float(text[:-1]) * {"m": 1, "h": 60, "d": 1440}[text[-1]]
+        except (ValueError, KeyError, IndexError):
+            return float("inf")
+
+    def _sort(self, col: str) -> None:
+        """Sort stations by a column. Mineral-level columns order stations by their best mineral row
+        (and the mineral rows inside each station by the same column)."""
+        tree = self.tree
+        if self._sort_col == col:
+            self._sort_rev = not self._sort_rev
+        else:
+            self._sort_col, self._sort_rev = col, False
+        vals = ("location", "pad", "distance", "ls", "demand", "price", "powerstate", "updated")
+        idx = {c: i for i, c in enumerate(vals)}
+
+        def child_key(item):
+            if col == "#0":
+                return str(tree.item(item, "text")).lower()
+            v = tree.item(item, "values")[idx[col]]
+            return self._age_minutes(v) if col == "updated" else self._num(v, 0)
+
+        def station_key(item):
+            if col in ("demand", "price", "updated", "#0"):
+                keys = [child_key(c) for c in tree.get_children(item)]
+                if not keys:
+                    return float("inf") if col == "updated" else (0 if col != "#0" else "")
+                return min(keys) if col in ("updated", "#0") else max(keys)
+            v = tree.item(item, "values")[idx[col]]
+            if col == "pad":
+                return self._PAD_ORDER.get(str(v), 0)
+            if col in ("distance", "ls"):
+                return self._num(v)
+            return str(v).lower()
+
+        parents = list(tree.get_children())
+        for parent in parents:
+            if col in ("demand", "price", "updated", "#0"):
+                for pos, child in enumerate(sorted(tree.get_children(parent), key=child_key, reverse=self._sort_rev)):
+                    tree.move(child, parent, pos)
+        for pos, parent in enumerate(sorted(parents, key=station_key, reverse=self._sort_rev)):
+            tree.move(parent, "", pos)
+        self._show_sort_arrow()
+
+    def _show_sort_arrow(self) -> None:
+        from ui.sort_indicator import apply_sort_arrow, strip_sort_arrow, ARROW_UP, ARROW_DOWN
+        apply_sort_arrow(self.tree, self._sort_col, self._sort_rev)
+        text = strip_sort_arrow(str(self.tree.heading("#0", "text")))
+        arrow = (ARROW_DOWN if self._sort_rev else ARROW_UP) if self._sort_col == "#0" else ""
+        self.tree.heading("#0", text=text + arrow)
 
     def _on_toggle(self, name: str) -> None:
         if sum(v.get() for v in self._mineral_vars.values()) > MAX_MINERALS:
@@ -249,6 +316,8 @@ class MultiMineralTab:
         app = self.app
         self.search_btn.config(state="normal")
         self.tree.delete(*self.tree.get_children())
+        self._sort_col, self._sort_rev = None, False
+        self._show_sort_arrow()
         if not stations:
             self.status_label.config(text=t('marketplace.no_results'))
             return

@@ -3,6 +3,13 @@
 
 ## New Features & Improvements
 
+### New Modern Theme
+- New "Modern" theme with a cleaner look, rounded buttons and frames, and a compact Hotspots Finder search.
+- Secondary Hotspots Finder filters now live under a collapsible "More filters" button that shows how many are active.
+- Cargo Monitor now sits above Ship Presets and shows a fill bar.
+- EDDN and Spansh status now show once in the bottom bar.
+- The Theme button now cycles through Elite Orange, Dark Gray and Modern.
+
 ### Commodity Market - Multiple Prices
 - New "Multiple Prices" tab finds the best stations to sell up to 5 minerals at once.
 - Stations buying the most of your minerals are listed first.
@@ -16,13 +23,6 @@
 - A new Refresh button updates the prices without closing the window.
 - The window now shows which system or ring the prices are for.
 - "+ Also Check" is now "+ Add Minerals".
-
-### New Modern Theme
-- New "Modern" theme with a cleaner look, rounded buttons and frames, and a compact Hotspots Finder search.
-- Secondary Hotspots Finder filters now live under a collapsible "More filters" button that shows how many are active.
-- Cargo Monitor now sits above Ship Presets and shows a fill bar.
-- EDDN and Spansh status now show once in the bottom bar.
-- The Theme button now cycles through Elite Orange, Dark Gray and Modern.
 
 ### Voiceattack Profile update to v5.5.6
 - General optimisations.
