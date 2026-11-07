@@ -847,6 +847,18 @@ def save_sidebar_sash_position(position: int) -> None:
     cfg["sidebar_sash_position"] = position
     _save_cfg(cfg)
 
+def load_modern_sidebar_sash_position() -> Optional[int]:
+    """Saved Cargo Monitor (top pane) height for the Modern theme's sidebar. Separate from the
+    classic key because there the top pane is Ship Presets."""
+    cfg = _load_cfg()
+    return cfg.get("sidebar_sash_position_modern")
+
+def save_modern_sidebar_sash_position(position: int) -> None:
+    """Save Modern theme sidebar sash position (Cargo Monitor pane height)"""
+    cfg = _load_cfg()
+    cfg["sidebar_sash_position_modern"] = position
+    _save_cfg(cfg)
+
 def load_main_sash_position() -> Optional[int]:
     """Load saved main horizontal sash position (content / sidebar split)"""
     cfg = _load_cfg()

@@ -1997,6 +1997,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             selection_bg = "#ff6600"
             selection_fg = "#000000"
             alt_row_bg = "#252525"
+        elif pp_theme == "modern":
+            tree_bg = "#1D2228"
+            tree_fg = "#E6EAF0"
+            header_bg = "#14171B"
+            selection_bg = "#4A3520"
+            selection_fg = "#FFFFFF"
+            alt_row_bg = "#232A31"
         else:
             tree_bg = "#1e1e1e"
             tree_fg = "#e6e6e6"
@@ -2988,6 +2995,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             _rpt_sel_bg = "#ff6600"
             _rpt_sel_fg = "#000000"
             _rpt_alt = "#252525"
+        elif _rpt_theme == "modern":
+            _rpt_bg = "#1D2228"
+            _rpt_fg = "#E6EAF0"
+            _rpt_hdr = "#14171B"
+            _rpt_sel_bg = "#4A3520"
+            _rpt_sel_fg = "#FFFFFF"
+            _rpt_alt = "#232A31"
         else:
             _rpt_bg = "#1e1e1e"
             _rpt_fg = "#e6e6e6"

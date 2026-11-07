@@ -90,6 +90,9 @@ class MiningChartsPanel:
         if self.current_theme == "elite_orange":
             self.chart_bg = '#1e1e1e'  # Dark gray background for orange theme
             self.chart_face = '#1e1e1e'
+        elif self.current_theme == "modern":
+            self.chart_bg = '#14171B'
+            self.chart_face = '#1D2228'
         else:
             self.chart_bg = '#2b2b2b'
             self.chart_face = '#1e1e1e'

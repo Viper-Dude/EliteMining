@@ -460,7 +460,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         from config import load_theme as _load_theme_for_header
         _sh_theme = _load_theme_for_header()
-        _sh_bg = "#0a0a0a" if _sh_theme == "elite_orange" else "#1e1e1e"
+        _sh_bg = "#0a0a0a" if _sh_theme == "elite_orange" else ("#14171B" if _sh_theme == "modern" else "#1e1e1e")
         
         # Search frame title and help text
         search_title = ttk.Label(search_header, text=t('ring_finder.title'), font=scaled_font(9, "bold"))
@@ -480,12 +480,14 @@ class RingFinder(ColumnVisibilityMixin):
         # EDDN/Spansh connectivity status, right-aligned just left of the status label
         self.spansh_status_label = tk.Label(search_header, text="⚫ Spansh: checking...",
                                             font=scaled_font(8), fg="#888888", bg=_sh_bg)
-        self.spansh_status_label.pack(side="right", padx=(0, 15))
+        if _sh_theme != "modern":
+            self.spansh_status_label.pack(side="right", padx=(0, 15))
         ToolTip(self.spansh_status_label, "Spansh API status - checks connectivity to spansh.co.uk")
 
         self.eddn_status_label = tk.Label(search_header, text="⚫ EDDN: checking...",
                                           font=scaled_font(8), fg="#888888", bg=_sh_bg)
-        self.eddn_status_label.pack(side="right", padx=(0, 10))
+        if _sh_theme != "modern":
+            self.eddn_status_label.pack(side="right", padx=(0, 10))
         ToolTip(self.eddn_status_label, "EDDN status - live data feed for PowerPlay and market data")
         
         # Distance info (below title on separate line) - label in white, values in yellow
@@ -495,7 +497,7 @@ class RingFinder(ColumnVisibilityMixin):
         # Get theme colors
         from config import load_theme
         rf_theme = load_theme()
-        rf_bg = "#0a0a0a" if rf_theme == "elite_orange" else "#1e1e1e"
+        rf_bg = "#0a0a0a" if rf_theme == "elite_orange" else ("#14171B" if rf_theme == "modern" else "#1e1e1e")
         rf_value_fg = "#ffcc00"  # Yellow for values in both themes
         
         ttk.Label(distance_header, text=t('ring_finder.distances'), font=scaled_font(9, "bold")).pack(side="left", padx=(0, 5))
@@ -522,6 +524,17 @@ class RingFinder(ColumnVisibilityMixin):
         search_frame.grid_columnconfigure(4, weight=0)
         search_frame.grid_columnconfigure(5, weight=0)
         search_frame.grid_columnconfigure(6, weight=1)  # Let column 6 take remaining space
+
+        from config import load_theme as _lt_form
+        _modern_form = _lt_form() == "modern"
+        if _modern_form:
+            # Containers re-gridded into the Modern layout after the form is built
+            self._rf_primary = tk.Frame(search_frame, bg="#14171B")
+            self._rf_more = tk.Frame(search_frame, bg="#14171B")
+            self._rf_flags = tk.Frame(search_frame, bg="#14171B")
+            self._rf_dist = tk.Frame(search_frame, bg="#14171B")
+            self._rf_actions = tk.Frame(search_frame, bg="#14171B")
+            self._more_open = False
         
         # Single smart search input
         ttk.Label(search_frame, text=t('ring_finder.reference_system')).grid(row=0, column=0, sticky="w", padx=5, pady=5)
@@ -545,6 +558,9 @@ class RingFinder(ColumnVisibilityMixin):
         if _cb_theme == "elite_orange":
             _cb_bg = "#000000"  # Black background for orange theme
             _cb_select = "#000000"
+        elif _cb_theme == "modern":
+            _cb_bg = "#14171B"
+            _cb_select = "#262C34"
         else:
             _cb_bg = "#1e1e1e"
             _cb_select = "#1e1e1e"
@@ -554,7 +570,7 @@ class RingFinder(ColumnVisibilityMixin):
         buttons_frame.grid(row=0, column=2, sticky="w", padx=(0, 0))
 
         # Auto-detect button (fills current system automatically) - with app color scheme
-        auto_btn = tk.Button(buttons_frame, text=t('ring_finder.use_current_system'), command=self._auto_detect_system,
+        auto_btn = self._rf_button(buttons_frame, text=t('ring_finder.use_current_system'), command=self._auto_detect_system,
                             bg="#4a3a2a", fg="#e0e0e0", 
                             activebackground="#5a4a3a", activeforeground="#ffffff",
                             relief="ridge", bd=1, padx=scaled_px(8), pady=scaled_px(4),
@@ -564,7 +580,7 @@ class RingFinder(ColumnVisibilityMixin):
         # Search button - with app color scheme. Toggles to "Stop" while a search is
         # running; clicking it then cancels the in-flight search instead of starting a new one.
         self._search_in_progress = False
-        self.search_btn = tk.Button(buttons_frame, text=t('ring_finder.search'), command=self._on_search_btn_clicked,
+        self.search_btn = self._rf_button(buttons_frame, primary=True, text=t('ring_finder.search'), command=self._on_search_btn_clicked,
                                    bg="#2a4a2a", fg="#e0e0e0",
                                    activebackground="#3a5a3a", activeforeground="#ffffff",
                                    relief="ridge", bd=1, padx=scaled_px(15), pady=scaled_px(4),
@@ -742,7 +758,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         reset_btn_fg = "#ff8c00" if _cb_theme == "elite_orange" else "#ffffff"
         reset_btn_active_fg = "#ffa500" if _cb_theme == "elite_orange" else "#ffffff"
-        reset_btn = tk.Button(pp_inner_row, text=t('ring_finder.reset_filters'),
+        reset_btn = self._rf_button(self._rf_actions if _modern_form else pp_inner_row, text=t('ring_finder.reset_short' if _modern_form else 'ring_finder.reset_filters'),
                              command=self._reset_filters,
                              bg="#3a3a3a", fg=reset_btn_fg,
                              activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
@@ -751,7 +767,7 @@ class RingFinder(ColumnVisibilityMixin):
         reset_btn.pack(side="left", padx=(15, 0))
         ToolTip(reset_btn, t('ring_finder.reset_filters_tooltip'))
 
-        best_mining_btn = tk.Button(pp_inner_row, text=t('ring_finder.find_best_mining_system'),
+        best_mining_btn = self._rf_button(self._rf_actions if _modern_form else pp_inner_row, text=t('ring_finder.find_best_short' if _modern_form else 'ring_finder.find_best_mining_system'),
                              command=self._show_reverse_search_dialog,
                              bg="#3a3a3a", fg=reset_btn_fg,
                              activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
@@ -772,9 +788,10 @@ class RingFinder(ColumnVisibilityMixin):
         else:
             unvisited_fg = "#FFFFFF"
 
-        ttk.Label(misc_inner_row, text=t('ring_finder.unvisited_only') + ":", foreground=unvisited_fg).pack(side="left")
+        _flag_parent = self._rf_flags if _modern_form else misc_inner_row
+        ttk.Label(_flag_parent, text=t('ring_finder.unvisited_only') + ":", foreground=unvisited_fg).pack(side="left")
         self.unvisited_only_var = tk.BooleanVar(value=False)
-        self.unvisited_only_cb = tk.Checkbutton(misc_inner_row,
+        self.unvisited_only_cb = tk.Checkbutton(_flag_parent,
                                                 variable=self.unvisited_only_var,
                                                 command=self._save_filter_settings,
                                                 bg=_cb_bg,
@@ -783,9 +800,9 @@ class RingFinder(ColumnVisibilityMixin):
         self.unvisited_only_cb.pack(side="left", padx=(5, 30))
         ToolTip(self.unvisited_only_cb, t('ring_finder.tooltip_unvisited'))
 
-        ttk.Label(misc_inner_row, text=t('ring_finder.favourites_only') + ":", foreground=unvisited_fg).pack(side="left")
+        ttk.Label(_flag_parent, text=t('ring_finder.favourites_only') + ":", foreground=unvisited_fg).pack(side="left")
         self.favourites_only_var = tk.BooleanVar(value=False)
-        self.favourites_only_cb = tk.Checkbutton(misc_inner_row,
+        self.favourites_only_cb = tk.Checkbutton(_flag_parent,
                                                 variable=self.favourites_only_var,
                                                 command=self._on_favourites_only_changed,
                                                 bg=_cb_bg,
@@ -804,12 +821,13 @@ class RingFinder(ColumnVisibilityMixin):
 
         # Distance filter (now a dropdown) - fixed pixel-width label so it doesn't
         # snap to different widths than the row above at odd UI scale percentages
-        _distance_label_frame = tk.Frame(right_filters_frame_row1, width=scaled_px(120), height=scaled_px(24), bg=_sh_bg)
+        _dist_parent = self._rf_dist if _modern_form else right_filters_frame_row1
+        _distance_label_frame = tk.Frame(_dist_parent, width=scaled_px(120), height=scaled_px(24), bg=_sh_bg)
         _distance_label_frame.pack(side="left", padx=(0, 5))
         _distance_label_frame.pack_propagate(False)
         ttk.Label(_distance_label_frame, text=t('ring_finder.max_distance') + ":", anchor="e", font=scaled_font(9)).pack(side="right", fill="y")
         self.distance_var = tk.StringVar(value="50")
-        _distance_combo_frame = tk.Frame(right_filters_frame_row1, width=scaled_px(70), height=scaled_px(24), bg=_sh_bg)
+        _distance_combo_frame = tk.Frame(_dist_parent, width=scaled_px(70), height=scaled_px(24), bg=_sh_bg)
         _distance_combo_frame.pack(side="left")
         _distance_combo_frame.pack_propagate(False)
         self.distance_combo = ttk.Combobox(_distance_combo_frame, textvariable=self.distance_var, state="readonly", font=scaled_font(9))
@@ -875,7 +893,8 @@ class RingFinder(ColumnVisibilityMixin):
             gap = target_x - current_x - scaled_px(3)
             if gap > 0:
                 _overlaps_align_spacer.configure(width=gap)
-        self.parent.after_idle(_align_overlaps_row)
+        if not _modern_form:
+            self.parent.after_idle(_align_overlaps_row)
 
         # Max Results filter - fixed pixel-width label to match Max Distance above
         _max_results_label_frame = tk.Frame(right_filters_frame_row2, width=scaled_px(120), height=scaled_px(24), bg=_sh_bg)
@@ -1024,6 +1043,16 @@ class RingFinder(ColumnVisibilityMixin):
                             fg="#cccccc", bg=_cb_bg, font=scaled_font(8, "italic"),
                             justify="left")
         info_text.grid(row=6, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
+
+        if _modern_form:
+            self._build_modern_search_layout(
+                search_frame,
+                ring_lbl=search_frame.grid_slaves(row=1, column=0)[0],
+                reserve_lbl=search_frame.grid_slaves(row=2, column=0)[0],
+                mineral_lbl=search_frame.grid_slaves(row=3, column=0)[0],
+                power_lbl=search_frame.grid_slaves(row=4, column=0)[0],
+                row3=row3_container, rf1=right_filters_frame_row1, rf2=right_filters_frame_row2,
+                misc=misc_inner_row, info=info_text)
         
         # Results section with help text in header
         results_header = ttk.Frame(self.scrollable_frame)
@@ -1032,6 +1061,10 @@ class RingFinder(ColumnVisibilityMixin):
         ttk.Label(results_header, text=t('ring_finder.search_results'), font=scaled_font(9, "bold")).pack(side="left")
         ttk.Label(results_header, text=t('ring_finder.right_click_help'),
                  font=scaled_font(8), foreground="#666666").pack(side="left", padx=(10, 0))
+        if _modern_form:
+            self._columns_btn = self._rf_button(results_header, text=t('ring_finder.columns_button') + " \u25be",
+                                                command=self._show_columns_menu)
+            self._columns_btn.pack(side="right", padx=(8, 0))
 
         from config import load_theme as _load_theme_for_new_entries
         _new_entries_fg = "#ff8c00" if _load_theme_for_new_entries() == "elite_orange" else "#e8b84b"
@@ -1057,6 +1090,12 @@ class RingFinder(ColumnVisibilityMixin):
             header_bg = "#1a1a1a"
             selection_bg = "#ff6600"
             selection_fg = "#000000"
+        elif current_theme == "modern":
+            tree_bg = "#1D2228"
+            tree_fg = "#E6EAF0"
+            header_bg = "#14171B"
+            selection_bg = "#4A3520"
+            selection_fg = "#FFFFFF"
         else:
             tree_bg = "#1e1e1e"
             tree_fg = "#e6e6e6"
@@ -1301,6 +1340,11 @@ class RingFinder(ColumnVisibilityMixin):
             # Only color Spansh results - keep database with normal orange theme colors
             self.results_tree.tag_configure('oddrow_spansh', background='#1e1e1e', foreground='#00ddff')  # Bright cyan
             self.results_tree.tag_configure('evenrow_spansh', background='#252525', foreground='#00ddff')
+        elif current_theme == "modern":
+            self.results_tree.tag_configure('oddrow', background='#1D2228', foreground='#E6EAF0')
+            self.results_tree.tag_configure('evenrow', background='#232A31', foreground='#E6EAF0')
+            self.results_tree.tag_configure('oddrow_spansh', background='#1D2228', foreground='#7CC4F0')
+            self.results_tree.tag_configure('evenrow_spansh', background='#232A31', foreground='#7CC4F0')
         else:
             self.results_tree.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6')
             self.results_tree.tag_configure('evenrow', background='#282828', foreground='#e6e6e6')
@@ -1916,6 +1960,9 @@ class RingFinder(ColumnVisibilityMixin):
         
         if hasattr(self, 'spansh_status_label'):
             self.spansh_status_label.config(text=status_text, fg=status_color)
+        top = self.parent.winfo_toplevel()
+        if hasattr(top, '_update_footer_indicator'):
+            top._update_footer_indicator('spansh', status_text, status_color)
 
     def _check_eddn_status(self):
         """Check EDDN gateway status in background and update indicator"""
@@ -1945,6 +1992,9 @@ class RingFinder(ColumnVisibilityMixin):
             status_color = "#ff4444"
         if hasattr(self, 'eddn_status_label'):
             self.eddn_status_label.config(text=status_text, fg=status_color)
+        top = self.parent.winfo_toplevel()
+        if hasattr(top, '_update_footer_indicator'):
+            top._update_footer_indicator('eddn', status_text, status_color)
 
     def _update_sol_distance(self, system_name: str):
         """Update distance info label using centralized Distance Calculator"""
@@ -2742,6 +2792,94 @@ class RingFinder(ColumnVisibilityMixin):
         self._search_in_progress = False
         self.search_btn.configure(text=t('ring_finder.search'))
         self._hide_search_overlay()
+
+    def _build_modern_search_layout(self, sf, ring_lbl, reserve_lbl, mineral_lbl, power_lbl,
+                                    row3, rf1, rf2, misc, info):
+        """Modern theme: primary filters on one row, secondary filters in a collapsible 'More filters' panel.
+        Re-grids the widgets built by setup_ui; variables, callbacks and values are untouched."""
+        from config import scaled_px
+        for w in (ring_lbl, self.material_combo, mineral_lbl, self.specific_material_combo, reserve_lbl,
+                  self.reserve_combo, power_lbl, self.pp_power_combo, row3, rf1, rf2, misc, info):
+            w.grid_forget()
+        pr = self._rf_primary
+        pr.grid(row=1, column=0, columnspan=7, sticky="ew", padx=5, pady=(4, 2))
+        mineral_lbl.pack(in_=pr, side="left", padx=(0, 5))
+        self.specific_material_combo.pack(in_=pr, side="left", padx=(0, 14))
+        ring_lbl.pack(in_=pr, side="left", padx=(0, 5))
+        self.material_combo.pack(in_=pr, side="left", padx=(0, 14))
+        self._rf_dist.pack(in_=pr, side="left", padx=(0, 6))
+        self._rf_actions.pack(in_=pr, side="left", padx=(8, 0))
+        for b in self._rf_actions.winfo_children():
+            b.pack(side="left", padx=(0, 8))
+        self._more_btn = self._rf_button(pr, text="", command=self._toggle_more_filters)
+        self._more_btn.pack(side="left")
+
+        misc.grid(row=2, column=0, columnspan=7, sticky="ew", padx=5, pady=(2, 2))
+
+        more = self._rf_more
+        reserve_lbl.grid(in_=more, row=0, column=0, sticky="w", padx=(0, 5), pady=3)
+        self.reserve_combo.grid(in_=more, row=0, column=1, sticky="w", padx=(0, 18), pady=3)
+        power_lbl.grid(in_=more, row=0, column=2, sticky="w", padx=(0, 5), pady=3)
+        self.pp_power_combo.grid(in_=more, row=0, column=3, sticky="w", padx=(0, 18), pady=3)
+        row3.grid(in_=more, row=0, column=4, sticky="w", pady=3)
+        self._rf_flags.grid(in_=more, row=1, column=0, columnspan=2, sticky="w", pady=3)
+        rf1.grid(in_=more, row=1, column=2, columnspan=3, sticky="w", pady=3)
+        rf2.grid(in_=more, row=2, column=0, columnspan=5, sticky="w", pady=3)
+        info.grid(row=4, column=0, columnspan=7, sticky="w", padx=5, pady=(5, 5))
+
+        for var in (self.reserve_var, self.pp_power_var, self.pp_state_var, self.unvisited_only_var,
+                    self.favourites_only_var, self.overlaps_only_var, self.res_only_var,
+                    self.ring_type_only_var, self.max_results_var):
+            var.trace_add("write", self._refresh_more_btn)
+        self._refresh_more_btn()
+
+    def _active_filter_count(self):
+        """Number of secondary filters currently differing from their defaults."""
+        checks = (
+            self.reserve_var.get() != t('ring_finder.all_reserves'),
+            self.pp_power_var.get() != 'Any',
+            self.pp_state_var.get() != 'Any',
+            bool(self.unvisited_only_var.get()),
+            bool(self.favourites_only_var.get()),
+            bool(self.overlaps_only_var.get()),
+            bool(self.res_only_var.get()),
+            bool(self.ring_type_only_var.get()),
+            self.max_results_var.get() != "50",
+        )
+        return sum(checks)
+
+    def _refresh_more_btn(self, *_):
+        if not getattr(self, '_more_btn', None):
+            return
+        n = self._active_filter_count()
+        text = t('ring_finder.more_filters') + (f" ({n})" if n else "")
+        self._more_btn.configure(text=text + (" \u25b4" if self._more_open else " \u25be"))
+
+    def _toggle_more_filters(self):
+        self._more_open = not self._more_open
+        if self._more_open:
+            self._rf_more.grid(row=3, column=0, columnspan=7, sticky="w", padx=5, pady=(0, 2))
+        else:
+            self._rf_more.grid_remove()
+        self._refresh_more_btn()
+
+    def _show_columns_menu(self):
+        class _Pos:
+            pass
+        pos = _Pos()
+        pos.x_root = self._columns_btn.winfo_rootx()
+        pos.y_root = self._columns_btn.winfo_rooty() + self._columns_btn.winfo_height()
+        self._cv_show_menu(pos, 'ring_finder')
+
+    def _rf_button(self, parent, primary=False, **kw):
+        """tk.Button, or a rounded flat button when the Modern theme is active."""
+        from config import load_theme, scaled_font, scaled_px
+        if load_theme() == "modern":
+            from ui.modern_widgets import RoundedButton
+            return RoundedButton(parent, text=kw.get("text", ""), command=kw.get("command"), primary=primary,
+                                 font=scaled_font(9, "bold" if primary else "normal"),
+                                 padx=scaled_px(11), pady=scaled_px(3))
+        return tk.Button(parent, **kw)
 
     def _on_search_btn_clicked(self):
         """Search button click handler. Starts a search normally; while a search is already
@@ -7256,6 +7394,9 @@ class RingFinder(ColumnVisibilityMixin):
         if current_theme == "elite_orange":
             tree_bg, tree_fg, header_bg = "#1e1e1e", "#ff8c00", "#1a1a1a"
             selection_bg, selection_fg = "#ff6600", "#000000"
+        elif current_theme == "modern":
+            tree_bg, tree_fg, header_bg = "#1D2228", "#E6EAF0", "#14171B"
+            selection_bg, selection_fg = "#4A3520", "#FFFFFF"
         else:
             tree_bg, tree_fg, header_bg = "#1e1e1e", "#e6e6e6", "#2a2a2a"
             selection_bg, selection_fg = "#0078d7", "#ffffff"
@@ -7526,10 +7667,10 @@ class RingFinder(ColumnVisibilityMixin):
                 self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
                 threading.Thread(target=reload_worker, args=(new_scope, force, fetch_materials, new_extras, new_ring_types), daemon=True).start()
 
-            scope_btn = tk.Button(scope_row, text=switch_label(), **btn_style(),
+            scope_btn = self._rf_button(scope_row, text=switch_label(), **btn_style(),
                                   command=lambda: reload('system' if scope_state['scope'] == 'ring' else 'ring', False))
             scope_btn.pack(side="right")
-            refresh_btn = tk.Button(scope_row, text=t('ring_finder.rank_refresh'), **btn_style(),
+            refresh_btn = self._rf_button(scope_row, text=t('ring_finder.rank_refresh'), **btn_style(),
                                     command=lambda: reload(scope_state['scope'], True))
             refresh_btn.pack(side="right", padx=(0, 8))
             busy_label = tk.Label(scope_row, text="", bg=bg, fg=fg, font=scaled_font(9))
@@ -8327,6 +8468,9 @@ class RingFinder(ColumnVisibilityMixin):
         if current_theme == "elite_orange":
             bg, fg, tree_bg, tree_fg, header_bg = "#1e1e1e", "#ff8c00", "#1e1e1e", "#ff8c00", "#1a1a1a"
             selection_bg, selection_fg = "#ff6600", "#000000"
+        elif current_theme == "modern":
+            bg, fg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], MENU_COLORS["fg"], "#1D2228", "#E6EAF0", "#14171B"
+            selection_bg, selection_fg = "#4A3520", "#FFFFFF"
         else:
             bg, fg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], MENU_COLORS["fg"], "#1e1e1e", "#e6e6e6", "#2a2a2a"
             selection_bg, selection_fg = "#0078d7", "#ffffff"
@@ -8884,6 +9028,9 @@ class RingFinder(ColumnVisibilityMixin):
         if current_theme == "elite_orange":
             bg, tree_bg, tree_fg, header_bg = "#1e1e1e", "#1e1e1e", "#ff8c00", "#1a1a1a"
             selection_bg, selection_fg = "#ff6600", "#000000"
+        elif current_theme == "modern":
+            bg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], "#1D2228", "#E6EAF0", "#14171B"
+            selection_bg, selection_fg = "#4A3520", "#FFFFFF"
         else:
             bg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], "#1e1e1e", "#e6e6e6", "#2a2a2a"
             selection_bg, selection_fg = "#0078d7", "#ffffff"

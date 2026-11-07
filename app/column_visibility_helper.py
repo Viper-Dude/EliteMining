@@ -129,6 +129,12 @@ class ColumnVisibilityMixin:
             menu_active_bg = "#3a3a3a"
             menu_active_fg = "#ffffff"
             select_color = "#ff8c00"
+        elif current_theme == "modern":
+            menu_bg = "#1D2228"
+            menu_fg = "#E6EAF0"
+            menu_active_bg = "#4A3520"
+            menu_active_fg = "#FFFFFF"
+            select_color = "#FF9A32"
         else:
             menu_bg = "#1e1e1e"
             menu_fg = "#e0e0e0"

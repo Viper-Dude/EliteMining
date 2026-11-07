@@ -98,7 +98,7 @@ from journal_parser import JournalParser
 from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir, get_variables_dir, get_ship_presets_dir
 
 # Import UI components from ui module
-from ui.theme import THEME_ELITE_ORANGE, THEME_DARK_GRAY, get_theme_colors
+from ui.theme import THEME_ELITE_ORANGE, THEME_DARK_GRAY, get_theme_colors, next_theme
 from ui.tooltip import ToolTip
 from ui.dialogs import centered_yesno_dialog, center_window, centered_info_dialog, set_translate_func
 
@@ -5461,6 +5461,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                    background=[("active", "#333333"), ("pressed", dark_bg)],
                    foreground=[("active", dark_fg), ("pressed", dark_fg)])
 
+        if self.current_theme == "modern":
+            self._apply_modern_styles(style, theme, _scaled_font, _scaled_px)
+
         self.title(f"{APP_TITLE} — {APP_VERSION}")
         self.resizable(True, True)
         self.minsize(1050, 680)  # Minimum width to fit all status bar info
@@ -5968,11 +5971,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from config import load_theme
         _current_theme = load_theme()
         # Button shows what you'll switch TO (opposite of current)
-        _theme_btn_text = t('sidebar.dark_theme') if _current_theme == "elite_orange" else t('sidebar.orange_theme')
+        _theme_btn_text = t('sidebar.' + self._THEME_STR_KEYS[next_theme(_current_theme)])
         # Style button to match current theme
         if _current_theme == "elite_orange":
             _btn_bg, _btn_fg = "#1a1a1a", "#ff8c00"
             _btn_active_bg, _btn_active_fg = "#ff8c00", "#000000"
+        elif _current_theme == "modern":
+            _btn_bg, _btn_fg = "#262C34", "#E6EAF0"
+            _btn_active_bg, _btn_active_fg = "#FF9A32", "#14171B"
         else:
             _btn_bg, _btn_fg = "#2d2d2d", "#ffffff"
             _btn_active_bg, _btn_active_fg = "#3d3d3d", "#ffffff"
@@ -6087,7 +6093,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Use black background for orange theme
         from config import load_theme
         _info_theme = load_theme()
-        _info_bg = "#000000" if _info_theme == "elite_orange" else "#1e1e1e"
+        _info_bg = "#000000" if _info_theme == "elite_orange" else ("#14171B" if _info_theme == "modern" else "#1e1e1e")
+        _info_val = "#FF9A32" if _info_theme == "modern" else "#ffcc00"
 
         info_frame = tk.Frame(actions, bg=_info_bg)
         info_frame.grid(row=0, column=0, sticky="w")
@@ -6112,15 +6119,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Labels for mixed colors (white labels, yellow values)
         self.cmdr_label_prefix = tk.Label(info_frame, text=t('status_bar.cmdr'), fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
-        self.cmdr_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.cmdr_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
         self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
-        self.system_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.system_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
         self.visits_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
-        self.visits_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"), cursor="hand2")
+        self.visits_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"), cursor="hand2")
         self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
-        self.route_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.route_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
         self.total_systems_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=self._scaled_font(9, "bold"))
-        self.total_systems_label_value = tk.Label(info_frame, text="", fg="#ffcc00", bg=_info_bg, font=self._scaled_font(9, "bold"))
+        self.total_systems_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
         
         # Make visits clickable to edit
         self.visits_label_value.bind("<Button-1>", lambda e: self._show_edit_visits_dialog_for_current_system())
@@ -6145,6 +6152,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.total_systems_help = tk.Label(info_frame, text="(?)", fg="gray", bg=_info_bg, font=self._scaled_font(9))
         self.total_systems_help.grid(row=0, column=11, sticky="w")
         ToolTip(self.total_systems_help, t('status_bar.total_systems_tooltip'))
+
+        # Modern theme: live EDDN/Spansh indicators live here once (tab headers hide theirs)
+        if _info_theme == "modern":
+            _ind_frame = tk.Frame(actions, bg=_info_bg)
+            _ind_frame.grid(row=0, column=1, sticky="e", padx=(0, 12))
+            self._footer_eddn_label = tk.Label(_ind_frame, text="\u26ab EDDN: checking...", fg="#888888",
+                                               bg=_info_bg, font=self._scaled_font(9))
+            self._footer_eddn_label.pack(side="left", padx=(0, 14))
+            self._footer_spansh_label = tk.Label(_ind_frame, text="\u26ab Spansh: checking...", fg="#888888",
+                                                 bg=_info_bg, font=self._scaled_font(9))
+            self._footer_spansh_label.pack(side="left")
         
         # Load CMDR name in background
         self.after(500, self._update_cmdr_system_display)
@@ -6155,6 +6173,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         sb.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 6))
 
         self._sidebar_visible = True
+
+        if self.current_theme == "modern":
+            self.after(600, self._modern_recolor_all)
+            self.bind_all("<<NotebookTabChanged>>", lambda e: self.after(50, self._modern_recolor_all), add="+")
 
         # Import existing values from VoiceAttack profile
         self.after(100, self._import_all_from_txt)
@@ -6229,6 +6251,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.integrated_cargo_summary = ttk.Label(header_frame, text="0/200t (0%) - Empty",
                                                  font=self._scaled_font(9))
         self.integrated_cargo_summary.grid(row=0, column=1, sticky="w", padx=(6, 0))
+
+        if self.current_theme == "modern":
+            # The refinery/limpet notes live in this icon's tooltip instead of the cargo list
+            _info_icon = ttk.Label(header_frame, text="\u24d8", foreground="#8A94A3", cursor="hand2",
+                                   font=self._scaled_font(10))
+            _info_icon.grid(row=0, column=2, sticky="e", padx=(6, 2))
+            self._cargo_info_tip = ToolTip(_info_icon, "")
+            from ui.modern_widgets import RoundedProgressBar
+            self._cargo_bar = RoundedProgressBar(header_frame, height=self._scaled_px(10))
+            self._cargo_bar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
         
         # Content area - expandable
         content_frame = ttk.Frame(cargo_frame)
@@ -6299,6 +6331,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
         summary_text = f"{cargo.current_cargo}/{cargo.max_cargo}t ({percentage:.0f}%){status_color}"
         self.integrated_cargo_summary.configure(text=summary_text)
+        if hasattr(self, '_cargo_bar'):
+            self._cargo_bar['value'] = min(percentage, 100)
         
         # Build the new content first, then skip the update if nothing changed
         # This prevents scrollbar jitter from delete+reinsert on every tick
@@ -6343,12 +6377,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if i < len(sorted_materials) - 1:
                     new_content_parts.append("\n")
         
-        sep_chars = 28
-        new_content_parts.append("\n" + "─" * sep_chars)
-        new_content_parts.append("\n" + t('sidebar.refinery_note'))
         has_limpets = any("limpet" in name.lower() for name in cargo.cargo_items.keys())
-        if has_limpets:
-            new_content_parts.append("\n" + t('sidebar.limpet_click_help'))
+        if hasattr(self, '_cargo_info_tip'):
+            self._cargo_info_tip.text = t('sidebar.refinery_note').strip() + (
+                "\n" + t('sidebar.limpet_click_help').strip() if has_limpets else "")
+        else:
+            sep_chars = 28
+            new_content_parts.append("\n" + "─" * sep_chars)
+            new_content_parts.append("\n" + t('sidebar.refinery_note'))
+            if has_limpets:
+                new_content_parts.append("\n" + t('sidebar.limpet_click_help'))
         
         new_content_str = "".join(new_content_parts)
         
@@ -6460,32 +6498,33 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if i < len(sorted_materials) - 1:
                     self.integrated_cargo_text.insert(tk.END, "\n")
         
-        # Add refinery note at the very bottom with proper spacing
-        # Separator width to match full cargo line including quantity
-        sep_chars = 28
-        self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
+        if not hasattr(self, '_cargo_info_tip'):
+            # Add refinery note at the very bottom with proper spacing
+            # Separator width to match full cargo line including quantity
+            sep_chars = 28
+            self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
         
-        # Configure tag for small italic text - left aligned
-        self.integrated_cargo_text.tag_configure("small_italic", font=self._scaled_font(8, "italic"), foreground="#888888", justify="left")
+            # Configure tag for small italic text - left aligned
+            self.integrated_cargo_text.tag_configure("small_italic", font=self._scaled_font(8, "italic"), foreground="#888888", justify="left")
         
-        # Insert refinery note with formatting - get position before inserting
-        note_start_index = self.integrated_cargo_text.index(tk.INSERT)
-        self.integrated_cargo_text.insert(tk.END, "\n" + t('sidebar.refinery_note'))
+            # Insert refinery note with formatting - get position before inserting
+            note_start_index = self.integrated_cargo_text.index(tk.INSERT)
+            self.integrated_cargo_text.insert(tk.END, "\n" + t('sidebar.refinery_note'))
         
-        # Add limpet help text if limpets are present
-        has_limpets = any("limpet" in name.lower() for name in cargo.cargo_items.keys())
-        if has_limpets:
-            self.integrated_cargo_text.insert(tk.END, "\n" + t('sidebar.limpet_click_help'))
+            # Add limpet help text if limpets are present
+            has_limpets = any("limpet" in name.lower() for name in cargo.cargo_items.keys())
+            if has_limpets:
+                self.integrated_cargo_text.insert(tk.END, "\n" + t('sidebar.limpet_click_help'))
         
-        note_end_index = self.integrated_cargo_text.index(tk.INSERT)
+            note_end_index = self.integrated_cargo_text.index(tk.INSERT)
         
-        # Apply formatting to the note text only
-        try:
-            self.integrated_cargo_text.tag_add("small_italic", note_start_index, note_end_index)
-        except tk.TclError:
-            # If tagging fails, just continue without formatting
-            pass
-        
+            # Apply formatting to the note text only
+            try:
+                self.integrated_cargo_text.tag_add("small_italic", note_start_index, note_end_index)
+            except tk.TclError:
+                # If tagging fails, just continue without formatting
+                pass
+
         self.integrated_cargo_text.configure(state="disabled")
         
         # Restore scroll position to prevent jumping
@@ -8765,16 +8804,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         tk.Label(theme_frame, text=t('settings.theme') + ":", bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left", padx=(4, 10))
         
-        current_theme_text = "Elite Orange" if self.current_theme == "elite_orange" else "Dark Gray"
+        current_theme_text = {"elite_orange": "Elite Orange", "modern": "Modern"}.get(self.current_theme, "Dark Gray")
         self.theme_label = tk.Label(theme_frame, text=current_theme_text, bg=_gs_bg, fg="#ffcc00", font=self._scaled_font(9, "bold"))
         self.theme_label.pack(side="left", padx=(0, 15))
         
         # Button shows what you'll switch TO (opposite of current)
-        _settings_theme_btn_text = t('settings.dark_theme') if _gs_theme == "elite_orange" else t('settings.orange_theme')
+        _settings_theme_btn_text = t('settings.' + self._THEME_STR_KEYS[next_theme(_gs_theme)])
         # Style to match current theme
         if _gs_theme == "elite_orange":
             _sbtn_bg, _sbtn_fg = "#1a1a1a", "#ff8c00"
             _sbtn_active_bg, _sbtn_active_fg = "#ff8c00", "#000000"
+        elif _gs_theme == "modern":
+            _sbtn_bg, _sbtn_fg = "#262C34", "#E6EAF0"
+            _sbtn_active_bg, _sbtn_active_fg = "#FF9A32", "#14171B"
         else:
             _sbtn_bg, _sbtn_fg = "#333333", "#ffffff"
             _sbtn_active_bg, _sbtn_active_fg = "#444444", "#ffffff"
@@ -8796,7 +8838,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         theme_toggle_settings.pack(side="left")
         r += 1
         
-        tk.Label(scrollable_frame, text="Switch between Elite Orange and Dark Gray themes (requires restart)", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
+        tk.Label(scrollable_frame, text="Switch between Elite Orange, Dark Gray and Modern themes (requires restart)", wraplength=760, justify="left", fg="gray", bg=_gs_bg,
                  font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
@@ -9609,6 +9651,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     else:
                         return
                 
+                if self.current_theme == "modern":
+                    if self._apply_modern_sidebar_sash():
+                        self._sidebar_sash_initialized = True
+                        self.after(200, lambda: setattr(self, '_startup_resize_settled', True))
+                    return
+
                 # Minimum heights for each pane
                 min_presets_height = 150
                 min_cargo_height = 120
@@ -9751,6 +9799,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
             style.map("ShipPresets.Treeview",
                      background=[("selected", "#ff8c00")],
                      foreground=[("selected", "#000000")])
+        elif self.current_theme == "modern":
+            style.configure("ShipPresets.Treeview",
+                           font=self._scaled_font(10),
+                           background="#1D2228",
+                           foreground="#E6EAF0",
+                           fieldbackground="#1D2228",
+                           borderwidth=0, bordercolor="#1D2228", lightcolor="#1D2228", darkcolor="#1D2228",
+                           rowheight=self._scaled_px(24))
+            style.map("ShipPresets.Treeview",
+                     background=[("selected", "#4A3520")],
+                     foreground=[("selected", "#FFFFFF")])
         else:
             style.configure("ShipPresets.Treeview",
                            font=self._scaled_font(10),
@@ -9763,10 +9822,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
                      foreground=[("selected", "#ffffff")])
 
         # Scrollable preset list - hierarchical treeview with ship groups
-        self.preset_list = ttk.Treeview(presets_pane, columns=("name",), show="tree", selectmode="browse", style="ShipPresets.Treeview")
+        # Modern theme: list sits inside an untitled (rounded) LabelFrame
+        _pl_parent, _pl_row = presets_pane, 2
+        if self.current_theme == "modern":
+            _pl_parent = ttk.LabelFrame(presets_pane, padding=2)
+            _pl_parent.grid(row=2, column=0, columnspan=2, sticky="nsew")
+            _pl_parent.columnconfigure(0, weight=1)
+            _pl_parent.rowconfigure(0, weight=1)
+            _pl_row = 0
+        self.preset_list = ttk.Treeview(_pl_parent, columns=("name",), show="tree", selectmode="browse", style="ShipPresets.Treeview")
         self.preset_list.column("#0", anchor="w", stretch=True, width=280, minwidth=220)
         self.preset_list.column("name", width=0, stretch=False)  # Hidden column to store full preset name
-        self.preset_list.grid(row=2, column=0, sticky="nsew")
+        self.preset_list.grid(row=_pl_row, column=0, sticky="nsew")
         self.preset_list.bind("<Double-1>", self._on_preset_double_click)
         self.preset_list.bind("<Return>", lambda e: self._load_selected_preset())
         # Save expand/collapse state when user clicks arrow icons (delay to ensure state is updated)
@@ -9776,8 +9843,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.preset_list.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.preset_list))
 
         # Add scrollbar to preset list
-        preset_scrollbar = ttk.Scrollbar(presets_pane, orient="vertical", command=self.preset_list.yview)
-        preset_scrollbar.grid(row=2, column=1, sticky="ns")
+        preset_scrollbar = ttk.Scrollbar(_pl_parent, orient="vertical", command=self.preset_list.yview)
+        preset_scrollbar.grid(row=_pl_row, column=1, sticky="ns")
         self.preset_list.configure(yscrollcommand=preset_scrollbar.set)
         presets_pane.columnconfigure(1, weight=0)
         
@@ -9833,7 +9900,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Bottom pane - Cargo Monitor
         cargo_pane = ttk.Frame(paned_window)
-        paned_window.add(cargo_pane, weight=1)  # weight=1 - allow expansion when sash moved
+        self._cargo_pane = cargo_pane
+        if self.current_theme == "modern":
+            # Cargo Monitor sits above Ship Presets; its sash position is fixed to the cargo's natural height
+            paned_window.insert(0, cargo_pane, weight=0)
+        else:
+            paned_window.add(cargo_pane, weight=1)  # weight=1 - allow expansion when sash moved
         
         # Configure cargo pane - allow vertical expansion
         cargo_pane.columnconfigure(0, weight=1)
@@ -9914,6 +9986,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         def _on_sidebar_sash_moved(event):
             if not getattr(self, '_sidebar_sash_initialized', False):
                 return  # Don't save during initial layout
+            if self.current_theme == "modern":
+                self._save_modern_sidebar_sash()  # Cargo is the top pane here; separate saved value
+                return
             try:
                 from config import save_sidebar_sash_position
                 pos = paned_window.sashpos(0)
@@ -9923,6 +9998,45 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception:
                 log.exception("Failed to save sidebar sash position")
         paned_window.bind("<ButtonRelease-1>", _on_sidebar_sash_moved)
+
+    def _apply_modern_sidebar_sash(self) -> bool:
+        """Modern theme: Cargo is the top pane. Restore its saved height (own config key, rescaled like the
+        classic one after a UI Scale change), else use its natural height; the rest goes to Ship Presets.
+        Returns False if the sidebar isn't laid out yet."""
+        paned = self.sidebar_paned
+        paned.update_idletasks()
+        total_height = paned.winfo_height()
+        if total_height < 100:
+            return False
+        min_cargo = self._scaled_px(80)
+        max_cargo = total_height - self._scaled_px(150)
+        from config import load_modern_sidebar_sash_position
+        saved_pos = load_modern_sidebar_sash_position()
+        if saved_pos is not None and self._ui_scale_resize_ratio != 1.0:
+            saved_pos = round(saved_pos * self._ui_scale_resize_ratio)
+        if saved_pos is not None and min_cargo <= saved_pos <= max_cargo:
+            pos = saved_pos
+            log.info(f"Modern sidebar sash restored: {pos}")
+        else:
+            pos = min(max(self._cargo_pane.winfo_reqheight(), self._scaled_px(120)), max_cargo)
+            log.info(f"Modern sidebar sash using natural height: {pos} (saved_pos={saved_pos})")
+        paned.sashpos(0, pos)
+        return True
+
+    def _save_modern_sidebar_sash(self) -> None:
+        """Persist the Modern sidebar's Cargo pane height (only sane values, only after initial layout)."""
+        try:
+            if not getattr(self, '_sidebar_sash_initialized', False) or not hasattr(self, 'sidebar_paned'):
+                return
+            paned = self.sidebar_paned
+            total_height = paned.winfo_height()
+            pos = paned.sashpos(0)
+            if total_height >= 100 and self._scaled_px(80) <= pos <= total_height - self._scaled_px(100):
+                from config import save_modern_sidebar_sash_position
+                save_modern_sidebar_sash_position(pos)
+                log.debug(f"Modern sidebar sash position saved: {pos}")
+        except Exception:
+            log.exception("Failed to save Modern sidebar sash position")
 
     def _save_sash_positions_now(self) -> None:
         """Force-save current sash positions, bypassing the ButtonRelease-1 trigger.
@@ -9938,7 +10052,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             log.exception("Failed to save main sash position on close")
 
         try:
-            if getattr(self, '_sidebar_sash_initialized', False) and hasattr(self, 'sidebar_paned'):
+            if self.current_theme == "modern":
+                self._save_modern_sidebar_sash()
+            elif getattr(self, '_sidebar_sash_initialized', False) and hasattr(self, 'sidebar_paned'):
                 from config import save_sidebar_sash_position
                 pos = self.sidebar_paned.sashpos(0)
                 if pos > 100:
@@ -9973,7 +10089,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._sash_initialized = True
 
             # --- Sidebar vertical sash (presets | cargo) ---
-            if hasattr(self, 'sidebar_paned'):
+            if hasattr(self, 'sidebar_paned') and self.current_theme == "modern":
+                if self._apply_modern_sidebar_sash():
+                    self._sidebar_sash_initialized = True
+            elif hasattr(self, 'sidebar_paned'):
                 paned = self.sidebar_paned
                 total_height = paned.winfo_height()
                 if total_height > 100:
@@ -12263,6 +12382,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.preset_list.tag_configure('evenrow', background='#252525', foreground='#ff8c00', font=self._scaled_font(9))
             self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#ffcc00', font=self._scaled_font(9, "bold"))
             self.preset_list.tag_configure('active_preset', background='#5a3a0a', foreground='#ffcc00', font=self._scaled_font(9, "bold"))
+        elif self.current_theme == "modern":
+            self.preset_list.tag_configure('oddrow', background='#1D2228', foreground='#E6EAF0', font=self._scaled_font(9))
+            self.preset_list.tag_configure('evenrow', background='#232A31', foreground='#E6EAF0', font=self._scaled_font(9))
+            self.preset_list.tag_configure('group', background='#1D2228', foreground='#FFB347', font=self._scaled_font(9, "bold"))
+            self.preset_list.tag_configure('active_preset', background='#4A3520', foreground='#FFFFFF', font=self._scaled_font(9, "bold"))
         else:
             self.preset_list.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6', font=self._scaled_font(9))
             self.preset_list.tag_configure('evenrow', background='#282828', foreground='#e6e6e6', font=self._scaled_font(9))
@@ -16189,16 +16313,146 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.after(50, _restore_sash)
             self._sidebar_visible = True
 
+    _MODERN_REMAP = {"#1e1e1e": "#14171B", "#1a1a1a": "#14171B", "#2d2d2d": "#1D2228", "#2b2b2b": "#1D2228",
+                     "#252525": "#1D2228", "#282828": "#1D2228", "#2a2a2a": "#1D2228"}
+    _MODERN_CONTENT_CLASSES = ("Text", "Listbox", "Entry", "Spinbox")
+    _MODERN_RECOLOR_CLASSES = ("Frame", "Label", "Labelframe", "Checkbutton", "Radiobutton", "Canvas",
+                               "Text", "Listbox", "Entry", "Spinbox", "Toplevel", "Scale", "Message")
+    _MODERN_COLOR_OPTIONS = ("bg", "activebackground", "selectcolor", "troughcolor", "highlightbackground",
+                             "buttonbackground", "disabledbackground", "readonlybackground")
+
+    def _modern_recolor_all(self) -> None:
+        """Modern theme: remap leftover hardcoded dark-gray backgrounds on classic tk widgets
+        (tabs/dialogs that still use inline colors) to the Modern palette. Exact-match only."""
+        def walk(widget):
+            for child in widget.winfo_children():
+                try:
+                    cls = child.winfo_class()
+                    if cls in self._MODERN_RECOLOR_CLASSES:
+                        content = cls in self._MODERN_CONTENT_CLASSES
+                        for opt in self._MODERN_COLOR_OPTIONS:
+                            try:
+                                cur = str(child.cget(opt)).lower()
+                            except tk.TclError:
+                                continue
+                            new = self._MODERN_REMAP.get(cur)
+                            if new:
+                                if content and cur == "#1e1e1e":
+                                    new = "#1D2228"
+                                child.configure(**{opt: new})
+                    walk(child)
+                except tk.TclError:
+                    continue
+        try:
+            walk(self)
+        except Exception:
+            log.exception("Modern recolor failed")
+
+    def _update_footer_indicator(self, kind: str, text: str, color: str) -> None:
+        """Mirror a connection status into the Modern footer (no-op in other themes)."""
+        label = getattr(self, '_footer_' + kind + '_label', None)
+        if label is not None:
+            label.config(text=text, fg=color)
+
+    _THEME_STR_KEYS = {"elite_orange": "orange_theme", "dark_gray": "dark_theme", "modern": "modern_theme"}
+
+    def _apply_modern_styles(self, style, theme, _scaled_font, _scaled_px) -> None:
+        """Extra ttk styling for the Modern theme only (flat tabs with orange underline, flat tables)."""
+        bg, panel, border = theme["bg"], theme["panel"], theme["border"]
+        fg, accent = theme["fg"], theme["accent"]
+
+        def _tab_img(underline):
+            img = tk.PhotoImage(width=8, height=8)
+            img.put(panel if underline else bg, to=(0, 0, 8, 8))
+            if underline:
+                img.put(accent, to=(0, 5, 8, 8))
+            return img
+        self._modern_tab_imgs = (_tab_img(False), _tab_img(True))
+        try:
+            style.element_create("Modern.Tab.bg", "image", self._modern_tab_imgs[0],
+                                 ("selected", self._modern_tab_imgs[1]), border=(0, 0, 0, 3), sticky="nswe")
+            style.layout("TNotebook.Tab", [("Modern.Tab.bg", {"sticky": "nswe", "children": [
+                ("Notebook.padding", {"side": "top", "sticky": "nswe", "children": [
+                    ("Notebook.label", {"side": "top", "sticky": ""})]})]})])
+        except tk.TclError as e:
+            log.warning(f"Modern tab layout failed: {e}")
+
+        style.configure("TNotebook", background=bg, borderwidth=0, tabmargins=[0, 0, 0, 0])
+        style.configure("TNotebook.Tab", background=bg, foreground=theme["fg_dim"], borderwidth=0,
+                        padding=[_scaled_px(8), _scaled_px(6)], font=_scaled_font(9))
+        style.map("TNotebook.Tab",
+                  foreground=[("selected", "#FFFFFF"), ("active", fg)],
+                  background=[("selected", panel), ("active", panel)],
+                  expand=[("selected", [0, 0, 0, 0])])
+
+        style.configure("Treeview", background=theme["tree_bg"], fieldbackground=theme["tree_bg"],
+                        foreground=fg, borderwidth=0, rowheight=_scaled_px(26))
+        style.configure("Treeview.Heading", background=bg, foreground=fg, relief="flat",
+                        borderwidth=0, padding=(_scaled_px(6), _scaled_px(5)), font=_scaled_font(9, "bold"))
+        style.map("Treeview.Heading", background=[("active", theme["btn_bg_hover"])])
+        style.configure("TCombobox", fieldbackground=panel, background=theme["btn_bg"], foreground=fg,
+                        bordercolor=border, lightcolor=border, darkcolor=border, arrowcolor=fg)
+        style.map("TCombobox", fieldbackground=[("readonly", panel), ("disabled", bg)])
+        style.configure("TEntry", fieldbackground=panel, foreground=fg, bordercolor=border,
+                        lightcolor=border, darkcolor=border, insertcolor=fg)
+        style.configure("TButton", background=theme["btn_bg"], foreground=fg, bordercolor=border,
+                        lightcolor=theme["btn_bg"], darkcolor=theme["btn_bg"], focuscolor=theme["btn_bg"],
+                        relief="flat", padding=(_scaled_px(10), _scaled_px(4)))
+        style.map("TButton", background=[("active", theme["btn_bg_hover"]), ("disabled", panel)],
+                  foreground=[("disabled", theme["btn_fg_disabled"])])
+        style.configure("Accent.TButton", background=accent, foreground=theme["accent_fg"], bordercolor=accent,
+                        lightcolor=accent, darkcolor=accent, relief="flat", font=_scaled_font(10, "bold"),
+                        padding=(_scaled_px(16), _scaled_px(5)))
+        style.map("Accent.TButton", background=[("active", "#FFB05A"), ("pressed", "#E88A28")],
+                  foreground=[("active", theme["accent_fg"]), ("pressed", theme["accent_fg"])])
+        style.configure("TCheckbutton", background=bg, foreground=fg)
+        style.map("TCheckbutton", background=[("active", bg)])
+        style.configure("Modern.Cargo.Horizontal.TProgressbar", troughcolor="#2A3038", background=accent,
+                        bordercolor=bg, lightcolor=accent, darkcolor=accent, thickness=_scaled_px(8))
+        for _orient in ("Vertical", "Horizontal"):
+            style.configure(_orient + ".TScrollbar", background=bg, troughcolor=bg, bordercolor=bg,
+                            lightcolor=bg, darkcolor=bg, arrowcolor=fg)
+            style.configure(_orient + ".Scrollbar.thumb", background="#3A424C")
+            style.map(_orient + ".TScrollbar", background=[("active", bg)])
+            style.map(_orient + ".Scrollbar.thumb", background=[("active", accent)])
+
+        # Subtle borders instead of clam's bright light/dark edges
+        for _name in ("TFrame", "TNotebook", "Treeview", "Treeview.Heading", "TEntry", "TCombobox"):
+            style.configure(_name, bordercolor=border, lightcolor=border, darkcolor=border)
+        style.configure("TLabelframe", background=bg, bordercolor=border, lightcolor=border, darkcolor=border)
+        style.configure("TLabelframe.Label", background=bg, foreground=fg)
+
+        # Rounded LabelFrame border (9-slice image, transparent outside the corners)
+        try:
+            from PIL import Image, ImageDraw, ImageTk
+
+            def _rgb(hex_color):
+                h = hex_color.lstrip("#")
+                return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+            size, radius, scale = 24, 6, 4
+            big = size * scale
+            mask = Image.new("L", (big, big), 0)
+            ImageDraw.Draw(mask).rounded_rectangle((0, 0, big - 1, big - 1), radius=radius * scale, fill=255)
+            inner = Image.new("L", (big, big), 0)
+            ImageDraw.Draw(inner).rounded_rectangle((scale, scale, big - 1 - scale, big - 1 - scale),
+                                                    radius=radius * scale - scale, fill=255)
+            img = Image.new("RGBA", (big, big), _rgb(border) + (255,))
+            img.paste(_rgb(bg) + (255,), mask=inner)
+            img.putalpha(mask)
+            img = img.resize((size, size), Image.LANCZOS)
+            self._modern_frame_img = ImageTk.PhotoImage(img)
+            style.element_create("Modern.Labelframe.border", "image", self._modern_frame_img,
+                                 border=(radius, radius, radius, radius), padding=(3, 3, 3, 3), sticky="nswe")
+            style.layout("TLabelframe", [("Modern.Labelframe.border", {"sticky": "nswe"})])
+        except Exception as e:
+            log.warning(f"Modern rounded frame failed: {e}")
+
     def _toggle_theme(self) -> None:
-        """Toggle between Elite Orange and Dark Gray themes"""
+        """Cycle between Elite Orange, Dark Gray and Modern themes"""
         from config import save_theme
         from app_utils import centered_askyesno
 
-        # Toggle theme
-        if self.current_theme == "elite_orange":
-            new_theme = "dark_gray"
-        else:
-            new_theme = "elite_orange"
+        new_theme = next_theme(self.current_theme)
 
         save_theme(new_theme)
 
@@ -18796,7 +19050,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             font=self._scaled_font(8), fg="#888888",
             bg=ttk.Style().lookup('TFrame', 'background')
         )
-        self.sysfinder_spansh_status_label.pack(side="right", padx=(0, 8))
+        if self.current_theme != "modern":
+            self.sysfinder_spansh_status_label.pack(side="right", padx=(0, 8))
         ToolTip(self.sysfinder_spansh_status_label, t('system_finder.spansh_status_tooltip'))
 
         # EDDN status indicator - to the left of Spansh
@@ -18805,7 +19060,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             font=self._scaled_font(8), fg="#888888",
             bg=ttk.Style().lookup('TFrame', 'background')
         )
-        self.sysfinder_eddn_status_label.pack(side="right", padx=(0, 4))
+        if self.current_theme != "modern":
+            self.sysfinder_eddn_status_label.pack(side="right", padx=(0, 4))
         ToolTip(self.sysfinder_eddn_status_label, t('system_finder.eddn_status_tooltip'))
         
         # Row 1: Allegiance and Population
@@ -19651,6 +19907,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         if hasattr(self, 'sysfinder_spansh_status_label'):
             self.sysfinder_spansh_status_label.config(text=status_text, fg=status_color)
+        self._update_footer_indicator('spansh', status_text, status_color)
 
     def _check_sysfinder_eddn_status(self):
         """Check EDDN gateway status in background and update indicator"""
@@ -19689,6 +19946,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         if hasattr(self, 'sysfinder_eddn_status_label'):
             self.sysfinder_eddn_status_label.config(text=status_text, fg=status_color)
+        self._update_footer_indicator('eddn', status_text, status_color)
 
     def _search_systems(self):
         """Search for systems matching criteria"""
