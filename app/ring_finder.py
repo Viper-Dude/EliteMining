@@ -456,26 +456,29 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Search section with database status
         search_header = ttk.Frame(self.scrollable_frame)
-        search_header.pack(fill="x", padx=10, pady=5)
-
         from config import load_theme as _load_theme_for_header
         _sh_theme = _load_theme_for_header()
+        if _sh_theme != "modern":  # Modern drops this row; the help link moves to the Distances row
+            search_header.pack(fill="x", padx=10, pady=5)
         _sh_bg = "#0a0a0a" if _sh_theme == "elite_orange" else ("#14171B" if _sh_theme == "modern" else "#1e1e1e")
         
         # Search frame title and help text
         search_title = ttk.Label(search_header, text=t('ring_finder.title'), font=scaled_font(9, "bold"))
-        search_title.pack(side="left")
+        if _sh_theme != "modern":
+            search_title.pack(side="left")
 
         # Help link - opens Hotspot Finder section of README on GitHub
         from ui.help_link import create_help_link
-        help_link = create_help_link(search_header, "hotspot-finder", t('ring_finder.help_tooltip'), ToolTip)
-        help_link.pack(side="left", padx=(6, 0))
+        if _sh_theme != "modern":
+            help_link = create_help_link(search_header, "hotspot-finder", t('ring_finder.help_tooltip'), ToolTip)
+            help_link.pack(side="left", padx=(6, 0))
 
         # Database status on the right
         self.status_var = tk.StringVar(value="Loading...")
         status_label = ttk.Label(search_header, textvariable=self.status_var,
                                 font=scaled_font(8), foreground="#888888")
-        status_label.pack(side="right")
+        if _sh_theme != "modern":  # Modern shows this text above the results table instead
+            status_label.pack(side="right")
 
         # EDDN/Spansh connectivity status, right-aligned just left of the status label
         self.spansh_status_label = tk.Label(search_header, text="⚫ Spansh: checking...",
@@ -511,6 +514,9 @@ class RingFinder(ColumnVisibilityMixin):
         self.db_info_var = tk.StringVar(value=t('ring_finder.total_hotspots_in_systems').format(hotspots="...", systems="..."))
         db_info_label = tk.Label(distance_header, textvariable=self.db_info_var,
                                 font=scaled_font(8, "italic"), foreground="#888888", bg=rf_bg)
+        if _sh_theme == "modern":
+            create_help_link(distance_header, "hotspot-finder", t('ring_finder.help_tooltip'), ToolTip).pack(
+                side="right", padx=(8, 0))
         db_info_label.pack(side="right")
 
         search_frame = ttk.Frame(self.scrollable_frame)
@@ -1065,6 +1071,8 @@ class RingFinder(ColumnVisibilityMixin):
             self._columns_btn = self._rf_button(results_header, text=t('ring_finder.columns_button') + " \u25be",
                                                 command=self._show_columns_menu)
             self._columns_btn.pack(side="right", padx=(8, 0))
+            ttk.Label(results_header, textvariable=self.status_var, font=scaled_font(9, "bold"),
+                      foreground="#E6EAF0").pack(side="right", padx=(0, 12))
 
         from config import load_theme as _load_theme_for_new_entries
         _new_entries_fg = "#ff8c00" if _load_theme_for_new_entries() == "elite_orange" else "#e8b84b"

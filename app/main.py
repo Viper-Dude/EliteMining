@@ -5963,7 +5963,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Left pane: tabs container
         # Bottom padding reduced to 0 to align with sidebar/status bar
-        content_frame = ttk.Frame(self.main_paned, padding=(10, 6, 6, 0))
+        # Modern: matching bottom gap on both columns so they end level, clear of the footer
+        content_frame = ttk.Frame(self.main_paned, padding=(10, 6, 6, 8 if self.current_theme == "modern" else 0))
         self.main_paned.add(content_frame, weight=3)  # Add to paned window with higher weight
         content_frame.columnconfigure(0, weight=1)
         content_frame.rowconfigure(0, weight=1)
@@ -9579,7 +9580,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Create the main Ship Presets and Cargo Monitor sidebar"""
         # Create the sidebar frame - add to main paned window
         # Reduced bottom padding (6,6,10,0) so cargo monitor aligns with app bottom
-        sidebar = ttk.Frame(self.main_paned, padding=(6, 6, 10, 0))
+        sidebar = ttk.Frame(self.main_paned, padding=(6, 6, 10, 8 if self.current_theme == "modern" else 0))
         sidebar.columnconfigure(0, weight=1)
         sidebar.rowconfigure(0, weight=1)  # Paned window expands
         sidebar.rowconfigure(1, weight=0)  # Theme button row fixed
