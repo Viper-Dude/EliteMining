@@ -873,7 +873,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.5.5"
+APP_VERSION = "v5.5.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -18109,6 +18109,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         mining_tab = ttk.Frame(sub_notebook, padding=8)
         self._build_mining_commodities_tab(mining_tab)
         sub_notebook.add(mining_tab, text=t('tabs.mining_commodities'))
+        
+        # Multiple Prices sub-tab
+        from multi_mineral_tab import MultiMineralTab
+        multi_tab = ttk.Frame(sub_notebook, padding=8)
+        self.multi_mineral_tab = MultiMineralTab(multi_tab, self)
+        self.market_sub_notebook = sub_notebook
+        self.market_multi_tab_frame = multi_tab
+        sub_notebook.add(multi_tab, text=t('tabs.multi_mineral'))
         
         # Trade Commodities sub-tab
         trade_tab = ttk.Frame(sub_notebook, padding=8)

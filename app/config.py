@@ -378,6 +378,17 @@ def save_commodity_market_column_widths(widths: Dict[str, int]) -> None:
     cfg["commodity_market_column_widths"] = widths
     _save_cfg(cfg)
 
+def load_multiple_prices_column_widths() -> Dict[str, int]:
+    """Load Multiple Prices table column widths from config"""
+    cfg = _load_cfg()
+    return cfg.get("multiple_prices_column_widths", {})
+
+def save_multiple_prices_column_widths(widths: Dict[str, int]) -> None:
+    """Save Multiple Prices table column widths to config"""
+    cfg = _load_cfg()
+    cfg["multiple_prices_column_widths"] = widths
+    _save_cfg(cfg)
+
 def load_trade_commodities_column_widths() -> Dict[str, int]:
     """Load Trade Commodities table column widths from config"""
     cfg = _load_cfg()

@@ -6080,10 +6080,7 @@ class RingFinder(ColumnVisibilityMixin):
         ])
         # Market
         add('find_sell_station', 'context_menu.find_sell_station', self._find_sell_station)
-        add_submenu('context_menu.submenu_rank_minerals', [
-            ('context_menu.rank_minerals', self._rank_minerals_for_system),
-            ('context_menu.rank_minerals_system', self._rank_all_minerals_for_system),
-        ])
+        add('rank_minerals', 'context_menu.best_minerals_to_mine', self._rank_minerals_for_system)
         self.context_menu.add_separator()
         # Database
         add('save', 'context_menu.save_to_local_database', self._save_to_database)
@@ -6250,8 +6247,11 @@ class RingFinder(ColumnVisibilityMixin):
                     mineral_display = self.specific_material_var.get()
                     mineral = self._to_english(mineral_display)
                     is_specific_mineral = not self._is_all_minerals(mineral)
+                    sel = self.results_tree.selection()
+                    sel_vals = self.results_tree.item(sel[0], 'values') if sel else ()
+                    has_row_minerals = len(sel_vals) > 8 and bool(self._parse_materials_from_hotspots(sel_vals[8]))
                     
-                    if is_specific_mineral:
+                    if is_specific_mineral or has_row_minerals:
                         self.context_menu.entryconfig(self._ctx_idx['find_sell_station'], state="normal")
                     else:
                         self.context_menu.entryconfig(self._ctx_idx['find_sell_station'], state="disabled")
@@ -6656,8 +6656,102 @@ class RingFinder(ColumnVisibilityMixin):
         if not values or len(values) < 3:
             return
         
+        if self._is_all_minerals(self._to_english(self.specific_material_var.get())):
+            self._find_sell_station_all_minerals(values)
+            return
+
         # Call the implementation
         self._find_sell_station_impl()
+
+    def _find_sell_station_all_minerals(self, values):
+        """All-minerals filter: pick from the row's hotspot minerals, then search them in Multi-Mineral."""
+        minerals = [self._expand_abbreviated_materials(m) for m in self._parse_materials_from_hotspots(values[8])]
+        minerals = list(dict.fromkeys(minerals))
+        if not minerals:
+            self.status_var.set(t('ring_finder.no_hotspot_minerals'))
+            return
+        if len(minerals) == 1:
+            self._find_sell_station_impl(mineral_override=minerals[0])
+            return
+        self._show_pick_minerals_dialog(values[2], minerals)
+
+    def _show_pick_minerals_dialog(self, system_name: str, minerals: List[str]):
+        from config import load_theme
+        from localization import get_material
+        theme = load_theme()
+        bg = "#000000" if theme == "elite_orange" else "#1e1e1e"
+        fg = "#ff8c00" if theme == "elite_orange" else "#e0e0e0"
+        dialog = tk.Toplevel(self.parent)
+        dialog.withdraw()
+        dialog.title(t('ring_finder.pick_minerals_title'))
+        dialog.configure(bg=bg)
+        dialog.resizable(False, False)
+        try:
+            from app_utils import get_app_icon_path
+            dialog.iconbitmap(get_app_icon_path())
+        except Exception:
+            pass
+
+        frame = tk.Frame(dialog, bg=bg, padx=20, pady=15)
+        frame.pack(fill="both", expand=True)
+        tk.Label(frame, text=t('ring_finder.pick_minerals_prompt'), bg=bg, fg=fg).pack(anchor="w", pady=(0, 8))
+        vars_ = {}
+        for m in minerals:
+            var = tk.BooleanVar(value=True)
+            vars_[m] = var
+            tk.Checkbutton(frame, text=get_material(m), variable=var, bg=bg, fg=fg, selectcolor=bg,
+                           activebackground=bg, activeforeground=fg, highlightthickness=0, bd=0,
+                           anchor="w").pack(fill="x")
+
+        def on_ok():
+            chosen = [m for m, v in vars_.items() if v.get()]
+            if not chosen:
+                return
+            dialog.destroy()
+            self._open_multi_mineral_search(system_name, chosen)
+
+        btns = tk.Frame(frame, bg=bg)
+        btns.pack(fill="x", pady=(12, 0))
+        ttk.Button(btns, text=t('ring_finder.find_sell_station_btn'), command=on_ok).pack(side="left")
+        ttk.Button(btns, text=t('common.close'), command=dialog.destroy).pack(side="right")
+
+        dialog.update_idletasks()
+        from ui.dialogs import center_window
+        center_window(dialog, self.parent.winfo_toplevel())
+        dialog.deiconify()
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except Exception:
+            pass
+
+        def keep_on_top():
+            try:
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            except Exception:
+                pass
+        dialog.after(100, keep_on_top)
+
+    def _open_multi_mineral_search(self, system_name: str, minerals: List[str]):
+        main_app = getattr(self.prospector_panel, 'main_app', None) if hasattr(self, 'prospector_panel') else None
+        tab = getattr(main_app, 'multi_mineral_tab', None)
+        if not tab:
+            self.status_var.set("Error: Could not access main application")
+            return
+        main_app.notebook.select(2)
+        main_app.market_sub_notebook.select(main_app.market_multi_tab_frame)
+        tab.ref_var.set(system_name)
+        tab.set_minerals(minerals)
+        tab.age_var.set(main_app._age_map.get('8 hours', '8 hours'))
+        tab.station_var.set(main_app._station_type_map.get('All', 'All'))
+        tab.exclude_carriers_var.set(False)
+        tab.large_pad_var.set(False)
+        main_app.after(100, tab.start_search)
+        self.status_var.set(f"Searching sell stations near {system_name}...")
     
     def _find_sell_station_impl(self, mineral_override: str = None):
         """Implementation of find sell station - gets system name and calls Commodity Market
@@ -6760,151 +6854,120 @@ class RingFinder(ColumnVisibilityMixin):
         else:
             self.status_var.set("Error: Could not access main application")
 
-    def _rank_minerals_for_system(self):
-        """Rank all hotspot minerals in the selected row by live sell price."""
+    def _rank_minerals_inputs(self, scope: str):
+        """Work out what to price for the selected row: (system_name, fetch_materials,
+        extra_candidates, mineral_ring_types), or None (status set) if nothing to rank.
+
+        scope 'ring' = only the clicked ring's hotspot minerals; 'system' = every hotspot
+        mineral known anywhere in that row's system (same scope as Auto Prices)."""
         selection = self.results_tree.selection()
         if not selection:
             self.status_var.set(t('ring_finder.no_selection'))
-            return
+            return None
 
-        item = selection[0]
-        values = self.results_tree.item(item, 'values')
+        values = self.results_tree.item(selection[0], 'values')
         if not values or len(values) < 9:
-            return
-
-        system_name = values[2]
-        hotspots_str = values[8]
-        ring_type_display = values[6]
-        ring_type = self._ring_type_rev_map.get(ring_type_display, ring_type_display)
-
-        materials = self._parse_materials_from_hotspots(hotspots_str)
-        if not materials:
-            self.status_var.set(t('ring_finder.no_hotspot_minerals'))
-            return
-
-        full_materials = list(dict.fromkeys(self._expand_abbreviated_materials(m) for m in materials))
-
-        # Non-hotspot minerals (e.g. Osmium) mineable in this one ring's type - same
-        # "Also check" picker as the system-wide ranking, just scoped to the single
-        # ring type already sitting in this row instead of a whole-system DB query.
-        extra_candidates = [mat for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
-                            if mat not in full_materials]
-
-        # Every mineral here (hotspot or "also check") comes from this one row's ring
-        # type - so mining method lookup only ever needs to consider that single type.
-        mineral_ring_types = {mat: {ring_type} for mat in full_materials + extra_candidates}
-
-        # Minerals the user previously ticked in "Also check" - fetch them upfront here
-        # too, so a ring-scoped rank shows them without reopening the picker each time.
-        try:
-            from config import load_also_check_minerals
-            always_check = set(load_also_check_minerals())
-        except Exception:
-            always_check = set()
-        preselected_extras = [mat for mat in extra_candidates if mat in always_check]
-        fetch_materials = full_materials + preselected_extras
-
-        # Reuse prefetched prices (from the "prefetch on jump" toggle) if they already
-        # cover every mineral this row needs with an actual priced hit - skips the wait
-        # dialog and live calls entirely. A prefetch miss (no price found, e.g. the jump
-        # fetch ran before Ardent/Spansh had indexed the station yet) doesn't count as
-        # "covered" - fall through to a fresh live fetch instead of showing that stale
-        # empty result forever.
-        prefetched = getattr(self, '_prefetched_prices', {}).get(system_name)
-        if prefetched is not None:
-            priced_materials = {mat for mat, best, _ in prefetched if best}
-            if set(fetch_materials).issubset(priced_materials):
-                cached_results = [(mat, best, priced_rows) for mat, best, priced_rows in prefetched if mat in fetch_materials]
-                cached_results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
-                self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
-                self._show_mineral_ranking_dialog(system_name, cached_results, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types, scope='ring')
-                return
-
-        self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
-        self._show_ranking_wait_dialog(system_name, 'ring')
-        threading.Thread(target=self._rank_minerals_worker, args=(system_name, fetch_materials, extra_candidates, mineral_ring_types, 'ring'), daemon=True).start()
-
-    def _rank_all_minerals_for_system(self):
-        """Rank every hotspot mineral known anywhere in the selected row's system by live
-        sell price - not just the clicked ring's minerals. Same system-wide scope as the
-        Auto Prices post-jump popup (user_db.get_system_hotspots)."""
-        selection = self.results_tree.selection()
-        if not selection:
-            self.status_var.set(t('ring_finder.no_selection'))
-            return
-
-        item = selection[0]
-        values = self.results_tree.item(item, 'values')
-        if not values or len(values) < 3:
-            return
+            return None
 
         system_name = values[2]
 
-        try:
-            hotspot_rows = self.user_db.get_system_hotspots(system_name)
-        except Exception:
-            hotspot_rows = []
-        if not hotspot_rows:
-            self.status_var.set(t('ring_finder.no_hotspot_minerals'))
-            return
+        if scope == 'ring':
+            ring_type = self._ring_type_rev_map.get(values[6], values[6])
+            materials = self._parse_materials_from_hotspots(values[8])
+            if not materials:
+                self.status_var.set(t('ring_finder.no_hotspot_minerals'))
+                return None
 
-        full_materials = list(dict.fromkeys(
-            self._expand_abbreviated_materials(row['material_name'])
-            for row in hotspot_rows if row.get('material_name')
-        ))
-        if not full_materials:
-            self.status_var.set(t('ring_finder.no_hotspot_minerals'))
-            return
+            full_materials = list(dict.fromkeys(self._expand_abbreviated_materials(m) for m in materials))
 
-        # Ring type(s) each hotspot mineral was actually found in, in this system - a
-        # mineral like Platinum can be a laser-mine in one ring type and core-only in
-        # another, so mining method needs to be checked per ring type, not per mineral.
-        mineral_ring_types: Dict[str, set] = {}
-        for row in hotspot_rows:
-            mat = row.get('material_name')
-            rt = row.get('ring_type')
-            if mat and rt:
-                mineral_ring_types.setdefault(self._expand_abbreviated_materials(mat), set()).add(rt)
+            # Non-hotspot minerals (e.g. Osmium) mineable in this one ring's type - same
+            # "Also check" picker as the system-wide ranking, just scoped to the single
+            # ring type already sitting in this row instead of a whole-system DB query.
+            extra_candidates = [mat for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
+                                if mat not in full_materials]
 
-        # Non-hotspot minerals (e.g. Osmium) mineable somewhere in this system, based on
-        # its known ring types - offered via the popup's "Also check" picker since
-        # hotspot-based ranking can never surface them on its own.
-        ring_types_present = {row['ring_type'] for row in hotspot_rows if row.get('ring_type')}
-        extra_candidates = sorted(dict.fromkeys(
-            mat for ring_type in ring_types_present
-            for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
-            if mat not in full_materials
-        ))
-        for mat in extra_candidates:
-            mineral_ring_types[mat] = {rt for rt in ring_types_present
-                                        if mat in self.NON_HOTSPOT_RING_MINERALS.get(rt, [])}
+            # Every mineral here (hotspot or "also check") comes from this one row's ring
+            # type - so mining method lookup only ever needs to consider that single type.
+            mineral_ring_types = {mat: {ring_type} for mat in full_materials + extra_candidates}
+        else:
+            try:
+                hotspot_rows = self.user_db.get_system_hotspots(system_name)
+            except Exception:
+                hotspot_rows = []
+            full_materials = list(dict.fromkeys(
+                self._expand_abbreviated_materials(row['material_name'])
+                for row in hotspot_rows if row.get('material_name')
+            ))
+            if not full_materials:
+                self.status_var.set(t('ring_finder.no_hotspot_minerals'))
+                return None
+
+            # Ring type(s) each hotspot mineral was actually found in, in this system - a
+            # mineral like Platinum can be a laser-mine in one ring type and core-only in
+            # another, so mining method needs to be checked per ring type, not per mineral.
+            mineral_ring_types: Dict[str, set] = {}
+            for row in hotspot_rows:
+                mat = row.get('material_name')
+                rt = row.get('ring_type')
+                if mat and rt:
+                    mineral_ring_types.setdefault(self._expand_abbreviated_materials(mat), set()).add(rt)
+
+            # Non-hotspot minerals (e.g. Osmium) mineable somewhere in this system, based on
+            # its known ring types - offered via the popup's "Also check" picker since
+            # hotspot-based ranking can never surface them on its own.
+            ring_types_present = {row['ring_type'] for row in hotspot_rows if row.get('ring_type')}
+            extra_candidates = sorted(dict.fromkeys(
+                mat for ring_type in ring_types_present
+                for mat in self.NON_HOTSPOT_RING_MINERALS.get(ring_type, [])
+                if mat not in full_materials
+            ))
+            for mat in extra_candidates:
+                mineral_ring_types[mat] = {rt for rt in ring_types_present
+                                            if mat in self.NON_HOTSPOT_RING_MINERALS.get(rt, [])}
 
         # Minerals the user previously ticked in "Also check" (e.g. always wants Osmium
         # tracked) - fetch them upfront alongside the hotspot minerals, so they're
-        # already in the ranked table without having to reopen the picker every jump.
+        # already in the ranked table without having to reopen the picker every time.
         try:
             from config import load_also_check_minerals
             always_check = set(load_also_check_minerals())
         except Exception:
             always_check = set()
         preselected_extras = [mat for mat in extra_candidates if mat in always_check]
-        fetch_materials = full_materials + preselected_extras
+        return system_name, full_materials + preselected_extras, extra_candidates, mineral_ring_types
 
-        # A prefetch miss (no price found) doesn't count as "covered" - fall through to
-        # a fresh live fetch instead of showing that stale empty result forever.
+    def _cached_rank_results(self, system_name: str, fetch_materials: List[str]):
+        """Prefetched prices (from the "prefetch on jump" toggle) if they already cover
+        every mineral with an actual priced hit, else None. A prefetch miss (no price
+        found, e.g. the jump fetch ran before Ardent/Spansh had indexed the station)
+        doesn't count as covered - the caller should do a fresh live fetch instead of
+        showing that stale empty result forever."""
         prefetched = getattr(self, '_prefetched_prices', {}).get(system_name)
-        if prefetched is not None:
-            priced_materials = {mat for mat, best, _ in prefetched if best}
-            if set(fetch_materials).issubset(priced_materials):
-                cached_results = [(mat, best, priced_rows) for mat, best, priced_rows in prefetched if mat in fetch_materials]
-                cached_results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
-                self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
-                self._show_mineral_ranking_dialog(system_name, cached_results, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types)
-                return
+        if prefetched is None:
+            return None
+        priced_materials = {mat for mat, best, _ in prefetched if best}
+        if not set(fetch_materials).issubset(priced_materials):
+            return None
+        cached = [(mat, best, priced_rows) for mat, best, priced_rows in prefetched if mat in fetch_materials]
+        cached.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
+        return cached
+
+    def _rank_minerals_for_system(self, scope: str = 'ring'):
+        """Open the Best Minerals to Mine dialog for the selected row."""
+        inputs = self._rank_minerals_inputs(scope)
+        if inputs is None:
+            return
+        system_name, fetch_materials, extra_candidates, mineral_ring_types = inputs
+
+        cached_results = self._cached_rank_results(system_name, fetch_materials)
+        if cached_results is not None:
+            self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
+            self._show_mineral_ranking_dialog(system_name, cached_results, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types, scope=scope)
+            return
 
         self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
-        self._show_ranking_wait_dialog(system_name)
-        threading.Thread(target=self._rank_minerals_worker, args=(system_name, fetch_materials, extra_candidates, mineral_ring_types), daemon=True).start()
+        self._show_ranking_wait_dialog(system_name, scope)
+        threading.Thread(target=self._rank_minerals_worker, args=(system_name, fetch_materials, extra_candidates, mineral_ring_types, scope), daemon=True).start()
 
     def _show_ranking_wait_dialog(self, system_name: str, scope: str = 'system'):
         """Show a small "please wait" dialog while the mineral ranking worker fetches live prices."""
@@ -6927,7 +6990,7 @@ class RingFinder(ColumnVisibilityMixin):
         except Exception:
             pass
 
-        dialog.title(t(f'ring_finder.rank_minerals_title_{scope}'))
+        dialog.title(t('ring_finder.rank_minerals_title'))
         dialog.resizable(False, False)
         dialog.configure(bg=bg)
 
@@ -7020,12 +7083,9 @@ class RingFinder(ColumnVisibilityMixin):
         except Exception:
             return '-'
 
-    def _rank_minerals_worker(self, system_name: str, materials: List[str], extra_candidates: List[str] = None, mineral_ring_types: Dict[str, set] = None, scope: str = 'system'):
-        """Background worker: fetch best sell price per mineral, concurrently.
-
-        extra_candidates: non-hotspot minerals mineable somewhere in this system (see
-        NON_HOTSPOT_RING_MINERALS) - offered via the popup's "Also check" picker, not
-        fetched here. Only fetched on-demand if the user actually ticks one."""
+    def _fetch_mineral_prices(self, system_name: str, materials: List[str]):
+        """Fetch best sell price per mineral concurrently; returns [(mat, best, priced_rows)]
+        sorted by best price. Blocking - call from a worker thread."""
         from marketplace_api import MarketplaceAPI
         from concurrent.futures import ThreadPoolExecutor
 
@@ -7051,6 +7111,15 @@ class RingFinder(ColumnVisibilityMixin):
                 results.append((mat, best, priced_rows))
 
         results.sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
+        return results
+
+    def _rank_minerals_worker(self, system_name: str, materials: List[str], extra_candidates: List[str] = None, mineral_ring_types: Dict[str, set] = None, scope: str = 'system'):
+        """Background worker: fetch best sell price per mineral, concurrently.
+
+        extra_candidates: non-hotspot minerals mineable somewhere in this system (see
+        NON_HOTSPOT_RING_MINERALS) - offered via the popup's "Also check" picker, not
+        fetched here. Only fetched on-demand if the user actually ticks one."""
+        results = self._fetch_mineral_prices(system_name, materials)
         self.parent.after(0, lambda: self._show_mineral_ranking_dialog(system_name, results, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types, scope=scope))
 
     def _show_mineral_ranking_dialog(self, system_name: str, results: list, modal: bool = True, extra_candidates: List[str] = None, mineral_ring_types: Dict[str, set] = None, scope: str = 'system'):
@@ -7095,7 +7164,7 @@ class RingFinder(ColumnVisibilityMixin):
         except Exception:
             pass
 
-        dialog.title(t(f'ring_finder.rank_minerals_title_{scope}'))
+        dialog.title(t('ring_finder.rank_minerals_title'))
         dialog.resizable(True, True)
         dialog.configure(bg=bg)
 
@@ -7103,7 +7172,23 @@ class RingFinder(ColumnVisibilityMixin):
         frame.pack(fill="both", expand=True)
 
         tk.Label(frame, text=t('ring_finder.rank_minerals_for').format(system=system_name),
-                 bg=bg, fg=fg, font=scaled_font(9, "bold")).pack(anchor="w", pady=(0, 10))
+                 bg=bg, fg=fg, font=scaled_font(9, "bold")).pack(anchor="w")
+
+        ring_name = ''
+        if modal:
+            sel = self.results_tree.selection()
+            ring_vals = self.results_tree.item(sel[0], 'values') if sel else ()
+            ring_name = ring_vals[3] if len(ring_vals) > 3 else ''
+
+        def scope_text(current_scope):
+            if current_scope == 'ring' and ring_name:
+                return t('ring_finder.rank_scope_for_ring').format(ring=ring_name, system=system_name)
+            return t('ring_finder.rank_scope_for_system').format(system=system_name)
+
+        scope_row = tk.Frame(frame, bg=bg)
+        scope_row.pack(fill="x", pady=(2, 10))
+        scope_label = tk.Label(scope_row, text=scope_text(scope), bg=bg, fg=fg, font=scaled_font(9))
+        scope_label.pack(side="left")
 
         # PowerPlay mode: restrict results to stations in system_name itself - for
         # undermining/reinforcing, the target system is the only place the player can
@@ -7127,7 +7212,7 @@ class RingFinder(ColumnVisibilityMixin):
         from report_generator import ReportGenerator
         core_materials = {mat for mat, info in ReportGenerator.MATERIAL_TPH_THRESHOLDS.items()
                           if info.get('is_core', False)}
-        ring_types_by_mat = mineral_ring_types or {}
+        ring_types_by_mat = mineral_ring_types if mineral_ring_types is not None else {}
 
         def mining_method_for(mat):
             rts = ring_types_by_mat.get(mat, set())
@@ -7239,14 +7324,22 @@ class RingFinder(ColumnVisibilityMixin):
             self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
             populate_rows()
 
-        if extra_candidates:
+        if extra_candidates is None:
+            extra_candidates = []
+
+        def sync_extra_vars():
+            # Reflect minerals already fetched upfront (previously saved "Also check"
+            # picks) as ticked, instead of showing unchecked despite already being in
+            # the ranked table below.
             already_fetched = {r[0] for r in results}
+            extra_checked_vars.clear()
             for mat in extra_candidates:
-                # Reflect minerals the caller already fetched upfront (previously saved
-                # "Also check" picks) as ticked, instead of showing unchecked despite
-                # already being in the ranked table below.
                 extra_checked_vars[mat] = tk.BooleanVar(value=mat in already_fetched)
 
+        sync_extra_vars()
+
+        # modal dialogs can switch scope, which changes the candidates, so always offer the button
+        if extra_candidates or modal:
             def show_extra_mineral_picker():
                 # A tk.Menu with add_checkbutton closes on every click, forcing the user
                 # to reopen it after each pick - a persistent Toplevel stays open so they
@@ -7373,6 +7466,74 @@ class RingFinder(ColumnVisibilityMixin):
                                         bg="#2a2a2a", fg=fg, activebackground="#3a3a3a", activeforeground=fg,
                                         relief="ridge", bd=1, font=scaled_font(9), cursor="hand2")
             extra_check_btn.pack(side="left", padx=(15, 0))
+
+        # Scope switch + Refresh only for the menu-opened dialog (modal): Auto Prices opens
+        # this same dialog non-modal with no ring selected, so it never gets these. Both
+        # reload the table in place instead of reopening the dialog.
+        if modal:
+            scope_state = {'scope': scope, 'busy': False}
+
+            def btn_style():
+                return dict(bg="#2a2a2a", fg=fg, activebackground="#3a3a3a", activeforeground=fg,
+                            relief="ridge", bd=1, font=scaled_font(9), cursor="hand2")
+
+            def switch_label():
+                other = 'system' if scope_state['scope'] == 'ring' else 'ring'
+                return t(f'ring_finder.rank_scope_switch_to_{other}')
+
+            def apply_reload(new_scope, new_results, new_extras, new_ring_types, new_pp):
+                if not dialog.winfo_exists():
+                    return
+                close_extra_mineral_picker_if_open()
+                scope_state['scope'] = new_scope
+                scope_label.config(text=scope_text(new_scope))
+                results[:] = new_results
+                extra_candidates[:] = new_extras
+                ring_types_by_mat.clear()
+                ring_types_by_mat.update(new_ring_types)
+                pp_data.clear()
+                pp_data.update(new_pp)
+                sync_extra_vars()
+                populate_rows()
+                finish_reload()
+
+            def finish_reload():
+                scope_state['busy'] = False
+                busy_label.config(text="")
+                scope_btn.config(state="normal", text=switch_label())
+                refresh_btn.config(state="normal")
+                self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
+
+            def reload_worker(new_scope, force, fetch_materials, new_extras, new_ring_types):
+                new_results = None if force else self._cached_rank_results(system_name, fetch_materials)
+                if new_results is None:
+                    new_results = self._fetch_mineral_prices(system_name, fetch_materials)
+                names = list({best.get('systemName', '') for _, best, _ in new_results if best and best.get('systemName')} | {system_name})
+                new_pp = SystemFinderAPI._batch_get_powerplay(names) if names else {}
+                self.parent.after(0, lambda: apply_reload(new_scope, new_results, new_extras, new_ring_types, new_pp))
+
+            def reload(new_scope, force):
+                if scope_state['busy']:
+                    return
+                inputs = self._rank_minerals_inputs(new_scope)
+                if inputs is None:
+                    return
+                _sys, fetch_materials, new_extras, new_ring_types = inputs
+                scope_state['busy'] = True
+                busy_label.config(text=t('ring_finder.rank_updating'))
+                scope_btn.config(state="disabled")
+                refresh_btn.config(state="disabled")
+                self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
+                threading.Thread(target=reload_worker, args=(new_scope, force, fetch_materials, new_extras, new_ring_types), daemon=True).start()
+
+            scope_btn = tk.Button(scope_row, text=switch_label(), **btn_style(),
+                                  command=lambda: reload('system' if scope_state['scope'] == 'ring' else 'ring', False))
+            scope_btn.pack(side="right")
+            refresh_btn = tk.Button(scope_row, text=t('ring_finder.rank_refresh'), **btn_style(),
+                                    command=lambda: reload(scope_state['scope'], True))
+            refresh_btn.pack(side="right", padx=(0, 8))
+            busy_label = tk.Label(scope_row, text="", bg=bg, fg=fg, font=scaled_font(9))
+            busy_label.pack(side="right", padx=(0, 8))
 
         tree_frame = tk.Frame(frame, bg=bg)
         tree_frame.pack(fill="both", expand=True)

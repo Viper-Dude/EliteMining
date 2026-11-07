@@ -357,8 +357,9 @@ How the app helps (all in the [Hotspot Finder](#hotspot-finder)):
 The Commodity Market helps you find the best prices for mining commodities and trade goods using real-time market data from the Ardent API, with automatic distance calculations to help you maximize profits.
 
 ### Key Features
-- **Two Tabs:**
+- **Three Tabs:**
   - **Mining Commodities** – Search for 28 mineable resources (Painite, Platinum, Low Temperature Diamonds, etc.)
+  - **Multiple Prices** – Tick up to 5 minerals and find the best stations to sell them together in one stop
   - **Trade Commodities** – Search across 15 categories of trade goods (Chemicals, Machinery, Medicines, Technology, and more)
 - **Two Search Modes:**
   - **Near System** – Find top 30 stations within 500 LY, filtered by distance
@@ -384,6 +385,9 @@ Perfect for planning your mining runs and finding the most profitable stations t
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commidity_marked.png" width="900"><br>  
 *Commodity Market showing mining commodities search results with filters and distance calculations.*
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/multiple_prices.png" width="900"><br>  
+*Multiple Prices tab ranking stations by how many of your chosen minerals they buy, with demand and price per mineral. In Ring Finder, Find Sell Station opens it with a ring's minerals pre-selected.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/trade_commodities.png" width="900"><br>  
 *Trade Commodities tab with 15 categories covering all tradeable goods in Elite Dangerous.*
