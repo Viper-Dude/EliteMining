@@ -10163,7 +10163,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if not candidates:
             return None
         try:
-            return max(candidates, key=lambda p: os.path.getmtime(p))
+            # Names embed the timestamp, so a name sort avoids stat-ing every journal each tick
+            return max(candidates)
         except Exception:
             return None
 

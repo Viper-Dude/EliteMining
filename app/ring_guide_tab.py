@@ -159,7 +159,7 @@ class RingGuideTab(tk.Frame):
             self._create_ring_section(ring_type)
         
         # Right column - RES Sites info (fixed width)
-        right_column = tk.Frame(main_container, bg=self.bg_color, width=320)
+        right_column = tk.Frame(main_container, bg=self.bg_color, width=400)
         right_column.pack(side="left", fill="y", padx=(5, 0))
         right_column.pack_propagate(False)  # Keep fixed width
         

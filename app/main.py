@@ -873,7 +873,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.5.7"
+APP_VERSION = "v5.5.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -3103,7 +3103,7 @@ cargo panel forces Elite to write detailed inventory data.
                         # Also check if there's a NEWER journal file (daily rotation)
                         journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
                         if journal_files:
-                            latest_file = max(journal_files, key=os.path.getmtime)
+                            latest_file = max(journal_files)  # name sort; stat-ing every journal each loop was slow
                             if latest_file != self.last_journal_file:
                                 logging.info(f"[JOURNAL_ROTATION] Detected new journal file: {os.path.basename(latest_file)}")
                                 self.last_journal_file = latest_file
@@ -6217,7 +6217,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     except tk.TclError:
                         pass
                     w.after_idle(lambda: self._modern_recolor_all(w))
-            self.bind_all("<Map>", _recolor_new_popup, add="+")
+            # Class binding: fires only for Toplevels, not for every widget mapped on a tab switch
+            self.bind_class("Toplevel", "<Map>", _recolor_new_popup, add="+")
 
         # Import existing values from VoiceAttack profile
         self.after(100, self._import_all_from_txt)
