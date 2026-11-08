@@ -414,12 +414,12 @@
     "t_ast": "T/Ast",
     "core_hits": "Core Hits",
     "avg_all": "Avg % (All)",
-    "avg_thr": "Avg % (≥Thr)",
+    "avg_thr": "Avg ≥Thr",
     "best_pct": "Best %",
     "latest_pct": "Latest %",
     "hits": "Hits (≥Thr)",
     "all_hits": "All Hits",
-    "quality_rate": "Hit Rate (≥Thr)",
+    "quality_rate": "Hit Rate",
     "double_click_hint": "💡 Double-click Hits (≥Thr) to correct accidental double prospects"
   },
   "graphs": {

@@ -410,12 +410,12 @@
     "t_ast": "T/Ast",
     "core_hits": "Kern-Treffer",
     "avg_all": "Durchschn % (Alle)",
-    "avg_thr": "Durchschn % (≥Thr)",
+    "avg_thr": "Durchschn ≥Thr",
     "best_pct": "Best %",
     "latest_pct": "Aktuell %",
     "hits": "Treffer (≥Thr)",
     "all_hits": "Alle Treffer",
-    "quality_rate": "Trefferquote (≥Thr)",
+    "quality_rate": "Trefferquote",
     "double_click_hint": "💡 Doppelklick auf Treffer (≥Thr) um versehentliche Doppel-Prospektionen zu korrigieren"
   },
   "graphs": {

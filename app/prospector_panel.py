@@ -2071,6 +2071,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             saved_widths = load_prospector_report_column_widths()
             if saved_widths:
                 for col_name, width in saved_widths.items():
+                    if col_name == "time":
+                        continue
                     try:
                         self.tree.column(col_name, width=width)
                     except:
@@ -2083,7 +2085,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             try:
                 from config import save_prospector_report_column_widths
                 widths = {}
-                for col in ["materials", "content", "time"]:
+                for col in ["materials", "content"]:
                     try:
                         widths[col] = self.tree.column(col, "width")
                     except:
@@ -2092,7 +2094,24 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             except Exception as e:
                 print(f"[DEBUG] Could not save Prospector Report column widths: {e}")
         
-        self.tree.bind("<ButtonRelease-1>", save_prospector_report_widths)
+        def keep_time_column_visible(event=None):
+            room = self.tree.winfo_width() - self.tree.column("time", "minwidth")
+            over = self.tree.column("materials", "width") + self.tree.column("content", "width") - room
+            if over <= 0:
+                return
+            content_w = self.tree.column("content", "width")
+            cut = min(over, content_w - self.tree.column("content", "minwidth"))
+            self.tree.column("content", width=content_w - cut)
+            over -= cut
+            if over > 0:
+                mat_w = self.tree.column("materials", "width")
+                self.tree.column("materials", width=max(mat_w - over, self.tree.column("materials", "minwidth")))
+        self.tree.bind("<Configure>", keep_time_column_visible, add="+")
+
+        def on_prospector_columns_released(event=None):
+            keep_time_column_visible()
+            save_prospector_report_widths()
+        self.tree.bind("<ButtonRelease-1>", on_prospector_columns_released)
         # Deselect when clicking empty space
         self.tree.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.tree))
         
@@ -2251,6 +2270,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             self.stats_tree.column(col_name, width=max(scaled_px(base_width), _minwidths[col_name]),
                                    minwidth=_minwidths[col_name], anchor="w", stretch=False)
         self.stats_tree.column("material", anchor="w")
+        for _c in ("tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct",
+                   "count", "core_hits", "all_hits", "quality_rate"):
+            self.stats_tree.column(_c, anchor="center")
+            self.stats_tree.heading(_c, anchor="center")
         self.stats_tree.column("_spacer", width=scaled_px(20), minwidth=scaled_px(20), anchor="w", stretch=True)
 
         # Setup column visibility for material analysis
@@ -2258,7 +2281,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             tree=self.stats_tree,
             columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "core_hits", "all_hits", "quality_rate"),
             default_widths={col: max(scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
-            config_key='mineral_analysis'
+            config_key='mineral_analysis',
+            use_displaycolumns=True
         )
 
         # Load saved column widths from config — but never let an old (pre-scale)
@@ -8862,21 +8886,21 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             if region == "heading" and column:
                 column_tooltips = {
-                    "#1": t('tooltips.mineral_name'),
-                    "#2": t('tooltips.mineral_tons'),
-                    "#3": t('tooltips.mineral_tph'),
-                    "#4": t('tooltips.mineral_tpa'),
-                    "#5": t('tooltips.mineral_avg_all'),
-                    "#6": t('tooltips.mineral_avg_thr'),
-                    "#7": t('tooltips.mineral_best'),
-                    "#8": t('tooltips.mineral_current'),
-                    "#9": t('tooltips.mineral_hits'),
-                    "#10": t('tooltips.mineral_core_hits'),
-                    "#11": t('tooltips.mineral_all_hits'),
-                    "#12": t('tooltips.mineral_quality_rate')
+                    "material": t('tooltips.mineral_name'),
+                    "tons": t('tooltips.mineral_tons'),
+                    "tph": t('tooltips.mineral_tph'),
+                    "tons_per": t('tooltips.mineral_tpa'),
+                    "avg_all": t('tooltips.mineral_avg_all'),
+                    "avg_pct": t('tooltips.mineral_avg_thr'),
+                    "best_pct": t('tooltips.mineral_best'),
+                    "latest_pct": t('tooltips.mineral_current'),
+                    "count": t('tooltips.mineral_hits'),
+                    "core_hits": t('tooltips.mineral_core_hits'),
+                    "all_hits": t('tooltips.mineral_all_hits'),
+                    "quality_rate": t('tooltips.mineral_quality_rate')
                 }
-                
-                tooltip_text = column_tooltips.get(column)
+
+                tooltip_text = column_tooltips.get(displayed_column(tree, column))
                 if tooltip_text:
                     x = event.x_root + 10
                     y = event.y_root + 10
