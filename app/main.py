@@ -230,7 +230,7 @@ class TextOverlay:
 
         # Always show message — events come from journal files regardless of which app has focus.
         self._is_showing = True
-        if not self._game_hidden and (ignore_sc_hide or not getattr(self, '_sc_hidden', False)) and not getattr(self, '_session_hidden', False):
+        if not self._game_hidden and (ignore_sc_hide or not getattr(self, '_sc_hidden', False)) and (ignore_sc_hide or not getattr(self, '_session_hidden', False)):
             self._show_on_top()
             logging.info(f"[OVERLAY] show_message: deiconified, duration={self.display_duration}ms, {self._window_diag()}")
         else:
@@ -873,7 +873,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.5.6"
+APP_VERSION = "v5.5.7"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -6710,7 +6710,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         self.cargo_text_overlay.overlay_window.wm_attributes("-alpha", 0)
                 if hasattr(self, 'text_overlay'):
                     self.text_overlay._session_hidden = True
-                    if self.text_overlay._is_showing and self.text_overlay.overlay_window:
+                    if self.text_overlay._is_showing and self.text_overlay.overlay_window \
+                            and not getattr(self.text_overlay, '_sc_exempt', False):
                         self.text_overlay._hide_window()
             else:
                 # Session is active (or setting disabled) — restore and keep overlays visible each cycle
