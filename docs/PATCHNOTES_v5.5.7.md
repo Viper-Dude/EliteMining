@@ -1,7 +1,7 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 **Release Date:** 2026-November-08
 
-## New Features & Improvements
+## Fixes & Improvements
 
 - Mining Session: Material Analysis numbers are now centered under their headers.
 - Mining Session: Removed a tiny stray mark that appeared next to some Material Analysis values.
