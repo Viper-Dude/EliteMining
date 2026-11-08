@@ -40,7 +40,7 @@ class MultiMineralTab:
 
         ref_row = tk.Frame(box, bg=bg)
         ref_row.pack(fill="x", pady=(0, 8))
-        self.status_label = tk.Label(ref_row, text=t('marketplace.multi_hint'), bg=bg, fg="gray",
+        self.status_label = tk.Label(ref_row, text='', bg=bg, fg="gray",
                                      font=app._scaled_font(8))
         self.status_label.pack(side="right", padx=(0, 5))
         ttk.Label(ref_row, text=t('marketplace.ref_system'), width=12).pack(side="left", padx=(0, 5))

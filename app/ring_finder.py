@@ -843,7 +843,7 @@ class RingFinder(ColumnVisibilityMixin):
         _dist_parent = self._rf_dist if _modern_form else right_filters_frame_row1
         _distance_label_frame = tk.Frame(_dist_parent, width=scaled_px(120), height=scaled_px(24), bg=_sh_bg)
         _distance_label_frame.pack(side="left", padx=(0, 5))
-        _distance_label_frame.pack_propagate(False)
+        _distance_label_frame.pack_propagate(bool(_modern_form))
         ttk.Label(_distance_label_frame, text=t('ring_finder.max_distance') + ":", anchor="e", font=scaled_font(9)).pack(side="right", fill="y")
         self.distance_var = tk.StringVar(value="50")
         _distance_combo_frame = tk.Frame(_dist_parent, width=scaled_px(70), height=scaled_px(24), bg=_sh_bg)

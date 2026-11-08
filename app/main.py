@@ -18562,7 +18562,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row0_frame.pack(fill="x", pady=(0, 10))
 
         # Status label (packed right FIRST so it claims far-right space)
-        self.marketplace_total_label = tk.Label(row0_frame, text=t('marketplace.enter_system_commodity'),
+        self.marketplace_total_label = tk.Label(row0_frame, text='',
                                                bg=_mkt_cb_bg, fg="gray", font=self._scaled_font(8))
         self.marketplace_total_label.pack(side="right", padx=(0, 5))
 
@@ -18860,7 +18860,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row0_frame.pack(fill="x", pady=(0, 10))
 
         # Status label (packed right FIRST so it claims far-right space)
-        self.trade_total_label = tk.Label(row0_frame, text=t('marketplace.enter_system_commodity'),
+        self.trade_total_label = tk.Label(row0_frame, text='',
                                           bg=_trade_cb_bg, fg="gray", font=self._scaled_font(8))
         self.trade_total_label.pack(side="right", padx=(0, 5))
 
