@@ -18528,6 +18528,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         trade_tab = ttk.Frame(sub_notebook, padding=8)
         self._build_trade_commodities_tab(trade_tab)
         sub_notebook.add(trade_tab, text=t('tabs.trade_commodities'))
+
+        def _clear_market_sub_focus(event=None):
+            sub_notebook.focus_set()
+            self.multi_mineral_tab.ref_entry.selection_clear()
+        sub_notebook.bind('<<NotebookTabChanged>>', lambda e: (_clear_market_sub_focus(), self.after(50, _clear_market_sub_focus)))
     
     def _build_mining_commodities_tab(self, frame: ttk.Frame) -> None:
         """Build the Mining Commodities sub-tab - matches original Commodity Market design"""

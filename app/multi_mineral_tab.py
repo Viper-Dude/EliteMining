@@ -47,7 +47,9 @@ class MultiMineralTab:
         self.ref_var = tk.StringVar(value=app.marketplace_reference_system.get())
         ref_entry = ttk.Entry(ref_row, textvariable=self.ref_var, width=30)
         ref_entry.pack(side="left", padx=(0, 5))
+        self.ref_entry = ref_entry
         ref_entry.bind("<Return>", lambda e: self.start_search())
+        ref_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
         from system_autocomplete import SystemAutocomplete
         self._ac_ref = SystemAutocomplete(ref_entry, self.ref_var, app)
         tk.Button(ref_row, text=t('marketplace.use_current'), command=self._use_current_system,
