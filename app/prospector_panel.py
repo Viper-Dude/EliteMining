@@ -8122,6 +8122,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         card_btn.pack(side="left", padx=(0, 5))
         self.ToolTip(card_btn, t('tooltips.mining_card'))
         self._card_btn = card_btn
+        for _b in (rebuild_btn, folder_btn, export_btn, discord_btn, card_btn):
+            _b.configure(font=scaled_font(8), padx=scaled_px(6))
+        self._reports_summary_label.configure(font=scaled_font(8))
         self.reports_tree_tab.bind("<<TreeviewSelect>>", lambda e: self._update_card_button(), add='+')
         
         # Add double-click functionality for opening report files

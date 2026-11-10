@@ -22,7 +22,7 @@ CALLOUTS = (
     ("prospector_sequence_initiated", "Prospector sequence initiated."),
     ("pulse_wave_scanning_terminated", "Pulse wave scanning terminated."),
     ("requesting_docking_clearance", "Requesting docking clearance."),
-    ("retracting_scoop_setting_power", "Retracting scoop. Setting power."),
+    ("retract_scoop_set_power_and_firegroup", "Retracting scoop. Setting power and fire group."),
     ("seismic_charge_system_online", "Seismic charge system online."),
     ("starting_mining_seq", "Starting Mining Sequence."),
     ("sub_surface_displacement_system_online", "Sub-surface displacement system online."),

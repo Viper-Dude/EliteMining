@@ -873,7 +873,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.5.7"
+APP_VERSION = "v5.5.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5418,6 +5418,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                    fieldbackground=[("disabled", dark_bg), ("readonly", dark_bg)],
                    foreground=[("disabled", "#666666"), ("readonly", dark_fg)])
 
+        self.bind_class("Treeview", "<Escape>", lambda e: e.widget.selection_remove(*e.widget.selection()), add="+")
+
         # Apply dark theme to classic widgets too
         self.option_add("*Listbox.background", dark_bg)
         self.option_add("*Listbox.foreground", dark_fg)
@@ -7751,7 +7753,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             tk.Label(rowf, text=name, bg=_toggle_bg, fg=_toggle_fg,
-                     font=self._scaled_font(9), width=34, anchor="w").pack(side="left", padx=(4, 0))
+                     font=self._scaled_font(9), width=40, anchor="w").pack(side="left", padx=(4, 0))
             event_combo = ttk.Combobox(rowf, textvariable=var, values=[_off_label, _tts_label] + packs,
                                        state="readonly", width=22)
             self.sound_event_combos[event] = event_combo

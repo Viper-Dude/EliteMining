@@ -772,6 +772,14 @@ Configure how many times the laser mining extra sequence runs:
 | Enable cargo text overlay | Turn on the cargo status overlay |
 | Disable cargo text overlay | Turn off the cargo status overlay |
 
+### Settings Control
+Enable, disable, or check the status of 15 EliteMining settings by voice. Spoken feedback and VoiceAttack log messages use the same "enabled" / "disabled" wording.
+| Voice Command | Action |
+|---------------|--------|
+| Enable cargo scoop | Turn the setting on |
+| Toggle off cargo scoop retraction during a reset mining sequence | Turn the setting off |
+| What is the cargo scoop status? | Hear whether the setting is on or off |
+
 > 💡 **Tip:** The VoiceAttack profile contains many more commands including firegroup assignments, status checks, and custom sequences. To see all available commands:
 > 1. Open VoiceAttack and export EliteMining profile
 > 2. Select export → Save Profile to HTML (Quick Reference)

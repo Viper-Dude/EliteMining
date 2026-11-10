@@ -64,7 +64,7 @@ SOUND_EVENT_CATEGORIES = {
     "mining_sequence_reset_complete": "mining",
     "cargo_scoop_retraction_aborted": "mining",
     "executing_clear_and_vector_protocol": "ship",
-    "retracting_scoop_setting_power": "mining",
+    "retract_scoop_set_power_and_firegroup": "mining",
     "seismic_charge_system_online": "mining",
     "sub_surface_displacement_system_online": "mining",
     "continuous_pulse_wave_scanning_initiated": "mining",
