@@ -6286,7 +6286,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Simple header without buttons
         header_frame = ttk.Frame(cargo_frame)
         header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 4))
-        header_frame.columnconfigure(1, weight=1)
+        header_frame.columnconfigure(2, weight=1)
         
         # Title and summary in one line
         title_label = ttk.Label(header_frame, text=t('sidebar.cargo_status'), font=self._scaled_font(9, "bold"))
@@ -6300,11 +6300,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # The refinery/limpet notes live in this icon's tooltip instead of the cargo list
             _info_icon = ttk.Label(header_frame, text="\u24d8", foreground="#8A94A3", cursor="hand2",
                                    font=self._scaled_font(10))
-            _info_icon.grid(row=0, column=2, sticky="e", padx=(6, 2))
+            _info_icon.grid(row=0, column=2, sticky="w", padx=(6, 2))
             self._cargo_info_tip = ToolTip(_info_icon, "")
             from ui.modern_widgets import RoundedProgressBar
             self._cargo_bar = RoundedProgressBar(header_frame, height=self._scaled_px(10))
-            self._cargo_bar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+            self._cargo_bar.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(6, 0))
         
         # Content area - expandable
         content_frame = ttk.Frame(cargo_frame)
@@ -9820,6 +9820,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         help_text = ttk.Label(presets_pane, text=t('sidebar.right_click_options'),
                              font=self._scaled_font(8), foreground="#666666")
         help_text.grid(row=1, column=0, sticky="w", pady=(0, 6))
+        presets_pane.bind("<Configure>", lambda e: help_text.configure(wraplength=max(e.width - 12, 60)), add="+")
 
         # Configure treeview style for selection highlight (theme-aware)
         style = ttk.Style()
