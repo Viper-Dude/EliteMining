@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add -A
-git commit -m "v5.5.8 - Added press keyboard Escape to clear selected row(s) in any table.VA profile and Sound packs update"
+git commit -m "v5.5.8 - Added press keyboard Escape to clear selected row(s) in any table. VA profile and Sound packs update"
 git push
 
 ## Standard Commit and Push Process
