@@ -696,7 +696,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Reserve filter (new row between Ring Type and Mineral)
         ttk.Label(search_frame, text=t('ring_finder.reserve')).grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.reserve_var = tk.StringVar(value=t('ring_finder.all_reserves'))
+        self.reserve_var = tk.StringVar(value=t('ring_finder.reserve_pristine'))
         self.reserve_combo = ttk.Combobox(search_frame, textvariable=self.reserve_var, width=15, state="readonly")
         # Reserve options: All, Pristine, Major, Common, Low, Depleted (all localized)
         reserve_options = [
@@ -2298,7 +2298,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.material_var.set(t('ring_finder.all'))
         
         # Reserve
-        self.reserve_var.set(t('ring_finder.all_reserves'))
+        self.reserve_var.set(t('ring_finder.reserve_pristine'))
         
         # Mineral
         self.specific_material_var.set(t('ring_finder.all_minerals'))
@@ -2367,7 +2367,7 @@ class RingFinder(ColumnVisibilityMixin):
                 t('ring_finder.reserve_low'): 'Low',
                 t('ring_finder.reserve_depleted'): 'Depleted'
             }
-            reserve_english = reserve_map_to_english.get(reserve_value, 'All')
+            reserve_english = reserve_map_to_english.get(reserve_value, 'Pristine')
             
             # Never persist the 500 LY PowerPlay-state override - save the user's real
             # picked distance (stashed by _sync_max_distance_for_pp_state while the
@@ -2454,7 +2454,7 @@ class RingFinder(ColumnVisibilityMixin):
                     'Low': t('ring_finder.reserve_low'),
                     'Depleted': t('ring_finder.reserve_depleted')
                 }
-                reserve_localized = reserve_map_to_localized.get(settings["reserve"], t('ring_finder.all_reserves'))
+                reserve_localized = reserve_map_to_localized.get(settings["reserve"], t('ring_finder.reserve_pristine'))
                 self.reserve_var.set(reserve_localized)
             if "pp_power" in settings and hasattr(self, 'pp_power_var'):
                 self.pp_power_var.set(settings.get("pp_power", "Any"))
@@ -2857,7 +2857,7 @@ class RingFinder(ColumnVisibilityMixin):
     def _active_filter_count(self):
         """Number of secondary filters currently differing from their defaults."""
         checks = (
-            self.reserve_var.get() != t('ring_finder.all_reserves'),
+            self.reserve_var.get() != t('ring_finder.reserve_pristine'),
             self.pp_power_var.get() != 'Any',
             self.pp_state_var.get() != 'Any',
             bool(self.unvisited_only_var.get()),

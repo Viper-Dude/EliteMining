@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add -A
-git commit -m "v5.5.8 - Added press keyboard Escape to clear selected row(s) in any table. VA profile and Sound packs update"
+git commit -m "v5.5.9 - Set Ring Finder default reserves to Pristine and fix VoiceAttack boost, overlapping sounds, and cargo scoop detection."
 git push
 
 ## Standard Commit and Push Process
