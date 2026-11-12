@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add -A
-git commit -m "v5.5.9 - Set Ring Finder default reserves to Pristine and fix VoiceAttack boost, overlapping sounds, and cargo scoop detection."
+git commit -m "v5.6.0: Show all ring hotspots, reset VA variables on session load, and optimize profile"
 git push
 
 ## Standard Commit and Push Process

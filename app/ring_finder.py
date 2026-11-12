@@ -3696,6 +3696,7 @@ class RingFinder(ColumnVisibilityMixin):
                     else:
                         # Filter by material if searching for specific mineral
                         materials_found = []
+                        selected_count = None
                         for sig in signals:
                             sig_name = sig.get('name', '')
                             sig_count = max(sig.get('count', 0), 1)  # At least 1 if signal exists
@@ -3704,18 +3705,18 @@ class RingFinder(ColumnVisibilityMixin):
                             if not sig_name or not self._is_valid_mining_material(sig_name):
                                 continue
                             
-                            if not self._is_all_minerals(specific_material):
-                                if sig_name == specific_material:
-                                    materials_found.append(f"{sig_name} ({sig_count})")
-                            else:
-                                materials_found.append(f"{sig_name} ({sig_count})")
-                        
+                            materials_found.append(f"{sig_name} ({sig_count})")
+                            if not self._is_all_minerals(specific_material) and sig_name == specific_material:
+                                selected_count = sig_count
+
                         # Sort materials by count (descending), then alphabetically
                         if materials_found and materials_found != ["-"]:
                             materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
-                        
+
                         # Skip rings without matching materials (normal mode only)
                         if not materials_found:
+                            continue
+                        if not self._is_all_minerals(specific_material) and selected_count is None:
                             continue
                     
                     # Format LS distance for display (same as user DB format)
@@ -3735,7 +3736,8 @@ class RingFinder(ColumnVisibilityMixin):
                         'systemName': system_name,
                         'bodyName': ring_name,  # Use ring name for bodyName
                         'type': ', '.join(materials_found),
-                        'count': sum(int(m.split('(')[1].rstrip(')')) for m in materials_found if '(' in m),
+                        'count': (selected_count if not ring_type_only and selected_count is not None
+                                  else sum(int(m.split('(')[1].rstrip(')')) for m in materials_found if '(' in m)),
                         'distance': f"{distance_ly:.1f}" if distance_ly > 0 else "0.0",  # String format
                         'coords': body_coords,
                         'data_source': entry_source,
@@ -4229,10 +4231,6 @@ class RingFinder(ColumnVisibilityMixin):
                 body_name = hotspot.get('bodyName', '')
                 material_name = hotspot.get('type', '')  # User database uses 'type' field for material name
                 hotspot_count = hotspot.get('count', 1)
-                
-                # Skip if specific material filter doesn't match
-                if not self._is_all_minerals(specific_material) and not self._material_matches(specific_material, material_name):
-                    continue
                 
                 # Get distance (already calculated in user_hotspots)
                 distance = hotspot.get('distance', 0)
@@ -5367,8 +5365,16 @@ class RingFinder(ColumnVisibilityMixin):
                             sorted_material_name = self._sort_hotspots_display(material_name)
                             display_material_name = self._abbreviate_material_for_display(sorted_material_name)
                         else:
-                            display_material_name = material_name
-                        
+                            cursor.execute(
+                                'SELECT material_name, hotspot_count FROM hotspot_data '
+                                'WHERE system_name = ? AND body_name = ? AND hotspot_count > 0',
+                                (system_name, body_name))
+                            ring_mats = sorted(
+                                cursor.fetchall(),
+                                key=lambda m: (not self._material_matches(specific_material, m[0]), -m[1], m[0]))
+                            display_material_name = self._abbreviate_material_for_display(
+                                ', '.join(f"{n} ({c})" for n, c in ring_mats)) if ring_mats else material_name
+
                         # Ensure distance is never None (safety check)
                         if distance is None or distance is False:
                             distance = 999.9
@@ -5955,6 +5961,10 @@ class RingFinder(ColumnVisibilityMixin):
             
             # Sort, abbreviate and localize material names in hotspot display
             hotspot_count_display = self._sort_hotspots_display(hotspot_count_display)
+            if not self._is_all_minerals(current_material_filter) and ',' in hotspot_count_display:
+                _parts = [p.strip() for p in hotspot_count_display.split(',')]
+                _parts.sort(key=lambda p: not self._material_matches(current_material_filter, p.split(' (')[0]))
+                hotspot_count_display = ', '.join(_parts)
             hotspot_count_display = self._abbreviate_material_for_display(hotspot_count_display)
             hotspot_count_display = self._localize_hotspot_display(hotspot_count_display)
             overlap_display = self._sort_hotspots_display(overlap_display)
