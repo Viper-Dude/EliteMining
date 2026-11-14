@@ -31,6 +31,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
+        'weasyprint', 'pdfkit', 'reportlab',
         # NOTE: numpy submodules cannot be safely excluded — matplotlib + numpy's
         # internal _distributor_init machinery requires them. Use collect_all('numpy').
         # Exclude unused stdlib packages

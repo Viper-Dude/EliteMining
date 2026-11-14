@@ -62,7 +62,7 @@ class ReleaseBuilder:
                 return False
                 
         except subprocess.TimeoutExpired:
-            print("❌ Command timed out after 5 minutes")
+            print("❌ Command timed out after 10 minutes")
             return False
         except Exception as e:
             print(f"❌ Error running command: {e}")
@@ -92,9 +92,15 @@ class ReleaseBuilder:
         # Clean previous build artifacts (same as batch file)
         for d in [self.project_root / "build", self.project_root / "dist"]:
             if d.exists():
-                import shutil
+                if d.resolve().parent != self.project_root.resolve():
+                    print(f"Cannot clean folder outside the project: {d}")
+                    return False
                 print(f"Cleaning: {d}")
-                shutil.rmtree(d, ignore_errors=True)
+                try:
+                    shutil.rmtree(d)
+                except OSError as e:
+                    print(f"Could not clean {d}: {e}")
+                    return False
         
         spec_file = self.project_root / "Configurator.spec"
         if not spec_file.exists():
@@ -138,26 +144,20 @@ class ReleaseBuilder:
                 # Add configuration files in EliteMining root
                 config_files = [
                     ("app/config.json.template", "config.json"),  # Use template for clean config
-                    ("LICENSE.txt", "LICENSE.txt")
+                    ("LICENSE", "LICENSE"),
+                    ("NOTICE", "NOTICE")
                 ]
                 
-                # Find versioned profile file (EliteMining v*-Profile.vap), exclude Dev profiles
-                # v4.7.8+: Look in Voiceattack Profile folder
                 profile_dir = self.project_root / "Voiceattack Profile"
-                if profile_dir.exists():
-                    profile_files = list(profile_dir.glob("EliteMining v*-Profile.vap"))
-                else:
-                    # Fallback to root if folder doesn't exist
-                    profile_files = list(self.project_root.glob("EliteMining v*-Profile.vap"))
-                # Filter out Dev profiles
-                profile_files = [f for f in profile_files if 'Dev' not in f.name]
-                if profile_files:
-                    profile_file = profile_files[0]  # Use first match
+                if not profile_dir.exists():
+                    profile_dir = self.project_root
+                profile_file = profile_dir / f"EliteMining v{version}-Profile.vap"
+                if profile_file.exists():
                     zipf.write(profile_file, f"EliteMining/{profile_file.name}")
                     print(f"✅ Added: EliteMining/{profile_file.name}")
                 else:
-                    print("⚠️  No production profile file found (EliteMining v*-Profile.vap, excluding Dev)")
-                
+                    print(f"⚠️  Production profile not found: {profile_file.name}")
+
                 for source_file, dest_file in config_files:
                     config_path = self.project_root / source_file
                     if config_path.exists():
@@ -415,7 +415,7 @@ class ReleaseBuilder:
         
         # Get version for display
         version = get_version()
-        print(f"📦 ZIP Package: Output/EliteMining_{version}.zip")
+        print(f"📦 ZIP Package: Output/EliteMining {version}.zip")
         if self.installer_iss.exists():
             print(f"💿 Installer: Output/EliteMiningSetup.exe")
         else:
