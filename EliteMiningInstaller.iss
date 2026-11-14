@@ -445,7 +445,7 @@ var
   ReleaseLine: Integer;
 begin
   ExtractTemporaryFile('INSTALLER_RELEASE_NOTES.txt');
-  ReleasePage := CreateOutputMsgMemoPage(wpWelcome, 'What''s new',
+  ReleasePage := CreateOutputMsgMemoPage(wpLicense, 'What''s new',
     'Highlights of this EliteMining release.', 'Click Next to continue.', '');
   if LoadStringsFromFile(ExpandConstant('{tmp}\INSTALLER_RELEASE_NOTES.txt'), ReleaseLines) then
     for ReleaseLine := 0 to GetArrayLength(ReleaseLines) - 1 do
