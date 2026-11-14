@@ -4,10 +4,14 @@
 
 This release includes an updated VoiceAttack profile (v5.6.1).
 
-The installer will guide you through the update process.
-Simply follow the on-screen instructions to complete the installation.
 
-After the update is commpleted, please check all your key and joystick binding
+What's changed:
+- Various improvements and fixes to the VoiceAttack profile.
+
+Keep the VoiceAttack profile option ticked on the next page to install the updated
+profile. Follow the app's profile update instructions to import it into VoiceAttack.
+
+After updating, please check all your key and joystick bindings.
 
 --------------------------------------------------------------------------------
 If you do NOT want to update the profile now, untick the option on the next

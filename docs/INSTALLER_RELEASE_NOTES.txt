@@ -1,0 +1,17 @@
+﻿What's new in EliteMining v5.6.1
+
+- Added Modern Dark and Modern Orange themes, with clearer theme names and Navy as the default for new installs.
+
+- Added column ordering and visibility controls through the Columns button, with choices saved for each table.
+
+- Double-click a system cell to open its system on Inara.
+
+- Limited sidebar resizing to keep it at a practical width.
+
+- Improved button sizes, wording and help tips across all themes.
+
+- Added Auto-load: choose one preset per ship type from the preset list, and it will load automatically when you switch to that ship type or start the app.
+
+- Open the ship preset folder directly from the right-click menu.
+
+- Made the selected ship preset easier to distinguish from the active preset.

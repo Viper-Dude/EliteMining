@@ -14,7 +14,7 @@
 
 ### VoiceAttack Profile Update (v5.6.1)
 
-- Improved multiple commands with clearer announcements and corrected wording.
+- Various improvements and fixes to the VoiceAttack profile.
 
 
 

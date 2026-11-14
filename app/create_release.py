@@ -10,6 +10,7 @@ import subprocess
 import time
 import zipfile
 import shutil
+import re
 from pathlib import Path
 
 # Add the app directory to the path to import version
@@ -272,14 +273,55 @@ class ReleaseBuilder:
             print(f"❌ Error creating ZIP package: {e}")
             return False
     
+    def generate_installer_notices(self):
+        sys.path.insert(0, str(self.project_root / "scripts"))
+        from update_version import VA_PROFILE_VERSION
+
+        patchnotes = self.project_root / "docs" / f"PATCHNOTES_v{get_version()}.md"
+        highlights = []
+        profile_highlights = []
+        section = None
+        for line in patchnotes.read_text(encoding="utf-8").splitlines():
+            if line.startswith("#"):
+                heading = line.lstrip('#').strip().lower()
+                if heading == "new features & improvements":
+                    section = highlights
+                elif heading.startswith("voiceattack profile"):
+                    section = profile_highlights
+                else:
+                    section = None
+            elif section is not None and line.startswith("- "):
+                section.append(line)
+        release_notice = self.project_root / "docs" / "INSTALLER_RELEASE_NOTES.txt"
+        release_notice.write_text(
+            f"What's new in EliteMining v{get_version()}\n\n" + "\n\n".join(highlights) + "\n",
+            encoding="utf-8-sig",
+        )
+
+        if VA_PROFILE_VERSION:
+            notice_file = self.project_root / "Voiceattack Profile" / "VA_PROFILE_UPDATE_NOTICE.txt"
+            notice = notice_file.read_text(encoding="utf-8")
+            notice = re.sub(r'(EliteMining v)[\d.]+', lambda m: m.group(1) + VA_PROFILE_VERSION, notice)
+            notice = re.sub(r'(VoiceAttack profile \(v)[\d.]+', lambda m: m.group(1) + VA_PROFILE_VERSION, notice)
+            notice = re.sub(
+                r"(?:What's changed:\n.*?\n)?(?=Keep the VoiceAttack profile option)",
+                lambda m: "What's changed:\n" + "\n".join(profile_highlights) + "\n\n",
+                notice,
+                count=1,
+                flags=re.DOTALL,
+            )
+            notice_file.write_text(notice, encoding="utf-8")
+
     def run_installer_script(self):
         """Execute the Inno Setup installer script"""
         self.print_step(5, "Creating Installer")
-        
+
         if not self.installer_iss.exists():
             print("⚠️  Installer script not found - skipping installer creation")
             print("ZIP package is available for manual installation")
             return True
+
+        self.generate_installer_notices()
         
         # Verify the executable exists and show its timestamp
         exe_path = self.project_root / "dist" / "EliteMining.exe"

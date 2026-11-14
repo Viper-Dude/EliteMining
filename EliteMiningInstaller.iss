@@ -9,6 +9,7 @@ OutputBaseFilename=EliteMiningSetup
 Compression=lzma
 SolidCompression=yes
 SetupIconFile=app\Images\logo_multi.ico
+LicenseFile=LICENSE
 ; Disable Inno's built-in Restart Manager close-apps page (unreliable/slow with our
 ; PyInstaller onefile launcher+child process). We handle detection ourselves via the
 ; app's own mutex in PrepareToInstall (see [Code]).
@@ -38,6 +39,7 @@ Type: filesandordirs; Name: "{app}\..\EliteAPI\*"; Check: ShouldInstallEliteAPI
 Type: filesandordirs; Name: "{app}\app\Sound_Packs"; Check: IsVADetected and SoundsNeedUpdate
 
 [Files]
+Source: "docs\INSTALLER_RELEASE_NOTES.txt"; Flags: dontcopy
 ; Only include specific file types from needed subfolders (exclude .py files)
 Source: "app\Images\*";    DestDir: "{app}\app\Images";    Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.py,*.pyc,__pycache__"
 ; Localization files (v4.6.7+) - required for UI translations
@@ -135,6 +137,7 @@ UninstalledAll=EliteMining has been successfully uninstalled.%n%nNOTE: Some file
 [Code]
 var
   VADetected: Boolean;
+  ReleasePage: TOutputMsgMemoWizardPage;
   { InstallPlugin: Boolean; }  { DISABLED - plugin not used }
   ProfileNeedsUpdate: Boolean;
   VABasePath: String;  { Store VoiceAttack base path for EliteAPI checking }
@@ -438,7 +441,15 @@ var
   BundledProfileVersion: String;
   StateFilePath: String;
   StateContent: AnsiString;
+  ReleaseLines: TArrayOfString;
+  ReleaseLine: Integer;
 begin
+  ExtractTemporaryFile('INSTALLER_RELEASE_NOTES.txt');
+  ReleasePage := CreateOutputMsgMemoPage(wpWelcome, 'What''s new',
+    'Highlights of this EliteMining release.', 'Click Next to continue.', '');
+  if LoadStringsFromFile(ExpandConstant('{tmp}\INSTALLER_RELEASE_NOTES.txt'), ReleaseLines) then
+    for ReleaseLine := 0 to GetArrayLength(ReleaseLines) - 1 do
+      ReleasePage.RichEditViewer.Lines.Add(ReleaseLines[ReleaseLine]);
   ExistingEliteAPIPath := '';
   ProfileNeedsUpdate := False;
   BundledProfileVersion := '5.6.1';
@@ -570,6 +581,18 @@ procedure CurPageChanged(CurPageID: Integer);
 var
   I: Integer;
 begin
+  if CurPageID = ReleasePage.ID then
+  begin
+    ReleasePage.RichEditViewer.SelStart := 0;
+    ReleasePage.RichEditViewer.SelLength := 0;
+    SendMessage(ReleasePage.RichEditViewer.Handle, $00B7, 0, 0);
+  end;
+  if CurPageID = wpInfoBefore then
+  begin
+    WizardForm.InfoBeforeMemo.SelStart := 0;
+    WizardForm.InfoBeforeMemo.SelLength := 0;
+    SendMessage(WizardForm.InfoBeforeMemo.Handle, $00B7, 0, 0);
+  end;
   { Toggle task checkboxes based on version detection }
   if CurPageID = wpSelectTasks then
   begin
