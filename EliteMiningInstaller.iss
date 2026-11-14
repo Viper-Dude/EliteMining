@@ -28,6 +28,8 @@ UninstallDisplayIcon={app}\Configurator\EliteMining.exe
 Type: files; Name: "{app}\Configurator\Configurator.exe"
 ; Delete old MIT LICENSE.txt (replaced with GPLv3 LICENSE in v4.4.1+)
 Type: files; Name: "{app}\LICENSE.txt"
+Type: files; Name: "{app}\bookmarks_debug.log"
+Type: files; Name: "{app}\app\bookmarks_debug.log"
 ; NOTE: Never delete profile files - user's choice what to keep
 ; The app handles profile version detection and keybind preservation
 ; v4.7.6+: Clean EliteAPI folder completely to ensure fresh install of all files (only if user confirmed)

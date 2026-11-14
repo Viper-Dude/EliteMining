@@ -16970,8 +16970,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         support_frame = tk.Frame(main_frame, bg=_about_bg)
         support_frame.pack(pady=(5, 0))
         
-        tk.Label(support_frame, text="☕ " + t('about.donation_text')[:50] + "...", 
-                 font=self._scaled_font(8, "italic"), fg="#aaaaaa", bg=_about_bg).pack(side="left")
+        tk.Label(support_frame, text="☕ " + t('about.donation_text'),
+                 font=self._scaled_font(8, "italic"), fg="#aaaaaa", bg=_about_bg,
+                 wraplength=380, justify="center").pack(pady=(0, 8))
         
         # PayPal button with logo image
         try:
@@ -16985,7 +16986,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     paypal_img = paypal_img.subsample(scale, scale)
                 self._about_dialog_paypal_img = paypal_img  # Keep reference
                 paypal_btn = tk.Label(support_frame, image=paypal_img, cursor="hand2", bg=_about_bg)
-                paypal_btn.pack(side="left", padx=(10, 0))
+                paypal_btn.pack()
                 paypal_btn.bind("<Button-1>", lambda e: webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=NZQTA4TGPDSC6"))
             else:
                 raise FileNotFoundError("PayPal image not found")
@@ -16995,7 +16996,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                   command=lambda: webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=NZQTA4TGPDSC6"),
                                   bg="#0070ba", fg="#ffffff", activebackground="#0060aa",
                                   relief="flat", bd=0, padx=8, pady=1, font=self._scaled_font(8), cursor="hand2")
-            paypal_btn.pack(side="left", padx=(10, 0))
+            paypal_btn.pack()
         
         # Close button
         close_btn = tk.Button(main_frame, text=t('common.close'), 
