@@ -108,6 +108,58 @@ set_translate_func(t)
 from path_utils import get_ship_presets_dir, get_reports_dir
 
 
+SHIP_TYPES = (
+    'Adder',
+    'Alliance Challenger',
+    'Alliance Chieftain',
+    'Alliance Crusader',
+    'Anaconda',
+    'Anaconda Mk II',
+    'Asp Explorer',
+    'Asp Scout',
+    'Beluga Liner',
+    'Caspian Explorer',
+    'Cobra Mk III',
+    'Cobra Mk IV',
+    'Cobra Mk V',
+    'Corsair',
+    'Diamondback Explorer',
+    'Diamondback Scout',
+    'Dolphin',
+    'Eagle Mk II',
+    'Federal Assault Ship',
+    'Federal Corvette',
+    'Federal Dropship',
+    'Federal Gunship',
+    'Fer-de-Lance',
+    'Hauler',
+    'Imperial Clipper',
+    'Imperial Courier',
+    'Imperial Cutter',
+    'Imperial Eagle',
+    'Keelback',
+    'Kestrel Mk II',
+    'Krait Mk II',
+    'Krait Phantom',
+    'Mamba',
+    'Mandalay',
+    'Orca',
+    'Panther Clipper Mk II',
+    'Python',
+    'Python Mk II',
+    'Sidewinder Mk I',
+    'Type-6 Transporter',
+    'Type-7 Transporter',
+    'Type-8 Transporter',
+    'Type-9 Heavy',
+    'Type-10 Defender',
+    'Type-11 Prospector',
+    'Viper Mk III',
+    'Viper Mk IV',
+    'Vulture',
+)
+
+
 def _foreground_window_title() -> str:
     try:
         import ctypes
@@ -2367,12 +2419,6 @@ class CargoMonitor:
         
         # Start periodic journal checking
         self.check_journal_updates()
-    
-    def clear_cargo(self):
-        """Clear all cargo items"""
-        self.cargo_items.clear()
-        self.current_cargo = 0
-        self.update_display()
     
     def reset_cargo_hold(self):
         """Reset cargo hold to actual game state using real-time Status.json data"""
@@ -6388,14 +6434,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Build the new content first, then skip the update if nothing changed
         # This prevents scrollbar jitter from delete+reinsert on every tick
-        new_content_parts = []
-        new_tags_map = []  # list of (start_offset, end_offset, tags) for special items
+        content_chunks = []
+
+        def append_content(text, tags=()):
+            content_chunks.append((text, tags))
         
         if not cargo.cargo_items:
             if cargo.current_cargo > 0:
-                new_content_parts.append(f"📊 {cargo.current_cargo}t {t('sidebar.total')}\n💡 {t('sidebar.no_item_details')}")
+                append_content(f"📊 {cargo.current_cargo}t {t('sidebar.total')}\n💡 {t('sidebar.no_item_details')}")
             else:
-                new_content_parts.append(f"📦 {t('sidebar.empty_cargo')}\n⛏️ {t('sidebar.start_mining')}")
+                append_content(f"📦 {t('sidebar.empty_cargo')}\n⛏️ {t('sidebar.start_mining')}")
         else:
             sorted_items = sorted(cargo.cargo_items.items(), key=lambda x: (x[0].lower() != 'limpet', -x[1]))
             for i, (item_name, quantity) in enumerate(sorted_items):
@@ -6409,25 +6457,25 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 name_field = f"{display_name:<12}"[:12]
                 quantity_text = f"{quantity:>4}t"
                 line = f"{icon} {name_field} {quantity_text}"
-                new_content_parts.append(line)
+                append_content(line, ("limpet_clickable", "cargo_item") if is_limpet else ("cargo_item",))
                 if i < len(sorted_items) - 1:
-                    new_content_parts.append("\n")
+                    append_content("\n")
         
         if cargo.materials_collected:
             sep_chars = 28
-            new_content_parts.append("\n" + "─" * sep_chars)
-            new_content_parts.append("\n")
-            new_content_parts.append(t('mining_session.engineering_materials'))
-            new_content_parts.append("\n")
+            append_content("\n" + "─" * sep_chars)
+            append_content("\n")
+            append_content(t('mining_session.engineering_materials'), ("section_header",))
+            append_content("\n")
             sorted_materials = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
             for i, (material_name, quantity) in enumerate(sorted_materials):
                 grade = cargo.MATERIAL_GRADES.get(material_name, 0)
                 display_name = cargo.materials_localized_names.get(material_name, material_name)[:12]
                 grade_text = f"(G{grade})"
                 line = f"{display_name} {grade_text} {quantity:>3}"
-                new_content_parts.append(line)
+                append_content(line, ("material_item",))
                 if i < len(sorted_materials) - 1:
-                    new_content_parts.append("\n")
+                    append_content("\n")
         
         has_limpets = any("limpet" in name.lower() for name in cargo.cargo_items.keys())
         if hasattr(self, '_cargo_info_tip'):
@@ -6435,12 +6483,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 "\n" + t('sidebar.limpet_click_help').strip() if has_limpets else "")
         else:
             sep_chars = 28
-            new_content_parts.append("\n" + "─" * sep_chars)
-            new_content_parts.append("\n" + t('sidebar.refinery_note'))
+            append_content("\n" + "─" * sep_chars)
+            append_content("\n" + t('sidebar.refinery_note'), ("small_italic",))
             if has_limpets:
-                new_content_parts.append("\n" + t('sidebar.limpet_click_help'))
+                append_content("\n" + t('sidebar.limpet_click_help'), ("small_italic",))
         
-        new_content_str = "".join(new_content_parts)
+        new_content_str = "".join(text for text, tags in content_chunks)
         
         # Compare with current content — skip full rewrite if unchanged
         try:
@@ -6461,121 +6509,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         self.integrated_cargo_text.delete(1.0, tk.END)
         
-        if not cargo.cargo_items:
-            if cargo.current_cargo > 0:
-                self.integrated_cargo_text.insert(tk.END, f"📊 {cargo.current_cargo}t {t('sidebar.total')}\n💡 {t('sidebar.no_item_details')}")
-            else:
-                self.integrated_cargo_text.insert(tk.END, f"📦 {t('sidebar.empty_cargo')}\n⛏️ {t('sidebar.start_mining')}")
-        else:
-            sorted_items = sorted(cargo.cargo_items.items(), key=lambda x: (x[0].lower() != 'limpet', -x[1]))
-            
-            # Configure clickable limpet tag (theme-aware color + hand cursor)
-            self.integrated_cargo_text.tag_configure("limpet_clickable", 
-                                                     foreground=self.theme_colors.get("fg", "#e0e0e0"))
-            self.integrated_cargo_text.tag_bind("limpet_clickable", "<Button-1>", 
-                                                lambda e: self.cargo_monitor.adjust_limpet_count())
-            self.integrated_cargo_text.tag_bind("limpet_clickable", "<Enter>", 
-                                                lambda e: self.integrated_cargo_text.configure(cursor="hand2"))
-            self.integrated_cargo_text.tag_bind("limpet_clickable", "<Leave>", 
-                                                lambda e: self.integrated_cargo_text.configure(cursor=""))
-            
-            # Show all items
-            for i, (item_name, quantity) in enumerate(sorted_items):
-                # Clean up item name for display - use full name, not truncated
-                display_name = item_name.replace('_', ' ').replace('$', '').title()
-                
-                # Abbreviate only "Low Temperature Diamonds" to prevent truncation
-                if display_name in ['Low Temp. Diamonds', 'Low Temperature Diamonds']:
-                    display_name = 'LTD'
-                
-                # Localize limpet to Drohne for German
-                is_limpet = "limpet" in item_name.lower()
-                if is_limpet:
-                    display_name = t('sidebar.limpet')
-                
-                # Use same symbol for all items for consistent alignment
-                icon = "●"  # Filled circle for all cargo
-                
-                # Configure tag for cargo items (10pt to match materials)
-                self.integrated_cargo_text.tag_configure("cargo_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
-                
-                # Simple fixed format: icon + space + name + spaces + quantity
-                name_field = f"{display_name:<12}"[:12]  # 12 characters for name
-                quantity_text = f"{quantity:>4}t"
-                
-                line = f"{icon} {name_field} {quantity_text}"
-                
-                # Mark start position for limpet lines (to make clickable)
-                if is_limpet:
-                    start_pos = self.integrated_cargo_text.index(tk.END)
-                    self.integrated_cargo_text.insert(tk.END, line, ("limpet_clickable", "cargo_item"))
-                else:
-                    self.integrated_cargo_text.insert(tk.END, line, "cargo_item")
-                
-                # Add newline for all but the last item
-                if i < len(sorted_items) - 1:
-                    self.integrated_cargo_text.insert(tk.END, "\n")
-        
-        # Display Engineering Materials section
-        if cargo.materials_collected:
-            # Separator width to match full cargo line including quantity
-            sep_chars = 28
-            self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
-            
-            # Configure tag for section header (larger, bold)
-            self.integrated_cargo_text.tag_configure("section_header", font=("Consolas", round(10 * self.ui_scale), "bold"))
-            
-            # Insert header with tag
-            self.integrated_cargo_text.insert(tk.END, "\n")
-            self.integrated_cargo_text.insert(tk.END, t('mining_session.engineering_materials'), "section_header")
-            self.integrated_cargo_text.insert(tk.END, "\n")
-            
-            # Sort materials alphabetically
-            sorted_materials = sorted(cargo.materials_collected.items(), key=lambda x: x[0])
-            
-            # Configure tag for material items (10pt to match header size)
-            self.integrated_cargo_text.tag_configure("material_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
-            
-            for i, (material_name, quantity) in enumerate(sorted_materials):
-                # Get grade for this material
-                grade = cargo.MATERIAL_GRADES.get(material_name, 0)
+        self.integrated_cargo_text.tag_configure("limpet_clickable",
+                                                 foreground=self.theme_colors.get("fg", "#e0e0e0"))
+        self.integrated_cargo_text.tag_bind("limpet_clickable", "<Button-1>",
+                                            lambda e: self.cargo_monitor.adjust_limpet_count())
+        self.integrated_cargo_text.tag_bind("limpet_clickable", "<Enter>",
+                                            lambda e: self.integrated_cargo_text.configure(cursor="hand2"))
+        self.integrated_cargo_text.tag_bind("limpet_clickable", "<Leave>",
+                                            lambda e: self.integrated_cargo_text.configure(cursor=""))
+        self.integrated_cargo_text.tag_configure("cargo_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
+        self.integrated_cargo_text.tag_configure("section_header", font=("Consolas", round(10 * self.ui_scale), "bold"))
+        self.integrated_cargo_text.tag_configure("material_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
+        self.integrated_cargo_text.tag_configure("small_italic", font=self._scaled_font(8, "italic"), foreground="#888888", justify="left")
 
-                # Use localized name for display if available, otherwise use English name
-                display_name = cargo.materials_localized_names.get(material_name, material_name)[:12]
-                grade_text = f"(G{grade})"
-                line = f"{display_name} {grade_text} {quantity:>3}"
-                self.integrated_cargo_text.insert(tk.END, line, "material_item")
-                
-                # Add newline for all but the last item
-                if i < len(sorted_materials) - 1:
-                    self.integrated_cargo_text.insert(tk.END, "\n")
-        
-        if not hasattr(self, '_cargo_info_tip'):
-            # Add refinery note at the very bottom with proper spacing
-            # Separator width to match full cargo line including quantity
-            sep_chars = 28
-            self.integrated_cargo_text.insert(tk.END, "\n" + "─" * sep_chars)
-        
-            # Configure tag for small italic text - left aligned
-            self.integrated_cargo_text.tag_configure("small_italic", font=self._scaled_font(8, "italic"), foreground="#888888", justify="left")
-        
-            # Insert refinery note with formatting - get position before inserting
-            note_start_index = self.integrated_cargo_text.index(tk.INSERT)
-            self.integrated_cargo_text.insert(tk.END, "\n" + t('sidebar.refinery_note'))
-        
-            # Add limpet help text if limpets are present
-            has_limpets = any("limpet" in name.lower() for name in cargo.cargo_items.keys())
-            if has_limpets:
-                self.integrated_cargo_text.insert(tk.END, "\n" + t('sidebar.limpet_click_help'))
-        
-            note_end_index = self.integrated_cargo_text.index(tk.INSERT)
-        
-            # Apply formatting to the note text only
-            try:
-                self.integrated_cargo_text.tag_add("small_italic", note_start_index, note_end_index)
-            except tk.TclError:
-                # If tagging fails, just continue without formatting
-                pass
+        for text, tags in content_chunks:
+            self.integrated_cargo_text.insert(tk.END, text, tags)
 
         self.integrated_cargo_text.configure(state="disabled")
         
@@ -9922,7 +9870,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._preset_menu.add_separator()
         self._preset_menu.add_command(label=t('context_menu.edit'), command=self._edit_selected_preset)
         self._preset_menu.add_command(label=t('context_menu.duplicate'), command=self._duplicate_selected_preset)
-        self._preset_menu.add_command(label=t('context_menu.rename'), command=self._rename_selected_preset)
         self._preset_menu.add_separator()
         self._preset_menu.add_command(label=t('context_menu.export'), command=self._export_selected_preset)
         self._preset_menu.add_command(label=t('context_menu.import'), command=self._import_preset_file)
@@ -12473,33 +12420,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             (ship_type, variant) tuple
         """
         # Known ship types (must match the dropdown list, longest first for proper matching)
-        known_ships = [
-            "Alliance Challenger", "Alliance Chieftain", "Alliance Crusader",
-            "Asp Explorer", "Asp Scout",
-            "Beluga Liner",
-            "Caspian Explorer",
-            "Cobra Mk III", "Cobra Mk IV", "Cobra Mk V",
-            "Corsair",
-            "Diamondback Explorer", "Diamondback Scout",
-            "Dolphin",
-            "Eagle Mk II",
-            "Federal Assault Ship", "Federal Corvette", "Federal Dropship", "Federal Gunship",
-            "Fer-de-Lance",
-            "Hauler",
-            "Imperial Clipper", "Imperial Courier", "Imperial Cutter", "Imperial Eagle",
-            "Keelback", "Kestrel Mk II",
-            "Krait Mk II", "Krait Phantom",
-            "Mamba", "Mandalay",
-            "Orca",
-            "Panther Clipper Mk II",
-            "Python Mk II", "Python",
-            "Sidewinder Mk I",
-            "Type-11 Prospector", "Type-10 Defender", "Type-9 Heavy", 
-            "Type-8 Transporter", "Type-7 Transporter", "Type-6 Transporter",
-            "Viper Mk III", "Viper Mk IV",
-            "Vulture",
-            "Anaconda Mk II", "Anaconda", "Adder",  # Short names last
-        ]
+        known_ships = sorted(SHIP_TYPES, key=len, reverse=True)
         
         # Try to match against known ship names
         name_to_check = preset_name
@@ -12895,57 +12816,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _ask_new_preset_name(self, preselect_ship: Optional[str] = None) -> Optional[str]:
         """Dialog for creating new preset with Ship Type dropdown and custom name"""
         # Complete Elite Dangerous ship list (alphabetical)
-        ship_types = [
-            "Adder",
-            "Alliance Challenger",
-            "Alliance Chieftain",
-            "Alliance Crusader",
-            "Anaconda",
-            "Anaconda Mk II",
-            "Asp Explorer",
-            "Asp Scout",
-            "Beluga Liner",
-            "Caspian Explorer",
-            "Cobra Mk III",
-            "Cobra Mk IV",
-            "Cobra Mk V",
-            "Corsair",
-            "Diamondback Explorer",
-            "Diamondback Scout",
-            "Dolphin",
-            "Eagle Mk II",
-            "Federal Assault Ship",
-            "Federal Corvette",
-            "Federal Dropship",
-            "Federal Gunship",
-            "Fer-de-Lance",
-            "Hauler",
-            "Imperial Clipper",
-            "Imperial Courier",
-            "Imperial Cutter",
-            "Imperial Eagle",
-            "Keelback",
-            "Kestrel Mk II",
-            "Krait Mk II",
-            "Krait Phantom",
-            "Mamba",
-            "Mandalay",
-            "Orca",
-            "Panther Clipper Mk II",
-            "Python",
-            "Python Mk II",
-            "Sidewinder Mk I",
-            "Type-6 Transporter",
-            "Type-7 Transporter",
-            "Type-8 Transporter",
-            "Type-9 Heavy",
-            "Type-10 Defender",
-            "Type-11 Prospector",
-            "Viper Mk III",
-            "Viper Mk IV",
-            "Vulture",
-            "Other"
-        ]
+        ship_types = (*SHIP_TYPES, "Other")
         
         dialog = tk.Toplevel(self)
         dialog.withdraw()  # Hide while setting up
@@ -13215,52 +13086,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             messagebox.showerror("Edit failed", str(e))
 
-    def _ask_edit_preset_name(self, detected_ship: str, detected_variant: str, original_name: str) -> Optional[str]:
-        """Dialog for editing preset - change ship type and build name"""
+    def _ask_edit_preset_name(self, detected_ship: str, detected_variant: str, original_name: str, *, importing: bool = False) -> Optional[str]:
+        """Choose the ship type and build name when editing or importing a preset."""
         # Complete Elite Dangerous ship list (alphabetical)
-        ship_types = [
-            "Adder",
-            "Alliance Challenger", "Alliance Chieftain", "Alliance Crusader",
-            "Anaconda",
-            "Anaconda Mk II",
-            "Asp Explorer", "Asp Scout",
-            "Beluga Liner",
-            "Caspian Explorer",
-            "Cobra Mk III", "Cobra Mk IV", "Cobra Mk V",
-            "Corsair",
-            "Diamondback Explorer", "Diamondback Scout",
-            "Dolphin",
-            "Eagle Mk II",
-            "Federal Assault Ship", "Federal Corvette", "Federal Dropship", "Federal Gunship",
-            "Fer-de-Lance",
-            "Hauler",
-            "Imperial Clipper", "Imperial Courier", "Imperial Cutter", "Imperial Eagle",
-            "Keelback",
-            "Krait Mk II", "Krait Phantom",
-            "Mamba", "Mandalay",
-            "Orca",
-            "Panther Clipper Mk II",
-            "Python", "Python Mk II",
-            "Sidewinder Mk I",
-            "Type-6 Transporter", "Type-7 Transporter", "Type-8 Transporter",
-            "Type-9 Heavy", "Type-10 Defender", "Type-11 Prospector",
-            "Viper Mk III", "Viper Mk IV",
-            "Vulture",
-            "Other"
-        ]
+        ship_types = (*SHIP_TYPES, "Other")
         
         dialog = tk.Toplevel(self)
         dialog.withdraw()
-        dialog.title(t('dialogs.edit_ship_preset'))
+        dialog.title(t('dialogs.import_ship_preset' if importing else 'dialogs.edit_ship_preset'))
         dialog.configure(bg="#1e1e1e")
-        dialog.geometry("550x300")
-        dialog.resizable(True, True)
-        dialog.minsize(480, 280)
-        # dialog.transient(self)  # Disabled - causes focus issues
-        try:
-            dialog.grab_set()
-        except:
-            pass
+        dialog.geometry("480x280" if importing else "550x300")
+        dialog.resizable(not importing, not importing)
+        if not importing:
+            dialog.minsize(480, 280)
         
         # Theme-aware accent color
         if self.current_theme == "elite_orange":
@@ -13291,22 +13129,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception:
             pass
         
-        # Center on parent
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
-        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
-        
         result = None
         
         # Title
-        title_label = tk.Label(dialog, text="✏️ Edit Ship Preset", 
+        title_label = tk.Label(dialog, text="📥 Import Ship Preset" if importing else "✏️ Edit Ship Preset",
                               bg="#1e1e1e", fg=accent_color, 
                               font=self._scaled_font(12, "bold"))
         title_label.pack(pady=(15, 5))
         
         # Show current name
-        orig_label = tk.Label(dialog, text=f"Current: {original_name}", 
+        orig_label = tk.Label(dialog, text=f"Original: {original_name}" if importing else f"Current: {original_name}",
                              bg="#1e1e1e", fg="#888888", 
                              font=self._scaled_font(9))
         orig_label.pack(pady=(0, 10))
@@ -13391,7 +13223,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         def on_cancel():
             dialog.destroy()
             
-        ok_btn = tk.Button(btn_frame, text="✏️ Save", command=on_ok,
+        ok_btn = tk.Button(btn_frame, text="📥 Import" if importing else "✏️ Save", command=on_ok,
                           bg=accent_color, fg=accent_fg, font=self._scaled_font(10, "bold"),
                           activebackground=accent_color, activeforeground=accent_fg,
                           width=10, cursor="hand2")
@@ -13406,12 +13238,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         dialog.bind('<Return>', lambda e: on_ok())
         dialog.bind('<Escape>', lambda e: on_cancel())
         
+        dialog.update_idletasks()
+        center_window(dialog, self.winfo_toplevel())
         dialog.deiconify()
         
         # Force dialog to stay on top and have focus
         dialog.attributes('-topmost', True)
         dialog.lift()
         dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except:
+            pass
         
         name_entry.focus_set()
         
@@ -13427,11 +13265,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         dialog.wait_window()
         return result
-
-    def _rename_selected_preset(self) -> None:
-        """Rename the selected preset - just call the Edit function"""
-        # Rename uses the same Edit dialog - Edit handles the full workflow
-        self._edit_selected_preset()
 
     # ==================== DISTANCE CALCULATOR TAB ====================
     
@@ -14597,217 +14430,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             messagebox.showerror("Import preset failed", str(e))
 
     def _ask_import_preset_name(self, detected_ship: str, detected_variant: str, original_name: str) -> Optional[str]:
-        """Dialog for importing preset - select ship type and build name"""
-        # Complete Elite Dangerous ship list (alphabetical)
-        ship_types = [
-            "Adder",
-            "Alliance Challenger", "Alliance Chieftain", "Alliance Crusader",
-            "Anaconda",
-            "Anaconda Mk II",
-            "Asp Explorer", "Asp Scout",
-            "Beluga Liner",
-            "Caspian Explorer",
-            "Cobra Mk III", "Cobra Mk IV", "Cobra Mk V",
-            "Corsair",
-            "Diamondback Explorer", "Diamondback Scout",
-            "Dolphin",
-            "Eagle Mk II",
-            "Federal Assault Ship", "Federal Corvette", "Federal Dropship", "Federal Gunship",
-            "Fer-de-Lance",
-            "Hauler",
-            "Imperial Clipper", "Imperial Courier", "Imperial Cutter", "Imperial Eagle",
-            "Keelback",
-            "Krait Mk II", "Krait Phantom",
-            "Mamba", "Mandalay",
-            "Orca",
-            "Panther Clipper Mk II",
-            "Python", "Python Mk II",
-            "Sidewinder Mk I",
-            "Type-6 Transporter", "Type-7 Transporter", "Type-8 Transporter",
-            "Type-9 Heavy", "Type-10 Defender", "Type-11 Prospector",
-            "Viper Mk III", "Viper Mk IV",
-            "Vulture",
-            "Other"
-        ]
-        
-        dialog = tk.Toplevel(self)
-        dialog.withdraw()
-        dialog.title(t('dialogs.import_ship_preset'))
-        dialog.configure(bg="#1e1e1e")
-        dialog.geometry("480x280")
-        dialog.resizable(False, False)
-        # dialog.transient(self)  # Disabled - causes focus issues
-        try:
-            dialog.grab_set()
-        except:
-            pass
-        
-        # Theme-aware accent color
-        if self.current_theme == "elite_orange":
-            accent_color = "#ff8c00"
-            accent_fg = "#000000"
-        else:
-            accent_color = "#4a9eff"
-            accent_fg = "#ffffff"
-        
-        # Configure theme style for combobox
-        style = ttk.Style(dialog)
-        style.configure("Preset.TCombobox", 
-                       fieldbackground="#2d2d2d",
-                       background="#2d2d2d",
-                       foreground="#ffffff",
-                       selectbackground=accent_color,
-                       selectforeground=accent_fg)
-        style.map("Preset.TCombobox",
-                 fieldbackground=[("readonly", "#2d2d2d")],
-                 selectbackground=[("readonly", accent_color)],
-                 selectforeground=[("readonly", accent_fg)])
-        
-        # Set app icon
-        try:
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                dialog.iconbitmap(icon_path)
-        except Exception:
-            pass
-        
-        # Center on parent
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
-        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
-        
-        result = None
-        
-        # Title
-        title_label = tk.Label(dialog, text="📥 Import Ship Preset", 
-                              bg="#1e1e1e", fg=accent_color, 
-                              font=self._scaled_font(12, "bold"))
-        title_label.pack(pady=(15, 5))
-        
-        # Show original filename
-        orig_label = tk.Label(dialog, text=f"Original: {original_name}", 
-                             bg="#1e1e1e", fg="#888888", 
-                             font=self._scaled_font(9))
-        orig_label.pack(pady=(0, 10))
-        
-        # Ship Type selection
-        type_frame = tk.Frame(dialog, bg="#1e1e1e")
-        type_frame.pack(fill="x", padx=25, pady=(0, 10))
-        
-        tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
-                font=self._scaled_font(10)).pack(side=tk.LEFT)
-        
-        # Find best match for detected ship
-        ship_var = tk.StringVar()
-        if detected_ship in ship_types:
-            ship_var.set(detected_ship)
-        else:
-            # Try case-insensitive match
-            for s in ship_types:
-                if s.lower() == detected_ship.lower():
-                    ship_var.set(s)
-                    break
-            else:
-                ship_var.set(ship_types[0])
-        
-        ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
-                                  state="readonly", width=28, font=self._scaled_font(10),
-                                  style="Preset.TCombobox")
-        ship_combo.pack(side=tk.LEFT, padx=(15, 0))
-        
-        # Build name entry
-        name_frame = tk.Frame(dialog, bg="#1e1e1e")
-        name_frame.pack(fill="x", padx=25, pady=10)
-        
-        tk.Label(name_frame, text="Build Name:", bg="#1e1e1e", fg="#ffffff", 
-                font=self._scaled_font(10)).pack(side=tk.LEFT)
-        
-        name_entry = tk.Entry(name_frame, font=self._scaled_font(10), width=30,
-                             bg="#2d2d2d", fg="#ffffff", insertbackground=accent_color,
-                             selectbackground=accent_color, selectforeground=accent_fg,
-                             relief="flat", bd=2)
-        name_entry.pack(side=tk.LEFT, padx=(10, 0))
-        if detected_variant:
-            name_entry.insert(0, detected_variant)
-        
-        # Preview
-        preview_frame = tk.Frame(dialog, bg="#1e1e1e")
-        preview_frame.pack(fill="x", padx=25, pady=10)
-        
-        tk.Label(preview_frame, text="New Name:", bg="#1e1e1e", fg="#888888", 
-                font=self._scaled_font(9)).pack(side=tk.LEFT)
-        
-        preview_label = tk.Label(preview_frame, text="", bg="#1e1e1e", fg=accent_color, 
-                                font=self._scaled_font(10, "bold"))
-        preview_label.pack(side=tk.LEFT, padx=(10, 0))
-        
-        def update_preview(*args):
-            ship = ship_var.get()
-            name = name_entry.get().strip()
-            if name:
-                preview_label.config(text=f"{ship} {name}")
-            else:
-                preview_label.config(text=f"{ship}")
-        
-        ship_var.trace("w", update_preview)
-        name_entry.bind("<KeyRelease>", update_preview)
-        update_preview()
-        
-        # Buttons frame
-        btn_frame = tk.Frame(dialog, bg="#1e1e1e")
-        btn_frame.pack(pady=15)
-        
-        def on_ok():
-            nonlocal result
-            ship = ship_var.get()
-            name = name_entry.get().strip()
-            if name:
-                result = f"{ship} {name}"
-            else:
-                result = ship
-            dialog.destroy()
-            
-        def on_cancel():
-            dialog.destroy()
-            
-        ok_btn = tk.Button(btn_frame, text="📥 Import", command=on_ok,
-                          bg=accent_color, fg=accent_fg, font=self._scaled_font(10, "bold"),
-                          activebackground=accent_color, activeforeground=accent_fg,
-                          width=10, cursor="hand2")
-        ok_btn.pack(side=tk.LEFT, padx=5)
-        
-        cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
-                              bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
-                              activebackground="#4a4a4a", activeforeground="#ffffff",
-                              width=10, cursor="hand2")
-        cancel_btn.pack(side=tk.LEFT, padx=5)
-        
-        dialog.bind('<Return>', lambda e: on_ok())
-        dialog.bind('<Escape>', lambda e: on_cancel())
-        
-        dialog.deiconify()
-        
-        # Force dialog to stay on top and have focus
-        dialog.attributes('-topmost', True)
-        dialog.lift()
-        dialog.focus_force()
-        
-        name_entry.focus_set()
-        
-        # Keep dialog on top while open
-        def keep_on_top():
-            try:
-                if dialog.winfo_exists():
-                    dialog.lift()
-                    dialog.after(100, keep_on_top)
-            except:
-                pass
-        dialog.after(100, keep_on_top)
-        
-        dialog.wait_window()
-        return result
-
+        return self._ask_edit_preset_name(detected_ship, detected_variant, original_name, importing=True)
     def _show_preset_menu(self, event) -> None:
         """Show context menu for presets or empty space"""
         try:
@@ -16439,15 +16062,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.main_paned.forget(self._sidebar_frame)
             self._sidebar_visible = False
         else:
-            self.main_paned.add(self._sidebar_frame, weight=1)
+            sidebar_width = getattr(self, '_last_sidebar_width', self._scaled_px(300))
+
+            # Use the last actual width instead of the children's wider size request on reinsert.
+            self._sidebar_frame.grid_propagate(False)
+            self._sidebar_frame.configure(width=self._sidebar_frame.winfo_width())
+            self.main_paned.add(self._sidebar_frame, weight=0)
             self._sidebar_visible = True
-
-            def _restore_sash():
-                self.main_paned.update_idletasks()
-                sidebar_width = getattr(self, '_last_sidebar_width', self._scaled_px(300))
-                self._constrain_sidebar_width(self.main_paned.winfo_width() - sidebar_width)
-
-            self.after(50, _restore_sash)
+            self.main_paned.update_idletasks()
+            self._constrain_sidebar_width(self.main_paned.winfo_width() - sidebar_width)
+            self.main_paned.pane(self._sidebar_frame, weight=1)
+            self._sidebar_frame.grid_propagate(True)
+            self.main_paned.update_idletasks()
 
     _MODERN_REMAP = {"#1e1e1e": modern_color("#14171B"), "#1a1a1a": modern_color("#14171B"), "#2d2d2d": modern_color("#1D2228"), "#2b2b2b": modern_color("#1D2228"),
                      "#252525": modern_color("#1D2228"), "#282828": modern_color("#1D2228"), "#2a2a2a": modern_color("#1D2228")}
