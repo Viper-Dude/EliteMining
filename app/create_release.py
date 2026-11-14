@@ -274,8 +274,8 @@ class ReleaseBuilder:
             return False
     
     def generate_installer_notices(self):
-        sys.path.insert(0, str(self.project_root / "scripts"))
-        from update_version import VA_PROFILE_VERSION
+        sys.path.insert(0, str(self.project_root))
+        from scripts.update_version import VA_PROFILE_VERSION
 
         patchnotes = self.project_root / "docs" / f"PATCHNOTES_v{get_version()}.md"
         highlights = []
