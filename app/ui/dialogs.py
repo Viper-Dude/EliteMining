@@ -3,6 +3,7 @@
 EliteMining Dialog Helpers
 Centered dialog utilities for Yes/No prompts, info messages, etc.
 """
+from ui.theme import modern_color
 
 import tkinter as tk
 from tkinter import ttk
@@ -150,11 +151,11 @@ def centered_info_dialog(parent, title, message):
         fg_color = "#ff8c00"
         btn_bg = "#1a1a1a"
         btn_fg = "#ff9900"
-    elif theme == "modern":
-        bg_color = "#14171B"
-        fg_color = "#E6EAF0"
-        btn_bg = "#FF9A32"
-        btn_fg = "#14171B"
+    elif theme in ("modern", "modern_slate", "modern_orange"):
+        bg_color = modern_color("#14171B")
+        fg_color = modern_color("#E6EAF0")
+        btn_bg = modern_color("#FF9A32")
+        btn_fg = modern_color("#14171B")
     else:
         bg_color = "#1e1e1e"
         fg_color = "#569cd6"

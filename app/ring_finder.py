@@ -3,6 +3,7 @@
 Hotspot Finder Module for EliteMining
 Provides mining hotspot location services with live API data integration
 """
+from ui.theme import modern_color
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -170,7 +171,7 @@ class ToolTip:
 # Ring finder module - searches for ring compositions in Elite Dangerous systems
 
 
-from column_visibility_helper import ColumnVisibilityMixin
+from column_visibility_helper import ColumnVisibilityMixin, displayed_column
 
 
 class RingFinder(ColumnVisibilityMixin):
@@ -431,9 +432,9 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Main container with scrollable frame
         from config import load_theme as _lt_canvas
-        _modern_canvas = _lt_canvas() == "modern"
+        _modern_canvas = _lt_canvas() in ("modern", "modern_slate", "modern_orange")
         # Modern: no default highlight border (it draws a bright line around the page)
-        canvas = tk.Canvas(self.parent, bg='#14171B' if _modern_canvas else '#2b2b2b',
+        canvas = tk.Canvas(self.parent, bg=modern_color('#14171B') if _modern_canvas else '#2b2b2b',
                            **({"highlightthickness": 0} if _modern_canvas else {}))
         scrollbar = ttk.Scrollbar(self.parent, orient="vertical", command=canvas.yview)
         self.scrollable_frame = ttk.Frame(canvas)
@@ -471,18 +472,18 @@ class RingFinder(ColumnVisibilityMixin):
         search_header = ttk.Frame(self.scrollable_frame)
         from config import load_theme as _load_theme_for_header
         _sh_theme = _load_theme_for_header()
-        if _sh_theme != "modern":  # Modern drops this row; the help link moves to the Distances row
+        if _sh_theme not in ("modern", "modern_slate", "modern_orange"):  # Modern drops this row; the help link moves to the Distances row
             search_header.pack(fill="x", padx=10, pady=5)
-        _sh_bg = "#0a0a0a" if _sh_theme == "elite_orange" else ("#14171B" if _sh_theme == "modern" else "#1e1e1e")
+        _sh_bg = "#0a0a0a" if _sh_theme == "elite_orange" else (modern_color("#14171B") if _sh_theme in ("modern", "modern_slate", "modern_orange") else "#1e1e1e")
         
         # Search frame title and help text
         search_title = ttk.Label(search_header, text=t('ring_finder.title'), font=scaled_font(9, "bold"))
-        if _sh_theme != "modern":
+        if _sh_theme not in ("modern", "modern_slate", "modern_orange"):
             search_title.pack(side="left")
 
         # Help link - opens Hotspot Finder section of README on GitHub
         from ui.help_link import create_help_link
-        if _sh_theme != "modern":
+        if _sh_theme not in ("modern", "modern_slate", "modern_orange"):
             help_link = create_help_link(search_header, "hotspot-finder", t('ring_finder.help_tooltip'), ToolTip)
             help_link.pack(side="left", padx=(6, 0))
 
@@ -490,19 +491,19 @@ class RingFinder(ColumnVisibilityMixin):
         self.status_var = tk.StringVar(value="Loading...")
         status_label = ttk.Label(search_header, textvariable=self.status_var,
                                 font=scaled_font(8), foreground="#888888")
-        if _sh_theme != "modern":  # Modern shows this text above the results table instead
+        if _sh_theme not in ("modern", "modern_slate", "modern_orange"):  # Modern shows this text above the results table instead
             status_label.pack(side="right")
 
         # EDDN/Spansh connectivity status, right-aligned just left of the status label
         self.spansh_status_label = tk.Label(search_header, text="⚫ Spansh: checking...",
                                             font=scaled_font(8), fg="#888888", bg=_sh_bg)
-        if _sh_theme != "modern":
+        if _sh_theme not in ("modern", "modern_slate", "modern_orange"):
             self.spansh_status_label.pack(side="right", padx=(0, 15))
         ToolTip(self.spansh_status_label, "Spansh API status - checks connectivity to spansh.co.uk")
 
         self.eddn_status_label = tk.Label(search_header, text="⚫ EDDN: checking...",
                                           font=scaled_font(8), fg="#888888", bg=_sh_bg)
-        if _sh_theme != "modern":
+        if _sh_theme not in ("modern", "modern_slate", "modern_orange"):
             self.eddn_status_label.pack(side="right", padx=(0, 10))
         ToolTip(self.eddn_status_label, "EDDN status - live data feed for PowerPlay and market data")
         
@@ -513,7 +514,7 @@ class RingFinder(ColumnVisibilityMixin):
         # Get theme colors
         from config import load_theme
         rf_theme = load_theme()
-        rf_bg = "#0a0a0a" if rf_theme == "elite_orange" else ("#14171B" if rf_theme == "modern" else "#1e1e1e")
+        rf_bg = "#0a0a0a" if rf_theme == "elite_orange" else (modern_color("#14171B") if rf_theme in ("modern", "modern_slate", "modern_orange") else "#1e1e1e")
         rf_value_fg = "#ffcc00"  # Yellow for values in both themes
         
         ttk.Label(distance_header, text=t('ring_finder.distances'), font=scaled_font(9, "bold")).pack(side="left", padx=(0, 5))
@@ -527,7 +528,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.db_info_var = tk.StringVar(value=t('ring_finder.total_hotspots_in_systems').format(hotspots="...", systems="..."))
         db_info_label = tk.Label(distance_header, textvariable=self.db_info_var,
                                 font=scaled_font(8, "italic"), foreground="#888888", bg=rf_bg)
-        if _sh_theme == "modern":
+        if _sh_theme in ("modern", "modern_slate", "modern_orange"):
             create_help_link(distance_header, "hotspot-finder", t('ring_finder.help_tooltip'), ToolTip).pack(
                 side="right", padx=(8, 0))
         db_info_label.pack(side="right")
@@ -545,14 +546,14 @@ class RingFinder(ColumnVisibilityMixin):
         search_frame.grid_columnconfigure(6, weight=1)  # Let column 6 take remaining space
 
         from config import load_theme as _lt_form
-        _modern_form = _lt_form() == "modern"
+        _modern_form = _lt_form() in ("modern", "modern_slate", "modern_orange")
         if _modern_form:
             # Containers re-gridded into the Modern layout after the form is built
-            self._rf_primary = tk.Frame(search_frame, bg="#14171B")
-            self._rf_more = tk.Frame(search_frame, bg="#14171B")
-            self._rf_flags = tk.Frame(search_frame, bg="#14171B")
-            self._rf_dist = tk.Frame(search_frame, bg="#14171B")
-            self._rf_actions = tk.Frame(search_frame, bg="#14171B")
+            self._rf_primary = tk.Frame(search_frame, bg=modern_color("#14171B"))
+            self._rf_more = tk.Frame(search_frame, bg=modern_color("#14171B"))
+            self._rf_flags = tk.Frame(search_frame, bg=modern_color("#14171B"))
+            self._rf_dist = tk.Frame(search_frame, bg=modern_color("#14171B"))
+            self._rf_actions = tk.Frame(search_frame, bg=modern_color("#14171B"))
             self._more_open = False
         
         # Single smart search input
@@ -577,9 +578,9 @@ class RingFinder(ColumnVisibilityMixin):
         if _cb_theme == "elite_orange":
             _cb_bg = "#000000"  # Black background for orange theme
             _cb_select = "#000000"
-        elif _cb_theme == "modern":
-            _cb_bg = "#14171B"
-            _cb_select = "#262C34"
+        elif _cb_theme in ("modern", "modern_slate", "modern_orange"):
+            _cb_bg = modern_color("#14171B")
+            _cb_select = modern_color("#262C34")
         else:
             _cb_bg = "#1e1e1e"
             _cb_select = "#1e1e1e"
@@ -777,7 +778,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         reset_btn_fg = "#ff8c00" if _cb_theme == "elite_orange" else "#ffffff"
         reset_btn_active_fg = "#ffa500" if _cb_theme == "elite_orange" else "#ffffff"
-        reset_btn = self._rf_button(self._rf_actions if _modern_form else pp_inner_row, text=t('ring_finder.reset_short' if _modern_form else 'ring_finder.reset_filters'),
+        reset_btn = self._rf_button(self._rf_actions if _modern_form else pp_inner_row, text=t('ring_finder.reset_filters'),
                              command=self._reset_filters,
                              bg="#3a3a3a", fg=reset_btn_fg,
                              activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
@@ -786,7 +787,7 @@ class RingFinder(ColumnVisibilityMixin):
         reset_btn.pack(side="left", padx=(15, 0))
         ToolTip(reset_btn, t('ring_finder.reset_filters_tooltip'))
 
-        best_mining_btn = self._rf_button(self._rf_actions if _modern_form else pp_inner_row, text=t('ring_finder.find_best_short' if _modern_form else 'ring_finder.find_best_mining_system'),
+        best_mining_btn = self._rf_button(self._rf_actions if _modern_form else pp_inner_row, text=t('ring_finder.find_best_mining_system'),
                              command=self._show_reverse_search_dialog,
                              bg="#3a3a3a", fg=reset_btn_fg,
                              activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
@@ -1078,14 +1079,14 @@ class RingFinder(ColumnVisibilityMixin):
         results_header.pack(fill="x", padx=10, pady=(2, 0))
         
         ttk.Label(results_header, text=t('ring_finder.search_results'), font=scaled_font(9, "bold")).pack(side="left")
-        ttk.Label(results_header, text=t('ring_finder.right_click_help'),
-                 font=scaled_font(8), foreground="#666666").pack(side="left", padx=(10, 0))
+        results_info = ttk.Label(results_header, text="\u24d8", foreground=modern_color("#8A94A3"),
+                                 cursor="hand2", font=scaled_font(10))
+        results_info.pack(side="left", padx=(6, 2))
+        ToolTip(results_info, t('ring_finder.right_click_help'))
+        self._columns_btn = self._cv_add_columns_button(results_header, 'ring_finder')
         if _modern_form:
-            self._columns_btn = self._rf_button(results_header, text=t('ring_finder.columns_button') + " \u25be",
-                                                command=self._show_columns_menu)
-            self._columns_btn.pack(side="right", padx=(8, 0))
             ttk.Label(results_header, textvariable=self.status_var, font=scaled_font(9, "bold"),
-                      foreground="#E6EAF0").pack(side="right", padx=(0, 12))
+                      foreground=modern_color("#E6EAF0")).pack(side="right", padx=(0, 12))
 
         from config import load_theme as _load_theme_for_new_entries
         _new_entries_fg = "#ff8c00" if _load_theme_for_new_entries() == "elite_orange" else "#e8b84b"
@@ -1111,11 +1112,11 @@ class RingFinder(ColumnVisibilityMixin):
             header_bg = "#1a1a1a"
             selection_bg = "#ff6600"
             selection_fg = "#000000"
-        elif current_theme == "modern":
-            tree_bg = "#1D2228"
-            tree_fg = "#E6EAF0"
-            header_bg = "#14171B"
-            selection_bg = "#4A3520"
+        elif current_theme in ("modern", "modern_slate", "modern_orange"):
+            tree_bg = modern_color("#1D2228")
+            tree_fg = modern_color("#E6EAF0")
+            header_bg = modern_color("#14171B")
+            selection_bg = modern_color("#4A3520")
             selection_fg = "#FFFFFF"
         else:
             tree_bg = "#1e1e1e"
@@ -1321,7 +1322,8 @@ class RingFinder(ColumnVisibilityMixin):
             columns=visibility_columns,
             default_widths={col: max(scaled_px(w), _minwidths[col]) for col, w in self.column_default_widths.items()},
             config_key='ring_finder',
-            use_displaycolumns=True
+            use_displaycolumns=True,
+            allow_reorder=True
         )
 
         # Bind column resize event to save widths
@@ -1361,11 +1363,11 @@ class RingFinder(ColumnVisibilityMixin):
             # Only color Spansh results - keep database with normal orange theme colors
             self.results_tree.tag_configure('oddrow_spansh', background='#1e1e1e', foreground='#00ddff')  # Bright cyan
             self.results_tree.tag_configure('evenrow_spansh', background='#252525', foreground='#00ddff')
-        elif current_theme == "modern":
-            self.results_tree.tag_configure('oddrow', background='#1D2228', foreground='#E6EAF0')
-            self.results_tree.tag_configure('evenrow', background='#232A31', foreground='#E6EAF0')
-            self.results_tree.tag_configure('oddrow_spansh', background='#1D2228', foreground='#7CC4F0')
-            self.results_tree.tag_configure('evenrow_spansh', background='#232A31', foreground='#7CC4F0')
+        elif current_theme in ("modern", "modern_slate", "modern_orange"):
+            self.results_tree.tag_configure('oddrow', background=modern_color('#1D2228'), foreground=modern_color('#E6EAF0'))
+            self.results_tree.tag_configure('evenrow', background=modern_color('#232A31'), foreground=modern_color('#E6EAF0'))
+            self.results_tree.tag_configure('oddrow_spansh', background=modern_color('#1D2228'), foreground='#7CC4F0')
+            self.results_tree.tag_configure('evenrow_spansh', background=modern_color('#232A31'), foreground='#7CC4F0')
         else:
             self.results_tree.tag_configure('oddrow', background='#1e1e1e', foreground='#e6e6e6')
             self.results_tree.tag_configure('evenrow', background='#282828', foreground='#e6e6e6')
@@ -2884,18 +2886,11 @@ class RingFinder(ColumnVisibilityMixin):
             self._rf_more.grid_remove()
         self._refresh_more_btn()
 
-    def _show_columns_menu(self):
-        class _Pos:
-            pass
-        pos = _Pos()
-        pos.x_root = self._columns_btn.winfo_rootx()
-        pos.y_root = self._columns_btn.winfo_rooty() + self._columns_btn.winfo_height()
-        self._cv_show_menu(pos, 'ring_finder')
 
     def _rf_button(self, parent, primary=False, **kw):
         """tk.Button, or a rounded flat button when the Modern theme is active."""
         from config import load_theme, scaled_font, scaled_px
-        if load_theme() == "modern":
+        if load_theme() in ("modern", "modern_slate", "modern_orange"):
             from ui.modern_widgets import RoundedButton
             return RoundedButton(parent, text=kw.get("text", ""), command=kw.get("command"), primary=primary,
                                  font=scaled_font(9, "bold" if primary else "normal"),
@@ -6703,7 +6698,7 @@ class RingFinder(ColumnVisibilityMixin):
     def _on_double_click(self, event):
         """Handle double-click on a specific results cell.
 
-        - PowerPlay cell: open Inara and fetch/refresh PP data.
+        - System or PowerPlay cell: open Inara and fetch/refresh PP data.
         - Last Mined cell (if a report exists): open that mining report.
         - Comment cell: open the comment edit dialog.
         """
@@ -6712,16 +6707,11 @@ class RingFinder(ColumnVisibilityMixin):
         item = self.results_tree.identify_row(event.y)
         if not item:
             return
-        column = self.results_tree.identify_column(event.x)
-        try:
-            col_index = int(column.replace('#', '')) - 1
-            col_name = self.results_tree['displaycolumns'][col_index]
-        except (ValueError, IndexError):
-            return
+        col_name = displayed_column(self.results_tree, self.results_tree.identify_column(event.x))
 
         values = self.results_tree.item(item, 'values')
 
-        if col_name == "PowerPlay":
+        if col_name in ("System", "PowerPlay"):
             if not values or len(values) <= 11:
                 return
             self.results_tree.selection_set(item)
@@ -6729,7 +6719,7 @@ class RingFinder(ColumnVisibilityMixin):
         elif col_name == "Comment":
             self.results_tree.selection_set(item)
             self._show_comment_dialog()
-        elif col_name in ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits",
+        elif col_name in ("Distance", "LS", "Planet/Ring", "Sol Dist", "Visits",
                           "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "Last Mined"):
             if values and len(values) > 12 and '🗄️' in str(values[12]):
                 self.results_tree.selection_set(item)
@@ -6742,10 +6732,7 @@ class RingFinder(ColumnVisibilityMixin):
         item = self.results_tree.identify_row(event.y)
         if not item:
             return
-        try:
-            col_name = self.results_tree['displaycolumns'][int(self.results_tree.identify_column(event.x).replace('#', '')) - 1]
-        except (ValueError, IndexError):
-            return
+        col_name = displayed_column(self.results_tree, self.results_tree.identify_column(event.x))
         if col_name != "Density":
             return
         self.results_tree.selection_set(item)
@@ -7425,9 +7412,9 @@ class RingFinder(ColumnVisibilityMixin):
         if current_theme == "elite_orange":
             tree_bg, tree_fg, header_bg = "#1e1e1e", "#ff8c00", "#1a1a1a"
             selection_bg, selection_fg = "#ff6600", "#000000"
-        elif current_theme == "modern":
-            tree_bg, tree_fg, header_bg = "#1D2228", "#E6EAF0", "#14171B"
-            selection_bg, selection_fg = "#4A3520", "#FFFFFF"
+        elif current_theme in ("modern", "modern_slate", "modern_orange"):
+            tree_bg, tree_fg, header_bg = modern_color("#1D2228"), modern_color("#E6EAF0"), modern_color("#14171B")
+            selection_bg, selection_fg = modern_color("#4A3520"), "#FFFFFF"
         else:
             tree_bg, tree_fg, header_bg = "#1e1e1e", "#e6e6e6", "#2a2a2a"
             selection_bg, selection_fg = "#0078d7", "#ffffff"
@@ -7710,6 +7697,10 @@ class RingFinder(ColumnVisibilityMixin):
         tree_frame = tk.Frame(frame, bg=bg)
         tree_frame.pack(fill="both", expand=True)
 
+        columns_header = ttk.Frame(tree_frame)
+        columns_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        self._cv_add_columns_button(columns_header, 'rank_minerals')
+
         columns = ("Mineral", "RingType", "Price", "Station", "Type", "Pad", "Dist", "LS", "Demand", "PowerPlay", "Updated")
         tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=min(len(results), 8),
                             selectmode="browse", style="RankMinerals.Treeview")
@@ -7803,13 +7794,11 @@ class RingFinder(ColumnVisibilityMixin):
             dialog.update_idletasks()
             dialog.geometry(f"{max(table_width + 30, 500)}x{dialog.winfo_height()}")
 
-        # Right-click on the header toggles columns (same mixin as the main Ring Finder
-        # table); right-click on a row is routed to row_menu via _context_handlers below.
         self.setup_column_visibility(
             tree=tree, columns=columns,
             default_widths={"Mineral": 130, "RingType": 90, "Price": 110, "Station": 280, "Type": 110,
                             "Pad": 50, "Dist": 80, "LS": 70, "Demand": 90, "PowerPlay": 200, "Updated": 90},
-            config_key='rank_minerals', use_displaycolumns=True, on_change=fit_dialog_width_to_columns)
+            config_key='rank_minerals', use_displaycolumns=True, on_change=fit_dialog_width_to_columns, allow_reorder=True)
 
         mineral_by_row = {}
         system_by_row = {}
@@ -7872,11 +7861,11 @@ class RingFinder(ColumnVisibilityMixin):
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
         h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
         tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
-        tree.grid(row=0, column=0, sticky="nsew")
-        v_scrollbar.grid(row=0, column=1, sticky="ns")
-        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        tree.grid(row=1, column=0, sticky="nsew")
+        v_scrollbar.grid(row=1, column=1, sticky="ns")
+        h_scrollbar.grid(row=2, column=0, sticky="ew")
         tree_frame.grid_columnconfigure(0, weight=1)
-        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_rowconfigure(1, weight=1)
 
         def copy_system_for_row(row_id):
             system = system_by_row.get(row_id)
@@ -7937,10 +7926,7 @@ class RingFinder(ColumnVisibilityMixin):
         def on_click(event):
             close_extra_mineral_picker_if_open()
             row_id = tree.identify_row(event.y)
-            col_index = int(tree.identify_column(event.x).lstrip('#') or 0) - 1
-            shown = tree['displaycolumns']
-            shown = columns if shown in ('#all', ('#all',)) else shown
-            col = shown[col_index] if 0 <= col_index < len(shown) else ''
+            col = displayed_column(tree, tree.identify_column(event.x))
             if not row_id:
                 return
             if col == "Station":
@@ -8499,9 +8485,9 @@ class RingFinder(ColumnVisibilityMixin):
         if current_theme == "elite_orange":
             bg, fg, tree_bg, tree_fg, header_bg = "#1e1e1e", "#ff8c00", "#1e1e1e", "#ff8c00", "#1a1a1a"
             selection_bg, selection_fg = "#ff6600", "#000000"
-        elif current_theme == "modern":
-            bg, fg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], MENU_COLORS["fg"], "#1D2228", "#E6EAF0", "#14171B"
-            selection_bg, selection_fg = "#4A3520", "#FFFFFF"
+        elif current_theme in ("modern", "modern_slate", "modern_orange"):
+            bg, fg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], MENU_COLORS["fg"], modern_color("#1D2228"), modern_color("#E6EAF0"), modern_color("#14171B")
+            selection_bg, selection_fg = modern_color("#4A3520"), "#FFFFFF"
         else:
             bg, fg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], MENU_COLORS["fg"], "#1e1e1e", "#e6e6e6", "#2a2a2a"
             selection_bg, selection_fg = "#0078d7", "#ffffff"
@@ -9059,9 +9045,9 @@ class RingFinder(ColumnVisibilityMixin):
         if current_theme == "elite_orange":
             bg, tree_bg, tree_fg, header_bg = "#1e1e1e", "#1e1e1e", "#ff8c00", "#1a1a1a"
             selection_bg, selection_fg = "#ff6600", "#000000"
-        elif current_theme == "modern":
-            bg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], "#1D2228", "#E6EAF0", "#14171B"
-            selection_bg, selection_fg = "#4A3520", "#FFFFFF"
+        elif current_theme in ("modern", "modern_slate", "modern_orange"):
+            bg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], modern_color("#1D2228"), modern_color("#E6EAF0"), modern_color("#14171B")
+            selection_bg, selection_fg = modern_color("#4A3520"), "#FFFFFF"
         else:
             bg, tree_bg, tree_fg, header_bg = MENU_COLORS["bg"], "#1e1e1e", "#e6e6e6", "#2a2a2a"
             selection_bg, selection_fg = "#0078d7", "#ffffff"
@@ -9082,6 +9068,10 @@ class RingFinder(ColumnVisibilityMixin):
 
         tree_frame = tk.Frame(frame, bg=bg)
         tree_frame.pack(fill="both", expand=True, pady=(0, 10))
+
+        columns_header = ttk.Frame(tree_frame)
+        columns_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        self._cv_add_columns_button(columns_header, 'acquisition_search')
 
         show_mineral_col = mineral_filter is None
         columns = ("System", "Station", "Type", "Pad", "Dist", "Power", "Mineral", "Demand", "Price", "Updated")
@@ -9117,8 +9107,6 @@ class RingFinder(ColumnVisibilityMixin):
         tree.column("Price", width=default_widths["Price"], minwidth=40, anchor="w", stretch=False)
         tree.column("Updated", width=default_widths["Updated"], minwidth=40, anchor="w", stretch=False)
 
-        # Right-click on the header toggles columns (same mixin as the main Ring Finder
-        # table); right-click on a row is routed to this dialog's own row menu below.
         def fit_dialog_width_to_columns():
             shown = tree['displaycolumns']
             shown = columns if shown in ('#all', ('#all',)) else shown
@@ -9129,7 +9117,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         self.setup_column_visibility(tree=tree, columns=columns, default_widths=default_widths,
                                      config_key='acquisition_search', use_displaycolumns=True,
-                                     on_change=fit_dialog_width_to_columns)
+                                     on_change=fit_dialog_width_to_columns, allow_reorder=True)
         # Best Mineral only means something when "All Minerals" was searched
         self._cv_set_force_hidden('acquisition_search', 'Mineral', not show_mineral_col)
 
@@ -9155,10 +9143,10 @@ class RingFinder(ColumnVisibilityMixin):
 
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=v_scrollbar.set)
-        tree.grid(row=0, column=0, sticky="nsew")
-        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        tree.grid(row=1, column=0, sticky="nsew")
+        v_scrollbar.grid(row=1, column=1, sticky="ns")
         tree_frame.grid_columnconfigure(0, weight=1)
-        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_rowconfigure(1, weight=1)
         dialog._acq_results_tree = tree
         dialog._acq_results_tree_frame = tree_frame
 

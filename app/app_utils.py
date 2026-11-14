@@ -2,6 +2,7 @@
 Centralized Application Utilities for EliteMining
 Handles paths, icons, and other common functions for both development and installer environments
 """
+from ui.theme import modern_color
 
 import os
 import sys
@@ -15,6 +16,12 @@ import tkinter as tk
 
 
 # ==================== PATH UTILITIES ====================
+
+def compact_classic_button(button) -> None:
+    from config import load_theme, scaled_font, scaled_px
+    if load_theme() in ("elite_orange", "dark_gray"):
+        button.configure(font=scaled_font(8), padx=scaled_px(6), pady=scaled_px(2), width=0)
+
 
 def get_app_data_dir() -> str:
     """
@@ -263,11 +270,11 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
         fg_color = "#ff8c00"  # Orange text
         btn_bg = "#1a1a1a"
         btn_fg = "#ff9900"
-    elif theme == "modern":
-        bg_color = "#14171B"
-        fg_color = "#E6EAF0"
-        btn_bg = "#FF9A32"
-        btn_fg = "#14171B"
+    elif theme in ("modern", "modern_slate", "modern_orange"):
+        bg_color = modern_color("#14171B")
+        fg_color = modern_color("#E6EAF0")
+        btn_bg = modern_color("#FF9A32")
+        btn_fg = modern_color("#14171B")
     else:  # dark_gray
         bg_color = "#1e1e1e"
         fg_color = "#e0e0e0"
@@ -306,8 +313,8 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
     
     ok_btn = tk.Button(btn_frame, text=t('common.ok'), width=12, command=on_ok,
                       bg=btn_bg, fg=btn_fg, font=("Segoe UI", 10),
-                      activebackground="#2a2a2a" if theme == "elite_orange" else ("#FFB05A" if theme == "modern" else "#3a4a5a"),
-                      activeforeground="#ffcc00" if theme == "elite_orange" else ("#14171B" if theme == "modern" else "#ffffff"),
+                      activebackground="#2a2a2a" if theme == "elite_orange" else (modern_color("#FFB05A") if theme in ("modern", "modern_slate", "modern_orange") else "#3a4a5a"),
+                      activeforeground="#ffcc00" if theme == "elite_orange" else (modern_color("#14171B") if theme in ("modern", "modern_slate", "modern_orange") else "#ffffff"),
                       cursor="hand2", relief="raised", bd=2)
     ok_btn.pack()
     

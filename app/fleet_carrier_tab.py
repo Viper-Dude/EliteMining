@@ -3,6 +3,7 @@ Fleet Carrier Tab - EliteMining
 Displays live fleet carrier status populated from journal events via JournalParser.
 All display strings use the localization system via t().
 """
+from ui.theme import modern_color
 
 import tkinter as tk
 from tkinter import ttk
@@ -102,16 +103,16 @@ class FleetCarrierTab(tk.Frame):
             self.ok_color  = "#00cc44"
             self.warn_color = "#ffaa00"
             self.err_color  = "#ff3333"
-        elif theme == "modern":
-            self.bg        = "#14171B"
-            self.fg        = "#E6EAF0"
+        elif theme in ("modern", "modern_slate", "modern_orange"):
+            self.bg        = modern_color("#14171B")
+            self.fg        = modern_color("#E6EAF0")
             self.fg_bright = "#FFFFFF"
-            self.fg_dim    = "#8A94A3"
+            self.fg_dim    = modern_color("#8A94A3")
             self.fg_inactive = "#6B7482"
-            self.sect_bg   = "#1D2228"
-            self.hdr_bg    = "#262C34"
-            self.bar_fill  = "#FF9A32"
-            self.bar_empty = "#2A3038"
+            self.sect_bg   = modern_color("#1D2228")
+            self.hdr_bg    = modern_color("#262C34")
+            self.bar_fill  = modern_color("#FF9A32")
+            self.bar_empty = modern_color("#2A3038")
             self.ok_color  = "#3DDC84"
             self.warn_color = "#FFC107"
             self.err_color  = "#FF5252"
@@ -185,9 +186,12 @@ class FleetCarrierTab(tk.Frame):
         lbl.pack(side="left")
         if copyable:
             self._make_copyable(lbl, sv_key)
-            tk.Label(row, text=t("fleet_carrier.copy_location_hint"), bg=self.sect_bg,
-                     fg=self.fg_dim, font=scaled_font(8, "italic", family="Helvetica"),
-                     anchor="w").pack(side="left", padx=(12, 0))
+            from config import load_theme
+            from ui.tooltip import ToolTip
+            copy_info = tk.Label(row, text="\u24d8", bg=self.sect_bg, fg=self.fg_dim,
+                                 cursor="hand2", font=scaled_font(10))
+            copy_info.pack(side="left", padx=(6, 2))
+            ToolTip(copy_info, t("fleet_carrier.copy_location_hint"))
 
     def _make_copyable(self, widget, sv_key):
         menu = tk.Menu(widget, tearoff=0, bg=self.sect_bg, fg=self.fg,

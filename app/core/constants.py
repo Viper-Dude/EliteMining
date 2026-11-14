@@ -1,4 +1,5 @@
 """Application constants and mappings"""
+from ui.theme import modern_color
 
 from typing import Dict, List, Optional
 
@@ -112,18 +113,18 @@ MENU_COLORS_ORANGE = {
 
 # Modern theme menu colors
 MENU_COLORS_MODERN = {
-    "bg": "#1D2228",
-    "fg": "#E6EAF0",
-    "activebackground": "#4A3520",
+    "bg": modern_color("#1D2228"),
+    "fg": modern_color("#E6EAF0"),
+    "activebackground": modern_color("#4A3520"),
     "activeforeground": "#FFFFFF",
-    "selectcolor": "#FF9A32"
+    "selectcolor": modern_color("#FF9A32")
 }
 
 # Theme is fixed for the session (changing it restarts the app), so the shared non-orange
 # MENU_COLORS can simply become the Modern palette; every menu using it picks it up.
 try:
     from config import load_theme as _load_theme_for_menus
-    if _load_theme_for_menus() == "modern":
+    if _load_theme_for_menus() in ("modern", "modern_slate", "modern_orange"):
         MENU_COLORS.update(MENU_COLORS_MODERN)
 except Exception:
     pass

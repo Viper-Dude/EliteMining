@@ -3,6 +3,7 @@
 Mining Analytics Charts Module
 Provides real-time graphical analysis for mining statistics
 """
+from ui.theme import modern_color
 
 import json
 import os
@@ -90,9 +91,9 @@ class MiningChartsPanel:
         if self.current_theme == "elite_orange":
             self.chart_bg = '#1e1e1e'  # Dark gray background for orange theme
             self.chart_face = '#1e1e1e'
-        elif self.current_theme == "modern":
-            self.chart_bg = '#14171B'
-            self.chart_face = '#1D2228'
+        elif self.current_theme in ("modern", "modern_slate", "modern_orange"):
+            self.chart_bg = modern_color('#14171B')
+            self.chart_face = modern_color('#1D2228')
         else:
             self.chart_bg = '#2b2b2b'
             self.chart_face = '#1e1e1e'

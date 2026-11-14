@@ -7,6 +7,7 @@ from typing import List
 
 from localization import t
 from marketplace_api import MarketplaceAPI
+from app_utils import compact_classic_button
 
 MAX_MINERALS = 5
 CHECK_COLUMNS = 3
@@ -92,10 +93,14 @@ class MultiMineralTab:
                                     bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                     activeforeground="#ffffff", relief="ridge", bd=1, padx=10, pady=4,
                                     font=app._scaled_font(9, "bold"), cursor="hand2")
+        compact_classic_button(self.search_btn)
         self.search_btn.pack(side="left")
 
-        tk.Label(container, text=t('marketplace.search_results'), bg=bg, fg=fg,
-                 font=app._scaled_font(10, "bold")).pack(anchor="w", pady=(10, 0))
+        results_header = ttk.Frame(container)
+        results_header.pack(fill="x", pady=(10, 0))
+        ttk.Label(results_header, text=t('marketplace.search_results'),
+                  font=app._scaled_font(10, "bold")).pack(side="left")
+        app._cv_add_columns_button(results_header, 'multiple_prices')
         table = ttk.Frame(container, relief="solid", borderwidth=1)
         table.pack(fill="both", expand=True, pady=(5, 0))
         cols = ("location", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
@@ -133,7 +138,7 @@ class MultiMineralTab:
             tree=self.tree,
             columns=tuple(c for c in cols if c != "_spacer"),
             default_widths={c: max(app._scaled_px(w), min_for(c)) for c, w in widths.items()},
-            config_key='multiple_prices')
+            config_key='multiple_prices', allow_reorder=True, use_displaycolumns=True)
 
         from config import load_multiple_prices_column_widths, save_multiple_prices_column_widths
         for col, width in load_multiple_prices_column_widths().items():
@@ -150,6 +155,7 @@ class MultiMineralTab:
                     widths[col] = w
             save_multiple_prices_column_widths(widths)
         self.tree.bind("<ButtonRelease-1>", save_widths)
+        self.tree.bind("<Double-1>", lambda e: app._on_commodity_tree_double_click(e, self.tree, refresh_powerplay=False))
         vsb = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
         self.tree.pack(side="left", fill="both", expand=True)

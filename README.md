@@ -23,6 +23,8 @@
 - [VoiceAttack Controls](#voiceattack-controls)
   - [Voice Feedback](#voice-feedback)
 - [EliteMining App](#elitemining-app)
+  - [Themes](#themes)
+  - [Customize Table Columns](#customize-table-columns)
   - [Text Overlay](#text-overlay)
 - [Hotspot Finder](#hotspot-finder)
 - [PowerPlay Merit Mining](#powerplay-merit-mining)
@@ -203,6 +205,22 @@ The **EliteMining App** provides a comprehensive GUI for configuring mining auto
 ### Start EliteMining  
 - EliteMining Desktop icon or direct: `\EliteMining\Configurator\EliteMining.exe`
 
+### Themes
+
+Choose **Classic Orange**, **Classic Dark**, **Navy**, **Modern Dark**, or **Modern Orange** using the theme button at the bottom of the app or in **Settings → General Settings**. **Navy** is the default for new installs. Changing themes requires a restart; table functions and column customization work across all themes.
+
+### Customize Table Columns
+
+Click **Columns** above a table to open **Customize Columns**. Select a column and use **Move Left** or **Move Right** to change its position, and tick **Visible** for the columns you want to see.
+
+- **Apply** saves the order and visibility separately for each table and keeps them between app restarts.
+- **Cancel** discards changes.
+- **Reset to Default** restores the original order and shows all available columns; click **Apply** to save the reset.
+
+Column settings open only through the **Columns** button. Right-clicking rows still opens their usual action menus.
+
+<img src="Screenshot/custom_column.png" alt="Customize Columns dialog with ordering and visibility controls" width="420"><br>
+
 [Back to Top](#top)
 
 ---
@@ -304,7 +322,7 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 - **RES Site Tracking** – Add and find Resource Extraction Sites (Hazardous, High, Low) for combat mining
 - **Pre-loaded Overlap & RES Data** – Ships with 161 known overlaps and 71 RES site locations
 - **Power/State Filter** – Filter results by controlling Power and PowerPlay state (Local Database source only). Selecting Fortified or Stronghold searches up to 500 LY via Spansh for fast, accurate territory data; other states rely on the local EDDN cache and the Max Distance setting.
-- **PowerPlay Column** – Displays the controlling power and state for each system. Fills in instantly for systems you jump into yourself, and via EDDN (live data from other commanders, stored locally while the app runs) for the rest — coverage of systems you haven't visited can take hours to days to build up. Double-click any row showing 'No data ↗' to open the system on Inara and fetch the data automatically.
+- **PowerPlay Column** – Displays the controlling power and state for each system. Fills in instantly for systems you jump into yourself, and via EDDN (live data from other commanders, stored locally while the app runs) for the rest — coverage of systems you haven't visited can take hours to days to build up. Double-click the System or Powerplay cell to open the system on Inara and refresh its Powerplay data.
 - **PowerPlay Tick Box** – Next to the Data Source options (Local searches only). Off (default) searches faster and shows only the PowerPlay info already saved on your PC. Tick it to also look up the latest PowerPlay info online from Spansh.
 - **Best Minerals to Mine** – Right-click a ring or system and choose "Best Minerals to Mine" to see the best sell prices for the hotspot minerals nearby. Use "+ add" to include minerals without hotspots (e.g. Osmium).
 - **Find Acquisition Systems** – Right-click a Fortified or Stronghold system to list nearby Unoccupied systems with a station buying your mineral, for PowerPlay Acquisition merits (search radius 20 Ly for Fortified, 30 Ly for Stronghold). Works with any mineral, including ones without hotspots like Osmium.
@@ -376,6 +394,7 @@ The Commodity Market helps you find the best prices for mining commodities and t
 - **Data Freshness** – Shows when prices were last updated (minutes/hours/days ago)
 - **Sortable Results** – Click column headers to sort by location, type, distance, demand, or price
 - **Threaded Updates** – Results appear instantly with distances calculated in background for smooth performance
+- **Inara Shortcut** – Double-click a System/Station cell to open the system on Inara.
 - **External Links** – Right-click any search result to:
   - Open station in Inara (station search)
   - Open system in EDSM (system page with all stations)
@@ -441,7 +460,8 @@ Search for nearby star systems with detailed status information. Perfect for fin
 - **Quick Actions:**
   - Right-click → **Find Hotspots** to jump directly to Hotspots Finder with the selected system as reference and trigger a search
   - Right-click to copy system name or open in Inara/EDSM/Spansh
-  - "Use Current" button fills reference system instantly
+  - Double-click a System cell to open the system on Inara
+  - **Use Current System** fills the reference system instantly
 
 **Note:** The Elite Dangerous journal does not report the Unoccupied Powerplay state. The app infers this state when no controlling Power is present and updates it automatically when newer EDDN data becomes available.
 
@@ -643,9 +663,12 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 ---
 
 #### Ship Presets & Cargo Monitor Sidebar
-*The Ship Presets and Cargo Monitor panels are always visible on the right side of the app.*
+*The Ship Presets and Cargo Monitor panels share the sidebar on the right side of the app.*
 
 - **Ship Presets** — double-click a preset to apply it to VoiceAttack; right-click for save, edit, duplicate, rename, export/import, and delete options. Includes the Anaconda Mk II.
+- **Auto-load** — right-click a preset under any ship type and enable **Auto-load**. You can set up all ship types without switching ships in-game. Each ship type has one automatic preset; choosing another preset for that type replaces the previous choice. It loads at app startup and when you switch to a ship of that type. Unsaved changes still prompt before switching; uncheck **Auto-load** to remove the assignment.
+- **Open Folder** — right-click a preset, ship group, or empty space in the preset list and choose **Open Folder** to open the ship preset folder in Windows Explorer.
+- **Preset highlights** — the active preset stays highlighted and bold; a clicked row uses a separate selection color. Single-click selects, double-click loads.
 - **Cargo Monitor** — live cargo hold status, updated in real time while mining.
 - **Hide/Show Sidebar** — click the **Sidebar** button at the bottom of the app to toggle the sidebar and reclaim screen space.
 

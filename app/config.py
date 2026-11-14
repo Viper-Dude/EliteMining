@@ -363,6 +363,17 @@ def save_column_visibility(table_key: str, visibility: Dict[str, bool]) -> None:
     cfg[f"{table_key}_column_visibility"] = visibility
     _save_cfg(cfg)
 
+def load_column_order(table_key: str) -> List[str]:
+    cfg = _load_cfg()
+    return cfg.get(f"{table_key}_column_order", [])
+
+
+def save_column_order(table_key: str, order: List[str]) -> None:
+    cfg = _load_cfg()
+    cfg[f"{table_key}_column_order"] = order
+    _save_cfg(cfg)
+
+
 def load_commodity_market_column_widths() -> Dict[str, int]:
     """Load Commodity Market table column widths from config"""
     cfg = _load_cfg()
@@ -927,6 +938,12 @@ def save_active_ship_preset(name: Optional[str]) -> None:
     else:
         cfg.pop("active_ship_preset", None)
     _save_cfg(cfg)
+
+def load_ship_preset_auto_load() -> dict:
+    return dict(_load_cfg().get("ship_preset_auto_load", {}))
+
+def save_ship_preset_auto_load(assignments: dict) -> None:
+    update_config_value("ship_preset_auto_load", assignments)
 
 # Layout version for migration - increment when layout changes require reset
 LAYOUT_VERSION = 3  # v4.6.4 - fixed sash initialization timing

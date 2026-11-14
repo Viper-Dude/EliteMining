@@ -115,13 +115,106 @@ THEME_MODERN = {
     "online": "#3DDC84",
 }
 
+THEME_MODERN_SLATE = {
+    **THEME_MODERN,
+    "bg": "#101010",
+    "bg_dark": "#101010",
+    "bg_accent": "#191919",
+    "fg": "#DEDEDE",
+    "fg_dim": "#B5B5B5",
+    "fg_muted": "#909090",
+    "selection_bg": "#383838",
+    "btn_bg": "#252525",
+    "btn_bg_hover": "#333333",
+    "btn_bg_disabled": "#191919",
+    "btn_fg": "#DEDEDE",
+    "btn_fg_disabled": "#686868",
+    "tree_bg": "#191919",
+    "tree_fg": "#DEDEDE",
+    "tree_selected_bg": "#383838",
+    "tree_heading_bg": "#101010",
+    "tree_heading_fg": "#DEDEDE",
+    "tip_fg": "#D8D8D8",
+    "help_fg": "#909090",
+    "panel": "#191919",
+    "border": "#343434",
+    "accent": "#D8D8D8",
+    "accent_fg": "#101010",
+    "row_alt": "#212121",
+}
+
+THEME_MODERN_ORANGE = {
+    **THEME_MODERN,
+    "bg": "#0E0E0E",
+    "bg_dark": "#0E0E0E",
+    "bg_accent": "#191919",
+    "fg": "#ED9A32",
+    "fg_bright": "#FFB454",
+    "fg_dim": "#C58A3F",
+    "fg_muted": "#929292",
+    "selection_bg": "#4A3018",
+    "btn_bg": "#262626",
+    "btn_bg_hover": "#333333",
+    "btn_bg_disabled": "#191919",
+    "btn_fg": "#ED9A32",
+    "btn_fg_disabled": "#6C6C6C",
+    "tree_bg": "#191919",
+    "tree_fg": "#ED9A32",
+    "tree_selected_bg": "#4A3018",
+    "tree_heading_bg": "#0E0E0E",
+    "tree_heading_fg": "#ED9A32",
+    "tip_fg": "#FF9A32",
+    "help_fg": "#929292",
+    "panel": "#191919",
+    "border": "#343434",
+    "accent": "#FF9A32",
+    "accent_fg": "#0E0E0E",
+    "row_alt": "#212121",
+}
+
+_MODERN_SLATE_COLORS = {
+    value.lower(): THEME_MODERN_SLATE[key]
+    for key, value in THEME_MODERN.items()
+}
+_MODERN_SLATE_COLORS.update({
+    "#ffb05a": "#F0F0F0", "#e88a28": "#BBBBBB",
+    "#2a3038": "#121212", "#232a31": "#212121",
+    "#323941": "#343434", "#434b55": "#494949",
+    "#ffb347": "#D8D8D8",
+})
+
+
+_MODERN_ORANGE_COLORS = {
+    value.lower(): THEME_MODERN_ORANGE[key]
+    for key, value in THEME_MODERN.items()
+}
+_MODERN_ORANGE_COLORS.update({
+    "#2a3038": "#222222", "#232a31": "#212121",
+    "#323941": "#343434", "#434b55": "#484848",
+    "#ffb347": "#FFB454",
+})
+
+
+def modern_color(color: str) -> str:
+    """Resolve legacy Modern colors for the selected Modern palette."""
+    from config import load_theme
+    theme = load_theme()
+    if theme == "modern_slate":
+        return _MODERN_SLATE_COLORS.get(color.lower(), color)
+    if theme == "modern_orange":
+        return _MODERN_ORANGE_COLORS.get(color.lower(), color)
+    return color
+
+
 THEMES = {
     "elite_orange": THEME_ELITE_ORANGE,
     "dark_gray": THEME_DARK_GRAY,
     "modern": THEME_MODERN,
+    "modern_slate": THEME_MODERN_SLATE,
+    "modern_orange": THEME_MODERN_ORANGE,
 }
 
-THEME_ORDER = ["elite_orange", "dark_gray", "modern"]
+THEME_ORDER = ["elite_orange", "dark_gray", "modern", "modern_slate", "modern_orange"]
 
 
 def get_theme_colors(theme_name: str) -> dict:

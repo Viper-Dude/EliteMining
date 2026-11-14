@@ -35,28 +35,34 @@
     "Headtracker Docking Control": 1,
     "Repeated Mining Cycles": 0,
     "Night Vision": 1,
+    "FSD Jump Sequence": 0,
+    "Open System Map": 0,
     "Power Settings": 1,
     "Prospector Sequence": 1,
+    "Continuous Prospector Sequence": 0,
     "Prospector Sound Effect": 1,
     "Target Prospector": 0,
-    "Thrust Up": 1,
+    "Thrust Up": 0,
     "Pulse Wave Analyser": 0,
     "Continuous Pulsewave": 0,
     "Auto Deselect Prospector": 0
   },
   "Announcements": {},
   "Timers": {
-    "Duration for firing mining lasers (standard)": 26,
+    "Duration for firing mining lasers (standard)": 13,
     "Pause between mining cycles for weapon recharge/cooldown": 8,
-    "Duration for repeated mining cycles (per cycle)": 8,
+    "Duration for repeated mining cycles (per cycle)": 12,
     "Delay before targeting the prospector after launching": 8,
-    "Delay before retracting cargo scoop after mining sequence": 17,
-    "Boost Interval (For Core Mining Boost sequense )": 1
+    "Delay before retracting cargo scoop after mining sequence": 30,
+    "Boost Interval (Core Mining)": 1,
+    "FSD Jump Pause Timer": 8,
+    "FSD System Map Timer": 8,
+    "Continuous Prospector Sequence Timer": 1.0
   },
   "LaserExtraRepeatCount": 2,
   "ProspectorDelay": 2.6,
-  "ThrustUpDuration": 1.2,
-  "ThrustClosed": 1.2,
-  "ThrustOpen": 3.8,
-  "AnnouncementPresetSlot": 1
+  "AnnouncementPresetSlot": 1,
+  "ThrustUpDuration": 2.5,
+  "ThrustClosed": 1.0,
+  "ThrustOpen": 3.2
 }

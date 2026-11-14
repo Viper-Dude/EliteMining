@@ -1,4 +1,5 @@
 {
+  "theme": "modern",
   "config_version": "4.3.7",
   "tts_volume": 100,
   "va_folder": "",

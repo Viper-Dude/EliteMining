@@ -29,7 +29,7 @@ class ColumnVisibilityMixin:
     3. Supports multiple trees in same class by using config_key as namespace
     """
     
-    def setup_column_visibility(self, tree, columns, default_widths, config_key, use_displaycolumns=False, on_change=None):
+    def setup_column_visibility(self, tree, columns, default_widths, config_key, use_displaycolumns=False, on_change=None, allow_reorder=False):
         """
         Setup column visibility for a treeview
 
@@ -69,6 +69,7 @@ class ColumnVisibilityMixin:
             'force_hidden': set(),  # Columns force-hidden by app logic, independent of user visibility pref
             'use_displaycolumns': use_displaycolumns,
             'on_change': on_change,
+            'allow_reorder': allow_reorder,
         }
         
         # Bind right-click with config_key context
@@ -76,9 +77,37 @@ class ColumnVisibilityMixin:
         
         # Load saved visibility
         self._cv_load_visibility(config_key)
+        if allow_reorder:
+            from config import load_column_order
+            self._cv_set_order(config_key, load_column_order(config_key), save=False)
     
+    def _cv_add_columns_button(self, parent, config_key, **grid_options):
+        from config import load_theme, scaled_font, scaled_px
+        from ui.modern_widgets import RoundedButton
+
+        def show_columns():
+            self._cv_show_order_dialog(config_key)
+
+        if load_theme() in ("modern", "modern_slate", "modern_orange"):
+            button = RoundedButton(parent, text=t('ring_finder.columns_button'),
+                                   command=show_columns, font=scaled_font(9),
+                                   padx=scaled_px(10), pady=scaled_px(4))
+        else:
+            from ui.theme import get_theme_colors
+            colors = get_theme_colors(load_theme())
+            button = tk.Button(parent, text=t('ring_finder.columns_button'),
+                               command=show_columns, font=scaled_font(8), cursor="hand2",
+                               bg=colors['btn_bg'], fg=colors['btn_fg'],
+                               activebackground=colors['btn_bg_hover'], activeforeground=colors['btn_fg'],
+                               padx=scaled_px(6), pady=scaled_px(2), relief="ridge", bd=1)
+        if grid_options:
+            button.grid(**grid_options)
+        else:
+            button.pack(side="right", padx=(scaled_px(8), 0))
+        return button
+
     def _cv_handle_right_click(self, event, config_key):
-        """Handle right-click - show column menu on header, normal context menu on rows"""
+        """Route row right-clicks to the table's context menu."""
         tree_data = self._cv_trees.get(config_key)
         if not tree_data:
             return
@@ -86,9 +115,7 @@ class ColumnVisibilityMixin:
         tree = tree_data['tree']
         region = tree.identify_region(event.x, event.y)
         
-        # Show column menu on header
         if region == "heading" or event.y <= 25:
-            self._cv_show_menu(event, config_key)
             return
         
         # Otherwise, call the original context menu if it exists
@@ -109,81 +136,6 @@ class ColumnVisibilityMixin:
         """Heading text without a trailing sort arrow (" ▲" / " ▼")."""
         return text[:-2] if text.endswith((" ▲", " ▼")) else text
 
-    def _cv_show_menu(self, event, config_key):
-        """Show column visibility menu"""
-        tree_data = self._cv_trees.get(config_key)
-        if not tree_data:
-            return
-        
-        tree = tree_data['tree']
-        columns = tree_data['columns']
-        visible = tree_data['visible']
-        
-        from config import load_theme
-        current_theme = load_theme()
-        
-        # Theme colors
-        if current_theme == "elite_orange":
-            menu_bg = "#1e1e1e"
-            menu_fg = "#ff8c00"
-            menu_active_bg = "#3a3a3a"
-            menu_active_fg = "#ffffff"
-            select_color = "#ff8c00"
-        elif current_theme == "modern":
-            menu_bg = "#1D2228"
-            menu_fg = "#E6EAF0"
-            menu_active_bg = "#4A3520"
-            menu_active_fg = "#FFFFFF"
-            select_color = "#FF9A32"
-        else:
-            menu_bg = "#1e1e1e"
-            menu_fg = "#e0e0e0"
-            menu_active_bg = "#3a3a3a"
-            menu_active_fg = "#ffffff"
-            select_color = "#4a4a4a"
-        
-        # Create menu
-        from config import scaled_font
-        menu = tk.Menu(tree, tearoff=0, bg=menu_bg, fg=menu_fg,
-                      activebackground=menu_active_bg, activeforeground=menu_active_fg,
-                      selectcolor=select_color, font=scaled_font(9))
-        
-        menu.add_command(label=t('ring_finder.column_visibility'), state="disabled")
-        menu.add_separator()
-        
-        # Store vars to prevent garbage collection
-        if not hasattr(self, '_cv_menu_vars'):
-            self._cv_menu_vars = {}
-        self._cv_menu_vars[config_key] = {}
-        
-        # Add checkboxes for each column (skip excluded/force-hidden ones)
-        excluded = tree_data.get('excluded_from_menu', set())
-        force_hidden = tree_data.get('force_hidden', set())
-        for col in columns:
-            if col in excluded or col in force_hidden:
-                continue
-            display_name = self._cv_clean_heading(tree.heading(col, "text"))
-            is_visible = visible.get(col, True)
-            var = tk.BooleanVar(value=is_visible)
-            self._cv_menu_vars[config_key][col] = var
-            menu.add_checkbutton(label=display_name,
-                                variable=var,
-                                command=lambda c=col, k=config_key: self._cv_toggle(c, k))
-        
-        menu.add_separator()
-        menu.add_command(label=t('ring_finder.reset_to_default'), 
-                        command=lambda k=config_key: self._cv_reset(k))
-        
-        # Popup dialogs run a keep-on-top loop that pauses while _row_menu_open is set -
-        # without it the loop re-lifts the dialog over this menu.
-        toplevel = tree.winfo_toplevel()
-        toplevel._row_menu_open = True
-        try:
-            menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            menu.grab_release()
-            toplevel._row_menu_open = False
-
     def _cv_apply_displaycolumns(self, config_key):
         """Rebuild the tree's displaycolumns from current visibility state (use_displaycolumns mode)."""
         tree_data = self._cv_trees.get(config_key)
@@ -193,10 +145,185 @@ class ColumnVisibilityMixin:
         columns = tree_data['columns']
         visible = tree_data['visible']
         force_hidden = tree_data.get('force_hidden', set())
-        full_columns = tree['columns']
+        full_columns = tree_data.get('order', tree['columns'])
         shown = [col for col in full_columns
                  if col not in columns or (visible.get(col, True) and col not in force_hidden)]
         tree.configure(displaycolumns=shown)
+
+    def _cv_set_order(self, config_key, order, save=True):
+        tree_data = self._cv_trees[config_key]
+        columns = list(tree_data['tree']['columns'])
+        configurable = tree_data['columns']
+        tree_data['order'] = [col for col in dict.fromkeys(list(order) + columns) if col in configurable]
+        tree_data['order'].extend(col for col in columns if col not in configurable)
+        self._cv_apply_displaycolumns(config_key)
+        if save:
+            from config import save_column_order
+            save_column_order(config_key, tree_data['order'])
+
+    def _cv_show_order_dialog(self, config_key):
+        from config import load_theme, scaled_font, scaled_px
+        from tkinter import ttk
+        from ui.theme import get_theme_colors
+        from ui.dialogs import center_window
+        from app_utils import get_app_icon_path
+
+        tree_data = self._cv_trees[config_key]
+        tree = tree_data['tree']
+        colors = get_theme_colors(load_theme())
+        order = list(tree_data['order'])
+        visible = tree_data['visible'].copy()
+        excluded = tree_data['excluded_from_menu'] | tree_data['force_hidden']
+        editable = set(tree_data['columns']) - excluded
+        parent = tree.winfo_toplevel()
+        previous_grab = parent.grab_current()
+        dialog = tk.Toplevel(parent)
+        dialog.withdraw()
+        dialog.title(t('column_order.title'))
+        dialog.configure(bg=colors['bg'])
+        dialog.resizable(False, False)
+        keep_on_top_job = None
+
+        def close():
+            if keep_on_top_job is not None:
+                dialog.after_cancel(keep_on_top_job)
+            dialog.destroy()
+
+        dialog.protocol('WM_DELETE_WINDOW', close)
+        try:
+            icon = get_app_icon_path()
+            if icon:
+                dialog.iconbitmap(icon)
+        except Exception:
+            pass
+
+        content = tk.Frame(dialog, bg=colors['bg'])
+        content.pack(padx=scaled_px(16), pady=scaled_px(12))
+        tk.Label(content, text=t('column_order.description'), bg=colors['bg'], fg=colors['fg'],
+                 font=scaled_font(9)).pack(anchor="w", pady=(0, scaled_px(8)))
+        list_frame = tk.Frame(content, bg=colors['bg'])
+        list_frame.pack(fill="both", expand=True)
+        listing = ttk.Treeview(list_frame, columns=('visible',), show='tree headings',
+                               height=12, selectmode='browse')
+        listing.heading('#0', text=t('column_order.column'), anchor='w')
+        listing.heading('visible', text=t('column_order.visible'), anchor='center')
+        listing.column('#0', width=scaled_px(240), minwidth=scaled_px(180))
+        listing.column('visible', width=scaled_px(80), minwidth=scaled_px(70), stretch=False, anchor='center')
+        listing.pack(side="left", fill="both", expand=True)
+        scrollbar = tk.Scrollbar(list_frame, command=listing.yview)
+        scrollbar.pack(side="right", fill="y")
+        listing.configure(yscrollcommand=scrollbar.set)
+        controls = tk.Frame(content, bg=colors['bg'])
+        controls.pack(fill="x", pady=(scaled_px(8), 0))
+
+        def populate(selected=None):
+            listing.delete(*listing.get_children())
+            for col in order:
+                if col in editable:
+                    listing.insert('', tk.END, iid=col,
+                                   text=self._cv_clean_heading(tree.heading(col, 'text')),
+                                   values=('☑' if visible[col] else '☐',))
+            rows = listing.get_children()
+            if rows:
+                selected = selected if selected in rows else rows[0]
+                listing.selection_set(selected)
+                listing.focus(selected)
+                listing.see(selected)
+            update_buttons()
+
+        def update_buttons(event=None):
+            selected = listing.selection()
+            rows = listing.get_children()
+            index = rows.index(selected[0]) if selected else -1
+            left_button.configure(state="normal" if index > 0 else "disabled")
+            right_button.configure(state="normal" if 0 <= index < len(rows) - 1 else "disabled")
+
+        def move(direction):
+            selected = listing.selection()
+            if not selected:
+                return
+            rows = listing.get_children()
+            index = rows.index(selected[0])
+            target = index + direction
+            if 0 <= target < len(rows):
+                source_index, target_index = order.index(rows[index]), order.index(rows[target])
+                order[source_index], order[target_index] = order[target_index], order[source_index]
+                populate(selected[0])
+
+        def toggle_visible(column):
+            visible[column] = not visible[column]
+            populate(column)
+
+        def on_click(event):
+            column = listing.identify_row(event.y)
+            if column and listing.identify_column(event.x) == '#1':
+                toggle_visible(column)
+                return "break"
+
+        def on_space(event):
+            selected = listing.selection()
+            if selected:
+                toggle_visible(selected[0])
+            return "break"
+
+        def reset_defaults():
+            order[:] = tree['columns']
+            visible.update({col: True for col in editable})
+            populate()
+
+        def apply_order():
+            tree_data['visible'].update({col: visible[col] for col in editable})
+            self._cv_set_order(config_key, order)
+            self._cv_save_visibility(config_key)
+            close()
+
+        def button(parent, text, command):
+            return tk.Button(parent, text=text, command=command, bg=colors['btn_bg'], fg=colors['btn_fg'],
+                             activebackground=colors['btn_bg_hover'], activeforeground=colors['btn_fg'],
+                             font=scaled_font(9), padx=scaled_px(8), pady=scaled_px(3), cursor="hand2")
+
+        left_button = button(controls, t('column_order.move_left'), lambda: move(-1))
+        left_button.pack(side="left")
+        right_button = button(controls, t('column_order.move_right'), lambda: move(1))
+        right_button.pack(side="left", padx=(scaled_px(6), 0))
+        button(controls, t('column_order.reset'), reset_defaults).pack(side="right", padx=(scaled_px(12), 0))
+        actions = tk.Frame(content, bg=colors['bg'])
+        actions.pack(fill="x", pady=(scaled_px(12), 0))
+        button(actions, t('common.cancel'), close).pack(side="right")
+        button(actions, t('common.apply'), apply_order).pack(side="right", padx=(0, scaled_px(6)))
+        listing.bind('<<TreeviewSelect>>', update_buttons)
+        listing.bind('<Button-1>', on_click)
+        listing.bind('<space>', on_space)
+        populate()
+        dialog.update_idletasks()
+        center_window(dialog, tree.winfo_toplevel())
+        previous_menu_state = getattr(parent, '_row_menu_open', False)
+        parent._row_menu_open = True
+        dialog.deiconify()
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except tk.TclError:
+            pass
+
+        def keep_on_top():
+            nonlocal keep_on_top_job
+            if dialog.winfo_exists():
+                dialog.lift()
+                keep_on_top_job = dialog.after(100, keep_on_top)
+
+        keep_on_top_job = dialog.after(100, keep_on_top)
+        try:
+            dialog.wait_window()
+        finally:
+            parent._row_menu_open = previous_menu_state
+            if previous_grab is not None and previous_grab.winfo_exists():
+                try:
+                    previous_grab.grab_set()
+                except tk.TclError:
+                    pass
 
     def _cv_set_force_hidden(self, config_key, column, hidden: bool):
         """Force a column out of the display regardless of the user's saved visibility

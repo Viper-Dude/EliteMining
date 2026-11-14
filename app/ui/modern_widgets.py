@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """Widgets used only by the Modern theme."""
+from ui.theme import modern_color
 import tkinter as tk
 from tkinter import ttk, font as tkfont
 
+from config import load_theme
 from ui.theme import get_theme_colors
 
 
@@ -11,7 +13,7 @@ class RoundedButton(tk.Canvas):
 
     def __init__(self, parent, text="", command=None, primary=False, font=None,
                  radius=6, padx=12, pady=4, **_ignored):
-        self._c = get_theme_colors("modern")
+        self._c = get_theme_colors(load_theme())
         self._text = text
         self._command = command
         self._primary = primary
@@ -73,7 +75,7 @@ class RoundedButton(tk.Canvas):
         if self._state == "disabled":
             return c["btn_bg_disabled"], c["btn_fg_disabled"], c["border"]
         if self._primary:
-            fill = "#E88A28" if self._pressed else ("#FFB05A" if self._hover else c["accent"])
+            fill = modern_color("#E88A28") if self._pressed else (modern_color("#FFB05A") if self._hover else c["accent"])
             return fill, c["accent_fg"], fill
         fill = c["btn_bg_hover"] if self._hover else c["btn_bg"]
         return fill, c["fg"], c["accent"] if self._hover else c["border"]
@@ -135,7 +137,7 @@ class RoundedProgressBar(tk.Canvas):
     """Pill-shaped progress bar. Set progress with bar['value'] = 0..100."""
 
     def __init__(self, parent, height=10, **_ignored):
-        self._c = get_theme_colors("modern")
+        self._c = get_theme_colors(load_theme())
         self._value = 0.0
         try:
             bg = parent.cget("bg")
@@ -159,7 +161,7 @@ class RoundedProgressBar(tk.Canvas):
         w = self.winfo_width()
         if w <= 1:
             return
-        self._pill(0, w, "#2A3038")
+        self._pill(0, w, modern_color("#2A3038"))
         if self._value > 0:
             self._pill(0, max(int(self.cget("height")), int(w * self._value / 100)), self._c["accent"])
 
@@ -195,7 +197,7 @@ def make_pill_image(fill, outline, size=24, radius=6, scale=4):
 
 _NEUTRAL_FILLS = {"#333333", "#2a2a2a", "#3a3a3a", "#1a1a1a", "#444444", "#2d2d2d", "#252525", "#1e1e1e",
                   "#2a3a4a", "#4a3a2a", "#3a4a5a", "#404040", "#555555", "#2e2e2e", "#222222", "#000000",
-                  "#0a0a0a", "#3d3d3d", "#353535", "#14171b", "#1d2228", "#262c34", "#4a4a4a"}
+                  "#0a0a0a", "#3d3d3d", "#353535", "#14171b", "#1d2228", "#262c34", modern_color("#14171b").lower(), modern_color("#1d2228").lower(), modern_color("#262c34").lower(), "#4a4a4a"}
 
 
 def _blend(c1, c2, t):

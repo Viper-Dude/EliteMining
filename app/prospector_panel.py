@@ -1,3 +1,4 @@
+from ui.theme import modern_color
 # ================================================================
 # Mining Analytics Panel - Final Baseline Version
 # Stable with the following fixes:
@@ -463,8 +464,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if not item:
             return
         
-        # Column #9 is the "count" (Hits) column
-        if column != "#9":
+        if displayed_column(self.stats_tree, column) != 'count':
             return
 
         # Get current values
@@ -1983,7 +1983,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         prospector_pane.columnconfigure(0, weight=1)
         prospector_pane.rowconfigure(1, weight=1)
         
-        ttk.Label(prospector_pane, text=t('mining_session.prospector_reports'), font=scaled_font(10, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 4))
+        prospector_header = ttk.Frame(prospector_pane)
+        prospector_header.grid(row=0, column=0, sticky="ew", pady=(0, 4))
+        ttk.Label(prospector_header, text=t('mining_session.prospector_reports'),
+                  font=scaled_font(10, "bold")).pack(side="left")
+        self._cv_add_columns_button(prospector_header, 'prospector_report')
 
         # Configure Prospector Reports Treeview style based on theme
         from config import load_theme
@@ -1997,13 +2001,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             selection_bg = "#ff6600"
             selection_fg = "#000000"
             alt_row_bg = "#252525"
-        elif pp_theme == "modern":
-            tree_bg = "#1D2228"
-            tree_fg = "#E6EAF0"
-            header_bg = "#14171B"
-            selection_bg = "#4A3520"
+        elif pp_theme in ("modern", "modern_slate", "modern_orange"):
+            tree_bg = modern_color("#1D2228")
+            tree_fg = modern_color("#E6EAF0")
+            header_bg = modern_color("#14171B")
+            selection_bg = modern_color("#4A3520")
             selection_fg = "#FFFFFF"
-            alt_row_bg = "#232A31"
+            alt_row_bg = modern_color("#232A31")
         else:
             tree_bg = "#1e1e1e"
             tree_fg = "#e6e6e6"
@@ -2062,7 +2066,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             tree=self.tree,
             columns=("materials", "content", "time"),
             default_widths={"materials": 400, "content": 180, "time": 80},
-            config_key='prospector_report'
+            config_key='prospector_report',
+            allow_reorder=True,
+            use_displaycolumns=True
         )
         
         # Load saved column widths from config
@@ -2186,9 +2192,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         mineral_header_frame.columnconfigure(1, weight=1)
         
         ttk.Label(mineral_header_frame, text=t('mining_session.material_analysis'), font=scaled_font(10, "bold")).grid(row=0, column=0, sticky="w")
-        ttk.Label(mineral_header_frame, text=t('mining_session.double_click_hint'),
-                  font=scaled_font(8), foreground="#888888").grid(row=0, column=1, sticky="e")
+        material_info = ttk.Label(mineral_header_frame, text="\u24d8", foreground=modern_color("#8A94A3"),
+                                  cursor="hand2", font=scaled_font(10))
+        material_info.grid(row=0, column=1, sticky="w", padx=(6, 2))
+        self.ToolTip(material_info, t('mining_session.double_click_hint'))
         
+        self._cv_add_columns_button(mineral_header_frame, 'mineral_analysis',
+                                    row=0, column=2, sticky="e", padx=(8, 0))
+
         stats_frame = ttk.Frame(material_pane)
         stats_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(0, 0))
         stats_frame.columnconfigure(0, weight=1)
@@ -2282,7 +2293,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "core_hits", "all_hits", "quality_rate"),
             default_widths={col: max(scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
             config_key='mineral_analysis',
-            use_displaycolumns=True
+            use_displaycolumns=True,
+            allow_reorder=True
         )
 
         # Load saved column widths from config — but never let an old (pre-scale)
@@ -3019,13 +3031,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             _rpt_sel_bg = "#ff6600"
             _rpt_sel_fg = "#000000"
             _rpt_alt = "#252525"
-        elif _rpt_theme == "modern":
-            _rpt_bg = "#1D2228"
-            _rpt_fg = "#E6EAF0"
-            _rpt_hdr = "#14171B"
-            _rpt_sel_bg = "#4A3520"
+        elif _rpt_theme in ("modern", "modern_slate", "modern_orange"):
+            _rpt_bg = modern_color("#1D2228")
+            _rpt_fg = modern_color("#E6EAF0")
+            _rpt_hdr = modern_color("#14171B")
+            _rpt_sel_bg = modern_color("#4A3520")
             _rpt_sel_fg = "#FFFFFF"
-            _rpt_alt = "#232A31"
+            _rpt_alt = modern_color("#232A31")
         else:
             _rpt_bg = "#1e1e1e"
             _rpt_fg = "#e6e6e6"
@@ -7741,7 +7753,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Hint text on a new line below filters
         hint_frame = ttk.Frame(main_frame)
         hint_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 2))
-        ttk.Label(hint_frame, text=t('reports.right_click_options'), foreground="gray").pack(side="left")
+        from config import load_theme
+        reports_info = ttk.Label(hint_frame, text="\u24d8", foreground=modern_color("#8A94A3"),
+                                 cursor="hand2", font=scaled_font(10))
+        reports_info.pack(side="left")
+        self.ToolTip(reports_info, t('reports.right_click_options'))
+        self._cv_add_columns_button(hint_frame, 'reports_tab')
         self._reports_showing_label = ttk.Label(hint_frame, text="", foreground="#888888")
         self._reports_load_more_btn = ttk.Button(hint_frame, text=t('reports.load_more'), width=14, command=self._load_more_reports)
 
@@ -7997,7 +8014,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             columns=("date", "duration", "session_type", "ship", "system", "body", "ring_type", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced"),
             default_widths={col: max(scaled_px(w), _reports_minwidths[col]) for col, w in _reports_base_widths.items()},
             config_key='reports_tab',
-            use_displaycolumns=True
+            use_displaycolumns=True,
+            allow_reorder=True
         )
 
         # Load saved column widths from config — but never let an old (pre-scale)
@@ -8842,12 +8860,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             if region == "heading" and column:
                 column_tooltips = {
-                    "#1": t('tooltips.prospector_minerals'),
-                    "#2": t('tooltips.prospector_content'),
-                    "#3": t('tooltips.prospector_time')
+                    "materials": t('tooltips.prospector_minerals'),
+                    "content": t('tooltips.prospector_content'),
+                    "time": t('tooltips.prospector_time')
                 }
                 
-                tooltip_text = column_tooltips.get(column)
+                tooltip_text = column_tooltips.get(displayed_column(tree, column))
                 if tooltip_text:
                     x = event.x_root + 10
                     y = event.y_root + 10
@@ -11738,21 +11756,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if not item:
             return
             
-        # Get clicked column and map dynamically to body/comment
-        column = self.reports_tree_tab.identify_column(event.x)
-        try:
-            cols = list(self.reports_tree_tab["columns"])
-            body_idx = cols.index('body') if 'body' in cols else None
-            comment_idx = cols.index('comment') if 'comment' in cols else None
-        except Exception:
-            body_idx = None
-            comment_idx = None
-
-        if body_idx is not None and column == f"#{body_idx+1}":
+        column = displayed_column(self.reports_tree_tab, self.reports_tree_tab.identify_column(event.x))
+        if column == 'body':
             self._edit_body(self.reports_tree_tab, item)
-        elif comment_idx is not None and column == f"#{comment_idx+1}":
+        elif column == 'comment':
             self._edit_comment(self.reports_tree_tab, item)
-    
+
     def _edit_comment_tab(self, event):
         """Edit comment in reports tab"""
         item = self.reports_tree_tab.selection()[0] if self.reports_tree_tab.selection() else None
@@ -11761,7 +11770,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
         # Get clicked column
         column = self.reports_tree_tab.identify_column(event.x)
-        if column != "#13":  # Comment column
+        if displayed_column(self.reports_tree_tab, column) != 'comment':
             return
             
         self._edit_comment(self.reports_tree_tab, item)
@@ -12932,6 +12941,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         search_entry.bind("<KeyRelease>", self._on_bookmark_search_changed)
         search_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
         
+        self._cv_add_columns_button(filter_frame, 'bookmarks')
+
         self.ToolTip(filter_combo, t('tooltips.bookmark_filter'))
         self.ToolTip(search_entry, t('tooltips.bookmark_search'))
 
@@ -13038,10 +13049,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     region = tree.identify_region(event.x, event.y)
                     if region == "heading":
                         col = tree.identify_column(event.x)
-                        col_num = int(col.replace('#', ''))
-                        columns = tree['columns']
-                        if 0 < col_num <= len(columns):
-                            col_id = columns[col_num - 1]
+                        col_id = displayed_column(tree, col)
+                        if col_id:
                             if col_id in tree._column_tooltips:
                                 # Show tooltip with word wrapping
                                 if hasattr(tree, '_header_tooltip_label'):
@@ -13105,7 +13114,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             tree=self.bookmarks_tree,
             columns=("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "density", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"),
             default_widths={col: max(scaled_px(w), _bm_minwidths[col]) for col, w in _bm_base_widths.items()},
-            config_key='bookmarks'
+            config_key='bookmarks',
+            use_displaycolumns=True,
+            allow_reorder=True
         )
 
         # Load saved column widths from config — but never let an old (pre-scale)
@@ -13580,7 +13591,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         column = self.bookmarks_tree.identify('column', event.x, event.y)
         
         # Check if clicking on Notes column and there's a valid item
-        if item and column == f"#{self.bookmarks_tree['columns'].index('notes') + 1}":
+        if item and displayed_column(self.bookmarks_tree, column) == 'notes':
             # Select the clicked item first
             self.bookmarks_tree.selection_set(item)
             self.bookmarks_tree.focus(item)
