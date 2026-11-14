@@ -8,9 +8,9 @@
 - Double-click a system cell to open its system on Inara.
 - Limited sidebar resizing to keep it at a practical width.
 - Improved button sizes, wording and help tips across all themes.
-- Added Auto-load: choose one preset per ship type from the preset list, and it will load automatically when you switch to that ship type or start the app.
-- Open the ship preset folder directly from the right-click menu.
-- Made the selected ship preset easier to distinguish from the active preset.
+- Added automatic ship preset loading: use the new Auto-load option to choose one preset per ship type, which loads when you switch to that ship type or start the app.
+- Added a right-click option to open the ship preset folder.
+- The new Auto-load feature shows which ship preset is active, with a separate highlight for the preset selected in the list.
 
 ### VoiceAttack Profile Update (v5.6.1)
 
