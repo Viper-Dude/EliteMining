@@ -3,6 +3,8 @@ import os
 import sys
 import tkinter as tk
 import unittest
+import time
+import csv
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,6 +47,36 @@ def sessions():
 
 
 class StatisticsChecks(unittest.TestCase):
+    def test_startup_load_without_mainloop(self):
+        root = tk.Tk()
+        root.withdraw()
+        from tkinter import ttk
+        frame = ttk.Frame(root)
+        frame.pack()
+        try:
+            with tempfile.TemporaryDirectory() as folder, \
+                 patch('session_statistics_panel._load_cfg', return_value={}), \
+                 patch('session_statistics_panel.update_config_value'), \
+                 patch.object(SessionStatisticsPanel, '_add_location_distances'):
+                row = {key: value for key, value in sessions()[0].items() if not key.startswith('_')}
+                with (Path(folder) / 'sessions_index.csv').open('w', encoding='utf-8', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=list(row))
+                    writer.writeheader()
+                    writer.writerow(row)
+                obj = owner()
+                obj.reports_dir = folder
+                widget = SessionStatisticsPanel(frame, obj)
+                root.update()
+                deadline = time.monotonic() + 3
+                while widget.loading and time.monotonic() < deadline:
+                    root.update()
+                    time.sleep(0.01)
+                self.assertFalse(widget.loading)
+                self.assertEqual(str(widget.refresh_button.cget('state')), 'normal')
+                self.assertIn('Total Sessions: 1', widget.overview.get('1.0', 'end'))
+                self.assertEqual(len(widget.best_tree.get_children()), 1)
+        finally:
+            root.destroy()
     def test_report_mineral_parser(self):
         text = '''--- Mineral Performance ---
 Platinum:

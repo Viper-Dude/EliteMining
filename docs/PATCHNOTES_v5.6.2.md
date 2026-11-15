@@ -3,6 +3,8 @@
 
 ## New Features & Improvements
 
+- Fixed Statistics sometimes staying blank when the app starts.
+
 - Reworked Mining Statistics with its own tab, filters, mineral performance, recent progress and your best and latest mining locations.
 
 - Added Iridium to the Metals list under Commodity Market → Trade Commodities.

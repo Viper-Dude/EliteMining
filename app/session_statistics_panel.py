@@ -9,6 +9,7 @@ import tkinter.font as tkfont
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from queue import Queue, Empty
 from tkinter import ttk
 
 from column_visibility_helper import ColumnVisibilityMixin, displayed_column
@@ -227,6 +228,8 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                 logging.getLogger('EliteMining').exception('Could not rebuild session index')
                 self._load_failed()
                 return
+        # Startup idle callbacks can run before mainloop; keep all Tk calls on the UI thread.
+        results = Queue()
         def worker():
             try:
                 if path.exists():
@@ -239,11 +242,23 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                     self._add_location_distances(rows, current_system)
                 else:
                     rows = []
-                self.parent.after(0, lambda: self._loaded(rows))
+                results.put(('loaded', rows))
             except Exception:
                 logging.getLogger('EliteMining').exception('Could not load session statistics')
-                self.parent.after(0, self._load_failed)
+                results.put(('failed', None))
         threading.Thread(target=worker, daemon=True).start()
+        self.parent.after(50, lambda: self._poll_load(results))
+
+    def _poll_load(self, results):
+        try:
+            status, rows = results.get_nowait()
+        except Empty:
+            self.parent.after(50, lambda: self._poll_load(results))
+            return
+        if status == 'loaded':
+            self._loaded(rows)
+        else:
+            self._load_failed()
 
     def _add_location_distances(self, rows, current_system):
         app = self.owner.main_app
