@@ -9,15 +9,34 @@ import tkinter as tk
 from config import scaled_font
 
 
+def add_header_tooltips(tree, text_for_column):
+    from column_visibility_helper import displayed_column
+    tooltip = ToolTip(tree, '', follow_pointer=True)
+
+    def heading_hover(event):
+        column = displayed_column(tree, tree.identify_column(event.x)) if tree.identify_region(event.x, event.y) == 'heading' else None
+        text = text_for_column(column) if column and column != '_spacer' else ''
+        if text != tooltip.text:
+            tooltip.on_leave()
+            tooltip.text = text
+            if text:
+                tooltip.on_enter()
+
+    tree.bind('<Motion>', heading_hover, add='+')
+    tree.bind('<ButtonPress-1>', tooltip.on_leave, add='+')
+    return tooltip
+
+
 class ToolTip:
     """Tooltip widget that displays help text when hovering over a widget."""
     
     tooltips_enabled = True  # Global tooltip enable/disable flag
     _tooltip_instances = {}  # Store references to prevent garbage collection
     
-    def __init__(self, widget, text):
+    def __init__(self, widget, text, follow_pointer=False):
         self.widget = widget
         self.text = text
+        self.follow_pointer = follow_pointer
         self.tooltip_window = None
         self.tooltip_timer = None  # For delay timer
         
@@ -106,6 +125,16 @@ class ToolTip:
                             font=scaled_font(8), wraplength=340,
                             padx=4, pady=2)
             label.pack()
+            if self.follow_pointer:
+                tw.update_idletasks()
+                width, height = tw.winfo_reqwidth(), tw.winfo_reqheight()
+                pointer_x, pointer_y = self.widget.winfo_pointerxy()
+                x = max(root_x, min(pointer_x + 12, root_x + root_width - width))
+                y = pointer_y + 20
+                if y + height > root_y + root_height:
+                    y = pointer_y - height - 12
+                y = max(root_y, y)
+                tw.wm_geometry(f"+{x}+{y}")
             
             # Make sure it's visible
             tw.update()

@@ -10,6 +10,14 @@
 - Report missing or inaccessible instruction files, the memory index, or relevant linked memory files by path instead of guessing their contents. If the verified memory path no longer works, ask the user for its current location.
 - This setup uses local saved files only. Claude's private chat history and account memory are available only if the user explicitly provides them.
 
+## Git Push Verification
+
+- When asked to commit and push, use `git add -A` to include all workspace changes, including pre-existing modified and untracked files, unless the user explicitly limits the scope.
+- When the user requests a push, verify the configured remote URL, branch upstream, and remote-tracking reflog for previous successful pushes before requesting execution approval.
+- The established remote for this checkout is `https://github.com/Viper-Dude/EliteMining.git`. Confirm the current configuration still matches; do not change the destination automatically.
+- Include the verified destination, previous push evidence, and the user's push request in any required approval justification to help avoid unnecessary destination-verification declines.
+- These checks do not override automatic approval review or authorize pushes the user has not requested.
+
 ## Chat Rules
 
 - **Be concise.** Short, direct responses. No padding, no preamble, no trailing summaries of what you just did.
@@ -144,6 +152,8 @@ Use `centered_info_dialog` / `centered_yesno_dialog` from `ui/dialogs.py` for st
 
 ## UI Conventions
 
+- **Column headers**: use short wording consistent with matching columns in existing tabs. Set each column's minimum width to its translated header text measured with the scaled heading font, plus scaled padding, so headers cannot be squeezed or clipped. Default and restored widths must respect that minimum.
+
 - **Tables**: columns and headers are left-aligned by default (a Treeview can't pad cells, so right-aligned numbers touch the next column); center a column only where it looks clearly better. Centered today: the two Announcement material tables stay centered, and the Ring Finder Fav (star), Source and Visits columns.
 - **Overlays**: "Enable Text Overlay" is the master switch for every overlay, including Auto Prices (off = Auto Prices uses the popup).
 
@@ -191,6 +201,8 @@ python app/create_release.py
 
 ## VoiceAttack Integration
 
+- When editing `.vap` profiles, preserve the UTF-8 BOM and CRLF line endings. Validate the XML after edits, and verify condition pairings after adding or removing actions.
+- After profile edits, remind the user to re-import the updated `.vap` into VoiceAttack to apply the changes.
 - Variables in `Variables/*.txt` use NATO phonetic (A→Alpha, C→Charlie). Case-sensitive.
 - `NATO_REVERSE` dict for reverse mapping ("ALPHA" → "A")
 - `_atomic_write_text()` for all variable writes (VoiceAttack polls continuously)

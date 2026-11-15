@@ -134,6 +134,8 @@ Use `centered_info_dialog` / `centered_yesno_dialog` from `ui/dialogs.py` for st
 
 ## UI Conventions
 
+- **Column headers**: use short wording consistent with matching columns in existing tabs. Set each column's minimum width to its translated header text measured with the scaled heading font, plus scaled padding, so headers cannot be squeezed or clipped. Default and restored widths must respect that minimum.
+
 - **Tables**: columns and headers are left-aligned by default (a Treeview can't pad cells, so right-aligned numbers touch the next column); center a column only where it looks clearly better. Centered today: the two Announcement material tables stay centered, and the Ring Finder Fav (star), Source and Visits columns.
 - **Overlays**: "Enable Text Overlay" is the master switch for every overlay, including Auto Prices (off = Auto Prices uses the popup).
 

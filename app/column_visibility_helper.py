@@ -210,7 +210,7 @@ class ColumnVisibilityMixin:
         listing.column('#0', width=scaled_px(240), minwidth=scaled_px(180))
         listing.column('visible', width=scaled_px(80), minwidth=scaled_px(70), stretch=False, anchor='center')
         listing.pack(side="left", fill="both", expand=True)
-        scrollbar = tk.Scrollbar(list_frame, command=listing.yview)
+        scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=listing.yview)
         scrollbar.pack(side="right", fill="y")
         listing.configure(yscrollcommand=scrollbar.set)
         controls = tk.Frame(content, bg=colors['bg'])

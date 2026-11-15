@@ -375,9 +375,10 @@ How the app helps (all in the [Hotspot Finder](#hotspot-finder)):
 The Commodity Market helps you find the best prices for mining commodities and trade goods using real-time market data from the Ardent API, with automatic distance calculations to help you maximize profits.
 
 ### Key Features
-- **Three Tabs:**
+- **Four Tabs:**
   - **Mining Commodities** – Search for 28 mineable resources (Painite, Platinum, Low Temperature Diamonds, etc.)
   - **Multiple Prices** – Tick up to 5 minerals and find the best stations to sell them together in one stop
+  - **Sell My Hold** – Compare one-stop, nearby, and two-stop sales for your current cargo while reserving cargo needed for mining missions
   - **Trade Commodities** – Search across 15 categories of trade goods (Chemicals, Machinery, Medicines, Technology, and more)
 - **Two Search Modes:**
   - **Near System** – Find top 30 stations within 500 LY, filtered by distance
@@ -407,6 +408,17 @@ Perfect for planning your mining runs and finding the most profitable stations t
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/multiple_prices.png" width="900"><br>  
 *Multiple Prices tab ranking stations by how many of your chosen minerals they buy, with demand and price per mineral. In Ring Finder, Find Sell Station opens it with a ring's minerals pre-selected.*
+
+### Sell My Hold
+
+Use **Current System** or enter another reference system, choose your search radius, pad size, carrier and price-age filters, then click **Search**. EliteMining reads your cargo and compares the best one-stop payout, a nearby sale, and a two-stop option when it earns more. Limpets are excluded, and cargo still needed for tracked mining missions is reserved automatically.
+
+Select an option to see what to sell at each stop, including quantities, prices, demand and price age. Unsold cargo is shown separately. Payouts are estimates; actual prices and demand may change. Distances are straight-line distances, not jump routes or travel times.
+
+Drag the divider to resize the tables, and use **Columns** to reorder or hide columns. Hover over headers for explanations. Right-click either table to copy a system name or open Inara, EDSM or Spansh; double-click opens Inara for that row's system, or the first stop in a two-stop option. Search choices and table layout are remembered between restarts.
+
+<img src="Screenshot/sell_my_hold.png" alt="Sell My Hold comparing cargo sale options and showing the commodities to sell at each stop" width="900"><br>
+*Sell My Hold showing cargo sale options and the selected plan's station and commodity details.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/trade_commodities.png" width="900"><br>  
 *Trade Commodities tab with 15 categories covering all tradeable goods in Elite Dangerous.*
@@ -605,7 +617,7 @@ Generate comprehensive HTML reports with interactive charts, mining analytics, a
 - **Session Comments** - Add notes and observations to your reports  
 - **Visual Charts** - Minerals breakdowns and performance graphs  
 - **Screenshot Integration** - Attach screenshots to document your sessions  
-- **Overall Statistics** - Compare current session to your mining history
+- **Mining Statistics** - Track session averages, mineral performance, recent progress, and your best and latest mining locations under **Mining → Statistics**.
 - **Analytics Tooltips** - Hover explanations for all efficiency metrics
 - **Clickable Images** - Charts and screenshots expand to full size
 - **Data Preservation** - Reports protected during software updates
@@ -656,9 +668,27 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 - **T/hr** shows the session total, or the rate for the chosen Mineral (bookmarks made from a report; older bookmarks keep their old value)
 - Hover a note to read the full text
 
-#### Comprehensive Analytics  
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_statistic.png" width="900"><br>  
-*Session statistics: yields, hit rates, and comparisons.*  
+#### Mining Statistics
+
+Open **Mining → Statistics** and filter by ship, mineral, or time period.
+
+- **Overview** — Session totals, averages, and records, plus your latest 10 sessions compared with the previous 10.
+- **Top 10 Best Locations** — Locations ranked by their best session T/hr, with average and lowest rates, session counts, and mining time.
+- **Last 10 Mining Locations** — Your latest mining locations, newest first. Each system/ring appears once.
+- **Mineral Performance** — Select a mineral to see Avg %, Best %, and Hits from saved reports. These follow your announcement thresholds; T/hr still includes all mined minerals.
+
+Both location tables include **Dist (LY)** from your current system and **LS** from the arrival star. Use **Columns** to reorder or hide columns, and hover over headers for descriptions.
+
+Right-click a location to copy its system, open Inara/EDSM/Spansh, view its report, or search in Hotspots Finder. Double-click a system to open Inara, or another cell to open the report.
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_statistic.png" alt="Mining Statistics overview with session averages, records and recent progress" width="900"><br>
+*Overview: totals, averages, records, and recent progress.*
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_statistic_top_10.png" alt="Best Locations with mining rates and mineral performance" width="900"><br>
+*Top 10 Best Locations: compare mining rates and mineral performance.*
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining-session_statistic_last_10.png" alt="Last 10 Mining Locations with dates, minerals mined and session details" width="900"><br>
+*Last 10 Mining Locations: recent mining spots and session details.*
 
 ---
 

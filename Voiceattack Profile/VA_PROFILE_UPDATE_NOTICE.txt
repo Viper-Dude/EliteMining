@@ -1,12 +1,12 @@
 ================================================================================
-  EliteMining v5.6.1 — VoiceAttack Profile Update 
+  EliteMining v5.6.2 — VoiceAttack Profile Update 
 ================================================================================
 
-This release includes an updated VoiceAttack profile (v5.6.1).
+This release includes an updated VoiceAttack profile (v5.6.2).
 
 
 What's changed:
-- Various improvements and fixes to the VoiceAttack profile.
+- Improved mining preparation sounds and reset behavior, clearing active commands at startup and after leaving supercruise to prevent conflicts.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.

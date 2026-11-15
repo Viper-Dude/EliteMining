@@ -10,6 +10,31 @@ from datetime import datetime
 
 log = logging.getLogger(__name__)
 
+
+def parse_mineral_performance(session_file_path):
+    import re
+    from pathlib import Path
+    try:
+        content = Path(session_file_path).read_text(encoding='utf-8')
+    except (OSError, UnicodeError):
+        return {}
+    section = re.search(r'--- (?:Mineral|Material) Performance ---\s*\n(.*?)(?=\n\s*(?:Overall Quality:|Best Performer:|===|---)|\Z)', content, re.S)
+    if not section:
+        return {}
+    results, current = {}, None
+    fields = {'Average': 'avg', 'Best': 'best', 'Hits': 'hits', 'Core Hits': 'core_hits'}
+    for line in section.group(1).splitlines():
+        line = line.strip()
+        if line.endswith(':') and not line.startswith(('•', '-')):
+            current = line[:-1].strip()
+        elif current:
+            match = re.match(r'•\s*(Average|Best|Hits|Core Hits):\s*([\d.]+)', line)
+            if match:
+                field = fields[match[1]]
+                value = float(match[2])
+                results.setdefault(current, {})[field] = int(value) if field in ('hits', 'core_hits') else value
+    return results
+
 @dataclass
 class MaterialFind:
     """Represents a single material find from prospector analysis"""

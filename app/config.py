@@ -858,6 +858,14 @@ def scaled_px(base_px: int) -> int:
     """Return a pixel size (e.g. rowheight) scaled by the configured UI scale factor"""
     return round(base_px * load_ui_scale())
 
+def load_sidebar_cargo_on_top(default: bool) -> bool:
+    return _load_cfg().get("sidebar_cargo_on_top", default)
+
+def save_sidebar_cargo_on_top(cargo_on_top: bool) -> None:
+    cfg = _load_cfg()
+    cfg["sidebar_cargo_on_top"] = cargo_on_top
+    _save_cfg(cfg)
+
 def load_sidebar_sash_position() -> Optional[int]:
     """Load saved sidebar sash position (Ship Presets / Cargo Monitor split)"""
     cfg = _load_cfg()

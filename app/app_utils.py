@@ -561,3 +561,53 @@ MIGRATION CHECKLIST:
 □ Test in both development and installer modes
 □ Update imports to use app_utils instead of individual modules
 """
+
+def open_system_website(system, site='inara'):
+    import webbrowser
+    from urllib.parse import quote
+    urls = {'inara': 'https://inara.cz/elite/starsystem/?search=',
+            'edsm': 'https://www.edsm.net/en/system/id/0/name/',
+            'spansh': 'https://spansh.co.uk/search/'}
+    webbrowser.open(urls[site] + quote(system))
+
+
+def format_market_station_type(api_type):
+    if api_type is None or api_type == '':
+        api_type = 'Unknown'
+
+    # Orbital starports - show as "Orbital/Type"
+    # Exact known types first, then prefix-based fallback for new
+    # Trailblazers/colonization types (OrbitalConstruction, SurfaceConstruction, etc.)
+    if api_type == 'AsteroidBase':
+        station_type = 'Orbital/Asteroid Base'
+    elif api_type in ['Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Dodec']:
+        station_type = f'Orbital/{api_type}'
+    elif api_type == 'CraterOutpost':
+        station_type = 'Surface/Crater Outpost'
+    elif api_type == 'CraterPort':
+        station_type = 'Surface/Crater Port'
+    elif api_type in ('SurfaceStation', 'SurfacePort'):
+        station_type = 'Surface/Port'
+    elif api_type == 'OnFootSettlement':
+        station_type = 'Surface/Settlement'
+    elif api_type == 'FleetCarrier':
+        station_type = 'Carrier'
+    elif api_type == 'StrongholdCarrier':
+        station_type = 'Stronghold'
+    elif api_type == 'MegaShip':
+        station_type = 'MegaShip'
+    elif api_type == 'Unknown':
+        station_type = 'Unknown'
+    elif 'Surface' in api_type or 'Crater' in api_type or 'Ground' in api_type:
+        station_type = 'Surface/Station'
+    elif 'Carrier' in api_type or 'Drake' in api_type:
+        station_type = 'Carrier'
+    elif 'Settlement' in api_type or 'OnFoot' in api_type:
+        station_type = 'Surface/Settlement'
+    elif 'Outpost' in api_type:
+        station_type = 'Orbital/Outpost'
+    elif 'Orbital' in api_type or 'Port' in api_type or 'Station' in api_type:
+        station_type = 'Orbital/Station'
+    else:
+        station_type = 'Orbital/Station'  # Safe default for any future types
+    return station_type

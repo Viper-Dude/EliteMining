@@ -2851,8 +2851,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             self.charts_panel = None
         
         # Statistics sub-tab
-        statistics = ttk.Frame(analytics_nb, padding=8)
-        analytics_nb.add(statistics, text=t('mining_session.statistics'))
+        statistics = ttk.Frame(nb, padding=8)
+        nb.add(statistics, text=t('mining_session.statistics'))
         statistics.columnconfigure(0, weight=1)
         statistics.rowconfigure(0, weight=1)
         
@@ -2861,7 +2861,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Reports tab - Session reports and management
         reports = ttk.Frame(nb, padding=8)
-        nb.add(reports, text=t('mining_session.reports'))
+        nb.insert(statistics, reports, text=t('mining_session.reports'))
         reports.columnconfigure(0, weight=1)
         reports.rowconfigure(0, weight=1)
         
@@ -8425,6 +8425,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         _menu_fg = "#ff8c00"
                         _menu_active_bg = "#ff6600"
                         _menu_active_fg = "#000000"
+                    elif _menu_theme in ("modern", "modern_slate", "modern_orange"):
+                        _menu_bg = MENU_COLORS["bg"]
+                        _menu_fg = MENU_COLORS["fg"]
+                        _menu_active_bg = MENU_COLORS["activebackground"]
+                        _menu_active_fg = MENU_COLORS["activeforeground"]
                     else:
                         _menu_bg = "#2d2d2d"
                         _menu_fg = "#ffffff"
@@ -14381,177 +14386,37 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self._set_status(f"Copied '{text}' to clipboard")
 
     def _create_statistics_panel(self, parent: ttk.Widget) -> None:
-        """Create the statistics panel for comprehensive mining analytics with scrolling support"""
-        # Get theme for styling
-        from config import load_theme
-        _stats_theme = load_theme()
-        _stats_bg = "#1a1a1a" if _stats_theme == "elite_orange" else "#2b2b2b"
-        _stats_fg = "#ff9900" if _stats_theme == "elite_orange" else "#ffffff"
-        _stats_border = "#ff6600" if _stats_theme == "elite_orange" else "#555555"
-        
-        # Configure ttk styles for Statistics panel
-        style = ttk.Style()
-        style.configure("Stats.TFrame", background=_stats_bg)
-        style.configure("Stats.TLabelframe", background=_stats_bg)
-        style.configure("Stats.TLabelframe.Label", background=_stats_bg, foreground=_stats_fg, font=scaled_font(10, "bold", family="Consolas"))
-        
-        # Main frame (no scrollbar needed - layout is compact)
-        main_frame = ttk.Frame(parent, style="Stats.TFrame")
-        main_frame.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        # Title row - combines title and info text on same line to save space
-        title_row = ttk.Frame(main_frame, style="Stats.TFrame")
-        title_row.pack(fill="x", pady=(0, 5))
-        
-        # Title text (emoji already in localization)
-        title_label = tk.Label(title_row, text=t('statistics.title'),
-                              font=scaled_font(12, "bold", family="Consolas"), fg="#ffffff", bg=_stats_bg)
-        title_label.pack(side="left")
-
-        # Info text - smaller, next to title
-        info_label = tk.Label(title_row, text="  —  " + t('statistics.info'),
-                             font=scaled_font(8, "italic"), fg="#666666", bg=_stats_bg)
-        info_label.pack(side="left", padx=(5, 0))
-        
-        # Statistics container
-        stats_container = ttk.Frame(main_frame, style="Stats.TFrame")
-        stats_container.pack(fill="both", expand=True)
-        
-        # Two-column layout
-        left_column = ttk.LabelFrame(stats_container, text=t('statistics.overall_statistics'), padding=5, style="Stats.TLabelframe")
-        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 3))
-        
-        right_column = ttk.LabelFrame(stats_container, text=t('statistics.best_records'), padding=5, style="Stats.TLabelframe")
-        right_column.grid(row=0, column=1, sticky="nsew", padx=(3, 0))
-        
-        stats_container.grid_columnconfigure(0, weight=1)
-        stats_container.grid_columnconfigure(1, weight=1)
-        stats_container.grid_rowconfigure(0, weight=1)
-        
-        # Initialize stats labels dictionary
-        self.stats_labels = {}
-        
-        # Overall Statistics (Left Column)
-        # Add "Session Overview" header
-        session_header = tk.Label(left_column, text=t('statistics.session_overview'), font=scaled_font(10, "bold", family="Consolas"),
-                                 fg="#ffaa00", bg=_stats_bg, anchor="w")
-        session_header.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5), padx=(0, 10))
-        
-        stats_data = [
-            (t('statistics.total_sessions'), "total_sessions"),
-            (t('statistics.total_time'), "total_time"),
-            (t('statistics.total_tonnage'), "total_tonnage"),
-            (t('statistics.avg_tph'), "avg_tph"),
-            (t('statistics.systems_mined'), "unique_systems"),
-            (t('statistics.total_asteroids'), "total_asteroids"),
-            (t('statistics.avg_hit_rate'), "avg_hit_rate")
-        ]
-        
-        for i, (label_text, key) in enumerate(stats_data):
-            # Label
-            label = tk.Label(left_column, text=label_text, font=scaled_font(10, family="Consolas"),
-                           fg="#cccccc", bg=_stats_bg, anchor="w")
-            label.grid(row=1+i, column=0, sticky="w", pady=2, padx=(0, 10))
-
-            # Value
-            value_label = tk.Label(left_column, text="0", font=scaled_font(10, "bold", family="Consolas"),
-                                 fg="#00ff00", bg=_stats_bg, anchor="w")
-            value_label.grid(row=1+i, column=1, sticky="w", pady=2)
-            self.stats_labels[key] = value_label
-        
-        # Add separator line
-        separator = tk.Frame(left_column, height=1, bg="#444444")
-        separator.grid(row=8, column=0, columnspan=2, sticky="ew", pady=8, padx=(0, 10))
-        
-        # Add "Best Records" header
-        best_header = tk.Label(left_column, text=t('statistics.best_records'), font=scaled_font(10, "bold", family="Consolas"),
-                              fg="#ffaa00", bg=_stats_bg, anchor="w")
-        best_header.grid(row=9, column=0, columnspan=2, sticky="w", pady=(5, 2), padx=(0, 10))
-        
-        # Best records data
-        best_records_data = [
-            (t('statistics.best_tph'), "best_session_tph"),
-            (t('statistics.best_system'), "best_session_system"),
-            (t('statistics.most_mined_ton_session'), "best_tonnage"),
-            (t('statistics.most_mined_system'), "most_mined_system"),
-            (t('statistics.most_mined_minerals'), "most_collected_material")
-        ]
-        
-        for i, (label_text, key) in enumerate(best_records_data):
-            # Label
-            label = tk.Label(left_column, text=label_text, font=scaled_font(10, family="Consolas"),
-                           fg="#cccccc", bg=_stats_bg, anchor="w")
-            label.grid(row=10+i, column=0, sticky="w", pady=2, padx=(0, 10))
-
-            # Value
-            value_label = tk.Label(left_column, text="0", font=scaled_font(10, "bold", family="Consolas"),
-                                 fg="#00ff00", bg=_stats_bg, anchor="w")
-            value_label.grid(row=10+i, column=1, sticky="w", pady=2)
-            self.stats_labels[key] = value_label
-            if key in ("best_session_system", "most_mined_system"):
-                self._make_stat_label_copyable(value_label, lambda w=value_label: w.cget("text"))
-        
-        # Records (Right Column) - Top 5 Best Systems only
-        top_systems_title = tk.Label(right_column, text=t('statistics.top_5_systems'), font=scaled_font(10, "bold", family="Consolas"),
-                                    fg="#cccccc", bg=_stats_bg, anchor="w")
-        top_systems_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 1), padx=(0, 10))
-        
-        # Create labels for top 5 systems (3 lines per system: System|Body, Material, then metrics)
-        self._top_system_names = {}
-        row_offset = 0
-        for rank in range(1, 6):
-            # Line 1: Rank. System | Body
-            system_label = tk.Label(right_column, text=f"{rank}. — | —", font=scaled_font(9, family="Consolas"),
-                                   fg="#ffffff", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
-            system_label.grid(row=1+row_offset, column=0, columnspan=2, sticky="w", pady=(1, 0), padx=(0, 10))
-            self.stats_labels[f'top_system_{rank}_line1'] = system_label
-            self._make_stat_label_copyable(system_label, lambda r=rank: self._top_system_names.get(r, ""))
-            
-            # Line 2: Material (indented to align below system name, after "1. ")
-            material_label = tk.Label(right_column, text="—", font=scaled_font(9, family="Consolas"),
-                                     fg="#ffaa00", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
-            material_label.grid(row=1+row_offset+1, column=0, columnspan=2, sticky="w", pady=0, padx=(15, 0))
-            self.stats_labels[f'top_system_{rank}_line2'] = material_label
-            
-            # Line 3: Metrics indented (T/Asteroid, TPH)
-            metrics_label = tk.Label(right_column, text="—", font=scaled_font(9, family="Consolas"),
-                                    fg="#00ff00", bg=_stats_bg, anchor="w", wraplength=350, justify="left")
-            metrics_label.grid(row=1+row_offset+2, column=0, columnspan=2, sticky="w", pady=(0, 1), padx=(15, 0))
-            self.stats_labels[f'top_system_{rank}_line3'] = metrics_label
-            
-            row_offset += 3
-        
-        # Initial statistics load
-        self._refresh_session_statistics()
+        from session_statistics_panel import SessionStatisticsPanel
+        self.session_statistics_panel = SessionStatisticsPanel(parent, self)
 
     # -------------------- Session Statistics Functions --------------------
     
-    def _calculate_session_statistics(self) -> dict:
+    def _calculate_session_statistics(self, sessions=None) -> dict:
         """Calculate comprehensive statistics from all mining sessions"""
         csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
         
-        if not os.path.exists(csv_path):
-            # Try to rebuild CSV from existing session files
-            try:
-                self._rebuild_csv_from_files_tab(csv_path, silent=True)
-            except Exception as e:
-                print(f"Could not rebuild CSV: {e}")
-                return {}
-            
-            # Check again after rebuild attempt
+        if sessions is None:
             if not os.path.exists(csv_path):
-                return {}
+                # Try to rebuild CSV from existing session files
+                try:
+                    self._rebuild_csv_from_files_tab(csv_path, silent=True)
+                except Exception as e:
+                    print(f"Could not rebuild CSV: {e}")
+                    return {}
+            
+                # Check again after rebuild attempt
+                if not os.path.exists(csv_path):
+                    return {}
         
         try:
             import csv
             from collections import defaultdict, Counter
             from datetime import datetime
             
-            sessions = []
-            with open(csv_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                sessions = list(reader)
-            
+            if sessions is None:
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    sessions = list(csv.DictReader(f))
+
             if not sessions:
                 return {}
             
@@ -14859,6 +14724,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
     
     def _refresh_session_statistics(self):
         """Update the statistics display with current data"""
+        if hasattr(self, 'session_statistics_panel'):
+            self.session_statistics_panel.reload()
+            return
         try:
             stats = self._calculate_session_statistics()
             
@@ -16582,51 +16450,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             messagebox.showerror("Report Error", f"Failed to generate enhanced report:\n{e}", parent=tree.winfo_toplevel())
             
     def _parse_filtered_yields_from_session_file(self, session_file_path):
-        """Parse filtered yield data from session text file"""
-        try:
-            with open(session_file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Look for "Mineral Performance" section (check both old and new names for compatibility)
-            if "--- Mineral Performance ---" not in content and "--- Material Performance ---" not in content:
-                return {}
-            
-            # Extract the Mineral Performance section (support both old and new names)
-            performance_start = content.find("--- Mineral Performance ---")
-            if performance_start == -1:
-                performance_start = content.find("--- Material Performance ---")
-            performance_section = content[performance_start:]
-            
-            # Parse each material's average percentage
-            filtered_yields = {}
-            lines = performance_section.split('\n')
-            
-            current_material = None
-            for line in lines:
-                line = line.strip()
-                
-                # Look for material name (ends with :)
-                if line.endswith(':') and not line.startswith('•') and not line.startswith('-'):
-                    current_material = line.rstrip(':')
-                
-                # Look for average percentage line
-                elif current_material and line.startswith('• Average:'):
-                    try:
-                        # Extract percentage from "• Average: 44.1%"
-                        avg_part = line.split('Average:')[1].strip()
-                        percentage_str = avg_part.replace('%', '').strip()
-                        percentage = float(percentage_str)
-                        filtered_yields[current_material] = percentage
-                        current_material = None  # Reset for next material
-                    except (ValueError, IndexError):
-                        continue
-            
-            return filtered_yields
-            
-        except Exception as e:
-            print(f"Error parsing filtered yields from session file: {e}")
-            return {}
-    
+        from mining_statistics import parse_mineral_performance
+        return {name: values['avg'] for name, values in parse_mineral_performance(session_file_path).items()
+                if 'avg' in values}
+
     def _generate_enhanced_report(self, cargo_session_data, text_report_path):
         """Generate enhanced HTML report with charts and screenshots"""
         try:

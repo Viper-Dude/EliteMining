@@ -1,17 +1,11 @@
-﻿What's new in EliteMining v5.6.1
+﻿What's new in EliteMining v5.6.2
 
-- Added Modern Dark and Modern Orange themes, with clearer theme names and Navy as the default for new installs.
+- Reworked Mining Statistics with its own tab, filters, mineral performance, recent progress and your best and latest mining locations.
 
-- Added column ordering and visibility controls through the Columns button, with choices saved for each table.
+- Added Iridium to the Metals list under Commodity Market → Trade Commodities.
 
-- Double-click a system cell to open its system on Inara.
+- Fixed the Customize Columns scrollbar to match the selected theme throughout the app.
 
-- Limited sidebar resizing to keep it at a practical width.
+- Added Sell My Hold under Commodity Market to compare cargo sale options, show station types and reserve mission cargo.
 
-- Improved button sizes, wording and help tips across all themes.
-
-- Added automatic ship preset loading: use the new Auto-load option to choose one preset per ship type, which loads when you switch to that ship type or start the app.
-
-- Added a right-click option to open the ship preset folder.
-
-- The new Auto-load feature shows which ship preset is active, with a separate highlight for the preset selected in the list.
+- Added a Sidebar menu option to swap Cargo Monitor.

@@ -926,7 +926,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.6.1"
+APP_VERSION = "v5.6.2"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -9677,7 +9677,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if (saved_pos is not None and
                     saved_pos >= min_presets_height and
                     saved_pos <= total_height - min_cargo_height):
-                    paned_window.sashpos(0, saved_pos)
+                    paned_window.sashpos(0, self._sidebar_sash_position(saved_pos))
                     log.info(f"Sidebar sash position restored: {saved_pos}")
                 else:
                     # Default: give 60% to presets, 40% to cargo monitor
@@ -9685,7 +9685,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     # Ensure minimum heights
                     sash_pos = max(sash_pos, min_presets_height)
                     sash_pos = min(sash_pos, total_height - min_cargo_height)
-                    paned_window.sashpos(0, sash_pos)
+                    paned_window.sashpos(0, self._sidebar_sash_position(sash_pos))
                     log.info(f"Sidebar sash position using default: {sash_pos} (saved_pos={saved_pos})")
 
                 self._sidebar_sash_initialized = True
@@ -9770,6 +9770,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Top pane - Presets section
         presets_pane = ttk.Frame(paned_window)
+        self._presets_pane = presets_pane
         paned_window.add(presets_pane, weight=5)
         presets_pane.columnconfigure(0, weight=1)
         presets_pane.rowconfigure(2, weight=1)  # Row 2 (preset list) expands
@@ -9911,11 +9912,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Bottom pane - Cargo Monitor
         cargo_pane = ttk.Frame(paned_window)
         self._cargo_pane = cargo_pane
-        if self.current_theme in ("modern", "modern_slate", "modern_orange"):
-            # Cargo Monitor sits above Ship Presets; its sash position is fixed to the cargo's natural height
+        from config import load_sidebar_cargo_on_top
+        self._sidebar_default_cargo_on_top = self.current_theme in ("modern", "modern_slate", "modern_orange")
+        self._sidebar_cargo_on_top = load_sidebar_cargo_on_top(self._sidebar_default_cargo_on_top)
+        if self._sidebar_cargo_on_top:
             paned_window.insert(0, cargo_pane, weight=0)
         else:
-            paned_window.add(cargo_pane, weight=1)  # weight=1 - allow expansion when sash moved
+            paned_window.add(cargo_pane, weight=1)
         
         # Configure cargo pane - allow vertical expansion
         cargo_pane.columnconfigure(0, weight=1)
@@ -9955,7 +9958,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sidebar_toggle_btn = tk.Button(
             theme_btn_frame,
             text=t('sidebar.sidebar_btn'),
-            command=self._toggle_sidebar_visibility,
+            command=self._show_sidebar_menu,
             bg=_tbtn_bg,
             fg=_tbtn_fg,
             activebackground=_tbtn_active_bg,
@@ -10001,7 +10004,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 return
             try:
                 from config import save_sidebar_sash_position
-                pos = paned_window.sashpos(0)
+                pos = self._sidebar_sash_position(paned_window.sashpos(0))
                 if pos > 100:  # Only save valid positions
                     save_sidebar_sash_position(pos)
                     log.debug(f"Sidebar sash position saved: {pos}")
@@ -10030,7 +10033,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             pos = min(max(self._cargo_pane.winfo_reqheight(), self._scaled_px(120)), max_cargo)
             log.info(f"Modern sidebar sash using natural height: {pos} (saved_pos={saved_pos})")
-        paned.sashpos(0, pos)
+        paned.sashpos(0, self._sidebar_sash_position(pos))
         return True
 
     def _save_modern_sidebar_sash(self) -> None:
@@ -10040,7 +10043,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 return
             paned = self.sidebar_paned
             total_height = paned.winfo_height()
-            pos = paned.sashpos(0)
+            pos = self._sidebar_sash_position(paned.sashpos(0))
             if total_height >= 100 and self._scaled_px(80) <= pos <= total_height - self._scaled_px(100):
                 from config import save_modern_sidebar_sash_position
                 save_modern_sidebar_sash_position(pos)
@@ -10066,7 +10069,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._save_modern_sidebar_sash()
             elif getattr(self, '_sidebar_sash_initialized', False) and hasattr(self, 'sidebar_paned'):
                 from config import save_sidebar_sash_position
-                pos = self.sidebar_paned.sashpos(0)
+                pos = self._sidebar_sash_position(self.sidebar_paned.sashpos(0))
                 if pos > 100:
                     save_sidebar_sash_position(pos)
                     log.info(f"Sidebar sash position saved on close: {pos}")
@@ -10116,7 +10119,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if (saved_pos is not None and
                         saved_pos >= min_presets_height and
                         saved_pos <= total_height - min_cargo_height):
-                        paned.sashpos(0, saved_pos)
+                        paned.sashpos(0, self._sidebar_sash_position(saved_pos))
                         log.info(f"Sidebar sash position re-applied: {saved_pos}")
                     self._sidebar_sash_initialized = True
 
@@ -14153,6 +14156,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.market_mining_status_label.config(text=status_text, fg=status_color)
         if hasattr(self, 'market_trade_status_label'):
             self.market_trade_status_label.config(text=trade_text, fg=status_color)
+        if hasattr(self, 'cargo_sell_planner'):
+            self.cargo_sell_planner.market_status_label.config(text=status_text, fg=status_color)
     
     # ==================== END DISTANCE CALCULATOR ====================
 
@@ -16048,6 +16053,42 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.main_paned.sashpos(0, position)
         self._last_sidebar_width = total_width - position
         return position
+
+    def _sidebar_sash_position(self, position):
+        # Keep saved heights tied to the same pane when the order is reversed.
+        if self._sidebar_cargo_on_top != self._sidebar_default_cargo_on_top:
+            return self.sidebar_paned.winfo_height() - position
+        return position
+
+    def _swap_sidebar_panes(self) -> None:
+        from config import save_sidebar_cargo_on_top
+        paned = self.sidebar_paned
+        position = paned.sashpos(0)
+        height = paned.winfo_height()
+        self._sidebar_cargo_on_top = not self._sidebar_cargo_on_top
+        top_pane = self._cargo_pane if self._sidebar_cargo_on_top else self._presets_pane
+        paned.insert(0, top_pane)
+        paned.update_idletasks()
+        paned.sashpos(0, height - position)
+        save_sidebar_cargo_on_top(self._sidebar_cargo_on_top)
+        self._save_sash_positions_now()
+
+    def _show_sidebar_menu(self) -> None:
+        tc = self.theme_colors
+        menu = tk.Menu(self, tearoff=0, bg=tc["bg_accent"], fg=tc["fg"],
+                       activebackground=tc["selection_bg"], activeforeground=tc["selection_fg"],
+                       bd=0, relief="flat", font=self._scaled_font(9))
+        key = 'sidebar.hide_sidebar' if self._sidebar_visible else 'sidebar.show_sidebar'
+        menu.add_command(label=t(key), command=self._toggle_sidebar_visibility)
+        menu.add_command(label=t('sidebar.swap_panels'), command=self._swap_sidebar_panes,
+                         state=tk.NORMAL if self._sidebar_visible else tk.DISABLED)
+        button = self.sidebar_toggle_btn
+        x = button.winfo_rootx()
+        y = button.winfo_rooty() - menu.yposition(tk.END) - 30 if button.winfo_rooty() > 300 else button.winfo_rooty() + button.winfo_height()
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
 
     def _toggle_sidebar_visibility(self) -> None:
         """Show or hide the Ship Presets + Cargo Monitor sidebar column"""
@@ -18254,6 +18295,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.market_sub_notebook = sub_notebook
         self.market_multi_tab_frame = multi_tab
         sub_notebook.add(multi_tab, text=t('tabs.multi_mineral'))
+
+        from cargo_sell_planner import CargoSellPlanner
+        sell_hold_tab = ttk.Frame(sub_notebook, padding=8)
+        self.cargo_sell_planner = CargoSellPlanner(sell_hold_tab, self)
+        sub_notebook.add(sell_hold_tab, text=t('sell_hold.title'))
         
         # Trade Commodities sub-tab
         trade_tab = ttk.Frame(sub_notebook, padding=8)
@@ -18377,7 +18423,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.marketplace_use_current_btn.pack(side="left")
 
         # Commodity label with consistent spacing
-        ttk.Label(filter_grid, text=t('marketplace.commodity')).grid(row=0, column=3, sticky="w", padx=(0, 8), pady=(0, 8))
+        ttk.Label(filter_grid, text=t('marketplace.commodity_type')).grid(row=0, column=3, sticky="w", padx=(0, 8), pady=(0, 8))
 
         # Commodity list with localization
         from core.constants import MINING_COMMODITY_ORDER
@@ -18659,7 +18705,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ref_entry_frame = tk.Frame(row1_frame, bg=_trade_cb_bg)
         ref_entry_frame.grid(row=0, column=1, columnspan=2, sticky="w", pady=(0, 8))
 
-        self.trade_ref_entry = ttk.Entry(ref_entry_frame, textvariable=self.trade_reference_system, width=30)
+        self.trade_ref_entry = ttk.Entry(ref_entry_frame, textvariable=self.trade_reference_system, width=24)
         self.trade_ref_entry.pack(side="left", padx=(0, 5))
         self.trade_ref_entry.bind("<Return>", lambda e: self._search_trade_market())
         self.trade_ref_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
@@ -18688,7 +18734,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         category_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')
 
         # Commodity dropdown (populated based on category)
-        ttk.Label(row1_frame, text=t('marketplace.commodity')).grid(row=0, column=5, sticky="w", padx=(0, 8), pady=(0, 8))
+        ttk.Label(row1_frame, text=t('marketplace.commodity_type')).grid(row=0, column=5, sticky="w", padx=(0, 8), pady=(0, 8))
         self.trade_commodity = tk.StringVar()
         self.trade_commodity_combo = ttk.Combobox(row1_frame, textvariable=self.trade_commodity,
                                                  values=[], state="readonly", width=20)
@@ -22304,46 +22350,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 # TYPE (Station type) - Show category/specific type
                 # Handle null/None values from API (some stations lack metadata)
-                api_type = result.get('stationType')
-                if api_type is None or api_type == '':
-                    api_type = 'Unknown'
-                
-                # Orbital starports - show as "Orbital/Type"
-                # Exact known types first, then prefix-based fallback for new
-                # Trailblazers/colonization types (OrbitalConstruction, SurfaceConstruction, etc.)
-                if api_type == 'AsteroidBase':
-                    station_type = 'Orbital/Asteroid Base'
-                elif api_type in ['Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Dodec']:
-                    station_type = f'Orbital/{api_type}'
-                elif api_type == 'CraterOutpost':
-                    station_type = 'Surface/Crater Outpost'
-                elif api_type == 'CraterPort':
-                    station_type = 'Surface/Crater Port'
-                elif api_type in ('SurfaceStation', 'SurfacePort'):
-                    station_type = 'Surface/Port'
-                elif api_type == 'OnFootSettlement':
-                    station_type = 'Surface/Settlement'
-                elif api_type == 'FleetCarrier':
-                    station_type = 'Carrier'
-                elif api_type == 'StrongholdCarrier':
-                    station_type = 'Stronghold'
-                elif api_type == 'MegaShip':
-                    station_type = 'MegaShip'
-                elif api_type == 'Unknown':
-                    station_type = 'Unknown'
-                elif 'Surface' in api_type or 'Crater' in api_type or 'Ground' in api_type:
-                    station_type = 'Surface/Station'
-                elif 'Carrier' in api_type or 'Drake' in api_type:
-                    station_type = 'Carrier'
-                elif 'Settlement' in api_type or 'OnFoot' in api_type:
-                    station_type = 'Surface/Settlement'
-                elif 'Outpost' in api_type:
-                    station_type = 'Orbital/Outpost'
-                elif 'Orbital' in api_type or 'Port' in api_type or 'Station' in api_type:
-                    station_type = 'Orbital/Station'
-                else:
-                    station_type = 'Orbital/Station'  # Safe default for any future types
-                
+                from app_utils import format_market_station_type
+                station_type = format_market_station_type(result.get('stationType'))
+
                 # PAD (Landing pad size) - Ardent API returns integer: 0=?, 1=S, 2=M, 3=L
                 pad_size = result.get('maxLandingPadSize')
                 
