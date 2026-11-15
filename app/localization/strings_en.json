@@ -1622,6 +1622,7 @@
     "sale_options": "Sale Options",
     "details": "Details",
     "header_tips": {
+      "leg_distance": "Distance from the previous stop. For stop 1, distance from your reference system.",
       "type": "Station type, using the same categories as Mining Commodities. For two stops, types follow the visit order.",
       "plan": "One stop: highest payout. Quick sale: nearby buyer, preferring a complete sale. Two stops: a higher combined payout.",
       "route": "Systems and stations in the recommended visit order.",

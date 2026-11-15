@@ -81,11 +81,13 @@ def build_plans(cargo, markets):
         if len(stops) == 2 and len({sale['stop'] for sale in sales}) < 2:
             return None
         distance = stops[0]['info'].get('distance')
+        legs = [distance]
         if len(stops) == 2:
             leg = _distance(stops[0]['info'], stops[1]['info'])
+            legs.append(leg)
             distance = distance + leg if distance is not None and leg is not None else None
         return {'stops': stops, 'sales': sales, 'total': total, 'sold': sold,
-                'unsold': sum(cargo.values()) - sold, 'distance': distance}
+                'unsold': sum(cargo.values()) - sold, 'distance': distance, 'legs': legs}
 
     singles = [make_plan([station]) for station in stations.values()]
     if not singles:
@@ -170,8 +172,8 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.tree = self._table(options_pane, ('plan', 'route', 'type', 'payout', 'sold', 'unsold', 'distance', 'extra'),
                                 (130, 350, 150, 130, 75, 75, 100, 130), 5)
         self.tree.bind('<<TreeviewSelect>>', self.select)
-        self.details = self._table(details_pane, ('stop', 'type', 'commodity', 'quantity', 'price', 'demand', 'arrival', 'updated'),
-                                   (330, 150, 180, 80, 110, 100, 100, 180), 10)
+        self.details = self._table(details_pane, ('stop', 'type', 'leg_distance', 'commodity', 'quantity', 'price', 'demand', 'arrival', 'updated'),
+                                   (330, 150, 100, 180, 80, 110, 100, 100, 180), 10)
         for variable in (self.system_var, self.large, self.carriers, self.radius, self.age):
             variable.trace_add('write', self._save_preferences)
         self.tables_paned.bind('<ButtonRelease-1>', self._save_layout)
@@ -209,7 +211,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         tree = ttk.Treeview(box, columns=columns, show='headings', height=height,
                            selectmode='browse', style='Marketplace.Treeview')
         heading_font = tkfont.Font(font=self.app._scaled_font(9, 'bold'))
-        shared_headers = {'route': 'location', 'stop': 'location', 'distance': 'distance',
+        shared_headers = {'route': 'location', 'stop': 'location', 'distance': 'distance', 'leg_distance': 'distance',
                           'demand': 'demand', 'price': 'price', 'updated': 'updated', 'type': 'type'}
         saved_widths = self.preferences.get('plan_widths' if columns[0] == 'plan' else 'detail_widths', {})
         for col, width in zip(columns, widths):
@@ -329,6 +331,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         for sale in sorted(plan['sales'], key=lambda sale: sale['stop']):
             row = sale['row']
             stop = plan['stops'][sale['stop']]['info']
+            leg = plan['legs'][sale['stop']]
             try:
                 stamp = datetime.fromisoformat(row['updatedAt'].replace('Z', '+00:00'))
                 age = (datetime.now(timezone.utc) - stamp.replace(tzinfo=stamp.tzinfo or timezone.utc)).total_seconds() / 3600
@@ -338,6 +341,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             item = self.details.insert('', 'end', values=(
                 f"{sale['stop'] + 1}. {stop['systemName']} / {stop['stationName']}",
                 format_market_station_type(row.get('stationType')),
+                f'{leg:.1f}' if leg is not None else '?',
                 self.app._commodity_map.get(sale['name'], sale['name']), sale['quantity'],
                 f"{row['sellPrice']:,.0f}", row['demand'], row.get('distanceToArrival', '?'), updated))
             self.destinations[item] = stop['systemName']

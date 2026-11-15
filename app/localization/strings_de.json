@@ -1630,6 +1630,7 @@
     "sale_options": "Verkaufsoptionen",
     "details": "Details",
     "header_tips": {
+      "leg_distance": "Entfernung vom vorherigen Stopp. Bei Stopp 1 vom Referenzsystem.",
       "type": "Stationstyp mit denselben Kategorien wie bei Bergbau-Rohstoffen. Bei zwei Stopps stehen die Typen in Besuchsreihenfolge.",
       "plan": "Ein Stopp: höchster Erlös. Schnellverkauf: naher Käufer, möglichst für die ganze Ladung. Zwei Stopps: höherer Gesamterlös.",
       "route": "Systeme und Stationen in der empfohlenen Besuchsreihenfolge.",

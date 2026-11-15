@@ -81,12 +81,14 @@ class CargoSellPlannerTests(unittest.TestCase):
             market('B', 90, 60, 12, 'Beta', systemX=3, systemY=4, systemZ=0),
         ])]))
         self.assertEqual(plans['two_stops']['distance'], 15)
+        self.assertEqual(plans['two_stops']['legs'], [10, 5])
 
     def test_unknown_route_is_not_zero(self):
         plans = dict(build_plans({'Gold': 100}, [('Gold', [
             market('A', 100, 40, system='Alpha'), market('B', 90, 60, system='Beta'),
         ])]))
         self.assertIsNone(plans['two_stops']['distance'])
+        self.assertEqual(plans['two_stops']['legs'], [10, None])
 
     def test_empty_results(self):
         self.assertEqual(build_plans({'Gold': 100}, [('Gold', [])]), [])
@@ -165,6 +167,7 @@ class CargoSellPlannerTests(unittest.TestCase):
                 self.assertEqual(len(tab.tree.get_children()), 2)
                 self.assertEqual(len(tab.details.get_children()), 1)
                 row = tab.details.get_children()[0]
+                self.assertEqual(tab.details.set(row, 'leg_distance'), '10.0')
                 tab.details.selection_set(row)
                 tab.copy_system()
                 self.assertEqual(root.clipboard_get(), 'Sol')
