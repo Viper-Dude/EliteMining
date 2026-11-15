@@ -149,13 +149,18 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         saved_age = self.preferences.get('age')
         self.age = tk.StringVar(value=app._age_map.get(saved_age, app.marketplace_max_age.get()))
         ttk.Label(filters, text=t('sell_hold.radius')).pack(side='left')
-        ttk.Combobox(filters, textvariable=self.radius, values=('50', '100', '150', '250', '500'),
-                     state='readonly', width=6).pack(side='left', padx=6)
+        self.radius_combo = ttk.Combobox(filters, textvariable=self.radius, values=('50', '100', '150', '250', '500'),
+                                        state='readonly', width=6)
+        self.radius_combo.pack(side='left', padx=6)
         ttk.Checkbutton(filters, text=t('marketplace.large_pads'), variable=self.large).pack(side='left', padx=8)
         ttk.Checkbutton(filters, text=t('marketplace.exclude_carriers'), variable=self.carriers).pack(side='left', padx=8)
         ttk.Label(filters, text=t('marketplace.max_age')).pack(side='left')
-        ttk.Combobox(filters, textvariable=self.age, values=[app._age_map[k] for k in app._age_order],
-                     state='readonly', width=12).pack(side='left', padx=6)
+        self.age_combo = ttk.Combobox(filters, textvariable=self.age, values=[app._age_map[k] for k in app._age_order],
+                                     state='readonly', width=12)
+        self.age_combo.pack(side='left', padx=6)
+        for combo in (self.radius_combo, self.age_combo):
+            combo.bind('<<ComboboxSelected>>', lambda event: event.widget.selection_clear(), add='+')
+            combo.bind('<FocusOut>', lambda event: event.widget.selection_clear(), add='+')
         self.button = ttk.Button(filters, text=t('marketplace.search'), command=self.search)
         self.button.pack(side='left', padx=8)
         self.status = ttk.Label(controls, wraplength=1000)
@@ -179,6 +184,10 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.tables_paned.bind('<ButtonRelease-1>', self._save_layout)
         self.tables_paned.bind('<Map>', self._restore_split)
         self._poll()
+
+    def _clear_field_selections(self):
+        for widget in (self.system_entry, self.radius_combo, self.age_combo):
+            widget.selection_clear()
 
     def _save_preferences(self, *args):
         self.preferences.update(system=self.system_var.get(), large_pads=self.large.get(),
@@ -254,13 +263,8 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self._ac_system.hide()
 
     def _poll(self):
-        if self.snapshot is not None and self.snapshot != self._cargo():
+        if self.plans and self.snapshot is not None and self.snapshot != self._cargo():
             self.status.config(text=t('sell_hold.changed'))
-            self.plans.clear()
-            self.tree.delete(*self.tree.get_children())
-            self.details.delete(*self.details.get_children())
-            self.destinations.clear()
-            self.snapshot = None
         self.frame.after(1000, self._poll)
 
     def search(self):
@@ -304,11 +308,14 @@ class CargoSellPlanner(ColumnVisibilityMixin):
 
     def _complete(self, snapshot, plans):
         self.button.config(state='normal')
-        if snapshot != self._cargo():
-            self.status.config(text=t('sell_hold.changed'))
-            return
+        changed = snapshot != self._cargo()
         self.snapshot = snapshot
-        self.status.config(text=t('sell_hold.results') if plans else t('marketplace.no_results'))
+        self.status.config(text=t('sell_hold.changed') if changed and plans else
+                           t('sell_hold.results') if plans else t('marketplace.no_results'))
+        self.tree.delete(*self.tree.get_children())
+        self.details.delete(*self.details.get_children())
+        self.plans.clear()
+        self.destinations.clear()
         baseline = plans[0][1] if plans else None
         for name, plan in plans:
             route = ' → '.join(s['info']['systemName'] + ' / ' + s['info']['stationName'] for s in plan['stops'])

@@ -18309,6 +18309,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         def _clear_market_sub_focus(event=None):
             sub_notebook.focus_set()
             self.multi_mineral_tab.ref_entry.selection_clear()
+            self.cargo_sell_planner._clear_field_selections()
         sub_notebook.bind('<<NotebookTabChanged>>', lambda e: (_clear_market_sub_focus(), self.after(50, _clear_market_sub_focus)))
     
     def _build_mining_commodities_tab(self, frame: ttk.Frame) -> None:

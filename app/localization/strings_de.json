@@ -1666,7 +1666,7 @@
     "updated": "Preisalter",
     "copy": "System des gewählten Stopps kopieren",
     "notice": "Geschätzte Erlöse können abweichen. Entfernungen sind Luftlinien, keine Sprungrouten. Prüfe vor der Reise immer die Andockberechtigung des Flottenträgers auf Inara.",
-    "changed": "Ladung, Missionen oder Standort geändert. Bitte erneut suchen.",
+    "changed": "Ladung, Missionen oder Referenzsystem geändert. Die letzte Suche bleibt sichtbar; erneut suchen zum Aktualisieren.",
     "cargo": "{tons} t zum Verkauf; {reserved} t für Missionen reserviert. Startsystem: {system}.",
     "empty": "Aktuelles System und verkäufliche Ladung werden benötigt.",
     "searching": "Käufer für deine Ladung werden gesucht...",

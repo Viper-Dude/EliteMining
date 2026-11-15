@@ -1658,7 +1658,7 @@
     "updated": "Price age",
     "copy": "Copy selected stop system",
     "notice": "Estimated payouts may vary. Distances are straight-line, not jump routes. Always check Fleet Carrier docking access on Inara before travelling.",
-    "changed": "Cargo, missions, or location changed. Search again for a fresh plan.",
+    "changed": "Cargo, missions or reference system changed. Showing your last search; search again to update.",
     "cargo": "{tons} t available to sell; {reserved} t reserved for missions. Starting system: {system}.",
     "empty": "Current system and saleable cargo are required.",
     "searching": "Finding buyers for your cargo...",

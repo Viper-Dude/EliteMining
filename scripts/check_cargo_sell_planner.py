@@ -113,7 +113,7 @@ class CargoSellPlannerTests(unittest.TestCase):
         with patch('mining_missions.get_mission_tracker', return_value=tracker):
             self.assertEqual(tab._cargo(), ('Wregoe MD-K d8-19', {'Platinum': 43, 'Osmium': 4}, {}))
 
-    def test_tab_renders_plan_and_clears_changed_cargo(self):
+    def test_tab_keeps_results_when_cargo_changes_during_mining(self):
         root = tk.Tk()
         root.withdraw()
         try:
@@ -151,6 +151,10 @@ class CargoSellPlannerTests(unittest.TestCase):
                 root.geometry('1100x800+-3000+-3000')
                 root.deiconify()
                 root.update()
+                for combo in (tab.radius_combo, tab.age_combo):
+                    combo.selection_range(0, 'end')
+                    combo.event_generate('<<ComboboxSelected>>')
+                    self.assertFalse(combo.selection_present())
                 self.assertEqual(len(tab.tables_paned.panes()), 2)
                 tab.tables_paned.sashpos(0, 180)
                 self.assertEqual(tab.tables_paned.sashpos(0), 180)
@@ -173,6 +177,7 @@ class CargoSellPlannerTests(unittest.TestCase):
                 self.assertEqual(root.clipboard_get(), 'Sol')
                 self.assertEqual(tab._row_systems(tab.details, row), ['Sol'])
                 plan_row = tab.tree.get_children()[0]
+                original_stops = tab.plans[plan_row]['stops']
                 tab.plans[plan_row]['stops'] = [
                     {'info': {'systemName': 'Sol'}}, {'info': {'systemName': 'Achenar'}}]
                 self.assertEqual(tab._row_systems(tab.tree, plan_row), ['Sol', 'Achenar'])
@@ -181,12 +186,18 @@ class CargoSellPlannerTests(unittest.TestCase):
                      patch('cargo_sell_planner.webbrowser.open') as open_url:
                     tab._open_row_system(SimpleNamespace(x=10, y=30), tab.tree)
                     open_url.assert_called_once_with('https://inara.cz/elite/starsystem/?search=Sol')
+                tab.plans[plan_row]['stops'] = original_stops
             with patch.object(CargoSellPlanner, '_cargo', return_value=('Sol', {'Gold': 50}, {})):
                 tab._poll()
-                self.assertEqual(tab.tree.get_children(), ())
-                self.assertEqual(tab.details.get_children(), ())
+                self.assertEqual(len(tab.tree.get_children()), 2)
+                self.assertEqual(len(tab.details.get_children()), 1)
+                self.assertIn('last search', tab.status.cget('text'))
                 tab._complete(snapshot, plans)
-                self.assertEqual(tab.tree.get_children(), ())
+                tab.select()
+                self.assertEqual(len(tab.tree.get_children()), 2)
+                self.assertEqual(len(tab.details.get_children()), 1)
+                self.assertIn('last search', tab.status.cget('text'))
+                self.assertEqual(tab.snapshot, snapshot)
         finally:
             root.destroy()
 
