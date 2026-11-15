@@ -174,8 +174,8 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         details_pane = ttk.Frame(self.tables_paned)
         self.tables_paned.add(options_pane, weight=1)
         self.tables_paned.add(details_pane, weight=2)
-        self.tree = self._table(options_pane, ('plan', 'route', 'type', 'payout', 'sold', 'unsold', 'distance', 'extra'),
-                                (130, 350, 150, 130, 75, 75, 100, 130), 5)
+        self.tree = self._table(options_pane, ('plan', 'route', 'type', 'payout', 'sold', 'unsold', 'distance', 'arrival', 'extra'),
+                                (130, 350, 150, 130, 75, 75, 100, 150, 130), 5)
         self.tree.bind('<<TreeviewSelect>>', self.select)
         self.details = self._table(details_pane, ('stop', 'type', 'leg_distance', 'commodity', 'quantity', 'price', 'demand', 'arrival', 'updated'),
                                    (330, 150, 100, 180, 80, 110, 100, 100, 180), 10)
@@ -229,7 +229,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             tree.heading(col, text=text, anchor='w')
             minimum = max(heading_font.measure(text) + self.app._scaled_px(24), self.app._scaled_px(50))
             tree.column(col, width=max(saved_widths.get(col, self.app._scaled_px(width)), minimum),
-                        anchor='w', minwidth=minimum)
+                        anchor='w', minwidth=minimum, stretch=False)
         self.setup_column_visibility(
             tree=tree, columns=columns,
             default_widths={col: tree.column(col, 'width') for col in columns},
@@ -321,12 +321,17 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             route = ' → '.join(s['info']['systemName'] + ' / ' + s['info']['stationName'] for s in plan['stops'])
             distance = f"{plan['distance']:.1f}" if plan['distance'] is not None else '?'
             station_types = ' → '.join(format_market_station_type(s['info'].get('stationType')) for s in plan['stops'])
+            arrival = ' → '.join(self._format_arrival(s['info'].get('distanceToArrival')) for s in plan['stops'])
             item = self.tree.insert('', 'end', values=(t('sell_hold.' + name), route, station_types,
-                f"{plan['total']:,.0f}", plan['sold'], plan['unsold'], distance,
+                f"{plan['total']:,.0f}", plan['sold'], plan['unsold'], distance, arrival,
                 f"{plan['total'] - baseline['total']:+,.0f}"))
             self.plans[item] = plan
         if self.tree.get_children():
             self.tree.selection_set(self.tree.get_children()[0])
+
+    @staticmethod
+    def _format_arrival(arrival):
+        return f'{int(float(arrival)):,}' if arrival is not None else '?'
 
     def select(self, event=None):
         self.details.delete(*self.details.get_children())
@@ -345,12 +350,14 @@ class CargoSellPlanner(ColumnVisibilityMixin):
                 updated = t('sell_hold.hours').format(hours=max(0, age))
             except (ValueError, KeyError, TypeError):
                 updated = '?'
+            arrival = row.get('distanceToArrival')
+            arrival_display = self._format_arrival(arrival)
             item = self.details.insert('', 'end', values=(
                 f"{sale['stop'] + 1}. {stop['systemName']} / {stop['stationName']}",
                 format_market_station_type(row.get('stationType')),
                 f'{leg:.1f}' if leg is not None else '?',
                 self.app._commodity_map.get(sale['name'], sale['name']), sale['quantity'],
-                f"{row['sellPrice']:,.0f}", row['demand'], row.get('distanceToArrival', '?'), updated))
+                f"{row['sellPrice']:,.0f}", row['demand'], arrival_display, updated))
             self.destinations[item] = stop['systemName']
 
     def _row_systems(self, tree, item):

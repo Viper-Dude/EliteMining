@@ -3,16 +3,47 @@ Version Update Script for EliteMining
 Updates version number in: version.py, main.py, EliteMiningInstaller.iss
 """
 
+import os
 import re
 from pathlib import Path
 from datetime import datetime
 
 # === CHANGE VERSION AND DATE HERE ===
-NEW_VERSION = "5.6.2"
+NEW_VERSION = "5.6.3"
 NEW_BUILD_DATE = ""  # Format: YYYY-Month-DD (leave empty for today's date)
-VA_PROFILE_VERSION = "5.6.2"  # Set to "" if this release does not include a VA profile update
+VA_PROFILE_VERSION = ""  # Set to "" if this release does not include a VA profile update
 SOUND_PACK_VERSION = "5.5.8"  # Release that last changed the sound files; only change when sounds change
 # ====================================
+
+def update_splash(base_path, app_version, profile_version):
+    from PIL import Image, ImageDraw, ImageFont
+
+    if not profile_version:
+        raise ValueError('Cannot generate splash without the bundled VoiceAttack profile version')
+
+    font_name = 'Orbitron-VariableFont_wght.ttf'
+    font_paths = [
+        Path(os.environ.get('LOCALAPPDATA', '')) / 'Microsoft' / 'Windows' / 'Fonts' / font_name,
+        Path(os.environ.get('WINDIR', r'C:\Windows')) / 'Fonts' / font_name,
+    ]
+    font_path = next((path for path in font_paths if path.is_file()), None)
+    if font_path is None:
+        raise FileNotFoundError(f'Install the Orbitron variable font ({font_name}) before updating the splash')
+
+    images_dir = base_path / 'app' / 'Images'
+    with Image.open(images_dir / 'EliteMining_splash_base.png') as source:
+        image = source.convert('RGBA')
+    scale = image.width / 3840
+    font = ImageFont.truetype(str(font_path), round(36.2 * 96 / 72 * scale))
+    font.set_variation_by_axes([500])  # Orbitron Medium
+    draw = ImageDraw.Draw(image)
+    for text, top in ((f'v{app_version}', 60), (f'Voiceattack v{profile_version}', 146)):
+        bounds = draw.textbbox((0, 0), text, font=font)
+        left = 325 * scale - (bounds[2] - bounds[0]) / 2 - bounds[0]
+        draw.text((left, top * scale - bounds[1]), text, font=font, fill='#bfbfbf')
+    image.save(images_dir / 'EliteMining_splash.png', optimize=True)
+    print(f'Updated splash: v{app_version}, Voiceattack v{profile_version}')
+
 
 def main():
     base_path = Path(__file__).parent.parent
@@ -74,6 +105,8 @@ def main():
     installer_file.write_text(content, encoding="utf-8")
     print(f"✓ Updated {installer_file.name}")
     
+    update_splash(base_path, NEW_VERSION, bundled_version)
+
     # Create patchnotes file from template
     template_file = base_path / "docs" / "PATCHNOTES_TEMPLATE.md"
     patchnotes_file = base_path / "docs" / f"PATCHNOTES_v{NEW_VERSION}.md"

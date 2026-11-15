@@ -1,4 +1,14 @@
-﻿What's new in EliteMining v5.6.2
+﻿What's new in EliteMining v5.6.3
+
+Hotfixes in v5.6.3
+
+- Fixed Sell My Hold freezing and going blank while a mining session was running.
+
+- Fixed unwanted column stretching in Sell My Hold.
+
+- Fixed excessive decimal places in the Sell My Hold LS column.
+
+Included changes from v5.6.2
 
 - Reworked Mining Statistics with its own tab, filters, mineral performance, recent progress and your best and latest mining locations.
 

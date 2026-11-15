@@ -286,6 +286,9 @@ class ReleaseBuilder:
                 heading = line.lstrip('#').strip().lower()
                 if heading == "new features & improvements":
                     section = highlights
+                elif heading.startswith(("hotfixes in v", "included changes from v")):
+                    section = highlights
+                    section.append(line.lstrip('#').strip())
                 elif heading.startswith("voiceattack profile"):
                     section = profile_highlights
                 else:
@@ -404,7 +407,8 @@ class ReleaseBuilder:
                 continue
             try:
                 from PIL import Image
-                img = Image.open(img_path)
+                with Image.open(img_path) as source:
+                    img = source.copy()
                 orig_size = img.size
                 img.thumbnail(max_size, Image.LANCZOS)
                 if img.size != orig_size:
