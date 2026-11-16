@@ -4,6 +4,7 @@ Hotspot Finder Module for EliteMining
 Provides mining hotspot location services with live API data integration
 """
 from ui.theme import modern_color
+from ui.search_control import SearchControl
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -607,15 +608,6 @@ class RingFinder(ColumnVisibilityMixin):
                                    font=scaled_font(8, "normal"), cursor="hand2")
         self.search_btn.pack(side="left", padx=(0, 5))
 
-        # Spinner shown in a fixed-width slot so its animation never shifts
-        # Auto-Search/Auto-Switch Tabs (and their alignment with the row below)
-        _spinner_frame = tk.Frame(buttons_frame, width=scaled_px(16), height=scaled_px(24), bg=_cb_bg)
-        _spinner_frame.pack(side="left", padx=(0, 0))
-        _spinner_frame.pack_propagate(False)
-        self.search_spinner_label = tk.Label(_spinner_frame, text="", bg=_cb_bg, fg="#e0e0e0",
-                                              font=scaled_font(9))
-        self.search_spinner_label.pack(side="left", fill="both", expand=True)
-
         # Auto-search checkbox
         self.auto_search_var = tk.BooleanVar(value=False)
 
@@ -1085,6 +1077,9 @@ class RingFinder(ColumnVisibilityMixin):
         ToolTip(results_info, t('ring_finder.right_click_help'))
         self._columns_btn = self._cv_add_columns_button(results_header, 'ring_finder')
         if _modern_form:
+            self._more_btn = self._rf_button(results_header, text="", command=self._toggle_more_filters)
+            self._more_btn.pack(side="right", padx=(0, 8))
+            self._refresh_more_btn()
             ttk.Label(results_header, textvariable=self.status_var, font=scaled_font(9, "bold"),
                       foreground=modern_color("#E6EAF0")).pack(side="right", padx=(0, 12))
 
@@ -1444,7 +1439,7 @@ class RingFinder(ColumnVisibilityMixin):
         data = [(self.results_tree.set(child, col), child) for child in self.results_tree.get_children('')]
         
         # Sort data - handle numeric columns specially
-        if col in ["Distance", "LS", "Sol Dist"]:
+        if col in ["Distance", "LS", "Sol Dist", "Visits"]:
             # Numeric sort - handle N/A values
             def sort_key(item):
                 val = item[0]
@@ -1683,41 +1678,6 @@ class RingFinder(ColumnVisibilityMixin):
             self._on_material_changed()  # Restore min hotspots state
             self.status_var.set("")
     
-    def _start_search_spinner(self):
-        """Start animated spinner on search button"""
-        self.search_spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-        self.search_spinner_index = 0
-        self.search_spinner_active = True
-        self._update_search_spinner()
-    
-    def _stop_search_spinner(self):
-        """Stop animated spinner on search button"""
-        self.search_spinner_active = False
-        # Clear spinner label
-        if hasattr(self, 'search_spinner_label') and self.search_spinner_label.winfo_exists():
-            self.search_spinner_label.configure(text="")
-
-        # Restore data source radio button if it was temporarily changed for auto-search
-        if hasattr(self, '_saved_data_source') and self._saved_data_source:
-            self.data_source_var.set(self._saved_data_source)
-            self._saved_data_source = None
-
-    def _update_search_spinner(self):
-        """Update spinner animation frame"""
-        if not self.search_spinner_active:
-            return
-
-        try:
-            char = self.search_spinner_chars[self.search_spinner_index]
-            self.search_spinner_label.configure(text=f" {char}")
-            self.search_spinner_index = (self.search_spinner_index + 1) % len(self.search_spinner_chars)
-            
-            # Schedule next frame
-            if hasattr(self, 'parent') and self.parent.winfo_exists():
-                self.parent.after(100, self._update_search_spinner)
-        except:
-            self.search_spinner_active = False
-
     def _show_search_overlay(self, system_name: str):
         """Blank the results tree and show a big 'Searching new system...' spinner -
         the small search-button spinner alone was too easy to miss when jumping,
@@ -1984,7 +1944,9 @@ class RingFinder(ColumnVisibilityMixin):
         if hasattr(self, 'spansh_status_label'):
             self.spansh_status_label.config(text=status_text, fg=status_color)
         top = self.parent.winfo_toplevel()
-        if hasattr(top, '_update_footer_indicator'):
+        if hasattr(top, '_update_sysfinder_spansh_status'):
+            top._update_sysfinder_spansh_status(status)
+        elif hasattr(top, '_update_footer_indicator'):
             top._update_footer_indicator('spansh', status_text, status_color)
 
     def _check_eddn_status(self):
@@ -2016,7 +1978,9 @@ class RingFinder(ColumnVisibilityMixin):
         if hasattr(self, 'eddn_status_label'):
             self.eddn_status_label.config(text=status_text, fg=status_color)
         top = self.parent.winfo_toplevel()
-        if hasattr(top, '_update_footer_indicator'):
+        if hasattr(top, '_update_sysfinder_eddn_status'):
+            top._update_sysfinder_eddn_status(status)
+        elif hasattr(top, '_update_footer_indicator'):
             top._update_footer_indicator('eddn', status_text, status_color)
 
     def _update_sol_distance(self, system_name: str):
@@ -2814,6 +2778,9 @@ class RingFinder(ColumnVisibilityMixin):
             return
         self._search_in_progress = False
         self.search_btn.configure(text=t('ring_finder.search'))
+        if getattr(self, '_saved_data_source', None):
+            self.data_source_var.set(self._saved_data_source)
+            self._saved_data_source = None
         self._hide_search_overlay()
 
     def _build_modern_search_layout(self, sf, ring_lbl, reserve_lbl, mineral_lbl, power_lbl,
@@ -2834,8 +2801,6 @@ class RingFinder(ColumnVisibilityMixin):
         self._rf_actions.pack(in_=pr, side="left", padx=(8, 0))
         for b in self._rf_actions.winfo_children():
             b.pack(side="left", padx=(0, 8))
-        self._more_btn = self._rf_button(pr, text="", command=self._toggle_more_filters)
-        self._more_btn.pack(side="left")
 
         misc.grid(row=2, column=0, columnspan=7, sticky="ew", padx=5, pady=(2, 2))
 
@@ -2889,13 +2854,8 @@ class RingFinder(ColumnVisibilityMixin):
 
     def _rf_button(self, parent, primary=False, **kw):
         """tk.Button, or a rounded flat button when the Modern theme is active."""
-        from config import load_theme, scaled_font, scaled_px
-        if load_theme() in ("modern", "modern_slate", "modern_orange"):
-            from ui.modern_widgets import RoundedButton
-            return RoundedButton(parent, text=kw.get("text", ""), command=kw.get("command"), primary=primary,
-                                 font=scaled_font(9, "bold" if primary else "normal"),
-                                 padx=scaled_px(11), pady=scaled_px(3))
-        return tk.Button(parent, **kw)
+        from app_utils import create_action_button
+        return create_action_button(parent, primary=primary, **kw)
 
     def _on_search_btn_clicked(self):
         """Search button click handler. Starts a search normally; while a search is already
@@ -2905,7 +2865,6 @@ class RingFinder(ColumnVisibilityMixin):
             print(f"[SEARCH] Stop clicked - cancelling search gen {self._search_generation}")
             self._stopped_generation = self._search_generation  # Marks this as a user Stop, not a superseding search
             self._search_generation += 1  # Any in-flight worker's generation check now fails
-            self._stop_search_spinner()
             self._reset_search_button()
         else:
             self.search_hotspots()
@@ -3033,10 +2992,9 @@ class RingFinder(ColumnVisibilityMixin):
             except (ValueError, AttributeError):
                 min_hotspots = 1
         
-        # Keep search button clickable (it now doubles as a Stop button) and start spinner
+        # Keep search button clickable (it now doubles as a Stop button)
         self._search_in_progress = True
         self.search_btn.configure(text=t('ring_finder.stop'))
-        self._start_search_spinner()
         self.status_var.set(t('ring_finder.searching'))
         
         # Check if Any Ring mode is enabled
@@ -3126,12 +3084,13 @@ class RingFinder(ColumnVisibilityMixin):
                 
                 if not reference_coords:
                     # Update UI with error message
-                    self.parent.after(0, lambda: self.status_var.set(t('ring_finder.coords_not_found_warning').format(system=reference_system)))
-                    self.parent.after(0, self._reset_search_button)
-                    self.parent.after(0, self._stop_search_spinner)
+                    self.parent.after(0, self._run_search_callback, search_generation,
+                                      self.status_var.set, t('ring_finder.coords_not_found_warning').format(system=reference_system))
                     return
             
             # Set the reference system coords for this worker thread
+            if search_generation != self._search_generation:
+                return
             self.current_system_coords = reference_coords
             print(f"[SEARCH-DEBUG] ref='{reference_system}' coords={reference_coords} systems_data={self.systems_data.get(reference_system.lower())}")
             print(f"[SEARCH] Coordinate resolution done at {time.time():.1f}, entering search dispatch")
@@ -3140,7 +3099,9 @@ class RingFinder(ColumnVisibilityMixin):
             if any_ring_mode:
                 # Use max_results if set, otherwise default to 150 for more results
                 spansh_max = max_results if max_results else 150
-                spansh_rings = self._search_spansh_rings(reference_system, material_filter, max_distance, spansh_max, reference_coords)
+                spansh_rings = self._search_spansh_rings(
+                    reference_system, material_filter, max_distance, spansh_max, reference_coords,
+                    is_cancelled=lambda: search_generation != self._search_generation)
                 print(f" DEBUG: Any Ring mode - found {len(spansh_rings)} rings from Spansh")
                 # Convert Spansh rings to hotspot format using local database lookup
                 hotspots = self._convert_spansh_to_hotspots(spansh_rings, reference_coords)
@@ -3211,19 +3172,13 @@ class RingFinder(ColumnVisibilityMixin):
                 if filtered_count < original_count:
                     print(f" DEBUG: Min hotspots filter ({min_hotspots}+): {original_count} -> {filtered_count} results")
             
-            # Apply max_results limit AFTER min_hotspots filtering (count unique rings, not rows)
-            # This is the ONLY place max_results limiting should happen
-            if max_results:
-                hotspots = self._limit_results_by_unique_rings(hotspots, max_results)
-            
             # Check if this search was superseded before updating UI
             if search_generation != self._search_generation:
                 if getattr(self, '_stopped_generation', None) == search_generation:
                     # User clicked Stop (not superseded by a newer search) — show whatever
                     # was collected so far instead of discarding it.
                     print(f"[SEARCH] Search gen {search_generation} stopped by user - showing {len(hotspots)} partial result(s)")
-                    self.parent.after(0, lambda: self.status_var.set(t('ring_finder.search_stopped_partial').format(count=len(hotspots))))
-                    self.parent.after(0, self._update_results, hotspots)
+                    self.parent.after(0, self._complete_search, search_generation, hotspots, max_results)
                 else:
                     print(f"[SEARCH] Search gen {search_generation} cancelled before display (current: {self._search_generation})")
                 return
@@ -3240,25 +3195,36 @@ class RingFinder(ColumnVisibilityMixin):
             print(f"[SEARCH] After EDSM fallback at {time.time():.1f}, scheduling _update_results")
             
             # Update UI in main thread
-            self.parent.after(0, self._update_results, hotspots)
+            self.parent.after(0, self._complete_search, search_generation, hotspots, max_results)
             
         except Exception as e:
             error_msg = f"Search failed: {str(e)}"
             try:
                 if self.parent.winfo_exists():
-                    self.parent.after(0, self._show_error, error_msg)
+                    self.parent.after(0, self._run_search_callback, search_generation, self._show_error, error_msg)
             except:
                 pass  # Window already destroyed
         finally:
-            # Reset search button back to "Search" and stop spinner — but only if no newer
+            # Reset search button back to "Search" — but only if no newer
             # search has started in the meantime (that search's own finally will handle it).
             try:
                 if self.parent.winfo_exists() and search_generation == self._search_generation:
-                    self.parent.after(0, self._stop_search_spinner)
-                    self.parent.after(0, self._reset_search_button)
+                    self.parent.after(0, self._run_search_callback, search_generation, self._reset_search_button)
             except:
                 pass  # Window already destroyed
     
+    def _run_search_callback(self, search_generation, callback, *args):
+        if search_generation == self._search_generation:
+            callback(*args)
+
+    def _complete_search(self, search_generation, hotspots, max_results):
+        stopped = (getattr(self, '_stopped_generation', None) == search_generation
+                   and self._search_generation == search_generation + 1)
+        if search_generation != self._search_generation and not stopped:
+            return
+        self._search_result_limit = max_results
+        self._update_results(hotspots)
+
     def _fill_missing_metadata_edsm(self, hotspots: List[Dict], max_systems: int = None):
         """
         Automatically fill missing ring metadata using EDSM fallback.
@@ -3407,17 +3373,16 @@ class RingFinder(ColumnVisibilityMixin):
         limited_results = []
         
         for result in results:
-            system = result.get('systemName', '')
-            body = result.get('bodyName', '')
-            ring_key = (system.lower(), body.lower())
-            
-            # Add this row and track the ring
+            system = result.get('systemName', result.get('system', ''))
+            body = result.get('bodyName', result.get('ring', ''))
+            body = self.user_db._normalize_body_name(body, system)
+            ring_key = (system.lower(), body)
+
+            if ring_key not in seen_rings:
+                if len(seen_rings) >= max_rings:
+                    continue
+                seen_rings.add(ring_key)
             limited_results.append(result)
-            seen_rings.add(ring_key)
-            
-            # Stop once we've collected enough unique rings
-            if len(seen_rings) >= max_rings:
-                break
         
         if len(limited_results) < len(results):
             print(f"[MAX_RESULTS] Limited from {len(results)} rows to {len(limited_results)} rows ({len(seen_rings)} unique rings)")
@@ -3489,7 +3454,8 @@ class RingFinder(ColumnVisibilityMixin):
         import time
         
         # Update status to show Spansh search is starting
-        self.parent.after(0, lambda: self.status_var.set("Querying Spansh API...") if self.parent.winfo_exists() else None)
+        self.parent.after(0, lambda: self.status_var.set("Querying Spansh API...")
+                          if self.parent.winfo_exists() and not (is_cancelled and is_cancelled()) else None)
         
         try:
             # Throttle API calls (1.5 second minimum between requests)
@@ -3574,7 +3540,8 @@ class RingFinder(ColumnVisibilityMixin):
                 # Update status message for pagination (especially for "All Minerals" searches)
                 if use_pagination and page_num > 0:
                     progress_msg = f"Fetching Spansh data... page {page_num + 1}/{max_pages}"
-                    self.parent.after(0, lambda msg=progress_msg: self.status_var.set(msg) if self.parent.winfo_exists() else None)
+                    self.parent.after(0, lambda msg=progress_msg: self.status_var.set(msg)
+                                      if self.parent.winfo_exists() and not (is_cancelled and is_cancelled()) else None)
                 
                 # Update last call time and throttle
                 elapsed = time.time() - self._last_spansh_call
@@ -3758,13 +3725,15 @@ class RingFinder(ColumnVisibilityMixin):
             
         except requests.exceptions.Timeout:
             print("[SPANSH] Request timed out")
-            self.parent.after(0, lambda: self.status_var.set("Spansh search timed out"))
+            self.parent.after(0, lambda: self.status_var.set("Spansh search timed out")
+                              if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh is offline/timing out
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except requests.exceptions.RequestException as e:
             print(f"[SPANSH] API error: {e}")
-            self.parent.after(0, lambda: self.status_var.set("Spansh API error"))
+            self.parent.after(0, lambda: self.status_var.set("Spansh API error")
+                              if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh has errors
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
@@ -3774,7 +3743,7 @@ class RingFinder(ColumnVisibilityMixin):
             traceback.print_exc()
             return []
     
-    def _search_spansh_rings(self, reference_system: str, ring_type: str, max_distance: float, max_results: int, reference_coords) -> List[Dict]:
+    def _search_spansh_rings(self, reference_system: str, ring_type: str, max_distance: float, max_results: int, reference_coords, is_cancelled=None) -> List[Dict]:
         """Search Spansh API for rings of a specific type (Any Ring mode)
         
         Args:
@@ -3955,13 +3924,15 @@ class RingFinder(ColumnVisibilityMixin):
             
         except requests.exceptions.Timeout:
             print("[SPANSH] Request timed out")
-            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_timeout')))
+            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_timeout'))
+                              if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh is offline/timing out
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except requests.exceptions.RequestException as e:
             print(f"[SPANSH] API error: {e}")
-            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_error')))
+            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_error'))
+                              if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh has errors
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
@@ -4146,7 +4117,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Query user database if selected
         if data_source in ["database", "both"]:
-            user_results = self._search_user_database_first(reference_system, material_filter, specific_material, max_distance, db_limit)
+            user_results = self._search_user_database_first(reference_system, material_filter, specific_material, max_distance, db_limit, is_cancelled=is_cancelled)
             print(f"[SEARCH] User database returned {len(user_results)} results")
         
         # Query Spansh if selected
@@ -4210,11 +4181,11 @@ class RingFinder(ColumnVisibilityMixin):
             
             return combined_results
     
-    def _search_user_database_first(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int = None) -> List[Dict]:
+    def _search_user_database_first(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int = None, is_cancelled=None) -> List[Dict]:
         """Search user database first for confirmed hotspots, return results in _update_results compatible format"""
         try:
             # Get user database hotspots
-            user_hotspots = self._get_user_database_hotspots(reference_system, material_filter, specific_material, max_distance)
+            user_hotspots = self._get_user_database_hotspots(reference_system, material_filter, specific_material, max_distance, is_cancelled=is_cancelled)
             
             if not user_hotspots:
                 return []
@@ -5061,7 +5032,7 @@ class RingFinder(ColumnVisibilityMixin):
         except Exception:
             return []
     
-    def _get_user_database_hotspots(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float) -> List[Dict]:
+    def _get_user_database_hotspots(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, is_cancelled=None) -> List[Dict]:
         """Search user database for hotspots - pure user database approach without EDSM"""
         try:
             import sqlite3
@@ -5260,6 +5231,8 @@ class RingFinder(ColumnVisibilityMixin):
                 max_process_limit = 10000  # Hard limit to prevent infinite processing
                 
                 for system_name, body_name, material_name, hotspot_count, x_coord, y_coord, z_coord, coord_source, ls_distance, reserve_level, ring_type_db, inner_radius, outer_radius in results:
+                    if is_cancelled and is_cancelled():
+                        break
                     try:
                         # Safety: Stop processing if we've hit the limit
                         processed_count += 1
@@ -5652,6 +5625,8 @@ class RingFinder(ColumnVisibilityMixin):
         
     def _update_results(self, hotspots: List[Dict]):
         """Update results treeview with hotspot data"""
+        generation = (self._search_generation, object())
+        self._results_generation = generation
         import time
         print(f"[SEARCH] _update_results() starting NOW with {len(hotspots)} hotspots at {time.time():.1f}")
         # Store results in cache for future use (e.g., refresh after save to database)
@@ -5706,6 +5681,9 @@ class RingFinder(ColumnVisibilityMixin):
             hotspots = filtered_hotspots
             print(f"[FILTER] Reserve '{reserve_filter}': {len(hotspots)} results")
         
+        # Limit only after all display filters so excluded rings don't consume slots.
+        hotspots = self._limit_results_by_unique_rings(hotspots, getattr(self, '_search_result_limit', None))
+
         # Track current results to identify new entries
         current_results = set()
         for hotspot in hotspots:
@@ -5769,14 +5747,12 @@ class RingFinder(ColumnVisibilityMixin):
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
         
-        # Force UI refresh
-        self.results_tree.update()
+        if hasattr(self, '_first_new_item'):
+            delattr(self, '_first_new_item')
 
         # --- Bulk-prefetch DB data to avoid per-row DB connections ---
         all_system_names = list({h.get('system', h.get('systemName', '')) for h in hotspots if h.get('system', h.get('systemName', ''))})
-        _visit_counts = self.user_db.bulk_get_visit_counts(all_system_names) if all_system_names else {}
-        # Merge with early prefetch (may have already been fetched above)
-        _visit_counts.update(_early_visit_counts)
+        _visit_counts = _early_visit_counts
 
         # Batch-fetch PowerPlay data for all systems from EDDN cache
         from system_finder_api import SystemFinderAPI
@@ -6115,11 +6091,12 @@ class RingFinder(ColumnVisibilityMixin):
         count = len(hotspots)
         search_term = self.system_var.get().strip()
         material_filter = self.material_var.get()
-        self._insert_row_batch(_pending_row_data, 0, count, search_term, material_filter, green_entries)
+        self._insert_row_batch(_pending_row_data, 0, count, search_term, material_filter, green_entries, generation=generation)
 
-    def _insert_row_batch(self, row_data, start, count, search_term, material_filter, green_entries, batch_size=25):
+    def _insert_row_batch(self, row_data, start, count, search_term, material_filter, green_entries, batch_size=25, generation=None):
         """Insert a batch of rows into the results treeview, then yield to the event loop."""
-        if not self.parent.winfo_exists():
+        if (not self.parent.winfo_exists() or generation != self._results_generation
+                or generation[0] != self._search_generation):
             return
         end = min(start + batch_size, len(row_data))
         for entry in row_data[start:end]:
@@ -6127,7 +6104,7 @@ class RingFinder(ColumnVisibilityMixin):
             if entry['is_green'] and not hasattr(self, '_first_new_item'):
                 self._first_new_item = item_id
         if end < len(row_data):
-            self.parent.after(1, self._insert_row_batch, row_data, end, count, search_term, material_filter, green_entries, batch_size)
+            self.parent.after(1, self._insert_row_batch, row_data, end, count, search_term, material_filter, green_entries, batch_size, generation)
         else:
             self._finish_update_results(count, search_term, material_filter, green_entries)
 
@@ -8148,6 +8125,8 @@ class RingFinder(ColumnVisibilityMixin):
             # second live search - same "instant toggle" behavior as Rank Minerals' own
             # PowerPlay-mode checkbox.
             save_pp_mode(pp_mode_var.get())
+            if dialog._search_control.running:
+                return
             cached = getattr(dialog, '_reverse_search_cache', None)
             if cached is None:
                 return
@@ -8165,6 +8144,9 @@ class RingFinder(ColumnVisibilityMixin):
         status_label.pack(anchor="w", pady=(0, 10))
 
         def run_search():
+            if dialog._search_control.running:
+                dialog._search_control.stop()
+                return
             target_system = target_var.get().strip()
             if not target_system:
                 status_label.config(text=t('ring_finder.reverse_search_no_target'))
@@ -8177,14 +8159,14 @@ class RingFinder(ColumnVisibilityMixin):
                 if mineral_filter == "Low Temp Diamonds":
                     mineral_filter = "Low Temperature Diamonds"
             status_label.config(text=t('ring_finder.reverse_search_searching').format(system=target_system))
-            search_btn.config(state="disabled")
-            self._show_reverse_search_wait_dialog(target_system)
-            threading.Thread(target=self._reverse_search_worker,
-                             args=(target_system, float(max_dist_var.get()), mineral_filter, pp_mode_var.get(), dialog, status_label, search_btn),
+            dialog._search_control.start()
+            threading.Thread(target=dialog._search_control.run,
+                             args=(self._reverse_search_worker, target_system, float(max_dist_var.get()), mineral_filter, pp_mode_var.get(), dialog, status_label, search_btn, dialog._search_control),
                              daemon=True).start()
 
         search_btn = ttk.Button(input_row, text=t('ring_finder.reverse_search_search_btn'), command=run_search)
         search_btn.pack(side="left")
+        dialog._search_control = SearchControl(self.parent, search_btn, status_label)
 
         target_entry.bind('<Return>', lambda e: run_search())
 
@@ -8197,6 +8179,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         def close_reverse_search_dialog():
             save_reverse_search_geometry()
+            dialog._search_control.stop()
             dialog.destroy()
         dialog.protocol("WM_DELETE_WINDOW", close_reverse_search_dialog)
 
@@ -8230,7 +8213,7 @@ class RingFinder(ColumnVisibilityMixin):
         # search_wait_dialog() re-lifts once after the wait popup closes.
 
     def _reverse_search_worker(self, target_system: str, max_distance: float, mineral_filter: Optional[str],
-                               pp_mode: bool, dialog, status_label, search_btn):
+                               pp_mode: bool, dialog, status_label, search_btn, control):
         """Background worker: find candidate mining systems near target_system, rank each
         by its own best hotspot mineral sell price.
 
@@ -8245,7 +8228,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         try:
             hotspots = self._get_hotspots(target_system, 'All', 'All Minerals', False,
-                                          max_distance, max_results=None, data_source='database')
+                                          max_distance, max_results=None, data_source='database', is_cancelled=control.is_cancelled)
         except Exception:
             hotspots = []
 
@@ -8275,8 +8258,8 @@ class RingFinder(ColumnVisibilityMixin):
 
         candidate_list = sorted(candidates.items(), key=lambda kv: kv[1]['distance'])[:MAX_CANDIDATES]
 
-        if not candidate_list:
-            self.parent.after(0, lambda: self._reverse_search_no_results(target_system, dialog, status_label, search_btn))
+        if not candidate_list or control.is_cancelled():
+            control.complete([], lambda rows: self._reverse_search_no_results(target_system, dialog, status_label, search_btn))
             return
 
         # One live fetch per unique mineral, centered on target_system - candidates near
@@ -8288,9 +8271,13 @@ class RingFinder(ColumnVisibilityMixin):
 
         rows_by_material = {}
         unique_materials = list({mat for _, entry in candidate_list for mat in entry['materials']})
+        def fetch(mat):
+            if control.is_cancelled():
+                return []
+            return MarketplaceAPI.search_buyers(mat, target_system, None, 7, False, is_cancelled=control.is_cancelled)
+
         with ThreadPoolExecutor(max_workers=min(len(unique_materials), 4)) as pool:
-            futures = {pool.submit(MarketplaceAPI.search_buyers, mat, target_system, None, 7, False): mat
-                      for mat in unique_materials}
+            futures = {pool.submit(fetch, mat): mat for mat in unique_materials}
             for future in futures:
                 mat = futures[future]
                 try:
@@ -8313,15 +8300,18 @@ class RingFinder(ColumnVisibilityMixin):
         except Exception:
             pass
 
-        dialog._reverse_search_cache = {
+        cache = {
             'target_system': target_system,
             'candidates': candidate_list,
             'rows_by_material': rows_by_material,
             'candidate_coords': candidate_coords,
             'max_distance': max_distance,
         }
-        self.parent.after(0, lambda: self._rerank_reverse_search_results(
-            target_system, candidate_list, rows_by_material, candidate_coords, max_distance, pp_mode, dialog, status_label, search_btn))
+        def show_results(candidates):
+            dialog._reverse_search_cache = cache
+            self._rerank_reverse_search_results(
+                target_system, candidates, rows_by_material, candidate_coords, max_distance, pp_mode, dialog, status_label, search_btn)
+        control.complete(candidate_list, show_results)
 
     def _rerank_reverse_search_results(self, target_system: str, candidate_list, rows_by_material: dict,
                                        candidate_coords: dict, max_distance: float, pp_mode: bool, dialog, status_label, search_btn):
@@ -8875,6 +8865,9 @@ class RingFinder(ColumnVisibilityMixin):
         status_label.bind("<Configure>", rewrap_status_label)
 
         def run_search():
+            if dialog._search_control.running:
+                dialog._search_control.stop()
+                return
             reference_system = reference_var.get().strip()
             if not reference_system:
                 status_label.config(text=t('ring_finder.acquisition_search_no_reference'))
@@ -8887,13 +8880,14 @@ class RingFinder(ColumnVisibilityMixin):
                 if mineral_filter == "Low Temp Diamonds":
                     mineral_filter = "Low Temperature Diamonds"
             status_label.config(text=t('ring_finder.acquisition_search_checking').format(system=reference_system))
-            search_btn.config(state="disabled")
-            threading.Thread(target=self._acquisition_search_worker,
-                             args=(reference_system, mineral_filter, dialog, status_label, search_btn),
+            dialog._search_control.start()
+            threading.Thread(target=dialog._search_control.run,
+                             args=(self._acquisition_search_worker, reference_system, mineral_filter, dialog, status_label, search_btn, dialog._search_control),
                              daemon=True).start()
 
         search_btn = ttk.Button(input_row, text=t('ring_finder.reverse_search_search_btn'), command=run_search)
         search_btn.pack(side="left")
+        dialog._search_control = SearchControl(self.parent, search_btn, status_label)
 
         reference_entry.bind('<Return>', lambda e: run_search())
 
@@ -8903,6 +8897,7 @@ class RingFinder(ColumnVisibilityMixin):
                 save_acquisition_search_window_width(dialog.winfo_width())
             except Exception:
                 pass
+            dialog._search_control.stop()
             dialog.destroy()
         dialog.protocol("WM_DELETE_WINDOW", close_acquisition_dialog)
 
@@ -8931,7 +8926,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         dialog._row_menu_open = False
 
-    def _acquisition_search_worker(self, reference_system: str, mineral_filter: Optional[str], dialog, status_label, search_btn):
+    def _acquisition_search_worker(self, reference_system: str, mineral_filter: Optional[str], dialog, status_label, search_btn, control):
         """Background worker: determine reference_system's own PowerPlay state
         (cache-first, Spansh fallback), pick the matching 20/30 Ly acquisition radius,
         then list nearby Unoccupied systems within it - each with the selected mineral's
@@ -8948,7 +8943,7 @@ class RingFinder(ColumnVisibilityMixin):
             # giving up, same enrichment call _apply_powerplay_filter already relies on.
             for state in ('Fortified', 'Stronghold'):
                 spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_systems(
-                    reference_system, 5.0, 'Any', state)
+                    reference_system, 5.0, 'Any', state, is_cancelled=control.is_cancelled)
                 if reference_system in spansh_pp:
                     power_state = state
                     SystemFinderAPI._store_powerplay_batch({reference_system: spansh_pp[reference_system]})
@@ -8956,10 +8951,10 @@ class RingFinder(ColumnVisibilityMixin):
 
         radius = self.ACQUISITION_RADIUS_BY_STATE.get(power_state)
         if radius is None:
-            self.parent.after(0, lambda: self._acquisition_search_not_eligible(reference_system, power_state, dialog, status_label, search_btn))
+            control.complete([], lambda rows: self._acquisition_search_not_eligible(reference_system, power_state, dialog, status_label, search_btn))
             return
 
-        nearby = SystemFinderAPI._fetch_spansh_powerplay_systems(reference_system, radius, 'Any', 'Unoccupied')
+        nearby = SystemFinderAPI._fetch_spansh_powerplay_systems(reference_system, radius, 'Any', 'Unoccupied', is_cancelled=control.is_cancelled)
         SystemFinderAPI._store_powerplay_batch(nearby)
 
         all_candidates = sorted(nearby.items(), key=lambda kv: kv[1].get('distance', 999999))
@@ -8985,8 +8980,10 @@ class RingFinder(ColumnVisibilityMixin):
             candidate_names = {sys_name for sys_name, _ in all_candidates}
 
             def fetch(mineral):
+                if control.is_cancelled():
+                    return mineral, []
                 try:
-                    return mineral, MarketplaceAPI.search_buyers(mineral, reference_system, int(radius), 7, False)
+                    return mineral, MarketplaceAPI.search_buyers(mineral, reference_system, int(radius), 7, False, is_cancelled=control.is_cancelled)
                 except Exception:
                     return mineral, []
 
@@ -9004,8 +9001,8 @@ class RingFinder(ColumnVisibilityMixin):
 
         results = [(sys_name, sys_entry) for sys_name, sys_entry in all_candidates if sys_name in sell_prices]
 
-        self.parent.after(0, lambda: self._show_acquisition_search_results(
-            reference_system, power_state, radius, results, mineral_filter, sell_prices, best_mineral, dialog, status_label, search_btn, best_rows))
+        control.complete(results, lambda rows: self._show_acquisition_search_results(
+            reference_system, power_state, radius, rows, mineral_filter, sell_prices, best_mineral, dialog, status_label, search_btn, best_rows))
 
     def _acquisition_search_not_eligible(self, reference_system: str, power_state: str, dialog, status_label, search_btn):
         search_btn.config(state="normal")

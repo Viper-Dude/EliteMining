@@ -21,10 +21,11 @@ class SystemAutocomplete:
         ac.unsuppress()
     """
 
-    def __init__(self, entry: tk.Entry, var: tk.StringVar, root: tk.Misc):
+    def __init__(self, entry: tk.Entry, var: tk.StringVar, root: tk.Misc, on_select=None):
         self._entry = entry
         self._var = var
         self._root = root
+        self._on_select = on_select
         self._listbox_toplevel = None
         self._lb = None
         self._timer = None
@@ -165,6 +166,8 @@ class SystemAutocomplete:
         self.hide()
         self._entry.focus_set()
         self._entry.icursor(tk.END)
+        if self._on_select is not None:
+            self._on_select(name)
 
     def _suppress_and_set(self, text: str):
         self._suppressed = True

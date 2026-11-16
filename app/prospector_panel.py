@@ -73,7 +73,7 @@ def get_app_icon_path() -> str:
                 return icon_path
     
     return None
-from mining_statistics import SessionAnalytics
+from mining_statistics import SessionAnalytics, read_session_report, session_date
 
 from config import _load_cfg, _save_cfg, _atomic_write_text, VA_TTS_ANNOUNCEMENT, CONFIG_FILE, scaled_font, scaled_px
 import announcer
@@ -436,13 +436,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     pass
         except Exception:
             pass
-    def _sync_spinboxes_to_min_pct_map(self):
-        """Update self.min_pct_map from the current values of the spinboxes."""
-        for mat, var in self._minpct_vars.items():
-            try:
-                self.min_pct_map[mat] = float(var.get())
-            except Exception:
-                pass
 
     def _deselect_on_empty_click(self, event, tree: ttk.Treeview) -> None:
         """Deselect all items when clicking on empty space in a treeview"""
@@ -743,14 +736,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Clear any cached session data to prevent stale data issues
         self.reports_tab_session_lookup = {}
-        self.session_lookup = {}
 
-        # Track reports window for refreshing
-        self.reports_window = None
-        self.reports_tree = None
         
-        # One-time wipe of Mining Session folder on v4.3.0 upgrade
-        self.after(100, self._wipe_mining_session_folder)
 
         # Initialize bookmarks system - use centralized path utility
         from path_utils import get_bookmarks_file
@@ -901,11 +888,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Defer journal scanning to prevent blocking UI initialization
         if self._initial_scan_pending:
             self.after(100, self._deferred_initial_scan)
-        # Force announce_map to UI after build (only if mat_tree exists)
-        if hasattr(self, 'mat_tree'):
-            for m in self.mat_tree.get_children():
-                flag = "✓" if self.announce_map.get(m, True) else "—"
-                self.mat_tree.item(m, values=(flag, m, ""))
         
         # Automatically rebuild CSV on startup to ensure data is current
         self.after(500, self._auto_rebuild_csv_on_startup)
@@ -926,14 +908,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         for delay in [2000, 4000, 6000, 8000, 10000]:
             self.after(delay, self._update_ship_info_display)
 
-    # --- Stub methods for announcements panel (moved to Settings) ---
-    def _position_minpct_spinboxes(self):
-        """Stub method - announcements panel moved to Settings tab"""
-        pass
         
-    def _sync_spinboxes_to_min_pct_map(self):
-        """Stub method - announcements panel moved to Settings tab"""
-        pass
 
     def _get_current_system(self) -> str:
         """Get current system from centralized app source or fallback to local tracking"""
@@ -966,6 +941,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         cfg = self._load_cfg()
         cfg["announce_map"] = self.announce_map
         self._save_cfg(cfg)
+        self._save_last_material_settings()
     
     def _get_current_docked_status(self) -> bool:
         """Get real-time docked status from Status.json file"""
@@ -1275,6 +1251,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         cfg = self._load_cfg()
         cfg["min_pct_map"] = self.min_pct_map
         self._save_cfg(cfg)
+        self._save_last_material_settings()
 
     def _load_threshold(self) -> float:
         cfg = self._load_cfg()
@@ -1294,203 +1271,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             log.exception("Saving threshold failed: %s", e)
 
     # --- Preset save/load methods ---
-    def _save_preset1(self):
-        from app_utils import centered_askyesno
-        if not centered_askyesno(self.winfo_toplevel(), "Save Preset 1", "Overwrite Announcement Preset 1?"):
-            return
-        cfg = self._load_cfg()
-        preset_data = {
-            'announce_map': self.announce_map.copy(),
-            'min_pct_map': self.min_pct_map.copy(),
-            'announce_threshold': float(self.threshold.get()),
-        }
-        
-        # Save Core/Non-Core asteroid settings with announcement presets
-        if hasattr(self, 'announcement_vars') and self.announcement_vars:
-            if "Core Asteroids" in self.announcement_vars:
-                preset_data['Core Asteroids'] = self.announcement_vars["Core Asteroids"].get()
-            if "Non-Core Asteroids" in self.announcement_vars:
-                preset_data['Non-Core Asteroids'] = self.announcement_vars["Non-Core Asteroids"].get()
-        
-        cfg['announce_preset_1'] = preset_data
-        self._save_cfg(cfg)
-        self._set_status("Saved Preset 1.")
 
-    def _load_preset1(self):
-        cfg = self._load_cfg()
-        data = cfg.get('announce_preset_1')
-        if not data:
-            from main import center_window
-            import tkinter as tk
-            main_parent = self.winfo_toplevel()
-            dialog = tk.Toplevel(main_parent)
-            dialog.title("Load Preset 1")
-            dialog.resizable(False, False)
-            label = tk.Label(dialog, text="No Preset 1 saved yet.", padx=20, pady=20)
-            label.pack()
-            center_window(dialog, main_parent)
-            tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-            # dialog.transient(main_parent)  # Disabled - causes focus issues
-            
-            # Force dialog to stay on top and have focus
-            dialog.attributes('-topmost', True)
-            dialog.lift()
-            dialog.focus_force()
-            
-            try:
-                dialog.grab_set()
-            except:
-                pass
-            
-            # Keep dialog on top while open
-            def keep_on_top():
-                try:
-                    if dialog.winfo_exists():
-                        dialog.lift()
-                        dialog.after(100, keep_on_top)
-                except:
-                    pass
-            dialog.after(100, keep_on_top)
-            
-            dialog.wait_window()
-            return
-        self.announce_map = data.get('announce_map', {}).copy()
-        self.min_pct_map = data.get('min_pct_map', {}).copy()
-        self.threshold.set(data.get('announce_threshold', 20.0))
-        
-        # Load Core/Non-Core asteroid settings from announcement presets
-        if hasattr(self, 'announcement_vars') and self.announcement_vars:
-            if "Core Asteroids" in self.announcement_vars and 'Core Asteroids' in data:
-                self.announcement_vars["Core Asteroids"].set(data['Core Asteroids'])
-            if "Non-Core Asteroids" in self.announcement_vars and 'Non-Core Asteroids' in data:
-                self.announcement_vars["Non-Core Asteroids"].set(data['Non-Core Asteroids'])
-        
-        # Update UI (only if mat_tree exists - announcements panel moved to Settings)
-        if hasattr(self, 'mat_tree'):
-            for m in self.mat_tree.get_children():
-                flag = "✓" if self.announce_map.get(m, True) else "—"
-                self.mat_tree.item(m, values=(flag, m, ""))
-                
-        if hasattr(self, '_minpct_spin'):
-            for m, v in self._minpct_spin.items():
-                if m in self.min_pct_map:
-                    v.set(self.min_pct_map[m])
-            self._position_minpct_spinboxes()
-            self._sync_spinboxes_to_min_pct_map()
-        self._save_announce_map()
-        self._save_min_pct_map()
-        self._save_threshold_value()
-        self._save_announce_map()
-        self._save_last_material_settings()  # Save material settings
-        # Save announcement preferences to main app config
-        if hasattr(self.main_app, '_save_announcement_preferences'):
-            self.main_app._save_announcement_preferences()
-        self._set_status("Loaded Preset 1.")
-
-    def _save_preset(self, num: int):
-        from app_utils import centered_askyesno
-        if not centered_askyesno(self.winfo_toplevel(), f"Save Preset {num}", f"Overwrite Announcement Preset {num}?"):
-            return
-        cfg = self._load_cfg()
-        preset_data = {
-            'announce_map': self.announce_map.copy(),
-            'min_pct_map': self.min_pct_map.copy(),
-            'announce_threshold': float(self.threshold.get()),
-        }
-        
-        # Save Core/Non-Core asteroid settings with announcement presets
-        if hasattr(self, 'announcement_vars') and self.announcement_vars:
-            if "Core Asteroids" in self.announcement_vars:
-                preset_data['Core Asteroids'] = self.announcement_vars["Core Asteroids"].get()
-            if "Non-Core Asteroids" in self.announcement_vars:
-                preset_data['Non-Core Asteroids'] = self.announcement_vars["Non-Core Asteroids"].get()
-        
-        cfg[f'announce_preset_{num}'] = preset_data
-        self._save_cfg(cfg)
-        self._set_status(f"Saved Preset {num}.")
-
-    def _load_preset(self, num: int):
-        cfg = self._load_cfg()
-        data = cfg.get(f'announce_preset_{num}')
-        if not data:
-            from main import center_window
-            import tkinter as tk
-            main_parent = self.winfo_toplevel()
-            dialog = tk.Toplevel(main_parent)
-            dialog.title(f"Load Preset {num}")
-            dialog.resizable(False, False)
-            label = tk.Label(dialog, text=f"No Preset {num} saved yet.", padx=20, pady=20)
-            label.pack()
-            center_window(dialog, main_parent)
-            tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-            # dialog.transient(main_parent)  # Disabled - causes focus issues
-            
-            # Force dialog to stay on top and have focus
-            dialog.attributes('-topmost', True)
-            dialog.lift()
-            dialog.focus_force()
-            
-            try:
-                dialog.grab_set()
-            except:
-                pass
-            
-            # Keep dialog on top while open
-            def keep_on_top():
-                try:
-                    if dialog.winfo_exists():
-                        dialog.lift()
-                        dialog.after(100, keep_on_top)
-                except:
-                    pass
-            dialog.after(100, keep_on_top)
-            
-            dialog.wait_window()
-            return
-        
-        # Merge preset data with current materials to preserve new materials
-        preset_announce = data.get('announce_map', {})
-        preset_minpct = data.get('min_pct_map', {})
-        
-        # Keep existing values for materials in KNOWN_MATERIALS but not in preset
-        for material in KNOWN_MATERIALS:
-            if material not in preset_announce:
-                preset_announce[material] = self.announce_map.get(material, True)
-            if material not in preset_minpct:
-                preset_minpct[material] = self.min_pct_map.get(material, 20.0)
-        
-        self.announce_map = preset_announce
-        self.min_pct_map = preset_minpct
-        self.threshold.set(data.get('announce_threshold', 20.0))
-        
-        # Load Core/Non-Core asteroid settings from announcement presets
-        if hasattr(self, 'announcement_vars') and self.announcement_vars:
-            if "Core Asteroids" in self.announcement_vars and 'Core Asteroids' in data:
-                self.announcement_vars["Core Asteroids"].set(data['Core Asteroids'])
-            if "Non-Core Asteroids" in self.announcement_vars and 'Non-Core Asteroids' in data:
-                self.announcement_vars["Non-Core Asteroids"].set(data['Non-Core Asteroids'])
-        
-        # Update UI (only if mat_tree exists - announcements panel moved to Settings)
-        if hasattr(self, 'mat_tree'):
-            for m in self.mat_tree.get_children():
-                flag = "✓" if self.announce_map.get(m, True) else "—"
-                self.mat_tree.item(m, values=(flag, m, ""))
-                
-        if hasattr(self, '_minpct_spin'):
-            for m, v in self._minpct_spin.items():
-                if m in self.min_pct_map:
-                    v.set(self.min_pct_map[m])
-            self._position_minpct_spinboxes()
-            self._sync_spinboxes_to_min_pct_map()
-        self._save_announce_map()
-        self._save_min_pct_map()
-        self._save_threshold_value()
-        self._save_last_material_settings()
-        self._save_announce_map()
-        # Save announcement preferences to main app config
-        if hasattr(self.main_app, '_save_announcement_preferences'):
-            self.main_app._save_announcement_preferences()
-        self._set_status(f"Loaded Preset {num}.")
 
     def _load_last_material_settings(self):
         """Load the last used material settings on startup"""
@@ -1508,18 +1289,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 if "Non-Core Asteroids" in self.announcement_vars and "Non-Core Asteroids" in last_settings:
                     self.announcement_vars["Non-Core Asteroids"].set(last_settings["Non-Core Asteroids"])
             
-            # Update UI (only if mat_tree exists - announcements panel moved to Settings)
-            if hasattr(self, 'mat_tree'):
-                for m in self.mat_tree.get_children():
-                    flag = "✓" if self.announce_map.get(m, True) else "—"
-                    self.mat_tree.item(m, values=(flag, m, ""))
-                    
-            if hasattr(self, '_minpct_spin'):
-                for m, v in self._minpct_spin.items():
-                    if m in self.min_pct_map:
-                        v.set(self.min_pct_map[m])
-                self._position_minpct_spinboxes()
-
     def _save_last_material_settings(self):
         """Save current material settings as last used"""
         cfg = self._load_cfg()
@@ -1656,8 +1425,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
     def _clear_reports_cache(self):
         """Clear all cached report data to prevent stale data issues"""
         self.reports_tab_session_lookup = {}
-        if hasattr(self, 'session_lookup'):
-            self.session_lookup = {}
     
     def _validate_csv_consistency(self) -> dict:
         """Validate CSV file consistency and return debug info"""
@@ -2566,264 +2333,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         buttons_frame = ttk.Frame(controls_frame)
         buttons_frame.grid(row=0, column=2, sticky="e")
         
-        # --- Announcements Panel moved to Settings tab ---
-        # (Announcements functionality moved to Settings → Announcements)
-        
-        """
-        # DISABLED: Announcements code - moved to Settings tab
-        # Left side: Announcement toggles
-        toggles_frame = ttk.Frame(main_controls)
-        toggles_frame.pack(side="left", padx=(0, 20))
-        
-        # Add announcement toggles if available
-        if hasattr(self, 'announcement_vars') and self.announcement_vars:
-            ttk.Label(toggles_frame, text="Announcement Types:", font=("Segoe UI", 9, "bold")).pack(anchor="w")
-            for name, (_fname, helptext) in ANNOUNCEMENT_TOGGLES.items():
-                # Check if the variable exists before trying to use it
-                if name in self.announcement_vars:
-                    checkbox = tk.Checkbutton(toggles_frame, text=name, 
-                                            variable=self.announcement_vars[name], 
-                                            bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", 
-                                            activebackground="#1e1e1e", activeforeground="#ffffff", 
-                                            highlightthickness=0, bd=0, font=("Segoe UI", 9), 
-                                            padx=4, pady=1, anchor="w")
-                    checkbox.pack(anchor="w", padx=(10, 0))
-                    
-                    # Add tooltip to checkbox
-                    self.ToolTip(checkbox, helptext)
-        
-        # Right side: Threshold controls
-        thr = ttk.Frame(main_controls)
-        thr.pack(side="left")
-        ttk.Label(thr, text="Announce at ≥").pack(side="left")
-        # Get theme for spinbox styling
-        from config import load_theme
-        _ann_theme = load_theme()
-        _ann_spinbox_fg = "#ff8c00" if _ann_theme == "elite_orange" else "#ffffff"
-        sp = tk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
-                         textvariable=self.threshold, command=self._save_threshold_value,
-                         bg="#1e1e1e", fg=_ann_spinbox_fg, buttonbackground="#2d2d2d",
-                         insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
-                         relief="solid", bd=0, highlightthickness=1,
-                         highlightbackground="#ffffff", highlightcolor="#ffffff",
-                         font=("Segoe UI", 9))
-        sp.pack(side="left", padx=(6, 4))
-        # Add mouse wheel support
-        def on_threshold_scroll(event, var=self.threshold):
-            try:
-                current = float(var.get())
-                if event.delta > 0:
-                    new_val = min(current + 0.5, 100.0)
-                else:
-                    new_val = max(current - 0.5, 0.0)
-                var.set(round(new_val, 1))
-            except:
-                pass
-            return "break"
-        sp.bind("<MouseWheel>", on_threshold_scroll)
-        self.ToolTip(sp, t('tooltips.announcement_threshold'))
-        
-        set_all_btn = tk.Button(thr, text="Set all", command=self._set_all_min_pct,
-                               bg="#2a4a5a", fg="#ffffff", 
-                               activebackground="#3a5a6a", activeforeground="#ffffff",
-                               relief="solid", bd=1, cursor="hand2", pady=2,
-                               highlightbackground="#1a2a3a", highlightcolor="#1a2a3a",
-                               width=8)
-        set_all_btn.pack(side="left", padx=(10, 0))
-        self.ToolTip(set_all_btn, t('tooltips.set_all_threshold'))
-        ttk.Label(thr, text="%").pack(side="left")
-
-        ttk.Label(ann, text="Select minerals and set minimum percentages:",
-                  font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", pady=(2, 2))
-
-        self.mat_tree = ttk.Treeview(ann, columns=("announce", "material", "minpct"), show="headings", height=14)
-        self.mat_tree.heading("announce", text="Announce")
-        self.mat_tree.heading("material", text="Mineral")
-        self.mat_tree.heading("minpct", text="Minimal %")
-        self.mat_tree.column("announce", width=90, anchor="center", stretch=False)
-        self.mat_tree.column("material", width=300, anchor="center", stretch=True)
-        self.mat_tree.column("minpct", width=100, anchor="center", stretch=False)  # keep center for Core label
-        self.mat_tree.grid(row=2, column=0, sticky="nsew")
-        y2 = ttk.Scrollbar(ann, orient="vertical", command=self.mat_tree.yview)
-        y2.grid(row=2, column=1, sticky="ns")
-
-        # keep scrollbar in sync + reposition spinboxes when scrolling
-        def _yscroll_set(lo, hi):
-            y2.set(lo, hi)
-            self._position_minpct_spinboxes()
-        self.mat_tree.configure(yscroll=_yscroll_set)
-
-        # populate rows - keep minpct column empty to avoid text showing behind spinboxes
-        for mat in KNOWN_MATERIALS:
-            flag = "✓" if self.announce_map.get(mat, True) else "—"
-            if mat in CORE_ONLY:
-                self.mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""))  # blank instead of "Core"
-            else:
-                self.mat_tree.insert("", "end", iid=mat, values=(flag, mat, ""))
-
-        # create one Spinbox per row and place it over the "minpct" cell
-        self._minpct_spin: dict[str, tk.Spinbox] = {}
-        self._minpct_vars: dict[str, tk.DoubleVar] = {} # This is the new line
-
-        def _on_minpct_change_factory(material: str):
-            def _on_change():
-                try:
-                    v = float(self._minpct_vars[material].get()) # This is the new line
-                    v = max(0.0, min(100.0, v))
-                    self.min_pct_map[material] = v
-                    self._save_min_pct_map()
-                    self._save_last_material_settings()  # Save last settings when min_pct changes
-                    # Refresh Material Analysis table to show updated threshold
-                    self._refresh_statistics_display()
-                except Exception:
-                    pass
-            return _on_change
-        
-        for mat in KNOWN_MATERIALS:
-            if mat in CORE_ONLY:
-                continue  # skip spinbox for core-only gems
-            start_val = self.min_pct_map.get(mat, 20.0)
-            var = tk.DoubleVar(value=float(start_val))
-            self._minpct_vars[mat] = var
-            spn = tk.Spinbox(ann, from_=0.0, to=100.0, increment=0.5, width=6, textvariable=var,
-                              command=_on_minpct_change_factory(mat),
-                              bg="#1e1e1e", fg=_ann_spinbox_fg, buttonbackground="#2d2d2d",
-                              insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
-                              relief="solid", bd=0, highlightthickness=1,
-                              highlightbackground="#ffffff", highlightcolor="#ffffff",
-                              font=("Segoe UI", 9))
-
-            # also update on Return/FocusOut
-            spn.bind("<Return>", lambda e, m=mat: _on_minpct_change_factory(m)())
-            spn.bind("<FocusOut>", lambda e, m=mat: _on_minpct_change_factory(m)())
-            # Add mouse wheel support
-            def on_minpct_scroll(event, v=var):
-                try:
-                    current = float(v.get())
-                    if event.delta > 0:
-                        new_val = min(current + 0.5, 100.0)
-                    else:
-                        new_val = max(current - 0.5, 0.0)
-                    v.set(round(new_val, 1))
-                except:
-                    pass
-                return "break"
-            spn.bind("<MouseWheel>", on_minpct_scroll)
-            self._minpct_spin[mat] = spn
-
-        # position spinboxes to match visible rows
-        def _place_spin_for_item(item_id: str):
-            spn = self._minpct_spin.get(item_id)
-            if not spn:
-                return
-            try:
-                bbox = self.mat_tree.bbox(item_id, column="#3")
-                if bbox and all(v is not None for v in bbox) and bbox[3] > 0:
-                    x, y, w, h = bbox
-                    # Only place if item is inside visible area
-                    tree_height = self.mat_tree.winfo_height()
-                    if 0 <= y <= tree_height - h:
-                        # center spinbox in its cell
-                        cell_center = x + (w // 2)
-                        spn_width = 56
-                        spn.place(in_=self.mat_tree, x=cell_center - spn_width//2, y=y+1, width=spn_width, height=h-2)
-                    else:
-                        spn.place_forget()
-                else:
-                    spn.place_forget()
-            except Exception:
-                spn.place_forget()
-
-        def _place_all_spins():
-            for item in self.mat_tree.get_children(""):
-                _place_spin_for_item(item)
-
-        # expose for other methods (bindings call this)
-        def _position_minpct_spinboxes():
-            _place_all_spins()
-        self._position_minpct_spinboxes = _position_minpct_spinboxes  # attach as instance method
-
-        # toggle announce on single click in column #1
-        def on_click(event):
-            item = self.mat_tree.identify_row(event.y)
-            col = self.mat_tree.identify_column(event.x)
-            if not item:
-                return
-            if col == "#1":
-                cur = self.announce_map.get(item, True)
-                cur = not cur
-                self.announce_map[item] = cur
-                prev_min = self.mat_tree.set(item, "minpct")
-                self.mat_tree.item(item, values=("✓" if cur else "—", item, prev_min))
-                self._save_announce_map()
-                self._save_last_material_settings()  # Save last settings when announce map changes
-                # keep spinboxes positioned after any layout change
-                self._position_minpct_spinboxes()
-
-        self.mat_tree.bind("<ButtonRelease-1>", on_click)
-
-        # reposition the spinboxes on common layout/scroll events
-        for ev in ("<Configure>", "<Expose>", "<Motion>",
-           "<ButtonRelease-1>", "<MouseWheel>",
-           "<KeyRelease-Up>", "<KeyRelease-Down>",
-           "<KeyRelease-Prior>", "<KeyRelease-Next>"):
-         self.mat_tree.bind(ev, lambda e: self._position_minpct_spinboxes(), add="+")
-
-        # initial placement after the widget is fully drawn
-        self.after_idle(self._position_minpct_spinboxes)
-
-        btns = ttk.Frame(ann)
-        btns.grid(row=3, column=0, sticky="w", pady=(8, 0))
-        
-        select_all_btn = tk.Button(btns, text="Select all", command=self._announce_all,
-                                  bg="#2a5a2a", fg="#ffffff", 
-                                  activebackground="#3a6a3a", activeforeground="#ffffff",
-                                  relief="solid", bd=1, cursor="hand2", pady=3,
-                                  highlightbackground="#1a3a1a", highlightcolor="#1a3a1a")
-        select_all_btn.pack(side="left")
-        self.ToolTip(select_all_btn, t('tooltips.select_all_materials'))
-        
-        unselect_all_btn = tk.Button(btns, text="Unselect all", command=self._mute_all,
-                                   bg="#5a2a2a", fg="#ffffff", 
-                                   activebackground="#6a3a3a", activeforeground="#ffffff",
-                                   relief="solid", bd=1, cursor="hand2", pady=3,
-                                   highlightbackground="#3a1a1a", highlightcolor="#3a1a1a")
-        unselect_all_btn.pack(side="left", padx=(6, 0))
-        self.ToolTip(unselect_all_btn, t('tooltips.unselect_all_materials'))
-
-        # --- Preset buttons row ---
-        self.preset_buttons = []
-        for i in range(1, 6):
-            btn = tk.Button(btns, text=t('settings.preset_button').format(num=i),
-                          bg="#4a4a2a", fg="#ffffff",
-                          activebackground="#5a5a3a", activeforeground="#ffffff",
-                          relief="solid", bd=1,
-                          width=8, font=("Segoe UI", 9), cursor="hand2", pady=3,
-                          highlightbackground="#2a2a1a", highlightcolor="#2a2a1a")
-            btn.pack(side="left", padx=(8, 0))
-            self.preset_buttons.append(btn)
-            # Add tooltip for preset buttons
-            self.ToolTip(btn, t('tooltips.preset_load_save').format(num=i))
-
-            if i == 1:
-                btn.bind("<Button-1>", lambda e: self._load_preset1())
-                btn.bind("<Button-3>", lambda e: self._save_preset1())
-                # Fix button state after right-click
-                btn.bind("<ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
-            else:
-                btn.bind("<Button-1>", lambda e, num=i: self._load_preset(num))
-                btn.bind("<Button-3>", lambda e, num=i: self._save_preset(num))
-                # Fix button state after right-click
-                btn.bind("<ButtonRelease-3>", lambda e: e.widget.config(relief="raised"))
-
-            # Add tooltip to each preset button
-            tooltip_text = ("Left-click = Load saved preset\n"
-                          "Right-click = Save current settings into that preset slot\n"
-                          f"Use Preset {i} to store different announcement profiles\n"
-                          "(e.g. Core-only, High-value, All materials)")
-            self.ToolTip(btn, tooltip_text)
-        """
-
         # Graphs tab - Analytics visualization (Session tab removed and merged into Prospector)
         # COMBINED: Analytics tab with Graphs and Statistics sub-sections
         analytics = ttk.Frame(nb, padding=8)
@@ -2945,1327 +2454,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             print("Cargo monitor not available")
 
 
-
     # --- Reports window (reads from CSV index) ---
-    def _open_reports_window(self) -> None:
-        # Close existing window if open
-        try:
-            if self.reports_window and self.reports_window.winfo_exists():
-                self.reports_window.destroy()
-        except:
-            # Window was already destroyed or invalid
-            pass
-        
-        # Reset references to avoid issues
-        self.reports_window = None
-        self.reports_tree = None
-            
-        win = tk.Toplevel(self)
-        win.title("Session Reports")
-        win.minsize(1100, 500)
-        win.columnconfigure(0, weight=1)
-        win.rowconfigure(0, weight=1)
-        
-        # Set app icon
-        try:
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                win.iconbitmap(icon_path)
-            elif icon_path and icon_path.endswith('.png'):
-                win.iconphoto(False, tk.PhotoImage(file=icon_path))
-        except Exception:
-            pass
-
-        # Position window relative to main application window
-        try:
-            # Get main window position
-            main_window = self.winfo_toplevel()
-            main_x = main_window.winfo_x()
-            main_y = main_window.winfo_y()
-            main_width = main_window.winfo_width()
-            
-            # Position reports window slightly offset from main window
-            offset_x = main_x + 50
-            offset_y = main_y + 50
-            
-            # Make sure window doesn't go off-screen
-            if offset_x < 0:
-                offset_x = 0
-            if offset_y < 0:
-                offset_y = 0
-                
-            win.geometry(f"900x500+{offset_x}+{offset_y}")
-        except:
-            # Fallback to default positioning if there's an error
-            pass
-
-        # Set window icon using centralized function
-        try:
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                win.iconbitmap(icon_path)
-            elif icon_path and icon_path.endswith('.png'):
-                win.iconphoto(False, tk.PhotoImage(file=icon_path))
-        except Exception as e:
-            # Use system default icon if all attempts fail
-            pass
-
-        # Track window and add close handler
-        self.reports_window = win
-        win.protocol("WM_DELETE_WINDOW", self._on_reports_window_close)
-
-        frame = ttk.Frame(win, padding=5)
-        frame.grid(row=0, column=0, sticky="nsew")
-        frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(0, weight=1)
-
-        # Configure Reports Treeview style (theme-aware)
-        from config import load_theme
-        _rpt_theme = load_theme()
-        style = ttk.Style()
-        
-        if _rpt_theme == "elite_orange":
-            _rpt_bg = "#1e1e1e"
-            _rpt_fg = "#ff8c00"
-            _rpt_hdr = "#1a1a1a"
-            _rpt_sel_bg = "#ff6600"
-            _rpt_sel_fg = "#000000"
-            _rpt_alt = "#252525"
-        elif _rpt_theme in ("modern", "modern_slate", "modern_orange"):
-            _rpt_bg = modern_color("#1D2228")
-            _rpt_fg = modern_color("#E6EAF0")
-            _rpt_hdr = modern_color("#14171B")
-            _rpt_sel_bg = modern_color("#4A3520")
-            _rpt_sel_fg = "#FFFFFF"
-            _rpt_alt = modern_color("#232A31")
-        else:
-            _rpt_bg = "#1e1e1e"
-            _rpt_fg = "#e6e6e6"
-            _rpt_hdr = "#2a2a2a"
-            _rpt_sel_bg = "#0078d7"
-            _rpt_sel_fg = "#ffffff"
-            _rpt_alt = "#282828"
-        
-        style.configure("Reports.Treeview",
-                       rowheight=scaled_px(25),
-                       borderwidth=1,
-                       relief="solid",
-                       bordercolor="#333333",
-                       background=_rpt_bg,
-                       foreground=_rpt_fg,
-                       fieldbackground=_rpt_bg,
-                       font=scaled_font(9))
-        style.configure("Reports.Treeview.Heading",
-                       borderwidth=1,
-                       relief="groove",
-                       background=_rpt_hdr,
-                       foreground=_rpt_fg,
-                       padding=[5, 5],
-                       anchor="w",
-                       font=scaled_font(9, "bold"))
-        style.map("Reports.Treeview",
-                 background=[('selected', _rpt_sel_bg)],
-                 foreground=[('selected', _rpt_sel_fg)])
-        
-        # Add subtle column separation via heading relief
-        style.layout("Reports.Treeview.Heading", [
-            ('Treeheading.cell', {'sticky': 'nswe'}),
-            ('Treeheading.border', {'sticky':'nswe', 'children': [
-                ('Treeheading.padding', {'sticky':'nswe', 'children': [
-                    ('Treeheading.image', {'side':'right', 'sticky':''}),
-                    ('Treeheading.text', {'sticky':'we'})
-                ]})
-            ]})
-        ])
-
-        # Create wrapper frame for bordered table
-        tree_frame_popup = ttk.Frame(frame, relief="solid", borderwidth=1)
-        tree_frame_popup.grid(row=0, column=0, sticky="nsew")
-        tree_frame_popup.grid_columnconfigure(0, weight=1)
-        tree_frame_popup.grid_rowconfigure(0, weight=1)
-
-        # Create sortable treeview with Material Analysis columns (NO ship column - ship is only in TXT/HTML reports)
-        tree = ttk.Treeview(tree_frame_popup, columns=("date", "duration", "system", "body", "tons", "tph", "materials", "tons_per", "asteroids", "hit_rate", "quality", "cargo", "prospectors", "comment", "enhanced"), show="headings", height=16, style="Reports.Treeview")
-        tree.grid(row=0, column=0, sticky="nsew")
-        
-        # Configure row tags for alternating colors (theme-aware)
-        tree.tag_configure('oddrow', background=_rpt_bg, foreground=_rpt_fg)
-        tree.tag_configure('evenrow', background=_rpt_alt, foreground=_rpt_fg)
-        
-        # Bind double-click to edit comments
-        tree.bind("<Double-1>", self._edit_comment_popup)
-        
-        # Bind single-click to handle detailed report opening (with higher priority)
-        tree.bind("<Button-1>", self._create_enhanced_click_handler(tree))
-        
-        # Add hover effect for detailed reports column
-        tree.bind("<Motion>", lambda event: self._handle_mouse_motion(event, tree))
-        
-        # Configure column headings
-        tree.heading("date", text="Date/Time", anchor="w")
-        tree.heading("duration", text="Duration", anchor="w")
-        tree.heading("system", text="System", anchor="w")
-        tree.heading("body", text="Body", anchor="w")
-        tree.heading("tons", text="Total Tons", anchor="w")
-        tree.heading("tph", text="T/hr", anchor="w")
-        tree.heading("materials", text="Mat Types", anchor="w")
-        tree.heading("tons_per", text="Tons/Asteroid", anchor="w")
-        tree.heading("asteroids", text="Prospected", anchor="w")
-        tree.heading("hit_rate", text="Hit Rate %", anchor="w")
-        tree.heading("quality", text="Average Yield %", anchor="w")
-        tree.heading("cargo", text="Minerals (Tonnage, Yields & T/hr)", anchor="w")
-        tree.heading("prospectors", text="Prospectors", anchor="w")
-        tree.heading("comment", text="Comment", anchor="w")
-        tree.heading("enhanced", text="Detail Report", anchor="w")
-        
-
-        
-
-        
-
-        
-        # Configure column widths and alignment (optimized for 1100px window)
-        # Left-align text columns
-        tree.column("date", width=145, minwidth=135, anchor="w")
-        tree.column("duration", width=80, minwidth=70, anchor="w")
-        tree.column("system", width=105, minwidth=85, anchor="w")
-        tree.column("body", width=155, minwidth=120, anchor="w")
-        
-        # Center-align short data columns
-        tree.column("asteroids", width=80, minwidth=70, anchor="w")
-        tree.column("materials", width=80, minwidth=70, anchor="w")
-        tree.column("tons_per", width=85, minwidth=60, anchor="w")
-        tree.column("hit_rate", width=90, minwidth=80, anchor="w")
-        tree.column("quality", width=120, minwidth=100, anchor="w")
-        
-        # Right-align numeric currency-like columns
-        tree.column("tons", width=75, minwidth=65, anchor="w")
-        tree.column("tph", width=60, minwidth=50, anchor="w")
-        
-        # New cargo columns - wider since we use full material names
-        tree.column("cargo", width=300, minwidth=250, anchor="w", stretch=False)
-        tree.column("prospectors", width=80, minwidth=70, anchor="w", stretch=False)
-        tree.column("comment", width=200, minwidth=150, anchor="w", stretch=True)
-        tree.column("enhanced", width=100, minwidth=80, anchor="w", stretch=False)
-
-        # Load saved column widths from config
-        try:
-            from config import load_mining_analysis_column_widths
-            saved_widths = load_mining_analysis_column_widths()
-            if saved_widths:
-                for col_name, width in saved_widths.items():
-                    try:
-                        tree.column(col_name, width=width)
-                    except Exception as e:
-                        pass
-            else:
-                pass
-        except Exception as e:
-            pass
-
-        # Bind column resize event to save widths
-        def save_column_widths(event=None):
-            try:
-                print("[DEBUG] ButtonRelease-1 triggered, attempting to save column widths...")
-                from config import save_mining_analysis_column_widths
-                widths = {}
-                for col in ["date", "duration", "system", "body", "tons", "tph", "materials", "tons_per", "asteroids", "hit_rate", "quality", "cargo", "prospectors", "comment", "enhanced"]:
-                    try:
-                        widths[col] = tree.column(col, "width")
-                    except:
-                        pass
-                print(f"[DEBUG] Saving column widths: {widths}")
-                save_mining_analysis_column_widths(widths)
-                print("[DEBUG] Column widths saved successfully")
-            except Exception as e:
-                print(f"[DEBUG] Could not save column widths: {e}")
-        
-        tree.bind("<ButtonRelease-1>", save_column_widths)
-
-        # Add scrollbar
-        sb = ttk.Scrollbar(tree_frame_popup, orient="vertical", command=tree.yview)
-        sb.grid(row=0, column=1, sticky="ns")
-        tree.configure(yscrollcommand=sb.set)
-
-        # Word wrap toggle variable for this window
-        word_wrap_enabled = tk.BooleanVar(value=False)
-        
-        # Initialize sort direction tracking
-        if not hasattr(self, 'reports_sort_reverse'):
-            self.reports_sort_reverse = {}
-        
-
-
-        # Read data from CSV
-        csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
-        sessions_data = []
-        
-        try:
-            import csv
-            with open(csv_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    # Format the timestamp for display
-                    try:
-                        # Try to parse as local time first, then fall back to UTC
-                        if row['timestamp_utc'].endswith('Z'):
-                            # UTC format - convert to local time for display
-                            timestamp = dt.datetime.fromisoformat(row['timestamp_utc'].replace('Z', '+00:00'))
-                            timestamp = timestamp.replace(tzinfo=dt.timezone.utc).astimezone()
-                        else:
-                            # Local time format
-                            timestamp = dt.datetime.fromisoformat(row['timestamp_utc'])
-                        date_str = timestamp.strftime("%Y-%m-%d %H:%M")
-                    except:
-                        date_str = row['timestamp_utc']
-                    
-                    # Format TPH
-                    try:
-                        tph_val = float(row['overall_tph'])
-                        tph_str = f"{tph_val:.1f}"
-                    except:
-                        tph_str = row['overall_tph']
-                    
-                    # Format tons
-                    try:
-                        tons_val = float(row['total_tons'])
-                        tons_str = f"{tons_val:.1f}"
-                    except:
-                        tons_str = row['total_tons']
-
-                    # Determine total finds/hits and calculate Tons per Hit (Tons/Hit)
-                    try:
-                        total_finds = int(str(row.get('total_finds', '')).strip() or 0)
-                    except Exception:
-                        total_finds = 0
-
-                    # Always attempt to prefer the TXT report's Total Material Finds when possible.
-                    # If a matching TXT is found and contains a Total Material Finds / Hits value, use it.
-                    try:
-                        raw_ts = row.get('timestamp_utc', '')
-                        import datetime as _dt, glob, re
-                        if raw_ts.endswith('Z'):
-                            ts = _dt.datetime.fromisoformat(raw_ts.replace('Z', '+00:00'))
-                            ts = ts.replace(tzinfo=_dt.timezone.utc).astimezone()
-                        else:
-                            ts = _dt.datetime.fromisoformat(raw_ts)
-                        date_part = ts.strftime("%Y-%m-%d")
-                        time_part = ts.strftime("%H-%M-%S")
-
-                        system_filename = (row.get('system', '') or '').replace(' ', '_')
-                        body_filename = (row.get('body', '') or '').replace(' ', '_')
-
-                        # Only use exact filename match to avoid picking up hits from other sessions
-                        # at the same system/body (wildcard patterns caused cross-session bleed-through)
-                        exact_pattern = f"Session_{date_part}_{time_part}_{system_filename}_{body_filename}.txt"
-                        matches = glob.glob(os.path.join(self.reports_dir, exact_pattern))
-
-                        for txt_path in matches:
-                            try:
-                                with open(txt_path, 'r', encoding='utf-8') as tf:
-                                    txt_content = tf.read()
-                                    tf_m = re.search(r'Total Material Hits:\s*(\d+)', txt_content)
-                                    if not tf_m:
-                                        tf_m = re.search(r'Total Material Finds:\s*(\d+)', txt_content)
-                                    if tf_m:
-                                        parsed = int(tf_m.group(1))
-                                        total_finds = parsed  # trust TXT (even if 0)
-                                    else:
-                                        total_finds = 0  # TXT found but no hits line — reset, don't keep stale CSV value
-                                    break
-                            except Exception:
-                                continue
-                        # Targeted debug for known timestamp to help trace matching
-                        try:
-                            if row.get('timestamp_utc','').startswith('2025-11-19T16:40:45'):
-                                print(f"[DEBUG-MATCH] CSV timestamp={row.get('timestamp_utc')} matches_found={matches} parsed_total_finds={total_finds}")
-                        except Exception:
-                            pass
-                    except Exception:
-                        pass
-
-                    try:
-                        asteroids_count = int(str(row.get('asteroids_prospected', '')).strip() or 0)
-                    except Exception:
-                        asteroids_count = 0
-
-                    # Prefer total_finds (total hits) for Tons/Hit calculation; fallback to asteroids_count
-                    try:
-                        total_tons_val = float(row.get('total_tons', 0.0) or 0.0)
-                    except Exception:
-                        try:
-                            total_tons_val = float(tons_str) if isinstance(tons_str, (int, float, str)) else 0.0
-                        except Exception:
-                            total_tons_val = 0.0
-
-                    tons_per_str = "—"
-                    if total_finds > 0:
-                        try:
-                            tons_per_str = f"{total_tons_val / total_finds:.1f}"
-                        except Exception:
-                            tons_per_str = "—"
-                    elif asteroids_count > 0:
-                        try:
-                            tons_per_str = f"{total_tons_val / asteroids_count:.1f}"
-                        except Exception:
-                            tons_per_str = "—"
-                    
-                    # Format Material Analysis fields (with fallback for old data)
-                    asteroids = row.get('asteroids_prospected', '').strip() or '0'
-                    materials = row.get('materials_tracked', '').strip() or '0'
-                    hit_rate = row.get('hit_rate_percent', '').strip() or '0'
-                    avg_quality = row.get('avg_quality_percent', '').strip() or '0'
-                    
-                    # Get new cargo tracking fields
-                    materials_breakdown_raw = row.get('materials_breakdown', '').strip() or '—'
-                    material_tph_breakdown = row.get('material_tph_breakdown', '').strip() or ''
-                    prospectors_used = row.get('prospectors_used', '').strip() or '—'
-                    
-                    # Enhanced materials display with yield percentages and TPH
-                    materials_breakdown = self._enhance_materials_with_yields_and_tph(materials_breakdown_raw, avg_quality, material_tph_breakdown)
-                    
-                    # Apply word wrap formatting if enabled
-                    if word_wrap_enabled.get() and materials_breakdown != '—':
-                        materials_breakdown = materials_breakdown.replace('; ', '\n')
-                    
-                    
-                    # Format asteroids and materials columns
-                    try:
-                        asteroids_val = int(asteroids) if asteroids and asteroids != '0' else 0
-                        asteroids_str = str(asteroids_val) if asteroids_val > 0 else "—"
-                    except:
-                        asteroids_str = "—"
-                    
-                    try:
-                        materials_val = int(materials) if materials and materials != '0' else 0
-                        materials_str = str(materials_val) if materials_val > 0 else "—"
-                    except:
-                        materials_str = "—"
-                    
-                    # Format hit rate
-                    try:
-                        hit_rate_val = float(hit_rate) if hit_rate and hit_rate != '0' else 0
-                        hit_rate_str = f"{hit_rate_val:.1f}" if hit_rate_val > 0 else "—"
-                    except:
-                        hit_rate_str = "—"
-                    
-                    # Format quality (yield %) - handle both old numerical and new formatted strings
-                    try:
-                        # Check if it's already a formatted string (contains letters)
-                        if any(c.isalpha() for c in avg_quality):
-                            quality_str = avg_quality  # Already formatted
-                        else:
-                            # Old numerical format
-                            quality_val = float(avg_quality) if avg_quality and avg_quality != '0' else 0
-                            quality_str = f"{quality_val:.1f}" if quality_val > 0 else "—"
-                    except:
-                        quality_str = "—"
-                    
-                    # Determine total hits/finds for the session (CSV may include 'total_finds')
-                    try:
-                        total_finds_val = int(str(row.get('total_finds', '')).strip() or 0)
-                    except Exception:
-                        total_finds_val = 0
-
-                    sessions_data.append({
-                        'date': date_str,
-                        'system': row['system'],
-                        'body': row['body'],
-                        'duration': row['elapsed'],
-                        'tons': tons_str,
-                        'tph': tph_str,
-                        'materials': materials_str,
-                        'tons_per': tons_per_str,
-                        'asteroids': asteroids_str,
-                        'hit_rate': hit_rate_str,
-                        'quality': quality_str,
-                        'cargo': materials_breakdown,
-                        'cargo_raw': materials_breakdown_raw,  # Store original for tooltip
-                        'prospects': prospectors_used,  # Use 'prospects' to match Reports Tab
-                        'prospectors': prospectors_used,  # Also provide 'prospectors' for popup compatibility
-                        'comment': row.get('comment', ''),  # Include comment data
-                        'total_finds': total_finds_val,
-                        'total_hits': total_finds_val,
-                        'timestamp_raw': row['timestamp_utc']  # For sorting
-                    })
-                    
-                    # Debug: Log if comment was loaded
-                    if row.get('comment', '').strip():
-                        log.debug(f"Loaded comment for session {date_str}: {row.get('comment', '')[:30]}...")
-                        
-        except Exception as e:
-            log.exception("Loading CSV failed: %s", e)
-            # Fallback to old file listing method
-            try:
-                for fn in os.listdir(self.reports_dir):
-                    if fn.lower().endswith(".txt") and fn.startswith("Session"):
-                        mtime = os.path.getmtime(os.path.join(self.reports_dir, fn))
-                        date_str = dt.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-                        sessions_data.append({
-                            'date': date_str,
-                            'system': 'Unknown',
-                            'body': 'Unknown',
-                            'duration': 'Unknown',
-                            'tons': '0.0',
-                            'tph': '0.0',
-                            'asteroids': '—',
-                            'materials': '—',
-                            'hit_rate': '—',
-                            'quality': '—',
-                            'cargo': '—',
-                            'prospectors': '—',
-                            'timestamp_raw': date_str
-                        })
-            except:
-                pass
-
-        # Sort by timestamp (newest first) by default
-        sessions_data.sort(key=lambda x: x['timestamp_raw'], reverse=True)
-        
-        # Store original sessions_data for lookup after sorting
-        original_sessions = sessions_data.copy()
-        
-        # Populate treeview and store session data for file lookup and tooltips
-        session_lookup = {}  # Map row IDs to full session data
-        for i, session in enumerate(sessions_data):
-            # Apply alternating row tags
-            tag = "evenrow" if i % 2 == 0 else "oddrow"
-            
-            # Check if this report has detailed reports (keep screenshots functionality but don't show column)
-            # Try both display date and raw timestamp for compatibility
-            report_id_display = f"{session['date']}_{session['system']}_{session['body']}"
-            report_id_raw = f"{session.get('timestamp_raw', session['date'])}_{session['system']}_{session['body']}"
-            
-            enhanced_indicator = (self._get_detailed_report_indicator(report_id_display) or 
-                                self._get_detailed_report_indicator(report_id_raw))
-            
-            # Build the inserted values from the tree's actual columns to avoid ordering issues
-            try:
-                cols = list(tree["columns"]) if tree is not None else []
-            except Exception:
-                cols = []
-
-            vals = []
-            for col in cols:
-                if col == 'date':
-                    vals.append(session.get('date', ''))
-                elif col == 'duration':
-                    vals.append(session.get('duration', ''))
-                elif col == 'system':
-                    vals.append(session.get('system', ''))
-                elif col == 'body':
-                    vals.append(session.get('body', ''))
-                elif col == 'tons':
-                    vals.append(session.get('tons', ''))
-                elif col == 'tph':
-                    vals.append(session.get('tph', ''))
-                elif col == 'materials':
-                    vals.append(session.get('materials', ''))
-                elif col == 'tons_per':
-                    vals.append(session.get('tons_per', session.get('tons_per', '—')))
-                elif col == 'asteroids':
-                    vals.append(session.get('asteroids', ''))
-                elif col == 'hit_rate':
-                    vals.append(session.get('hit_rate', ''))
-                elif col == 'quality':
-                    vals.append(session.get('quality', ''))
-                elif col == 'cargo':
-                    vals.append(session.get('cargo', ''))
-                elif col in ('prospectors', 'prospects'):
-                    vals.append(session.get('prospectors', session.get('prospects', '—')))
-                elif col == 'comment':
-                    vals.append(session.get('comment', ''))
-                elif col == 'enhanced':
-                    vals.append(enhanced_indicator)
-                else:
-                    vals.append(session.get(col, ''))
-
-            # Debug: log columns and vals to help diagnose misalignment
-            try:
-                log.debug(f"Popup tree columns: {cols}")
-                log.debug(f"Popup insert vals: {vals}")
-            except Exception:
-                pass
-
-            item_id = tree.insert("", "end", values=tuple(vals), tags=(tag,))
-
-            # Ensure critical columns are explicitly set after insert to avoid GUI shifts
-            try:
-                # Set comment explicitly (emoji) and enhanced indicator
-                tree.set(item_id, 'comment', '💬' if session.get('comment', '').strip() else '')
-                # Recompute enhanced indicator based on actual displayed date/system/body
-                date_val = tree.set(item_id, "date")
-                system_val = tree.set(item_id, "system")
-                body_val = tree.set(item_id, "body")
-                if date_val and system_val and body_val:
-                    tree_report_id = f"{date_val}_{system_val}_{body_val}"
-                    actual_enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
-                    tree.set(item_id, "enhanced", actual_enhanced_indicator)
-            except Exception:
-                pass
-
-            # Store the full session data for file lookup and tooltips
-            session_lookup[item_id] = session
-        
-        # Store session lookup for tooltip access
-        self.reports_window_session_lookup = session_lookup
-        
-        # Store original sessions for sorting lookup
-        self.reports_window_original_sessions = original_sessions
-
-        # Ensure comment and engineering materials cells are correctly placed (defensive pass)
-        try:
-            self._ensure_comment_and_eng_cells(tree, session_lookup)
-        except Exception:
-            pass
-        
-        # Direct sorting implementation
-        sort_dirs = {}
-        def sort_col(col):
-            try:
-                print(f"Sorting {col}")
-                reverse = sort_dirs.get(col, False)
-                items = [(tree.set(item, col), item) for item in tree.get_children('')]
-                
-                # Smart sorting based on column type
-                numeric_cols = {"tons", "tph", "tons_per", "hit_rate", "quality", "materials", "asteroids", "prospectors"}
-                if col in numeric_cols:
-                    # Numeric sorting - handle "—" and empty values
-                    def safe_float(x):
-                        try:
-                            val = str(x).replace("—", "0").strip()
-                            return float(val) if val else 0.0
-                        except:
-                            return 0.0
-                    items.sort(key=lambda x: safe_float(x[0]), reverse=reverse)
-                else:
-                    # String sorting for text columns
-                    items.sort(key=lambda x: str(x[0]).lower(), reverse=reverse)
-                    
-                for index, (val, item) in enumerate(items):
-                    tree.move(item, '', index)
-                sort_dirs[col] = not reverse
-            except Exception as e:
-                print(f"Sorting error for column {col}: {e}")
-                # Fallback to simple string sort
-                try:
-                    items = [(tree.set(item, col), item) for item in tree.get_children('')]
-                    items.sort(key=lambda x: str(x[0]).lower(), reverse=sort_dirs.get(col, False))
-                    for index, (val, item) in enumerate(items):
-                        tree.move(item, '', index)
-                    sort_dirs[col] = not sort_dirs.get(col, False)
-                except Exception as e2:
-                    print(f"Fallback sorting failed: {e2}")
-            
-            # CRITICAL: Rebuild session_lookup after sorting to match new order
-            new_session_lookup = {}
-            for item_id in tree.get_children(''):
-                values = tree.item(item_id, 'values')
-                # Find the original session data that matches these values from original_sessions
-                found = False
-                for orig_session in self.reports_window_original_sessions:
-                    if (orig_session['date'] == values[0] and 
-                        orig_session['system'] == values[1] and 
-                        orig_session['body'] == values[2] and
-                        orig_session['duration'] == values[3]):
-                        new_session_lookup[item_id] = orig_session
-                        print(f"    Found match: {orig_session['timestamp_raw']}")
-                        found = True
-                        break
-            session_lookup.clear()
-            session_lookup.update(new_session_lookup)
-        
-        from ui.sort_indicator import apply_sort_arrow
-        _sort_col_rows = sort_col
-        def sort_col(col):
-            _sort_col_rows(col)
-            apply_sort_arrow(tree, col, not sort_dirs.get(col, False))
-
-        # Set commands for all popup window columns
-        tree.heading("date", command=lambda: sort_col("date"))
-        tree.heading("system", command=lambda: sort_col("system"))
-        tree.heading("body", command=lambda: sort_col("body"))
-        tree.heading("duration", command=lambda: sort_col("duration"))
-        tree.heading("tons", command=lambda: sort_col("tons"))
-        tree.heading("tph", command=lambda: sort_col("tph"))
-        tree.heading("tons_per", command=lambda: sort_col("tons_per"))
-        tree.heading("materials", command=lambda: sort_col("materials"))
-        tree.heading("asteroids", command=lambda: sort_col("asteroids"))
-        tree.heading("hit_rate", command=lambda: sort_col("hit_rate"))
-        tree.heading("quality", command=lambda: sort_col("quality"))
-        tree.heading("cargo", command=lambda: sort_col("cargo"))
-        tree.heading("prospectors", command=lambda: sort_col("prospectors"))
-        tree.heading("comment", command=lambda: sort_col("comment"))
-        
-        # Store tree reference after everything is set up
-        self.reports_tree = tree
-
-        from ui.cell_tooltip import attach_cell_tooltip
-        attach_cell_tooltip(tree, "comment", lambda item: self.reports_window_session_lookup.get(item, {}).get('comment', ''))
-        
-        # Apply initial word wrap state
-        if word_wrap_enabled.get():
-            max_lines = 1
-            for item in tree.get_children():
-                item_data = session_lookup.get(item)
-                if item_data:
-                    lines = item_data['cargo_raw'].count(';') + 1
-                    max_lines = max(max_lines, min(lines, 3))
-            new_height = max_lines * scaled_px(20) + scaled_px(10)
-            style = ttk.Style()
-            style.configure("ReportsWindow.Treeview", rowheight=new_height)
-            tree.configure(style="ReportsWindow.Treeview")
-
-
-
-        def open_selected():
-            selection = tree.selection()
-            if not selection:
-                return
-            
-            # Get the session data directly from tree values - ignore session_lookup
-            item_id = selection[0]
-            values = tree.item(item_id, 'values')
-            if not values or len(values) < 14:
-                self._set_status("Could not find session data...")
-                self._open_path(self.reports_dir)
-                return
-            
-            # Create session dict from tree values and find timestamp from CSV
-            session = {
-                'date': values[0],
-                'system': values[2], 
-                'body': values[3],
-                'duration': values[1]
-            }
-            
-            # Find timestamp by reading CSV directly
-            try:
-                import csv
-                csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
-                with open(csv_path, 'r', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        # Match by system, body, and duration
-                        if (row['system'] == values[2] and 
-                            row['body'] == values[3] and
-                            row['elapsed'] == values[1]):
-                            session['timestamp_raw'] = row['timestamp_utc']
-                            break
-            except Exception as e:
-                print(f"CSV read error: {e}")
-                # Fallback - use display date
-                session['timestamp_raw'] = values[0]
-            
-            # Try to find the corresponding text file using multiple strategies
-            try:
-                report_files = []
-                for fn in os.listdir(self.reports_dir):
-                    if fn.lower().endswith(".txt") and fn.startswith("Session"):
-                        report_files.append(fn)
-                
-                # Strategy 1: Parse CSV timestamp to match filename format
-                try:
-                    # Convert "2025-08-22T17:44:49Z" to "2025-08-22_17-44-49"
-                    timestamp = session['timestamp_raw'].replace('Z', '').replace('T', '_').replace(':', '-')
-                    for fn in report_files:
-                        if timestamp in fn:
-                            fpath = os.path.join(self.reports_dir, fn)
-                            self._open_path(fpath)
-                            return
-                except Exception:
-                    pass
-                
-                # Strategy 2: Find by system and body match
-                system = session['system'].replace(' ', '_')
-                body = session['body'].replace(' ', '_')
-                matching_files = []
-                for fn in report_files:
-                    if system in fn and body in fn:
-                        matching_files.append((os.path.getmtime(os.path.join(self.reports_dir, fn)), fn))
-                
-                if matching_files:
-                    # Sort by modification time and pick the closest one
-                    matching_files.sort()
-                    # For now, just pick the first match - could be improved with better timestamp matching
-                    fpath = os.path.join(self.reports_dir, matching_files[0][1])
-                    self._open_path(fpath)
-                    return
-                
-                # Strategy 3: Find by approximate time match
-                try:
-                    # Parse session timestamp
-                    session_time = dt.datetime.fromisoformat(session['timestamp_raw'].replace('Z', '+00:00'))
-                    best_match = None
-                    min_diff = float('inf')
-                    
-                    for fn in report_files:
-                        file_path = os.path.join(self.reports_dir, fn)
-                        file_time = dt.datetime.fromtimestamp(os.path.getmtime(file_path))
-                        time_diff = abs((session_time.replace(tzinfo=None) - file_time).total_seconds())
-                        
-                        if time_diff < min_diff:
-                            min_diff = time_diff
-                            best_match = fn
-                    
-                    if best_match and min_diff < 3600:  # Within 1 hour
-                        fpath = os.path.join(self.reports_dir, best_match)
-                        self._open_path(fpath)
-                        return
-                        
-                except Exception:
-                    pass
-                
-            except Exception as e:
-                self._set_status(f"Error searching for report: {e}")
-            
-            # Fallback: open the reports folder
-            self._set_status("Could not find specific report file, opening reports folder...")
-            self._open_path(self.reports_dir)
-
-        def handle_popup_double_click(event):
-            """Handle double-click on popup reports tree"""
-            # Identify which column was clicked
-            item = tree.identify('item', event.x, event.y)
-            column = tree.identify('column', event.x, event.y)
-            
-            if not item:
-                return
-            
-            # Determine dynamic column indices for comment/enhanced
-            try:
-                cols = list(tree["columns"])
-                comment_idx = cols.index('comment') if 'comment' in cols else None
-                enhanced_idx = cols.index('enhanced') if 'enhanced' in cols else None
-            except Exception:
-                comment_idx = None
-                enhanced_idx = None
-
-            # Check if clicked column matches comment or enhanced
-            if comment_idx is not None and column == f"#{comment_idx+1}":
-                self._edit_comment_popup(event)
-                return
-            if enhanced_idx is not None and column == f"#{enhanced_idx+1}":
-                # Handle detailed report opening
-                column_name = cols[enhanced_idx]
-                cell_value = tree.set(item, column_name)
-                if cell_value == "✓":  # Has detailed report
-                    session_data = self.reports_window_session_lookup.get(item)
-                    if session_data:
-                        original_timestamp = session_data.get('timestamp_raw', session_data.get('date', ''))
-                        system = session_data.get('system', '')
-                        body = session_data.get('body', '')
-                        report_id = f"{original_timestamp}_{system}_{body}"
-                        self._open_enhanced_report(report_id)
-                return
-            else:
-                # Open the report file for other columns
-                open_selected()
-
-        tree.bind("<Double-1>", handle_popup_double_click)
-        
-        # Add right-click context menu
-        def copy_system_to_clipboard_reports(tree_ref):
-            """Copy selected system name to clipboard from reports tree"""
-            selection = tree_ref.selection()
-            if not selection:
-                return
-            
-            # Get selected item data
-            item = selection[0]
-            values = tree_ref.item(item, 'values')
-            if not values or len(values) < 3:
-                return
-            
-            # System name is in column index 2 (third column: date, duration, system...)
-            system_name = values[2]
-            if system_name:
-                # Copy to clipboard
-                tree_ref.clipboard_clear()
-                tree_ref.clipboard_append(system_name)
-                tree_ref.update()  # Required to ensure clipboard is updated
-                
-                # Show brief status message
-                self._set_status(f"Copied '{system_name}' to clipboard")
-            else:
-                self._set_status("No system name to copy")
-
-        def show_context_menu(event):
-            # Check if we right-clicked on an item
-            item = tree.identify_row(event.y)
-            if item:
-                # Get current selection
-                selected_items = tree.selection()
-                
-                # If right-clicked item isn't in selection, add it to selection
-                # (don't replace the entire selection)
-                if item not in selected_items:
-                    tree.selection_add(item)
-                
-                # Get all currently selected items after potential addition
-                selected_items = tree.selection()
-                if selected_items:
-                    context_menu = tk.Menu(tree, tearoff=0, bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
-                                         activebackground=MENU_COLORS["activebackground"],
-                                         activeforeground=MENU_COLORS["activeforeground"],
-                                         selectcolor=MENU_COLORS["selectcolor"],
-                                         font=scaled_font(9))
-                    context_menu.add_command(label=t('context_menu.open_report_txt'), command=open_selected)
-                    context_menu.add_command(label=t('context_menu.open_report_html'), command=lambda: self._open_enhanced_report_from_menu(tree))
-                    context_menu.add_separator()
-                    context_menu.add_command(label=t('context_menu.generate_report_html'), command=lambda: self._generate_enhanced_report_from_menu(tree))
-                    context_menu.add_separator()
-                    context_menu.add_command(label=t('context_menu.share_discord'), command=lambda: self._share_selected_to_discord_popup(tree))
-                    context_menu.add_command(label=t('context_menu.create_mining_card'), command=lambda: self._create_mining_card_from_report_popup(tree))
-                    context_menu.add_separator()
-                    context_menu.add_command(label=t('context_menu.copy_system'), command=lambda: copy_system_to_clipboard_reports(tree))
-                    context_menu.add_separator()
-                    context_menu.add_separator()
-                    
-                    # Word wrap toggle
-                    wrap_text = t('context_menu.word_wrap_off') if word_wrap_enabled.get() else t('context_menu.word_wrap_on')
-                    def toggle_word_wrap():
-                        word_wrap_enabled.set(not word_wrap_enabled.get())
-                        # Don't change global row height - handle per-row instead
-                        # Update existing data in place and manage row tags
-                        for i, item in enumerate(tree.get_children()):
-                            values = list(tree.item(item, 'values'))
-                            item_data = session_lookup.get(item)
-                            if item_data:
-                                    if word_wrap_enabled.get():
-                                        values[11] = item_data['cargo_raw'].replace('; ', '\n')  # cargo column (shifted)
-                                        # Use special tag for wrapped rows - but tkinter doesn't support per-row height
-                                        # Keep alternating colors but indicate wrapped content
-                                    else:
-                                        values[11] = item_data['cargo_raw']
-                                    tree.item(item, values=values)
-                        
-                        # Tkinter limitation: Must use global row height, calculate needed height
-                        max_lines = 1
-                        if word_wrap_enabled.get():
-                            for item in tree.get_children():
-                                item_data = session_lookup.get(item)
-                                if item_data:
-                                    lines = item_data['cargo_raw'].count(';') + 1
-                                    max_lines = max(max_lines, min(lines, 3))  # Cap at 3 lines
-                        
-                        # Set row height for word wrap
-                        if word_wrap_enabled.get():
-                            new_height = max_lines * scaled_px(20) + scaled_px(10)  # 20px per line + padding
-                        else:
-                            new_height = scaled_px(20)  # Default single line height
-                        style = ttk.Style()
-                        style.configure("ReportsWindow.Treeview", rowheight=new_height)
-                        tree.configure(style="ReportsWindow.Treeview")
-                        
-                        # Force complete tree refresh
-                        tree.yview_scroll(1, 'units')
-                        tree.yview_scroll(-1, 'units')
-                        tree.update_idletasks()
-                    
-                    context_menu.add_command(label=wrap_text, command=toggle_word_wrap)
-                    context_menu.add_separator()
-                    
-                    # Add Refinery Contents option (only for single selection)
-                    if len(selected_items) == 1:
-                        context_menu.add_command(label=t('context_menu.add_refinery'), 
-                                               command=lambda: self._add_refinery_to_session_from_menu(tree, selected_items[0]))
-                        context_menu.add_separator()
-                    
-                    # Update label based on selection count
-                    if len(selected_items) == 1:
-                        context_menu.add_command(label=t('context_menu.delete_report_screenshots'), 
-                                               command=lambda: self._delete_enhanced_report_from_menu(tree))
-                        context_menu.add_separator()  # Add separator for safety
-                        context_menu.add_command(label=t('context_menu.delete_complete_session'), 
-                                               command=lambda items=selected_items: delete_selected(items))
-                    else:
-                        context_menu.add_command(label=t('context_menu.delete_csv_entries').format(count=len(selected_items)), 
-                                               command=lambda items=selected_items: delete_selected(items))
-                    
-                    try:
-                        context_menu.tk_popup(event.x_root, event.y_root)
-                    finally:
-                        context_menu.grab_release()
-        
-        def delete_selected(selected_items):
-            # Get session data directly from tree values - ignore session_lookup completely
-            sessions_to_delete = []
-            for item_id in selected_items:
-                values = tree.item(item_id, 'values')
-                if values and len(values) >= 12:
-                    # Create a session dict directly from tree values and find timestamp from CSV
-                    session_data = {
-                        'date': values[0],
-                        'duration': values[1], 
-                        'system': values[2],
-                        'body': values[3],
-                        'tons': values[4],
-                        'tph': values[5],
-                        'materials': values[6],
-                        'tons_per': values[7],
-                        'asteroids': values[8],
-                        'hit_rate': values[9],
-                        'quality': values[10],
-                        'cargo': values[11],
-                        'prospectors': values[12]
-                    }
-                    
-                    # Find timestamp by reading CSV directly
-                    try:
-                        import csv
-                        csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
-                        with open(csv_path, 'r', encoding='utf-8') as f:
-                            reader = csv.DictReader(f)
-                            for row in reader:
-                                # Match by formatted date, system, body
-                                if (row['system'] == values[2] and 
-                                            row['body'] == values[3] and
-                                            row['elapsed'] == values[1]):
-                                    session_data['timestamp_raw'] = row['timestamp_utc']
-                                    break
-                    except:
-                        # Fallback - use display date
-                        session_data['timestamp_raw'] = values[0]
-                    
-                    sessions_to_delete.append((item_id, session_data))
-            
-            if not sessions_to_delete:
-                return
-            
-            # Create confirmation message
-            if len(sessions_to_delete) == 1:
-                item_id, session = sessions_to_delete[0]
-                confirm_msg = (t('context_menu.delete_session_confirm') + "\n\n"
-                              f"{t('context_menu.session_details')}\n"
-                              f"• {t('context_menu.date_label')} {session['date']}\n"
-                              f"• {t('context_menu.system_label')} {session['system']}\n"
-                              f"• {t('context_menu.body_label')} {session['body']}\n"
-                              f"• {t('context_menu.duration_label')} {session['duration']}\n"
-                              f"• {t('context_menu.tons_mined_label')} {session['tons']}\n\n"
-                              f"{t('context_menu.will_delete')}\n"
-                              f"• {t('context_menu.all_csv_entries')}\n"
-                              f"• {t('context_menu.all_report_files')}\n"
-                              f"• {t('context_menu.all_associated_files')}\n\n"
-                              f"{t('context_menu.cannot_undone')}")
-                title = t('context_menu.delete_session_title')
-            else:
-                confirm_msg = t('context_menu.delete_sessions_confirm', count=len(sessions_to_delete)) + "\n\n"
-                confirm_msg += t('context_menu.sessions_to_delete') + "\n"
-                for i, (_, session) in enumerate(sessions_to_delete[:5], 1):  # Show max 5 items
-                    confirm_msg += f"  {i}. {session['date']} - {session['system']}/{session['body']}\n"
-                if len(sessions_to_delete) > 5:
-                    confirm_msg += t('context_menu.and_more', count=len(sessions_to_delete) - 5) + "\n"
-                confirm_msg += f"\n{t('context_menu.will_delete')}\n"
-                confirm_msg += f"• {t('context_menu.all_csv_entries')}\n"
-                confirm_msg += f"• {t('context_menu.all_report_files')}\n"
-                confirm_msg += f"• {t('context_menu.all_associated_files')}\n\n"
-                confirm_msg += t('context_menu.cannot_undone')
-                title = t('context_menu.delete_sessions_title')
-            
-            # Confirm deletion
-            from main import centered_yesno_dialog
-            result = centered_yesno_dialog(
-                win.winfo_toplevel(),
-                title,
-                confirm_msg
-            )
-            
-            # Bring reports window back to front after messagebox
-            try:
-                win.lift()
-                win.focus_force()
-            except:
-                pass
-            
-            if result:
-                success_count = 0
-                file_delete_count = 0
-                errors = []
-                
-                # Get list of report files once
-                report_files = []
-                for fn in os.listdir(self.reports_dir):
-                    if fn.lower().endswith(".txt") and fn.startswith("Session"):
-                        report_files.append(fn)
-                
-                for item_id, session in sessions_to_delete:
-                    try:
-                        # Find and delete the corresponding text file
-                        file_deleted = False
-                        
-                        # Strategy 1: Parse CSV timestamp to match filename format
-                        try:
-                            timestamp = session['timestamp_raw'].replace('Z', '').replace('T', '_').replace(':', '-')
-                            for fn in report_files:
-                                if timestamp in fn:
-                                    fpath = os.path.join(self.reports_dir, fn)
-                                    os.remove(fpath)
-                                    file_deleted = True
-                                    break
-                        except Exception:
-                            pass
-                        
-                        if not file_deleted:
-                            # Strategy 2: Find by system and body match
-                            system = session['system'].replace(' ', '_')
-                            body = session['body'].replace(' ', '_')
-                            matching_files = []
-                            for fn in report_files:
-                                if system in fn and body in fn:
-                                    matching_files.append((os.path.getmtime(os.path.join(self.reports_dir, fn)), fn))
-                            
-                            if matching_files:
-                                matching_files.sort()
-                                fpath = os.path.join(self.reports_dir, matching_files[0][1])
-                                os.remove(fpath)
-                                file_deleted = True
-                        
-                        if file_deleted:
-                            file_delete_count += 1
-                        
-                        # Delete corresponding graph files
-                        try:
-                            # Get graphs directory using centralized path utility
-                            graphs_dir = os.path.join(get_reports_dir(), "Graphs")
-                            
-                            if os.path.exists(graphs_dir):
-                                # Create session ID to match graph files - use EXACT same logic as auto_save_graphs
-                                try:
-                                    timestamp = session['timestamp_raw'].replace('Z', '').replace('T', '_').replace(':', '-')
-                                    session_prefix = f"Session_{timestamp}"
-                                    
-                                    if session['system']:
-                                        # Clean system name for filename (same as auto_save_graphs)
-                                        clean_system = "".join(c for c in session['system'] if c.isalnum() or c in (' ', '-', '_')).strip()
-                                        clean_system = clean_system.replace(' ', '_')
-                                        session_prefix += f"_{clean_system}"
-                                    
-                                    if session['body']:
-                                        # Clean body name for filename (same as auto_save_graphs)
-                                        clean_body = "".join(c for c in session['body'] if c.isalnum() or c in (' ', '-', '_')).strip()
-                                        clean_body = clean_body.replace(' ', '_')
-                                        session_prefix += f"_{clean_body}"
-                                    
-                                    # Delete graph files
-                                    deleted_graphs = []
-                                    for graph_file in os.listdir(graphs_dir):
-                                        if graph_file.startswith(session_prefix) and graph_file.endswith('.png'):
-                                            graph_path = os.path.join(graphs_dir, graph_file)
-                                            os.remove(graph_path)
-                                            deleted_graphs.append(graph_file)
-                                    
-                                    # Update graph mappings JSON
-                                    mappings_file = os.path.join(graphs_dir, "graph_mappings.json")
-                                    if os.path.exists(mappings_file):
-                                        try:
-                                            with open(mappings_file, 'r', encoding='utf-8') as f:
-                                                mappings = json.load(f)
-                                            if session_prefix in mappings:
-                                                del mappings[session_prefix]
-                                                with open(mappings_file, 'w', encoding='utf-8') as f:
-                                                    json.dump(mappings, f, indent=2)
-                                                print(f"DEBUG: Removed {session_prefix} from mappings")
-                                        except Exception as e:
-                                            print(f"DEBUG: Error updating mappings: {e}")
-                                except Exception as e:
-                                    print(f"DEBUG: Error processing session data: {e}")
-                            else:
-                                print(f"DEBUG: Graphs directory does not exist: {graphs_dir}")
-                        except Exception as e:
-                            print(f"DEBUG: Error in graph deletion: {e}")
-                        
-                        # Delete corresponding mining card (v4.4.3+)
-                        try:
-                            cards_dir = os.path.join(get_reports_dir(), "Cards")
-                            
-                            if os.path.exists(cards_dir):
-                                try:
-                                    # Build expected card filename from session timestamp
-                                    from datetime import datetime
-                                    timestamp_raw = session['timestamp_raw']
-                                    dt = datetime.fromisoformat(timestamp_raw.replace('Z', ''))
-                                    timestamp_str = dt.strftime("%Y-%m-%d_%H-%M-%S")
-                                    
-                                    clean_system = session['system'].replace(' ', '_')
-                                    clean_body = session['body'].replace(' ', '_')
-                                    
-                                    expected_card = f"Session_{timestamp_str}_{clean_system}_{clean_body}_Card.png"
-                                    card_path = os.path.join(cards_dir, expected_card)
-                                    
-                                    if os.path.exists(card_path):
-                                        os.remove(card_path)
-                                except Exception as e:
-                                    print(f"[DELETE] Error deleting mining card: {e}")
-                                    import traceback
-                                    traceback.print_exc()
-                        except Exception as e:
-                            print(f"[DELETE] Error in card deletion: {e}")
-                        
-                        success_count += 1
-                        
-                    except Exception as e:
-                        errors.append(f"  • {session['system']}/{session['body']} ({session['date']}): {str(e)}")
-                
-                # Update CSV file - remove all deleted sessions at once
-                if success_count > 0:
-                    try:
-                        import csv
-                        
-                        # Get timestamps of sessions to delete
-                        timestamps_to_delete = {session['timestamp_raw'] for _, session in sessions_to_delete}
-                        
-                        # Read all sessions except the ones to delete
-                        remaining_sessions = []
-                        with open(csv_path, 'r', encoding='utf-8') as f:
-                            reader = csv.DictReader(f)
-                            for row in reader:
-                                if row['timestamp_utc'] not in timestamps_to_delete:
-                                    remaining_sessions.append(row)
-                        
-                        # Write back the remaining sessions
-                        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                            if remaining_sessions:
-                                # Build a complete fieldname list that includes any keys present in any remaining row
-                                fieldnames = list(remaining_sessions[0].keys())
-                                for r in remaining_sessions:
-                                    for k in r.keys():
-                                        if k not in fieldnames:
-                                            fieldnames.append(k)
-                                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                                writer.writeheader()
-                                writer.writerows(remaining_sessions)
-                        
-                        # Remove from tree
-                        for item_id, _ in sessions_to_delete:
-                            tree.delete(item_id)
-                        
-                        # Show success message
-                        if len(sessions_to_delete) == 1:
-                            status_msg = "Session report deleted successfully"
-                            if file_delete_count > 0:
-                                status_msg += " (including report file)"
-                            else:
-                                status_msg += " (CSV entry removed, report file not found)"
-                        else:
-                            status_msg = f"{success_count} session reports deleted successfully"
-                            if file_delete_count > 0:
-                                status_msg += f" (including {file_delete_count} report files)"
-                        
-                        self._set_status(status_msg)
-                        
-                        # Show errors if any
-                        if errors:
-                            error_msg = f"Some errors occurred while deleting:\n\n" + "\n".join(errors)
-                            from main import center_window
-                            import tkinter as tk
-                            main_parent = self.winfo_toplevel()
-                            dialog = tk.Toplevel(main_parent)
-                            dialog.withdraw()  # Prevent flicker
-                            dialog.title("Partial Success")
-                            dialog.resizable(False, False)
-                            label = tk.Label(dialog, text=error_msg, padx=20, pady=20, fg="orange")
-                            label.pack()
-                            center_window(dialog, main_parent)
-                            dialog.deiconify()  # Show centered immediately
-                            tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-                            # dialog.transient(main_parent)  # Disabled - causes focus issues
-                            
-                            # Force dialog to stay on top and have focus
-                            dialog.attributes('-topmost', True)
-                            dialog.lift()
-                            dialog.focus_force()
-                            
-                            try:
-                                dialog.grab_set()
-                            except:
-                                pass
-                            
-                            # Keep dialog on top while open
-                            def keep_on_top():
-                                try:
-                                    if dialog.winfo_exists():
-                                        dialog.lift()
-                                        dialog.after(100, keep_on_top)
-                                except:
-                                    pass
-                            dialog.after(100, keep_on_top)
-                            
-                            dialog.wait_window()
-                        
-                    except Exception as e:
-                        self._set_status(f"Error updating CSV file: {e}")
-                        from main import center_window
-                        import tkinter as tk
-                        main_parent = self.winfo_toplevel()
-                        dialog = tk.Toplevel(main_parent)
-                        dialog.withdraw()  # Prevent flicker
-                        dialog.title("Delete Error")
-                        dialog.resizable(False, False)
-                        label = tk.Label(dialog, text=f"Failed to update CSV file:\n{e}", padx=20, pady=20, fg="red")
-                        label.pack()
-                        center_window(dialog, main_parent)
-                        dialog.deiconify()  # Show centered immediately
-                        tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-                        # dialog.transient(main_parent)  # Disabled - causes focus issues
-                        
-                        # Force dialog to stay on top and have focus
-                        dialog.attributes('-topmost', True)
-                        dialog.lift()
-                        dialog.focus_force()
-                        
-                        try:
-                            dialog.grab_set()
-                        except:
-                            pass
-                        
-                        # Keep dialog on top while open
-                        def keep_on_top():
-                            try:
-                                if dialog.winfo_exists():
-                                    dialog.lift()
-                                    dialog.after(100, keep_on_top)
-                            except:
-                                pass
-                        dialog.after(100, keep_on_top)
-                        
-                        dialog.wait_window()
-                
-                # Bring reports window back to front after completion
-                try:
-                    win.lift()
-                    win.focus_force()
-                except:
-                    pass
-        
-        tree.bind("<Button-3>", show_context_menu)  # Right-click
-
-        btns = ttk.Frame(win, padding=(6, 8))
-        btns.grid(row=1, column=0, sticky="ew", pady=(8, 8))
-        btns.columnconfigure(0, weight=1)  # Left spacer
-        btns.columnconfigure(5, weight=1)  # Right spacer to push close button to the right
-        
-        # Center the action buttons
-        rebuild_btn = tk.Button(btns, text="Rebuild CSV", command=lambda: self._rebuild_csv_from_files(csv_path, win), bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
-        rebuild_btn.grid(row=0, column=1, padx=(4, 0))
-        self.ToolTip(rebuild_btn, t('tooltips.rebuild_csv'))
-        
-        folder_btn = tk.Button(btns, text="Open Folder", command=lambda: self._open_path(self.reports_dir), bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
-        folder_btn.grid(row=0, column=2, padx=(4, 0))
-        self.ToolTip(folder_btn, t('tooltips.open_folder'))
-        
-        export_btn = tk.Button(btns, text="Export CSV", command=lambda: self._export_csv(csv_path), bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
-        export_btn.grid(row=0, column=3, padx=(4, 0))
-        self.ToolTip(export_btn, t('tooltips.export_csv'))
-        
-        batch_btn = tk.Button(btns, text="Batch Reports", command=lambda: self._open_batch_reports_dialog(win), bg="#2a4a5a", fg="#ffffff", activebackground="#3a5a6a", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666")
-        batch_btn.grid(row=0, column=4, padx=(4, 0))
-        self.ToolTip(batch_btn, t('tooltips.batch_reports'))
-
-        # Close button on the far right with more space
-        close_btn = tk.Button(btns, text="Close", command=win.destroy, bg="#444444", fg="#ffffff", activebackground="#555555", activeforeground="#ffffff", relief="solid", bd=1, highlightbackground="#666666", highlightcolor="#666666", width=8)
-        close_btn.grid(row=0, column=6, sticky="e", padx=(20, 0))
-        self.ToolTip(close_btn, t('tooltips.close_reports'))
 
     def _is_summary_entry(self, material_name: str) -> bool:
         """Check if material name is a summary entry that should be filtered out"""
@@ -4278,353 +2467,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return 'Low Temperature Diamonds'
         return material_name
 
-    def _rebuild_csv_from_files(self, csv_path: str, parent_window) -> None:
-        """Rebuild the CSV index from existing text files - PARSES TPH FROM TEXT"""
-        print("[REBUILD] === STARTING CSV REBUILD (popup version) ===")
-        try:
-            import csv
-            import re
-            from tkinter import messagebox
-            
-            # First, try to read existing Material Analysis data from current CSV
-            existing_analysis_data = {}
-            if os.path.exists(csv_path):
-                try:
-                    with open(csv_path, 'r', encoding='utf-8') as f:
-                        reader = csv.DictReader(f)
-                        for row in reader:
-                            # Use timestamp as key to preserve Material Analysis data
-                            timestamp = row.get('timestamp_utc', '')
-                            if timestamp:
-                                print(f"[REBUILD CSV READ] Timestamp from CSV: '{timestamp}'")
-                                existing_analysis_data[timestamp] = {
-                                    'asteroids_prospected': row.get('asteroids_prospected', ''),
-                                    'materials_tracked': row.get('materials_tracked', ''),
-                                    'hit_rate_percent': row.get('hit_rate_percent', ''),
-                                    'avg_quality_percent': row.get('avg_quality_percent', ''),
-                                    'best_material': row.get('best_material', ''),
-                                    'materials_breakdown': row.get('materials_breakdown', ''),
-                                    'material_tph_breakdown': row.get('material_tph_breakdown', ''),  # Preserve TPH
-                                    'prospectors_used': row.get('prospectors_used', ''),
-                                    'engineering_materials': row.get('engineering_materials', ''),  # Preserve engineering materials
-                                    'comment': row.get('comment', '')
-                                }
-                except Exception as e:
-                    print(f"Warning: Could not read existing analysis data: {e}")
-            
-            # Parse all text files
-            sessions = []
-            
-            for fn in os.listdir(self.reports_dir):
-                if not (fn.lower().endswith(".txt") and fn.startswith("Session")):
-                    continue
-                    
-                try:
-                    file_path = os.path.join(self.reports_dir, fn)
-                    
-                    # Extract timestamp from filename: Session_YYYY-MM-DD_HH-MM-SS_...
-                    timestamp_match = re.search(r'Session_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})', fn)
-                    if not timestamp_match:
-                        continue
-                        
-                    date_part = timestamp_match.group(1)
-                    time_part_raw = timestamp_match.group(2)
-                    time_part = time_part_raw.replace('-', ':')  # Convert HH-MM-SS to HH:MM:SS
-                    timestamp_local = f"{date_part}T{time_part}"
-                    
-                    # Read file content
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read().strip()
-                    
-                    # Parse header line: "Session: System — Body — Duration — Total XYt"
-                    first_line = content.split('\n')[0]
-                    if not first_line.startswith("Session:"):
-                        continue
-                    
-                    parts = first_line.split("—")
-                    if len(parts) < 4:
-                        continue
-                    
-                    system = parts[0].replace("Session:", "").strip()
-                    body = parts[1].strip()
-                    duration = parts[2].strip()
-                    total_part = parts[3].strip()
-                    
-                    # Extract total tons from "Total XXt"
-                    total_match = re.search(r'Total (\d+(?:\.\d+)?)t', total_part)
-                    total_tons = float(total_match.group(1)) if total_match else 0.0
-                    
-                    # Calculate TPH from duration and total
-                    duration_seconds = 0
-                    try:
-                        # Parse duration HH:MM:SS
-                        time_parts = duration.split(':')
-                        if len(time_parts) == 3:
-                            duration_seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(time_parts[2])
-                    except:
-                        duration_seconds = 0
-                    
-                    # For manual entries with zero duration, set TPH to 0 instead of calculating
-                    if duration_seconds == 0:
-                        overall_tph = 0.0
-                    else:
-                        duration_hours = duration_seconds / 3600.0
-                        overall_tph = total_tons / duration_hours
-                    
-                    # Parse additional data from session content
-                    asteroids_prospected = ''
-                    materials_tracked = ''
-                    hit_rate_percent = ''
-                    avg_quality_percent = ''
-                    best_material = ''
-                    materials_breakdown = ''
-                    prospectors_used = ''
-                    
-                    # Extract asteroids prospected
-                    asteroids_match = re.search(r'Asteroids Prospected:\s*(\d+)', content)
-                    if asteroids_match:
-                        asteroids_prospected = asteroids_match.group(1)
-                    
-                    # Extract Minerals tracked  
-                    materials_match = re.search(r'Minerals Tracked:\s*(\d+)', content)
-                    if materials_match:
-                        materials_tracked = materials_match.group(1)
-                    
-                    # Extract hit rate
-                    hit_rate_match = re.search(r'Hit Rate:\s*([\d.]+)%', content)
-                    if hit_rate_match:
-                        hit_rate_percent = hit_rate_match.group(1)
-                    
-                    # Extract overall quality
-                    quality_match = re.search(r'Overall Quality:\s*([\d.]+)%', content)
-                    if quality_match:
-                        avg_quality_percent = quality_match.group(1)
-                    
-                    # Extract best performer
-                    best_match = re.search(r'Best Performer:\s*([^\(]+)', content)
-                    if best_match:
-                        best_material = best_match.group(1).strip()
-                    
-                    # Extract prospector limpets used
-                    prospector_match = re.search(r'Prospector Limpets Used:\s*(\d+)', content)
-                    if prospector_match:
-                        prospectors_used = prospector_match.group(1)
-                    
-                    # Extract materials breakdown AND TPH - merge from multiple sources for complete data
-                    materials_dict = {}
-                    material_tph_breakdown = ""  # Will be parsed from CARGO section
-                    
-                    if not materials_breakdown:
-                        # First, get data from CARGO MATERIAL BREAKDOWN (WITH TPH if available)
-                        cargo_section = re.search(r'=== CARGO MATERIAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
-                        if cargo_section:
-                            cargo_text = cargo_section.group(1)
-                            # Try to parse WITH TPH: "Platinum: 1.0t (80.3 t/hr)"
-                            material_lines_with_tph = re.findall(r'^([A-Za-z.\s]+):\s*([\d.]+)t\s*\(([\d.]+)\s*t/hr\)', cargo_text, re.MULTILINE)
-                            if material_lines_with_tph:
-                                # Successfully parsed TPH from text file
-                                tph_pairs = []
-                                for mat, tons, tph in material_lines_with_tph:
-                                    mat_clean = self._normalize_material_key(mat.strip())
-                                    if not self._is_summary_entry(mat_clean):
-                                        is_new = mat_clean not in materials_dict
-                                        materials_dict[mat_clean] = materials_dict.get(mat_clean, 0.0) + float(tons)
-                                        if is_new:
-                                            tph_pairs.append(f"{mat_clean}: {tph}")
-                                if tph_pairs:
-                                    material_tph_breakdown = ", ".join(tph_pairs)
-                                    print(f"[REBUILD] ✓ Parsed TPH from text: {material_tph_breakdown}")
-                            else:
-                                # No TPH in text, parse basic format
-                                material_lines = re.findall(r'^([A-Za-z.\s]+):\s*([\d.]+)t\s*$', cargo_text, re.MULTILINE)
-                                for mat, tons in material_lines:
-                                    mat_clean = self._normalize_material_key(mat.strip())
-                                    if not self._is_summary_entry(mat_clean):
-                                        materials_dict[mat_clean] = materials_dict.get(mat_clean, 0.0) + float(tons)
-
-                        # Then, merge with REFINED CARGO TRACKING (manually added materials during session)
-                        refined_cargo_section = re.search(r'=== REFINED CARGO TRACKING ===(.*?)(?:===|\Z)', content, re.DOTALL)
-                        if refined_cargo_section:
-                            refined_cargo_text = refined_cargo_section.group(1)
-                            refined_material_lines = re.findall(r'^([A-Za-z.\s]+):\s*([\d.]+)t\s*$', refined_cargo_text, re.MULTILINE)
-                            for mat, tons in refined_material_lines:
-                                mat_clean = self._normalize_material_key(mat.strip())
-                                if not self._is_summary_entry(mat_clean):
-                                    if mat_clean in materials_dict:
-                                        # Add to existing quantity
-                                        materials_dict[mat_clean] += float(tons)
-                                    else:
-                                        # New material from refinery
-                                        materials_dict[mat_clean] = float(tons)
-
-                        # Fallback to REFINED MINERALS section if no cargo data found
-                        if not materials_dict:
-                            refined_section = re.search(r'=== REFINED MINERALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
-                            if refined_section:
-                                refined_text = refined_section.group(1)
-                                material_lines = re.findall(r'- ([A-Za-z.\s]+) ([\d.]+)t', refined_text)
-                                for mat, tons in material_lines:
-                                    mat_clean = self._normalize_material_key(mat.strip())
-                                    if not self._is_summary_entry(mat_clean):
-                                        materials_dict[mat_clean] = materials_dict.get(mat_clean, 0.0) + float(tons)
-
-                        # Convert dictionary to string format
-                        if materials_dict:
-                            materials_breakdown = ', '.join([f"{mat}: {tons:.1f}t" for mat, tons in materials_dict.items()])
-                    
-                    # If materials_tracked is empty but we have materials_breakdown, count the materials
-                    if not materials_tracked and materials_breakdown:
-                        # Count comma-separated materials in breakdown
-                        material_count = len([m.strip() for m in materials_breakdown.split(',') if m.strip()])
-                        materials_tracked = str(material_count) if material_count > 0 else ''
-                    
-                    # Get preserved data for this timestamp (fallback if parsing fails)
-                    existing_data = existing_analysis_data.get(timestamp_local, {})
-                    if not existing_data:
-                        print(f"[REBUILD DEBUG] No CSV match for timestamp: {timestamp_local}")
-                        print(f"[REBUILD DEBUG] Filename: {fn}")
-                        print(f"[REBUILD DEBUG] Available CSV keys sample: {list(existing_analysis_data.keys())[:3]}")
-                        print(f"[REBUILD DEBUG] Total CSV entries: {len(existing_analysis_data)}")
-                    else:
-                        print(f"[REBUILD DEBUG] ✓ MATCH FOUND for: {timestamp_local}")
-                        print(f"[REBUILD DEBUG] TPH data: {existing_data.get('material_tph_breakdown', 'EMPTY')}")
-                    
-                    # Determine total hits/founds for this session from the TXT content
-                    try:
-                        tf_match = re.search(r'Total Material Hits:\s*(\d+)', content)
-                        if not tf_match:
-                            tf_match = re.search(r'Total Material Finds:\s*(\d+)', content)
-                        if tf_match:
-                            total_finds_val = int(tf_match.group(1))
-                        else:
-                            # Fallback: sum any per-material hit lines (supports both 'Hits:' and legacy 'Finds: 12x')
-                            per_hits = re.findall(r'•\s*(?:Hits|Finds):\s*(\d+)', content)
-                            if per_hits:
-                                total_finds_val = sum(int(x) for x in per_hits)
-                            else:
-                                total_finds_val = 0
-                    except Exception:
-                        total_finds_val = 0
-
-                    sessions.append({
-                        'timestamp_utc': timestamp_local,
-                        'system': system,
-                        'body': body,
-                        'elapsed': duration,
-                        'total_tons': total_tons,
-                        'overall_tph': overall_tph,
-                        'asteroids_prospected': asteroids_prospected or existing_data.get('asteroids_prospected', ''),
-                        'materials_tracked': materials_tracked or existing_data.get('materials_tracked', ''),
-                        'hit_rate_percent': hit_rate_percent or existing_data.get('hit_rate_percent', ''),
-                        'avg_quality_percent': avg_quality_percent or existing_data.get('avg_quality_percent', ''),
-                        'total_finds': total_finds_val,
-                        'best_material': best_material or existing_data.get('best_material', ''),
-                        'materials_breakdown': existing_data.get('materials_breakdown', '') or materials_breakdown,  # Prefer CSV data (has yields)
-                        'material_tph_breakdown': existing_data.get('material_tph_breakdown', '') or material_tph_breakdown,  # Preserve TPH from CSV or parse from text
-                        'prospectors_used': existing_data.get('prospectors_used', '') or prospectors_used,  # Prefer CSV data
-                        'engineering_materials': existing_data.get('engineering_materials', ''),  # Preserve engineering materials
-                        'comment': existing_data.get('comment', '')  # Preserve existing comments
-                    })
-                    
-                except Exception as e:
-                    print(f"Error parsing {fn}: {e}")
-                    continue
-            
-            if not sessions:
-                # If no session files exist, create empty CSV with headers
-                with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'material_tph_breakdown', 'prospectors_used', 'engineering_materials', 'comment'])
-                    writer.writeheader()
-                from main import center_window
-                import tkinter as tk
-                main_parent = self.winfo_toplevel()
-                dialog = tk.Toplevel(main_parent)
-                dialog.title("CSV Created")
-                dialog.resizable(False, False)
-                label = tk.Label(dialog, text="Created new CSV file - ready for your first session", padx=20, pady=20)
-                label.pack()
-                center_window(dialog, main_parent)
-                tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-                # dialog.transient(main_parent)  # Disabled - causes focus issues
-                
-                # Force dialog to stay on top and have focus
-                dialog.attributes('-topmost', True)
-                dialog.lift()
-                dialog.focus_force()
-                
-                try:
-                    dialog.grab_set()
-                except:
-                    pass
-                
-                # Keep dialog on top while open
-                def keep_on_top():
-                    try:
-                        if dialog.winfo_exists():
-                            dialog.lift()
-                            dialog.after(100, keep_on_top)
-                    except:
-                        pass
-                dialog.after(100, keep_on_top)
-                
-                dialog.wait_window()
-                parent_window.destroy()
-                return
-            
-            # Sort by timestamp
-            sessions.sort(key=lambda x: x['timestamp_utc'])
-            
-            # Write new CSV (include total_finds)
-            with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body', 'elapsed', 'total_tons', 'overall_tph', 'asteroids_prospected', 'materials_tracked', 'hit_rate_percent', 'avg_quality_percent', 'total_average_yield', 'best_material', 'materials_breakdown', 'material_tph_breakdown', 'prospectors_used', 'engineering_materials', 'comment'])
-                writer.writeheader()
-                # Remove any keys not present in CSV schema (avoid DictWriter errors)
-                for _r in sessions:
-                    if 'total_finds' in _r:
-                        _r.pop('total_finds', None)
-                writer.writerows(sessions)
-            
-            # Close and reopen the reports window to refresh data
-            parent_window.destroy()
-            self._open_reports_window()
-            
-            self._set_status(f"CSV rebuilt with {len(sessions)} sessions.")
-            
-        except Exception as e:
-            from main import center_window
-            import tkinter as tk
-            main_parent = self.winfo_toplevel()
-            dialog = tk.Toplevel(main_parent)
-            dialog.title("Rebuild Failed")
-            dialog.resizable(False, False)
-            label = tk.Label(dialog, text=f"Failed to rebuild CSV: {e}", padx=20, pady=20, fg="red")
-            label.pack()
-            center_window(dialog, main_parent)
-            tk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
-            # dialog.transient(main_parent)  # Disabled - causes focus issues
-            
-            # Force dialog to stay on top and have focus
-            dialog.attributes('-topmost', True)
-            dialog.lift()
-            dialog.focus_force()
-            
-            try:
-                dialog.grab_set()
-            except:
-                pass
-            
-            # Keep dialog on top while open
-            def keep_on_top():
-                try:
-                    if dialog.winfo_exists():
-                        dialog.lift()
-                        dialog.after(100, keep_on_top)
-                except:
-                    pass
-            dialog.after(100, keep_on_top)
-            
-            dialog.wait_window()
-            self._set_status(f"CSV rebuild failed: {e}")
 
     def _rebuild_csv_from_files_tab(self, csv_path: str, silent: bool = False) -> None:
         """Rebuild the CSV index from existing text files for Reports tab - PARSES TPH FROM TEXT"""
@@ -5603,87 +3445,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             traceback.print_exc()
             return None
 
-    def _share_selected_to_discord_popup(self, tree):
-        """Share the currently selected session to Discord from popup window"""
-        try:
-            # Check if a session is selected in the popup tree
-            selected = tree.selection()
-            if not selected:
-                from tkinter import messagebox
-                messagebox.showwarning("No Selection", "Please select a mining session to share to Discord.")
-                return
-            
-            # Get the session data from popup tree - need to get from session lookup
-            item_id = selected[0]
-            
-            # Check if there's a session lookup for the popup
-            if hasattr(self, 'session_lookup') and item_id in self.session_lookup:
-                session = self.session_lookup[item_id]
-            else:
-                # Fall back to reports_tab_session_lookup
-                if item_id in self.reports_tab_session_lookup:
-                    session = self.reports_tab_session_lookup[item_id]
-                else:
-                    from tkinter import messagebox
-                    messagebox.showerror("Error", "Session data not found for selected item.")
-                    return
-            
-            # Get or prompt for Discord username
-            username_result = self._get_discord_username()
-            if not username_result[0]:  # User cancelled
-                return
-            
-            username, comment = username_result
-            
-            # Add username and comment to session data
-            session_with_user = session.copy()
-            session_with_user['discord_username'] = username
-            if comment:
-                session_with_user['discord_comment'] = comment
-            
-            # Try to add report content for material breakdown
-            try:
-                if 'file_path' in session and session['file_path']:
-                    report_path = session['file_path']
-                    if os.path.exists(report_path):
-                        with open(report_path, 'r', encoding='utf-8') as f:
-                            session_with_user['report_content'] = f.read()
-            except Exception as e:
-                print(f"[DEBUG] Could not read report content: {e}")
-                # Continue without report content
-            
-            # Import Discord integration
-            try:
-                from discord_integration import send_discord_report, is_discord_enabled
-            except ImportError:
-                from app_utils import centered_message
-                centered_message(self.winfo_toplevel(), "Error", "Discord integration module not found.")
-                return
-            
-            # Check if Discord is configured
-            if not is_discord_enabled():
-                from app_utils import centered_message
-                centered_message(self.winfo_toplevel(), "Discord Sharing",
-                                 "Discord sharing is not available in this version.\n\n"
-                                 "Contact the administrator if you believe this is an error.")
-                return
-            
-            # Send to Discord
-            success, message = send_discord_report(session_with_user)
-            
-            from app_utils import centered_message
-            if success:
-                centered_message(self.winfo_toplevel(), "Discord Share", message)
-                self._set_status("Report shared to Discord successfully!")
-            else:
-                centered_message(self.winfo_toplevel(), "Discord Error", message)
-                self._set_status(f"Discord share failed: {message}")
-                
-        except Exception as e:
-            error_msg = f"Failed to share to Discord: {e}"
-            self._set_status(error_msg)
-            from app_utils import centered_message
-            centered_message(self.winfo_toplevel(), "Error", error_msg)
 
     def _create_mining_card_from_report(self):
         """Create mining card PNG from selected report in main Reports tab"""
@@ -5713,37 +3474,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             from tkinter import messagebox
             messagebox.showerror("Error", f"Failed to create mining card: {e}")
 
-    def _create_mining_card_from_report_popup(self, tree):
-        """Create mining card PNG from selected report in popup window"""
-        try:
-            selected = tree.selection()
-            if not selected:
-                from tkinter import messagebox
-                messagebox.showwarning("No Selection", "Please select a mining session to create a card.")
-                return
-            
-            item_id = selected[0]
-            
-            # Get session from appropriate lookup
-            if hasattr(self, 'session_lookup') and item_id in self.session_lookup:
-                session = self.session_lookup[item_id]
-            elif item_id in self.reports_tab_session_lookup:
-                session = self.reports_tab_session_lookup[item_id]
-            else:
-                from tkinter import messagebox
-                messagebox.showerror("Error", "Session data not found for selected item.")
-                return
-            
-            # Get CMDR name and comment
-            cmdr_info = self._get_cmdr_info_for_card()
-            if cmdr_info is None:
-                return  # User cancelled
-            
-            self._generate_mining_card(session, cmdr_info)
-            
-        except Exception as e:
-            from tkinter import messagebox
-            messagebox.showerror("Error", f"Failed to create mining card: {e}")
 
     def _get_card_path(self, session) -> str:
         """Expected Cards/ PNG path for a session (file may not exist)"""
@@ -6098,49 +3828,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             from tkinter import messagebox
             messagebox.showerror("Error", f"Failed to generate mining card: {e}")
 
-    def _parse_report_file(self, filename: str, first_line: str, mtime: float) -> Optional[Tuple[str, str, str, str, str]]:
-        """Parse report filename and content to extract date, system, body, duration, and TPH"""
-        try:
-            # Extract date from filename or use file modification time
-            if "_" in filename:
-                # New format: Session_YYYY-MM-DD_HH-MM-SS_...
-                parts = filename.split("_")
-                if len(parts) >= 3:
-                    date_part = f"{parts[1]} {parts[2].replace('-', ':')}"
-                else:
-                    date_part = dt.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-            else:
-                # Old format or fallback
-                date_part = dt.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-            
-            # Extract system, body, duration from first line
-            # Format: "Session: System — Body — Duration — Total XYt"
-            if "Session:" in first_line and "—" in first_line:
-                parts = first_line.split("—")
-                if len(parts) >= 4:
-                    system = parts[0].replace("Session:", "").strip()
-                    body = parts[1].strip()
-                    duration = parts[2].strip()
-                    total_part = parts[3].strip()
-                else:
-                    system = body = duration = "Unknown"
-            else:
-                system = body = duration = "Unknown"
-            
-            # Extract TPH from filename (newer format) or calculate from content
-            tph = "0.0"
-            if " tph.txt" in filename:
-                # Extract TPH from filename
-                tph_part = filename.split(" tph.txt")[0].split()[-1]
-                try:
-                    tph = f"{float(tph_part):.1f}"
-                except ValueError:
-                    tph = "0.0"
-            
-            return (date_part, system, body, duration, tph)
-            
-        except Exception:
-            return None
 
     def _open_path(self, path: str) -> None:
         try:
@@ -6176,55 +3863,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             self._set_status("Journal folder updated and saved.")
 
-    def _on_enabled_changed(self) -> None:
-        try:
-            if not self.enabled.get():
-                self._write_var_text("prospectReadout", "")
-                self._set_status("Main announcement toggle disabled.")
-            else:
-                self._set_status("Main announcement toggle enabled.")
-                try:
-                    self.toggle_vars["Prospector Sequence"].set(1)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    def _announce_all(self) -> None:
-        for m in KNOWN_MATERIALS:
-            self.announce_map[m] = True
-            prev = self.mat_tree.set(m, "minpct") if self.mat_tree.exists(m) else ""
-            self.mat_tree.item(m, values=("✓", m, prev))
-        self._save_announce_map()
-        self._save_last_material_settings()  # Save material settings
-
-    def _mute_all(self) -> None:
-        for m in KNOWN_MATERIALS:
-            self.announce_map[m] = False
-            prev = self.mat_tree.set(m, "minpct") if self.mat_tree.exists(m) else ""
-            self.mat_tree.item(m, values=("—", m, prev))
-        self._save_announce_map()
-        self._save_last_material_settings()  # Save material settings
-
-    def _set_all_min_pct(self):
-        val = self.threshold.get()
-        try:
-            val = float(val)
-            val = max(0.0, min(100.0, val))
-            for mat in KNOWN_MATERIALS:
-                self.min_pct_map[mat] = val
-                if self.mat_tree.exists(mat):
-                    flag = self.announce_map.get(mat, True)
-                    # Don't set text in minpct column to avoid visible text behind spinbox
-                    self.mat_tree.item(mat, values=("✓" if flag else "—", mat, ""))
-                # Update the spinbox value too
-                if mat in self._minpct_spin:
-                    self._minpct_spin[mat].set(val)
-            self._save_min_pct_map()
-            self._save_last_material_settings()  # Save material settings
-            self._position_minpct_spinboxes()  # Reposition spinboxes
-        except Exception as e:
-            messagebox.showerror("Invalid value", f"Could not set minimum %: {e}")
 
     # --- Report saving on Stop & Compute ---
     def _save_session_report(self, header: str, lines: List[str], overall_tph: float, cargo_session_data: dict = None, comment: str = "") -> str:
@@ -6486,6 +4124,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             yield_display_string = "0.0"  # Initialize to prevent undefined variable error
             total_avg_yield = 0.0  # Initialize total average yield
             
+            raw_yields = {}
             if material_summary and asteroids_prospected > 0:
                 # Hit rate: percentage of asteroids with valuable minerals
                 session_info = self.session_analytics.get_session_info()
@@ -7147,20 +4786,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 else:
                     # Keep original format if no colon found
                     enhanced_materials.append(pair)
-            
+
             return '; '.join(enhanced_materials) if enhanced_materials else materials_breakdown_raw
-            
+
         except Exception as e:
             # If parsing fails, return original
             print(f"Warning: Could not enhance materials with yields and TPH: {e}")
             return materials_breakdown_raw
 
-    def _on_reports_window_close(self) -> None:
-        """Handle reports window closing"""
-        if self.reports_window:
-            self.reports_window.destroy()
-        self.reports_window = None
-        self.reports_tree = None
 
     def _setup_stats_tree_tooltips(self, tree: ttk.Treeview) -> None:
         """Setup tooltip for Material Analysis table header"""
@@ -7189,7 +4822,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     "#7": "Most recent prospector scan result for this material",
                     "#8": "Number of asteroids that met your threshold\n(quality finds that triggered announcements)"
                 }
-                
+
                 tooltip_text = tooltips.get(column)
                 if tooltip_text:
                     
@@ -7216,410 +4849,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree.bind("<Leave>", hide_tooltip)
         tree.bind("<Button-1>", hide_tooltip)
 
-    def _setup_reports_tooltips_with_wordwrap(self, tree: ttk.Treeview, word_wrap_enabled: tk.BooleanVar) -> None:
-        """Setup tooltip functionality with word wrapping for all cells in reports treeview"""
-        tooltip_window = None
-        
-        def show_tooltip(event):
-            nonlocal tooltip_window
-            
-            # Hide existing tooltip first
-            if tooltip_window:
-                tooltip_window.destroy()
-                tooltip_window = None
-            
-            # Don't show if tooltips are disabled
-            if not hasattr(self, 'ToolTip') or not self.ToolTip:
-                return
-                
-            # Get item and column at cursor position
-            item = tree.identify_row(event.y)
-            column = tree.identify_column(event.x)
-            
-            if not item:
-                return
-            
-            # Get the cell text content
-            column_names = {
-                "#1": "date", "#2": "duration", "#3": "system", "#4": "body",
-                "#5": "tons", "#6": "tph", "#7": "materials", "#8": "asteroids", 
-                "#9": "hit_rate", "#10": "quality", "#11": "cargo", "#12": "prospectors"
-            }
-            
-            tooltip_text = ""
-            
-            # Show cell content for all columns
-            if column == "#11":  # Materials column - show full breakdown
-                try:
-                    if hasattr(self, 'reports_window_session_lookup') and item in self.reports_window_session_lookup:
-                        session_data = self.reports_window_session_lookup[item]
-                        cargo_raw = session_data.get('cargo_raw', '')
-                        
-                        if cargo_raw and cargo_raw != "—":
-                            tooltip_text = f"Materials Breakdown:\n{cargo_raw.replace(';', '\n').replace(':', ': ')}"
-                        else:
-                            tooltip_text = "No materials data available"
-                    else:
-                        cell_text = tree.set(item, column_names.get(column, ""))
-                        tooltip_text = f"Materials: {cell_text}"
-                except Exception as e:
-                    cell_text = tree.set(item, column_names.get(column, ""))
-                    tooltip_text = f"Materials: {cell_text}"
-            else:
-                # For other columns, show cell content
-                if column in column_names:
-                    cell_text = tree.set(item, column_names[column])
-                    if cell_text:  # Show tooltip for all non-empty cells
-                        column_headers = {
-                            "#1": "Date/Time", "#2": "Duration", "#3": "System", "#4": "Body",
-                            "#5": "Total Tons", "#6": "TPH", "#7": "Mat Types", "#8": "Prospected",
-                            "#9": "Hit Rate %", "#10": "Yield %", "#12": "Prospectors"
-                        }
-                        header = column_headers.get(column, "Info")
-                        tooltip_text = f"{header}: {cell_text}"
-            
-            # Show tooltip if we have text
-            if tooltip_text:
-                x = event.x_root + 10
-                y = event.y_root + 10
-                
-                tooltip_window = tk.Toplevel(tree)
-                tooltip_window.wm_overrideredirect(True)
-                tooltip_window.wm_geometry(f"+{x}+{y}")
-                tooltip_window.configure(background="#ffffe0")
-                
-                # Use word wrap only if enabled
-                wrap_length = 400 if word_wrap_enabled.get() else 9999
-                label = tk.Label(tooltip_window, text=tooltip_text,
-                               background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                               font=scaled_font(9), justify=tk.LEFT, wraplength=wrap_length)
-                label.pack(ipadx=5, ipady=3)
-        
-        def hide_tooltip(event):
-            nonlocal tooltip_window
-            if tooltip_window:
-                tooltip_window.destroy()
-                tooltip_window = None
-        
-        # Bind hover events
-        tree.bind("<Motion>", show_tooltip)
-        tree.bind("<Leave>", hide_tooltip)
-        tree.bind("<Button-1>", hide_tooltip)
-
-    def _setup_reports_tooltips(self, tree: ttk.Treeview) -> None:
-        """Setup tooltip functionality for reports treeview"""
-        tooltip_window = None
-        
-        def show_tooltip(event):
-            nonlocal tooltip_window
-            
-            # Hide existing tooltip first
-            if tooltip_window:
-                tooltip_window.destroy()
-                tooltip_window = None
-            
-            # Don't show if tooltips are disabled
-            if not hasattr(self, 'ToolTip') or not self.ToolTip:
-                return
-                
-            # Get item and column at cursor position
-            item = tree.identify_row(event.y)
-            column = tree.identify_column(event.x)
-            
-            if not item:
-                return
-            
-            # Define tooltips for each column
-            tooltip_texts = {
-                "#1": "Date and time when the mining session ended",
-                "#2": "Total duration of the mining session",
-                "#3": "Star system where mining took place", 
-                "#4": "Planet/body/ring that was mined",
-                "#5": "Total tons of materials mined",
-                "#6": "Tons per hour mining rate",
-                "#7": "Number of different mineral types found",
-                "#8": "Total asteroids scanned during the session",
-                "#9": "Percentage of asteroids that had valuable minerals",
-                "#10": "Average quality/yield percentage of minerals found",
-                "#11": "Minerals mined with quantities (hover for full names)",
-                "#12": "Number of limpets used during mining session"
-            }
-            
-            # Handle cargo column with original data
-            if column == "#11":
-                # Get the original cargo data from session_lookup
-                try:
-                    if hasattr(self, 'reports_window_session_lookup') and item in self.reports_window_session_lookup:
-                        session_data = self.reports_window_session_lookup[item]
-                        cargo_raw = session_data.get('cargo_raw', '')
-                        
-                        # Show tooltip if there's cargo data
-                        if cargo_raw and cargo_raw != "—":
-                            # Format tooltip text directly
-                            tooltip_text = f"Materials Breakdown:\n{cargo_raw.replace(';', '\n').replace(':', ': ')}"
-                            
-                            # Create tooltip window
-                            x = event.x_root + 10
-                            y = event.y_root + 10
-                            
-                            tooltip_window = tk.Toplevel(tree)
-                            tooltip_window.wm_overrideredirect(True)
-                            tooltip_window.wm_geometry(f"+{x}+{y}")
-                            tooltip_window.configure(background="#ffffe0")
-                            
-                            label = tk.Label(tooltip_window, text=tooltip_text,
-                                           background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                           font=scaled_font(9), justify=tk.LEFT, wraplength=300)
-                            label.pack(ipadx=5, ipady=3)
-                except Exception as e:
-                    print(f"Tooltip error: {e}")
-            else:
-                # Show standard tooltip for other columns
-                if column in tooltip_texts:
-                    tooltip_text = tooltip_texts[column]
-                    
-                    x = event.x_root + 10
-                    y = event.y_root + 10
-                    
-                    tooltip_window = tk.Toplevel(tree)
-                    tooltip_window.wm_overrideredirect(True)
-                    tooltip_window.wm_geometry(f"+{x}+{y}")
-                    tooltip_window.configure(background="#ffffe0")
-                    
-                    label = tk.Label(tooltip_window, text=tooltip_text,
-                                   background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=scaled_font(9), justify=tk.LEFT, wraplength=300)
-                    label.pack(ipadx=5, ipady=3)
-        
-        def hide_tooltip(event):
-            nonlocal tooltip_window
-            if tooltip_window:
-                tooltip_window.destroy()
-                tooltip_window = None
-        
-        # Bind hover events
-        tree.bind("<Motion>", show_tooltip)
-        tree.bind("<Leave>", hide_tooltip)
-        tree.bind("<Button-1>", hide_tooltip)  # Hide on click
-
-    def _refresh_reports_window(self) -> None:
-        """Refresh the reports window if it's open"""
-        try:
-            if self.reports_window and self.reports_tree:
-                # Check if window still exists
-                if not self.reports_window.winfo_exists():
-                    self.reports_window = None
-                    self.reports_tree = None
-                    return
-                    
-                # Clear existing data
-                for item in self.reports_tree.get_children():
-                    self.reports_tree.delete(item)
-                
-                # Reload data from CSV
-                csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
-                if os.path.exists(csv_path):
-                    import csv
-                    with open(csv_path, 'r', encoding='utf-8') as f:
-                        reader = csv.DictReader(f)
-                        sessions_data = []
-                        for row in reader:
-                            # Format the timestamp for display
-                            try:
-                                # Try to parse as local time first, then fall back to UTC
-                                if row['timestamp_utc'].endswith('Z'):
-                                    # UTC format - convert to local time for display
-                                    timestamp = dt.datetime.fromisoformat(row['timestamp_utc'].replace('Z', '+00:00'))
-                                    timestamp = timestamp.replace(tzinfo=dt.timezone.utc).astimezone()
-                                else:
-                                    # Local time format
-                                    timestamp = dt.datetime.fromisoformat(row['timestamp_utc'])
-                                date_str = timestamp.strftime("%Y-%m-%d %H:%M")
-                            except:
-                                date_str = row['timestamp_utc']
-                            
-                            # Format TPH and tons
-                            try:
-                                tph_val = float(row['overall_tph'])
-                                tph_str = f"{tph_val:.1f}"
-                            except:
-                                tph_str = row['overall_tph']
-                                
-                            try:
-                                tons_val = float(row['total_tons'])
-                                tons_str = f"{tons_val:.1f}"
-                            except:
-                                tons_str = row['total_tons']
-                            # Compute total finds (hits) and Tons/Hit for this CSV row
-                            try:
-                                total_finds = int(str(row.get('total_finds', '')).strip() or 0)
-                            except Exception:
-                                total_finds = 0
-
-                            try:
-                                asteroids_count = int(str(row.get('asteroids_prospected', '')).strip() or 0)
-                            except Exception:
-                                asteroids_count = 0
-
-                            try:
-                                total_tons_val = float(row.get('total_tons', 0.0) or 0.0)
-                            except Exception:
-                                try:
-                                    total_tons_val = float(tons_str)
-                                except Exception:
-                                    total_tons_val = 0.0
-
-                            if total_finds > 0:
-                                try:
-                                    tons_per_str = f"{total_tons_val / total_finds:.1f}"
-                                except Exception:
-                                    tons_per_str = "—"
-                            elif asteroids_count > 0:
-                                try:
-                                    tons_per_str = f"{total_tons_val / asteroids_count:.1f}"
-                                except Exception:
-                                    tons_per_str = "—"
-                            else:
-                                tons_per_str = "—"
-                            
-                            # Format Material Analysis fields (with fallback for old data)
-                            asteroids = row.get('asteroids_prospected', '').strip() or '0'
-                            materials = row.get('materials_tracked', '').strip() or '0'
-                            hit_rate = row.get('hit_rate_percent', '').strip() or '0'
-                            avg_quality = row.get('avg_quality_percent', '').strip() or '0'
-                            
-                            # Get new cargo tracking fields
-                            materials_breakdown_raw = row.get('materials_breakdown', '').strip() or '—'
-                            prospectors_used = row.get('prospectors_used', '').strip() or '—'
-                            
-                            # Use full material names with optional word wrap
-                            if self.reports_tab_word_wrap_enabled.get():
-                                materials_breakdown = materials_breakdown_raw.replace('; ', '\n')
-                            else:
-                                materials_breakdown = materials_breakdown_raw
-                            
-                            # Format asteroids and materials columns
-                            try:
-                                asteroids_val = int(asteroids) if asteroids and asteroids != '0' else 0
-                                asteroids_str = str(asteroids_val) if asteroids_val > 0 else "—"
-                            except:
-                                asteroids_str = "—"
-                            
-                            try:
-                                materials_val = int(materials) if materials and materials != '0' else 0
-                                materials_str = str(materials_val) if materials_val > 0 else "—"
-                            except:
-                                materials_str = "—"
-                            
-                            # Format hit rate
-                            try:
-                                hit_rate_val = float(hit_rate) if hit_rate and hit_rate != '0' else 0
-                                hit_rate_str = f"{hit_rate_val:.1f}" if hit_rate_val > 0 else "—"
-                            except:
-                                hit_rate_str = "—"
-                            
-                            # Format quality (yield %) - handle both old numerical and new formatted strings
-                            try:
-                                # Check if it's already a formatted string (contains letters)
-                                if any(c.isalpha() for c in avg_quality):
-                                    quality_str = avg_quality  # Already formatted
-                                else:
-                                    # Old numerical format
-                                    quality_val = float(avg_quality) if avg_quality and avg_quality != '0' else 0
-                                    quality_str = f"{quality_val:.1f}" if quality_val > 0 else "—"
-                            except:
-                                quality_str = "—"
-                            
-                            try:
-                                total_finds_val = int(str(row.get('total_finds', '')).strip() or 0)
-                            except Exception:
-                                total_finds_val = 0
-
-                            sessions_data.append({
-                                'date': date_str,
-                                'system': row['system'],
-                                'body': row['body'],
-                                'duration': row['elapsed'],
-                                'tons': tons_str,
-                                'tph': tph_str,
-                                'tons_per': tons_per_str,
-                                'asteroids': asteroids_str,
-                                'materials': materials_str,
-                                'hit_rate': hit_rate_str,
-                                'quality': quality_str,
-                                'cargo': materials_breakdown,
-                                'cargo_raw': materials_breakdown_raw,  # Store original for tooltip
-                                'prospectors': prospectors_used,
-                                'timestamp_raw': row['timestamp_utc']
-                            })
-                    
-                    # Sort by timestamp (newest first)
-                    sessions_data.sort(key=lambda x: x['timestamp_raw'], reverse=True)
-                    
-                    # Populate the tree
-                    for session in sessions_data:
-                        # Ensure insertion order matches tree columns defined at popup creation
-                        # Build values list dynamically from actual tree columns to avoid ordering issues
-                        cols = list(self.reports_tree["columns"]) if hasattr(self, 'reports_tree') and self.reports_tree is not None else []
-                        vals = []
-                        for col in cols:
-                            if col == 'date':
-                                vals.append(session.get('date', ''))
-                            elif col == 'duration':
-                                vals.append(session.get('duration', ''))
-                            elif col == 'system':
-                                vals.append(session.get('system', ''))
-                            elif col == 'body':
-                                vals.append(session.get('body', ''))
-                            elif col == 'tons':
-                                vals.append(session.get('tons', ''))
-                            elif col == 'tph':
-                                vals.append(session.get('tph', ''))
-                            elif col == 'materials':
-                                vals.append(session.get('materials', ''))
-                            elif col == 'tons_per':
-                                vals.append(session.get('tons_per', session.get('tons_per', '—')))
-                            elif col == 'asteroids':
-                                vals.append(session.get('asteroids', ''))
-                            elif col == 'hit_rate':
-                                vals.append(session.get('hit_rate', ''))
-                            elif col == 'quality':
-                                vals.append(session.get('quality', ''))
-                            elif col == 'cargo':
-                                vals.append(session.get('cargo', ''))
-                            elif col in ('prospectors', 'prospects'):
-                                vals.append(session.get('prospectors', session.get('prospects', '—')))
-                            elif col == 'comment':
-                                vals.append('💬' if session.get('comment', '').strip() else '')
-                            elif col == 'enhanced':
-                                vals.append("")
-                            else:
-                                vals.append(session.get(col, ''))
-
-                        item_id = self.reports_tree.insert("", "end", values=tuple(vals))
-
-                        # Ensure comment and enhanced/engineering columns are set explicitly
-                        try:
-                            # Place comment emoji into the comment column explicitly to avoid column-shifts
-                            comment_val = '💬' if session.get('comment', '').strip() else ''
-                            self.reports_tree.set(item_id, 'comment', comment_val)
-
-                            # Set enhanced indicator by composing id from date/system/body fields
-                            date_val = self.reports_tree.set(item_id, "date")
-                            system_val = self.reports_tree.set(item_id, "system")
-                            body_val = self.reports_tree.set(item_id, "body")
-                            if date_val and system_val and body_val:
-                                tree_report_id = f"{date_val}_{system_val}_{body_val}"
-                                enhanced_indicator = self._get_detailed_report_indicator(tree_report_id)
-                                self.reports_tree.set(item_id, "enhanced", enhanced_indicator)
-                        except Exception:
-                            # Don't raise on UI set failures; keep UI stable
-                            pass
-        except Exception as e:
-            print(f"Failed to refresh reports window: {e}")
-            # Reset window references if there's an error
-            self.reports_window = None
-            self.reports_tree = None
 
     def _create_reports_panel(self, parent: ttk.Widget) -> None:
         """Create the reports panel interface within the provided parent widget."""
@@ -8764,6 +5993,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Load and display initial data
         self._refresh_reports_tab()
 
+
     def _show_header_tooltip(self, event, tree):
         """Show tooltip for reports tab column headers"""
         try:
@@ -9214,8 +6444,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 try:
                     if hasattr(self, 'reports_tab_session_lookup') and item in self.reports_tab_session_lookup:
                         raw_timestamp = self.reports_tab_session_lookup[item].get('timestamp_raw')
-                    elif hasattr(self, 'reports_window_session_lookup') and item in self.reports_window_session_lookup:
-                        raw_timestamp = self.reports_window_session_lookup[item].get('timestamp_raw')
                 except Exception:
                     raw_timestamp = None
 
@@ -9287,11 +6515,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Parse timestamp to get date/time parts for filename
             import datetime as dt
             try:
-                if timestamp_raw.endswith('Z'):
-                    session_time = dt.datetime.fromisoformat(timestamp_raw.replace('Z', '+00:00'))
-                    session_time = session_time.replace(tzinfo=dt.timezone.utc).astimezone()
-                else:
-                    session_time = dt.datetime.fromisoformat(timestamp_raw)
+                session_time = session_date(timestamp_raw).astimezone()
                 
                 # Format timestamp for filename: YYYY-MM-DD_HH-MM-SS
                 date_str = session_time.strftime("%Y-%m-%d")
@@ -9324,8 +6548,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     return ("", "")
             
             # Read the TXT file
-            with open(txt_path, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
+            content = read_session_report(txt_path).strip()
             
             # Format: "Session: SYSTEM — BODY — DURATION — Total XXXt\nShip: SHIP_NAME | materials..."
             ship_match = content.find("\nShip: ")
@@ -9380,14 +6603,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     for row in reader:
                         # Format the timestamp for display (compact format with year)
                         try:
-                            # Try to parse as local time first, then fall back to UTC
-                            if row['timestamp_utc'].endswith('Z'):
-                                # UTC format - convert to local time for display
-                                timestamp = dt.datetime.fromisoformat(row['timestamp_utc'].replace('Z', '+00:00'))
-                                timestamp = timestamp.replace(tzinfo=dt.timezone.utc).astimezone()
-                            else:
-                                # Local time format
-                                timestamp = dt.datetime.fromisoformat(row['timestamp_utc'])
+                            timestamp = session_date(row['timestamp_utc']).astimezone()
                             date_str = timestamp.strftime("%m/%d/%y %H:%M")  # Compact format with year
                         except:
                             date_str = row['timestamp_utc']
@@ -9569,7 +6785,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     pass
 
             # Sort by timestamp (newest first) by default
-            sessions_data.sort(key=lambda x: x['timestamp_raw'], reverse=True)
+            sessions_data.sort(key=lambda x: session_date(x['timestamp_raw']) or
+                               dt.datetime.min.replace(tzinfo=dt.timezone.utc), reverse=True)
             
             # Pre-resolve ship names for By Ship filtering
             for session in sessions_data:
@@ -9593,16 +6810,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 }
                 days = time_cutoffs.get(time_key)
                 if days or time_key == 'this_year':
-                    now = datetime.now()
-                    cutoff = datetime(now.year, 1, 1) if time_key == 'this_year' else now - timedelta(days=days)
+                    now = dt.datetime.now()
+                    cutoff = session_date((dt.datetime(now.year, 1, 1) if time_key == 'this_year'
+                                           else now - timedelta(days=days)).isoformat())
                     filtered = []
                     for session in sessions_data:
                         try:
-                            if session['timestamp_raw'].endswith('Z'):
-                                session_time = datetime.fromisoformat(session['timestamp_raw'].replace('Z', '+00:00'))
-                                session_time = session_time.replace(tzinfo=dt.timezone.utc).astimezone()
-                            else:
-                                session_time = datetime.fromisoformat(session['timestamp_raw'])
+                            session_time = session_date(session['timestamp_raw'])
                             if session_time >= cutoff:
                                 filtered.append(session)
                         except:
@@ -9803,80 +7017,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 except Exception:
                     total_finds_val = 0
 
-                # If CSV/session dict lacks total_finds, attempt to parse the TXT report directly now
-                if (not total_finds_val or total_finds_val == 0) and session.get('timestamp_raw'):
-                    try:
-                        import datetime as _dt, glob, re
-                        raw_ts = session.get('timestamp_raw')
-                        if raw_ts.endswith('Z'):
-                            ts = _dt.datetime.fromisoformat(raw_ts.replace('Z', '+00:00'))
-                            ts = ts.replace(tzinfo=_dt.timezone.utc).astimezone()
-                        else:
-                            ts = _dt.datetime.fromisoformat(raw_ts)
-                        date_part = ts.strftime("%Y-%m-%d")
-                        time_part = ts.strftime("%H-%M-%S")
-                        system_filename = (session.get('system','') or '').replace(' ', '_')
-                        body_filename = (session.get('body','') or '').replace(' ', '_')
-                        exact_pattern = f"Session_{date_part}_{time_part}_{system_filename}_{body_filename}.txt"
-                        matches = glob.glob(os.path.join(self.reports_dir, exact_pattern))
-                        for txt_path in matches:
-                            try:
-                                with open(txt_path, 'r', encoding='utf-8') as tf:
-                                    txt_content = tf.read()
-                                    tf_m = re.search(r'Total Material Hits:\s*(\d+)', txt_content)
-                                    if not tf_m:
-                                        tf_m = re.search(r'Total Material Finds:\s*(\d+)', txt_content)
-                                    if tf_m:
-                                        total_finds_val = int(tf_m.group(1))
-                                    else:
-                                        total_finds_val = 0
-                                    break
-                            except Exception:
-                                continue
-                    except Exception:
-                        pass
-
-                try:
-                    core_hits_val = int(str(session.get('core_hits', '')).strip() or 0)
-                except Exception:
-                    core_hits_val = 0
-
-                # If CSV/session dict lacks core_hits, attempt to parse the TXT report directly now
-                # (Core Hits isn't persisted to CSV, same as total_finds — always derived from the TXT report)
-                if not core_hits_val and session.get('timestamp_raw'):
-                    try:
-                        import datetime as _dt, glob, re
-                        raw_ts = session.get('timestamp_raw')
-                        if raw_ts.endswith('Z'):
-                            ts = _dt.datetime.fromisoformat(raw_ts.replace('Z', '+00:00'))
-                            ts = ts.replace(tzinfo=_dt.timezone.utc).astimezone()
-                        else:
-                            ts = _dt.datetime.fromisoformat(raw_ts)
-                        date_part = ts.strftime("%Y-%m-%d")
-                        time_part = ts.strftime("%H-%M-%S")
-                        system_filename = (session.get('system','') or '').replace(' ', '_')
-                        body_filename = (session.get('body','') or '').replace(' ', '_')
-                        exact_pattern = f"Session_{date_part}_{time_part}_{system_filename}_{body_filename}.txt"
-                        matches = glob.glob(os.path.join(self.reports_dir, exact_pattern))
-                        for txt_path in matches:
-                            try:
-                                with open(txt_path, 'r', encoding='utf-8') as tf:
-                                    txt_content = tf.read()
-                                    # Sum "• Core Hits: N" across all mineral blocks in Mineral Performance section
-                                    core_hits_val = sum(int(m) for m in re.findall(r'•\s*Core Hits:\s*(\d+)', txt_content))
-                                    # Legacy format fallback: older reports wrote core hits as a
-                                    # separate "<Mineral> (Core):" block with its own "• Hits: N" line
-                                    # instead of a "• Core Hits: N" sub-line under the base mineral.
-                                    if core_hits_val == 0:
-                                        for block_match in re.finditer(r'^(.+?) \(Core\):\n((?:[ \t]+.+\n?)*)', txt_content, re.MULTILINE):
-                                            hits_match = re.search(r'•\s*Hits:\s*(\d+)', block_match.group(2))
-                                            if hits_match:
-                                                core_hits_val += int(hits_match.group(1))
-                                    break
-                            except Exception:
-                                continue
-                    except Exception:
-                        pass
+                txt_content = read_session_report(file_path) if file_path else ''
+                if not total_finds_val:
+                    hit_match = re.search(r'Total Material (?:Hits|Finds):\s*(\d+)', txt_content)
+                    total_finds_val = int(hit_match.group(1)) if hit_match else 0
+                core_hits_val = sum(int(value) for value in re.findall(r'•\s*Core Hits:\s*(\d+)', txt_content))
+                if not core_hits_val:
+                    for block in re.finditer(r'^(.+?) \(Core\):\n((?:[ \t]+.+\n?)*)', txt_content, re.MULTILINE):
+                        hit_match = re.search(r'•\s*Hits:\s*(\d+)', block.group(2))
+                        if hit_match:
+                            core_hits_val += int(hit_match.group(1))
                 core_hits_display = str(core_hits_val) if core_hits_val > 0 else "—"
 
                 if total_finds_val > 0 and total_tons_val > 0:
@@ -10876,9 +8026,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         if mat_name not in selected_materials:
                             selected_materials.append(mat_name)
             
-            # Sync current UI thresholds to min_pct_map before processing
-            self._sync_spinboxes_to_min_pct_map()
-            
             # Add the prospector result to analytics with properly selected materials and thresholds
             self.session_analytics.add_prospector_event(evt, selected_materials, self.min_pct_map)
             
@@ -11734,26 +8881,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 pass
         dialog.after(100, keep_on_top)
 
-    def _edit_comment_popup(self, event):
-        """Edit Body or Comment column in reports popup window"""
-        item = self.reports_tree.selection()[0] if self.reports_tree.selection() else None
-        if not item:
-            return
-        
-        # Get clicked column and map dynamically to body/comment
-        column = self.reports_tree.identify_column(event.x)
-        try:
-            cols = list(self.reports_tree["columns"])
-            body_idx = cols.index('body') if 'body' in cols else None
-            comment_idx = cols.index('comment') if 'comment' in cols else None
-        except Exception:
-            body_idx = None
-            comment_idx = None
-
-        if body_idx is not None and column == f"#{body_idx+1}":
-            self._edit_body(self.reports_tree, item)
-        elif comment_idx is not None and column == f"#{comment_idx+1}":
-            self._edit_comment(self.reports_tree, item)
     
     def _edit_cell_tab(self, event):
         """Edit Body or Comment column in reports tab"""
@@ -11789,10 +8916,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Get the actual comment from session lookup data
         if tree == self.reports_tree_tab and hasattr(self, 'reports_tab_session_lookup'):
             session_data = self.reports_tab_session_lookup.get(item)
-            if session_data:
-                current_comment = session_data.get('comment', '')
-        elif tree == self.reports_tree and hasattr(self, 'reports_window_session_lookup'):
-            session_data = self.reports_window_session_lookup.get(item)
             if session_data:
                 current_comment = session_data.get('comment', '')
         
@@ -11841,10 +8964,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 session_data = self.reports_tab_session_lookup.get(item)
                 if session_data:
                     raw_timestamp = session_data.get('timestamp_raw')
-            elif tree == self.reports_tree and hasattr(self, 'reports_window_session_lookup'):
-                session_data = self.reports_window_session_lookup.get(item)
-                if session_data:
-                    raw_timestamp = session_data.get('timestamp_raw')
             
             # Fallback to display timestamp if raw timestamp not found
             if not raw_timestamp:
@@ -11858,10 +8977,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if csv_updated and text_updated:
                 if tree == self.reports_tree_tab and hasattr(self, 'reports_tab_session_lookup'):
                     session_data = self.reports_tab_session_lookup.get(item)
-                    if session_data:
-                        session_data['comment'] = new_comment
-                elif tree == self.reports_tree and hasattr(self, 'reports_window_session_lookup'):
-                    session_data = self.reports_window_session_lookup.get(item)
                     if session_data:
                         session_data['comment'] = new_comment
             
@@ -11965,10 +9080,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 session_data = self.reports_tab_session_lookup.get(item)
                 if session_data:
                     raw_timestamp = session_data.get('timestamp_raw')
-            elif tree == self.reports_tree and hasattr(self, 'reports_window_session_lookup'):
-                session_data = self.reports_window_session_lookup.get(item)
-                if session_data:
-                    raw_timestamp = session_data.get('timestamp_raw')
             
             # Fallback to display timestamp if raw timestamp not found
             if not raw_timestamp:
@@ -12066,93 +9177,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             log.warning(f"Failed to find matching session in CSV for timestamp: {timestamp}")
             return False
     
-    def _wipe_mining_session_folder(self):
-        """
-        One-time wipe of Mining Session folder on v4.3.0 upgrade.
-        Deletes entire folder and recreates it clean.
-        Only shows notification if old data was actually wiped (not on fresh install).
-        """
-        try:
-            import shutil
-            
-            # self.reports_dir already points to Reports/Mining Session
-            wipe_flag = os.path.join(os.path.dirname(self.reports_dir), ".v430_wipe_done")
-            
-            # Check if wipe already done - EXIT IMMEDIATELY if flag exists
-            if os.path.exists(wipe_flag):
-                return
-            
-            # Check if there's actually old data to wipe (BEFORE the folder was just created)
-            had_old_data = False
-            if os.path.exists(self.reports_dir):
-                # Check if folder has any actual content (not just empty installer-created folders)
-                try:
-                    contents = os.listdir(self.reports_dir)
-                    # Filter out folders/files created by installer, standard structure, or app initialization
-                    ignored_items = [
-                        'Detailed Reports', 'Screenshots', 'Cards', '.gitkeep',
-                        'sessions_index.csv',  # Created by app on first run
-                        'detailed_report_mappings.json'  # Created by app on first run
-                    ]
-                    meaningful_contents = [c for c in contents if c not in ignored_items]
-                    
-                    # Check if there are any actual files (not just empty folders)
-                    if meaningful_contents:
-                        had_old_data = True
-                    else:
-                        # Check if standard folders have any files in them (excluding new app-created files)
-                        for folder in ['Detailed Reports', 'Screenshots', 'Cards']:
-                            folder_path = os.path.join(self.reports_dir, folder)
-                            if os.path.exists(folder_path) and os.path.isdir(folder_path):
-                                try:
-                                    folder_contents = os.listdir(folder_path)
-                                    # Also ignore app-created files in subfolders
-                                    filtered_contents = [f for f in folder_contents 
-                                                       if f not in ignored_items and 
-                                                       os.path.isfile(os.path.join(folder_path, f))]
-                                    if filtered_contents:
-                                        had_old_data = True
-                                        break
-                                except:
-                                    pass
-                except:
-                    had_old_data = False
-            
-            # Delete entire Mining Session folder if it exists
-            if os.path.exists(self.reports_dir):
-                shutil.rmtree(self.reports_dir)
-                if had_old_data:
-                    print("[V4.3.0 UPGRADE] Deleted entire Mining Session folder with old data")
-                else:
-                    print("[V4.3.0 UPGRADE] Removed empty Mining Session folder (first install)")
-            
-            # Recreate clean folder structure
-            os.makedirs(os.path.join(self.reports_dir, "Detailed Reports", "Screenshots"), exist_ok=True)
-            
-            # Create flag so this never runs again
-            with open(wipe_flag, 'w') as f:
-                f.write("v4.3.0 wipe completed")
-            
-            print("[V4.3.0 UPGRADE] Mining Session folder recreated")
-            
-            # Only show user notification if we actually wiped old data (not on fresh install)
-            if had_old_data:
-                self._show_upgrade_notification()
-            else:
-                print("[V4.3.0 UPGRADE] First install detected - no notification needed")
-        except Exception as e:
-            print(f"[V4.3.0 UPGRADE] Error during wipe: {e}")
     
-    def _show_upgrade_notification(self):
-        """Show popup notification about v4.3.0 upgrade"""
-        from app_utils import centered_message
-
-        # Show message directly parented to main app
-        centered_message(self.main_app, "EliteMining v4.3.0 Upgrade",
-                         "Mining Session data has been reset due to major format improvements.\n\n"
-                         "• Old session reports and graphs have been cleared\n"
-                         "• Enhanced report generation with material icons\n"
-                         "• Improved TPH calculations and statistics")
 
     def _update_comment_in_text_file(self, timestamp, new_comment):
         """Update comment in the corresponding session text file. Returns True if successful, False otherwise."""
@@ -12747,13 +9772,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Update CSV index with new session data (pass timestamp for consistency)
             self._update_csv_with_session(sysname, body, elapsed_txt, total_tons, overall_tph, cargo_session_data, session_comment, session_timestamp)
             
-            # Rebuild CSV from files to ensure everything is properly synchronized
-            csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
-            self._rebuild_csv_from_files_tab(csv_path, silent=True)
-            
-            # Refresh the Reports tab to show the new session
-            self._refresh_reports_tab()
-            
             # Auto-save graphs if data exists
             if CHARTS_AVAILABLE and self.charts_panel:
                 try:
@@ -12765,12 +9783,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 except Exception as graph_error:
                     print(f"Warning: Could not auto-save graphs: {graph_error}")
             
-            # Refresh reports tab and window if open (don't auto-open popup)
+            # Refresh saved-session views once.
             try:
                 self._refresh_reports_tab()  # Always refresh the main reports tab
-                if self.reports_window and self.reports_tree and self.reports_window.winfo_exists():
-                    self._refresh_reports_window()  # Only refresh popup if already open
-                    
                 # Refresh statistics after session completion
                 self._refresh_session_statistics()
             except Exception as window_error:
@@ -12855,15 +9870,142 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             print(f"Error loading bookmarks: {e}")
             self.bookmarks_data = []
 
-    def _save_bookmarks(self) -> None:
-        """Save bookmarks to JSON file"""
+    def _save_bookmarks(self, bookmarks=None) -> bool:
+        temp_path = None
         try:
-            with open(self.bookmarks_file, 'w', encoding='utf-8') as f:
-                json.dump(self.bookmarks_data, f, indent=2, ensure_ascii=False)
+            folder = os.path.dirname(self.bookmarks_file) or '.'
+            os.makedirs(folder, exist_ok=True)
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=folder,
+                                             delete=False) as f:
+                temp_path = f.name
+                json.dump(self.bookmarks_data if bookmarks is None else bookmarks,
+                          f, indent=2, ensure_ascii=False)
+            os.replace(temp_path, self.bookmarks_file)
+            return True
         except Exception as e:
-            print(f"Error saving bookmarks: {e}")
-            import traceback
-            traceback.print_exc()
+            log.exception("Error saving bookmarks")
+            centered_message(self.winfo_toplevel(), t('dialogs.error'),
+                             t('bookmarks.save_failed').format(error=e), icon='error')
+            return False
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    log.warning("Could not remove temporary bookmarks file: %s", temp_path)
+
+    def _bookmark_location_key(self, system, body):
+        from user_database import UserDatabase
+        system = ' '.join(system.split())
+        body = UserDatabase._normalize_body_name(' '.join(body.split()), system)
+        return system.casefold(), body.casefold()
+
+    def _find_bookmark(self, system, body, exclude=None):
+        key = self._bookmark_location_key(system, body)
+        for index, bookmark in enumerate(self.bookmarks_data):
+            if index != exclude and self._bookmark_location_key(bookmark.get('system', ''), bookmark.get('body', '')) == key:
+                return index
+        return None
+
+    def _bookmark_ring_type(self, value):
+        aliases = {'metallisch': 'Metallic', 'felsig': 'Rocky', 'eisig': 'Icy', 'metallreich': 'Metal Rich'}
+        aliases.update({value.casefold(): value for value in ('Metallic', 'Rocky', 'Icy', 'Metal Rich')})
+        return aliases.get(value.strip().casefold(), value.strip())
+
+    def _bookmark_material_key(self, value):
+        canonical = JournalParser.normalize_material_name(to_english(value).replace('-', ' '))
+        return get_abbr(canonical).casefold()
+
+    def _bookmark_yield(self, bookmark, mineral=''):
+        value = bookmark.get('avg_yield', '')
+        if mineral:
+            value = next((rate for name, rate in bookmark.get('mineral_tph', {}).items()
+                          if self._bookmark_material_key(name) == self._bookmark_material_key(mineral)), None)
+        try:
+            import math
+            value = float(str(value).replace(' T/hr', '').replace(',', '').strip())
+            return value if math.isfinite(value) else None
+        except (ValueError, TypeError):
+            return None
+
+    def _bookmark_screenshot_folder(self, bookmark):
+        from path_utils import get_bookmark_screenshots_dir
+        folder = bookmark.get('screenshot_folder') or re.sub(r'[\\/:*?"<>|]', '_',
+                     f"{bookmark.get('system', '')}_{bookmark.get('body', '')}")
+        return os.path.join(get_bookmark_screenshots_dir(), folder)
+
+    def _bookmark_screenshot_paths(self, bookmark):
+        folder = self._bookmark_screenshot_folder(bookmark)
+        return [os.path.join(folder, name) for name in bookmark.get('screenshots', [])]
+
+    def _cleanup_bookmark_screenshots(self, paths):
+        referenced = {os.path.normcase(os.path.abspath(path)) for bookmark in self.bookmarks_data
+                      for path in self._bookmark_screenshot_paths(bookmark)}
+        for path in set(paths):
+            if os.path.normcase(os.path.abspath(path)) in referenced:
+                continue
+            try:
+                if os.path.isfile(path):
+                    os.remove(path)
+                folder = os.path.dirname(path)
+                if os.path.isdir(folder) and not os.listdir(folder):
+                    os.rmdir(folder)
+            except OSError:
+                log.exception("Could not remove bookmark screenshot: %s", path)
+
+    def _commit_bookmark(self, bookmark, bookmark_index, screenshots):
+        import shutil
+        import uuid
+        previous = self.bookmarks_data[bookmark_index] if bookmark_index is not None else None
+        conflict = self._find_bookmark(bookmark['system'], bookmark['body'], exclude=bookmark_index)
+        if conflict is not None and (previous is None or
+                self._bookmark_location_key(previous['system'], previous['body']) !=
+                self._bookmark_location_key(bookmark['system'], bookmark['body'])):
+            centered_message(self.winfo_toplevel(), t('dialogs.error'), t('bookmarks.location_exists'), icon='error')
+            return False
+        bookmark = dict(bookmark)
+        bookmark['screenshot_folder'] = (os.path.basename(self._bookmark_screenshot_folder(previous))
+                                         if previous else uuid.uuid4().hex)
+        folder = self._bookmark_screenshot_folder(bookmark)
+        copied = []
+        filenames = []
+        try:
+            reserved = {entry['filename'].casefold() for entry in screenshots}
+            for entry in screenshots:
+                name = entry['filename']
+                if entry['is_pending_add']:
+                    os.makedirs(folder, exist_ok=True)
+                    base, ext = os.path.splitext(name)
+                    counter = 1
+                    while os.path.exists(os.path.join(folder, name)) or name.casefold() in {n.casefold() for n in filenames}:
+                        name = f"{base}_{counter}{ext}"
+                        counter += 1
+                        while name.casefold() in reserved:
+                            name = f"{base}_{counter}{ext}"
+                            counter += 1
+                    dest = os.path.join(folder, name)
+                    copied.append(dest)
+                    shutil.copy2(entry['path'], dest)
+                filenames.append(name)
+            bookmark['screenshots'] = filenames
+            updated = list(self.bookmarks_data)
+            if bookmark_index is None:
+                updated.append(bookmark)
+            else:
+                updated[bookmark_index] = bookmark
+            if not self._save_bookmarks(updated):
+                self._cleanup_bookmark_screenshots(copied)
+                return False
+        except Exception as e:
+            self._cleanup_bookmark_screenshots(copied)
+            log.exception("Could not save bookmark screenshots")
+            centered_message(self.winfo_toplevel(), t('dialogs.error'),
+                             t('bookmarks.save_failed').format(error=e), icon='error')
+            return False
+        self.bookmarks_data = updated
+        if previous:
+            self._cleanup_bookmark_screenshots(self._bookmark_screenshot_paths(previous))
+        return True
 
     def _create_bookmarks_panel(self, parent: ttk.Widget) -> None:
         """Create the bookmarks panel interface"""
@@ -12932,7 +10074,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         ttk.Label(filter_frame, text=t('bookmarks.type')).pack(side="left", padx=(10, 5))
         self.bookmark_ring_type_var = tk.StringVar(value=t('bookmarks.all_types'))
         ring_type_combo = ttk.Combobox(filter_frame, textvariable=self.bookmark_ring_type_var,
-                                       values=[t('bookmarks.all_types'), "Metallic", "Icy", "Rocky", "Metal Rich"],
+                                       values=[t('bookmarks.all_types')] + [t('ring_finder.' + key) for key in ('metallic', 'icy', 'rocky', 'metal_rich')],
                                        state="readonly", width=12)
         ring_type_combo.pack(side="left", padx=(0, 10))
         ring_type_combo.bind("<<ComboboxSelected>>", self._on_bookmark_filter_changed)
@@ -13014,9 +10156,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.bookmarks_tree.tag_configure('oddrow', background=_bm_bg, foreground=_bm_fg)
         self.bookmarks_tree.tag_configure('evenrow', background=_bm_alt, foreground=_bm_fg)
         
-        # Ensure multiple selection is properly configured
-        self.bookmarks_tree.configure(selectmode="extended")
-        
         # Force focus to ensure selection behavior works properly
         self.bookmarks_tree.focus_set()
         
@@ -13038,52 +10177,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.bookmarks_tree.heading("rating", text=t('bookmarks.rating'), anchor="w")
         self.bookmarks_tree.heading("notes", text=t('bookmarks.notes'), anchor="w")
         
-        # Add tooltip to avg_yield column header (hover over the column header itself)
-        # Create an invisible label over the column header area for tooltip
-        try:
-            # Get the treeview's heading bbox to position the tooltip trigger
-            def create_column_tooltip(tree, column_id, tooltip_text):
-                """Create a tooltip for a treeview column header"""
-                # Store tooltip text in the tree widget
-                if not hasattr(tree, '_column_tooltips'):
-                    tree._column_tooltips = {}
-                tree._column_tooltips[column_id] = tooltip_text
-                
-                # Bind motion event to show tooltip when hovering over header
-                def on_motion(event):
-                    region = tree.identify_region(event.x, event.y)
-                    if region == "heading":
-                        col = tree.identify_column(event.x)
-                        col_id = displayed_column(tree, col)
-                        if col_id:
-                            if col_id in tree._column_tooltips:
-                                # Show tooltip with word wrapping
-                                if hasattr(tree, '_header_tooltip_label'):
-                                    tree._header_tooltip_label.destroy()
-                                tree._header_tooltip_label = tk.Label(tree, text=tree._column_tooltips[col_id],
-                                                                     background="#2a2a2a", foreground="#e0e0e0",
-                                                                     relief="solid", borderwidth=1,
-                                                                     font=scaled_font(9), padx=6, pady=4,
-                                                                     wraplength=300, justify="left")
-                                tree._header_tooltip_label.place(x=event.x + 10, y=event.y + 10)
-                                return
-                    # Hide tooltip if not over a column with tooltip
-                    if hasattr(tree, '_header_tooltip_label'):
-                        tree._header_tooltip_label.destroy()
-                        delattr(tree, '_header_tooltip_label')
-                
-                def on_leave(event):
-                    if hasattr(tree, '_header_tooltip_label'):
-                        tree._header_tooltip_label.destroy()
-                        delattr(tree, '_header_tooltip_label')
-                
-                tree.bind('<Motion>', on_motion, add='+')
-                tree.bind('<Leave>', on_leave, add='+')
-            
-            create_column_tooltip(self.bookmarks_tree, 'avg_yield', t('tooltips.bookmark_avg_yield'))
-        except Exception as e:
-            print(f"Could not create column tooltip: {e}")
-        
+        from ui.tooltip import add_header_tooltips
+        add_header_tooltips(self.bookmarks_tree, lambda col: t('tooltips.bookmark_avg_yield') if col == 'avg_yield' else '')
+
         # Configure column widths
 
         # minwidth is derived from the actual rendered header text width (at the
@@ -13104,15 +10200,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         _bm_minwidths = {col: _bm_min_for(col) for col in _bm_base_widths}
 
-        _bm_anchors = {"last_visited": "w", "last_mined": "w", "system": "w", "body": "w",
-                        "distance": "w", "sol_dist": "w", "hotspot": "w", "reserve": "w", "density": "w",
-                        "materials": "w", "avg_yield": "w", "overlap": "w", "res_site": "w",
-                        "visits": "w", "rating": "w", "notes": "w"}
-
         for col_name, base_width in _bm_base_widths.items():
             self.bookmarks_tree.column(col_name, width=max(scaled_px(base_width), _bm_minwidths[col_name]),
                                    minwidth=_bm_minwidths[col_name], stretch=False,
-                                   anchor=_bm_anchors[col_name])
+                                   anchor="w")
 
         # Setup column visibility for bookmarks
         self.setup_column_visibility(
@@ -13141,6 +10232,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Bind column resize event to save widths
         def save_bookmarks_widths(event=None):
+            if not getattr(self, '_bookmark_resizing', False):
+                return
+            self._bookmark_resizing = False
             try:
                 from config import save_bookmarks_column_widths
                 widths = {}
@@ -13172,45 +10266,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             self._bookmark_sort_dirs = {}
         if not hasattr(self, '_bookmark_sort_col'):
             self._bookmark_sort_col = None
-        sort_dirs = self._bookmark_sort_dirs
-        def sort_bookmark_col(col):
-            try:
-                reverse = sort_dirs.get(col, False)
-                items = [(self.bookmarks_tree.set(item, col), item) for item in self.bookmarks_tree.get_children('')]
-                
-                # Date sorting for last_mined / last_visited
-                if col in ("last_mined", "last_visited"):
-                    def safe_date(x):
-                        try:
-                            return dt.datetime.strptime(str(x), '%Y-%m-%d') if x else dt.datetime.min
-                        except:
-                            return dt.datetime.min
-                    items.sort(key=lambda x: safe_date(x[0]), reverse=reverse)
-                # Numeric sorting for avg_yield
-                elif col in ("avg_yield", "distance", "sol_dist", "visits"):
-                    def safe_float(x):
-                        try:
-                            val = str(x).replace(" T/hr", "").replace(" LY", "").replace(",", "").strip()
-                            return float(val) if val else 0.0
-                        except:
-                            return 0.0
-                    items.sort(key=lambda x: safe_float(x[0]), reverse=reverse)
-                else:
-                    # String sorting
-                    items.sort(key=lambda x: str(x[0]).lower(), reverse=reverse)
-                    
-                for index, (val, item) in enumerate(items):
-                    self.bookmarks_tree.move(item, '', index)
-                sort_dirs[col] = not reverse
-                self._bookmark_sort_col = col
-                from ui.sort_indicator import apply_sort_arrow
-                apply_sort_arrow(self.bookmarks_tree, col, reverse)
-            except Exception as e:
-                print(f"Bookmark sorting error for column {col}: {e}")
-
-        # Bind column headers to sorting
-        for col in ("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "density", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"):
-            self.bookmarks_tree.heading(col, command=lambda c=col: sort_bookmark_col(c))
+        for col in self.bookmarks_tree['columns']:
+            self.bookmarks_tree.heading(col, command=lambda c=col: self._sort_bookmarks(c))
 
         # Buttons frame
         button_frame = ttk.Frame(main_frame)
@@ -13250,7 +10307,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.bookmarks_tree.bind("<Double-1>", self._on_bookmark_double_click)
         
         # Single-click handler for Notes column
-        self.bookmarks_tree.bind("<Button-1>", self._on_bookmark_single_click)
+        self.bookmarks_tree.bind("<Button-1>", self._on_bookmark_single_click, add="+")
 
         # Hover tooltip showing the note text
         from ui.cell_tooltip import attach_cell_tooltip
@@ -13264,32 +10321,43 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self._refresh_bookmarks()
 
     def _on_bookmark_filter_changed(self, event=None) -> None:
-        """Handle bookmark filter dropdown change"""
-        self._refresh_bookmarks()
+        self._refresh_bookmarks(reuse_derived=True)
 
     def _on_bookmark_search_changed(self, event=None) -> None:
-        """Handle bookmark search text change"""
-        self._refresh_bookmarks()
+        pending = getattr(self, '_bookmark_search_after', None)
+        if pending:
+            self.after_cancel(pending)
+        def refresh():
+            self._bookmark_search_after = None
+            self._refresh_bookmarks(reuse_derived=True)
+        self._bookmark_search_after = self.after(200, refresh)
 
-    def _abbreviate_material_for_bookmark(self, material_name: str) -> str:
-        """Abbreviate material name for bookmark display"""
-        abbreviations = {
-            'Alexandrite': 'Alex',
-            'Benitoite': 'Beni',
-            'Bromellite': 'Brom',
-            'Grandidierite': 'Gran',
-            'Low Temperature Diamonds': 'LTD',
-            'Low-Temperature Diamonds': 'LTD',
-            'Monazite': 'Mona',
-            'Musgravite': 'Musg',
-            'Painite': 'Pain',
-            'Platinum': 'Plat',
-            'Rhodplumsite': 'Rhod',
-            'Serendibite': 'Sere',
-            'Tritium': 'Trit',
-            'Void Opals': 'Opals'
-        }
-        return abbreviations.get(material_name, material_name[:4] if len(material_name) > 4 else material_name)
+    def _sort_bookmarks(self, col, toggle=True):
+        reverse = self._bookmark_sort_dirs.get(col, False)
+        if not toggle:
+            reverse = not reverse
+        def sort_key(item):
+            value = self.bookmarks_tree.set(item, col)
+            if col in ('last_mined', 'last_visited'):
+                try:
+                    return dt.datetime.strptime(value, '%Y-%m-%d')
+                except ValueError:
+                    return dt.datetime.min
+            if col in ('avg_yield', 'distance', 'sol_dist', 'visits'):
+                try:
+                    return float(str(value).replace(' T/hr', '').replace(',', '').strip())
+                except (ValueError, TypeError):
+                    return float('-inf')
+            return str(value).casefold()
+        items = sorted(self.bookmarks_tree.get_children(''), key=sort_key, reverse=reverse)
+        for index, item in enumerate(items):
+            self.bookmarks_tree.move(item, '', index)
+            self.bookmarks_tree.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
+        if toggle:
+            self._bookmark_sort_dirs[col] = not reverse
+        self._bookmark_sort_col = col
+        from ui.sort_indicator import apply_sort_arrow
+        apply_sort_arrow(self.bookmarks_tree, col, reverse)
 
     def _sync_bookmark_last_mined(self) -> None:
         """Advance each bookmark's Last Mined to its newest mining report date."""
@@ -13300,31 +10368,28 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 return
             latest = {}
             for (system, body), (_display, ts_raw) in lookup.items():
-                try:
-                    if ts_raw.endswith('Z'):
-                        ts = dt.datetime.fromisoformat(ts_raw.replace('Z', '+00:00')).astimezone()
-                    else:
-                        ts = dt.datetime.fromisoformat(ts_raw)
-                except ValueError:
-                    continue
-                latest[(system.lower(), ' '.join(body.lower().split()))] = ts.strftime('%Y-%m-%d')
+                stamp = session_date(ts_raw)
+                if stamp:
+                    key = self._bookmark_location_key(system, body)
+                    latest[key] = max(latest.get(key, ''), stamp.astimezone().strftime('%Y-%m-%d'))
+            updated = [dict(bookmark) for bookmark in self.bookmarks_data]
             changed = False
-            for bookmark in self.bookmarks_data:
-                system = bookmark.get('system', '')
-                body = ' '.join(bookmark.get('body', '').lower().split())
-                if body.startswith(system.lower()):
-                    body = body[len(system):].strip()
-                report_date = latest.get((system.lower(), body)) or latest.get((system.lower(), f"{system.lower()} {body}"))
+            for bookmark in updated:
+                report_date = latest.get(self._bookmark_location_key(bookmark.get('system', ''), bookmark.get('body', '')))
                 if report_date and report_date > bookmark.get('last_mined', ''):
                     bookmark['last_mined'] = report_date
                     changed = True
-            if changed:
-                self._save_bookmarks()
+            if changed and self._save_bookmarks(updated):
+                self.bookmarks_data = updated
         except Exception as e:
             print(f"Bookmark last-mined sync failed: {e}")
 
-    def _refresh_bookmarks(self) -> None:
+    def _refresh_bookmarks(self, reuse_derived=False) -> None:
         """Refresh the bookmarks display with current filter/search"""
+        pending = getattr(self, '_bookmark_search_after', None)
+        if pending:
+            self.after_cancel(pending)
+            self._bookmark_search_after = None
         # Clear existing items
         for item in self.bookmarks_tree.get_children():
             self.bookmarks_tree.delete(item)
@@ -13337,7 +10402,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         mineral_sel = self.bookmark_mineral_var.get() if hasattr(self, 'bookmark_mineral_var') else ""
         mineral_filter = "" if mineral_sel == t('bookmarks.all_minerals') else mineral_sel
 
-        yield_header = t('bookmarks.avg_yield_mineral').format(mineral=mineral_filter) if mineral_filter else t('bookmarks.avg_yield_best')
+        yield_header = t('bookmarks.avg_yield_mineral').format(mineral=get_material(mineral_filter)) if mineral_filter else t('bookmarks.avg_yield_best')
         self.bookmarks_tree.heading("avg_yield", text=yield_header)
         import tkinter.font as _tkfont
         yield_header_width = _tkfont.Font(font=scaled_font(9, "bold")).measure(yield_header) + scaled_px(24)
@@ -13345,60 +10410,46 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                    width=max(self.bookmarks_tree.column("avg_yield", "width"), yield_header_width))
 
         ring_type_sel = self.bookmark_ring_type_var.get() if hasattr(self, 'bookmark_ring_type_var') else ""
-        ring_type_filter = "" if ring_type_sel == t('bookmarks.all_types') else ring_type_sel
+        ring_type_filter = "" if ring_type_sel == t('bookmarks.all_types') else self._bookmark_ring_type(ring_type_sel)
 
-        from ring_finder import translate_reserve_level
-        user_db = ring_finder = None
-        last_visit_dates, visit_counts, density_lookup, system_coords, current_coords = {}, {}, {}, {}, None
-        try:
-            user_db = self.main_app.cargo_monitor.user_db
-            bookmark_systems = list({b.get('system', '') for b in self.bookmarks_data if b.get('system')})
-            last_visit_dates = user_db.bulk_get_last_visit_dates(bookmark_systems)
-            visit_counts = user_db.bulk_get_visit_counts(bookmark_systems)
-            density_lookup = user_db.bulk_get_ring_density_for_rings(bookmark_systems)
-            ring_finder = self.main_app.ring_finder
-            current_system = self.main_app.get_current_system()
+        from ring_finder import translate_reserve_level, translate_ring_type
+        user_db = getattr(getattr(self.main_app, 'cargo_monitor', None), 'user_db', None)
+        ring_finder = getattr(self.main_app, 'ring_finder', None)
+        bookmark_systems = sorted({b.get('system', '') for b in self.bookmarks_data if b.get('system')})
+        current_system = self.main_app.get_current_system()
+        cache_key = (tuple(bookmark_systems), current_system)
+        cached = getattr(self, '_bookmark_derived', None) if reuse_derived else None
+        if cached and cached[0] == cache_key:
+            last_visit_dates, visit_counts, density_lookup, reserves, system_coords, current_coords = cached[1]
+        else:
+            last_visit_dates, visit_counts, density_lookup, reserves, system_coords, current_coords = {}, {}, {}, {}, {}, None
+            if user_db:
+                last_visit_dates = user_db.bulk_get_last_visit_dates(bookmark_systems)
+                visit_counts = user_db.bulk_get_visit_counts(bookmark_systems)
+                density_lookup = user_db.bulk_get_ring_density_for_rings(bookmark_systems)
+                reserves = user_db.bulk_get_reserve_levels_for_rings(bookmark_systems)
+            if ring_finder:
+                def coords(system_name):
+                    value = ring_finder.systems_data.get(system_name.lower()) or ring_finder._get_system_coords_from_galaxy_db(system_name)
+                    if not value and user_db:
+                        visited = user_db._get_coordinates_from_visited_systems(system_name)
+                        value = dict(zip(('x', 'y', 'z'), visited)) if visited else None
+                    return value
+                system_coords = {name: coords(name) for name in bookmark_systems}
+                current_coords = system_coords[current_system] if current_system in system_coords else (coords(current_system) if current_system else None)
+            self._bookmark_derived = (cache_key, (last_visit_dates, visit_counts, density_lookup, reserves, system_coords, current_coords))
 
-            def _coords(system_name):
-                # Same lookup chain Ring Finder uses: session cache, galaxy DB, visited systems
-                coords = ring_finder.systems_data.get(system_name.lower()) or ring_finder._get_system_coords_from_galaxy_db(system_name)
-                if not coords:
-                    visited = user_db._get_coordinates_from_visited_systems(system_name)
-                    coords = {'x': visited[0], 'y': visited[1], 'z': visited[2]} if visited else None
-                return coords
-
-            system_coords = {name: _coords(name) for name in bookmark_systems}
-            current_coords = _coords(current_system) if current_system else None
-        except Exception:
-            pass
-
-        # Filter and display bookmarks
         row_index = 0
-        for bookmark in self.bookmarks_data:
-            # Apply filter using internal keys
-            if filter_value == "high_yield":
-                yield_str = bookmark.get('avg_yield', '')
-                try:
-                    yield_val = float(yield_str.replace(' T/hr', '')) if yield_str else 0
-                    if yield_val <= 350:
-                        continue
-                except:
+        for bookmark_index, bookmark in enumerate(self.bookmarks_data):
+            yield_value = self._bookmark_yield(bookmark, mineral_filter)
+            if filter_value in ('high_yield', 'medium_yield', 'low_yield'):
+                if yield_value is None:
                     continue
-            elif filter_value == "medium_yield":
-                yield_str = bookmark.get('avg_yield', '')
-                try:
-                    yield_val = float(yield_str.replace(' T/hr', '')) if yield_str else 0
-                    if yield_val < 250 or yield_val > 350:
-                        continue
-                except:
+                if filter_value == 'high_yield' and yield_value < 1000:
                     continue
-            elif filter_value == "low_yield":
-                yield_str = bookmark.get('avg_yield', '')
-                try:
-                    yield_val = float(yield_str.replace(' T/hr', '')) if yield_str else 0
-                    if yield_val < 100 or yield_val >= 250:
-                        continue
-                except:
+                if filter_value == 'medium_yield' and not 500 <= yield_value < 1000:
+                    continue
+                if filter_value == 'low_yield' and not 100 <= yield_value < 500:
                     continue
             elif filter_value == "recent":
                 last_mined = bookmark.get('last_mined', '')
@@ -13422,8 +10473,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 except ValueError:
                     continue
             elif filter_value == "hotspot_locations":
-                hotspot = bookmark.get('hotspot', '').lower()
-                if not hotspot or hotspot == '':
+                if not bookmark.get('materials', '').strip():
                     continue
             elif filter_value == "no_overlap":
                 overlap_type = bookmark.get('overlap_type', '')
@@ -13438,13 +10488,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 if overlap_type != '3x':
                     continue
             
-            if ring_type_filter and bookmark.get('hotspot', '').lower() != ring_type_filter.lower():
+            if ring_type_filter and self._bookmark_ring_type(bookmark.get('hotspot', '')) != ring_type_filter:
                 continue
 
             if mineral_filter:
-                materials_text = bookmark.get('materials', '').lower()
-                if (mineral_filter.lower() not in materials_text and
-                        self._abbreviate_material_for_bookmark(mineral_filter).lower() not in materials_text):
+                materials = {self._bookmark_material_key(name.strip()) for name in bookmark.get('materials', '').split(',')}
+                if self._bookmark_material_key(mineral_filter) not in materials:
                     continue
 
             # Apply search filter
@@ -13462,7 +10511,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             overlap_type = bookmark.get('overlap_type', '')
             if target_material and overlap_type:
                 # Abbreviate material name for display
-                mat_abbr = self._abbreviate_material_for_bookmark(target_material)
+                mat_abbr = get_abbr(target_material)
                 overlap_display = f"{mat_abbr} {overlap_type}"
             else:
                 overlap_display = ''
@@ -13471,7 +10520,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             res_site = bookmark.get('res_site', '')
             res_material = bookmark.get('res_material', '')
             if res_site and res_material:
-                mat_abbr = self._abbreviate_material_for_bookmark(res_material)
+                mat_abbr = get_abbr(res_material)
                 res_abbr = {'Hazardous': 'HAZ', 'High': 'High', 'Low': 'Low'}.get(res_site, res_site)
                 res_display = f"{res_abbr} {mat_abbr}"
             elif res_site:
@@ -13500,12 +10549,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             else:
                 notes_display = ''
 
-            yield_display = bookmark.get('avg_yield', '')
-            if mineral_filter:
-                for mat, tph_val in bookmark.get('mineral_tph', {}).items():
-                    if mat.lower() == mineral_filter.lower() or self._abbreviate_material_for_bookmark(mat).lower() == self._abbreviate_material_for_bookmark(mineral_filter).lower():
-                        yield_display = f"{tph_val:.1f} T/hr"
-                        break
+            yield_display = f"{yield_value:.1f} T/hr" if yield_value is not None else ''
 
             distance_display = sol_display = ''
             bm_coords = system_coords.get(bookmark.get('system', ''))
@@ -13514,21 +10558,21 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 if current_coords:
                     distance_display = f"{ring_finder._calculate_distance(bm_coords, current_coords):.1f}"
 
-            reserve_display = translate_reserve_level(user_db.get_reserve_level(bookmark.get('system', ''), bookmark.get('body', ''))) if user_db else ''
+            reserve_display = translate_reserve_level(reserves.get((bookmark.get('system', ''), user_db._normalize_body_name(bookmark.get('body', ''), bookmark.get('system', ''))), '')) if user_db else ''
             visits_display = visit_counts.get(bookmark.get('system', ''), 0) or ''
             _bm_sys, _bm_body = bookmark.get('system', ''), bookmark.get('body', '')
             density_key = density_lookup.get((_bm_sys, user_db._normalize_body_name(_bm_body, _bm_sys))) if user_db else None
             density_display = t(f'ring_finder.density_{density_key}') if density_key else ''
 
             tag = "evenrow" if row_index % 2 == 0 else "oddrow"
-            self.bookmarks_tree.insert("", "end", values=(
+            self.bookmarks_tree.insert("", "end", iid=str(bookmark_index), values=(
                 last_visit_dates.get(bookmark.get('system', ''), ''),
                 bookmark.get('last_mined', ''),
                 bookmark.get('system', ''),
                 bookmark.get('body', ''),
                 distance_display,
                 sol_display,
-                bookmark.get('hotspot', ''),
+                translate_ring_type(self._bookmark_ring_type(bookmark.get('hotspot', ''))),
                 reserve_display,
                 density_display,
                 bookmark.get('materials', ''),
@@ -13541,56 +10585,25 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             ), tags=(tag,))
             row_index += 1
 
-        # Re-apply current sort, defaulting to last_mined descending (newest on top)
-        if hasattr(self, '_bookmark_sort_col') and self._bookmark_sort_col:
-            active_col = self._bookmark_sort_col
-        else:
-            active_col = 'last_mined'
+        if not self._bookmark_sort_col:
             self._bookmark_sort_col = 'last_mined'
-            self._bookmark_sort_dirs['last_mined'] = False  # next click = ascending; current (default) = descending
-        try:
-            reverse = not self._bookmark_sort_dirs.get(active_col, False)  # apply opposite of "next" state = current state
-            items = [(self.bookmarks_tree.set(item, active_col), item) for item in self.bookmarks_tree.get_children('')]
-            if active_col in ('last_mined', 'last_visited'):
-                def safe_date(x):
-                    try:
-                        return dt.datetime.strptime(str(x), '%Y-%m-%d') if x else dt.datetime.min
-                    except:
-                        return dt.datetime.min
-                items.sort(key=lambda x: safe_date(x[0]), reverse=reverse)
-            elif active_col in ('avg_yield', 'distance', 'sol_dist', 'visits'):
-                def safe_float(x):
-                    try:
-                        return float(str(x).replace(' T/hr', '').replace(' LY', '').replace(',', '').strip()) if x else 0.0
-                    except:
-                        return 0.0
-                items.sort(key=lambda x: safe_float(x[0]), reverse=reverse)
-            else:
-                items.sort(key=lambda x: str(x[0]).lower(), reverse=reverse)
-            for index, (val, item) in enumerate(items):
-                self.bookmarks_tree.move(item, '', index)
-                self.bookmarks_tree.item(item, tags=("evenrow" if index % 2 == 0 else "oddrow",))
-            from ui.sort_indicator import apply_sort_arrow
-            apply_sort_arrow(self.bookmarks_tree, active_col, reverse)
-        except Exception:
-            pass
+            self._bookmark_sort_dirs['last_mined'] = False
+        self._sort_bookmarks(self._bookmark_sort_col, toggle=False)
 
     def _on_bookmark_double_click(self, event) -> None:
         """Handle double-click on bookmark tree - only edit if clicking on an item, not header"""
         # Check if click is on an actual item, not header
         item = self.bookmarks_tree.identify('item', event.x, event.y)
-        if item:  # Only edit if there's an actual item under the cursor
+        if item:
+            self.bookmarks_tree.selection_set(item)
             self._edit_bookmark_dialog()
 
     def _bookmark_note_text(self, item) -> str:
-        values = self.bookmarks_tree.item(item, 'values')
-        for bookmark in self.bookmarks_data:
-            if bookmark.get('system') == values[2] and bookmark.get('body') == values[3]:
-                return bookmark.get('notes', '')
-        return ""
+        return self.bookmarks_data[int(item)].get('notes', '')
 
     def _on_bookmark_single_click(self, event) -> None:
         """Handle single-click on bookmark tree - open edit dialog if clicking on Notes column"""
+        self._bookmark_resizing = self.bookmarks_tree.identify_region(event.x, event.y) == 'separator'
         # Identify what was clicked
         item = self.bookmarks_tree.identify('item', event.x, event.y)
         column = self.bookmarks_tree.identify('column', event.x, event.y)
@@ -13614,25 +10627,29 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if not selection:
             return
         
-        # Get selected bookmark data
-        item = selection[0]
-        values = self.bookmarks_tree.item(item, 'values')
-        if not values:
-            return
-        
-        # Find the bookmark in data
-        system, body = values[2], values[3]
-        bookmark_index = None
-        for i, bookmark in enumerate(self.bookmarks_data):
-            if bookmark.get('system') == system and bookmark.get('body') == body:
-                bookmark_index = i
-                break
-        
-        if bookmark_index is not None:
-            self._show_bookmark_dialog(self.bookmarks_data[bookmark_index], bookmark_index)
+        bookmark_index = int(selection[0])
+        self._show_bookmark_dialog(self.bookmarks_data[bookmark_index], bookmark_index)
 
     def _show_bookmark_dialog(self, bookmark_data=None, bookmark_index=None) -> None:
         """Show add/edit bookmark dialog"""
+        if bookmark_index is None and bookmark_data:
+            existing_index = self._find_bookmark(bookmark_data.get('system', ''), bookmark_data.get('body', ''))
+            if existing_index is not None:
+                if not centered_askyesno(self.winfo_toplevel(), t('bookmarks.edit_bookmark'),
+                                        t('bookmarks.update_existing')):
+                    return
+                existing = self.bookmarks_data[existing_index]
+                incoming = bookmark_data
+                bookmark_data = dict(existing)
+                for key in ('hotspot', 'materials', 'target_material', 'overlap_type', 'res_site', 'res_material'):
+                    if incoming.get(key):
+                        bookmark_data[key] = incoming[key]
+                if incoming.get('avg_yield'):
+                    bookmark_data['avg_yield'] = incoming['avg_yield']
+                    bookmark_data['mineral_tph'] = incoming.get('mineral_tph', {})
+                bookmark_data['last_mined'] = max(existing.get('last_mined', ''), incoming.get('last_mined', ''))
+                bookmark_index = existing_index
+
         dialog = tk.Toplevel(self)
         dialog.withdraw()
         dialog.title(t('bookmarks.add_new_bookmark') if bookmark_index is None else t('bookmarks.edit_bookmark'))
@@ -13677,7 +10694,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Hotspot field - Ring Type dropdown
         ttk.Label(frame, text=t('bookmarks.ring_type')).grid(row=3, column=0, sticky="w", pady=(0, 5), padx=(0, 10))
-        hotspot_var = tk.StringVar(value=bookmark_data.get('hotspot', '') if bookmark_data else '')
+        from ring_finder import translate_ring_type
+        hotspot_var = tk.StringVar(value=translate_ring_type(self._bookmark_ring_type(bookmark_data.get('hotspot', ''))) if bookmark_data else '')
         hotspot_combo = ttk.Combobox(frame, textvariable=hotspot_var, width=32, state="readonly")
         hotspot_combo['values'] = ("", t('ring_finder.metallic'), t('ring_finder.rocky'), t('ring_finder.icy'), t('ring_finder.metal_rich'))
         hotspot_combo.grid(row=3, column=1, sticky="w", pady=(0, 5))
@@ -13758,10 +10776,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Localized names for display
         target_materials_display = [get_material(m) if m else '' for m in target_materials_en]
         
-        # Create mapping between display and English names
-        display_to_en = {get_material(m): m for m in target_materials_en if m}
-        display_to_en[''] = ''
-        
         # Get current value and convert to display name
         current_value = bookmark_data.get('target_material', '') if bookmark_data else ''
         current_display = get_material(current_value) if current_value else ''
@@ -13815,45 +10829,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             notes_text.insert("1.0", bookmark_data.get('notes', ''))
 
         # ---- Screenshots section ----
-        # screenshots_state: list of dicts with keys: filename, path, is_pending_add
-        #   is_pending_add=True  -> not yet copied (src path), copy on Save
-        #   is_pending_add=False -> already in AppData (appdata path)
-        # pending_remove: list of appdata paths to delete on Save
         screenshots_state = []
-        pending_remove = []
-
-        existing_screenshots = bookmark_data.get('screenshots', []) if bookmark_data else []
-
-        def _screenshots_appdata_dir():
-            """Compute appdata screenshots folder for current system/body."""
-            from path_utils import get_bookmark_screenshots_dir
-            import re
-            sys_name = system_var.get().strip() or 'unknown'
-            body_name = body_var.get().strip() or 'unknown'
-            folder_name = re.sub(r'[\\/:*?"<>|]', '_', f"{sys_name}_{body_name}")
-            folder = os.path.join(get_bookmark_screenshots_dir(), folder_name)
-            os.makedirs(folder, exist_ok=True)
-            return folder
-
-        def _build_existing_screenshot_state():
-            """Populate screenshots_state from existing bookmark data."""
-            from path_utils import get_bookmark_screenshots_dir
-            import re
-            for fname in existing_screenshots:
-                # Try to find the file in any subfolder of BookmarkScreenshots
-                # First try current system/body folder
-                appdata_path = os.path.join(_screenshots_appdata_dir(), fname)
-                if not os.path.exists(appdata_path):
-                    # Search all subfolders
-                    root = get_bookmark_screenshots_dir()
-                    for sub in os.listdir(root):
-                        candidate = os.path.join(root, sub, fname)
-                        if os.path.exists(candidate):
-                            appdata_path = candidate
-                            break
-                screenshots_state.append({'filename': fname, 'path': appdata_path, 'is_pending_add': False})
-
-        _build_existing_screenshot_state()
+        if bookmark_data:
+            for path in self._bookmark_screenshot_paths(bookmark_data):
+                screenshots_state.append({'filename': os.path.basename(path), 'path': path, 'is_pending_add': False})
 
         ttk.Label(frame, text=t('bookmarks.screenshots_label')).grid(row=14, column=0, sticky="nw", pady=(0, 5), padx=(0, 10))
         ss_outer = ttk.Frame(frame)
@@ -13885,8 +10864,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         def _ss_add():
             from tkinter import filedialog
             src = filedialog.askopenfilename(
-                title="Select Screenshot",
-                filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif")],
+                title=t('bookmarks.select_screenshot'),
+                filetypes=[(t('bookmarks.image_files'), '*.png *.jpg *.jpeg *.bmp *.gif')],
                 parent=dialog
             )
             if not src:
@@ -13911,7 +10890,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if os.path.exists(path):
                 os.startfile(path)
             else:
-                from main import centered_info_dialog
+                from ui.dialogs import centered_info_dialog
                 centered_info_dialog(dialog, t('dialogs.warning'),
                                      t('bookmarks.screenshot_file_not_found') + f"\n{path}")
 
@@ -13925,7 +10904,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 import subprocess
                 subprocess.Popen(f'explorer /select,"{path}"')
             else:
-                from main import centered_info_dialog
+                from ui.dialogs import centered_info_dialog
                 centered_info_dialog(dialog, t('dialogs.warning'),
                                      t('bookmarks.screenshot_file_not_found') + f"\n{path}")
 
@@ -13934,13 +10913,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if not sel:
                 return
             entry = screenshots_state[sel[0]]
-            from main import centered_yesno_dialog
+            from ui.dialogs import centered_yesno_dialog
             if not centered_yesno_dialog(dialog, t('dialogs.confirm_delete'),
                                          t('bookmarks.remove_screenshot_confirm')):
                 return
-            if not entry['is_pending_add']:
-                # Queue for deletion from AppData on Save
-                pending_remove.append(entry['path'])
             screenshots_state.pop(sel[0])
             _refresh_ss_listbox()
 
@@ -14032,9 +11008,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if bookmark_data:
             load_from_database()
         
-        # Remove the column weight so fields don't expand
-        # frame.columnconfigure(1, weight=1)  # Commented out to prevent expansion
-        
         # Buttons
         button_frame = ttk.Frame(frame)
         button_frame.grid(row=15, column=0, columnspan=2, pady=(10, 0))
@@ -14062,10 +11035,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             else:
                 materials_en = ''
             
-            bookmark = {
+            bookmark = dict(bookmark_data or {})
+            bookmark.update({
                 'system': system,
                 'body': body,
-                'hotspot': hotspot_var.get().strip(),
+                'hotspot': self._bookmark_ring_type(hotspot_var.get()),
                 'materials': materials_en,
                 'avg_yield': yield_var.get().strip(),
                 'mineral_tph': bookmark_data.get('mineral_tph', {}) if bookmark_data else {},
@@ -14077,32 +11051,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 'last_mined': last_mined_var.get().strip(),
                 'notes': notes_text.get("1.0", "end-1c").strip(),
                 'date_added': bookmark_data.get('date_added', dt.datetime.now().strftime('%Y-%m-%d')) if bookmark_data else dt.datetime.now().strftime('%Y-%m-%d')
-            }
+            })
 
-            # Handle screenshots: copy pending additions, delete queued removals
-            import shutil
-            dest_folder = _screenshots_appdata_dir()
-            for entry in screenshots_state:
-                if entry['is_pending_add']:
-                    try:
-                        dest_path = os.path.join(dest_folder, entry['filename'])
-                        shutil.copy2(entry['path'], dest_path)
-                        entry['path'] = dest_path
-                        entry['is_pending_add'] = False
-                    except Exception as e:
-                        print(f"[SCREENSHOT] Failed to copy {entry['path']}: {e}")
-            for remove_path in pending_remove:
-                try:
-                    if os.path.exists(remove_path):
-                        os.remove(remove_path)
-                        # Remove the parent subfolder if it is now empty
-                        parent = os.path.dirname(remove_path)
-                        if os.path.isdir(parent) and not os.listdir(parent):
-                            os.rmdir(parent)
-                except Exception as e:
-                    print(f"[SCREENSHOT] Failed to delete {remove_path}: {e}")
-            pending_remove.clear()
-            bookmark['screenshots'] = [e['filename'] for e in screenshots_state]
+            if not self._commit_bookmark(bookmark, bookmark_index, screenshots_state):
+                return
 
             try:
                 if _density_user_db:
@@ -14145,14 +11097,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             except Exception as e:
                 print(f"Error syncing bookmark to database: {e}")
             
-            if bookmark_index is not None:
-                # Edit existing bookmark
-                self.bookmarks_data[bookmark_index] = bookmark
-            else:
-                # Add new bookmark
-                self.bookmarks_data.append(bookmark)
-            
-            self._save_bookmarks()
             self._refresh_bookmarks()
             dialog.destroy()
         
@@ -14180,29 +11124,17 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Focus on system entry
         system_entry.focus()
         
-        # Center and show the dialog now that all widgets are created
+        from ui.dialogs import center_window
         dialog.update_idletasks()
-        main_parent = self.winfo_toplevel()
-        main_parent.update_idletasks()
-        
-        # Get dialog size
-        dialog_width = dialog.winfo_reqwidth()
-        dialog_height = dialog.winfo_reqheight()
-        
-        # Get parent position and size
-        parent_x = main_parent.winfo_rootx()
-        parent_y = main_parent.winfo_rooty()
-        parent_width = main_parent.winfo_width()
-        parent_height = main_parent.winfo_height()
-        
-        # Calculate centered position
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
-        
-        dialog.geometry(f"+{x}+{y}")
+        center_window(dialog, self.winfo_toplevel())
         dialog.deiconify()
-        dialog.transient(main_parent)
-        dialog.grab_set()
+        dialog.attributes('-topmost', True)
+        dialog.lift()
+        dialog.focus_force()
+        try:
+            dialog.grab_set()
+        except tk.TclError:
+            pass
 
     def _delete_bookmark(self) -> None:
         """Delete selected bookmark(s)"""
@@ -14219,75 +11151,21 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             confirm_message = t('dialogs.delete_bookmark_multi').format(count=bookmark_count)
         
         # Confirm deletion using centered dialog
-        from main import centered_yesno_dialog
+        from ui.dialogs import centered_yesno_dialog
         main_parent = self.winfo_toplevel()
         
         if not centered_yesno_dialog(main_parent, t('dialogs.confirm_delete'), confirm_message):
             return
         
-        # Collect all bookmarks to delete
-        bookmarks_to_delete = []
-        for item in selection:
-            values = self.bookmarks_tree.item(item, 'values')
-            if values and len(values) >= 4:
-                system, body = values[2], values[3]
-                bookmarks_to_delete.append((system, body))
-        
-        # Remove bookmarks from data (iterate in reverse to avoid index issues)
-        for system, body in bookmarks_to_delete:
-            for i in range(len(self.bookmarks_data) - 1, -1, -1):
-                bookmark = self.bookmarks_data[i]
-                if bookmark.get('system') == system and bookmark.get('body') == body:
-                    # Delete associated screenshot files
-                    try:
-                        import re, shutil
-                        from path_utils import get_bookmark_screenshots_dir
-                        folder_name = re.sub(r'[\\/:*?"<>|]', '_', f"{system}_{body}")
-                        ss_folder = os.path.join(get_bookmark_screenshots_dir(), folder_name)
-                        if os.path.exists(ss_folder):
-                            shutil.rmtree(ss_folder)
-                    except Exception as e:
-                        print(f"[SCREENSHOT] Failed to remove screenshot folder for {system}/{body}: {e}")
-                    del self.bookmarks_data[i]
-                    break
-        
-        self._save_bookmarks()
+        indices = {int(item) for item in selection}
+        removed = [bookmark for index, bookmark in enumerate(self.bookmarks_data) if index in indices]
+        updated = [bookmark for index, bookmark in enumerate(self.bookmarks_data) if index not in indices]
+        if not self._save_bookmarks(updated):
+            return
+        self.bookmarks_data = updated
+        self._cleanup_bookmark_screenshots([path for bookmark in removed
+                                           for path in self._bookmark_screenshot_paths(bookmark)])
         self._refresh_bookmarks()
-
-    def _bookmark_from_session(self, system: str, body: str, materials: str = "", avg_yield: str = "") -> None:
-        """Add bookmark from session data (called from Reports context menu)"""
-        # Check if bookmark already exists
-        for bookmark in self.bookmarks_data:
-            if bookmark.get('system') == system and bookmark.get('body') == body:
-                from app_utils import centered_askyesno
-                if centered_askyesno(self.winfo_toplevel(), "Bookmark Exists", 
-                                      f"A bookmark for {system} - {body} already exists. Update it?"):
-                    # Update existing bookmark
-                    bookmark['materials'] = materials
-                    bookmark['avg_yield'] = avg_yield
-                    bookmark['last_mined'] = dt.datetime.now().strftime('%Y-%m-%d')
-                    self._save_bookmarks()
-                    self._refresh_bookmarks()
-                return
-        
-        # Add new bookmark
-        bookmark = {
-            'system': system,
-            'body': body,
-            'materials': materials,
-            'avg_yield': avg_yield,
-            'target_material': '',
-            'overlap_type': '',
-            'last_mined': dt.datetime.now().strftime('%Y-%m-%d'),
-            'notes': '',
-            'date_added': dt.datetime.now().strftime('%Y-%m-%d')
-        }
-        
-        self.bookmarks_data.append(bookmark)
-        self._save_bookmarks()
-        self._refresh_bookmarks()
-        
-        self._set_status(f"Bookmarked: {system} - {body}")
 
     def _setup_bookmark_context_menu(self) -> None:
         """Setup right-click context menu for bookmarks tree"""
@@ -14362,28 +11240,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         else:
             self._set_status("No system name to copy")
 
-    def _make_stat_label_copyable(self, widget, text_getter) -> None:
-        """Add a right-click 'Copy' context menu to a statistics label"""
-        menu = tk.Menu(widget, tearoff=0, bg=widget.cget("bg"), fg=widget.cget("fg"),
-                       activebackground="#444444", activeforeground="#ffffff")
-        menu.add_command(label=t('common.copy'), command=lambda: self._copy_stat_text(text_getter()))
-
-        def show_menu(event):
-            try:
-                menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                menu.grab_release()
-
-        widget.bind("<Button-3>", show_menu)
-
-    def _copy_stat_text(self, text: str) -> None:
-        """Copy a statistics value to clipboard, ignoring placeholder/empty values"""
-        if not text or text in ("—", "None", "No sessions found"):
-            return
-        self.clipboard_clear()
-        self.clipboard_append(text)
-        self.update()
-        self._set_status(f"Copied '{text}' to clipboard")
 
     def _create_statistics_panel(self, parent: ttk.Widget) -> None:
         from session_statistics_panel import SessionStatisticsPanel
@@ -14625,205 +11481,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except:
             return 0.0
     
-    def _calculate_ring_quality_rating(self, tph, tons_per_asteroid):
-        """Calculate ring quality rating based on TPH and tons/asteroid.
-        
-        Returns: (rating_name, color_hex)
-        - Excellent: TPH >= 800 AND T/ast >= 20
-        - Good: TPH >= 600 AND T/ast >= 15
-        - Fair: TPH >= 400 AND T/ast >= 10
-        - Poor: Below Fair threshold
-        """
-        try:
-            tph = float(tph or 0)
-            tons_per_asteroid = float(tons_per_asteroid or 0)
-            
-            if tph >= 800 and tons_per_asteroid >= 20:
-                return ("EXCELLENT", "#2d5a3d", "#a8d5ba")
-            elif tph >= 600 and tons_per_asteroid >= 15:
-                return ("GOOD", "#1c4a5e", "#8fd4e8")
-            elif tph >= 400 and tons_per_asteroid >= 10:
-                return ("FAIR", "#5e4e1c", "#f0d896")
-            else:
-                return ("POOR", "#5e1c24", "#f5a5ae")
-        except (ValueError, TypeError):
-            return ("No data", "#2b2b2b", "#888888")
     
-    def _get_top_systems_from_csv(self, limit=5):
-        """Get top N unique systems by TPH from CSV, keeping the BEST session for each system/body.
-        
-        T/Asteroid is calculated using HITS (asteroids with materials), not asteroids_prospected.
-        Uses hit_rate_percent to derive hits: hits = asteroids_prospected * (hit_rate / 100)
-        
-        Returns list of dicts with system, body, tons_per, tph, material
-        """
-        try:
-            import csv
-            csv_path = os.path.join(self.reports_dir, "sessions_index.csv")
-            
-            if not os.path.exists(csv_path):
-                return []
-            
-            # Track best session for each system|body (by TPH)
-            best_sessions = {}  # key: system|body, value: session dict
-            
-            with open(csv_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    try:
-                        system = row.get('system', '')
-                        body = row.get('body', '')
-                        system_key = f"{system}|{body}"
-                        
-                        total_tons = float(row.get('total_tons', 0) or 0)
-                        asteroids = int(row.get('asteroids_prospected', 0) or 0)
-                        tph = float(row.get('overall_tph', 0) or 0)
-                        hit_rate = float(row.get('hit_rate_percent', 0) or 0)
-                        
-                        if total_tons <= 0:
-                            continue
-                        
-                        # Calculate T/Asteroid using HITS (not asteroids_prospected)
-                        # hits = asteroids that contained tracked materials
-                        if asteroids > 0 and hit_rate > 0:
-                            hits = int(round(asteroids * (hit_rate / 100.0)))
-                            hits = max(hits, 1)  # At least 1 hit if we have tons
-                            tons_per = total_tons / hits
-                        elif asteroids > 0:
-                            # Fallback: if no hit_rate, use asteroids_prospected
-                            tons_per = total_tons / asteroids
-                        else:
-                            tons_per = 0
-                        
-                        if tons_per > 0:
-                            best_material = row.get('best_material', 'Unknown')
-                            
-                            session_data = {
-                                'system': system,
-                                'body': body,
-                                'tons_per': tons_per,
-                                'tph': tph,
-                                'material': best_material
-                            }
-                            
-                            # Keep the BEST session for each system/body (by TPH)
-                            if system_key not in best_sessions or tph > best_sessions[system_key]['tph']:
-                                best_sessions[system_key] = session_data
-                                
-                    except (ValueError, TypeError):
-                        continue
-            
-            # Convert to list and sort by TPH descending
-            sessions = list(best_sessions.values())
-            sessions.sort(key=lambda x: x['tph'], reverse=True)
-            
-            return sessions[:limit]
-        except Exception as e:
-            print(f"Error getting top systems: {e}")
-            return []
     
     def _refresh_session_statistics(self):
-        """Update the statistics display with current data"""
         if hasattr(self, 'session_statistics_panel'):
             self.session_statistics_panel.reload()
-            return
-        try:
-            stats = self._calculate_session_statistics()
-            
-            if not stats:
-                # No data available - show helpful message
-                self.stats_labels['total_sessions'].config(text="0")
-                self.stats_labels['total_time'].config(text="0h 0m")
-                self.stats_labels['total_tonnage'].config(text="0 tons")
-                self.stats_labels['avg_tph'].config(text="0.0")
-                self.stats_labels['unique_systems'].config(text="0")
-                self.stats_labels['best_session_tph'].config(text="0.0")
-                self.stats_labels['best_session_system'].config(text="No sessions found")
-                self.stats_labels['most_mined_system'].config(text="No sessions found")
-                self.stats_labels['most_collected_material'].config(text="No sessions found")
-                self.stats_labels['best_tonnage'].config(text="0")
-                self.stats_labels['avg_hit_rate'].config(text="0%")
-                self.stats_labels['total_asteroids'].config(text="0")
-                # Clear top 5 systems
-                for rank in range(1, 6):
-                    self.stats_labels[f'top_system_{rank}_line1'].config(text=f"{rank}. — | —")
-                    self.stats_labels[f'top_system_{rank}_line2'].config(text="—")
-                    self.stats_labels[f'top_system_{rank}_line3'].config(text="—")
-                    self._top_system_names[rank] = ""
-                return
-            
-            # Update overall statistics
-            self.stats_labels['total_sessions'].config(text=str(stats['total_sessions']))
-            
-            # Format time
-            total_hours = stats['total_time_hours']
-            hours = int(total_hours)
-            minutes = int((total_hours - hours) * 60)
-            self.stats_labels['total_time'].config(text=f"{hours}h {minutes}m")
-            
-            self.stats_labels['total_tonnage'].config(text=f"{stats['total_tonnage']:.1f} tons")
-            self.stats_labels['avg_tph'].config(text=f"{stats['avg_tph']:.1f}")
-            self.stats_labels['unique_systems'].config(text=str(stats['unique_systems']))
-            self.stats_labels['best_session_tph'].config(text=f"{stats['best_session']['tph']:.1f}")
-            
-            # Extract and display best session system
-            best_session_info = stats['best_session']['session']
-            if best_session_info and ' - ' in best_session_info:
-                best_session_system = best_session_info.split(' - ')[0]
-            else:
-                best_session_system = best_session_info if best_session_info else 'None'
-            
-            # Only truncate if extremely long (50+ characters)
-            if len(best_session_system) > 50:
-                best_session_system = best_session_system[:50] + "..."
-            self.stats_labels['best_session_system'].config(text=best_session_system)
-            
-            # Update records
-            most_system = stats.get('most_mined_system', 'None')
-            if most_system and len(most_system) > 50:
-                most_system = most_system[:50] + "..."
-            self.stats_labels['most_mined_system'].config(text=most_system)
-            
-            most_material = stats.get('most_collected_material', 'None')
-            # Localize the material name
-            most_material_localized = get_material(most_material) if most_material and most_material != 'None' else most_material
-            if most_material_localized and len(most_material_localized) > 30:
-                most_material_localized = most_material_localized[:30] + "..."
-            self.stats_labels['most_collected_material'].config(text=most_material_localized)
-            
-            self.stats_labels['best_tonnage'].config(text=f"{stats['best_session']['tonnage']:.1f}")
-            self.stats_labels['avg_hit_rate'].config(text=f"{stats['avg_hit_rate']:.1f}%")
-            self.stats_labels['total_asteroids'].config(text=str(stats['total_asteroids']))
-            
-            # Update Top 5 Systems: Line 1=System|Body, Line 2=Material, Line 3=Metrics
-            top_systems = self._get_top_systems_from_csv(limit=5)
-            for rank in range(1, 6):
-                if rank <= len(top_systems):
-                    sys_data = top_systems[rank - 1]
-                    # Line 1: Rank. System | Body
-                    line1_text = f"{rank}. {sys_data['system']} | {sys_data['body']}"
-                    self._top_system_names[rank] = sys_data['system']
-                    # Line 2: Material with label (localized)
-                    material_localized = get_material(sys_data['material']) if sys_data['material'] else sys_data['material']
-                    line2_text = f"{t('statistics.minerals_label')} {material_localized}"
-                    # Line 3: Metrics (T/Asteroid and TPH only) - localized
-                    line3_text = f"{sys_data['tons_per']:.1f} {t('statistics.t_per_asteroid')}  |  {sys_data['tph']:.1f} {t('statistics.t_per_hr')}"
-                else:
-                    line1_text = f"{rank}. — | —"
-                    line2_text = "—"
-                    line3_text = "—"
-                    self._top_system_names[rank] = ""
-                
-                self.stats_labels[f'top_system_{rank}_line1'].config(text=line1_text)
-                self.stats_labels[f'top_system_{rank}_line2'].config(text=line2_text)
-                self.stats_labels[f'top_system_{rank}_line3'].config(text=line3_text)
-            
-            self._set_status(f"Statistics updated: {stats['total_sessions']} sessions analyzed")
-            
-        except Exception as e:
-            print(f"Error refreshing statistics: {e}")
-            self._set_status("Error updating statistics")
-            
+
     def _add_screenshots_to_report(self, tree):
         """Add screenshots to selected report via file selection dialog"""
         try:
@@ -15504,10 +12167,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             # Refresh tree to remove icons
             if deleted_count > 0:
-                if tree == self.reports_tree_tab:
-                    self._refresh_reports_tab()
-                else:
-                    self._refresh_reports_window()
+                self._refresh_reports_tab()
                 
                 # Show success message
                 from app_utils import centered_message
@@ -15827,13 +12487,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         if file_path and os.path.exists(file_path):
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    first_line = f.readline().strip()
-                    # Parse header line: "Session: System — Body — Duration — Total XXt (Multi-Session)"
-                    if "(Multi-Session)" in first_line:
-                        return "Multi-Session"
-                    elif "(Single Session)" in first_line:
-                        return "Single Session"
+                first_line = read_session_report(file_path).split('\n', 1)[0].strip()
+                if "(Multi-Session)" in first_line:
+                    return "Multi-Session"
+                elif "(Single Session)" in first_line:
+                    return "Single Session"
             except Exception as e:
                 pass
         
@@ -15874,12 +12532,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     # Convert display format to report generator format
                     session_data = self._convert_session_data_for_report(session_data)
                     print(f"✓ DEBUG: After conversion, individual_yields = {session_data.get('individual_yields', 'NOT FOUND')}")
-            elif hasattr(self, 'reports_window_session_lookup'):
-                session_data = self.reports_window_session_lookup.get(item)
-                if session_data:
-                    print(f"✓ DEBUG: Got session_data from reports_window_session_lookup")
-                    # Convert display format to report generator format
-                    session_data = self._convert_session_data_for_report(session_data)
             
             # If no detailed session data, create basic data from tree item
             if not session_data:
@@ -16712,11 +13364,5 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except Exception as e:
             print(f"Error opening batch reports dialog: {e}")
             messagebox.showerror("Dialog Error", f"Could not open batch reports dialog: {e}", parent=parent_window)
-
-
-
-
-
-
 
 

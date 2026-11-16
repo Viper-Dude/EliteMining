@@ -180,6 +180,8 @@ Report any checks that could not be run; do not claim visual verification from c
 
 ## Build & Release
 
+The user handles all installer and release-package builds. Agents must limit their work to code changes and tests; do not run PyInstaller, the release builder, or the installer compiler. The build instructions below are for the user's workflow.
+
 ```powershell
 # CRITICAL: Clean PyInstaller cache before every build
 Remove-Item -Recurse -Force dist, build -ErrorAction SilentlyContinue
@@ -201,6 +203,24 @@ python app/create_release.py
 - Every installer clears only the installed `{app}\app\Images` folder before copying the current runtime images. ZIP extraction does not remove old files.
 - Keep the installer image exclusions in `EliteMiningInstaller.iss` and ZIP image exclusions in `app/create_release.py` in sync. Build-only and unused artwork stays in the project but is excluded from both packages, including the clean splash base and README main logo.
 - Keep `EliteMining_txt_logo_transp_resize.png` in both packages: non-Modern status bars, About screens, and generated mining cards still use it.
+
+---
+
+## Mining Sessions and Reports
+
+- Session timestamps without a timezone offset represent local time, despite the historical `timestamp_utc` field name. Use `session_date()` from `app/mining_statistics.py` to normalize local, UTC, and offset timestamps for comparisons; convert to local time for display.
+- Use `read_session_report()` from `app/mining_statistics.py` when reading reports for display or analysis. Its bounded cache checks file modification time and size so edits are picked up without repeatedly reading unchanged files.
+- Normal session completion updates `sessions_index.csv` incrementally and refreshes Reports and Statistics once each. Full rebuilds are for repair or recovery of a missing or inconsistent index, not routine session saves.
+- Mining Missions and Reference use widget-local mousewheel bindings through `bind_mousewheel_recursive()` in `app/app_utils.py`; do not replace or remove global wheel bindings.
+- Mark changed graphs dirty and combine visible refreshes. Defer hidden graph updates until shown, and refresh dirty graphs before saving or exporting them.
+
+---
+
+## Commodity Market
+
+- Mining and Trade searches display all matching returned results; sorting changes their order without removing rows. Calculate distances for all returned matches when a reference system is supplied.
+- When merging market records, retain coordinates from another record only if both name the same system; a Fleet Carrier may have jumped since the older record. Stations in the reference system have a distance of zero even when their market record lacks coordinates.
+- Multiple Prices uses `MINING_COMMODITY_ORDER` from `app/core/constants.py`, matching the Mining Commodities dropdown. Its mineral choices wrap across the available width to preserve space for results.
 
 ---
 
@@ -239,5 +259,4 @@ python app/create_release.py
 
 - The user-facing cargo display is `EliteMiningApp._update_integrated_cargo_display()` in `app/main.py`. Make Cargo Monitor display changes there.
 - The legacy popup (`CargoMonitor.update_display()`) is not exposed to users in the shipped app. Do not propagate display changes to it unless the user explicitly asks.
-- `docs/CARGO_MONITOR_REFERENCE.md` and the cargo warning document contain outdated instructions to always update both displays. Follow this section for the scope of display changes.
 

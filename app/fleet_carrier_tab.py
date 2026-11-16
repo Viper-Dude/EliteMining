@@ -11,6 +11,8 @@ import logging
 from datetime import datetime, timezone
 
 from config import scaled_font
+from app_utils import bind_mousewheel_recursive
+from copy import deepcopy
 
 log = logging.getLogger("EliteMining.FleetCarrierTab")
 
@@ -98,11 +100,6 @@ class FleetCarrierTab(tk.Frame):
             self.fg_inactive = "#888888"
             self.sect_bg   = "#141414"
             self.hdr_bg    = "#1e1e1e"
-            self.bar_fill  = "#ff8c00"
-            self.bar_empty = "#2a2a2a"
-            self.ok_color  = "#00cc44"
-            self.warn_color = "#ffaa00"
-            self.err_color  = "#ff3333"
         elif theme in ("modern", "modern_slate", "modern_orange"):
             self.bg        = modern_color("#14171B")
             self.fg        = modern_color("#E6EAF0")
@@ -111,11 +108,6 @@ class FleetCarrierTab(tk.Frame):
             self.fg_inactive = "#6B7482"
             self.sect_bg   = modern_color("#1D2228")
             self.hdr_bg    = modern_color("#262C34")
-            self.bar_fill  = modern_color("#FF9A32")
-            self.bar_empty = modern_color("#2A3038")
-            self.ok_color  = "#3DDC84"
-            self.warn_color = "#FFC107"
-            self.err_color  = "#FF5252"
         else:
             self.bg        = "#1e1e1e"
             self.fg        = "#e6e6e6"
@@ -124,16 +116,12 @@ class FleetCarrierTab(tk.Frame):
             self.fg_inactive = "#999999"
             self.sect_bg   = "#252525"
             self.hdr_bg    = "#333333"
-            self.bar_fill  = "#4CAF50"
-            self.bar_empty = "#3a3a3a"
-            self.ok_color  = "#4CAF50"
-            self.warn_color = "#FFC107"
-            self.err_color  = "#FF5252"
 
         super().__init__(parent, bg=self.bg, **kwargs)
         self._tracker = None
         self._countdown_job = None
         self._sv = {}
+        self._history_snapshot = None
         self._build_ui()
 
     # ------------------------------------------------------------------
@@ -185,33 +173,18 @@ class FleetCarrierTab(tk.Frame):
                              font=scaled_font(9, family="Helvetica"), anchor="w")
         lbl.pack(side="left")
         if copyable:
-            self._make_copyable(lbl, sv_key)
-            from config import load_theme
+            self._make_copyable(lbl, lambda: self._sv[sv_key].get())
             from ui.tooltip import ToolTip
             copy_info = tk.Label(row, text="\u24d8", bg=self.sect_bg, fg=self.fg_dim,
                                  cursor="hand2", font=scaled_font(10))
             copy_info.pack(side="left", padx=(6, 2))
             ToolTip(copy_info, t("fleet_carrier.copy_location_hint"))
 
-    def _make_copyable(self, widget, sv_key):
+    def _make_copyable(self, widget, get_text):
         menu = tk.Menu(widget, tearoff=0, bg=self.sect_bg, fg=self.fg,
                        activebackground=self.hdr_bg, activeforeground=self.fg_bright)
         menu.add_command(label=t('common.copy'),
-                         command=lambda: self._copy_to_clipboard(self._sv[sv_key].get()))
-
-        def show_menu(event):
-            try:
-                menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                menu.grab_release()
-
-        widget.bind("<Button-3>", show_menu)
-
-    def _make_copyable_text(self, widget, text):
-        menu = tk.Menu(widget, tearoff=0, bg=self.sect_bg, fg=self.fg,
-                       activebackground=self.hdr_bg, activeforeground=self.fg_bright)
-        menu.add_command(label=t('common.copy'),
-                         command=lambda: self._copy_to_clipboard(text))
+                         command=lambda: self._copy_to_clipboard(get_text()))
 
         def show_menu(event):
             try:
@@ -249,8 +222,7 @@ class FleetCarrierTab(tk.Frame):
                     lambda e: canvas.itemconfig(self._scroll_win, width=e.width))
         self._scroll_frame.bind("<Configure>",
                                 lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind_all("<MouseWheel>",
-                        lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+        self._canvas = canvas
 
         sf = self._scroll_frame
 
@@ -282,6 +254,7 @@ class FleetCarrierTab(tk.Frame):
             bg=self.bg, fg=self.fg_dim, font=scaled_font(9, family="Helvetica"), justify="center"
         )
         # shown only when location is known but stats not yet received
+        bind_mousewheel_recursive(canvas, self._on_mousewheel)
 
     def _build_status_section(self, parent):
         self._section_header(parent, "fleet_carrier.section_status", large=True, help_anchor="fleet-carrier")
@@ -428,26 +401,7 @@ class FleetCarrierTab(tk.Frame):
             text=t("fleet_carrier.fuel_fmt", fuel=fuel or 0, capacity=cap)
             if fuel is not None else "-")
 
-        # Jump schedule — clear stale jump data if departure is in the past
-        dep = cd.get('jump_departure_time')
-        if dep:
-            try:
-                dt = datetime.fromisoformat(dep.replace('Z', '+00:00'))
-                if (datetime.now(timezone.utc) - dt).total_seconds() > 300:
-                    cd['jump_destination'] = None
-                    cd['jump_body'] = None
-                    cd['jump_departure_time'] = None
-                    dep = None
-            except Exception:
-                pass
-        dest = cd.get('jump_destination')
-        self._sv["jump_dest"].set(dest or t("fleet_carrier.none_scheduled"))
-        self._sv["jump_body"].set(cd.get("jump_body") or "-")
-        dep = cd.get("jump_departure_time")
-        self._sv["jump_departure"].set(_fmt_ts(dep) if dep else "-")
-        self._sv["jump_countdown"].set(_countdown(dep) if dep else "-")
-        if dep:
-            self._schedule_countdown()
+        self._refresh_jump(cd)
 
         # Finance
         self._sv["fin_balance"].set(_fmt_credits(cd.get("balance")))
@@ -479,22 +433,25 @@ class FleetCarrierTab(tk.Frame):
 
         # Cargo
         total   = cd.get("space_total")
-        cargo   = cd.get("space_cargo") or 0
-        crew_sp = cd.get("space_crew")  or 0
+        cargo   = cd.get("space_cargo")
+        crew_sp = cd.get("space_crew")
         free    = cd.get("space_free")
-        used    = cargo + crew_sp
-        self._sv["cargo_total"].set(t("fleet_carrier.units_fmt", n=total) if total else "-")
-        self._sv["cargo_used"].set(t("fleet_carrier.units_fmt", n=cargo) if cargo else "-")
+        used    = cargo + crew_sp if cargo is not None and crew_sp is not None else None
+        self._sv["cargo_total"].set(t("fleet_carrier.units_fmt", n=total) if total is not None else "-")
+        self._sv["cargo_used"].set(t("fleet_carrier.units_fmt", n=cargo) if cargo is not None else "-")
         self._sv["cargo_free"].set(t("fleet_carrier.units_fmt", n=free)  if free is not None else "-")
-        self._sv["cargo_crew"].set(t("fleet_carrier.units_fmt", n=crew_sp) if crew_sp else "-")
+        self._sv["cargo_crew"].set(t("fleet_carrier.units_fmt", n=crew_sp) if crew_sp is not None else "-")
         self._sv["cargo_used_total"].set(
-            f"{used:,} / {total:,}" if total else "-")
+            f"{used:,} / {total:,}" if total is not None and used is not None else "-")
 
         # Jump history
+        history = cd.get("jump_history") or []
+        if history == self._history_snapshot:
+            return
+        self._history_snapshot = deepcopy(history)
         for w in self._history_rows:
             w.destroy()
         self._history_rows.clear()
-        history = cd.get("jump_history") or []
         if not history:
             lbl = tk.Label(self._history_frame,
                            text=f"  {t('fleet_carrier.no_jumps')}",
@@ -516,8 +473,9 @@ class FleetCarrierTab(tk.Frame):
                          bg=self.sect_bg, fg=self.fg, font=scaled_font(9, family="Helvetica"),
                          anchor="w")
                 sys_lbl.pack(side="left")
-                self._make_copyable_text(sys_lbl, system_name)
+                self._make_copyable(sys_lbl, lambda name=system_name: name)
                 self._history_rows.append(row)
+        bind_mousewheel_recursive(self._history_frame, self._on_mousewheel)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -532,10 +490,37 @@ class FleetCarrierTab(tk.Frame):
         self._countdown_job = self.after(self._COUNTDOWN_INTERVAL, self._tick_countdown)
 
     def _tick_countdown(self):
-        cd  = self._tracker.carrier_data if self._tracker else None
-        dep = cd.get("jump_departure_time") if cd else None
+        self._countdown_job = None
+        cd = self._tracker.carrier_data if self._tracker else None
+        self._refresh_jump(cd or {})
+
+    def _refresh_jump(self, cd):
+        dep = cd.get('jump_departure_time')
         if dep:
-            self._sv["jump_countdown"].set(_countdown(dep))
+            try:
+                departure = datetime.fromisoformat(dep.replace('Z', '+00:00'))
+                if (datetime.now(timezone.utc) - departure).total_seconds() > 300:
+                    dep = None
+            except (ValueError, TypeError):
+                dep = None
+        self._sv['jump_dest'].set((cd.get('jump_destination') or '-') if dep else t('fleet_carrier.none_scheduled'))
+        self._sv['jump_body'].set((cd.get('jump_body') or '-') if dep else '-')
+        self._sv['jump_departure'].set(_fmt_ts(dep) if dep else '-')
+        self._sv['jump_countdown'].set(_countdown(dep) if dep else '-')
+        if dep:
             self._schedule_countdown()
-        else:
-            self._sv["jump_countdown"].set("-")
+        elif self._countdown_job:
+            self.after_cancel(self._countdown_job)
+            self._countdown_job = None
+
+    def _on_mousewheel(self, event):
+        self._canvas.yview_scroll(int(-event.delta / 120), 'units')
+        return 'break'
+
+    def destroy(self):
+        if self._countdown_job:
+            self.after_cancel(self._countdown_job)
+            self._countdown_job = None
+        if self._tracker:
+            self._tracker.set_on_updated(None)
+        super().destroy()

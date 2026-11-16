@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from ui.theme import modern_color
+from ui.search_control import SearchControl
 
 import os
 import sys
@@ -96,7 +97,7 @@ from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
 from update_checker import UpdateChecker
 from user_database import UserDatabase
 from journal_parser import JournalParser
-from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir, get_variables_dir, get_ship_presets_dir, compact_classic_button
+from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir, get_variables_dir, get_ship_presets_dir, compact_classic_button, create_action_button
 
 # Import UI components from ui module
 from ui.theme import THEME_ELITE_ORANGE, THEME_DARK_GRAY, get_theme_colors, next_theme
@@ -926,7 +927,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.6.3"
+APP_VERSION = "v5.6.4"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -1776,22 +1777,10 @@ class CargoMonitor:
     """
     Cargo monitoring system that reads Elite Dangerous game data.
     
-    ⚠️ CRITICAL: This class has TWO SEPARATE DISPLAY METHODS:
-    
-    1. POPUP WINDOW (Optional, rarely used):
-       - Method: update_display() - line ~1850
-       - Widgets: self.cargo_text, self.cargo_summary
-       - Used only when popup window is opened
-    
-    2. INTEGRATED DISPLAY (PRIMARY - Default in main app):
-       - Method: _update_integrated_cargo_display() - line ~3570
-       - Widgets: self.integrated_cargo_text, self.integrated_cargo_summary
-       - Located in: EliteMiningApp._create_integrated_cargo_monitor()
-       - THIS IS THE ONE USERS SEE BY DEFAULT!
-    
-    ⚠️ WHEN MODIFYING DISPLAY: Update BOTH methods to keep them in sync!
-    
-    Both modes share the same underlying data:
+    The main app uses App._update_integrated_cargo_display().
+    The legacy popup is not exposed in the shipped UI.
+
+    Cargo data:
     - self.cargo_items: Refined minerals/cargo
     - self.materials_collected: Engineering materials (Raw)
     """
@@ -2942,9 +2931,8 @@ cargo panel forces Elite to write detailed inventory data.
         """
         Update the POPUP WINDOW display with exact cargo contents.
         
-        ⚠️ WARNING: This is for the OPTIONAL popup window, NOT the main app display!
-        ⚠️ Most users use the INTEGRATED display instead (see _update_integrated_cargo_display)
-        ⚠️ When modifying display logic, update BOTH methods!
+        Legacy popup display, not exposed in the shipped UI.
+        See App._update_integrated_cargo_display() for the user-facing display.
         """
         if not hasattr(self, 'cargo_summary') or not hasattr(self, 'cargo_text'):
             return
@@ -3720,6 +3708,7 @@ cargo panel forces Elite to write detailed inventory data.
         try:
             event = json.loads(line)
             event_type = event.get("event", "")
+            self.journal_parser.process_carrier_event(event)
             
             # Track ship information from LoadGame and Loadout events
             if event_type in ["LoadGame", "Loadout"]:
@@ -4125,11 +4114,6 @@ cargo panel forces Elite to write detailed inventory data.
                         import traceback
                         print(f"[PP] live-write block raised: {pp_exc}")
                         traceback.print_exc()
-                # Also update FC tracker with completed jump
-                try:
-                    self.journal_parser.process_carrier_jump_completed(event)
-                except Exception as _ce:
-                    pass
             
             elif event_type == "Location":
                 # Game loaded - check if this is offline carrier jump or normal login
@@ -4173,73 +4157,6 @@ cargo panel forces Elite to write detailed inventory data.
                         import traceback
                         print(f"[PP] live-write block raised: {pp_exc}")
                         traceback.print_exc()
-                # Also update FC tracker if this Location shows us docked at our own carrier
-                try:
-                    self.journal_parser.process_carrier_docked_via_location(event)
-                except Exception as _ce:
-                    pass
-
-            elif event_type == "Docked":
-                # Update FC tracker if this is a dock at our own fleet carrier
-                try:
-                    self.journal_parser.process_carrier_docked(event)
-                except Exception as _ce:
-                    pass
-
-            elif event_type == "CarrierLocation":
-                # CarrierLocation tells us where YOUR carrier is
-                # This is informational - it does NOT count as a visit because:
-                # - If carrier jumped while online, CarrierJump event already counted
-                # - If carrier jumped while offline, this just tells us where it is now
-                # We only use this to update the current system display
-                carrier_type = event.get("CarrierType", "")
-                system_name = event.get("StarSystem", "")
-                
-                if system_name and carrier_type == "FleetCarrier":
-                    # Update current system display but DON'T count as visit
-                    if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'update_current_system'):
-                        self.main_app_ref.update_current_system(system_name, None, count_visit=False)
-                # Always route to journal_parser carrier tracker
-                try:
-                    self.journal_parser.process_carrier_location(event)
-                except Exception as _ce:
-                    pass
-
-            elif event_type == "CarrierStats":
-                try:
-                    self.journal_parser.process_carrier_stats(event)
-                except Exception as _ce:
-                    pass
-
-            elif event_type == "CarrierFinance":
-                try:
-                    self.journal_parser.process_carrier_finance(event)
-                except Exception as _ce:
-                    pass
-
-            elif event_type == "CarrierJumpRequest":
-                try:
-                    self.journal_parser.process_carrier_jump_request(event)
-                except Exception as _ce:
-                    pass
-
-            elif event_type == "CarrierJumpCancelled":
-                try:
-                    self.journal_parser.process_carrier_jump_cancelled(event)
-                except Exception as _ce:
-                    pass
-
-            elif event_type == "CarrierDepositFuel":
-                try:
-                    self.journal_parser.process_carrier_deposit_fuel(event)
-                except Exception as _ce:
-                    pass
-
-            elif event_type == "CarrierBankTransfer":
-                try:
-                    self.journal_parser.process_carrier_bank_transfer(event)
-                except Exception as _ce:
-                    pass
 
             elif event_type == "Scan":
                 # Process Scan events through JournalParser to store ring info
@@ -5201,8 +5118,6 @@ cargo panel forces Elite to write detailed inventory data.
                     # Refresh reports displays if they exist
                     try:
                         prospector_panel._refresh_reports_tab()
-                        if hasattr(prospector_panel, 'reports_window') and prospector_panel.reports_window:
-                            prospector_panel._refresh_reports_window()
                     except Exception as e:
                         print(f"Error refreshing reports displays: {e}")
                 else:
@@ -6076,9 +5991,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.prospector_panel._refresh_bookmarks()
 
                 # Sync Settings tab with ring_finder state when Settings tab is selected
-                current_tab = self.notebook.index(self.notebook.select())
-                settings_tab_index = 7  # Settings is typically index 7
-                if current_tab == settings_tab_index:
+                if self.notebook.select() == str(getattr(self, '_settings_tab', '')):
                     # Sync auto-search checkbox with ring_finder
                     if hasattr(self, 'ring_finder') and self.ring_finder and hasattr(self.ring_finder, 'auto_search_var'):
                         ring_finder_state = self.ring_finder.auto_search_var.get()
@@ -6114,8 +6027,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Fleet Carrier tab - live FC status from journal events
         try:
-            from fleet_carrier_tab import FleetCarrierTab
-            from fleet_carrier_tracker import get_fleet_carrier_tracker
             fc_frame = ttk.Frame(self.notebook, padding=0)
             self._build_fleet_carrier_tab(fc_frame)
             self.notebook.add(fc_frame, text=t('fleet_carrier.tab_title'))
@@ -6141,6 +6052,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Settings tab (simplified with remaining sub-tabs)
         settings_tab = ttk.Frame(self.notebook, padding=8)
+        self._settings_tab = settings_tab
         self._build_settings_notebook(settings_tab)
         self.notebook.add(settings_tab, text=t('tabs.settings'))
 
@@ -6391,6 +6303,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
         )
         self.integrated_cargo_text.grid(row=0, column=0, sticky="nsew")
         
+        self.integrated_cargo_text.tag_configure("limpet_clickable",
+                                                 foreground=self.theme_colors.get("fg", "#e0e0e0"))
+        self.integrated_cargo_text.tag_bind("limpet_clickable", "<Button-1>",
+                                            lambda e: self.cargo_monitor.adjust_limpet_count())
+        self.integrated_cargo_text.tag_bind("limpet_clickable", "<Enter>",
+                                            lambda e: self.integrated_cargo_text.configure(cursor="hand2"))
+        self.integrated_cargo_text.tag_bind("limpet_clickable", "<Leave>",
+                                            lambda e: self.integrated_cargo_text.configure(cursor=""))
+        self.integrated_cargo_text.tag_configure("cargo_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
+        self.integrated_cargo_text.tag_configure("section_header", font=("Consolas", round(10 * self.ui_scale), "bold"))
+        self.integrated_cargo_text.tag_configure("material_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
+        self.integrated_cargo_text.tag_configure("small_italic", font=self._scaled_font(8, "italic"), foreground="#888888", justify="left")
+
         # Thin scrollbar
         integrated_scrollbar = ttk.Scrollbar(content_frame, orient="vertical", 
                                            command=self.integrated_cargo_text.yview)
@@ -6415,7 +6340,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         Update the INTEGRATED cargo display with data from cargo monitor.
         
         ✅ PRIMARY DISPLAY METHOD - This is what users see in the main app window!
-        ⚠️ When modifying display logic, also update update_display() for popup window!
         
         Location: Bottom pane of main EliteMining window
         Widgets: self.integrated_cargo_text, self.integrated_cargo_summary
@@ -6508,19 +6432,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             scroll_position = None
         
         self.integrated_cargo_text.delete(1.0, tk.END)
-        
-        self.integrated_cargo_text.tag_configure("limpet_clickable",
-                                                 foreground=self.theme_colors.get("fg", "#e0e0e0"))
-        self.integrated_cargo_text.tag_bind("limpet_clickable", "<Button-1>",
-                                            lambda e: self.cargo_monitor.adjust_limpet_count())
-        self.integrated_cargo_text.tag_bind("limpet_clickable", "<Enter>",
-                                            lambda e: self.integrated_cargo_text.configure(cursor="hand2"))
-        self.integrated_cargo_text.tag_bind("limpet_clickable", "<Leave>",
-                                            lambda e: self.integrated_cargo_text.configure(cursor=""))
-        self.integrated_cargo_text.tag_configure("cargo_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
-        self.integrated_cargo_text.tag_configure("section_header", font=("Consolas", round(10 * self.ui_scale), "bold"))
-        self.integrated_cargo_text.tag_configure("material_item", font=("Consolas", round(10 * self.ui_scale), "normal"))
-        self.integrated_cargo_text.tag_configure("small_italic", font=self._scaled_font(8, "italic"), foreground="#888888", justify="left")
 
         for text, tags in content_chunks:
             self.integrated_cargo_text.insert(tk.END, text, tags)
@@ -7790,7 +7701,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         def _test_voice_interface():
             try:
-                announcer.say("This is a test of the selected voice.")
+                announcer.say(t('settings.tts_test_message'))
             except Exception as e:
                 print(f"Error testing voice: {e}")
         tk.Button(box, text=t('settings.test_voice'), command=_test_voice_interface, **_btn_kw).grid(row=1, column=2, sticky="w", padx=(8, 0))
@@ -7800,7 +7711,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 announcer.diagnose_tts()
                 success = announcer.reinitialize_tts()
                 if success:
-                    announcer.say("TTS engine reinitialized successfully")
+                    announcer.say(t('settings.tts_reset_message'))
                     print("[INTERFACE] TTS engine reinitialized successfully")
                     self._refresh_voice_list()
                 else:
@@ -7932,7 +7843,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 ttk.Label(thr, text=t('settings.announce_at')).pack(side="left")
                 # Use theme-aware colors for spinbox
                 _ann_spinbox_fg = "#ff8c00" if self.current_theme == "elite_orange" else "#ffffff"
-                def _ann_threshold_changed():
+                def _ann_threshold_changed(event=None):
+                    try:
+                        value = round(max(0.0, min(100.0, float(self.prospector_panel.threshold.get()))), 1)
+                    except (ValueError, tk.TclError):
+                        value = _load_cfg().get('announce_threshold', 20.0)
+                    self.prospector_panel.threshold.set(value)
                     self.prospector_panel._save_threshold_value()
                     self._ann_check_modified()
                 sp = tk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
@@ -7944,6 +7860,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
                                  font=self._scaled_font(9))
                 sp.pack(side="left", padx=(6, 4))
+                sp.bind("<Return>", _ann_threshold_changed)
+                sp.bind("<FocusOut>", _ann_threshold_changed)
                 # Add mouse wheel support
                 def on_ann_threshold_scroll(event, var=self.prospector_panel.threshold):
                     try:
@@ -7955,12 +7873,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         var.set(round(new_val, 1))
                     except:
                         pass
-                    self._ann_check_modified()
+                    _ann_threshold_changed()
                     return "break"
                 sp.bind("<MouseWheel>", on_ann_threshold_scroll)
                 ToolTip(sp, t('tooltips.announcement_threshold'))
                 
-                set_all_btn = tk.Button(thr, text=t('settings.set_all'), command=self._ann_set_all_threshold,
+                announcement_button = create_action_button if getattr(self, 'current_theme', '') in ('modern', 'modern_slate', 'modern_orange') else tk.Button
+                set_all_btn = announcement_button(thr, text=t('settings.set_all'), command=self._ann_set_all_threshold,
                                        bg="#2a4a5a", fg="#ffffff", 
                                        activebackground="#3a5a6a", activeforeground="#ffffff",
                                        relief="solid", bd=1, cursor="hand2", pady=2, padx=8)
@@ -8194,14 +8113,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 btns = ttk.Frame(frame)
                 btns.grid(row=4, column=0, sticky="w", pady=(8, 0))
                 
-                select_all_btn = tk.Button(btns, text=t('settings.select_all'), command=self._ann_select_all,
+                select_all_btn = announcement_button(btns, text=t('settings.select_all'), command=self._ann_select_all,
                                           bg="#2a5a2a", fg="#ffffff", 
                                           activebackground="#3a6a3a", activeforeground="#ffffff",
                                           relief="solid", bd=1, cursor="hand2", pady=3)
                 select_all_btn.pack(side="left")
                 ToolTip(select_all_btn, t('tooltips.select_all_materials'))
                 
-                unselect_all_btn = tk.Button(btns, text=t('settings.unselect_all'), command=self._ann_unselect_all,
+                unselect_all_btn = announcement_button(btns, text=t('settings.unselect_all'), command=self._ann_unselect_all,
                                            bg="#5a2a2a", fg="#ffffff", 
                                            activebackground="#6a3a3a", activeforeground="#ffffff",
                                            relief="solid", bd=1, cursor="hand2", pady=3)
@@ -8223,7 +8142,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 _preset_btn_hl = "#2a2a1a" if _preset_is_orange else "#2a2a2a"
                 for i in range(1, 7):  # Preset 1 to 6
                     # Get custom name or use default
-                    custom_name = preset_names.get(str(i), f"Preset {i}")
+                    custom_name = preset_names.get(str(i), t('settings.preset_button').format(num=i))
                     
                     preset_btn = tk.Button(btns, text=custom_name,
                                          bg=_preset_btn_bg, fg="#ffffff",
@@ -8237,13 +8156,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.preset_buttons[i] = preset_btn
                     
                     # Bind left and right click events
-                    if i == 1:
-                        preset_btn.bind("<Button-1>", lambda e: self._ann_load_preset1())
-                        preset_btn.bind("<Button-3>", lambda e: self._ann_save_preset1())
-                    else:
-                        preset_btn.bind("<Button-1>", lambda e, num=i: self._ann_load_preset(num))
-                        preset_btn.bind("<Button-3>", lambda e, num=i: self._ann_save_preset(num))
-                    
+                    preset_btn.bind("<Button-1>", lambda e, num=i: self._ann_load_preset(num))
+                    preset_btn.bind("<Button-3>", lambda e, num=i: self._ann_save_preset(num))
+
                     # Ctrl+Click (left or right) or Middle-click to rename preset
                     preset_btn.bind("<Button-2>", lambda e, num=i: self._rename_preset(num))
                     preset_btn.bind("<Control-Button-1>", lambda e, num=i: self._rename_preset(num))
@@ -8257,7 +8172,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     preset_btn.bind("<Control-ButtonRelease-3>", lambda e: self._ann_update_preset_buttons())
                     
                     # Add tooltip
-                    ToolTip(preset_btn, f"Left-click: Load | Right-click: Save | Ctrl+Click: Rename")
+                    ToolTip(preset_btn, t('settings.preset_actions'))
                 
                 # Restore active preset and reload its settings on startup
                 try:
@@ -8266,8 +8181,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         preset_key = f'announce_preset_{active_num}'
                         data = cfg.get(preset_key)
                         if data:
-                            preset_announce = data.get('announce_map', {})
-                            preset_minpct = data.get('min_pct_map', {})
+                            preset_announce = data.get('announce_map', {}).copy()
+                            preset_minpct = data.get('min_pct_map', {}).copy()
                             for material in KNOWN_MATERIALS:
                                 if material not in preset_announce:
                                     preset_announce[material] = self.prospector_panel.announce_map.get(material, True)
@@ -8387,7 +8302,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Theme-aware colors
         is_orange = hasattr(self, 'current_theme') and self.current_theme == "elite_orange"
-        if is_orange:
+        if getattr(self, 'current_theme', '') in ('modern', 'modern_slate', 'modern_orange'):
+            from ui.theme import get_theme_colors
+            colors = get_theme_colors(self.current_theme)
+            active_bg = colors['btn_bg_hover']
+            active_hover = colors['btn_bg_hover']
+            inactive_bg = colors['btn_bg']
+            inactive_hover = colors['btn_bg_hover']
+        elif is_orange:
             active_bg = "#5a3a0a"
             active_hover = "#6a4a1a"
             inactive_bg = "#4a4a2a"
@@ -8399,7 +8321,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             inactive_hover = "#4a4a4a"
         
         for i, btn in self.preset_buttons.items():
-            base_name = preset_names.get(str(i), f"Preset {i}")
+            base_name = preset_names.get(str(i), t('settings.preset_button').format(num=i))
             
             if i == self._active_preset_num:
                 # Active preset — highlighted
@@ -8477,73 +8399,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception as e:
                 print(f"Error in _ann_update_display: {e}")
 
-    def _ann_save_preset1(self):
-        """Save current announcement settings as preset 1"""
-        if hasattr(self, 'prospector_panel') and self.prospector_panel:
-            try:
-                cfg = self.prospector_panel._load_cfg()
-                preset_data = {
-                    'announce_map': self.prospector_panel.announce_map.copy(),
-                    'min_pct_map': self.prospector_panel.min_pct_map.copy(),
-                    'announce_threshold': self.prospector_panel.threshold.get()
-                }
-                
-                # Save Core/Non-Core settings if available
-                if hasattr(self, 'announcement_vars') and self.announcement_vars:
-                    if "Core Asteroids" in self.announcement_vars:
-                        preset_data['Core Asteroids'] = self.announcement_vars["Core Asteroids"].get()
-                    if "Non-Core Asteroids" in self.announcement_vars:
-                        preset_data['Non-Core Asteroids'] = self.announcement_vars["Non-Core Asteroids"].get()
-                
-                cfg['announce_preset_1'] = preset_data
-                self.prospector_panel._save_cfg(cfg)
-                self._ann_set_active_preset(1)
-                self._set_status("Saved Preset 1.")
-                
-                # Visual feedback - flash button green then restore active style
-                if hasattr(self, 'preset_buttons') and 1 in self.preset_buttons:
-                    btn = self.preset_buttons[1]
-                    btn.config(bg="#2a5a2a")
-                    self.after(300, self._ann_update_preset_buttons)
-            except Exception as e:
-                print(f"Error saving preset 1: {e}")
-
-    def _ann_load_preset1(self):
-        """Load announcement settings from preset 1"""
-        if hasattr(self, 'prospector_panel') and self.prospector_panel:
-            try:
-                cfg = self.prospector_panel._load_cfg()
-                data = cfg.get('announce_preset_1')
-                if not data:
-                    from app_utils import centered_message
-                    centered_message(self, "Load Preset 1", "No Preset 1 saved yet.")
-                    return
-                
-                self.prospector_panel.announce_map = data.get('announce_map', {}).copy()
-                self.prospector_panel.min_pct_map = data.get('min_pct_map', {}).copy()
-                self.prospector_panel.threshold.set(data.get('announce_threshold', 20.0))
-                
-                # Load Core/Non-Core settings if available
-                if hasattr(self, 'announcement_vars') and self.announcement_vars:
-                    if "Core Asteroids" in self.announcement_vars and 'Core Asteroids' in data:
-                        self.announcement_vars["Core Asteroids"].set(data['Core Asteroids'])
-                    if "Non-Core Asteroids" in self.announcement_vars and 'Non-Core Asteroids' in data:
-                        self.announcement_vars["Non-Core Asteroids"].set(data['Non-Core Asteroids'])
-                
-                # Update spinboxes
-                if hasattr(self, '_ann_minpct_vars'):
-                    for mat, var in self._ann_minpct_vars.items():
-                        if mat in self.prospector_panel.min_pct_map:
-                            var.set(self.prospector_panel.min_pct_map[mat])
-                
-                self.prospector_panel._save_announce_map()
-                self.prospector_panel._save_min_pct_map()
-                self._ann_update_display()
-                self._ann_set_active_preset(1)
-                self._set_status("Loaded Preset 1.")
-            except Exception as e:
-                print(f"Error loading preset 1: {e}")
-
     def _ann_save_preset(self, num):
         """Save current announcement settings as preset num"""
         if hasattr(self, 'prospector_panel') and self.prospector_panel:
@@ -8565,7 +8420,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cfg[f'announce_preset_{num}'] = preset_data
                 self.prospector_panel._save_cfg(cfg)
                 self._ann_set_active_preset(num)
-                self._set_status(f"Saved Preset {num}.")
+                self._set_status(t('settings.preset_saved').format(num=num))
                 
                 # Visual feedback - flash button green then restore active style
                 if hasattr(self, 'preset_buttons') and num in self.preset_buttons:
@@ -8584,12 +8439,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 data = cfg.get(f'announce_preset_{num}')
                 if not data:
                     from app_utils import centered_message
-                    centered_message(self, f"Load Preset {num}", f"No Preset {num} saved yet.")
+                    centered_message(self, t('settings.preset_load_title').format(num=num), t('settings.preset_empty').format(num=num))
                     return
                 
                 # Merge preset data with current materials to preserve new materials
-                preset_announce = data.get('announce_map', {})
-                preset_minpct = data.get('min_pct_map', {})
+                preset_announce = data.get('announce_map', {}).copy()
+                preset_minpct = data.get('min_pct_map', {}).copy()
                 
                 # Fill in any missing materials with defaults
                 for material in KNOWN_MATERIALS:
@@ -8617,9 +8472,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 self.prospector_panel._save_announce_map()
                 self.prospector_panel._save_min_pct_map()
+                self.prospector_panel._save_threshold_value()
                 self._ann_update_display()
                 self._ann_set_active_preset(num)
-                self._set_status(f"Loaded Preset {num}.")
+                self._set_status(t('settings.preset_loaded').format(num=num))
             except Exception as e:
                 print(f"Error loading preset {num}: {e}")
 
@@ -8631,7 +8487,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             cfg = self.prospector_panel._load_cfg() if hasattr(self, 'prospector_panel') else {}
             preset_names = cfg.get('preset_names', {})
-            current_name = preset_names.get(str(num), f"Preset {num}")
+            current_name = preset_names.get(str(num), t('settings.preset_button').format(num=num))
             
             # Theme colors
             theme = load_theme()
@@ -8646,7 +8502,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.title(t('settings.rename_preset').format(num=num))
             dialog.configure(bg=bg)
             dialog.resizable(False, False)
-            dialog.transient(self)
             
             # Set icon
             try:
@@ -8672,15 +8527,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                            bg="#2a2a2a", fg="#ffffff",
                            insertbackground="#ffffff")
             entry.pack(pady=5)
-            
-            # Center and show dialog
-            dialog.update_idletasks()
-            self._center_dialog_on_parent(dialog)
-            dialog.deiconify()  # Show dialog after centering
-            dialog.grab_set()  # Grab focus after showing
-            
-            entry.select_range(0, tk.END)
-            entry.focus_set()
             
             def save_name():
                 new_name = name_var.get().strip()
@@ -8713,12 +8559,27 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Enter key to save
             entry.bind("<Return>", lambda e: save_name())
             
-            # CRITICAL: Center on parent window
+            from ui.dialogs import center_window
+            dialog.bind("<Escape>", lambda e: dialog.destroy())
             dialog.update_idletasks()
-            self._center_dialog_on_parent(dialog)
-            
+            center_window(dialog, self)
+            dialog.deiconify()
+            dialog.attributes('-topmost', True)
+            dialog.lift()
+            dialog.focus_force()
+            try:
+                dialog.grab_set()
+            except tk.TclError:
+                pass
+            entry.select_range(0, tk.END)
             entry.focus_set()
-            
+
+            def keep_on_top():
+                if dialog.winfo_exists():
+                    dialog.lift()
+                    dialog.after(100, keep_on_top)
+            keep_on_top()
+
         except Exception as e:
             print(f"Error renaming preset {num}: {e}")
 
@@ -8749,10 +8610,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
         # Bind mousewheel to canvas and all child widgets
-        def _bind_mousewheel_recursive(widget):
-            widget.bind("<MouseWheel>", _on_mousewheel)
-            for child in widget.winfo_children():
-                _bind_mousewheel_recursive(child)
+        from app_utils import bind_mousewheel_recursive
         
         # Bind to canvas and scrollable_frame initially
         canvas.bind("<MouseWheel>", _on_mousewheel)
@@ -8760,7 +8618,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Rebind to all children after content is built
         def _bind_all_children():
-            _bind_mousewheel_recursive(scrollable_frame)
+            bind_mousewheel_recursive(scrollable_frame, _on_mousewheel)
         frame.after(100, _bind_all_children)
 
         # Now build content in scrollable_frame instead of frame
@@ -8861,7 +8719,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         def _on_ui_scale_change(event=None):
             selected = self.ui_scale_var.get()
-            if selected == _current_ui_scale_display:
+            if _ui_scale_options.get(selected, 1.0) == load_ui_scale():
                 return
             save_ui_scale(_ui_scale_options.get(selected, 1.0))
 
@@ -8943,7 +8801,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         def _on_language_change(event=None):
             selected_name = self.language_var.get()
             selected_code = self._lang_name_to_code.get(selected_name, 'en')
-            if selected_code == saved_lang:
+            if selected_code == load_config_func().get('language', 'en'):
                 return
 
             # Update display label
@@ -9132,7 +8990,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         for internal_name, color_hex in self.color_options.items():
             display_name = color_display_names.get(internal_name, internal_name)
             # For very light colors, use black text for readability
-            text_color = "#000000" if internal_name in ["White", "Yellow", "Light Gray", "Light Green", "Light Blue", "Cyan"] else "#000000"
+            text_color = "#000000"
 
             def set_color(disp=display_name, internal=internal_name):
                 self._color_display_var.set(disp)
@@ -9259,19 +9117,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         _apply_auto_prices_duration_state()
         r += 1
 
-        # Show all materials checkbox (for enhanced mode) - HIDDEN but functionality preserved
-        # tk.Checkbutton(scrollable_frame, text="Enhanced Mode: Show All Materials (uncheck to only show materials above threshold)",
-        #               variable=self.prospector_show_all,
-        #               bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
-        #               activeforeground="#ffffff", highlightthickness=0, bd=0, font=("Segoe UI", 9),
-        #               padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
-        #               highlightcolor="#1e1e1e", takefocus=False).grid(row=r, column=0, sticky="w")
-        # r += 1
-        # tk.Label(scrollable_frame, text="Only affects Enhanced mode - controls whether to display all materials or filter by threshold",
-        #          wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-        #          font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
-        # r += 1
-        
         # Apply initial greyed-out state for overlay sub-controls if master toggle is off
         self._apply_overlay_enabled_state()
 
@@ -9359,7 +9204,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Sync with ring_finder
             if hasattr(self, 'ring_finder') and self.ring_finder and hasattr(self.ring_finder, 'auto_search_var'):
                 self.ring_finder.auto_search_var.set(enabled)
-                self.ring_finder._save_auto_search_state()
+                self.ring_finder._on_auto_search_toggle()
             self._set_status(f"Auto-search hotspots {'enabled' if enabled else 'disabled'}")
         
         tk.Checkbutton(scrollable_frame, text=t('settings.auto_search_hotspots'), variable=self.auto_search_enabled, 
@@ -9418,64 +9263,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                  font=self._scaled_font(8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
         r += 1
 
-        # ========== EDSM API KEY SECTION - DISABLED ==========
-        # ttk.Label(scrollable_frame, text="EDSM API Key", font=("Segoe UI", 10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
-        # r += 1
-        # 
-        # # Add separator line
-        # separator_edsm = tk.Frame(scrollable_frame, height=1, bg="#444444")
-        # separator_edsm.grid(row=r, column=0, sticky="ew", pady=(0, 8))
-        # r += 1
-        # 
-        # # EDSM signup instructions
-        # instructions_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        # instructions_frame.grid(row=r, column=0, sticky="w", pady=(4, 4))
-        # 
-        # tk.Label(instructions_frame, text="1. Sign up at EDSM:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w")
-        # 
-        # # EDSM link
-        # import webbrowser
-        # edsm_link = tk.Label(instructions_frame, text="https://www.edsm.net/", bg=_gs_bg, fg="#4da6ff", font=("Segoe UI", 9, "underline"), cursor="hand2")
-        # edsm_link.pack(anchor="w", padx=(15, 0))
-        # edsm_link.bind("<Button-1>", lambda e: webbrowser.open("https://www.edsm.net/"))
-        # 
-        # tk.Label(instructions_frame, text="2. Log in → Account settings → API key", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
-        # tk.Label(instructions_frame, text="3. Paste the key here:", bg=_gs_bg, fg="#ffffff", font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
-        # 
-        # r += 1
-        # 
-        # # EDSM API key input
-        # api_key_frame = tk.Frame(scrollable_frame, bg=_gs_bg)
-        # api_key_frame.grid(row=r, column=0, sticky="w", pady=(4, 0))
-        # 
-        # # Initialize EDSM API key variable
-        # if not hasattr(self, 'edsm_api_key'):
-        #     self.edsm_api_key = tk.StringVar()
-        #     self.edsm_api_key.set(_load_cfg().get('edsm_api_key', ''))
-        # 
-        # api_key_entry = tk.Entry(api_key_frame, textvariable=self.edsm_api_key, bg="#2d2d2d", fg="#ffffff", 
-        #                         font=("Consolas", 9), width=45, show="*")
-        # api_key_entry.grid(row=0, column=0, padx=(0, 8))
-        # 
-        # # Save button
-        # def _save_api_key():
-        #     key = self.edsm_api_key.get().strip()
-        #     from config import update_config_value
-        #     update_config_value("edsm_api_key", key)
-        #     messagebox.showinfo("Saved", "EDSM API key saved successfully!")
-        # 
-        # save_btn = tk.Button(api_key_frame, text="Save", command=_save_api_key,
-        #                     bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-        #                     activeforeground="#ffffff", relief="ridge", bd=1, 
-        #                     font=("Segoe UI", 8, "normal"), cursor="hand2")
-        # save_btn.grid(row=0, column=1)
-        # 
-        # r += 1
-        # tk.Label(scrollable_frame, text="Required for Ring Finder to search nearby systems for comprehensive results.", 
-        #          wraplength=760, justify="left", fg="gray", bg=_gs_bg,
-        #          font=("Segoe UI", 8, "italic")).grid(row=r, column=0, sticky="w", pady=(0, 12))
-        # r += 1
-
         # ========== BACKUP & RESTORE SECTION ==========
         ttk.Label(scrollable_frame, text=t('settings.backup_restore_title'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
         r += 1
@@ -9497,7 +9284,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         compact_classic_button(backup_btn)
         backup_btn.pack(side="left", padx=(0, 8))
         _backup_tooltip = t('tooltips.backup')
-        print(f"[DEBUG TOOLTIP] tooltips.backup = {repr(_backup_tooltip)}")
         ToolTip(backup_btn, _backup_tooltip)
         
         restore_btn = tk.Button(backup_frame, text="📂 " + t('settings.restore_button'), command=self._show_restore_dialog,
@@ -9986,12 +9772,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             from config import load_active_ship_preset
             active_name = load_active_ship_preset()
             if active_name and os.path.exists(self._settings_path(active_name)):
-                with open(self._settings_path(active_name), "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                self._apply_mapping(data)
-                self._active_ship_preset_name = active_name
-                self._active_ship_preset_snapshot = self._ship_get_current_snapshot()
-                self._ship_update_preset_row_highlight()
+                self._load_ship_preset(active_name)
         except Exception:
             pass
 
@@ -10044,7 +9825,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             paned = self.sidebar_paned
             total_height = paned.winfo_height()
             pos = self._sidebar_sash_position(paned.sashpos(0))
-            if total_height >= 100 and self._scaled_px(80) <= pos <= total_height - self._scaled_px(100):
+            if total_height >= 100 and self._scaled_px(80) <= pos <= total_height - self._scaled_px(150):
                 from config import save_modern_sidebar_sash_position
                 save_modern_sidebar_sash_position(pos)
                 log.debug(f"Modern sidebar sash position saved: {pos}")
@@ -10194,10 +9975,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             _bind_mousewheel_recursive(scrollable_frame)
         frame.after(100, _bind_all_children)
         
-        # Helper to prevent spinbox scroll from affecting canvas (kept for compatibility)
-        def _block_canvas_scroll_on_spinbox(spinbox):
-            pass  # No longer needed with recursive binding
-
         # Now build content in scrollable_frame instead of frame
         scrollable_frame.columnconfigure(0, weight=1)
         
@@ -10653,10 +10430,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 # Create closure with captured values
                 def make_save_cargoscoop(tn, fn, l, h):
-                    return lambda: self._save_cargoscoop_delay(tn, fn, l, h)
+                    return lambda: self._save_timer(tn, fn, l, h)
                 
                 def make_trace_cargoscoop(tn, fn, l, h):
-                    return lambda *args: self._save_cargoscoop_delay(tn, fn, l, h)
+                    return lambda *args: self._save_timer(tn, fn, l, h)
                 
                 cargoscoop_spinbox = tk.Spinbox(cargoscoop_frame, from_=lo, to=hi, width=5, 
                                                  textvariable=self.timer_vars[cargoscoop_timer_name],
@@ -11005,7 +10782,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         if event.delta > 0:
                             new_val = min(current + 0.1, 5.0)
                         else:
-                            new_val = max(current - 0.1, 0.5)
+                            new_val = max(current - 0.1, 1.0)
                         var.set(round(new_val, 1))
                         self._save_thrust_open()  # Save on scroll
                     except:
@@ -11263,29 +11040,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[LASER EXTRA] Error saving repeat count: {e}")
     
-    def _load_laser_extra_repeat(self) -> None:
-        """Load laser mining extra repeat count from txt file"""
-        try:
-            txt_path = os.path.join(self.vars_dir, "laserminingextra_count.txt")
-            print(f"[LOAD DEBUG] Reading laser_extra from: {txt_path}")
-            if os.path.exists(txt_path):
-                with open(txt_path, 'r', encoding='utf-8') as f:
-                    count = int(f.read().strip())
-                    self.laser_extra_repeat_var.set(count)
-                    print(f"[LASER EXTRA] Loaded repeat count: {count}")
-            else:
-                # Create default file with value 1
-                self._save_laser_extra_repeat()
-                print(f"[LASER EXTRA] Created default repeat count file: 1")
-            
-            # Update status label after loading
-            count = self.laser_extra_repeat_var.get()
-            times_text = t('voiceattack.time') if count == 1 else t('voiceattack.times')
-            self.laser_extra_status_label.config(text=f"({t('voiceattack.will_run')} {count} {times_text})")
-        except Exception as e:
-            print(f"[LASER EXTRA] Error loading repeat count: {e}")
-            self.laser_extra_repeat_var.set(1)  # Fallback to default
-    
     def _save_prospector_delay(self) -> None:
         """Save prospector delay to delayprospector.txt"""
         # Skip save during import to prevent feedback loop
@@ -11302,23 +11056,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._ship_check_modified()
         except Exception as e:
             print(f"[PROSPECTOR DELAY] Error saving delay: {e}")
-    
-    def _load_prospector_delay(self) -> None:
-        """Load prospector delay from delayprospector.txt"""
-        try:
-            txt_path = os.path.join(self.vars_dir, "delayprospector.txt")
-            if os.path.exists(txt_path):
-                with open(txt_path, 'r', encoding='utf-8') as f:
-                    delay = float(f.read().strip())
-                    # Clamp to valid range
-                    delay = max(0.0, min(6.0, delay))
-                    self.prospector_delay_var.set(delay)
-                    print(f"[PROSPECTOR DELAY] Loaded delay: {delay:.1f} seconds")
-            else:
-                self._save_prospector_delay()
-        except Exception as e:
-            print(f"[PROSPECTOR DELAY] Error loading delay: {e}")
-            self.prospector_delay_var.set(2.6)  # Fallback to default
     
     def _list_sound_events(self) -> dict:
         """{event: ["British Female", ...]} from Sound_Packs/<pack>/<pack>_<voice>/*.wav; fills self._sound_label_map"""
@@ -11435,16 +11172,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         off_label = t('voiceattack.sound_event_off')
         tts_label = t('voiceattack.sound_event_tts')
         custom = _load_cfg().get("sound_events", {})
-        for event, var in self.sound_event_vars.items():
-            if SOUND_EVENT_CATEGORIES.get(event, "other") != category:
-                continue
-            packs = self._sound_event_packs[event]
-            if active:
-                value = active if active in packs or active == tts_label else off_label
-            else:
-                saved = custom.get(event)
-                value = off_label if saved == "" else tts_label if saved == "tts" else saved if saved in packs else packs[0]
-            var.set(value)
+        self._updating_sound_events = True
+        try:
+            for event, var in self.sound_event_vars.items():
+                if SOUND_EVENT_CATEGORIES.get(event, "other") != category:
+                    continue
+                packs = self._sound_event_packs[event]
+                if active:
+                    value = active if active in packs or active == tts_label else off_label
+                else:
+                    saved = custom.get(event)
+                    value = off_label if saved == "" else tts_label if saved == "tts" else saved if saved in packs else packs[0]
+                var.set(value)
+        finally:
+            self._updating_sound_events = False
         self._save_sound_events()
 
     def _clear_voice_set(self, category: str) -> None:
@@ -11461,18 +11202,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _reset_sound_events(self, category: str = None) -> None:
         """Reset a section (or all) to the default voice for every event and untick its voice set"""
-        if not centered_yesno_dialog(self.parent.winfo_toplevel(), t('voiceattack.sound_reset_title'),
+        if not centered_yesno_dialog(self, t('voiceattack.sound_reset_title'),
                                      t('voiceattack.sound_reset_confirm')):
             return
         from config import update_config_value
         default_tts = _load_cfg().get("tts_voice") or ""
-        for event, var in self.sound_event_vars.items():
-            if category and SOUND_EVENT_CATEGORIES.get(event, "other") != category:
-                continue
-            packs = self._sound_event_packs[event]
-            var.set(next((p for p in packs if p.endswith(" Female")), packs[0]))
-            if default_tts:
-                self.sound_event_tts_vars[event].set(default_tts)
+        self._updating_sound_events = True
+        try:
+            for event, var in self.sound_event_vars.items():
+                if category and SOUND_EVENT_CATEGORIES.get(event, "other") != category:
+                    continue
+                packs = self._sound_event_packs[event]
+                var.set(next((p for p in packs if p.endswith(" Female")), packs[0]))
+                if default_tts:
+                    self.sound_event_tts_vars[event].set(default_tts)
+        finally:
+            self._updating_sound_events = False
         for cat in ([category] if category else list(self._voice_set_active)):
             self._voice_set_active.pop(cat, None)
         for (cat, _label), sv in self._voice_set_vars.items():
@@ -11483,7 +11228,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _save_sound_events(self) -> None:
         """Persist per-event choice ("" = Off, "tts", or "<pack> <voice>") and TTS voice, and write the path variables"""
-        from config import update_config_value
+        if getattr(self, '_updating_sound_events', False):
+            return
+        from config import update_config_values
         off_label = t('voiceattack.sound_event_off')
         tts_label = t('voiceattack.sound_event_tts')
         active = getattr(self, '_voice_set_active', {})
@@ -11495,8 +11242,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     events[e] = existing[e]
             else:
                 events[e] = "" if v.get() == off_label else "tts" if v.get() == tts_label else v.get()
-        update_config_value("sound_events", events)
-        update_config_value("sound_event_tts", {e: vv.get() for e, vv in self.sound_event_tts_vars.items()})
+        update_config_values({
+            "sound_events": events,
+            "sound_event_tts": {e: vv.get() for e, vv in self.sound_event_tts_vars.items()},
+        })
         self._write_sound_event_paths()
 
     _SOUND_LEVEL_FILES = {"sound_volume": "soundVolume", "sound_balance": "soundBalance"}
@@ -11602,25 +11351,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[TIMER] Error auto-saving {timer_name}: {e}")
     
-    def _save_cargoscoop_delay(self, timer_name: str, filename: str, lo: int, hi: int) -> None:
-        """Save cargo scoop delay to file immediately on change"""
-        # Skip save during import to prevent feedback loop
-        if getattr(self, '_importing', False):
-            return
-        try:
-            delay = self.timer_vars[timer_name].get()
-            # Clamp to valid range
-            delay = max(lo, min(hi, delay))
-            self.timer_vars[timer_name].set(delay)
-            
-            # Write to file
-            base = os.path.splitext(filename)[0]
-            self._write_var_text(base, str(delay))
-            print(f"[CARGO SCOOP DELAY] Auto-saved: {delay} seconds")
-            self._ship_check_modified()
-        except Exception as e:
-            print(f"[CARGO SCOOP DELAY] Error auto-saving: {e}")
-    
     def _save_thrust_upduration(self) -> None:
         """Save thrust key hold duration to thrustUpduration.txt"""
         if getattr(self, '_importing', False):
@@ -11634,23 +11364,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._ship_check_modified()
         except Exception as e:
             print(f"[THRUST UPDURATION] Error saving: {e}")
-
-    def _load_thrust_upduration(self) -> None:
-        """Load thrust key hold duration from thrustUpduration.txt"""
-        try:
-            txt_path = os.path.join(self.vars_dir, "thrustUpduration.txt")
-            if os.path.exists(txt_path):
-                with open(txt_path, 'r', encoding='utf-8') as f:
-                    delay = float(f.read().strip())
-                    delay = max(0.5, min(3.5, delay))
-                    self.thrust_upduration_var.set(delay)
-                    print(f"[THRUST UPDURATION] Loaded: {delay:.1f} seconds")
-            else:
-                self._save_thrust_upduration()
-                print(f"[THRUST UPDURATION] Created default file: 1.5 seconds")
-        except Exception as e:
-            print(f"[THRUST UPDURATION] Error loading: {e}")
-            self.thrust_upduration_var.set(1.5)
 
     def _save_thrust_closed(self) -> None:
         """Save thrust closed timing to thrustScoopClosed.txt"""
@@ -11668,25 +11381,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[THRUST CLOSED] Error saving timing: {e}")
     
-    def _load_thrust_closed(self) -> None:
-        """Load thrust closed timing from thrustScoopClosed.txt"""
-        try:
-            txt_path = os.path.join(self.vars_dir, "thrustScoopClosed.txt")
-            if os.path.exists(txt_path):
-                with open(txt_path, 'r', encoding='utf-8') as f:
-                    delay = float(f.read().strip())
-                    # Clamp to valid range
-                    delay = max(0.0, min(5.0, delay))
-                    self.thrust_closed_var.set(delay)
-                    print(f"[THRUST CLOSED] Loaded timing: {delay:.1f} seconds")
-            else:
-                # Create default file with value 1.6
-                self._save_thrust_closed()
-                print(f"[THRUST CLOSED] Created default timing file: 1.6 seconds")
-        except Exception as e:
-            print(f"[THRUST CLOSED] Error loading timing: {e}")
-            self.thrust_closed_var.set(1.6)  # Fallback to default
-    
     def _save_thrust_open(self) -> None:
         """Save thrust open timing to thrustScoopOpen.txt"""
         # Skip save during import to prevent feedback loop
@@ -11702,25 +11396,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._ship_check_modified()
         except Exception as e:
             print(f"[THRUST OPEN] Error saving timing: {e}")
-    
-    def _load_thrust_open(self) -> None:
-        """Load thrust open timing from thrustScoopOpen.txt"""
-        try:
-            txt_path = os.path.join(self.vars_dir, "thrustScoopOpen.txt")
-            if os.path.exists(txt_path):
-                with open(txt_path, 'r', encoding='utf-8') as f:
-                    delay = float(f.read().strip())
-                    # Clamp to valid range
-                    delay = max(1.0, min(5.0, delay))
-                    self.thrust_open_var.set(delay)
-                    print(f"[THRUST OPEN] Loaded timing: {delay:.1f} seconds")
-            else:
-                # Create default file with value 3.8
-                self._save_thrust_open()
-                print(f"[THRUST OPEN] Created default timing file: 3.8 seconds")
-        except Exception as e:
-            print(f"[THRUST OPEN] Error loading timing: {e}")
-            self.thrust_open_var.set(3.8)  # Fallback to default
     
     def _initialize_va_variables(self) -> None:
         """Initialize VoiceAttack variables manager"""
@@ -11748,58 +11423,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             log.error(f"Error polling VA variables: {e}")
         finally:
             self.after(2000, self._poll_va_variables)
-    
-    def _initialize_jumps_left(self) -> None:
-        """Initialize jumpsleft.txt by checking for active route in current journal"""
-        try:
-            journal_dir = self.prospector_panel.journal_dir if hasattr(self, 'prospector_panel') else None
-            if not journal_dir or not os.path.exists(journal_dir):
-                self._write_jumps_left(0)
-                return
-            
-            # Find most recent journal file
-            journal_files = [f for f in os.listdir(journal_dir) if f.startswith('Journal.') and f.endswith('.log')]
-            if not journal_files:
-                self._write_jumps_left(0)
-                return
-            
-            journal_files.sort(reverse=True)
-            latest_journal = os.path.join(journal_dir, journal_files[0])
-            
-            # Scan backwards through journal to find most recent FSDTarget or NavRouteClear
-            jumps_remaining = 0
-            try:
-                with open(latest_journal, 'r', encoding='utf-8') as f:
-                    # Read last 50KB to find recent route info
-                    f.seek(0, 2)
-                    file_size = f.tell()
-                    f.seek(max(0, file_size - 51200))
-                    lines = f.readlines()
-                    
-                    # Scan backwards for most recent route event
-                    for line in reversed(lines):
-                        if not line.strip():
-                            continue
-                        try:
-                            event = json.loads(line)
-                            event_type = event.get('event')
-                            
-                            if event_type == 'FSDTarget':
-                                jumps_remaining = event.get('RemainingJumpsInRoute', 0)
-                                break
-                            elif event_type == 'NavRouteClear':
-                                jumps_remaining = 0
-                                break
-                        except json.JSONDecodeError:
-                            continue
-            except Exception as e:
-                log.error(f"Error reading journal for route info: {e}")
-            
-            self._write_jumps_left(jumps_remaining)
-            
-        except Exception as e:
-            log.error(f"Error initializing jumpsleft: {e}")
-            self._write_jumps_left(0)
     
     def _poll_route_status(self) -> None:
         """Poll journal and NavRoute for changes (runs every 2 seconds)"""
@@ -12549,7 +12172,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Clicked on empty space - deselect all
             tree.selection_remove(*tree.selection())
     
-    def _on_preset_double_click(self, event) -> None:
+    def _on_preset_double_click(self, event) -> Optional[str]:
         """Handle double-click on preset list - load preset or toggle group"""
         item = self.preset_list.identify_row(event.y)
         if not item:
@@ -12567,6 +12190,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             # It's a preset - load it
             self._load_selected_preset()
+        return "break"
 
     def _current_mapping(self) -> Dict[str, Any]:
         # Exclude Core/Non-Core settings from ship presets
@@ -12616,11 +12240,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             btn = spec.get("btn")
             if tool in self.tool_btn and isinstance(btn, int) and btn in (1, 2):
                 self.tool_btn[tool].set(btn)
-        toggles_data = data.get("Toggles", {})
+        toggles_data = data.get("Toggles", {}).copy()
+        for old_key in ("Target", "Auto Deselect Target"):
+            if old_key in toggles_data:
+                toggles_data.setdefault("Auto Deselect Prospector", toggles_data.pop(old_key))
         for k, v in toggles_data.items():
-            # Migrate old toggle keys to new keys
-            if k == "Target" or k == "Auto Deselect Target":
-                k = "Auto Deselect Prospector"
             if k in self.toggle_vars and k not in PRESET_EXCLUDED_TOGGLES:
                 self.toggle_vars[k].set(int(v))
         # Toggles missing from an older preset default to off, so a discarded
@@ -12699,8 +12323,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if "ThrustClosed" in data and hasattr(self, 'thrust_closed_var'):
             try:
                 delay = float(data["ThrustClosed"])
-                # Clamp to valid range (1.0-5.0)
-                delay = max(1.0, min(5.0, delay))
+                # Clamp to valid range (0.0-5.0)
+                delay = max(0.0, min(5.0, delay))
                 self.thrust_closed_var.set(delay)
                 self._save_thrust_closed()
                 print(f"[PRESET] Loaded thrust closed timing: {delay:.1f}s")
@@ -12723,257 +12347,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._save_all_to_txt()
         self._set_status("Preset loaded and saved to Variables.")
 
-    def _ask_preset_name(self, initial: Optional[str] = None) -> Optional[str]:
-        """Custom dark dialog for preset names"""
-        dialog = tk.Toplevel(self)
-        dialog.withdraw()  # Hide initially to prevent blinking on wrong monitor
-        dialog.title(t('dialogs.preset_name'))
-        dialog.configure(bg="#2c3e50")
-        dialog.geometry("400x150")
-        dialog.resizable(False, False)
-        # dialog.transient(self)  # Disabled - causes focus issues
-        
-        # Set app icon
-        try:
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                dialog.iconbitmap(icon_path)
-            elif icon_path and icon_path.endswith('.png'):
-                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
-        except Exception:
-            pass
-        
-        # Center on parent
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
-        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
-        dialog.deiconify()  # Show dialog after centering
-        
-        # Force dialog to stay on top and have focus
-        dialog.attributes('-topmost', True)
-        dialog.lift()
-        dialog.focus_force()
-        
-        try:
-            dialog.grab_set()  # Grab focus after showing
-        except:
-            pass
-        
-        result = None
-        
-        # Label
-        label = tk.Label(dialog, text="Enter a name for this preset:", 
-                        bg="#2c3e50", fg="#ecf0f1", font=self._scaled_font(9))
-        label.pack(pady=(20, 10))
-        
-        # Entry
-        entry = tk.Entry(dialog, font=self._scaled_font(9), width=30)
-        entry.pack(pady=5)
-        if initial:
-            entry.insert(0, initial)
-            entry.selection_range(0, tk.END)
-        
-        # Buttons frame
-        btn_frame = tk.Frame(dialog, bg="#2c3e50")
-        btn_frame.pack(pady=20)
-        
-        def on_ok():
-            nonlocal result
-            result = entry.get().strip()
-            dialog.destroy()
-            
-        def on_cancel():
-            dialog.destroy()
-            
-        ok_btn = tk.Button(btn_frame, text=t('common.ok'), command=on_ok,
-                          bg="#27ae60", fg="white", font=self._scaled_font(9),
-                          width=10)
-        ok_btn.pack(side=tk.LEFT, padx=5)
-        
-        cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
-                              bg="#e74c3c", fg="white", font=self._scaled_font(9),
-                              width=10)
-        cancel_btn.pack(side=tk.LEFT, padx=5)
-        
-        # Bind Enter/Escape
-        dialog.bind('<Return>', lambda e: on_ok())
-        dialog.bind('<Escape>', lambda e: on_cancel())
-        entry.bind('<Return>', lambda e: on_ok())
-        
-        entry.focus_set()
-        
-        # Keep dialog on top while open
-        def keep_on_top():
-            try:
-                if dialog.winfo_exists():
-                    dialog.lift()
-                    dialog.after(100, keep_on_top)
-            except:
-                pass
-        dialog.after(100, keep_on_top)
-        
-        dialog.wait_window()
-        return result if result else None
-
     def _ask_new_preset_name(self, preselect_ship: Optional[str] = None) -> Optional[str]:
-        """Dialog for creating new preset with Ship Type dropdown and custom name"""
-        # Complete Elite Dangerous ship list (alphabetical)
-        ship_types = (*SHIP_TYPES, "Other")
-        
-        dialog = tk.Toplevel(self)
-        dialog.withdraw()  # Hide while setting up
-        dialog.title(t('dialogs.new_ship_preset'))
-        dialog.configure(bg="#1e1e1e")
-        dialog.geometry("550x280")
-        dialog.resizable(True, True)
-        dialog.minsize(450, 240)  # Minimum size
-        dialog.transient(self)  # Keep dialog in front of main window
-        try:
-            dialog.grab_set()
-        except:
-            pass
-        
-        # Theme-aware accent color
-        if self.current_theme == "elite_orange":
-            accent_color = "#ff8c00"
-            accent_fg = "#000000"
-        else:
-            accent_color = "#4a9eff"
-            accent_fg = "#ffffff"
-        
-        # Configure theme style for combobox
-        style = ttk.Style(dialog)
-        style.configure("Preset.TCombobox", 
-                       fieldbackground="#2d2d2d",
-                       background="#2d2d2d",
-                       foreground="#ffffff",
-                       selectbackground=accent_color,
-                       selectforeground=accent_fg)
-        style.map("Preset.TCombobox",
-                 fieldbackground=[("readonly", "#2d2d2d")],
-                 selectbackground=[("readonly", accent_color)],
-                 selectforeground=[("readonly", accent_fg)])
-        
-        # Set app icon
-        try:
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                dialog.iconbitmap(icon_path)
-            elif icon_path and icon_path.endswith('.png'):
-                dialog.iconphoto(False, tk.PhotoImage(file=icon_path))
-        except Exception:
-            pass
-        
-        # Center on parent
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
-        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
-        
-        result = None
-        
-        # Title
-        title_label = tk.Label(dialog, text="💾 Create New Ship Preset", 
-                              bg="#1e1e1e", fg="#ff8c00", 
-                              font=self._scaled_font(12, "bold"))
-        title_label.pack(pady=(15, 15))
-        
-        # Ship Type selection
-        type_frame = tk.Frame(dialog, bg="#1e1e1e")
-        type_frame.pack(fill="x", padx=25, pady=(0, 10))
-        
-        tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
-                font=self._scaled_font(10)).pack(side=tk.LEFT)
-        
-        # Pre-select ship if provided
-        default_ship = preselect_ship if preselect_ship and preselect_ship in ship_types else ship_types[0]
-        ship_var = tk.StringVar(value=default_ship)
-        ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
-                                  state="readonly", width=28, font=self._scaled_font(10),
-                                  style="Preset.TCombobox")
-        ship_combo.pack(side=tk.LEFT, padx=(15, 0))
-        
-        # Custom name entry
-        name_frame = tk.Frame(dialog, bg="#1e1e1e")
-        name_frame.pack(fill="x", padx=25, pady=10)
-        
-        tk.Label(name_frame, text="Build Name:", bg="#1e1e1e", fg="#ffffff", 
-                font=self._scaled_font(10)).pack(side=tk.LEFT)
-        
-        name_entry = tk.Entry(name_frame, font=self._scaled_font(10), width=30,
-                             bg="#2d2d2d", fg="#ffffff", insertbackground=accent_color,
-                             selectbackground=accent_color, selectforeground=accent_fg,
-                             relief="flat", bd=2)
-        name_entry.pack(side=tk.LEFT, padx=(10, 0))
-        
-        # Preview
-        preview_frame = tk.Frame(dialog, bg="#1e1e1e")
-        preview_frame.pack(fill="x", padx=25, pady=10)
-        
-        tk.Label(preview_frame, text="Preview:", bg="#1e1e1e", fg="#888888", 
-                font=self._scaled_font(9)).pack(side=tk.LEFT)
-        
-        preview_label = tk.Label(preview_frame, text="", bg="#1e1e1e", fg=accent_color, 
-                                font=self._scaled_font(10, "bold"))
-        preview_label.pack(side=tk.LEFT, padx=(10, 0))
-        
-        def update_preview(*args):
-            ship = ship_var.get()
-            name = name_entry.get().strip()
-            if name:
-                preview_label.config(text=f"{ship} {name}")
-            else:
-                preview_label.config(text=f"{ship}")
-        
-        ship_var.trace("w", update_preview)
-        name_entry.bind("<KeyRelease>", update_preview)
-        update_preview()  # Initial preview
-        
-        # Buttons frame
-        btn_frame = tk.Frame(dialog, bg="#1e1e1e")
-        btn_frame.pack(pady=15)
-        
-        def on_ok():
-            nonlocal result
-            ship = ship_var.get()
-            name = name_entry.get().strip()
-            if name:
-                result = f"{ship} {name}"
-            else:
-                result = ship
-            dialog.destroy()
-            
-        def on_cancel():
-            dialog.destroy()
-            
-        ok_btn = tk.Button(btn_frame, text="💾 Save", command=on_ok,
-                          bg=accent_color, fg=accent_fg, font=self._scaled_font(10, "bold"),
-                          activebackground=accent_color, activeforeground=accent_fg,
-                          width=10, cursor="hand2")
-        ok_btn.pack(side=tk.LEFT, padx=5)
-        
-        cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
-                              bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
-                              activebackground="#4a4a4a", activeforeground="#ffffff",
-                              width=10, cursor="hand2")
-        cancel_btn.pack(side=tk.LEFT, padx=5)
-        
-        # Bind Enter/Escape
-        dialog.bind('<Return>', lambda e: on_ok())
-        dialog.bind('<Escape>', lambda e: on_cancel())
-        
-        # Show dialog
-        dialog.deiconify()
-        
-        # Force dialog to have focus (no -topmost or lift loop — they hide combobox dropdown)
-        dialog.lift()
-        dialog.focus_force()
-        
-        name_entry.focus_set()
-        
-        dialog.wait_window()
-        return result if result else None
+        return self._ask_edit_preset_name(preselect_ship or "", "", "", creating=True)
 
     def _get_selected_preset(self) -> Optional[str]:
         """Get the selected preset name (not group headers)"""
@@ -13089,20 +12464,25 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             messagebox.showerror("Edit failed", str(e))
 
-    def _ask_edit_preset_name(self, detected_ship: str, detected_variant: str, original_name: str, *, importing: bool = False) -> Optional[str]:
-        """Choose the ship type and build name when editing or importing a preset."""
+    def _ask_edit_preset_name(self, detected_ship: str, detected_variant: str, original_name: str, *, importing: bool = False, creating: bool = False) -> Optional[str]:
+        """Choose the ship type and build name for a preset."""
         # Complete Elite Dangerous ship list (alphabetical)
         ship_types = (*SHIP_TYPES, "Other")
-        
+
         dialog = tk.Toplevel(self)
         dialog.withdraw()
-        dialog.title(t('dialogs.import_ship_preset' if importing else 'dialogs.edit_ship_preset'))
-        dialog.configure(bg="#1e1e1e")
-        dialog.geometry("480x280" if importing else "550x300")
+        title_key = 'new_ship_preset' if creating else 'import_ship_preset' if importing else 'edit_ship_preset'
+        dialog.title(t('dialogs.' + title_key))
+        bg = self.theme_colors['bg']
+        fg = self.theme_colors['fg']
+        entry_bg = self.theme_colors['bg_accent']
+        dialog.configure(bg=bg)
+        width, height = (480, 280) if importing else (550, 300)
+        dialog.geometry(f"{self._scaled_px(width)}x{self._scaled_px(height)}")
         dialog.resizable(not importing, not importing)
         if not importing:
-            dialog.minsize(480, 280)
-        
+            dialog.minsize(self._scaled_px(480), self._scaled_px(280))
+
         # Theme-aware accent color
         if self.current_theme == "elite_orange":
             accent_color = "#ff8c00"
@@ -13110,20 +12490,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             accent_color = "#4a9eff"
             accent_fg = "#ffffff"
-        
+
         # Configure theme style for combobox
         style = ttk.Style(dialog)
-        style.configure("Preset.TCombobox", 
-                       fieldbackground="#2d2d2d",
-                       background="#2d2d2d",
-                       foreground="#ffffff",
+        style.configure("Preset.TCombobox",
+                       fieldbackground=entry_bg,
+                       background=entry_bg,
+                       foreground=fg,
                        selectbackground=accent_color,
                        selectforeground=accent_fg)
         style.map("Preset.TCombobox",
-                 fieldbackground=[("readonly", "#2d2d2d")],
+                 fieldbackground=[("readonly", entry_bg)],
                  selectbackground=[("readonly", accent_color)],
                  selectforeground=[("readonly", accent_fg)])
-        
+
         # Set app icon
         try:
             icon_path = get_app_icon_path()
@@ -13131,28 +12511,29 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 dialog.iconbitmap(icon_path)
         except Exception:
             pass
-        
+
         result = None
-        
+
         # Title
-        title_label = tk.Label(dialog, text="📥 Import Ship Preset" if importing else "✏️ Edit Ship Preset",
-                              bg="#1e1e1e", fg=accent_color, 
+        title_label = tk.Label(dialog, text=t("dialogs." + title_key),
+                              bg=bg, fg=accent_color,
                               font=self._scaled_font(12, "bold"))
         title_label.pack(pady=(15, 5))
-        
+
         # Show current name
-        orig_label = tk.Label(dialog, text=f"Original: {original_name}" if importing else f"Current: {original_name}",
-                             bg="#1e1e1e", fg="#888888", 
-                             font=self._scaled_font(9))
-        orig_label.pack(pady=(0, 10))
-        
+        if not creating:
+            orig_label = tk.Label(dialog, text=t('dialogs.preset_original' if importing else 'dialogs.preset_current').format(name=original_name),
+                                  bg=bg, fg=self.theme_colors['fg_muted'],
+                                  font=self._scaled_font(9))
+            orig_label.pack(pady=(0, 10))
+
         # Ship Type selection
-        type_frame = tk.Frame(dialog, bg="#1e1e1e")
+        type_frame = tk.Frame(dialog, bg=bg)
         type_frame.pack(fill="x", padx=25, pady=(0, 10))
-        
-        tk.Label(type_frame, text="Ship Type:", bg="#1e1e1e", fg="#ffffff", 
+
+        tk.Label(type_frame, text=t("dialogs.preset_ship_type"), bg=bg, fg=fg,
                 font=self._scaled_font(10)).pack(side=tk.LEFT)
-        
+
         # Find best match for detected ship
         ship_var = tk.StringVar()
         if detected_ship in ship_types:
@@ -13165,38 +12546,38 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     break
             else:
                 ship_var.set(ship_types[0])
-        
-        ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types, 
+
+        ship_combo = ttk.Combobox(type_frame, textvariable=ship_var, values=ship_types,
                                   state="readonly", width=28, font=self._scaled_font(10),
                                   style="Preset.TCombobox")
         ship_combo.pack(side=tk.LEFT, padx=(15, 0))
-        
+
         # Build name entry
-        name_frame = tk.Frame(dialog, bg="#1e1e1e")
+        name_frame = tk.Frame(dialog, bg=bg)
         name_frame.pack(fill="x", padx=25, pady=10)
-        
-        tk.Label(name_frame, text="Build Name:", bg="#1e1e1e", fg="#ffffff", 
+
+        tk.Label(name_frame, text=t("dialogs.preset_build_name"), bg=bg, fg=fg,
                 font=self._scaled_font(10)).pack(side=tk.LEFT)
-        
+
         name_entry = tk.Entry(name_frame, font=self._scaled_font(10), width=30,
-                             bg="#2d2d2d", fg="#ffffff", insertbackground=accent_color,
+                             bg=entry_bg, fg=fg, insertbackground=accent_color,
                              selectbackground=accent_color, selectforeground=accent_fg,
                              relief="flat", bd=2)
         name_entry.pack(side=tk.LEFT, padx=(10, 0))
         if detected_variant:
             name_entry.insert(0, detected_variant)
-        
+
         # Preview
-        preview_frame = tk.Frame(dialog, bg="#1e1e1e")
+        preview_frame = tk.Frame(dialog, bg=bg)
         preview_frame.pack(fill="x", padx=25, pady=10)
-        
-        tk.Label(preview_frame, text="New Name:", bg="#1e1e1e", fg="#888888", 
+
+        tk.Label(preview_frame, text=t("dialogs.preset_preview"), bg=bg, fg="#888888",
                 font=self._scaled_font(9)).pack(side=tk.LEFT)
-        
-        preview_label = tk.Label(preview_frame, text="", bg="#1e1e1e", fg=accent_color, 
+
+        preview_label = tk.Label(preview_frame, text="", bg=bg, fg=accent_color,
                                 font=self._scaled_font(10, "bold"))
         preview_label.pack(side=tk.LEFT, padx=(10, 0))
-        
+
         def update_preview(*args):
             ship = ship_var.get()
             name = name_entry.get().strip()
@@ -13204,15 +12585,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 preview_label.config(text=f"{ship} {name}")
             else:
                 preview_label.config(text=f"{ship}")
-        
+
         ship_var.trace("w", update_preview)
         name_entry.bind("<KeyRelease>", update_preview)
         update_preview()
-        
+
         # Buttons frame
-        btn_frame = tk.Frame(dialog, bg="#1e1e1e")
+        btn_frame = tk.Frame(dialog, bg=bg)
         btn_frame.pack(pady=15)
-        
+
         def on_ok():
             nonlocal result
             ship = ship_var.get()
@@ -13222,29 +12603,29 @@ class App(tk.Tk, ColumnVisibilityMixin):
             else:
                 result = ship
             dialog.destroy()
-            
+
         def on_cancel():
             dialog.destroy()
-            
-        ok_btn = tk.Button(btn_frame, text="📥 Import" if importing else "✏️ Save", command=on_ok,
+
+        ok_btn = tk.Button(btn_frame, text=t("common.import" if importing else "common.save"), command=on_ok,
                           bg=accent_color, fg=accent_fg, font=self._scaled_font(10, "bold"),
                           activebackground=accent_color, activeforeground=accent_fg,
                           width=10, cursor="hand2")
         ok_btn.pack(side=tk.LEFT, padx=5)
-        
+
         cancel_btn = tk.Button(btn_frame, text=t('common.cancel'), command=on_cancel,
-                              bg="#3a3a3a", fg="#ffffff", font=self._scaled_font(10),
-                              activebackground="#4a4a4a", activeforeground="#ffffff",
+                              bg="#3a3a3a", fg=fg, font=self._scaled_font(10),
+                              activebackground="#4a4a4a", activeforeground=fg,
                               width=10, cursor="hand2")
         cancel_btn.pack(side=tk.LEFT, padx=5)
-        
+
         dialog.bind('<Return>', lambda e: on_ok())
         dialog.bind('<Escape>', lambda e: on_cancel())
-        
+
         dialog.update_idletasks()
         center_window(dialog, self.winfo_toplevel())
         dialog.deiconify()
-        
+
         # Force dialog to stay on top and have focus
         dialog.attributes('-topmost', True)
         dialog.lift()
@@ -13253,19 +12634,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.grab_set()
         except:
             pass
-        
+
         name_entry.focus_set()
-        
+
         # Keep dialog on top while open
         def keep_on_top():
             try:
                 if dialog.winfo_exists():
-                    dialog.lift()
+                    # A lift while the native dropdown is open buries it.
+                    popdown = dialog.tk.call('ttk::combobox::PopdownWindow', str(ship_combo))
+                    if not dialog.tk.getboolean(dialog.tk.call('winfo', 'ismapped', popdown)):
+                        dialog.lift()
                     dialog.after(100, keep_on_top)
             except:
                 pass
         dialog.after(100, keep_on_top)
-        
+
         dialog.wait_window()
         return result
 
@@ -13275,9 +12659,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Build the Distance Calculator tab"""
         from edsm_distance import get_distance_calculator
         from fleet_carrier_tracker import get_fleet_carrier_tracker
-        from config import (load_home_system, save_home_system,
-                           load_fleet_carrier_system, save_fleet_carrier_system,
-                           load_distance_calculator_systems, load_theme)
+        from config import load_home_system, load_distance_calculator_systems, load_theme
         
         # Theme-aware background color
         _dc_theme = load_theme()
@@ -13286,6 +12668,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Get calculator instance
         self.distance_calculator = get_distance_calculator()
         self.fc_tracker = get_fleet_carrier_tracker()
+        self._distance_calculation_generation = 0
+        self._distance_update_generation = 0
+        self._distance_update_pending = None
+        self._distance_update_running = False
+        self._distance_refresh_generation = 0
+        self._distance_refresh_running = False
+        self._distance_values = {}
         
         # Main container
         main_container = ttk.Frame(frame)
@@ -13356,7 +12745,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Autocomplete
         from system_autocomplete import SystemAutocomplete
         self._ac_home = SystemAutocomplete(home_entry, self.distance_home_system, self)
-        home_entry.bind("<Return>", lambda e: (self._ac_home.hide(), self._distance_set_home(e)))  # Bind Enter key
+        home_entry.bind("<Return>", lambda e: (self._ac_home.hide(), self._distance_set_home(e)))
+        home_entry.bind('<FocusOut>', lambda e: (e.widget.selection_clear(), self._distance_set_home(e)))
         
         # Distance to Home (from current) and to Sol
         home_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
@@ -13404,11 +12794,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Refresh locations button (current system + FC)
         row += 1
-        auto_fc_btn = tk.Button(config_frame, text=t('distance_calculator.refresh_locations'), 
+        auto_fc_btn = create_action_button(config_frame, text=t('distance_calculator.refresh_locations'),
                                command=self._distance_refresh_locations,
                                bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
-                               activeforeground="#ffffff", relief="ridge", bd=1, padx=8, pady=3,
-                               font=self._scaled_font(8, "normal"), cursor="hand2")
+                               activeforeground="#ffffff", relief="ridge", bd=1, cursor="hand2")
+        self.distance_refresh_btn = auto_fc_btn
         auto_fc_btn.grid(row=row, column=0, columnspan=4, pady=(8, 0))
         ToolTip(auto_fc_btn, t('tooltips.refresh_locations'))
         
@@ -13428,6 +12818,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row = 0
         ttk.Label(calc_frame, text=t('distance_calculator.system_a'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_system_a = tk.StringVar(value=saved_system_a)
+        self.distance_system_a.trace_add('write', self._invalidate_distance_calculation)
         system_a_entry = tk.Entry(calc_frame, textvariable=self.distance_system_a, 
                                   bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9),
                                   insertbackground="#ffffff")
@@ -13437,11 +12828,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._ac_system_a = SystemAutocomplete(system_a_entry, self.distance_system_a, self)
         system_a_entry.bind("<Return>", lambda e: (self._ac_system_a.hide(), self._calculate_distances()))
         
-        use_current_btn = tk.Button(calc_frame, text=t('distance_calculator.use_current'), command=self._distance_use_current_system,
+        use_current_btn = create_action_button(calc_frame, text=t('distance_calculator.use_current'), command=self._distance_use_current_system,
                                    bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                    activeforeground="#ffffff", relief="ridge", bd=1, 
-                                   font=self._scaled_font(8, "normal"), cursor="hand2", width=14)
-        compact_classic_button(use_current_btn)
+                                   cursor="hand2")
         use_current_btn.grid(row=row, column=2, pady=3, padx=(5, 0), sticky="w")
         ToolTip(use_current_btn, t('tooltips.use_current'))
         
@@ -13449,6 +12839,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row += 1
         ttk.Label(calc_frame, text=t('distance_calculator.system_b'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
         self.distance_system_b = tk.StringVar(value=saved_system_b)
+        self.distance_system_b.trace_add('write', self._invalidate_distance_calculation)
         system_b_entry = tk.Entry(calc_frame, textvariable=self.distance_system_b, 
                                   bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9),
                                   insertbackground="#ffffff")
@@ -13462,17 +12853,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         buttons_frame = tk.Frame(calc_frame, bg="#1e1e1e")
         buttons_frame.grid(row=row, column=2, pady=3, padx=(5, 0), sticky="w")
         
-        use_home_btn = tk.Button(buttons_frame, text=t('distance_calculator.home'), command=self._distance_use_home,
+        use_home_btn = create_action_button(buttons_frame, text=t('distance_calculator.home'), command=self._distance_use_home,
                                 bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                                 activeforeground="#ffffff", relief="ridge", bd=1, 
-                                font=self._scaled_font(8, "normal"), cursor="hand2", width=6)
+                                cursor="hand2")
         use_home_btn.pack(side="left", padx=(0, 2))
         ToolTip(use_home_btn, t('tooltips.use_home'))
         
-        use_fc_btn = tk.Button(buttons_frame, text=t('distance_calculator.fc'), command=self._distance_use_fc,
+        use_fc_btn = create_action_button(buttons_frame, text=t('distance_calculator.fc'), command=self._distance_use_fc,
                               bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
                               activeforeground="#ffffff", relief="ridge", bd=1, 
-                              font=self._scaled_font(8, "normal"), cursor="hand2", width=4)
+                              cursor="hand2")
         use_fc_btn.pack(side="left")
         ToolTip(use_fc_btn, t('tooltips.use_fc'))
         
@@ -13496,7 +12887,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.distance_status_label.grid(row=row, column=0, columnspan=2, pady=(0, 5))
         
         # EDSM API status indicator
-        self.edsm_status_label = tk.Label(calc_frame, text="⚫ EDSM: checking...", 
+        self.edsm_status_label = tk.Label(calc_frame, text=t('distance_calculator.edsm_checking'), 
                                           font=self._scaled_font(8), fg="#888888", bg=_dc_bg, anchor="e")
         self.edsm_status_label.grid(row=row, column=2, pady=(0, 5), sticky="e", padx=(5, 0))
         ToolTip(self.edsm_status_label, t('tooltips.edsm_status'))
@@ -13574,36 +12965,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(1000, self._distance_auto_calculate_on_startup)
     
     def _distance_auto_calculate_on_startup(self):
-        """Auto-detect Fleet Carrier on startup (runs in background thread)
-        
-        Note: Distance calculations and UI updates happen after journal scan completes.
-        """
-        import threading
-        
-        def startup_thread():
-            try:
-                # Auto-detect Fleet Carrier location from carrier_data (populated by JournalParser)
-                try:
-                    cd = self.fc_tracker.carrier_data
-                    carrier_system = cd.get('system') if cd else None
-                    if carrier_system:
-                        try:
-                            self.after(0, lambda s=carrier_system: self.distance_fc_system.set(s))
-                        except RuntimeError:
-                            pass  # Tkinter loop already stopped
-                        print(f"Auto-detected Fleet Carrier in: {carrier_system}")
-                except Exception as e:
-                    print(f"Error auto-detecting FC on startup: {e}")
-                
-                # Distance updates are triggered after journal scan completes
-                # See _process_journals_for_catchup() which calls _update_home_fc_distances
-                
-            except Exception as e:
-                print(f"Error in FC detection on startup: {e}")
-        
-        # Start background thread
-        threading.Thread(target=startup_thread, daemon=True).start()
-    
+        carrier = self.fc_tracker.carrier_data or {}
+        if carrier.get('system'):
+            self.distance_fc_system.set(carrier['system'])
+        self._update_home_fc_distances()
+
     def _distance_use_current_system(self):
         """Fill System A with current system"""
         try:
@@ -13615,17 +12981,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.distance_system_a.set(current_system)
                 self._ac_system_a.unsuppress()
                 self._ac_system_a.hide()
-                self._set_status(f"Current system: {current_system}")
-                self.distance_status_label.config(text=f"Using current system: {current_system}", fg="#4da6ff")
+                self._set_status(t('distance_calculator.using_current').format(system=current_system))
+                self.distance_status_label.config(text=t('distance_calculator.using_current').format(system=current_system), fg="#4da6ff")
                 # Update Home/FC distances
                 self._update_home_fc_distances()
             else:
                 from app_utils import centered_message
-                centered_message(self, "No Current System", "No current system detected.\n\nMake sure Elite Dangerous is running and you're in a system.")
-                self.distance_status_label.config(text="⚠ No current system detected", fg="#ffaa00")
+                centered_message(self, t('distance_calculator.current_system'), t('distance_calculator.no_current'))
+                self.distance_status_label.config(text=t('distance_calculator.no_current'), fg="#ffaa00")
         except Exception as e:
-            print(f"Error getting current system: {e}")
-            messagebox.showerror("Error", f"Failed to get current system: {e}")
+            logging.getLogger('EliteMining').exception('Could not get current system')
+            self._show_distance_error(str(e))
     
     def _distance_use_home(self):
         """Fill System B with home system"""
@@ -13637,7 +13003,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._ac_system_b.hide()
         else:
             from app_utils import centered_message
-            centered_message(self, "No Home System", "Please set your home system first in Configuration section below.")
+            centered_message(self, t('distance_calculator.home_system'), t('distance_calculator.no_home'))
     
     def _distance_use_fc(self):
         """Fill System B with fleet carrier system"""
@@ -13649,90 +13015,59 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._ac_system_b.hide()
         else:
             from app_utils import centered_message
-            centered_message(self, "No Fleet Carrier", "Please set your fleet carrier location first, or use Auto-detect.")
+            centered_message(self, t('distance_calculator.fleet_carrier'), t('distance_calculator.no_carrier'))
     
     def _distance_set_home(self, event=None):
-        """Save home system to config (called by Enter key)"""
-        from config import save_home_system
+        from config import load_home_system, save_home_system
         home = self.distance_home_system.get().strip()
-        if home:
+        if home != load_home_system():
             save_home_system(home)
-            self._set_status(f"Home system set to: {home}")
-            # Update distances (provides visual confirmation)
+            key = 'distance_calculator.home_saved' if home else 'distance_calculator.home_cleared'
+            self._set_status(t(key).format(system=home))
             self._update_home_fc_distances()
-    
+
     def _distance_refresh_locations(self):
-        """Refresh current system and fleet carrier from journals"""
-        try:
-            # Set journal directory for tracker
-            journal_dir = (hasattr(self, 'prospector_panel') and 
-                          self.prospector_panel and 
-                          getattr(self.prospector_panel, 'journal_dir', None))
-            if not journal_dir:
-                # Journal dir not ready yet - retry in 2 seconds
-                self.after(2000, self._distance_refresh_locations)
-                return
-            if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
-                self.fc_tracker.set_journal_directory(self.prospector_panel.journal_dir)
-                
-                # Show scanning message
-                self._set_status("Scanning journals...")
-                
-                # Run in background thread to avoid UI freeze
-                import threading
-                def scan_thread():
-                    try:
-                        results = []
-                        
-                        # 1. Refresh current system from journals
-                        from journal_parser import JournalParser
-                        parser = JournalParser(self.prospector_panel.journal_dir)
-                        current_system = parser.get_last_known_system()
-                        
-                        # 2. Get fleet carrier location from carrier_data (populated by JournalParser)
-                        cd = self.fc_tracker.carrier_data
-                        carrier_system = cd.get('system') if cd else None
-                        carrier_name = cd.get('name') if cd else None
-                        
-                        # Update UI on main thread
-                        def update_ui():
-                            if current_system:
-                                # This is a refresh/scan - NOT a visit
-                                self.update_current_system(current_system, count_visit=False)
-                                results.append(f"System: {current_system}")
-                            
-                            if carrier_system:
-                                self.distance_fc_system.set(carrier_system)
-                                if carrier_name:
-                                    results.append(f"FC '{carrier_name}': {carrier_system}")
-                                else:
-                                    results.append(f"FC: {carrier_system}")
-                            
-                            # Update distances after detection
-                            self._update_home_fc_distances()
-                            
-                            # Refresh Mining Analytics distance display if it exists
-                            if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, '_update_distance_display'):
-                                self.prospector_panel._update_distance_display()
-                            
-                            # Show results
-                            if results:
-                                self._set_status(" | ".join(results))
-                            else:
-                                self._set_status("No locations found in journals")
-                        
-                        self.after(0, update_ui)
-                    except Exception as e:
-                        self.after(0, lambda: self._set_status(f"Error: {e}"))
-                
-                threading.Thread(target=scan_thread, daemon=True).start()
-            else:
-                messagebox.showwarning("No Journal Directory", 
-                                     "Journal directory not set. Please configure it in Settings → General Settings → Journal Files.")
-        except Exception as e:
-            print(f"Error refreshing locations: {e}")
-            messagebox.showerror("Error", f"Failed to scan journals: {e}")
-    
+        if self._distance_refresh_running:
+            return
+        parser = getattr(getattr(self, 'cargo_monitor', None), 'journal_parser', None)
+        if not parser:
+            self._set_status(t('distance_calculator.no_journal'))
+            return
+        self._distance_refresh_running = True
+        self.distance_refresh_btn.config(state='disabled', text=t('distance_calculator.refreshing'))
+        self._distance_refresh_generation += 1
+        generation = self._distance_refresh_generation
+        initial_current = getattr(self, 'current_system', None)
+        self._set_status(t('distance_calculator.scanning'))
+
+        def scan_thread():
+            try:
+                current = parser.get_last_known_system()
+                self.after(0, self._apply_distance_location_refresh, generation, initial_current, current)
+            except Exception as exc:
+                self.after(0, self._apply_distance_location_refresh, generation, initial_current, None, str(exc))
+        threading.Thread(target=scan_thread, daemon=True).start()
+
+    def _apply_distance_location_refresh(self, generation, initial_current, current, error=None):
+        if generation != self._distance_refresh_generation:
+            return
+        self.after(350, self._finish_distance_location_refresh, generation)
+        if error:
+            self._set_status(t('distance_calculator.scan_failed').format(error=error))
+            return
+        if current and current != initial_current and getattr(self, 'current_system', None) == initial_current:
+            self.update_current_system(current, count_visit=False)
+        carrier = self.fc_tracker.carrier_data or {}
+        self.distance_fc_system.set(carrier.get('system') or '')
+        self._update_home_fc_distances()
+        key = 'distance_calculator.locations_refreshed' if current or carrier.get('system') else 'distance_calculator.locations_missing'
+        self._set_status(t(key))
+
+    def _finish_distance_location_refresh(self, generation):
+        if generation == self._distance_refresh_generation:
+            self._distance_refresh_running = False
+            self.distance_refresh_btn.config(state='normal', text=t('distance_calculator.refresh_locations'))
+
     def _save_distance_systems(self):
         """Save System A and B to config"""
         try:
@@ -13741,144 +13076,125 @@ class App(tk.Tk, ColumnVisibilityMixin):
             system_b = self.distance_system_b.get().strip()
             save_distance_calculator_systems(system_a, system_b)
         except Exception as e:
-            print(f"Error saving distance calculator systems: {e}")
+            logging.getLogger('EliteMining').exception('Could not save distance calculator systems')
     
-    def _calculate_distances(self):
-        """Calculate distances between systems - runs in background thread"""
-        system_a = self.distance_system_a.get().strip()
-        system_b = self.distance_system_b.get().strip()
-        
-        # Update system info labels with system names on same line
-        self.distance_system_a_name.config(text=f"{t('distance_calculator.system_a_info')} {system_a if system_a else '---'}")
-        self.distance_system_b_name.config(text=f"{t('distance_calculator.system_b_info')} {system_b if system_b else '---'}")
-        
-        if not system_a and not system_b:
-            self.distance_status_label.config(text="⚠ Please enter at least one system name", fg="#ffaa00")
-            return
-        
-        # Save systems to config
-        self._save_distance_systems()
-        
-        # Show calculating status
-        self.distance_status_label.config(text="🔍 Querying EDSM...", fg="#4da6ff")
-        self._set_status("Calculating distances...")
-        
-        # Reset labels
-        self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}:", fg="#cccccc")
-        self.distance_ab_value_label.config(text="...", fg="#cccccc")
-        self.distance_a_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
-        self.distance_a_coords_label.config(text=t('distance_calculator.coordinates') + " ---", fg="#ffffff")
-        self.distance_b_sol_label.config(text=t('distance_calculator.distance_to_sol') + " ---", fg="#ffffff")
-        self.distance_b_coords_label.config(text=t('distance_calculator.coordinates') + " ---", fg="#ffffff")
-        
-        # Run calculation in background thread
-        def _background_calc():
+    def _invalidate_distance_calculation(self, *args):
+        self._distance_calculation_generation += 1
+
+    def _distance_coordinate_lookup(self, system_name, current_system, current_coords):
+        if system_name.casefold() == 'sol':
+            return dict(x=0.0, y=0.0, z=0.0)
+        if current_system and system_name.casefold() == current_system.casefold() and current_coords is not None:
+            return dict(zip(('x', 'y', 'z'), current_coords))
+        user_db = getattr(getattr(self, 'cargo_monitor', None), 'user_db', None)
+        if user_db:
+            coords = user_db._get_coordinates_from_visited_systems(system_name)
+            if coords is not None:
+                return dict(zip(('x', 'y', 'z'), coords))
+        finder = getattr(self, 'ring_finder', None)
+        if finder:
+            coords = (getattr(finder, 'systems_data', None) or {}).get(system_name.lower())
+            if coords is None:
+                coords = finder._get_system_coords_from_galaxy_db(system_name)
+            if coords is not None:
+                return coords
+        return self.distance_calculator.get_system_coordinates(system_name)
+
+    def _resolve_distance_systems(self, names, current_system, current_coords, is_cancelled):
+        results = {}
+        user_db = getattr(getattr(self, 'cargo_monitor', None), 'user_db', None)
+        for name in names:
+            if is_cancelled():
+                break
+            key = name.casefold()
+            if not name or key in results:
+                continue
+            info = dict(coords=None, sol_distance=None, visits=None, error=None)
             try:
-                # Get system info from EDSM
-                sys_a_info = None
-                sys_b_info = None
-                
-                if system_a:
-                    sys_a_info = self.distance_calculator.get_system_coordinates(system_a)
-                
-                if system_b:
-                    sys_b_info = self.distance_calculator.get_system_coordinates(system_b)
-                
-                # Update UI on main thread
-                self.after(0, lambda: self._apply_distance_results(system_a, system_b, sys_a_info, sys_b_info))
-                    
-            except Exception as e:
-                self.after(0, lambda: self._show_distance_error(str(e)))
-        
-        threading.Thread(target=_background_calc, daemon=True).start()
-    
-    def _apply_distance_results(self, system_a, system_b, sys_a_info, sys_b_info):
-        """Apply distance calculation results to UI - called on main thread"""
-        try:
-            # Show errors if systems not found
-            if system_a and not sys_a_info:
-                self.distance_a_sol_label.config(text=f"➤ System '{system_a}' not found in EDSM", fg="#ff6666")
-                self._set_status(f"System A '{system_a}' not found")
-            
-            if system_b and not sys_b_info:
-                self.distance_b_sol_label.config(text=f"➤ System '{system_b}' not found in EDSM", fg="#ff6666")
-                self._set_status(f"System B '{system_b}' not found")
-            
-            # Calculate distance between A and B
-            if sys_a_info and sys_b_info:
-                distance_ab = self.distance_calculator.calculate_distance(sys_a_info, sys_b_info)
-                if distance_ab is not None:
-                    self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a} ↔ {system_b}:", fg="#ffcc00")
-                    self.distance_ab_value_label.config(text=f"{distance_ab:.2f} LY", fg="#66ff99")
-                else:
-                    self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a} ↔ {system_b}:", fg="#ff6666")
-                    self.distance_ab_value_label.config(text="---", fg="#ff6666")
-            else:
-                self.distance_ab_label.config(text=f"➤ {t('distance_calculator.distance')} {system_a or 'A'} ↔ {system_b or 'B'}:", fg="#cccccc")
-                self.distance_ab_value_label.config(text="---", fg="#cccccc")
-            
-            # System A info
-            if sys_a_info:
-                sol_dist_a, _ = self.distance_calculator.get_distance_to_sol(system_a)
-                self.distance_a_sol_label.config(
-                    text=f"{t('distance_calculator.distance_to_sol')} {sol_dist_a:.2f} LY" if sol_dist_a is not None else t('distance_calculator.distance_to_sol') + " ---",
-                    fg="#ffffff"
-                )
-                self.distance_a_coords_label.config(
-                    text=f"{t('distance_calculator.coordinates')} X: {sys_a_info['x']:.2f}, Y: {sys_a_info['y']:.2f}, Z: {sys_a_info['z']:.2f}",
-                    fg="#ffffff"
-                )
-                # System A visits count
-                if hasattr(self, 'distance_a_visits_label') and hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
-                    try:
-                        visit_data = self.cargo_monitor.user_db.is_system_visited(system_a)
-                        visits_count = visit_data.get('visit_count', 0) if visit_data else 0
-                        self.distance_a_visits_label.config(text=f"{t('distance_calculator.visits')} {visits_count}", fg="#ffffff")
-                    except:
-                        self.distance_a_visits_label.config(text=t('distance_calculator.visits') + " ---", fg="#ffffff")
-            
-            # System B info
-            if sys_b_info:
-                sol_dist_b, _ = self.distance_calculator.get_distance_to_sol(system_b)
-                self.distance_b_sol_label.config(
-                    text=f"{t('distance_calculator.distance_to_sol')} {sol_dist_b:.2f} LY" if sol_dist_b is not None else t('distance_calculator.distance_to_sol') + " ---",
-                    fg="#ffffff"
-                )
-                self.distance_b_coords_label.config(
-                    text=f"{t('distance_calculator.coordinates')} X: {sys_b_info['x']:.2f}, Y: {sys_b_info['y']:.2f}, Z: {sys_b_info['z']:.2f}",
-                    fg="#ffffff"
-                )
-                # System B visits count
-                if hasattr(self, 'distance_b_visits_label') and hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
-                    try:
-                        visit_data = self.cargo_monitor.user_db.is_system_visited(system_b)
-                        visits_count = visit_data.get('visit_count', 0) if visit_data else 0
-                        self.distance_b_visits_label.config(text=f"{t('distance_calculator.visits')} {visits_count}", fg="#ffffff")
-                    except:
-                        self.distance_b_visits_label.config(text=t('distance_calculator.visits') + " ---", fg="#ffffff")
-            
-            # Update status based on results
-            if sys_a_info and sys_b_info:
-                self.distance_status_label.config(text=t('distance_calculator.calculation_complete'), fg="#00ff00")
-            elif sys_a_info or sys_b_info:
-                self.distance_status_label.config(text="⚠ One system not found", fg="#ffaa00")
-            else:
-                self.distance_status_label.config(text="✗ Systems not found in EDSM", fg="#ff6666")
-            
-            # Calculate distances to Home and FC from current position
-            self._update_home_fc_distances()
-            
-            self._set_status("Distance calculation complete")
-            
-        except Exception as e:
-            self._show_distance_error(str(e))
-    
+                info['coords'] = self._distance_coordinate_lookup(name, current_system, current_coords)
+                if info['coords'] is not None:
+                    info['sol_distance'] = self.distance_calculator.calculate_distance(info['coords'], dict(x=0, y=0, z=0))
+            except Exception as exc:
+                logging.getLogger('EliteMining').warning('Distance lookup failed for %s: %s', name, exc)
+                info['error'] = str(exc)
+            if user_db:
+                try:
+                    visited = user_db.is_system_visited(name)
+                    info['visits'] = visited.get('visit_count', 0) if visited else 0
+                except Exception:
+                    logging.getLogger('EliteMining').exception('Could not load visits for %s', name)
+            results[key] = info
+        return results
+
+    def _calculate_distances(self):
+        names = (self.distance_system_a.get().strip(), self.distance_system_b.get().strip())
+        self._invalidate_distance_calculation()
+        generation = self._distance_calculation_generation
+        self._save_distance_systems()
+        for side, name in zip(('a', 'b'), names):
+            getattr(self, 'distance_system_' + side + '_name').config(text=t('distance_calculator.system_' + side + '_info') + ' ' + (name or '---'))
+            for field, key in (('sol', 'distance_to_sol'), ('coords', 'coordinates'), ('visits', 'visits')):
+                getattr(self, 'distance_' + side + '_' + field + '_label').config(text=t('distance_calculator.' + key) + ' ---', fg='#ffffff')
+        self.distance_ab_label.config(text='➤ ' + t('distance_calculator.pair_label').format(a=names[0] or 'A', b=names[1] or 'B'), fg='#ffcc00')
+        self.distance_ab_value_label.config(text='---', fg='#66ff99')
+        if not any(names):
+            self.distance_status_label.config(text=t('distance_calculator.enter_system'), fg='#ffaa00')
+            return
+        self.distance_status_label.config(text=t('distance_calculator.calculating'), fg='#4da6ff')
+        current_system = getattr(self, 'current_system', None)
+        current_coords = getattr(self, 'current_system_coords', None)
+
+        def worker():
+            try:
+                results = self._resolve_distance_systems(names, current_system, current_coords,
+                    lambda: generation != self._distance_calculation_generation)
+                self.after(0, self._apply_distance_results, generation, names, results)
+            except Exception as exc:
+                self.after(0, self._distance_calculation_failed, generation, names, str(exc))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _distance_calculation_failed(self, generation, names, error):
+        if generation == self._distance_calculation_generation and names == (self.distance_system_a.get().strip(), self.distance_system_b.get().strip()):
+            self._show_distance_error(error)
+
+    def _apply_distance_results(self, generation, names, results):
+        if generation != self._distance_calculation_generation or names != (self.distance_system_a.get().strip(), self.distance_system_b.get().strip()):
+            return
+        found = 0
+        failed = False
+        for side, name in zip(('a', 'b'), names):
+            if not name:
+                continue
+            info = results[name.casefold()]
+            coords = info['coords']
+            if coords is None:
+                key = 'distance_calculator.lookup_failed' if info['error'] else 'distance_calculator.coordinates_unavailable'
+                getattr(self, 'distance_' + side + '_sol_label').config(text=t(key).format(system=name, error=info['error']), fg='#ff6666')
+                failed = failed or bool(info['error'])
+                continue
+            found += 1
+            sol_distance = info['sol_distance']
+            getattr(self, 'distance_' + side + '_sol_label').config(text=t('distance_calculator.distance_to_sol') + f' {sol_distance:.2f} LY')
+            getattr(self, 'distance_' + side + '_coords_label').config(text=t('distance_calculator.coordinates') + f" X: {coords['x']:.2f}, Y: {coords['y']:.2f}, Z: {coords['z']:.2f}")
+            if info['visits'] is not None:
+                getattr(self, 'distance_' + side + '_visits_label').config(text=t('distance_calculator.visits') + f" {info['visits']}")
+        if all(names) and found == 2:
+            distance = self.distance_calculator.calculate_distance(*(results[name.casefold()]['coords'] for name in names))
+            self.distance_ab_value_label.config(text=f'{distance:.2f} LY')
+        if failed:
+            key, color = 'distance_calculator.lookup_error', '#ff6666'
+        elif found == sum(bool(name) for name in names):
+            key, color = 'distance_calculator.calculation_complete', '#00ff00'
+        else:
+            key, color = 'distance_calculator.coordinates_missing', '#ffaa00'
+        self.distance_status_label.config(text=t(key), fg=color)
+        self._set_status(t(key))
+
     def _show_distance_error(self, error_msg: str):
-        """Show distance calculation error - called on main thread"""
-        print(f"Error calculating distances: {error_msg}")
-        self.distance_status_label.config(text=f"✗ Error: {error_msg[:50]}", fg="#ff6666")
-        self._set_status("Distance calculation failed")
-    
+        logging.getLogger('EliteMining').error('Distance calculation failed: %s', error_msg)
+        self.distance_status_label.config(text=t('distance_calculator.calculation_failed').format(error=error_msg), fg='#ff6666')
+        self._set_status(t('distance_calculator.lookup_error'))
+
     def _refresh_visit_count(self, system_name):
         """Refresh the visit count display for a system"""
         if hasattr(self, 'distance_visits_label') and system_name:
@@ -13893,182 +13209,76 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.distance_visits_label.config(text=f"{t('distance_calculator.visits_label')} {visits_count}")
     
     def _update_home_fc_distances(self):
-        """Update distance displays for Home and FC from current system"""
-        # Run in background thread to avoid blocking UI during network calls
-        def _background_update():
-            try:
-                current_system = self.distance_current_system.get().strip()
-                if not current_system:
-                    # Current system not populated yet - retry once after a short delay
-                    # Guard against multiple retry chains stacking
-                    if not getattr(self, '_distance_retry_pending', False):
-                        self._distance_retry_pending = True
-                        def _retry():
-                            self._distance_retry_pending = False
-                            self._update_home_fc_distances()
-                        try:
-                            self.after(3000, _retry)
-                        except RuntimeError:
-                            pass  # Tkinter loop already stopped
-                    return
-                self._distance_retry_pending = False
-                
-                # Calculate distance from current system to Sol
-                sol_distance = None
-                if hasattr(self, 'current_sol_label'):
-                    sol_distance, _ = self.distance_calculator.get_distance_to_sol(current_system)
-                
-                # Calculate distance to Home
-                home_system = self.distance_home_system.get().strip()
-                home_distance = None
-                home_sol_distance = None
-                home_visits = 0
-                if home_system:
-                    home_distance, home_info, current_info = self.distance_calculator.get_distance_between_systems(
-                        current_system, home_system
-                    )
-                    home_sol_distance, _ = self.distance_calculator.get_distance_to_sol(home_system)
-                    
-                    if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
-                        try:
-                            visit_data = self.cargo_monitor.user_db.is_system_visited(home_system)
-                            home_visits = visit_data.get('visit_count', 0) if visit_data else 0
-                        except:
-                            pass
-                
-                # Calculate distance to FC
-                fc_system = self.distance_fc_system.get().strip()
-                fc_distance = None
-                fc_sol_distance = None
-                fc_visits = 0
-                if fc_system:
-                    fc_distance, fc_info, current_info = self.distance_calculator.get_distance_between_systems(
-                        current_system, fc_system
-                    )
-                    fc_sol_distance, _ = self.distance_calculator.get_distance_to_sol(fc_system)
-                    
-                    if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db'):
-                        try:
-                            visit_data = self.cargo_monitor.user_db.is_system_visited(fc_system)
-                            fc_visits = visit_data.get('visit_count', 0) if visit_data else 0
-                        except:
-                            pass
-                
-                # Update UI on main thread with all calculated values
-                try:
-                    self.after(0, lambda: self._apply_distance_updates(
-                        sol_distance, home_distance, home_sol_distance, home_visits,
-                        fc_distance, fc_sol_distance, fc_visits
-                    ))
-                except RuntimeError:
-                    pass  # Tkinter loop already stopped
+        self.after(0, self._schedule_distance_update)
 
-            except Exception as e:
-                print(f"Error updating home/FC distances: {e}")
-        
-        # Start background thread
-        threading.Thread(target=_background_update, daemon=True).start()
-    
-    def _clear_distance_labels(self):
-        """Clear all distance labels - called on UI thread"""
-        self.distance_to_home_label.config(text="")
-        self.home_sol_label.config(text="")
-        self.distance_to_fc_label.config(text="")
-        self.fc_sol_label.config(text="")
-        if hasattr(self, 'current_sol_label'):
-            self.current_sol_label.config(text="")
-    
-    def _apply_distance_updates(self, sol_distance, home_distance, home_sol_distance, home_visits,
-                                 fc_distance, fc_sol_distance, fc_visits):
-        """Apply distance calculations to UI labels - called on UI thread"""
-        try:
-            # Update current system Sol distance
-            if hasattr(self, 'current_sol_label'):
-                if sol_distance is not None:
-                    self.current_sol_label.config(text=f"➤ {sol_distance:.2f} LY from Sol", fg="#ffcc00")
-                else:
-                    self.current_sol_label.config(text="")
-            
-            # Update Home distances
-            if home_distance is not None:
-                self.distance_to_home_label.config(text=f"➤ {home_distance:.2f} {t('distance_calculator.from_current')}", fg="#ffcc00")
-            else:
-                self.distance_to_home_label.config(text="")
-            
-            if home_sol_distance is not None:
-                self.home_sol_label.config(text=f"({t('distance_calculator.sol_distance')} {home_sol_distance:.2f} LY)", fg="#888888")
-            else:
-                self.home_sol_label.config(text="")
-            
-            if hasattr(self, 'home_visits_label'):
-                if home_visits > 0:
-                    self.home_visits_label.config(text=f"{t('distance_calculator.visits_label')} {home_visits}")
-                else:
-                    self.home_visits_label.config(text="")
-            
-            # Update FC distances
-            if fc_distance is not None:
-                self.distance_to_fc_label.config(text=f"➤ {fc_distance:.2f} {t('distance_calculator.from_current')}", fg="#ffcc00")
-            else:
-                self.distance_to_fc_label.config(text="")
-            
-            if fc_sol_distance is not None:
-                self.fc_sol_label.config(text=f"({t('distance_calculator.sol_distance')} {fc_sol_distance:.2f} LY)", fg="#888888")
-            else:
-                self.fc_sol_label.config(text="")
-            
-            if hasattr(self, 'fc_visits_label'):
-                if fc_visits > 0:
-                    self.fc_visits_label.config(text=f"{t('distance_calculator.visits_label')} {fc_visits}")
-                else:
-                    self.fc_visits_label.config(text="")
-            
-            # Notify Mining Session and Ring Finder to update their distance displays
-            if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, '_update_distance_display'):
-                self.prospector_panel._update_distance_display()
-            
-            if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, '_update_sol_distance'):
-                current_system = self.distance_current_system.get().strip()
-                self.ring_finder._update_sol_distance(current_system)
-                
-        except Exception as e:
-            print(f"Error applying distance updates: {e}")
-    
+    def _distance_location_inputs(self):
+        current = self.distance_current_system.get().strip()
+        return ('' if current == '---' else current, self.distance_home_system.get().strip(), self.distance_fc_system.get().strip())
+
+    def _schedule_distance_update(self):
+        self._distance_update_generation += 1
+        if self._distance_update_pending is not None:
+            self.after_cancel(self._distance_update_pending)
+        self._distance_update_pending = self.after(100, self._start_distance_update)
+
+    def _start_distance_update(self):
+        self._distance_update_pending = None
+        if self._distance_update_running:
+            return
+        names = self._distance_location_inputs()
+        generation = self._distance_update_generation
+        current_system = getattr(self, 'current_system', None)
+        current_coords = getattr(self, 'current_system_coords', None)
+        self._distance_update_running = True
+
+        def worker():
+            try:
+                results = self._resolve_distance_systems(names, current_system, current_coords,
+                    lambda: generation != self._distance_update_generation)
+            except Exception:
+                logging.getLogger('EliteMining').exception('Home/Carrier distance update failed')
+                results = {}
+            self.after(0, self._apply_distance_updates, generation, names, results)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_distance_updates(self, generation, names, results):
+        self._distance_update_running = False
+        if generation != self._distance_update_generation or names != self._distance_location_inputs():
+            self._schedule_distance_update()
+            return
+        current_info = results.get(names[0].casefold(), {})
+        current_coords = current_info.get('coords')
+        sol = current_info.get('sol_distance')
+        self.current_sol_label.config(text=f"➤ {sol:.2f} {t('distance_calculator.from_sol')}" if sol is not None else '')
+        values = {'sol': sol}
+        for kind, name in zip(('home', 'fc'), names[1:]):
+            info = results.get(name.casefold(), {})
+            coords = info.get('coords')
+            distance = self.distance_calculator.calculate_distance(current_coords, coords)
+            values[kind] = distance
+            getattr(self, 'distance_to_' + kind + '_label').config(text=f"➤ {distance:.2f} {t('distance_calculator.from_current')}" if distance is not None else '')
+            sol_distance = info.get('sol_distance')
+            text = f"({t('distance_calculator.sol_distance')} {sol_distance:.2f} LY)" if sol_distance is not None else ''
+            if info.get('error'):
+                text = t('distance_calculator.lookup_failed').format(system=name, error=info['error'])
+            getattr(self, kind + '_sol_label').config(text=text)
+            visits = info.get('visits')
+            getattr(self, kind + '_visits_label').config(text=t('distance_calculator.visits_label') + f' {visits}' if visits is not None else '')
+        self._distance_values = values
+        if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, '_update_distance_display'):
+            self.prospector_panel._update_distance_display()
+        if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, '_update_sol_distance'):
+            self.ring_finder._update_sol_distance(names[0])
+
     def get_distance_info_text(self) -> str:
-        """Get formatted distance info string for display in other tabs
-        
-        Returns distance info in format: "➤ Sol: X.XX LY | Home: Y.YY LY | Fleet Carrier: Z.ZZ LY"
-        This provides a centralized way for Mining Session and Ring Finder to display
-        distance information without recalculating.
-        """
-        try:
-            # Extract distances from the Distance Calculator labels
-            sol_text = self.current_sol_label.cget("text") if hasattr(self, 'current_sol_label') else ""
-            home_text = self.distance_to_home_label.cget("text") if hasattr(self, 'distance_to_home_label') else ""
-            fc_text = self.distance_to_fc_label.cget("text") if hasattr(self, 'distance_to_fc_label') else ""
-            
-            # Parse distances from label text (format: "➤ XX.XX LY from Sol/current")
-            sol_ly = "---"
-            home_ly = "---"
-            fc_ly = "---"
-            
-            if sol_text and "LY" in sol_text:
-                # Extract number from "➤ XX.XX LY from Sol"
-                sol_ly = sol_text.split("LY")[0].replace("➤", "").strip()
-            
-            if home_text and "LY" in home_text:
-                # Extract number from "➤ XX.XX LY from current"
-                home_ly = home_text.split("LY")[0].replace("➤", "").strip()
-            
-            if fc_text and "LY" in fc_text:
-                # Extract number from "➤ XX.XX LY from current"
-                fc_ly = fc_text.split("LY")[0].replace("➤", "").strip()
-            
-            return f"➤ {t('mining_session.sol')} {sol_ly} LY | {t('mining_session.home')} {home_ly} LY | {t('mining_session.fleet_carrier')} {fc_ly} LY"
-            
-        except Exception as e:
-            return f"➤ {t('mining_session.sol')} --- | {t('mining_session.home')} --- | {t('mining_session.fleet_carrier')} ---"
-    
+        values = getattr(self, '_distance_values', {})
+        parts = []
+        for key, label in (('sol', 'sol'), ('home', 'home'), ('fc', 'fleet_carrier')):
+            value = values.get(key)
+            text = f'{value:.2f} LY' if value is not None else '---'
+            parts.append(t('mining_session.' + label) + ' ' + text)
+        return '➤ ' + ' | '.join(parts)
+
     def _check_edsm_status(self):
         """Check EDSM API status in background and update indicator"""
         def _background_check():
@@ -14079,10 +13289,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 except RuntimeError:
                     pass  # Tkinter loop already stopped — app is shutting down
             try:
-                response = requests.get("https://www.edsm.net/api-v1/system",
+                response = requests.get(self.distance_calculator.api_base_url,
                                        params={"systemName": "Sol", "showCoordinates": 1},
-                                       timeout=5,
-                                       headers={"User-Agent": "EliteMining/5.1.3 (+https://github.com/Viper-Dude/EliteMining)"})
+                                       timeout=5, headers=self.distance_calculator.headers)
                 if response.status_code == 200 and response.text.strip():
                     _schedule("online")
                 elif response.status_code >= 500:
@@ -14108,11 +13317,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             return
             
         if status == "online":
-            self.edsm_status_label.config(text="🟢 EDSM: Online", fg="#00ff00")
+            self.edsm_status_label.config(text=t('distance_calculator.edsm_online'), fg="#00ff00")
         elif status == "error":
-            self.edsm_status_label.config(text="🟡 EDSM: Slow", fg="#ffaa00")
+            self.edsm_status_label.config(text=t('distance_calculator.edsm_slow'), fg="#ffaa00")
         else:
-            self.edsm_status_label.config(text="🔴 EDSM: Offline", fg="#ff4444")
+            self.edsm_status_label.config(text=t('distance_calculator.edsm_offline'), fg="#ff4444")
     
     def _check_market_api_status(self):
         """Check market API status in background and update indicator"""
@@ -14267,7 +13476,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         preset_names = cfg.get('preset_names', {})
 
         for i in range(1, 7):
-            name = preset_names.get(str(i), f"Preset {i}")
+            name = preset_names.get(str(i), t('settings.preset_button').format(num=i))
             self._ann_preset_submenu.add_radiobutton(
                 label=name, variable=self._ann_preset_menu_var, value=i,
                 command=lambda i=i: self._set_preset_announcement_link(preset_full_name, i))
@@ -14576,6 +13785,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _on_announcement_change(self, *args) -> None:
         """Called when any announcement setting changes - auto-save to config"""
         self._save_announcement_preferences()
+        self._ann_update_preset_buttons()
 
     def _on_stay_on_top_toggle(self, *args) -> None:
         """Called when stay on top checkbox is toggled"""
@@ -16195,7 +15405,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             pass
                     if cls == "Scale":
                         try:
-                            child.configure(troughcolor=modern_color("#2A3038"), activebackground=modern_color("#FF9A32"), bd=0)
+                            child.configure(troughcolor=modern_color("#434B55"), activebackground=modern_color("#FF9A32"),
+                                            sliderrelief="raised", bd=2)
                         except tk.TclError:
                             pass
                     if cls in ("Spinbox", "Entry", "Text", "Listbox"):
@@ -16811,8 +16022,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.update_idletasks()
             geometry = self.geometry()
             geom_payload = {"geometry": geometry, "zoomed": is_zoomed}
-            if geometry_ui_scale is not None:
-                geom_payload["ui_scale"] = geometry_ui_scale
+            geom_payload["ui_scale"] = self.ui_scale if geometry_ui_scale is None else geometry_ui_scale
             save_window_geometry(geom_payload)
             log.info(f"Window geometry saved before restart: {geometry} (zoomed={is_zoomed})")
         except Exception as e:
@@ -16838,6 +16048,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 mutex = None
         except Exception as e:
             print(f"Warning: Could not close single-instance mutex before restart: {e}")
+
+        flush_config()
 
         executable = sys.executable
         exe_dir = os.path.dirname(executable)
@@ -17356,7 +16568,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Set up tracing for announcement variables after loading is complete"""
         for var in self.announcement_vars.values():
             var.trace('w', self._on_announcement_change)  # Save to config.json
-            var.trace('w', lambda *args: self._save_prospector_settings())
         
         # Set up traces again after prospector panel is created
         self.after(500, self._setup_delayed_announcement_tracing)
@@ -17369,12 +16580,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 var.trace_vdelete("w", trace_id[1])
             # Set up fresh traces
             var.trace('w', self._on_announcement_change)
-            var.trace('w', lambda *args: self._save_prospector_settings())
-
-    def _save_prospector_settings(self):
-        """Save prospector settings when announcement checkboxes change"""
-        if hasattr(self, 'prospector_panel') and self.prospector_panel:
-            self.prospector_panel._save_last_material_settings()
 
     # ---------- Backup and Restore functionality ----------
     def _show_backup_dialog(self) -> None:
@@ -17712,15 +16917,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 va_profile_path = old_path
                     else:
                         # Running in development - profile is in project root
-                        project_root = os.path.dirname(os.path.dirname(app_data_dir))
-                        profile_pattern = os.path.join(project_root, "EliteMining v*-Profile.vap")
+                        project_root = os.path.dirname(app_data_dir)
+                        profile_dir = os.path.join(project_root, "Voiceattack Profile")
+                        if not os.path.isdir(profile_dir):
+                            profile_dir = project_root
+                        profile_pattern = os.path.join(profile_dir, "EliteMining v*-Profile.vap")
                         profile_files = glob.glob(profile_pattern)
                         
                         if profile_files:
                             va_profile_path = profile_files[0]
                         else:
                             # Fallback
-                            old_path = os.path.join(project_root, "EliteMining-Profile.vap")
+                            old_path = os.path.join(profile_dir, "EliteMining-Profile.vap")
                             if os.path.exists(old_path):
                                 va_profile_path = old_path
                     
@@ -17737,7 +16945,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if include_userdb:
                     userdb_path = os.path.join(app_data_dir, "data", "user_data.db")
                     if os.path.exists(userdb_path):
-                        zipf.write(userdb_path, "data/user_data.db")
+                        import sqlite3
+                        import tempfile
+                        from contextlib import closing
+                        with tempfile.TemporaryDirectory() as backup_dir:
+                            snapshot = os.path.join(backup_dir, "user_data.db")
+                            with closing(sqlite3.connect(userdb_path)) as source, closing(sqlite3.connect(snapshot)) as target:
+                                source.backup(target)
+                            zipf.write(snapshot, "data/user_data.db")
                 
                 # Add journal files
                 if include_journals:
@@ -17771,7 +16986,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 # Add configuration file
                 if include_config:
-                    from app.config import CONFIG_FILE
+                    from config import CONFIG_FILE
+                    flush_config()
                     if os.path.exists(CONFIG_FILE):
                         zipf.write(CONFIG_FILE, "config.json")
                 
@@ -18104,8 +17320,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             app_data_dir = self._get_app_data_dir()
             restored_items = []
+            restart_required = False
             
             with zipfile.ZipFile(backup_path, 'r') as zipf:
+                restart_required = ((restore_config and "config.json" in zipf.namelist()) or
+                                    (restore_userdb and "data/user_data.db" in zipf.namelist()))
+                if restart_required and hasattr(self, 'prospector_panel') and self.prospector_panel.session_active:
+                    self.prospector_panel._session_stop()
                 # Restore ship presets
                 if restore_presets:
                     settings_dir = os.path.join(app_data_dir, "Ship Presets")
@@ -18162,36 +17383,37 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         self.prospector_panel._refresh_bookmarks()
                 
                 # Restore VoiceAttack profile
-                if restore_va_profile and "EliteMining-Profile.vap" in zipf.namelist():
-                    # Use same path detection logic as backup
-                    if getattr(sys, 'frozen', False):
-                        # Running as executable - profile should go to same directory as executable or parent
-                        exe_dir = os.path.dirname(sys.executable)
-                        va_profile_path = os.path.join(exe_dir, "EliteMining-Profile.vap")
-                        
-                        # Check if we need to place it in parent directory instead
-                        if not os.path.exists(os.path.join(exe_dir, "EliteMining-Profile.vap")) and os.path.basename(exe_dir) == "Configurator":
-                            parent_dir = os.path.dirname(exe_dir)
-                            va_profile_path = os.path.join(parent_dir, "EliteMining-Profile.vap")
-                    else:
-                        # Running in development - profile goes to project root
-                        va_profile_path = os.path.join(os.path.dirname(app_data_dir), "EliteMining-Profile.vap")
-                    
-                    # Create target directory if needed
-                    target_dir = os.path.dirname(va_profile_path)
-                    os.makedirs(target_dir, exist_ok=True)
-                    
-                    with open(va_profile_path, 'wb') as f:
-                        f.write(zipf.read("EliteMining-Profile.vap"))
-                    restored_items.append("VoiceAttack Profile")
-                
+                if restore_va_profile:
+                    profile_files = [name for name in zipf.namelist()
+                                     if os.path.basename(name) == name and name.endswith("-Profile.vap")]
+                    profile_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(app_data_dir)
+                    if getattr(sys, 'frozen', False) and os.path.basename(profile_dir).lower() == "configurator":
+                        profile_dir = os.path.dirname(profile_dir)
+                    if not getattr(sys, 'frozen', False):
+                        dev_profile_dir = os.path.join(profile_dir, "Voiceattack Profile")
+                        if os.path.isdir(dev_profile_dir):
+                            profile_dir = dev_profile_dir
+                    os.makedirs(profile_dir, exist_ok=True)
+                    for profile_name in profile_files:
+                        with open(os.path.join(profile_dir, profile_name), 'wb') as f:
+                            f.write(zipf.read(profile_name))
+                    if profile_files:
+                        restored_items.append("VoiceAttack Profile")
+
                 # Restore user database
                 if restore_userdb and "data/user_data.db" in zipf.namelist():
                     userdb_dir = os.path.join(app_data_dir, "data")
                     os.makedirs(userdb_dir, exist_ok=True)
                     target_path = os.path.join(userdb_dir, "user_data.db")
-                    with open(target_path, 'wb') as f:
-                        f.write(zipf.read("data/user_data.db"))
+                    import sqlite3
+                    import tempfile
+                    from contextlib import closing
+                    with tempfile.TemporaryDirectory() as restore_dir:
+                        snapshot = os.path.join(restore_dir, "user_data.db")
+                        with open(snapshot, 'wb') as f:
+                            f.write(zipf.read("data/user_data.db"))
+                        with closing(sqlite3.connect(snapshot)) as source, closing(sqlite3.connect(target_path)) as target:
+                            source.backup(target)
                     restored_items.append("User Database")
                 
                 # Restore journal files
@@ -18219,20 +17441,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             
                             restored_items.append(f"Journal Files ({journal_count} files)")
                 
-                # Restore configuration
+                # Restore configuration through the shared cache before restarting.
                 if restore_config and "config.json" in zipf.namelist():
-                    from app.config import CONFIG_FILE
-                    config_dir = os.path.dirname(CONFIG_FILE)
-                    os.makedirs(config_dir, exist_ok=True)
-                    with open(CONFIG_FILE, 'wb') as f:
-                        f.write(zipf.read("config.json"))
+                    restored_config = json.loads(zipf.read("config.json").decode("utf-8-sig"))
+                    _save_cfg(restored_config)
+                    flush_config()
                     restored_items.append("Configuration")
             
             if restored_items:
                 items_text = ", ".join(restored_items)
                 from app_utils import centered_message
-                centered_message(self, "Restore Complete", f"Successfully restored:\n{items_text}")
+                message = t('dialogs.restore_success_msg') + "\n" + items_text
+                if restart_required:
+                    message += "\n\n" + t('settings.restore_restart')
+                centered_message(self, t('dialogs.restore_success'), message)
                 self._set_status(f"Restored from backup: {items_text}")
+                if restart_required:
+                    self._restart_app()
             else:
                 messagebox.showwarning("Nothing Restored", "No items were restored from the backup.")
                 
@@ -18416,10 +17641,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from system_autocomplete import SystemAutocomplete
         self._ac_marketplace_ref = SystemAutocomplete(self.marketplace_ref_entry, self.marketplace_reference_system, self)
 
-        self.marketplace_use_current_btn = tk.Button(ref_entry_frame, text=t('marketplace.use_current'),
+        self.marketplace_use_current_btn = create_action_button(ref_entry_frame, text=t('marketplace.use_current'),
                                     command=self._use_current_system_marketplace,
                                     bg="#4a3a2a", fg="#e0e0e0", activebackground="#5a4a3a", activeforeground="#ffffff",
-                                    relief="ridge", bd=1, padx=6, pady=2, font=self._scaled_font(8), cursor="hand2",
+                                    relief="ridge", bd=1, cursor="hand2",
                                     highlightbackground=_mkt_cb_bg, highlightcolor=_mkt_cb_bg)
         self.marketplace_use_current_btn.pack(side="left")
 
@@ -18538,13 +17763,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Row 3 (grid row 2): Search button and Max Age (aligned under Station / Sort by)
         row3_frame = filter_grid
 
-        search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'),
+        search_btn = create_action_button(row3_frame, primary=True, text="🔍 " + t('marketplace.search'),
                               command=self._search_marketplace,
                               bg="#2a4a2a", fg="#e0e0e0", 
                               activebackground="#3a5a3a", activeforeground="#ffffff",
-                              relief="ridge", bd=1, padx=10, pady=4,
-                              font=self._scaled_font(9, "bold"), cursor="hand2")
-        compact_classic_button(search_btn)
+                              relief="ridge", bd=1, cursor="hand2")
+        self.marketplace_search_btn = search_btn
         search_btn.grid(row=2, column=0, columnspan=3, sticky="w")
 
         # Max Age aligned under Sort by (grid column 3/4)
@@ -18714,10 +17938,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from system_autocomplete import SystemAutocomplete
         self._ac_trade_ref = SystemAutocomplete(self.trade_ref_entry, self.trade_reference_system, self)
 
-        self.trade_use_current_btn = tk.Button(ref_entry_frame, text=t('marketplace.use_current'),
+        self.trade_use_current_btn = create_action_button(ref_entry_frame, text=t('marketplace.use_current'),
                                     command=self._use_current_system_trade,
                                     bg="#4a3a2a", fg="#e0e0e0", activebackground="#5a4a3a", activeforeground="#ffffff",
-                                    relief="ridge", bd=1, padx=6, pady=2, font=self._scaled_font(8), cursor="hand2",
+                                    relief="ridge", bd=1, cursor="hand2",
                                     highlightbackground=_trade_cb_bg, highlightcolor=_trade_cb_bg)
         self.trade_use_current_btn.pack(side="left")
 
@@ -18823,13 +18047,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Row 3 (grid row 2): Search button and Max Age (aligned under Station / Sort by)
         row3_frame = filter_grid
 
-        search_btn = tk.Button(row3_frame, text="🔍 " + t('marketplace.search'),
+        search_btn = create_action_button(row3_frame, primary=True, text="🔍 " + t('marketplace.search'),
                               command=self._search_trade_market,
                               bg="#2a4a2a", fg="#e0e0e0",
                               activebackground="#3a5a3a", activeforeground="#ffffff",
-                              relief="ridge", bd=1, padx=10, pady=4,
-                              font=self._scaled_font(9, "bold"), cursor="hand2")
-        compact_classic_button(search_btn)
+                              relief="ridge", bd=1, cursor="hand2")
+        self.trade_search_btn = search_btn
         search_btn.grid(row=2, column=0, columnspan=3, sticky="w")
 
         # Max Age aligned under Sort by (grid column 3/4)
@@ -18916,6 +18139,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         )
         from config import load_theme
         
+        self._sysfinder_option_values = {}
+        def localized_options(options):
+            labels = [self._sysfinder_option_label(value) for value in options]
+            self._sysfinder_option_values.update(zip(labels, options))
+            return labels
+
         # Get theme colors
         sf_theme = load_theme()
         if sf_theme == "elite_orange":
@@ -18962,35 +18191,33 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_ref_entry.pack(side="left")
         # Autocomplete
         from system_autocomplete import SystemAutocomplete
-        self._ac_sysfinder_ref = SystemAutocomplete(self.sysfinder_ref_entry, self.sysfinder_reference_system, self)
+        self._ac_sysfinder_ref = SystemAutocomplete(self.sysfinder_ref_entry, self.sysfinder_reference_system, self,
+                                                     on_select=self._confirm_sysfinder_reference)
         self.sysfinder_ref_entry.bind("<Return>", lambda e: (self._ac_sysfinder_ref.hide(), self._search_systems()))
         
         # Use Current System button - right next to entry (like ring finder)
-        self.sysfinder_use_current_btn = tk.Button(
+        self.sysfinder_use_current_btn = create_action_button(
             ref_frame, text=t('ring_finder.use_current_system'),
             command=self._use_current_system_sysfinder,
             bg="#4a3a2a", fg="#e0e0e0",
             activebackground="#5a4a3a", activeforeground="#ffffff",
-            relief="ridge", bd=1, padx=8, pady=4,
-            font=self._scaled_font(8, "normal"), cursor="hand2"
+            relief="ridge", bd=1, cursor="hand2"
         )
         self.sysfinder_use_current_btn.pack(side="left", padx=(5, 0))
         
         # Search button - moved to Row 0 for faster access
-        self.sysfinder_search_btn = tk.Button(
-            ref_frame, text=t('system_finder.search'),
+        self.sysfinder_search_btn = create_action_button(
+            ref_frame, primary=True, text=t('system_finder.search'),
             command=self._search_systems,
             bg="#2a4a2a", fg="#e0e0e0",
             activebackground="#3a5a3a", activeforeground="#ffffff",
-            relief="ridge", bd=1, padx=15, pady=4,
-            font=self._scaled_font(8, "normal"), cursor="hand2"
+            relief="ridge", bd=1, cursor="hand2"
         )
-        compact_classic_button(self.sysfinder_search_btn)
         self.sysfinder_search_btn.pack(side="left", padx=(10, 0))
 
         # Spansh status indicator - to the right of Search button
         self.sysfinder_spansh_status_label = tk.Label(
-            ref_frame, text="⚫ Spansh: checking...",
+            ref_frame, text=t('system_finder.service_checking').format(service='Spansh'),
             font=self._scaled_font(8), fg="#888888",
             bg=ttk.Style().lookup('TFrame', 'background')
         )
@@ -19000,7 +18227,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # EDDN status indicator - to the left of Spansh
         self.sysfinder_eddn_status_label = tk.Label(
-            ref_frame, text="⚫ EDDN: checking...",
+            ref_frame, text=t('system_finder.service_checking').format(service='EDDN'),
             font=self._scaled_font(8), fg="#888888",
             bg=ttk.Style().lookup('TFrame', 'background')
         )
@@ -19013,21 +18240,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ttk.Label(search_frame, text=t('system_finder.allegiance') + ":").grid(
             row=row, column=0, sticky="w", padx=(0, 5), pady=3)
         
-        self.sysfinder_allegiance = tk.StringVar(value="Any")
+        self.sysfinder_allegiance = tk.StringVar(value=self._sysfinder_option_label("Any"))
         allegiance_combo = ttk.Combobox(
             search_frame, textvariable=self.sysfinder_allegiance,
-            values=ALLEGIANCE_OPTIONS, width=15, state="readonly"
+            values=localized_options(ALLEGIANCE_OPTIONS), width=15, state="readonly"
         )
         allegiance_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
         
         ttk.Label(search_frame, text=t('system_finder.population') + ":").grid(
             row=row, column=2, sticky="w", padx=(15, 5), pady=3)
         
-        # Population options (Inara-style thresholds - no localization needed)
-        self.sysfinder_population = tk.StringVar(value="Any")
+        self.sysfinder_population = tk.StringVar(value=self._sysfinder_option_label("Any"))
         pop_combo = ttk.Combobox(
             search_frame, textvariable=self.sysfinder_population,
-            values=POPULATION_OPTIONS, width=22, state="readonly"
+            values=localized_options(POPULATION_OPTIONS), width=22, state="readonly"
         )
         pop_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
         
@@ -19036,20 +18262,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ttk.Label(search_frame, text=t('system_finder.government') + ":").grid(
             row=row, column=0, sticky="w", padx=(0, 5), pady=3)
         
-        self.sysfinder_government = tk.StringVar(value="Any")
+        self.sysfinder_government = tk.StringVar(value=self._sysfinder_option_label("Any"))
         gov_combo = ttk.Combobox(
             search_frame, textvariable=self.sysfinder_government,
-            values=GOVERNMENT_OPTIONS, width=15, state="readonly"
+            values=localized_options(GOVERNMENT_OPTIONS), width=15, state="readonly"
         )
         gov_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
         
         ttk.Label(search_frame, text=t('system_finder.security') + ":").grid(
             row=row, column=2, sticky="w", padx=(15, 5), pady=3)
         
-        self.sysfinder_security = tk.StringVar(value="Any")
+        self.sysfinder_security = tk.StringVar(value=self._sysfinder_option_label("Any"))
         security_combo = ttk.Combobox(
             search_frame, textvariable=self.sysfinder_security,
-            values=SECURITY_OPTIONS, width=22, state="readonly"
+            values=localized_options(SECURITY_OPTIONS), width=22, state="readonly"
         )
         security_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
         
@@ -19058,20 +18284,20 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ttk.Label(search_frame, text=t('system_finder.economy') + ":").grid(
             row=row, column=0, sticky="w", padx=(0, 5), pady=3)
         
-        self.sysfinder_economy = tk.StringVar(value="Any")
+        self.sysfinder_economy = tk.StringVar(value=self._sysfinder_option_label("Any"))
         economy_combo = ttk.Combobox(
             search_frame, textvariable=self.sysfinder_economy,
-            values=ECONOMY_OPTIONS, width=15, state="readonly"
+            values=localized_options(ECONOMY_OPTIONS), width=15, state="readonly"
         )
         economy_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
         
         ttk.Label(search_frame, text=t('system_finder.state') + ":").grid(
             row=row, column=2, sticky="w", padx=(15, 5), pady=3)
         
-        self.sysfinder_state = tk.StringVar(value="Any")
+        self.sysfinder_state = tk.StringVar(value=self._sysfinder_option_label("Any"))
         state_combo = ttk.Combobox(
             search_frame, textvariable=self.sysfinder_state,
-            values=STATE_OPTIONS, width=18, state="readonly"
+            values=localized_options(STATE_OPTIONS), width=18, state="readonly"
         )
         state_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
         
@@ -19080,10 +18306,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ttk.Label(search_frame, text=t('system_finder.pp_power') + ":").grid(
             row=row, column=0, sticky="w", padx=(0, 5), pady=3)
 
-        self.sysfinder_power = tk.StringVar(value="Any")
+        self.sysfinder_power = tk.StringVar(value=self._sysfinder_option_label("Any"))
         power_combo = ttk.Combobox(
             search_frame, textvariable=self.sysfinder_power,
-            values=POWER_FILTER_OPTIONS, width=22, state="readonly"
+            values=localized_options(POWER_FILTER_OPTIONS), width=22, state="readonly"
         )
         power_combo.grid(row=row, column=1, sticky="w", padx=5, pady=3)
         power_combo.bind("<<ComboboxSelected>>", lambda e: power_combo.selection_clear())
@@ -19092,10 +18318,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ttk.Label(search_frame, text=t('system_finder.pp_state') + ":").grid(
             row=row, column=2, sticky="w", padx=(15, 5), pady=3)
 
-        self.sysfinder_pp_state = tk.StringVar(value="Any")
+        self.sysfinder_pp_state = tk.StringVar(value=self._sysfinder_option_label("Any"))
         pp_state_combo = ttk.Combobox(
             search_frame, textvariable=self.sysfinder_pp_state,
-            values=PP_STATE_OPTIONS, width=18, state="readonly"
+            values=localized_options(PP_STATE_OPTIONS), width=18, state="readonly"
         )
         pp_state_combo.grid(row=row, column=3, sticky="w", padx=5, pady=3)
         pp_state_combo.bind("<<ComboboxSelected>>", lambda e: pp_state_combo.selection_clear())
@@ -19118,14 +18344,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from config import load_player_power
         row0_mypower = tk.Frame(ref_info_frame, bg=sf_bg)
         row0_mypower.pack(anchor="center", pady=(2, 10))
-        tk.Label(row0_mypower, text="My Power:", font=font_label, fg="#aaaaaa", bg=sf_bg).pack(side="left")
+        tk.Label(row0_mypower, text=t('system_finder.pp_my_power') + ':', font=font_label, fg="#aaaaaa", bg=sf_bg).pack(side="left")
         _saved_power = load_player_power()
         if _saved_power in ("Not pledged", ""):
             _saved_power = "Select your pledge..."
-        self.sysfinder_my_power_var = tk.StringVar(value=_saved_power)
+        self.sysfinder_my_power_var = tk.StringVar(value=self._sysfinder_option_label(_saved_power))
         mypower_combo = ttk.Combobox(
             row0_mypower, textvariable=self.sysfinder_my_power_var,
-            values=ELITE_POWERS, width=22, state="readonly"
+            values=localized_options(ELITE_POWERS), width=22, state="readonly"
         )
         mypower_combo.pack(side="left", padx=(4, 0))
         mypower_combo.bind("<<ComboboxSelected>>", lambda e: (mypower_combo.selection_clear(), self._save_player_power()))
@@ -19134,7 +18360,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row1_container = tk.Frame(ref_info_frame, bg=sf_bg)
         row1_container.pack(anchor="center")
         
-        tk.Label(row1_container, text="System:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        tk.Label(row1_container, text=t('system_finder.col_system') + ':', font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_system = tk.Label(row1_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_system.pack(side="left")
         
@@ -19142,46 +18368,49 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row2_container = tk.Frame(ref_info_frame, bg=sf_bg)
         row2_container.pack(anchor="center")
         
-        tk.Label(row2_container, text="Security:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        tk.Label(row2_container, text=t('system_finder.security') + ':', font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_sec = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_sec.pack(side="left")
         
-        tk.Label(row2_container, text=" | Allegiance:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        tk.Label(row2_container, text=' | ' + t('system_finder.allegiance') + ':', font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_alleg = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_alleg.pack(side="left")
         
-        tk.Label(row2_container, text=" | Government:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        tk.Label(row2_container, text=' | ' + t('system_finder.government') + ':', font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_gov = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_gov.pack(side="left")
         
-        tk.Label(row2_container, text=" | Economy:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        tk.Label(row2_container, text=' | ' + t('system_finder.economy') + ':', font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_eco = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_eco.pack(side="left")
         
-        tk.Label(row2_container, text=" | Population:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        tk.Label(row2_container, text=' | ' + t('system_finder.population') + ':', font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_pop = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_pop.pack(side="left")
         
-        tk.Label(row2_container, text=" | State:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        tk.Label(row2_container, text=' | ' + t('system_finder.state') + ':', font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_state = tk.Label(row2_container, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_state.pack(side="left")
 
-        # Row PP: Powerplay info (hidden until data is available)
-        row_pp = tk.Frame(ref_info_frame, bg=sf_bg)
+        # Reserve the row during loading so the results table stays in place.
+        pp_container = tk.Frame(ref_info_frame, bg=sf_bg, height=self._scaled_px(24))
+        pp_container.pack(fill='x')
+        pp_container.pack_propagate(False)
+        row_pp = tk.Frame(pp_container, bg=sf_bg)
         self.sysfinder_pp_frame = row_pp
-        tk.Label(row_pp, text="Powerplay:", font=font_label, fg="#aaaaaa", bg=sf_bg).pack(side="left")
+        tk.Label(row_pp, text=t('system_finder.powerplay') + ':', font=font_label, fg="#aaaaaa", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_pp_power = tk.Label(row_pp, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_pp_power.pack(side="left")
-        tk.Label(row_pp, text=" | State:", font=font_label, fg="white", bg=sf_bg).pack(side="left")
+        tk.Label(row_pp, text=' | ' + t('system_finder.state') + ':', font=font_label, fg="white", bg=sf_bg).pack(side="left")
         self.sysfinder_ref_val_pp_state = tk.Label(row_pp, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_pp_state.pack(side="left")
-        _foryou_lbl = tk.Label(row_pp, text=" | For you:", font=font_label, fg="white", bg=sf_bg)
+        _foryou_lbl = tk.Label(row_pp, text=' | ' + t('system_finder.pp_for_you') + ':', font=font_label, fg="white", bg=sf_bg)
         _foryou_lbl.pack(side="left")
         self.sysfinder_ref_val_pp_foryou = tk.Label(row_pp, text=" -", font=font_value, fg="#ff9900", bg=sf_bg)
         self.sysfinder_ref_val_pp_foryou.pack(side="left")
         ToolTip(_foryou_lbl, t('system_finder.pp_tooltip_foryou'))
         ToolTip(self.sysfinder_ref_val_pp_foryou, t('system_finder.pp_tooltip_foryou'))
-        _merits_lbl = tk.Label(row_pp, text=" | Merits:", font=font_label, fg="white", bg=sf_bg)
+        _merits_lbl = tk.Label(row_pp, text=' | ' + t('system_finder.pp_merits') + ':', font=font_label, fg="white", bg=sf_bg)
         _merits_lbl.pack(side="left")
         self.sysfinder_ref_val_pp_merits = tk.Label(row_pp, text=" -", font=font_value, fg="#ffcc00", bg=sf_bg)
         self.sysfinder_ref_val_pp_merits.pack(side="left")
@@ -19196,52 +18425,34 @@ class App(tk.Tk, ColumnVisibilityMixin):
             row=6, column=0, columnspan=4, sticky="ew", pady=(8, 4))
 
         # Row 6: Material Trader search
-        ttk.Label(search_frame, text="Material Trader:").grid(
+        ttk.Label(search_frame, text=t('system_finder.material_trader') + ':').grid(
             row=7, column=0, sticky="e", padx=(0, 5), pady=3)
 
         trader_ctrl_frame = ttk.Frame(search_frame)
         trader_ctrl_frame.grid(row=7, column=1, columnspan=3, sticky="w", padx=5, pady=3)
 
-        self.sysfinder_trader_type = tk.StringVar(value="Encoded")
+        self.sysfinder_trader_type = tk.StringVar(value=self._sysfinder_option_label("Encoded"))
         trader_combo = ttk.Combobox(
             trader_ctrl_frame, textvariable=self.sysfinder_trader_type,
-            values=MATERIAL_TRADER_OPTIONS, width=15, state="readonly"
+            values=localized_options(MATERIAL_TRADER_OPTIONS), width=15, state="readonly"
         )
         trader_combo.pack(side="left")
         trader_combo.bind("<<ComboboxSelected>>", lambda e: trader_combo.selection_clear())
 
-        self.sysfinder_trader_btn = tk.Button(
-            trader_ctrl_frame, text="Find Nearest",
+        self.sysfinder_trader_btn = create_action_button(
+            trader_ctrl_frame, primary=True, text=t('system_finder.find_nearest'),
             command=self._search_material_traders,
             bg="#2a4a2a", fg="#e0e0e0",
             activebackground="#3a5a3a", activeforeground="#ffffff",
-            relief="ridge", bd=1, padx=15, pady=4,
-            font=self._scaled_font(8, "normal"), cursor="hand2"
+            relief="ridge", bd=1, cursor="hand2"
         )
         self.sysfinder_trader_btn.pack(side="left", padx=(10, 0))
 
-        # Add trace to update info when reference system changes (with debounce)
-        self._sysfinder_ref_update_pending = None
-        def on_ref_system_change(*args):
-            # Cancel any pending update
-            if self._sysfinder_ref_update_pending:
-                self.after_cancel(self._sysfinder_ref_update_pending)
-            # Schedule new update after 500ms debounce
-            system = self.sysfinder_reference_system.get().strip()
-            if system:
-                self._sysfinder_ref_update_pending = self.after(500, lambda: self._update_sysfinder_ref_info(system))
-            else:
-                # Reset all values to "-"
-                self.sysfinder_ref_val_system.config(text=" Enter system")
-                self.sysfinder_ref_val_sec.config(text=" -")
-                self.sysfinder_ref_val_alleg.config(text=" -")
-                self.sysfinder_ref_val_gov.config(text=" -")
-                self.sysfinder_ref_val_eco.config(text=" -")
-                self.sysfinder_ref_val_pop.config(text=" -")
-                self.sysfinder_ref_val_state.config(text=" -")
-                self.sysfinder_pp_frame.pack_forget()
-        self.sysfinder_reference_system.trace_add('write', on_ref_system_change)
-        
+        self._sysfinder_ref_requested = None
+        self._sysfinder_ref_generation = 0
+        self._sysfinder_ref_status = None
+        self.sysfinder_reference_system.trace_add('write', self._on_sysfinder_reference_changed)
+
         # Results section
         results_frame = ttk.LabelFrame(main_container, padding=(5, 8, 5, 5))
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
@@ -19249,7 +18460,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Title row: "Systems" + help text + status/count, used as the LabelFrame's title
         title_row = ttk.Frame(results_frame)
-        ttk.Label(title_row, text="Systems", style="TLabelframe.Label").pack(side="left")
+        self.sysfinder_results_title = ttk.Label(title_row, text=t('system_finder.systems'), style="TLabelframe.Label")
+        self.sysfinder_results_title.pack(side="left")
         systems_info = ttk.Label(title_row, text="\u24d8", foreground=modern_color("#8A94A3"),
                                  cursor="hand2", font=self._scaled_font(10))
         systems_info.pack(side="left", padx=(6, 2))
@@ -19257,7 +18469,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_status_label = ttk.Label(title_row, text="", font=self._scaled_font(8))
         self.sysfinder_status_label.pack(side="left", padx=(10, 0))
         title_row.pack(fill="x", pady=(0, 4))
-        self._cv_add_columns_button(title_row, 'system_finder')
+        self._sysfinder_columns_buttons = {
+            key: self._cv_add_columns_button(title_row, key)
+            for key in ('system_finder', 'system_finder_traders')
+        }
         
         # Store theme colors for context menu (before creating it)
         self._sysfinder_menu_bg = sf_menu_bg
@@ -19266,7 +18481,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._sysfinder_menu_active_fg = sf_menu_active_fg
         
         # Create results table
+        self._sysfinder_tables = {}
         self._create_sysfinder_results_table(results_frame)
+        self._create_sysfinder_results_table(results_frame, trader=True)
+        self._sysfinder_show_results('system_finder')
         
         # Create context menu
         self._create_sysfinder_context_menu()
@@ -19275,21 +18493,34 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(2000, self._populate_sysfinder_system)
         
         # Start Spansh and EDDN status checks
-        self.after(1000, self._check_sysfinder_spansh_status)
-        self.after(1200, self._check_sysfinder_eddn_status)
+        self.after(60000, self._check_sysfinder_spansh_status)
+        self.after(60000, self._check_sysfinder_eddn_status)
         
         # Remove focus from entry field (prevent highlight on tab switch)
         # Focus the frame instead of the entry
         frame.focus_set()
     
-    def _create_sysfinder_results_table(self, parent_frame):
+    def _create_sysfinder_results_table(self, parent_frame, trader=False):
         """Create results table for system finder"""
         table_frame = ttk.Frame(parent_frame, relief="solid", borderwidth=1)
-        table_frame.pack(fill="both", expand=True, padx=2, pady=2)
         
-        # Define columns (faction removed - users can right-click → Inara for details)
-        columns = ("system", "distance", "security", "allegiance", "state", "population", "economy", "powerplay", "_spacer")
-        
+        config_key = 'system_finder_traders' if trader else 'system_finder'
+        if trader:
+            definitions = (
+                ('system', 'system_finder.col_system', 150),
+                ('distance', 'system_finder.col_distance', 70),
+                ('station', 'ring_finder.col_station', 160),
+                ('type', 'marketplace.type', 110),
+                ('pad', 'marketplace.pad', 55),
+                ('ls', 'system_finder.col_arrival', 100),
+                ('planetary', 'system_finder.col_planetary', 90),
+            )
+        else:
+            definitions = tuple((col, 'system_finder.col_' + col, width) for col, width in (
+                ('system', 150), ('distance', 70), ('security', 80), ('allegiance', 90),
+                ('state', 90), ('population', 100), ('economy', 120), ('powerplay', 170)))
+        columns = tuple(col for col, _, _ in definitions) + ('_spacer',)
+
         # Configure treeview style based on theme
         from config import load_theme
         current_theme = load_theme()
@@ -19322,30 +18553,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
         
-        self.sysfinder_tree = ttk.Treeview(
+        tree = ttk.Treeview(
             table_frame, columns=columns, show="headings", height=15, style="SystemFinder.Treeview"
         )
         
-        # Column headings
-        self.sysfinder_tree.heading("system", text=t('system_finder.col_system'), 
-                                    command=lambda: self._sort_sysfinder_column("system", False))
-        self.sysfinder_tree.heading("distance", text=t('system_finder.col_distance'), 
-                                    command=lambda: self._sort_sysfinder_column("distance", True))
-        self.sysfinder_tree.heading("security", text=t('system_finder.col_security'), 
-                                    command=lambda: self._sort_sysfinder_column("security", False))
-        self.sysfinder_tree.heading("allegiance", text=t('system_finder.col_allegiance'), 
-                                    command=lambda: self._sort_sysfinder_column("allegiance", False))
-        self.sysfinder_tree.heading("state", text=t('system_finder.col_state'), 
-                                    command=lambda: self._sort_sysfinder_column("state", False))
-        self.sysfinder_tree.heading("population", text=t('system_finder.col_population'), 
-                                    command=lambda: self._sort_sysfinder_column("population", True))
-        self.sysfinder_tree.heading("economy", text=t('system_finder.col_economy'),
-                                    command=lambda: self._sort_sysfinder_column("economy", False))
-        self.sysfinder_tree.heading("powerplay", text=t('system_finder.col_powerplay'),
-                                    command=lambda: self._sort_sysfinder_column("powerplay", False))
-        self.sysfinder_tree.heading("_spacer", text="", anchor="w")
-        for _c in columns:
-            self.sysfinder_tree.heading(_c, anchor="w")
+        numeric_columns = {'distance', 'population', 'ls'}
+        for col, key, _ in definitions:
+            tree.heading(col, text=t(key), anchor='w',
+                         command=lambda c=col: self._sort_sysfinder_column(c, c in numeric_columns))
+        tree.heading('_spacer', text='', anchor='w')
 
         # Column widths
         # minwidth is derived from the actual rendered header text width (at the
@@ -19353,12 +18569,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # squeezed below what their own label needs, at any UI scale or language.
         import tkinter.font as _tkfont
         _heading_font = _tkfont.Font(font=self._scaled_font(9, "bold"))
-        _base_widths = {"system": 150, "distance": 70, "security": 80, "allegiance": 90,
-                        "state": 90, "population": 100, "economy": 120, "powerplay": 170}
+        _base_widths = {col: width for col, _, width in definitions}
         _header_pad = self._scaled_px(24)  # header cell padding + sort-arrow space
 
         def _min_for(col_name):
-            header_text = self.sysfinder_tree.heading(col_name, "text")
+            header_text = tree.heading(col_name, "text")
             text_width = _heading_font.measure(header_text) + _header_pad
             return max(text_width, self._scaled_px(50))
 
@@ -19366,38 +18581,38 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         _anchors = {col: "w" for col in _base_widths}
         for col_name, base_width in _base_widths.items():
-            self.sysfinder_tree.column(col_name, width=max(self._scaled_px(base_width), _minwidths[col_name]),
-                                       minwidth=_minwidths[col_name], anchor=_anchors[col_name])
+            tree.column(col_name, width=max(self._scaled_px(base_width), _minwidths[col_name]),
+                                       minwidth=_minwidths[col_name], anchor=_anchors[col_name], stretch=False)
 
         # Spacer column — always last, gives the real last column a draggable right border
-        self.sysfinder_tree.column("_spacer", width=self._scaled_px(20), minwidth=self._scaled_px(20),
+        tree.column("_spacer", width=self._scaled_px(20), minwidth=self._scaled_px(20),
                                    anchor="w", stretch=True)
 
         # Setup column visibility for system finder (exclude _spacer from menu)
         _visibility_columns = tuple(c for c in columns if c != "_spacer")
         self.setup_column_visibility(
-            tree=self.sysfinder_tree,
+            tree=tree,
             columns=_visibility_columns,
             default_widths={col: max(self._scaled_px(w), _minwidths[col]) for col, w in _base_widths.items()},
-            config_key='system_finder',
+            config_key=config_key,
             allow_reorder=True,
             use_displaycolumns=True
         )
         
         # Vertical scrollbar
-        v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.sysfinder_tree.yview)
-        self.sysfinder_tree.configure(yscrollcommand=v_scrollbar.set)
+        v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=v_scrollbar.set)
         
         # Horizontal scrollbar (like Ring Finder)
-        h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.sysfinder_tree.xview)
-        self.sysfinder_tree.configure(xscrollcommand=h_scrollbar.set)
+        h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=tree.xview)
+        tree.configure(xscrollcommand=h_scrollbar.set)
         
         # Configure row tags for alternating colors (like Ring Finder)
-        self.sysfinder_tree.tag_configure('oddrow', background='#1e1e1e')
-        self.sysfinder_tree.tag_configure('evenrow', background='#1a1a1a')
+        tree.tag_configure('oddrow', background='#1e1e1e')
+        tree.tag_configure('evenrow', background='#1a1a1a')
         
         # Grid layout for treeview and scrollbars (like Ring Finder)
-        self.sysfinder_tree.grid(row=0, column=0, sticky="nsew")
+        tree.grid(row=0, column=0, sticky="nsew")
         v_scrollbar.grid(row=0, column=1, sticky="ns")
         h_scrollbar.grid(row=1, column=0, sticky="ew")
         
@@ -19405,18 +18620,25 @@ class App(tk.Tk, ColumnVisibilityMixin):
         table_frame.grid_columnconfigure(0, weight=1)
         table_frame.grid_rowconfigure(0, weight=1)
         
-        # Register context menu handler for system finder
         if not hasattr(self, '_context_handlers'):
             self._context_handlers = {}
-        self._context_handlers['system_finder'] = self._show_sysfinder_context_menu
-        # Note: Right-click binding handled by column visibility mixin
+        self._context_handlers[config_key] = self._show_sysfinder_context_menu
+        tree.bind('<Double-1>', self._sysfinder_on_double_click)
+        tree._sysfinder_sort_reverse = {}
+        tree._sysfinder_numbers = {}
+        self._sysfinder_tables[config_key] = {'tree': tree, 'frame': table_frame}
 
-        # Double-click a row to open Inara and fetch/refresh PP data
-        self.sysfinder_tree.bind("<Double-1>", self._sysfinder_on_double_click)
+        from config import _load_cfg, update_config_value
+        saved_widths = _load_cfg().get(config_key + '_column_widths', {})
+        for col in _base_widths:
+            if col in saved_widths:
+                tree.column(col, width=max(saved_widths[col], _minwidths[col]))
 
-        # Store sort direction
-        self._sysfinder_sort_reverse = {}
-    
+        def save_widths(event):
+            widths = {col: tree.column(col, 'width') for col in _base_widths}
+            update_config_value(config_key + '_column_widths', widths)
+        tree.bind('<ButtonRelease-1>', save_widths, add='+')
+
     def _create_sysfinder_context_menu(self):
         """Create context menu for system finder results with theme colors"""
         menu_bg = getattr(self, '_sysfinder_menu_bg', '#1e1e1e')
@@ -19472,7 +18694,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             system_name = item['values'][0]
             self.clipboard_clear()
             self.clipboard_append(system_name)
-            self._set_status(f"Copied: {system_name}", 3000)
+            self._set_status(t('marketplace.copied_to_clipboard').format(system=system_name), 3000)
     
     def _find_hotspots_from_sysfinder(self):
         """Switch to Hotspots Finder with the selected system as reference"""
@@ -19513,16 +18735,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._open_sysfinder_inara()
 
     def _open_sysfinder_inara(self):
-        """Open selected system(s) in Inara and fetch/refresh their PP data"""
         selection = self.sysfinder_tree.selection()
         if selection:
-            item = self.sysfinder_tree.item(selection[0])
-            system_name = item['values'][0]
-            import urllib.parse
-            import webbrowser
-            url = f"https://inara.cz/elite/starsystem/?search={urllib.parse.quote(system_name)}"
-            webbrowser.open(url)
-        self._fetch_sysfinder_pp_from_inara()
+            from app_utils import open_system_website
+            open_system_website(self.sysfinder_tree.set(selection[0], 'system'))
+            self._fetch_sysfinder_pp_from_inara()
 
     PP_FETCH_MAX_BATCH = 10
     PP_FETCH_DELAY_SECS = 1.5
@@ -19579,22 +18796,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _fetch_sysfinder_pp_complete(self, system_name, result, quiet=False):
         """Update treeview row(s) for system_name with fetched PP data (runs on main thread)."""
         if result:
-            from app_utils import format_relative_age
+            from app_utils import format_market_powerplay
             pp_power = result.get('controlling_power', '')
-            pp_state = result.get('power_state', '')
-            pp_age = format_relative_age(result.get('updated_at')) if (pp_power or pp_state) else ''
-            pp_age_suffix = f" ({pp_age})" if pp_age else ''
-            if pp_power == '~none~':
-                pp_str = (pp_state or t('common.pp_no_power')) + pp_age_suffix
-            elif pp_power and pp_state:
-                pp_str = f"{pp_power} / {pp_state}{pp_age_suffix}"
-            else:
-                pp_str = f"{pp_power}{pp_age_suffix}"
-            for item in self.sysfinder_tree.get_children():
-                vals = list(self.sysfinder_tree.item(item, 'values'))
+            pp_str = format_market_powerplay({**result, 'power_state': self._sysfinder_option_label(result.get('power_state') or '')}, include_age=True, no_data=t('common.pp_no_data'))
+            tree = self._sysfinder_tables['system_finder']['tree']
+            for item in tree.get_children():
+                vals = list(tree.item(item, 'values'))
                 if vals and len(vals) > 7 and vals[0] == system_name:
                     vals[7] = pp_str
-                    self.sysfinder_tree.item(item, values=vals)
+                    tree.item(item, values=vals)
             if not quiet:
                 if pp_power == '~none~':
                     self.sysfinder_status_label.config(text=t('ring_finder.pp_fetch_no_power').format(system=system_name))
@@ -19608,42 +18818,31 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._update_sysfinder_ref_info(system_name)
 
     def _open_sysfinder_edsm(self):
-        """Open selected system in EDSM"""
         selection = self.sysfinder_tree.selection()
         if selection:
-            item = self.sysfinder_tree.item(selection[0])
-            system_name = item['values'][0]
-            import urllib.parse
-            import webbrowser
-            url = f"https://www.edsm.net/en/system/id/0/name/{urllib.parse.quote(system_name)}"
-            webbrowser.open(url)
-    
+            from app_utils import open_system_website
+            open_system_website(self.sysfinder_tree.set(selection[0], 'system'), 'edsm')
+
     def _open_sysfinder_spansh(self):
-        """Open selected system in Spansh"""
         selection = self.sysfinder_tree.selection()
         if selection:
-            item = self.sysfinder_tree.item(selection[0])
-            system_name = item['values'][0]
-            import urllib.parse
-            import webbrowser
-            # Spansh uses /search/ endpoint for system lookup
-            url = f"https://spansh.co.uk/search/{urllib.parse.quote(system_name)}"
-            webbrowser.open(url)
+            from app_utils import open_system_website
+            open_system_website(self.sysfinder_tree.set(selection[0], 'system'), 'spansh')
 
     def _use_current_system_sysfinder(self):
         """Use current system from journal for system finder"""
         try:
             current = self.get_current_system()
             if current:
-                self._ac_sysfinder_ref.suppress()
-                self.sysfinder_reference_system.set(current)
-                self._ac_sysfinder_ref.unsuppress()
+                if self.sysfinder_reference_system.get().strip() != current:
+                    self._ac_sysfinder_ref.suppress()
+                    self.sysfinder_reference_system.set(current)
+                    self._ac_sysfinder_ref.unsuppress()
                 self._ac_sysfinder_ref.hide()
-                self._set_status(f"Using current system: {current}", 3000)
-                # Update reference system info display
-                self._update_sysfinder_ref_info(current)
+                self._confirm_sysfinder_reference()
+                self._set_status(t('system_finder.using_current').format(system=current), 3000)
             else:
-                self._set_status("Could not determine current system", 3000)
+                self._set_status(t('ring_finder.could_not_detect_system'), 3000)
         except Exception as e:
             logging.error(f"[SYSTEM_FINDER] Error getting current system: {e}")
     
@@ -19658,8 +18857,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.sysfinder_reference_system.set(current)
                     if hasattr(self, '_ac_sysfinder_ref'):
                         self._ac_sysfinder_ref.unsuppress()
-                    # Update reference system info display
-                    self._update_sysfinder_ref_info(current)
+                    self._confirm_sysfinder_reference()
                     # Remove selection/focus from entry field
                     if hasattr(self, 'sysfinder_ref_entry'):
                         self.sysfinder_ref_entry.selection_clear()
@@ -19667,23 +18865,36 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception:
             pass
     
+    @staticmethod
+    def _sysfinder_option_label(value):
+        if value == 'Select your pledge...':
+            return t('system_finder.pledge_prompt')
+        key = 'system_finder.options.' + value.lower().replace(' ', '_').replace(',', '')
+        label = t(key)
+        return value if label == key else label
+
+    def _sysfinder_option_value(self, value):
+        return getattr(self, '_sysfinder_option_values', {}).get(value, value)
+
     def _save_player_power(self):
         """Persist the My Power dropdown selection to config"""
         from config import save_player_power
-        save_player_power(self.sysfinder_my_power_var.get())
+        save_player_power(self._sysfinder_option_value(self.sysfinder_my_power_var.get()))
+        if getattr(self, '_sysfinder_ref_status', None):
+            self._update_sysfinder_ref_labels(self._sysfinder_ref_status)
 
     @staticmethod
     def _compute_pp_foryou(power: str, power_state: str, player_power: str) -> str:
         """Return contextual Powerplay action text for the player."""
+        if not player_power or player_power in ('Select your pledge...', 'Not pledged'):
+            return ''
+        if power == '~none~' or (power_state or '').lower() in ('unoccupied', 'expansion'):
+            return t('system_finder.pp_acquire')
         if not power:
-            return "Acquire"
-        if power_state and power_state.lower() == "expansion":
-            return "Acquire"
-        if not player_power or player_power in ("Select your pledge...", "Not pledged", ""):
-            return ""
+            return ''
         if power == player_power:
-            return "Reinforce ✓ (your Power)"
-        return "Undermine"
+            return t('system_finder.pp_reinforce')
+        return t('system_finder.pp_undermine')
 
     @staticmethod
     def _compute_pp_merits(power_state: str, bgs_state: str) -> str:
@@ -19711,147 +18922,94 @@ class App(tk.Tk, ColumnVisibilityMixin):
         context = " (Boom)" if boom else ""
         return f"{base}{context}"
 
-    def _update_sysfinder_ref_info(self, system_name: str):
-        """Update the reference system info display with system status"""
-        if not system_name or not hasattr(self, 'sysfinder_ref_val_system'):
-            return
+    def _on_sysfinder_reference_changed(self, *args):
+        self._sysfinder_ref_generation += 1
+        self._sysfinder_ref_requested = None
+        self._sysfinder_ref_status = None
+        system = self.sysfinder_reference_system.get().strip()
+        self._update_sysfinder_ref_labels(None, system)
 
-        # Show loading state
-        self.sysfinder_ref_val_system.config(text=f" {system_name}")
-        self.sysfinder_ref_val_sec.config(text=" ...")
-        self.sysfinder_ref_val_alleg.config(text=" ...")
-        self.sysfinder_ref_val_gov.config(text=" ...")
-        self.sysfinder_ref_val_eco.config(text=" ...")
-        self.sysfinder_ref_val_pop.config(text=" ...")
-        self.sysfinder_ref_val_state.config(text=" ...")
+    def _confirm_sysfinder_reference(self, system_name=None):
+        system = (system_name or self.sysfinder_reference_system.get()).strip()
+        if system and system != self._sysfinder_ref_requested:
+            self._update_sysfinder_ref_info(system)
+
+    def _update_sysfinder_ref_info(self, system_name: str):
+        if system_name != self.sysfinder_reference_system.get().strip():
+            return
+        self._sysfinder_ref_requested = system_name
+        self._sysfinder_ref_generation += 1
+        generation = self._sysfinder_ref_generation
+        self._sysfinder_ref_status = None
+        self._update_sysfinder_ref_labels(None, system_name, loading=True)
 
         def fetch_info():
-            try:
-                from system_finder_api import SystemFinderAPI
-                status = SystemFinderAPI.get_system_status(system_name)
+            from system_finder_api import SystemFinderAPI
+            status = SystemFinderAPI.get_system_status(system_name)
+            self.after(0, self._sysfinder_ref_info_complete, system_name, generation, status)
+        threading.Thread(target=fetch_info, daemon=True).start()
 
-                if status:
-                    # Extract values
-                    security = status.get('security') or '-'
-                    allegiance = status.get('allegiance') or '-'
-                    government = status.get('government') or '-'
-                    population = status.get('population', 0)
-                    state = status.get('state') or 'Normal'
-                    if state == 'None':
-                        state = 'Normal'
-                    economy = status.get('economy', {})
-                    if isinstance(economy, dict):
-                        economy_str = economy.get('primary') or '-'
-                    else:
-                        economy_str = economy or '-'
+    def _sysfinder_ref_info_complete(self, system_name, generation, status):
+        if generation != self._sysfinder_ref_generation or system_name != self.sysfinder_reference_system.get().strip():
+            return
+        self._sysfinder_ref_status = status
+        if status is None:
+            self._sysfinder_ref_requested = None
+        self._update_sysfinder_ref_labels(status, system_name)
 
-                    # Format population with suffix
-                    if population >= 1_000_000_000:
-                        pop_str = f"{population / 1_000_000_000:.1f}B"
-                    elif population >= 1_000_000:
-                        pop_str = f"{population / 1_000_000:.1f}M"
-                    elif population >= 1_000:
-                        pop_str = f"{population / 1_000:.1f}K"
-                    elif population > 0:
-                        pop_str = str(population)
-                    else:
-                        pop_str = "-"
+    @staticmethod
+    def _format_sysfinder_population(population):
+        if population is None:
+            return '-'
+        for threshold, suffix in ((1_000_000_000, 'B'), (1_000_000, 'M'), (1_000, 'K')):
+            if population >= threshold:
+                return f'{population / threshold:.1f}{suffix}'
+        return str(population)
 
-                    # Powerplay
-                    power = status.get('power') or None
-                    power_state = status.get('power_state') or None
-                    player_power = self.sysfinder_my_power_var.get() if hasattr(self, 'sysfinder_my_power_var') else ""
-                    pp_power_str = power or "Unoccupied"
-                    pp_state_str = power_state or "-"
-                    pp_foryou_str = self._compute_pp_foryou(power, power_state, player_power)
-                    pp_merits_str = self._compute_pp_merits(power_state, state)
-                    has_pp = bool(power or power_state)
-
-                    # Update each value label on main thread
-                    def update_labels():
-                        self.sysfinder_ref_val_system.config(text=f" {system_name}")
-                        self.sysfinder_ref_val_sec.config(text=f" {security}")
-                        self.sysfinder_ref_val_alleg.config(text=f" {allegiance}")
-                        self.sysfinder_ref_val_gov.config(text=f" {government}")
-                        self.sysfinder_ref_val_eco.config(text=f" {economy_str}")
-                        self.sysfinder_ref_val_pop.config(text=f" {pop_str}")
-                        self.sysfinder_ref_val_state.config(text=f" {state}")
-                        if has_pp:
-                            self.sysfinder_ref_val_pp_power.config(text=f" {pp_power_str}")
-                            self.sysfinder_ref_val_pp_state.config(text=f" {pp_state_str}")
-                            self.sysfinder_ref_val_pp_foryou.config(text=f" {pp_foryou_str}" if pp_foryou_str else "")
-                            self.sysfinder_ref_val_pp_merits.config(text=f" {pp_merits_str}" if pp_merits_str else "")
-                            self.sysfinder_pp_frame.pack(anchor="center")
-                        else:
-                            self.sysfinder_pp_frame.pack_forget()
-                    self.after(0, update_labels)
-                else:
-                    # No data available
-                    def update_no_data():
-                        self.sysfinder_ref_val_system.config(text=f" {system_name}")
-                        self.sysfinder_ref_val_sec.config(text=" -")
-                        self.sysfinder_ref_val_alleg.config(text=" -")
-                        self.sysfinder_ref_val_gov.config(text=" -")
-                        self.sysfinder_ref_val_eco.config(text=" -")
-                        self.sysfinder_ref_val_pop.config(text=" -")
-                        self.sysfinder_ref_val_state.config(text=" -")
-                        self.sysfinder_pp_frame.pack_forget()
-                    self.after(0, update_no_data)
-
-            except Exception as e:
-                logging.error(f"[SYSTEM_FINDER] Error fetching ref system info: {e}")
-                def update_error():
-                    self.sysfinder_ref_val_system.config(text=f" {system_name}")
-                    self.sysfinder_ref_val_sec.config(text=" Error")
-                    self.sysfinder_ref_val_alleg.config(text=" -")
-                    self.sysfinder_ref_val_gov.config(text=" -")
-                    self.sysfinder_ref_val_eco.config(text=" -")
-                    self.sysfinder_ref_val_pop.config(text=" -")
-                    self.sysfinder_ref_val_state.config(text=" -")
-                    self.sysfinder_pp_frame.pack_forget()
-                self.after(0, update_error)
-
-        # Run in background thread to avoid blocking UI
-        import threading
-        thread = threading.Thread(target=fetch_info, daemon=True)
-        thread.start()
+    def _update_sysfinder_ref_labels(self, status, system_name=None, loading=False):
+        system_name = system_name or self.sysfinder_reference_system.get().strip()
+        self.sysfinder_ref_val_system.config(text=' ' + (system_name or t('system_finder.enter_system')))
+        empty = ' ...' if loading else ' -'
+        fields = {'sec': 'security', 'alleg': 'allegiance', 'gov': 'government', 'eco': 'economy',
+                  'pop': 'population', 'state': 'state'}
+        for label, field in fields.items():
+            value = status.get(field) if status else None
+            if status and field == 'population':
+                value = self._format_sysfinder_population(value)
+            elif isinstance(value, dict):
+                value = value.get('primary')
+            elif field == 'state' and value == 'Normal':
+                value = t('system_finder.normal')
+            if isinstance(value, str) and field != 'population':
+                value = self._sysfinder_option_label(value)
+            getattr(self, 'sysfinder_ref_val_' + label).config(text=' ' + str(value) if value is not None and value != '' else empty)
+        power = status.get('power') if status else None
+        power_state = status.get('power_state') if status else None
+        if not (power or power_state):
+            self.sysfinder_pp_frame.pack_forget()
+            return
+        if power == '~none~':
+            power_text = t('common.pp_no_power')
+        else:
+            power_text = power or '-'
+        player_power = self._sysfinder_option_value(self.sysfinder_my_power_var.get())
+        self.sysfinder_ref_val_pp_power.config(text=' ' + power_text)
+        self.sysfinder_ref_val_pp_state.config(text=' ' + self._sysfinder_option_label(power_state or '-'))
+        self.sysfinder_ref_val_pp_foryou.config(text=' ' + self._compute_pp_foryou(power, power_state, player_power))
+        self.sysfinder_ref_val_pp_merits.config(text=' ' + self._compute_pp_merits(power_state, status.get('state')))
+        self.sysfinder_pp_frame.pack(anchor='center')
 
     def _check_sysfinder_spansh_status(self):
-        """Check Spansh API status in background and update indicator"""
-        def _background_check():
-            import requests
-            def _schedule(status):
-                try:
-                    self.after(0, lambda: self._update_sysfinder_spansh_status(status))
-                except RuntimeError:
-                    pass  # Tkinter loop already stopped — app is shutting down
-            try:
-                url = 'https://spansh.co.uk/api/systems/field_values/system_names'
-                response = requests.get(url, params={'q': 'Sol'}, timeout=10)
-                if response.status_code == 200:
-                    _schedule("online")
-                else:
-                    _schedule("offline")
-            except Exception as e:
-                print(f"[SYSFINDER SPANSH STATUS] Check failed: {e}")
-                _schedule("offline")
-
-        import threading
-        threading.Thread(target=_background_check, daemon=True).start()
-
-        # Re-check periodically so the indicator recovers after a connectivity drop
-        try:
-            self.after(60000, self._check_sysfinder_spansh_status)
-        except RuntimeError:
-            pass
+        self.ring_finder._check_spansh_status()
+        self.after(60000, self._check_sysfinder_spansh_status)
 
     def _update_sysfinder_spansh_status(self, status: str):
         """Update Spansh status label in system finder - called on UI thread"""
         if status == "online":
-            status_text = "🟢 Spansh: Online"
+            status_text = t('system_finder.service_online').format(service='Spansh')
             status_color = "#00ff00"
         else:
-            status_text = "🔴 Spansh: Offline"
+            status_text = t('system_finder.service_offline').format(service='Spansh')
             status_color = "#ff4444"
 
         if hasattr(self, 'sysfinder_spansh_status_label'):
@@ -19859,38 +19017,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._update_footer_indicator('spansh', status_text, status_color)
 
     def _check_sysfinder_eddn_status(self):
-        """Check EDDN gateway status in background and update indicator"""
-        def _background_check():
-            import requests
-            def _schedule(status):
-                try:
-                    self.after(0, lambda: self._update_sysfinder_eddn_status(status))
-                except RuntimeError:
-                    pass
-            try:
-                response = requests.get('https://eddn.edcd.io:4430/', timeout=10)
-                _schedule("online")
-            except requests.exceptions.ConnectionError:
-                _schedule("offline")
-            except Exception:
-                _schedule("online")  # Any HTTP response (even 4xx) means the server is up
-
-        import threading
-        threading.Thread(target=_background_check, daemon=True).start()
-
-        # Re-check periodically so the indicator recovers after a connectivity drop
-        try:
-            self.after(60000, self._check_sysfinder_eddn_status)
-        except RuntimeError:
-            pass
+        self.ring_finder._check_eddn_status()
+        self.after(60000, self._check_sysfinder_eddn_status)
 
     def _update_sysfinder_eddn_status(self, status: str):
         """Update EDDN status label in system finder - called on UI thread"""
         if status == "online":
-            status_text = "🟢 EDDN: Online"
+            status_text = t('system_finder.service_online').format(service='EDDN')
             status_color = "#00ff00"
         else:
-            status_text = "🔴 EDDN: Offline"
+            status_text = t('system_finder.service_offline').format(service='EDDN')
             status_color = "#ff4444"
 
         if hasattr(self, 'sysfinder_eddn_status_label'):
@@ -19899,50 +19035,52 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _search_systems(self):
         """Search for systems matching criteria"""
+        if getattr(self, '_traders_search_control', None) and self._traders_search_control.running:
+            self._traders_search_control.stop()
+            return
+        if not hasattr(self, '_systems_search_control'):
+            self._systems_search_control = SearchControl(self, self.sysfinder_search_btn, self.sysfinder_status_label)
+        control = self._systems_search_control
+        if control.running:
+            control.stop()
+            return
         reference = self.sysfinder_reference_system.get().strip()
         if not reference:
             self.sysfinder_status_label.config(text=t('system_finder.no_system_entered'))
             return
         
-        # Ensure system columns are showing
-        self._sysfinder_set_system_columns()
-
-        # Disable search button during search
-        self.sysfinder_search_btn.config(state="disabled")
+        self._ac_sysfinder_ref.hide()
+        self._confirm_sysfinder_reference()
+        control.on_finish = lambda: self.sysfinder_trader_btn.config(state='normal')
+        control.start()
+        self.sysfinder_trader_btn.config(state='disabled')
         self.sysfinder_status_label.config(text=t('system_finder.searching'))
-        self.config(cursor="wait")
-        self.update()
         
+        filters = {
+            'allegiance': self.sysfinder_allegiance.get(),
+            'government': self.sysfinder_government.get(),
+            'security': self.sysfinder_security.get(),
+            'economy': self.sysfinder_economy.get(),
+            'state': self.sysfinder_state.get(),
+            'population': self.sysfinder_population.get(),
+            'power': self.sysfinder_power.get() if hasattr(self, 'sysfinder_power') else 'Any',
+            'pp_state': self.sysfinder_pp_state.get() if hasattr(self, 'sysfinder_pp_state') else 'Any',
+        }
+
+        filters = {key: self._sysfinder_option_value(value) for key, value in filters.items()}
+
         # Run search in background thread
-        thread = threading.Thread(target=self._search_systems_worker, daemon=True)
+        thread = threading.Thread(target=self._search_systems_worker, args=(reference, filters, control), daemon=True)
         thread.start()
     
-    def _search_systems_worker(self):
+    def _search_systems_worker(self, reference, filters, control):
         """Background worker for system search - uses Spansh API with server-side filtering"""
         try:
             from system_finder_api import SystemFinderAPI
             
-            reference = self.sysfinder_reference_system.get().strip()
-            
-            print(f"[SYSTEM_FINDER DEBUG] Starting Spansh search near: {reference}")
-            
             def progress_callback(current, total, message):
-                self.after(0, lambda: self.sysfinder_status_label.config(text=message))
-            
-            # Build filters (all values are direct English, no mapping needed)
-            filters = {
-                'allegiance': self.sysfinder_allegiance.get(),
-                'government': self.sysfinder_government.get(),
-                'security': self.sysfinder_security.get(),
-                'economy': self.sysfinder_economy.get(),
-                'state': self.sysfinder_state.get(),
-                'population': self.sysfinder_population.get(),
-                'power': self.sysfinder_power.get() if hasattr(self, 'sysfinder_power') else 'Any',
-                'pp_state': self.sysfinder_pp_state.get() if hasattr(self, 'sysfinder_pp_state') else 'Any',
-            }
-            
-            print(f"[SYSTEM_FINDER DEBUG] Filters: {filters}")
-            
+                control.progress(message)
+
             # Check if any filters are active
             has_filters = any(v not in ('Any', '') for v in filters.values())
             
@@ -19951,274 +19089,172 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 reference_system=reference,
                 filters=filters,
                 max_results=100,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                is_cancelled=control.is_cancelled
             )
             
-            print(f"[SYSTEM_FINDER DEBUG] Spansh returned {len(systems) if systems else 0} systems")
-            if systems and len(systems) > 0:
-                print(f"[SYSTEM_FINDER DEBUG] First system sample: {systems[0]}")
             
             if not systems:
-                self.after(0, self._sysfinder_search_complete, [], None, has_filters)
+                control.complete([], self._sysfinder_search_complete, None, has_filters)
                 return
 
             # Pre-format rows in background thread to keep main thread work minimal
             formatted_rows = []
             for idx, system in enumerate(systems):
                 row_tag = 'oddrow' if idx % 2 == 0 else 'evenrow'
-                pop = system.get('population', 0)
-                if pop >= 1_000_000_000:
-                    pop_str = f"{pop / 1_000_000_000:.1f}B"
-                elif pop >= 1_000_000:
-                    pop_str = f"{pop / 1_000_000:.1f}M"
-                elif pop >= 1000:
-                    pop_str = f"{pop / 1000:.1f}K"
-                elif pop > 0:
-                    pop_str = str(pop)
-                else:
-                    pop_str = "0"
+                pop = system.get('population')
+                pop_str = self._format_sysfinder_population(pop)
                 economy = system.get('economy', {})
                 eco_str = economy.get('primary') or '-' if isinstance(economy, dict) else (str(economy) if economy else '-')
-                distance = system.get('distance', 0)
-                dist_str = f"{distance:.1f} ly" if distance else "0 ly"
+                distance = system.get('distance')
+                dist_str = f"{distance:.1f}" if distance is not None else "-"
                 state_val = system.get('state', 'Normal')
                 if not state_val or state_val in ('-', 'None'):
                     state_val = 'Normal'
-                pp_power = system.get('power') or ''
-                pp_state_val = system.get('power_state') or ''
-                from app_utils import format_relative_age
-                pp_age = format_relative_age(system.get('power_updated_at')) if (pp_power or pp_state_val) else ''
-                pp_age_suffix = f" ({pp_age})" if pp_age else ''
-                if pp_power == '~none~':
-                    pp_str = (pp_state_val or t('common.pp_no_power')) + pp_age_suffix
-                elif pp_power and pp_state_val:
-                    pp_str = f"{pp_power} / {pp_state_val}{pp_age_suffix}"
-                elif pp_power:
-                    pp_str = f"{pp_power}{pp_age_suffix}"
-                elif pp_state_val:
-                    pp_str = pp_state_val
-                else:
-                    pp_str = t('common.pp_no_data')
+                from app_utils import format_market_powerplay
+                pp_str = format_market_powerplay({
+                    'controlling_power': system.get('power'),
+                    'power_state': self._sysfinder_option_label(system.get('power_state') or ''),
+                    'updated_at': system.get('power_updated_at'),
+                }, include_age=True, no_data=t('common.pp_no_data'))
                 formatted_rows.append((
-                    (system.get('systemName', '-'), dist_str, system.get('security', '-'),
-                     system.get('allegiance', '-'), state_val, pop_str, eco_str, pp_str),
-                    row_tag
+                    (system.get('systemName', '-'), dist_str, self._sysfinder_option_label(system.get('security') or '-'),
+                     self._sysfinder_option_label(system.get('allegiance') or '-'), t('system_finder.normal') if state_val == 'Normal' else self._sysfinder_option_label(state_val), pop_str, self._sysfinder_option_label(eco_str), pp_str),
+                    row_tag, {'distance': distance, 'population': pop}
                 ))
 
-            self.after(0, self._sysfinder_search_complete, formatted_rows, None, has_filters)
+            control.complete(formatted_rows, self._sysfinder_search_complete, None, has_filters)
             
         except Exception as e:
             logging.error(f"[SYSTEM_FINDER] Search error: {e}")
             import traceback
             traceback.print_exc()
-            self.after(0, self._sysfinder_search_complete, [], str(e), False)
+            control.failed(str(e))
     
     def _sysfinder_search_complete(self, results: list, error: str = None, had_filters: bool = False):
-        """Handle search completion - update UI"""
-        self.sysfinder_search_btn.config(state="normal")
-        self.config(cursor="")
-        
-        # Clear existing results
-        for item in self.sysfinder_tree.get_children():
-            self.sysfinder_tree.delete(item)
-        
+        self._sysfinder_show_results('system_finder')
+        self._populate_sysfinder_rows(results)
         if error:
-            self.sysfinder_status_label.config(text=f"Error: {error}")
-            return
-        
-        if not results:
-            if had_filters:
-                # Filters were applied but no matches found
-                self.sysfinder_status_label.config(text=t('system_finder.no_filter_results'))
-            else:
-                self.sysfinder_status_label.config(text=t('system_finder.no_results'))
-            return
-        
-        # Update status
-        self.sysfinder_status_label.config(
-            text=t('system_finder.results_count').format(count=len(results))
-        )
-        
-        # Populate results - rows are pre-formatted tuples (values, tag) from background thread
-        for values, row_tag in results:
-            self.sysfinder_tree.insert("", "end", values=values, tags=(row_tag,))
-    
+            text = t('marketplace.search_failed').format(error=error)
+        elif results:
+            text = t('system_finder.results_count').format(count=len(results))
+        else:
+            text = t('system_finder.no_filter_results' if had_filters else 'system_finder.no_results')
+        self.sysfinder_status_label.config(text=text)
+
     def _sort_sysfinder_column(self, column: str, numeric: bool):
-        """Sort system finder results by column"""
-        try:
-            items = [(self.sysfinder_tree.set(item, column), item) 
-                     for item in self.sysfinder_tree.get_children('')]
-            
-            # Toggle sort direction
-            reverse = self._sysfinder_sort_reverse.get(column, False)
-            self._sysfinder_sort_reverse[column] = not reverse
-            
-            if numeric:
-                # Parse numeric values (handle "123.4 ly", "1.5B", "2.3M", etc.)
-                def parse_value(val):
-                    val = val.strip()
-                    if not val:
-                        return 0
-                    # Remove ' ly' / ' ls' suffixes
-                    val = val.replace(' ly', '').replace(' ls', '').strip()
-                    # Handle B/M/K suffixes
-                    if val.endswith('B'):
-                        return float(val[:-1]) * 1_000_000_000
-                    elif val.endswith('M'):
-                        return float(val[:-1]) * 1_000_000
-                    elif val.endswith('K'):
-                        return float(val[:-1]) * 1000
-                    try:
-                        return float(val)
-                    except:
-                        return 0
-                
-                items.sort(key=lambda x: parse_value(x[0]), reverse=reverse)
-            elif column == "powerplay":
-                # No data / not fetched should sort to the top in ascending order
-                no_data_str = t('common.pp_no_data')
-                def sort_key(val):
-                    if not val or val == no_data_str:
-                        return (0, "")
-                    return (1, val.lower())
-                items.sort(key=lambda x: sort_key(x[0]), reverse=reverse)
-            else:
-                items.sort(key=lambda x: x[0].lower(), reverse=reverse)
-            
-            # Rearrange items
-            for index, (val, item) in enumerate(items):
-                self.sysfinder_tree.move(item, '', index)
-
-            from ui.sort_indicator import apply_sort_arrow
-            apply_sort_arrow(self.sysfinder_tree, column, reverse)
-
-        except Exception as e:
-            logging.error(f"[SYSTEM_FINDER] Sort error: {e}")
-
-    def _sysfinder_set_system_columns(self):
-        """Restore treeview headings/widths for system search mode"""
-        if not hasattr(self, 'sysfinder_tree'):
-            return
         tree = self.sysfinder_tree
-        tree.heading("system",     text="System")
-        tree.heading("distance",   text="Distance")
-        tree.heading("security",   text="Security")
-        tree.heading("allegiance", text="Allegiance")
-        tree.heading("state",      text="State")
-        tree.heading("population", text="Population")
-        tree.heading("economy",    text="Economy")
-        tree.heading("powerplay",  text=t('system_finder.col_powerplay'))
-        tree.heading("_spacer",    text="")
-        tree.column("system",     width=150)
-        tree.column("security",   width=80)
-        tree.column("allegiance", width=90)
-        tree.column("state",      width=90)
-        tree.column("population", width=100)
-        tree.column("economy",    width=120)
-        tree.column("powerplay",  width=170, minwidth=100)
-        tree.column("_spacer",    width=20, minwidth=20, stretch=True)
-        if hasattr(self, 'sysfinder_results_frame'):
-            self.sysfinder_results_frame.configure(text="Systems")
+        reverse = tree._sysfinder_sort_reverse.get(column, False)
+        tree._sysfinder_sort_reverse[column] = not reverse
+        items = list(tree.get_children())
+        if numeric:
+            def value(item):
+                return tree._sysfinder_numbers.get(item, {}).get(column)
+            known = [item for item in items if value(item) is not None]
+            unknown = [item for item in items if value(item) is None]
+            items = sorted(known, key=value, reverse=reverse) + unknown
+        else:
+            items.sort(key=lambda item: tree.set(item, column).lower(), reverse=reverse)
+        for index, item in enumerate(items):
+            tree.move(item, '', index)
+        from ui.sort_indicator import apply_sort_arrow
+        apply_sort_arrow(tree, column, reverse)
 
-    def _sysfinder_set_trader_columns(self):
-        """Switch treeview headings/widths for material trader mode"""
-        if not hasattr(self, 'sysfinder_tree'):
-            return
+    def _sysfinder_show_results(self, config_key):
+        for key, data in self._sysfinder_tables.items():
+            data['frame'].pack_forget()
+            self._sysfinder_columns_buttons[key].pack_forget()
+        data = self._sysfinder_tables[config_key]
+        self.sysfinder_tree = data['tree']
+        data['frame'].pack(fill='both', expand=True, padx=2, pady=2)
+        self._sysfinder_columns_buttons[config_key].pack(side='right', padx=(self._scaled_px(8), 0))
+        label = 'system_finder.systems' if config_key == 'system_finder' else 'system_finder.material_traders'
+        self.sysfinder_results_title.config(text=t(label))
+
+    def _populate_sysfinder_rows(self, results):
         tree = self.sysfinder_tree
-        tree.heading("system",     text="System")
-        tree.heading("distance",   text="Distance")
-        tree.heading("security",   text="Station")
-        tree.heading("allegiance", text="Type")
-        tree.heading("state",      text="Pad")
-        tree.heading("population", text="Arrival (ls)")
-        tree.heading("economy",    text="Planetary")
-        tree.heading("powerplay",  text="")
-        tree.heading("_spacer",    text="")
-        tree.column("system",     width=130)
-        tree.column("security",   width=160)
-        tree.column("allegiance", width=110)
-        tree.column("state",      width=45)
-        tree.column("population", width=90)
-        tree.column("economy",    width=70)
-        tree.column("powerplay",  width=0, minwidth=0)
-        tree.column("_spacer",    width=20, minwidth=20, stretch=True)
-        if hasattr(self, 'sysfinder_results_frame'):
-            trader_type = getattr(self, 'sysfinder_trader_type', None)
-            label = (trader_type.get() + " ") if trader_type else ""
-            self.sysfinder_results_frame.configure(text=f"{label}Material Traders")
+        tree.delete(*tree.get_children())
+        tree._sysfinder_numbers.clear()
+        for values, row_tag, numbers in results:
+            item = tree.insert('', 'end', values=values, tags=(row_tag,))
+            tree._sysfinder_numbers[item] = numbers
+        tree._sysfinder_sort_reverse.clear()
+        from ui.sort_indicator import apply_sort_arrow
+        apply_sort_arrow(tree, None, False)
 
     def _search_material_traders(self):
         """Search for nearest material traders"""
+        if getattr(self, '_systems_search_control', None) and self._systems_search_control.running:
+            self._systems_search_control.stop()
+            return
+        if not hasattr(self, '_traders_search_control'):
+            self._traders_search_control = SearchControl(self, self.sysfinder_trader_btn, self.sysfinder_status_label)
+        control = self._traders_search_control
+        if control.running:
+            control.stop()
+            return
         reference = self.sysfinder_reference_system.get().strip()
         if not reference:
             self.sysfinder_status_label.config(text=t('system_finder.no_system_entered'))
             return
-        self._sysfinder_set_trader_columns()
-        self.sysfinder_trader_btn.config(state="disabled")
+        self._ac_sysfinder_ref.hide()
+        self._confirm_sysfinder_reference()
+        control.on_finish = lambda: self.sysfinder_search_btn.config(state='normal')
+        control.start()
         self.sysfinder_search_btn.config(state="disabled")
-        self.sysfinder_status_label.config(text="Searching for material traders...")
-        self.config(cursor="wait")
-        self.update()
-        threading.Thread(target=self._search_material_traders_worker, daemon=True).start()
+        self.sysfinder_status_label.config(text=t('system_finder.searching_traders'))
+        threading.Thread(target=self._search_material_traders_worker,
+                         args=(reference, self._sysfinder_option_value(self.sysfinder_trader_type.get()), control), daemon=True).start()
 
-    def _search_material_traders_worker(self):
+    def _search_material_traders_worker(self, reference, trader_type, control):
         """Background worker for material trader search"""
         try:
             from system_finder_api import SystemFinderAPI
-            reference = self.sysfinder_reference_system.get().strip()
-            trader_type = self.sysfinder_trader_type.get()
 
             def progress_callback(current, total, message):
-                self.after(0, lambda: self.sysfinder_status_label.config(text=message))
+                control.progress(message)
 
             results = SystemFinderAPI.search_material_traders(
                 reference_system=reference,
                 trader_type=trader_type,
                 max_results=50,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                is_cancelled=control.is_cancelled
             )
 
             formatted_rows = []
             for idx, r in enumerate(results):
                 row_tag = 'oddrow' if idx % 2 == 0 else 'evenrow'
-                dist = r.get('distance', 0)
+                dist = r.get('distance')
                 arrival = r.get('distanceToArrival')
-                arrival_str = f"{arrival:.0f} ls" if arrival is not None else '-'
-                planetary = "Yes" if r.get('isPlanetary') else "No"
+                arrival_str = f"{int(float(arrival)):,}" if arrival is not None else '-'
+                planetary = t('common.yes' if r.get('isPlanetary') else 'common.no')
                 formatted_rows.append((
                     (r.get('systemName', '-'),
-                     f"{dist:.1f} ly",
+                     f"{dist:.1f}" if dist is not None else '-',
                      r.get('stationName', '-'),
                      r.get('stationType', '-'),
                      r.get('landingPad', '-'),
                      arrival_str,
                      planetary),
-                    row_tag
+                    row_tag, {'distance': dist, 'ls': arrival}
                 ))
 
-            self.after(0, self._sysfinder_trader_complete, formatted_rows, None)
+            control.complete(formatted_rows, self._sysfinder_trader_complete, None)
         except Exception as e:
             logging.error(f"[SYSTEM_FINDER] Material trader search error: {e}")
-            self.after(0, self._sysfinder_trader_complete, [], str(e))
+            control.failed(str(e))
 
     def _sysfinder_trader_complete(self, results: list, error: str = None):
-        """Handle material trader search completion"""
-        self.sysfinder_trader_btn.config(state="normal")
-        self.sysfinder_search_btn.config(state="normal")
-        self.config(cursor="")
-        for item in self.sysfinder_tree.get_children():
-            self.sysfinder_tree.delete(item)
+        self._sysfinder_show_results('system_finder_traders')
+        self._populate_sysfinder_rows(results)
         if error:
-            self.sysfinder_status_label.config(text=f"Error: {error}")
-            return
-        if not results:
-            self.sysfinder_status_label.config(text="No material traders found")
-            return
-        trader_type = self.sysfinder_trader_type.get()
-        self.sysfinder_status_label.config(
-            text=f"Found {len(results)} {trader_type} material traders")
-        for values, row_tag in results:
-            self.sysfinder_tree.insert("", "end", values=values, tags=(row_tag,))
+            text = t('marketplace.search_failed').format(error=error)
+        elif results:
+            text = t('system_finder.trader_results_count').format(count=len(results))
+        else:
+            text = t('system_finder.no_traders')
+        self.sysfinder_status_label.config(text=text)
 
     def _create_marketplace_results_table(self, parent_frame):
         """Create results table for marketplace search"""
@@ -20561,18 +19597,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception as e:
                 print(f"[MARKETPLACE] Error opening Spansh: {e}")
 
-    def _show_marketplace_context_menu(self, event):
-        """Show context menu on right-click"""
-        try:
-            # Select item under cursor
-            item = self.marketplace_tree.identify_row(event.y)
-            if item:
-                self.marketplace_tree.selection_set(item)
-                self.marketplace_tree.focus(item)
-                self.marketplace_context_menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            self.marketplace_context_menu.grab_release()
-    
     def _copy_marketplace_system(self):
         """Copy system name from location column (format: 'System / Station')"""
         selection = self.marketplace_tree.selection()
@@ -20816,7 +19840,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _convert_age_to_days(self, age_str):
         """Convert max age string to days for API (API expects integer days, rounds up sub-day values)"""
-        import math
         age_map = {
             "Any": 30,
             "1 hour": 1,    # API doesn't support hours, use 1 day minimum
@@ -20827,50 +19850,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         }
         return age_map.get(age_str, 1)  # Default to 1 day
     
-    def _filter_results_by_age(self, results, max_age_str):
-        """Filter results by max age locally (for accurate hour-level filtering)
-        
-        The API only supports maxDaysAgo (integer days), so for hour-based filters
-        we need to filter the results locally using the updatedAt timestamp.
-        
-        NOTE: Filter values are set to include results that DISPLAY as that time.
-        e.g., "1 hour" filter includes results showing "1h" (60-119 min old)
-        """
-        from datetime import datetime, timezone, timedelta
-        
-        # Map age string to hours (values include the displayed hour range)
-        age_hours_map = {
-            "Any": None,       # No filtering
-            "1 hour": 2,       # Include results showing "1h" (60-119 min)
-            "8 hours": 9,      # Include results showing "8h" (480-539 min)
-            "16 hours": 17,    # Include results showing "16h"
-            "1 day": 25,       # Include results showing "1d" (24h)
-            "2 days": 49       # Include results showing "2d" (48h)
-        }
-        
-        max_hours = age_hours_map.get(max_age_str)
-        if max_hours is None:
-            return results  # No age filtering
-        
-        now = datetime.now(timezone.utc)
-        cutoff_time = now - timedelta(hours=max_hours)
-        
-        filtered = []
-        for result in results:
-            updated_at = result.get('updatedAt')
-            if not updated_at:
-                continue  # Skip results without timestamp
-            
-            try:
-                # Parse ISO timestamp (e.g., "2024-11-03T12:30:00Z" or "2024-11-03T12:30:00.000Z")
-                updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
-                if updated_time >= cutoff_time:
-                    filtered.append(result)
-            except Exception:
-                # If parsing fails, include the result (conservative)
-                filtered.append(result)
-        
-        return filtered
     
     def _use_current_system_marketplace(self):
         """Use current system from journal/hotspots finder for marketplace search"""
@@ -20960,50 +19939,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         webbrowser.open(url)
         self._set_status(f"Opening edtools.cc for {commodity} near {system if system else 'Sol'}...")
-        
-    def _export_marketplace_results(self):
-        """Export marketplace search results to CSV"""
-        try:
-            import csv
-            from tkinter import filedialog
-            
-            # Get all items from tree
-            items = []
-            for child in self.marketplace_tree.get_children():
-                values = self.marketplace_tree.item(child)['values']
-                items.append(values)
-            
-            if not items:
-                self.marketplace_total_label.config(text=t('marketplace.no_results_to_export'))
-                return
-            
-            # Ask for save location
-            file_path = filedialog.asksaveasfilename(
-                defaultextension=".csv",
-                filetypes=[("CSV files", "*.csv")],
-                title="Export Marketplace Results"
-            )
-            
-            if file_path:
-                with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
-                    writer = csv.writer(csvfile)
-                    
-                    # Write headers
-                    headers = ["Location", "Station Type", "Pad", "St dist", "Distance", "Demand", "Price", "Updated"]
-                    writer.writerow(headers)
-                    
-                    # Write data
-                    writer.writerows(items)
-                
-                self.marketplace_total_label.config(text=t('marketplace.export_success').format(count=len(items), path=file_path))
-            
-        except Exception as e:
-            self.marketplace_total_label.config(text=t('marketplace.export_failed').format(error=str(e)))
-    
-    def _clear_marketplace_cache(self):
-        """Clear marketplace cache - no longer needed (using external sites)"""
-        self.marketplace_total_label.config(text=t('marketplace.cache_not_needed'))
-    
+
     def _load_marketplace_preferences(self):
         """Load all marketplace preferences from config and apply them"""
         from config import _load_cfg
@@ -21115,7 +20051,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if self.trade_sell_mode.get():
             sort_order = ['Best price (highest)', 'Distance', 'Best demand', 'Last update']
         else:
-            sort_order = ['Best price (lowest)', 'Distance', 'Best stock', 'Last update']
+            sort_order = ['Best price (lowest)', 'Distance', 'Best supply', 'Last update']
         self.trade_order_combo['values'] = [self._trade_sort_options_map.get(k, k) for k in sort_order]
     
     def _use_current_system_trade(self):
@@ -21207,6 +20143,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _search_trade_market(self):
         """Search for trade commodity prices using same backend as mining commodities"""
+        if not hasattr(self, '_trade_search_control'):
+            self._trade_search_control = SearchControl(self, self.trade_search_btn, self.trade_total_label)
+        control = self._trade_search_control
+        if control.running:
+            control.stop()
+            return
         try:
             self._save_trade_preferences()
             
@@ -21223,125 +20165,68 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.trade_total_label.config(text=t('marketplace.enter_system'))
                     return
             
+            reference_system = self.trade_reference_system.get().strip()
+            max_age_str = self._trade_age_rev_map.get(self.trade_max_age.get(), self.trade_max_age.get())
+            max_days_ago = self._convert_age_to_days(max_age_str)
+            is_buy_mode = self.trade_buy_mode.get()
+            exclude_carriers = self.trade_exclude_carriers.get()
+            trade_station_type_filter = self._trade_station_type_rev_map.get(self.trade_station_type.get(), self.trade_station_type.get())
+            exclude_carriers = exclude_carriers and trade_station_type_filter != "Fleet Carrier"
+            large_pad_only = self.trade_large_pad_only.get()
+            trade_order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
+
             # Show searching status
             is_buy_mode = self.trade_buy_mode.get()
             if is_buy_mode:
                 self.trade_total_label.config(text=t('marketplace.searching_buying'))
             else:
                 self.trade_total_label.config(text=t('marketplace.searching_selling'))
-            self.config(cursor="watch")
-            self.update()
+            control.start()
             
             # Run search in background thread to prevent UI freeze
             import threading
             def search_thread():
                 try:
-                    # Convert max age to days
-                    max_age_str = self._trade_age_rev_map.get(self.trade_max_age.get(), self.trade_max_age.get())
-                    max_days_ago = self._convert_age_to_days(max_age_str)
-                    
-                    # Determine buy/sell mode
-                    is_buy_mode = self.trade_buy_mode.get()
-                    is_sell_mode = self.trade_sell_mode.get()
-                    
-                    # Get exclude carriers setting
-                    exclude_carriers = self.trade_exclude_carriers.get()
-                    
                     # Call appropriate API based on search mode and buy/sell mode
                     if search_mode == "galaxy_wide":
                         if is_buy_mode:
-                            results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
+                            results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, max_days_ago, exclude_carriers, is_cancelled=control.is_cancelled)
                         else:
-                            results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, max_days_ago, exclude_carriers)
+                            results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, max_days_ago, exclude_carriers, is_cancelled=control.is_cancelled)
                     else:
-                        reference_system = self.trade_reference_system.get().strip()
                         if is_buy_mode:
-                            results = MarketplaceAPI.search_sellers(commodity, reference_system, None, max_days_ago, exclude_carriers)
+                            results = MarketplaceAPI.search_sellers(commodity, reference_system, None, max_days_ago, exclude_carriers, is_cancelled=control.is_cancelled)
                         else:
-                            results = MarketplaceAPI.search_buyers(commodity, reference_system, None, max_days_ago)
+                            results = MarketplaceAPI.search_buyers(commodity, reference_system, None, max_days_ago, exclude_carriers, is_cancelled=control.is_cancelled)
                     
                     # Do heavy filtering/sorting in background thread (keeps UI responsive)
                     original_count = len(results)
 
-                    # Filter zero-stock/demand
-                    if is_buy_mode:
-                        results = [r for r in results if r.get('stock', 0) > 0]
-                    else:
-                        results = [r for r in results if r.get('demand', 0) > 0]
-
-                    # Filter carriers
-                    trade_station_type_filter = self._trade_station_type_rev_map.get(self.trade_station_type.get(), self.trade_station_type.get())
-                    if exclude_carriers and trade_station_type_filter != "Fleet Carrier":
-                        results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
-
-                    # Filter station type
-                    if trade_station_type_filter == "Orbital":
-                        orbital_kw = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
-                        surface_kw = ["Crater", "OnFoot", "Planetary", "Surface"]
-                        results = [r for r in results
-                                   if any(k in (r.get('stationType') or '') for k in orbital_kw)
-                                   and not any(k in (r.get('stationType') or '') for k in surface_kw)]
-                    elif trade_station_type_filter == "Surface":
-                        results = [r for r in results if any(k in (r.get('stationType') or '') for k in ["Crater", "OnFoot", "Planetary", "Surface"])]
-                    elif trade_station_type_filter == "Fleet Carrier":
-                        results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
-                    elif trade_station_type_filter == "Megaship":
-                        results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
-                    elif trade_station_type_filter == "Stronghold":
-                        results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
-
-                    # Filter landing pad
-                    if self.trade_large_pad_only.get():
-                        results = [r for r in results if r.get('maxLandingPadSize') == 3]
-
-                    # Filter by age
-                    results = self._filter_results_by_age(results, max_age_str)
-
-                    # Sort
-                    if results:
-                        trade_order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
-                        if "Distance" in trade_order_by:
-                            if search_mode == "galaxy_wide":
-                                # Galaxy-wide: no distances yet — pre-sort by best price so top
-                                # candidates make it into the distance-calculation window (top 50).
-                                # Actual distance re-sort happens in _update_trade_with_distances.
-                                if is_buy_mode:
-                                    results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 999999))
-                                else:
-                                    results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
-                            else:
-                                results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
-                        elif "Best price" in trade_order_by:
-                            if is_buy_mode:
-                                results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 999999))
-                            else:
-                                results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
-                        elif "supply" in trade_order_by or "demand" in trade_order_by:
-                            results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
-                        elif "Last update" in trade_order_by:
-                            results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
-                        else:
-                            results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
-                    else:
-                        results_sorted = []
-
-                    # Send processed results to main thread for UI update only
-                    self.after(0, lambda: self._display_trade_search_results(
-                        results_sorted, search_mode, is_buy_mode, original_count))
+                    results = MarketplaceAPI.filter_results(
+                        results, trade_station_type_filter, max_age_str, exclude_carriers, large_pad_only, is_buy_mode)
+                    results_sorted = MarketplaceAPI.sort_results(results, trade_order_by, is_buy_mode)
+                    if results_sorted and search_mode == 'galaxy_wide' and reference_system and not control.is_cancelled():
+                        control.progress(t('marketplace.calculating_distances'))
+                        measured = MarketplaceAPI.add_distances_to_results(
+                            results_sorted, reference_system, is_cancelled=control.is_cancelled)
+                        results_sorted = MarketplaceAPI.sort_results(measured, trade_order_by, is_buy_mode)
+                    control.complete(results_sorted, self._display_trade_search_results,
+                                     search_mode, is_buy_mode, original_count)
                 except Exception as e:
-                    log.error(f"Trade search failed: {e}")
-                    self.after(0, lambda: self._trade_search_error(str(e)))
+                    log.error(f"trade search failed: {e}")
+                    control.failed(str(e))
             
             thread = threading.Thread(target=search_thread, daemon=True)
             thread.start()
             
         except Exception as e:
             log.error(f"Trade search failed: {e}")
-            self.trade_total_label.config(text=f"Error: {str(e)}")
-            self.config(cursor="")
+            control.failed(str(e))
     
     def _display_trade_search_results(self, results_sorted: list, search_mode: str, is_buy_mode: bool, original_count: int):
         """Display pre-filtered/sorted trade results on the main thread (UI only)"""
+        control = getattr(self, '_trade_search_control', None)
+        enrich_powerplay = not (control and control.is_cancelled())
         self.config(cursor="")
         if not results_sorted:
             self._clear_trade_results()
@@ -21351,166 +20236,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.trade_total_label.config(text=t('marketplace.no_results'))
             return
 
-        if search_mode == "galaxy_wide":
-            reference_system = self.trade_reference_system.get().strip()
-            if reference_system:
-                self._display_trade_results(results_sorted[:50])
-                self.trade_total_label.config(text=t('marketplace.calculating_distances'))
-                self.config(cursor="watch")
-                self.update_idletasks()
-                import threading
-                def calculate_distances_thread():
-                    try:
-                        top = results_sorted[:50]
-                        top_with_dist = MarketplaceAPI.add_distances_to_results(top, reference_system)
-                        self.after(0, lambda: self._update_trade_with_distances(top_with_dist, len(results_sorted)))
-                    except Exception as e:
-                        print(f"[TRADE] Distance calculation error: {e}")
-                        self.after(0, lambda: self._restore_trade_cursor(len(results_sorted)))
-                threading.Thread(target=calculate_distances_thread, daemon=True).start()
-                return
-
-        self._display_trade_results(results_sorted[:50])
+        self._display_trade_results(results_sorted, enrich_powerplay=enrich_powerplay)
         self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
 
-    def _process_trade_search_results(self, results: list, search_mode: str, is_buy_mode: bool, max_age_str: str):
-        """Process and display trade search results (runs on main thread)"""
-        try:
-            # Apply filters
-            station_type_filter = self._trade_station_type_rev_map.get(self.trade_station_type.get(), self.trade_station_type.get())
-            original_count = len(results)
-            
-            # Filter out stations with 0 demand/stock
-            if is_buy_mode:
-                results = [r for r in results if r.get('stock', 0) > 0]
-            else:
-                results = [r for r in results if r.get('demand', 0) > 0]
-            
-            # Filter by Fleet Carriers
-            exclude_carriers = self.trade_exclude_carriers.get()
-            if exclude_carriers and station_type_filter != "Fleet Carrier":
-                results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
-            
-            # Filter by Station Type
-            if station_type_filter == "Orbital":
-                # Debug: Print unique station types to understand API format
-                unique_types = set(r.get('stationType', 'None') for r in results[:50])
-                print(f"[DEBUG Trade Filter] Sample station types before orbital filter: {unique_types}")
-                
-                # Orbital stations - use substring match but exclude Surface types
-                orbital_keywords = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
-                surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
-                results = [r for r in results 
-                          if any(keyword in (r.get('stationType') or '') for keyword in orbital_keywords)
-                          and not any(surface_kw in (r.get('stationType') or '') for surface_kw in surface_keywords)]
-                
-                print(f"[DEBUG Trade Filter] After orbital filter: {len(results)} stations")
-            elif station_type_filter == "Surface":
-                # Surface stations - use substring match for variants
-                surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
-                results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in surface_keywords)]
-            elif station_type_filter == "Fleet Carrier":
-                # Fleet Carriers - use substring match
-                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
-            elif station_type_filter == "Megaship":
-                # MegaShips - use substring match
-                results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
-            elif station_type_filter == "Stronghold":
-                # Stronghold Carriers - use substring match
-                results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
-            
-            # Filter by Landing Pad Size
-            large_pad_only = self.trade_large_pad_only.get()
-            if large_pad_only:
-                results = [r for r in results if r.get('maxLandingPadSize') == 3]
-            
-            # Filter by Max Age
-            results = self._filter_results_by_age(results, max_age_str)
-            
-            if results:
-                # Sort results
-                order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
-                
-                if "Distance" in order_by:
-                    results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')), reverse=False)
-                elif "Best price" in order_by:
-                    if is_buy_mode:
-                        results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 999999), reverse=False)
-                    else:
-                        results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
-                elif "supply" in order_by or "demand" in order_by:
-                    results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
-                elif "Last update" in order_by:
-                    results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
-                else:
-                    results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')), reverse=False)
-                
-                # Display results using trade table (separate from mining table)
-                if search_mode == "galaxy_wide":
-                    reference_system = self.trade_reference_system.get().strip()
-                    if reference_system:
-                        self._display_trade_results(results_sorted[:50])
-                        self.trade_total_label.config(text=t('marketplace.calculating_distances'))
-                        self.config(cursor="watch")
-                        self.update_idletasks()
-                        
-                        import threading
-                        def calculate_distances_thread():
-                            try:
-                                top_30 = results_sorted[:50]
-                                top_30_with_dist = MarketplaceAPI.add_distances_to_results(top_30, reference_system)
-                                self.after(0, lambda: self._update_trade_with_distances(top_30_with_dist, len(results)))
-                            except Exception as e:
-                                print(f"[TRADE] Distance calculation error: {e}")
-                                self.after(0, lambda: self._restore_trade_cursor(len(results)))
-                        
-                        thread = threading.Thread(target=calculate_distances_thread, daemon=True)
-                        thread.start()
-                    else:
-                        self._display_trade_results(results_sorted[:50])
-                        self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
-                        self.config(cursor="")
-                elif search_mode == "near_system":
-                    self._display_trade_results(results_sorted[:50])
-                    self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
-                    self.config(cursor="")
-            else:
-                self._clear_trade_results()
-                self.config(cursor="")
-                if original_count > 0:
-                    self.trade_total_label.config(text=t('marketplace.no_results_after_filter'))
-                else:
-                    self.trade_total_label.config(text=t('marketplace.no_results'))
-                    
-        except Exception as e:
-            log.error(f"Trade search results processing failed: {e}")
-            self.trade_total_label.config(text=f"Error: {str(e)}")
-            self.config(cursor="")
-    
-    def _trade_search_error(self, error_msg: str):
-        """Handle trade search error (runs on main thread)"""
-        self.trade_total_label.config(text=f"Error: {error_msg}")
-        self.config(cursor="")
-    
-    def _update_trade_with_distances(self, results_with_distances: list, total_count: int):
-        """Update trade results with calculated distances"""
-        order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
-        if "Distance" in order_by:
-            results_with_distances = sorted(results_with_distances, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
-        self._display_trade_results(results_with_distances)
-        self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=total_count))
-        self.config(cursor="")
-    
-    def _restore_trade_cursor(self, total_count: int):
-        """Restore cursor after distance calculation error"""
-        self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=total_count))
-        self.config(cursor="")
-    
-    def _perform_trade_search(self, commodity: str, search_mode: str):
-        """Perform the actual trade commodity search"""
-        # This function is no longer used - _search_trade_market() handles everything
-        pass
-    
     def _create_trade_results_table(self, parent_frame):
         """Create results table for trade commodities - separate from mining table"""
         # Create own table frame
@@ -21691,7 +20419,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from ui.sort_indicator import apply_sort_arrow
         apply_sort_arrow(self.trade_tree, col, self.trade_sort_reverse)
 
-    def _display_trade_results(self, results: list):
+    def _display_trade_results(self, results: list, enrich_powerplay=True):
         """Display trade search results in trade table"""
         # Clear existing results
         for item in self.trade_tree.get_children():
@@ -21716,9 +20444,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Determine mode for correct field handling
         is_buy_mode = self.trade_buy_mode.get()
 
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
-
         # Bulk-fetch PowerPlay data from the local EDDN cache for all result systems in one
         # query - local-only, no Spansh/Inara calls.
         from system_finder_api import SystemFinderAPI
@@ -21726,62 +20451,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         _trade_pp_data = SystemFinderAPI._batch_get_powerplay(_trade_pp_names) if _trade_pp_names else {}
 
         # Display results
-        for result in results:
+        for row_index, result in enumerate(results):
             # LOCATION (System + Station)
             location = f"{result.get('systemName', 'Unknown')} / {result.get('stationName', 'Unknown')[:25]}"
             
-            # TYPE (Station type)
-            api_type = result.get('stationType')
-            if api_type is None or api_type == '':
-                api_type = 'Unknown'
-            
-            # Exact known types first, then prefix-based fallback for new
-            # Trailblazers/colonization types (PlanetaryConstructionDepot, SpaceConstructionDepot, etc.)
-            if api_type == 'AsteroidBase':
-                station_type = 'Orbital/Asteroid'
-            elif api_type in ['Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Dodec']:
-                station_type = f'Orbital/{api_type}'
-            elif api_type == 'CraterOutpost':
-                station_type = 'Surface/Crater'
-            elif api_type == 'CraterPort':
-                station_type = 'Surface/Port'
-            elif api_type in ('SurfaceStation', 'SurfacePort'):
-                station_type = 'Surface/Port'
-            elif api_type == 'OnFootSettlement':
-                station_type = 'Surface/Settlement'
-            elif api_type == 'FleetCarrier':
-                station_type = 'Carrier'
-            elif api_type == 'StrongholdCarrier':
-                station_type = 'Stronghold'
-            elif api_type == 'MegaShip':
-                station_type = 'MegaShip'
-            elif api_type == 'Unknown':
-                station_type = 'Unknown'
-            elif 'Planetary' in api_type or 'Crater' in api_type or 'Ground' in api_type:
-                station_type = 'Surface/Station'
-            elif 'Space' in api_type and 'Construction' in api_type:
-                station_type = 'Orbital/Station'
-            elif 'Surface' in api_type or 'Settlement' in api_type or 'OnFoot' in api_type:
-                station_type = 'Surface/Station'
-            elif 'Carrier' in api_type or 'Drake' in api_type:
-                station_type = 'Carrier'
-            elif 'Outpost' in api_type:
-                station_type = 'Orbital/Outpost'
-            elif 'Orbital' in api_type or 'Port' in api_type or 'Station' in api_type:
-                station_type = 'Orbital/Station'
-            else:
-                station_type = 'Orbital/Station'
-            
-            # PAD (Landing pad size)
-            pad_size = result.get('maxLandingPadSize')
-            if isinstance(pad_size, int):
-                pad_map = {0: '?', 1: 'S', 2: 'M', 3: 'L'}
-                pad = pad_map.get(pad_size, '?')
-            elif isinstance(pad_size, str):
-                pad = pad_size.upper()
-            else:
-                pad = '?'
-            
+            from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay
+            station_type = format_market_station_type(result.get('stationType'))
+            pad = format_market_pad(result.get('maxLandingPadSize'))
+
             # DISTANCE
             if 'distance' in result and result['distance'] is not None:
                 distance = f"{result['distance']:.1f}"
@@ -21792,7 +20469,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             station_ls = result.get('distanceToArrival')
             if station_ls is not None:
                 # 0 is valid for fleet carriers at arrival point
-                ls = f"{int(station_ls):,}"
+                ls = f"{int(float(station_ls)):,}"
             else:
                 ls = "?"
             
@@ -21808,42 +20485,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             else:
                 price = f"{result.get('sellPrice', 0):,} CR"
             
-            # UPDATED (Data age)
-            updated_at = result.get('updatedAt', '')
-            if updated_at:
-                try:
-                    from datetime import datetime, timezone
-                    updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
-                    diff = now - updated_time
-                    total_minutes = diff.total_seconds() / 60
-                    if total_minutes < 60:
-                        updated = f"{int(total_minutes)}m"
-                    elif total_minutes < 1440:
-                        updated = f"{int(total_minutes / 60)}h"
-                    else:
-                        updated = f"{int(total_minutes / 1440)}d"
-                except Exception:
-                    updated = '-'
-            else:
-                updated = '-'
-
-            # POWERPLAY - local EDDN cache only, no Spansh/Inara lookups
-            pp_entry = _trade_pp_data.get(result.get('systemName', ''), {})
-            pp_power = pp_entry.get('controlling_power', '')
-            pp_state = pp_entry.get('power_state', '')
-            if pp_power == '~none~':
-                powerstate = pp_state or t('common.no_data')
-            elif pp_power and pp_state:
-                powerstate = f"{pp_power} / {pp_state}"
-            elif pp_power:
-                powerstate = pp_power
-            elif pp_state:
-                powerstate = pp_state
-            else:
-                powerstate = t('common.no_data')
+            updated = format_relative_age(result.get('updatedAt')) or '?'
+            powerstate = format_market_powerplay(_trade_pp_data.get(result.get('systemName', ''), {}))
 
             # Insert row with alternating row tag
-            row_index = len(self.trade_tree.get_children())
             row_tag = 'oddrow' if row_index % 2 == 0 else 'evenrow'
             self.trade_tree.insert('', 'end', values=(
                 f" {location} ",
@@ -21862,7 +20507,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # data - queried for every result system, not just ones missing from the EDDN cache,
         # so a stale cached entry gets replaced whenever Spansh's is newer (mirrors Ring
         # Finder/Star Systems' updated_at comparison).
-        if _trade_pp_names:
+        if _trade_pp_names and enrich_powerplay:
             threading.Thread(target=self._backfill_commodity_pp_worker,
                               args=(_trade_pp_names, _trade_pp_data, self.trade_tree), daemon=True).start()
 
@@ -21882,6 +20527,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _search_marketplace(self):
         """Search for commodity prices using Ardent API (threaded to prevent UI freeze)"""
+        if not hasattr(self, '_marketplace_search_control'):
+            self._marketplace_search_control = SearchControl(self, self.marketplace_search_btn, self.marketplace_total_label)
+        control = self._marketplace_search_control
+        if control.running:
+            control.stop()
+            return
         try:
             # Save current search parameters
             self._save_marketplace_preferences()
@@ -21915,16 +20566,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Capture all filter state upfront (main thread)
             station_type_filter = self._station_type_rev_map.get(self.marketplace_station_type.get(), self.marketplace_station_type.get())
+            exclude_carriers = exclude_carriers and station_type_filter != "Fleet Carrier"
             large_pad_only = self.marketplace_large_pad_only.get()
             order_by = self._sort_rev_map.get(self.marketplace_order_by.get(), self.marketplace_order_by.get())
             
+            distance_reference = reference_system or self.marketplace_reference_system.get().strip()
+
             # Show searching status
             if is_buy_mode:
                 self.marketplace_total_label.config(text=t('marketplace.searching_buying'))
             else:
                 self.marketplace_total_label.config(text=t('marketplace.searching_selling'))
-            self.config(cursor="watch")
-            self.update()
+            control.start()
             
             # Run search in background thread to prevent UI freeze
             import threading
@@ -21935,104 +20588,43 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     
                     if search_mode == "galaxy_wide":
                         if is_buy_mode:
-                            results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, api_days, exclude_carriers)
+                            results = MarketplaceAPI.search_sellers_galaxy_wide(commodity, api_days, exclude_carriers, is_cancelled=control.is_cancelled)
                         else:
-                            results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, api_days, exclude_carriers)
+                            results = MarketplaceAPI.search_buyers_galaxy_wide(commodity, api_days, exclude_carriers, is_cancelled=control.is_cancelled)
                     else:
                         if is_buy_mode:
-                            results = MarketplaceAPI.search_sellers(commodity, reference_system, None, api_days, exclude_carriers)
+                            results = MarketplaceAPI.search_sellers(commodity, reference_system, None, api_days, exclude_carriers, is_cancelled=control.is_cancelled)
                         else:
-                            results = MarketplaceAPI.search_buyers(commodity, reference_system, None, api_days, exclude_carriers)
+                            results = MarketplaceAPI.search_buyers(commodity, reference_system, None, api_days, exclude_carriers, is_cancelled=control.is_cancelled)
                     
                     # Do heavy filtering/sorting in background thread (keeps UI responsive)
                     original_count = len(results)
 
-                    # Filter zero-stock/demand
-                    if is_buy_mode:
-                        results = [r for r in results if r.get('stock', 0) > 0 and (r.get('buyPrice', 0) > 0 or r.get('sellPrice', 0) > 0)]
-                    else:
-                        results = [r for r in results if r.get('demand', 0) > 0]
-
-                    # Filter carriers
-                    if exclude_carriers and station_type_filter != "Fleet Carrier":
-                        results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
-
-                    # Filter station type
-                    if station_type_filter == "Orbital":
-                        orbital_kw = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
-                        surface_kw = ["Crater", "OnFoot", "Planetary", "Surface"]
-                        results = [r for r in results
-                                   if any(k in (r.get('stationType') or '') for k in orbital_kw)
-                                   and not any(k in (r.get('stationType') or '') for k in surface_kw)]
-                    elif station_type_filter == "Surface":
-                        results = [r for r in results if any(k in (r.get('stationType') or '') for k in ["Crater", "OnFoot", "Planetary", "Surface"])]
-                    elif station_type_filter == "Fleet Carrier":
-                        results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
-                    elif station_type_filter == "Megaship":
-                        results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
-                    elif station_type_filter == "Stronghold":
-                        results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
-
-                    # Filter landing pad
-                    if large_pad_only:
-                        results = [r for r in results if r.get('maxLandingPadSize') == 3]
-
-                    # Filter by age
-                    results = self._filter_results_by_age(results, max_age_str)
-
-                    # Sort
-                    if results:
-                        if "Distance" in order_by:
-                            if search_mode == "galaxy_wide":
-                                # Galaxy-wide: no distances yet — pre-sort by best price so top
-                                # candidates make it into the distance-calculation window (top 50).
-                                # Actual distance re-sort happens in _update_marketplace_with_distances.
-                                if is_buy_mode:
-                                    results_sorted = sorted(results, key=lambda x: x.get('buyPrice', 999999))
-                                else:
-                                    results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
-                            else:
-                                results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
-                        elif "Best price" in order_by:
-                            if is_buy_mode:
-                                results_sorted = sorted(results, key=lambda x: x.get('buyPrice', 999999))
-                            else:
-                                results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
-                        elif "supply" in order_by or "demand" in order_by:
-                            if is_buy_mode:
-                                results_sorted = sorted(results, key=lambda x: x.get('stock', 0), reverse=True)
-                            else:
-                                results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
-                        elif "Last update" in order_by:
-                            results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
-                        else:
-                            results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')))
-                    else:
-                        results_sorted = []
-
-                    # Send processed results to main thread for UI update only
-                    self.after(0, lambda: self._display_marketplace_search_results(
-                        results_sorted, search_mode, reference_system, is_buy_mode,
-                        exclude_carriers, original_count))
+                    results = MarketplaceAPI.filter_results(
+                        results, station_type_filter, max_age_str, exclude_carriers, large_pad_only, is_buy_mode)
+                    results_sorted = MarketplaceAPI.sort_results(results, order_by, is_buy_mode)
+                    if results_sorted and search_mode == 'galaxy_wide' and distance_reference and not control.is_cancelled():
+                        control.progress(t('marketplace.calculating_distances'))
+                        measured = MarketplaceAPI.add_distances_to_results(
+                            results_sorted, distance_reference, is_cancelled=control.is_cancelled)
+                        results_sorted = MarketplaceAPI.sort_results(measured, order_by, is_buy_mode)
+                    control.complete(results_sorted, self._display_marketplace_search_results,
+                                     search_mode, reference_system, is_buy_mode, exclude_carriers, original_count)
                 except Exception as e:
-                    log.error(f"Marketplace search failed: {e}")
-                    _err = str(e)
-                    self.after(0, lambda err=_err: self._marketplace_search_error(err))
+                    log.error(f"marketplace search failed: {e}")
+                    control.failed(str(e))
             
             thread = threading.Thread(target=search_thread, daemon=True)
             thread.start()
                 
         except Exception as e:
-            self.marketplace_total_label.config(text=t('marketplace.search_failed').format(error=str(e)))
-
-    def _marketplace_search_error(self, error_msg: str):
-        """Handle marketplace search error (called on main thread)"""
-        self.marketplace_total_label.config(text=t('marketplace.search_failed').format(error=error_msg))
-        self.config(cursor="")
+            control.failed(str(e))
 
     def _display_marketplace_search_results(self, results_sorted: list, search_mode: str, reference_system: str,
                                              is_buy_mode: bool, exclude_carriers: bool, original_count: int):
         """Display pre-filtered/sorted marketplace results on the main thread (UI only)"""
+        control = getattr(self, '_marketplace_search_control', None)
+        enrich_powerplay = not (control and control.is_cancelled())
         self.config(cursor="")
         if not results_sorted:
             self._clear_marketplace_results()
@@ -22045,141 +20637,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.marketplace_total_label.config(text=t('marketplace.no_results'))
             return
 
-        if search_mode == "galaxy_wide":
-            ref = reference_system or self.marketplace_reference_system.get().strip()
-            if ref:
-                self._display_marketplace_results(results_sorted[:50])
-                self.marketplace_total_label.config(text=t('marketplace.calculating_distances'))
-                self.config(cursor="watch")
-                self.update_idletasks()
-                import threading
-                def calculate_distances_thread():
-                    try:
-                        top = results_sorted[:50]
-                        top_with_dist = MarketplaceAPI.add_distances_to_results(top, ref)
-                        self.after(0, lambda: self._update_marketplace_with_distances(top_with_dist, len(results_sorted)))
-                    except Exception as e:
-                        print(f"[MARKETPLACE] Distance calculation error: {e}")
-                        self.after(0, lambda: self._restore_marketplace_cursor(len(results_sorted)))
-                threading.Thread(target=calculate_distances_thread, daemon=True).start()
-                return
-
-        self._display_marketplace_results(results_sorted[:50])
+        self._display_marketplace_results(results_sorted, enrich_powerplay=enrich_powerplay)
         self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
-
-    def _process_marketplace_search_results(self, results, search_mode, reference_system,
-                                             is_buy_mode, exclude_carriers, station_type_filter,
-                                             large_pad_only, max_age_str, order_by):
-        """Process and display marketplace search results (runs on main thread)"""
-        try:
-            self.config(cursor="")
-            
-            # Track original count before filtering for better error messages
-            original_count = len(results)
-            print(f"[MARKETPLACE FILTER] Starting with {original_count} results from API")
-            
-            # Filter out stations with 0 demand/stock
-            if is_buy_mode:
-                results = [r for r in results if r.get('stock', 0) > 0 and (r.get('buyPrice', 0) > 0 or r.get('sellPrice', 0) > 0)]
-                print(f"[MARKETPLACE FILTER] After stock/price filter: {len(results)}")
-            else:
-                results = [r for r in results if r.get('demand', 0) > 0]
-                print(f"[MARKETPLACE FILTER] After demand filter: {len(results)}")
-            
-            # Filter by Fleet Carriers
-            if exclude_carriers and station_type_filter != "Fleet Carrier":
-                results = [r for r in results if "FleetCarrier" not in (r.get('stationType') or '')]
-                print(f"[MARKETPLACE FILTER] After carrier filter: {len(results)}")
-            
-            # Filter by Station Type
-            if station_type_filter == "Orbital":
-                orbital_keywords = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
-                surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
-                results = [r for r in results 
-                          if any(keyword in (r.get('stationType') or '') for keyword in orbital_keywords)
-                          and not any(surface_kw in (r.get('stationType') or '') for surface_kw in surface_keywords)]
-            elif station_type_filter == "Surface":
-                surface_keywords = ["Crater", "OnFoot", "Planetary", "Surface"]
-                results = [r for r in results if any(keyword in (r.get('stationType') or '') for keyword in surface_keywords)]
-            elif station_type_filter == "Fleet Carrier":
-                results = [r for r in results if "FleetCarrier" in (r.get('stationType') or '')]
-            elif station_type_filter == "Megaship":
-                results = [r for r in results if "Mega" in (r.get('stationType') or '') or "MegaShip" in (r.get('stationType') or '')]
-            elif station_type_filter == "Stronghold":
-                results = [r for r in results if "Stronghold" in (r.get('stationType') or '')]
-            
-            if station_type_filter != "All":
-                print(f"[MARKETPLACE FILTER] After station type filter ({station_type_filter}): {len(results)}")
-            
-            # Filter by Landing Pad Size
-            if large_pad_only:
-                results = [r for r in results if r.get('maxLandingPadSize') == 3]
-                print(f"[MARKETPLACE FILTER] After large pad filter: {len(results)}")
-            
-            # Filter by Max Age
-            count_before_age = len(results)
-            results = self._filter_results_by_age(results, max_age_str)
-            print(f"[MARKETPLACE FILTER] After age filter ({max_age_str}): {len(results)} (was {count_before_age})")
-            
-            if results:
-                # Sort results
-                if "Distance" in order_by:
-                    results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')), reverse=False)
-                elif "Best price" in order_by:
-                    if is_buy_mode:
-                        results_sorted = sorted(results, key=lambda x: x.get('buyPrice', 999999), reverse=False)
-                    else:
-                        results_sorted = sorted(results, key=lambda x: x.get('sellPrice', 0), reverse=True)
-                elif "supply" in order_by or "demand" in order_by:
-                    if is_buy_mode:
-                        results_sorted = sorted(results, key=lambda x: x.get('stock', 0), reverse=True)
-                    else:
-                        results_sorted = sorted(results, key=lambda x: x.get('demand', 0), reverse=True)
-                elif "Last update" in order_by:
-                    results_sorted = sorted(results, key=lambda x: x.get('updatedAt', ''), reverse=True)
-                else:
-                    results_sorted = sorted(results, key=lambda x: (999999 if x.get('distance') is None else x.get('distance')), reverse=False)
-                
-                # For galaxy-wide mode, calculate distances in background
-                if search_mode == "galaxy_wide":
-                    ref = reference_system or self.marketplace_reference_system.get().strip()
-                    if ref:
-                        self._display_marketplace_results(results_sorted[:50])
-                        self.marketplace_total_label.config(text=t('marketplace.calculating_distances'))
-                        self.config(cursor="watch")
-                        self.update_idletasks()
-                        
-                        import threading
-                        def calculate_distances_thread():
-                            try:
-                                top_30 = results_sorted[:50]
-                                top_30_with_dist = MarketplaceAPI.add_distances_to_results(top_30, ref)
-                                self.after(0, lambda: self._update_marketplace_with_distances(top_30_with_dist, len(results)))
-                            except Exception as e:
-                                print(f"[MARKETPLACE] Distance calculation error: {e}")
-                                self.after(0, lambda: self._restore_marketplace_cursor(len(results)))
-                        
-                        threading.Thread(target=calculate_distances_thread, daemon=True).start()
-                    else:
-                        self._display_marketplace_results(results_sorted[:50])
-                        self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
-                elif search_mode == "near_system":
-                    self._display_marketplace_results(results_sorted[:50])
-                    self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results)))
-            else:
-                self._clear_marketplace_results()
-                if original_count > 0:
-                    if exclude_carriers:
-                        self.marketplace_total_label.config(
-                            text=t('marketplace.all_fleet_carriers').format(count=original_count))
-                    else:
-                        self.marketplace_total_label.config(
-                            text=t('marketplace.no_match_filters').format(count=original_count))
-                else:
-                    self.marketplace_total_label.config(text=t('marketplace.no_results'))
-        except Exception as e:
-            self.marketplace_total_label.config(text=t('marketplace.search_failed').format(error=str(e)))
-            self.config(cursor="")
 
     def _on_commodity_tree_double_click(self, event, tree, refresh_powerplay=True):
         """Open Inara from a System/Station or Powerplay cell, refreshing Powerplay when supported."""
@@ -22222,17 +20681,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Update Powerplay cell(s) for system_name in the given tree with fetched data."""
         label = self.marketplace_total_label if tree is self.marketplace_tree else self.trade_total_label
         if result:
-            from app_utils import format_relative_age
+            from app_utils import format_market_powerplay
             pp_power = result.get('controlling_power', '')
-            pp_state = result.get('power_state', '')
-            pp_age = format_relative_age(result.get('updated_at')) if (pp_power or pp_state) else ''
-            pp_age_suffix = f" ({pp_age})" if pp_age else ''
-            if pp_power == '~none~':
-                pp_str = (pp_state or t('common.pp_no_power')) + pp_age_suffix
-            elif pp_power and pp_state:
-                pp_str = f"{pp_power} / {pp_state}{pp_age_suffix}"
-            else:
-                pp_str = f"{pp_power}{pp_age_suffix}" if pp_power else t('common.no_data')
+            pp_str = format_market_powerplay(result, include_age=True)
 
             columns = tree['columns']
             pp_col_index = columns.index('powerstate')
@@ -22284,14 +20735,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             entry = pp_data.get(row_system)
             if not entry:
                 continue
-            pp_power = entry.get('controlling_power', '')
-            pp_state = entry.get('power_state', '')
-            if pp_power == '~none~':
-                pp_str = pp_state or t('common.pp_no_power')
-            elif pp_power and pp_state:
-                pp_str = f"{pp_power} / {pp_state}"
-            else:
-                pp_str = pp_power or t('common.no_data')
+            from app_utils import format_market_powerplay
+            pp_str = format_market_powerplay(entry)
             vals[pp_col_index] = f" {pp_str} "
             tree.item(item, values=vals)
 
@@ -22304,7 +20749,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if hasattr(self, 'marketplace_best_label'):
             self.marketplace_best_label.config(text="")
     
-    def _display_marketplace_results(self, results):
+    def _display_marketplace_results(self, results, enrich_powerplay=True):
         """Display marketplace results (already sorted by user's selected criteria)"""
         self._clear_marketplace_results()
 
@@ -22327,14 +20772,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.marketplace_best_label.config(text="")
         
         commodity = self.marketplace_commodity.get()
-        self._populate_marketplace_results(results, commodity)
+        self._populate_marketplace_results(results, commodity, enrich_powerplay=enrich_powerplay)
     
-    def _populate_marketplace_results(self, results, commodity):
+    def _populate_marketplace_results(self, results, commodity, enrich_powerplay=True):
         """Populate marketplace results in UI"""
         try:
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc)
-
             # Determine mode for correct field handling
             is_buy_mode = self.marketplace_buy_mode.get()
 
@@ -22345,28 +20787,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             _pp_data = SystemFinderAPI._batch_get_powerplay(_pp_system_names) if _pp_system_names else {}
 
             # Populate results (sorted by distance - closest first)
-            for result in results:
+            for row_index, result in enumerate(results):
                 # LOCATION (System + Station) - API uses camelCase
                 location = f"{result['systemName']} / {result['stationName'][:25]}"
                 
-                # TYPE (Station type) - Show category/specific type
-                # Handle null/None values from API (some stations lack metadata)
-                from app_utils import format_market_station_type
+                from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay
                 station_type = format_market_station_type(result.get('stationType'))
+                pad = format_market_pad(result.get('maxLandingPadSize'))
 
-                # PAD (Landing pad size) - Ardent API returns integer: 0=?, 1=S, 2=M, 3=L
-                pad_size = result.get('maxLandingPadSize')
-                
-                # Map integer to letter (based on actual Elite Dangerous pad sizes)
-                if isinstance(pad_size, int):
-                    pad_map = {0: '?', 1: 'S', 2: 'M', 3: 'L'}
-                    pad = pad_map.get(pad_size, '?')
-                elif isinstance(pad_size, str):
-                    # Fallback if API ever sends strings
-                    pad = pad_size.upper()
-                else:
-                    pad = '?'
-                
                 # DISTANCE (System distance) - calculate for both modes
                 if result.get('distance') is not None:
                     distance = f"{result['distance']:.1f}"
@@ -22377,7 +20805,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 station_ls = result.get('distanceToArrival')
                 if station_ls is not None:
                     # 0 is valid for fleet carriers at arrival point
-                    ls = f"{int(station_ls):,}"
+                    ls = f"{int(float(station_ls)):,}"
                 else:
                     ls = "?"
                 
@@ -22399,46 +20827,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     # Sell mode (imports endpoint): Use 'sellPrice' (what YOU get when selling TO them)
                     price = f"{result.get('sellPrice', 0):,} CR"
                 
-                # UPDATED (Data age) - show hours/days ago
-                updated_at = result.get('updatedAt', 'Unknown')
-                if updated_at and updated_at != 'Unknown':
-                    try:
-                        # Parse ISO timestamp (e.g., "2024-11-03T12:30:00Z")
-                        updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
-                        diff = now - updated_time
-                        
-                        # Convert to minutes, hours, or days
-                        total_minutes = diff.total_seconds() / 60
-                        if total_minutes < 60:
-                            updated = f"{int(total_minutes)}m"
-                        elif total_minutes < 1440:  # Less than 24 hours
-                            hours = int(total_minutes / 60)
-                            updated = f"{hours}h"
-                        else:
-                            days = int(total_minutes / 1440)
-                            updated = f"{days}d"
-                    except Exception as e:
-                        updated = 'Unknown'
-                else:
-                    updated = 'Unknown'
-
-                # POWERSTATE - local EDDN cache only, no Spansh/Inara lookups
-                pp_entry = _pp_data.get(result.get('systemName', ''), {})
-                pp_power = pp_entry.get('controlling_power', '')
-                pp_state = pp_entry.get('power_state', '')
-                if pp_power == '~none~':
-                    powerstate = pp_state or t('common.no_data')
-                elif pp_power and pp_state:
-                    powerstate = f"{pp_power} / {pp_state}"
-                elif pp_power:
-                    powerstate = pp_power
-                elif pp_state:
-                    powerstate = pp_state
-                else:
-                    powerstate = t('common.no_data')
+                updated = format_relative_age(result.get('updatedAt')) or '?'
+                powerstate = format_market_powerplay(_pp_data.get(result.get('systemName', ''), {}))
 
                 # Insert with alternating row tags for visual separation
-                row_index = len(self.marketplace_tree.get_children())
                 tag = 'evenrow' if row_index % 2 == 0 else 'oddrow'
 
                 # Add subtle visual separator using spacing
@@ -22459,16 +20851,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Unoccupied data - queried for every result system, not just ones missing from
             # the EDDN cache, so a stale cached entry gets replaced whenever Spansh's is newer
             # (mirrors Ring Finder/Star Systems' updated_at comparison).
-            if _pp_system_names:
+            if _pp_system_names and enrich_powerplay:
                 threading.Thread(target=self._backfill_commodity_pp_worker,
                                   args=(_pp_system_names, _pp_data, self.marketplace_tree), daemon=True).start()
 
             # Update status (like hotspots finder format)
             if results:
                 if is_buy_mode:
-                    # Buy mode: find lowest sellPrice (cheapest to buy from)
-                    best_price = min(results, key=lambda x: x.get('sellPrice', 999999))
-                    price_value = best_price.get('sellPrice', 0)
+                    best_price = min(results, key=lambda x: x.get('buyPrice', float('inf')))
+                    price_value = best_price.get('buyPrice', 0)
                     mode_text = "to buy from"
                 else:
                     # Sell mode: find highest sellPrice (best to sell to)
@@ -22477,7 +20868,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     mode_text = "to sell to"
                 
                 # Different message for galaxy-wide vs near system
-                if 'distance' in best_price:
+                if best_price.get('distance') is not None:
                     self.marketplace_total_label.config(
                         text=f"Found {len(results)} stations {mode_text}. "
                              f"Best price: {price_value:,} CR/t at {best_price['stationName']} "
@@ -22493,40 +20884,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             self.marketplace_total_label.config(text=f"❌ Error displaying results: {str(e)}")
             print(f"Error populating results: {e}")
-    
-    def _get_landing_pad_size(self, station_type):
-        """Get landing pad size abbreviation from station type"""
-        if not station_type:
-            return "?"
-        
-        # Large pad stations
-        large_pad_types = [
-            "Coriolis Starport", "Orbis Starport", "Ocellus Starport",
-            "Asteroid Base", "Planetary Port", "Planetary Outpost"
-        ]
-        
-        # Small pad stations (outposts)
-        small_pad_types = ["Outpost"]
-        
-        # Fleet carriers (large pads)
-        if "Fleet Carrier" in station_type:
-            return "L"
-        
-        # Check for large pad stations
-        for large_type in large_pad_types:
-            if large_type in station_type:
-                return "L"
-        
-        # Check for small pad stations
-        for small_type in small_pad_types:
-            if small_type in station_type:
-                return "S"
-        
-        # Default to medium for most other stations
-        return "M"
-    
 
-    
     def _show_marketplace_context_menu(self, event):
         """Show the context menu when right-clicking on marketplace results"""
         try:
@@ -22538,21 +20896,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.marketplace_context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.marketplace_context_menu.grab_release()
-    
-    def _copy_marketplace_system_name(self):
-        """Copy the selected system name to clipboard"""
-        selection = self.marketplace_tree.selection()
-        if selection:
-            item = selection[0]
-            values = self.marketplace_tree.item(item, 'values')
-            if values and len(values) > 0:
-                # Location format is "System / Station", extract system name
-                location = values[0]  # Location is column index 0
-                system_name = location.split(' / ')[0] if ' / ' in location else location
-                self.clipboard_clear()
-                self.clipboard_append(system_name)
-                self.marketplace_total_label.config(text=f"✅ Copied '{system_name}' to clipboard")
-    
+
     def _sort_marketplace_column(self, column, numeric):
         """Sort marketplace results by column"""
         try:
@@ -22647,64 +20991,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"Error sorting marketplace column: {e}")
             self.marketplace_total_label.config(text=f"❌ Sort error: {str(e)}")
     
-    def _update_marketplace_with_distances(self, results_with_distances, total_results):
-        """Update marketplace display after distance calculation completes (called from thread)"""
-        try:
-            # Re-sort results based on current sort order after distances are added
-            order_by = self._sort_rev_map.get(self.marketplace_order_by.get(), self.marketplace_order_by.get())
-
-            if "Distance" in order_by:
-                # Sort by distance (nearest first)
-                results_sorted = sorted(results_with_distances, key=lambda x: 999999 if x.get('distance') is None else x.get('distance'), reverse=False)
-            elif "Best price" in order_by:
-                # Keep original price sorting
-                results_sorted = results_with_distances
-            else:
-                # For other sort orders, keep original
-                results_sorted = results_with_distances
-            
-            # Re-display results with distances
-            self._display_marketplace_results(results_sorted)
-            self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_distance').format(count=total_results))
-            self.config(cursor="")
-        except Exception as e:
-            print(f"[MARKETPLACE] Error updating with distances: {e}")
-            self.config(cursor="")
     
-    def _restore_marketplace_cursor(self, total_results):
-        """Restore cursor if distance calculation fails"""
-        self.marketplace_total_label.config(text=t('marketplace.found_stations_top30').format(count=total_results))
-        self.config(cursor="")
     
-    def _has_large_pads(self, station_type):
-        """Check if station has large landing pads"""
-        large_pad_stations = [
-            "Coriolis Starport", "Orbis Starport", "Ocellus Starport",
-            "Asteroid Base", "Planetary Outpost", "Planetary Port"
-        ]
-        return any(pad_type in station_type for pad_type in large_pad_stations)
     
-    def _has_medium_pads(self, station_type):
-        """Check if station has medium landing pads (most stations)"""
-        return not self._has_large_pads(station_type) and "Fleet Carrier" not in station_type
     
-    def _has_small_pads(self, station_type):
-        """Check if station has small landing pads (outposts)"""
-        small_pad_stations = ["Outpost", "Planetary Outpost"]
-        return any(pad_type in station_type for pad_type in small_pad_stations)
     
-    def _is_surface_station(self, station_type):
-        """Check if station is on planetary surface"""
-        surface_stations = ["Planetary Outpost", "Planetary Port", "Odyssey Settlement"]
-        return any(surface_type in station_type for surface_type in surface_stations)
     
-    def _is_space_station(self, station_type):
-        """Check if station is in space"""
-        space_stations = [
-            "Coriolis Starport", "Orbis Starport", "Ocellus Starport",
-            "Asteroid Base", "Outpost"
-        ]
-        return any(space_type in station_type for space_type in space_stations)
 
     def _check_for_updates_startup(self):
         """Check for updates on startup (automatic check) - checks every time app starts"""
@@ -23662,10 +21954,10 @@ Your keybinds will need to be reconfigured manually."""
                         try:
                             event = json.loads(line)
                             event_type = event.get('event', '')
+                            self.cargo_monitor.journal_parser.process_carrier_event(event)
                             
-                            # Process visits - ONLY FSDJump counts as a player visit
-                            # CarrierJump is for FC location tracking, not visit counting
-                            if event_type == 'FSDJump':
+                            # CarrierJump is a commander arrival; CarrierLocation only tracks the carrier.
+                            if event_type in ('FSDJump', 'CarrierJump'):
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     timestamp = event.get('timestamp', '')
@@ -23678,58 +21970,12 @@ Your keybinds will need to be reconfigured manually."""
                                         visits_added += 1
                                     current_system = system_name
                             
-                            elif event_type == 'CarrierJump':
-                                # CarrierJump just tracks current system context, not visits
-                                system_name = event.get('StarSystem', '')
-                                if system_name:
-                                    current_system = system_name
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_jump_completed(event)
-                                except Exception:
-                                    pass
 
                             elif event_type == 'Location':
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     current_system = system_name
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_docked_via_location(event)
-                                except Exception:
-                                    pass
 
-                            elif event_type == 'Docked':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_docked(event)
-                                except Exception:
-                                    pass
-
-                            # Fleet carrier events - populate carrier_data
-                            elif event_type == 'CarrierLocation':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_location(event)
-                                except Exception:
-                                    pass
-                            elif event_type == 'CarrierStats':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_stats(event)
-                                except Exception:
-                                    pass
-                            elif event_type == 'CarrierFinance':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_finance(event)
-                                except Exception:
-                                    pass
-                            elif event_type == 'CarrierJumpRequest':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_jump_request(event)
-                                except Exception:
-                                    pass
-                            elif event_type == 'CarrierJumpCancelled':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_jump_cancelled(event)
-                                except Exception:
-                                    pass
-                            
                             elif event_type == 'Scan':
                                 try:
                                     self.cargo_monitor.journal_parser.process_scan(event)
@@ -23786,12 +22032,7 @@ Your keybinds will need to be reconfigured manually."""
         
         # Re-enable carrier notifications and fire a single update
         self.cargo_monitor.journal_parser._suppress_carrier_notifications = False
-        if self.cargo_monitor.journal_parser.on_carrier_updated:
-            try:
-                cd = self.cargo_monitor.journal_parser.carrier_data
-                self.cargo_monitor.journal_parser.on_carrier_updated(cd)
-            except Exception:
-                pass
+        self.cargo_monitor.journal_parser._notify_carrier_updated()
         
         # Sync FC location to distance calculator from the now-correct carrier_data
         def _sync_fc_location():
@@ -23944,11 +22185,10 @@ Your keybinds will need to be reconfigured manually."""
                         try:
                             event = json.loads(line)
                             event_type = event.get('event', '')
+                            self.cargo_monitor.journal_parser.process_carrier_event(event)
                             
-                            # Process visits - ONLY FSDJump counts as a player visit
-                            # CarrierJump is for FC location tracking, not visit counting
-                            # Visit counting uses current system as reference (safety net)
-                            if event_type == 'FSDJump':
+                            # CarrierJump is a commander arrival; CarrierLocation only tracks the carrier.
+                            if event_type in ('FSDJump', 'CarrierJump'):
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     timestamp = event.get('timestamp', '')
@@ -23961,58 +22201,14 @@ Your keybinds will need to be reconfigured manually."""
                                         visits_added += 1
                                     current_system = system_name
                             
-                            elif event_type == 'CarrierJump':
-                                # CarrierJump just tracks current system context, not visits
-                                system_name = event.get('StarSystem', '')
-                                if system_name:
-                                    current_system = system_name
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_jump_completed(event)
-                                except Exception:
-                                    pass
 
                             elif event_type == 'Location':
                                 # Location = game loaded, just track current system for context
                                 system_name = event.get('StarSystem', '')
                                 if system_name:
                                     current_system = system_name
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_docked_via_location(event)
-                                except Exception:
-                                    pass
 
-                            elif event_type == 'Docked':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_docked(event)
-                                except Exception:
-                                    pass
 
-                            # Fleet carrier events - populate carrier_data
-                            elif event_type == 'CarrierLocation':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_location(event)
-                                except Exception:
-                                    pass
-                            elif event_type == 'CarrierStats':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_stats(event)
-                                except Exception:
-                                    pass
-                            elif event_type == 'CarrierFinance':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_finance(event)
-                                except Exception:
-                                    pass
-                            elif event_type == 'CarrierJumpRequest':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_jump_request(event)
-                                except Exception:
-                                    pass
-                            elif event_type == 'CarrierJumpCancelled':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_carrier_jump_cancelled(event)
-                                except Exception:
-                                    pass
                             
                             # Process Scan events for ring/hotspot data
                             elif event_type == 'Scan':
@@ -24092,12 +22288,7 @@ Your keybinds will need to be reconfigured manually."""
         
         # Re-enable carrier notifications and fire a single update
         self.cargo_monitor.journal_parser._suppress_carrier_notifications = False
-        if self.cargo_monitor.journal_parser.on_carrier_updated:
-            try:
-                cd = self.cargo_monitor.journal_parser.carrier_data
-                self.cargo_monitor.journal_parser.on_carrier_updated(cd)
-            except Exception:
-                pass
+        self.cargo_monitor.journal_parser._notify_carrier_updated()
         
         # Sync FC location to distance calculator from the now-correct carrier_data
         def _sync_fc_location():
@@ -24398,7 +22589,7 @@ Your keybinds will need to be reconfigured manually."""
         # 5. Update System Finder current system display and reference field
         if hasattr(self, 'sysfinder_reference_system'):
             self.sysfinder_reference_system.set(system_name)
-            self._update_sysfinder_ref_info(system_name)
+            self._confirm_sysfinder_reference()
         
         # Clear any selection that might have been applied and set neutral focus
         try:

@@ -5,8 +5,7 @@ All sources are queried in parallel. Results are merged by marketId, keeping the
 record with the newer updatedAt timestamp so the freshest price always wins.
 """
 import requests
-import functools
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional
 
 _system_coords_cache: Dict[str, object] = {}  # module-level coord cache
@@ -20,7 +19,7 @@ _short_cache_guard = _threading.Lock()
 _short_cache_key_locks: Dict[tuple, object] = {}
 
 
-def _short_cached(key: tuple, fetch):
+def _short_cached(key: tuple, fetch, is_cancelled=None):
     """Return fetch() result, reused for _SHORT_CACHE_TTL seconds. Concurrent callers
     with the same key wait for one fetch instead of each issuing the same request."""
     with _short_cache_guard:
@@ -33,8 +32,10 @@ def _short_cached(key: tuple, fetch):
             hit = _short_cache.get(key)
             if hit and _time_mod.time() - hit[0] < _SHORT_CACHE_TTL:
                 return hit[1]
+        if is_cancelled and is_cancelled():
+            return []
         value = fetch()
-        if value:
+        if value and not (is_cancelled and is_cancelled()):
             with _short_cache_guard:
                 _short_cache[key] = (_time_mod.time(), value)
         return value
@@ -75,11 +76,6 @@ class MarketplaceAPI:
             MarketplaceAPI._spansh_failure_count += 1
             if MarketplaceAPI._spansh_failure_count >= MarketplaceAPI.SPANSH_FAILURE_THRESHOLD:
                 MarketplaceAPI._spansh_open_until = time.monotonic() + MarketplaceAPI.SPANSH_COOLDOWN_SECONDS
-
-    # Keep BASE_URL for any legacy callers
-    PRIMARY_URL  = ARDENT_URL
-    FALLBACK_URL = ARDENT_URL
-    BASE_URL     = PRIMARY_URL
 
     # Map normalized commodity names -> Spansh display names
     SPANSH_COMMODITY_MAP = {
@@ -138,6 +134,7 @@ class MarketplaceAPI:
         max_days_ago: float = 2,
         exclude_carriers: bool = False,
         size: int = 100,
+        is_cancelled=None,
     ) -> List[Dict]:
         """
         Fetch commodity data from Spansh (POST API) using parallel pagination
@@ -147,6 +144,8 @@ class MarketplaceAPI:
         For galaxy-wide (max_distance=0) all results are kept.
         For distance-limited searches, results are filtered by distance field.
         """
+        if is_cancelled and is_cancelled():
+            return []
         if not MarketplaceAPI._spansh_available():
             print("[SPANSH] Skipped - circuit breaker open (recent failures)")
             return []
@@ -162,6 +161,8 @@ class MarketplaceAPI:
 
             # Parallel paginated fetch — 3 pages x 100 results
             def _fetch_page(page_num):
+                if is_cancelled and is_cancelled():
+                    return []
                 try:
                     body = {
                         "filters": {filter_type: {"value": [spansh_name]}},
@@ -301,6 +302,7 @@ class MarketplaceAPI:
         max_distance: int = 500,
         max_days_ago: float = 30,
         exclude_carriers: bool = False,
+        is_cancelled=None,
     ) -> List[Dict]:
         """
         Fetch fleet carrier market data from Spansh.  Spansh's commodity
@@ -309,6 +311,8 @@ class MarketplaceAPI:
 
         Uses parallel pagination (10 pages x 100) sorted by market_updated_at.
         """
+        if is_cancelled and is_cancelled():
+            return []
         if exclude_carriers:
             return []
         if not MarketplaceAPI._spansh_available():
@@ -328,6 +332,8 @@ class MarketplaceAPI:
             page_errors = [0]
 
             def _fetch_page(page_num):
+                if is_cancelled and is_cancelled():
+                    return []
                 try:
                     body = {
                         "filters": {"type": {"value": ["Drake-Class Carrier"]}},
@@ -526,6 +532,9 @@ class MarketplaceAPI:
                 sy = row["system_y"]
                 sz = row["system_z"]
 
+                if ref_coords and (row['system_name'] or '').casefold() == (reference_system or '').casefold():
+                    sx, sy, sz = ref_coords
+
                 # Resolve missing coords from galaxy DB
                 if sx is None and row["system_name"] in coords_cache:
                     sx, sy, sz = coords_cache[row["system_name"]]
@@ -628,7 +637,6 @@ class MarketplaceAPI:
             return []
 
     @staticmethod
-    @staticmethod
     def _get_system_coords(system_name: str):
         """Return (x, y, z) for system_name, or None on failure. Results are cached."""
         return MarketplaceAPI._get_system_coords_cached(system_name)
@@ -672,12 +680,15 @@ class MarketplaceAPI:
         max_days_ago: float = 2,
         exclude_carriers: bool = False,
         size: int = 500,
+        is_cancelled=None,
     ) -> List[Dict]:
         """
         Spansh nearby search using parallel paginated queries sorted by
         market_updated_at desc.  Fetches 3 pages of 100 results concurrently
         (300 total) then filters by 3-D distance from reference_system.
         """
+        if is_cancelled and is_cancelled():
+            return []
         if not MarketplaceAPI._spansh_available():
             print("[SPANSH NEARBY] Skipped - circuit breaker open (recent failures)")
             return []
@@ -698,6 +709,8 @@ class MarketplaceAPI:
 
             # Parallel paginated fetch — 3 pages x 100 results
             def _fetch_page(page_num):
+                if is_cancelled and is_cancelled():
+                    return []
                 try:
                     body = {
                         "filters": {filter_type: {"value": [spansh_name]}},
@@ -726,7 +739,7 @@ class MarketplaceAPI:
                 return pages
 
             # Query has no reference system, so consecutive jumps can share the raw rows
-            raw_results = _short_cached(("spansh_nearby", filter_type, spansh_name), _fetch_all_pages)
+            raw_results = _short_cached(("spansh_nearby", filter_type, spansh_name), _fetch_all_pages, is_cancelled)
 
             cutoff = datetime.now(timezone.utc) - timedelta(days=max_days_ago + 0.5)
 
@@ -835,18 +848,14 @@ class MarketplaceAPI:
             MarketplaceAPI._spansh_record_result(success=False)
             return []
 
-    @staticmethod
-    def _make_api_request(url: str, params: dict, timeout: int = 10) -> requests.Response:
-        """Single GET request (kept for compatibility). Raises on failure."""
-        response = requests.get(url, params=params, timeout=timeout)
-        response.raise_for_status()
-        return response
 
     @staticmethod
-    def _fetch_ardent(path: str, params: dict, timeout: int = 10) -> List[Dict]:
+    def _fetch_ardent(path: str, params: dict, timeout: int = 10, is_cancelled=None) -> List[Dict]:
         """
         Fetch *path* from Ardent API.
         """
+        if is_cancelled and is_cancelled():
+            return []
         try:
             url = f"{MarketplaceAPI.ARDENT_URL}{path}"
             r = requests.get(url, params=params, timeout=timeout)
@@ -872,14 +881,15 @@ class MarketplaceAPI:
         whichever source has valid data.  EDDN is freshest for prices but
         often lacks station metadata — Ardent/Spansh fill that in.
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         def _ts(row: Dict) -> datetime:
             raw = row.get("updatedAt") or ""
             try:
-                return datetime.fromisoformat(raw.replace("Z", "+00:00"))
-            except Exception:
-                return datetime.min
+                stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                return stamp.replace(tzinfo=stamp.tzinfo or timezone.utc)
+            except (ValueError, TypeError, AttributeError):
+                return datetime.min.replace(tzinfo=timezone.utc)
 
         def _has_meta(row: Dict) -> bool:
             """True when the row carries valid station-type metadata."""
@@ -894,6 +904,16 @@ class MarketplaceAPI:
             if w is not None:
                 return w
             return l  # may still be None — UI shows '?'
+
+        def _preserve_coords(winner, other):
+            axes = ('systemX', 'systemY', 'systemZ')
+            same_system = (winner.get('systemName') or '').casefold() == (other.get('systemName') or '').casefold()
+            # Carrier coordinates from a previous system must never follow it after a jump.
+            if same_system and winner.get('systemName') and any(winner.get(k) is None for k in axes) and all(other.get(k) is not None for k in axes):
+                winner = dict(winner)
+                for key in axes:
+                    winner[key] = other[key]
+            return winner
 
         best: Dict[int, Dict] = {}
         no_id: List[Dict] = []
@@ -916,7 +936,7 @@ class MarketplaceAPI:
                     if merged.get("maxLandingPadSize", 0) <= 1 and existing.get("maxLandingPadSize", 0) > 1:
                         merged["maxLandingPadSize"] = existing["maxLandingPadSize"]
                     merged["distanceToArrival"] = _pick_dist_to_arrival(merged, existing)
-                    best[mid] = merged
+                    best[mid] = _preserve_coords(merged, existing)
                 else:
                     # Existing is newer — patch in metadata from newer row if existing lacks it
                     if not _has_meta(existing) and _has_meta(row):
@@ -928,6 +948,7 @@ class MarketplaceAPI:
                     if best[mid].get("distanceToArrival") is None:
                         best[mid] = dict(best[mid])
                         best[mid]["distanceToArrival"] = _pick_dist_to_arrival(existing, row)
+                    best[mid] = _preserve_coords(best[mid], row)
 
         merged = list(best.values()) + no_id
         print(f"[DUAL-API] After merge: {len(merged)} unique results")
@@ -993,14 +1014,14 @@ class MarketplaceAPI:
         return commodity_lower.replace(" ", "")
     
     @staticmethod
-    def search_buyers(commodity: str, reference_system: str, max_distance: Optional[int] = None, max_days_ago: float = 2, exclude_carriers: bool = False) -> List[Dict]:
+    def search_buyers(commodity: str, reference_system: str, max_distance: Optional[int] = None, max_days_ago: float = 2, exclude_carriers: bool = False, is_cancelled=None) -> List[Dict]:
         """
         Search for stations buying a commodity near a reference system (for SELLING to them)
         
         Args:
             commodity: Commodity name (e.g., "Painite", "Low Temperature Diamonds", "Void Opals")
             reference_system: Reference system name
-            max_distance: Maximum distance in light years (None for unlimited)
+            max_distance: Maximum distance in light years (None uses the default 500 LY search)
             max_days_ago: Maximum age of data in days (default 2)
             exclude_carriers: Whether to exclude Fleet Carriers from results
             
@@ -1011,6 +1032,8 @@ class MarketplaceAPI:
             - system_distance, arrival_distance
             - updated
         """
+        if is_cancelled and is_cancelled():
+            return []
         try:
             # Normalize and URL encode commodity and system names
             import urllib.parse
@@ -1020,10 +1043,11 @@ class MarketplaceAPI:
 
             # --- Nearby imports (both APIs in parallel) ---
             nearby_path = f"/system/name/{system_encoded}/commodity/name/{commodity_encoded}/nearby/imports"
+            search_distance = 500 if max_distance is None else max_distance
             nearby_params = {
                 "minVolume": 1,
                 "maxDaysAgo": max_days_ago,
-                "maxDistance": 500,
+                "maxDistance": search_distance,
             }
             if exclude_carriers:
                 nearby_params["fleetCarriers"] = False
@@ -1032,27 +1056,30 @@ class MarketplaceAPI:
 
             # Run Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params)
+                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params, is_cancelled=is_cancelled)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh_nearby,
                     commodity_normalized, reference_system, "buying_commodities",
-                    500, max_days_ago, exclude_carriers, 500
+                    search_distance, max_days_ago, exclude_carriers, 500, is_cancelled=is_cancelled
                 )
                 _fut_carriers = _pool.submit(
                     MarketplaceAPI._fetch_spansh_carriers,
                     commodity_normalized, reference_system, "buying_commodities",
-                    500, max_days_ago, exclude_carriers
+                    search_distance, max_days_ago, exclude_carriers, is_cancelled=is_cancelled
                 )
                 _fut_eddn = _pool.submit(
                     MarketplaceAPI._fetch_eddn_cache,
                     commodity_normalized, reference_system, "buying_commodities",
-                    500, max_days_ago, exclude_carriers
+                    search_distance, max_days_ago, exclude_carriers
                 )
                 nearby_rows  = _fut_both.result()
                 spansh_rows  = _fut_spansh.result()
                 carrier_rows = _fut_carriers.result()
                 eddn_rows    = _fut_eddn.result()
             nearby_rows = nearby_rows + spansh_rows + carrier_rows + eddn_rows
+
+            if is_cancelled and is_cancelled():
+                return MarketplaceAPI._merge_by_freshness(nearby_rows)
 
             # --- Local system imports (both APIs in parallel) ---
             local_path = f"/system/name/{system_encoded}/commodities/imports"
@@ -1062,7 +1089,7 @@ class MarketplaceAPI:
             # Same response for every commodity in this system - fetch once, filter per commodity
             local_rows_raw = _short_cached(
                 ("ardent_local", reference_system, max_days_ago),
-                lambda: MarketplaceAPI._fetch_ardent(local_path, local_params))
+                lambda: MarketplaceAPI._fetch_ardent(local_path, local_params, is_cancelled=is_cancelled), is_cancelled)
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
             for r in local_rows:
                 r["distance"] = 0
@@ -1070,6 +1097,10 @@ class MarketplaceAPI:
             print(f"[BUYERS] nearby={len(nearby_rows)} local={len(local_rows)}")
             results = MarketplaceAPI._merge_by_freshness(nearby_rows + local_rows)
             MarketplaceAPI._backfill_eddn_cache(results)
+            if max_distance is not None and max_distance > 0:
+                results = [r for r in results if r.get('distance') is not None and r['distance'] <= max_distance]
+            if exclude_carriers:
+                results = [r for r in results if 'FleetCarrier' not in (r.get('stationType') or '')]
             return results
             
         except requests.exceptions.RequestException as e:
@@ -1080,14 +1111,14 @@ class MarketplaceAPI:
             return []
     
     @staticmethod
-    def search_sellers(commodity: str, reference_system: str, max_distance: Optional[int] = None, max_days_ago: float = 2, exclude_carriers: bool = True) -> List[Dict]:
+    def search_sellers(commodity: str, reference_system: str, max_distance: Optional[int] = None, max_days_ago: float = 2, exclude_carriers: bool = True, is_cancelled=None) -> List[Dict]:
         """
         Search for stations selling a commodity near a reference system (for BUYING from them)
         
         Args:
             commodity: Commodity name (e.g., "Painite", "Low Temperature Diamonds", "Void Opals")
             reference_system: Reference system name
-            max_distance: Maximum distance in light years (None for unlimited)
+            max_distance: Maximum distance in light years (None uses the default 500 LY search)
             max_days_ago: Maximum age of data in days (default 2)
             
         Returns:
@@ -1097,6 +1128,8 @@ class MarketplaceAPI:
             - system_distance, arrival_distance
             - updated
         """
+        if is_cancelled and is_cancelled():
+            return []
         try:
             import urllib.parse
             commodity_normalized = MarketplaceAPI.normalize_commodity_name(commodity)
@@ -1105,10 +1138,11 @@ class MarketplaceAPI:
 
             # --- Nearby exports (both APIs in parallel) ---
             nearby_path = f"/system/name/{system_encoded}/commodity/name/{commodity_encoded}/nearby/exports"
+            search_distance = 500 if max_distance is None else max_distance
             nearby_params = {
                 "minVolume": 1,
                 "maxDaysAgo": max_days_ago,
-                "maxDistance": 500,
+                "maxDistance": search_distance,
             }
             if exclude_carriers:
                 nearby_params["fleetCarriers"] = False
@@ -1117,21 +1151,21 @@ class MarketplaceAPI:
 
             # Run Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params)
+                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params, is_cancelled=is_cancelled)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh_nearby,
                     commodity_normalized, reference_system, "selling_commodities",
-                    500, max_days_ago, exclude_carriers, 500
+                    search_distance, max_days_ago, exclude_carriers, 500, is_cancelled=is_cancelled
                 )
                 _fut_carriers = _pool.submit(
                     MarketplaceAPI._fetch_spansh_carriers,
                     commodity_normalized, reference_system, "selling_commodities",
-                    500, max_days_ago, exclude_carriers
+                    search_distance, max_days_ago, exclude_carriers, is_cancelled=is_cancelled
                 )
                 _fut_eddn = _pool.submit(
                     MarketplaceAPI._fetch_eddn_cache,
                     commodity_normalized, reference_system, "selling_commodities",
-                    500, max_days_ago, exclude_carriers
+                    search_distance, max_days_ago, exclude_carriers
                 )
                 nearby_rows  = _fut_both.result()
                 spansh_rows  = _fut_spansh.result()
@@ -1139,12 +1173,15 @@ class MarketplaceAPI:
                 eddn_rows    = _fut_eddn.result()
             nearby_rows = nearby_rows + spansh_rows + carrier_rows + eddn_rows
 
+            if is_cancelled and is_cancelled():
+                return MarketplaceAPI._merge_by_freshness(nearby_rows)
+
             # --- Local system exports (both APIs in parallel) ---
             local_path = f"/system/name/{system_encoded}/commodities/exports"
             local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
 
             print(f"[SELLERS] local path: {local_path}")
-            local_rows_raw = MarketplaceAPI._fetch_ardent(local_path, local_params)
+            local_rows_raw = MarketplaceAPI._fetch_ardent(local_path, local_params, is_cancelled=is_cancelled)
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
             for r in local_rows:
                 r["distance"] = 0
@@ -1159,6 +1196,10 @@ class MarketplaceAPI:
             print(f"[SELLERS] nearby={len(nearby_rows)} local={len(local_rows)}")
             results = MarketplaceAPI._merge_by_freshness(nearby_rows + local_rows)
             MarketplaceAPI._backfill_eddn_cache(results)
+            if max_distance is not None and max_distance > 0:
+                results = [r for r in results if r.get('distance') is not None and r['distance'] <= max_distance]
+            if exclude_carriers:
+                results = [r for r in results if 'FleetCarrier' not in (r.get('stationType') or '')]
             return results
             
         except requests.exceptions.RequestException as e:
@@ -1169,7 +1210,7 @@ class MarketplaceAPI:
             return []
     
     @staticmethod
-    def search_buyers_galaxy_wide(commodity: str, max_days_ago: float = 2, exclude_carriers: bool = False) -> List[Dict]:
+    def search_buyers_galaxy_wide(commodity: str, max_days_ago: float = 2, exclude_carriers: bool = False, is_cancelled=None) -> List[Dict]:
         """
         Search for top 100 best prices galaxy-wide (no distance limit) - for SELLING to them
         
@@ -1181,6 +1222,8 @@ class MarketplaceAPI:
         Returns:
             List of station data dictionaries sorted by highest price
         """
+        if is_cancelled and is_cancelled():
+            return []
         try:
             import urllib.parse
             commodity_normalized = MarketplaceAPI.normalize_commodity_name(commodity)
@@ -1194,16 +1237,16 @@ class MarketplaceAPI:
             print(f"[GALAXY BUYERS] path: {path} params: {params}")
 
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, path, params)
+                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, path, params, is_cancelled=is_cancelled)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh,
                     commodity_normalized, "Sol", "buying_commodities",
-                    0, max_days_ago, exclude_carriers, 1000
+                    0, max_days_ago, exclude_carriers, 1000, is_cancelled=is_cancelled
                 )
                 _fut_carriers = _pool.submit(
                     MarketplaceAPI._fetch_spansh_carriers,
                     commodity_normalized, None, "buying_commodities",
-                    0, max_days_ago, exclude_carriers
+                    0, max_days_ago, exclude_carriers, is_cancelled=is_cancelled
                 )
                 _fut_eddn = _pool.submit(
                     MarketplaceAPI._fetch_eddn_cache,
@@ -1228,7 +1271,7 @@ class MarketplaceAPI:
             return []
     
     @staticmethod
-    def search_sellers_galaxy_wide(commodity: str, max_days_ago: float = 2, exclude_carriers: bool = True) -> List[Dict]:
+    def search_sellers_galaxy_wide(commodity: str, max_days_ago: float = 2, exclude_carriers: bool = True, is_cancelled=None) -> List[Dict]:
         """
         Search for top 100 best prices galaxy-wide (no distance limit) - for BUYING from them
         
@@ -1239,6 +1282,8 @@ class MarketplaceAPI:
         Returns:
             List of station data dictionaries sorted by lowest price
         """
+        if is_cancelled and is_cancelled():
+            return []
         try:
             import urllib.parse
             commodity_normalized = MarketplaceAPI.normalize_commodity_name(commodity)
@@ -1252,16 +1297,16 @@ class MarketplaceAPI:
             print(f"[GALAXY SELLERS] path: {path} params: {params}")
 
             with ThreadPoolExecutor(max_workers=4) as _pool:
-                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, path, params)
+                _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, path, params, is_cancelled=is_cancelled)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh,
                     commodity_normalized, "Sol", "selling_commodities",
-                    0, max_days_ago, exclude_carriers, 1000
+                    0, max_days_ago, exclude_carriers, 1000, is_cancelled=is_cancelled
                 )
                 _fut_carriers = _pool.submit(
                     MarketplaceAPI._fetch_spansh_carriers,
                     commodity_normalized, None, "selling_commodities",
-                    0, max_days_ago, exclude_carriers
+                    0, max_days_ago, exclude_carriers, is_cancelled=is_cancelled
                 )
                 _fut_eddn = _pool.submit(
                     MarketplaceAPI._fetch_eddn_cache,
@@ -1286,7 +1331,7 @@ class MarketplaceAPI:
             return []
     
     @staticmethod
-    def add_distances_to_results(results: List[Dict], reference_system: str) -> List[Dict]:
+    def add_distances_to_results(results: List[Dict], reference_system: str, is_cancelled=None) -> List[Dict]:
         """
         Add distance information to galaxy-wide results using local database + EDSM fallback
         
@@ -1298,41 +1343,21 @@ class MarketplaceAPI:
             Same list with 'distance' key added to each result
         """
         try:
-            ref_x, ref_y, ref_z = None, None, None
-            
-            # Try local database first (instant!)
-            try:
-                from local_database import LocalSystemsDatabase
-                local_db = LocalSystemsDatabase()
-                if local_db.is_database_available():
-                    ref_coords = local_db.get_system_coordinates(reference_system)
-                    if ref_coords:
-                        ref_x, ref_y, ref_z = ref_coords['x'], ref_coords['y'], ref_coords['z']
-                        print(f"[DISTANCE CALC] Using local database for {reference_system}")
-            except Exception as e:
-                print(f"[DISTANCE CALC] Local DB failed: {e}")
-            
-            # Fallback to EDSM if local DB didn't work
-            if ref_x is None:
-                import urllib.parse
-                system_encoded = urllib.parse.quote(reference_system)
-                edsm_url = f"https://www.edsm.net/api-v1/system?systemName={system_encoded}&showCoordinates=1"
-                
-                response = requests.get(edsm_url, timeout=15, headers={"User-Agent": "EliteMining/5.1.3 (+https://github.com/Viper-Dude/EliteMining)"})
-                response.raise_for_status()
-                ref_data = response.json()
-                
-                if not ref_data or 'coords' not in ref_data:
-                    print(f"[DISTANCE CALC] Could not get coordinates for {reference_system}")
-                    return results
-                
-                ref_coords = ref_data['coords']
-                ref_x, ref_y, ref_z = ref_coords['x'], ref_coords['y'], ref_coords['z']
-                print(f"[DISTANCE CALC] Using EDSM fallback for {reference_system}")
-            
+            if is_cancelled and is_cancelled():
+                return results
+            ref_coords = MarketplaceAPI._get_system_coords(reference_system)
+            if ref_coords is None:
+                return results
+            ref_x, ref_y, ref_z = ref_coords
+
+            for result in results:
+                if (result.get('systemName') or '').casefold() == reference_system.casefold():
+                    result['systemX'], result['systemY'], result['systemZ'] = ref_coords
+                    result['distance'] = 0.0
+
             # Batch-resolve missing coords from galaxy DB for results without systemX/Y/Z
             missing_coord_results = [r for r in results
-                                     if r.get('systemX') is None and r.get('systemName')]
+                                     if any(r.get(axis) is None for axis in ('systemX', 'systemY', 'systemZ')) and r.get('systemName')]
             if missing_coord_results:
                 try:
                     from local_database import LocalSystemsDatabase
@@ -1359,6 +1384,8 @@ class MarketplaceAPI:
 
             # Calculate distance for each result
             for result in results:
+                if is_cancelled and is_cancelled():
+                    break
                 sys_x = result.get('systemX')
                 sys_y = result.get('systemY')
                 sys_z = result.get('systemZ')
@@ -1378,16 +1405,92 @@ class MarketplaceAPI:
             print(f"[DISTANCE CALC] Error: {e}")
             return results
     
+
     @staticmethod
-    def get_station_types() -> List[str]:
-        """Get list of station types for filtering"""
-        return [
-            "Coriolis Starport",
-            "Orbis Starport", 
-            "Ocellus Starport",
-            "Asteroid Base",
-            "Planetary Outpost",
-            "Planetary Port",
-            "Fleet Carrier",
-            "Odyssey Settlement"
-        ]
+    def filter_results_by_age(results, max_age_str):
+        """Filter results by max age locally (for accurate hour-level filtering)
+
+        The API only supports maxDaysAgo (integer days), so for hour-based filters
+        we need to filter the results locally using the updatedAt timestamp.
+
+        NOTE: Filter values are set to include results that DISPLAY as that time.
+        e.g., "1 hour" filter includes results showing "1h" (60-119 min old)
+        """
+        from datetime import datetime, timezone, timedelta
+
+        # Map age string to hours (values include the displayed hour range)
+        age_hours_map = {
+            "Any": None,       # No filtering
+            "1 hour": 2,       # Include results showing "1h" (60-119 min)
+            "8 hours": 9,      # Include results showing "8h" (480-539 min)
+            "16 hours": 17,    # Include results showing "16h"
+            "1 day": 25,       # Include results showing "1d" (24h)
+            "2 days": 49       # Include results showing "2d" (48h)
+        }
+
+        max_hours = age_hours_map.get(max_age_str)
+        if max_hours is None:
+            return results  # No age filtering
+
+        now = datetime.now(timezone.utc)
+        cutoff_time = now - timedelta(hours=max_hours)
+
+        filtered = []
+        for result in results:
+            updated_at = result.get('updatedAt')
+            if not updated_at:
+                continue  # Skip results without timestamp
+
+            try:
+                # Parse ISO timestamp (e.g., "2024-11-03T12:30:00Z" or "2024-11-03T12:30:00.000Z")
+                updated_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                updated_time = updated_time.replace(tzinfo=updated_time.tzinfo or timezone.utc)
+                if updated_time >= cutoff_time:
+                    filtered.append(result)
+            except Exception:
+                # If parsing fails, include the result (conservative)
+                filtered.append(result)
+
+        return filtered
+
+
+    @staticmethod
+    def filter_results(results, station_type='All', max_age='Any', exclude_carriers=False,
+                       large_pad=False, is_buy_mode=False):
+        volume = 'stock' if is_buy_mode else 'demand'
+        price = 'buyPrice' if is_buy_mode else 'sellPrice'
+        results = [r for r in results if r.get(volume, 0) > 0 and r.get(price, 0) > 0]
+        if exclude_carriers and station_type != 'Fleet Carrier':
+            results = [r for r in results if 'FleetCarrier' not in (r.get('stationType') or '')]
+        orbital = ('Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Asteroid', 'Dodec', 'Orbital', 'Space')
+        surface = ('Crater', 'OnFoot', 'Planetary', 'Surface', 'Ground', 'Settlement')
+        if station_type == 'Orbital':
+            results = [r for r in results if any(k in (r.get('stationType') or '') for k in orbital)
+                       and not any(k in (r.get('stationType') or '') for k in surface)]
+        elif station_type == 'Surface':
+            results = [r for r in results if any(k in (r.get('stationType') or '') for k in surface)]
+        elif station_type in ('Fleet Carrier', 'Megaship', 'Stronghold'):
+            keyword = {'Fleet Carrier': 'FleetCarrier', 'Megaship': 'Mega', 'Stronghold': 'Stronghold'}[station_type]
+            results = [r for r in results if keyword in (r.get('stationType') or '')]
+        if large_pad:
+            results = [r for r in results if r.get('maxLandingPadSize') == 3]
+        return MarketplaceAPI.filter_results_by_age(results, max_age)
+
+    @staticmethod
+    def sort_results(results, order_by, is_buy_mode=False):
+        if 'Best price' in order_by:
+            field = 'buyPrice' if is_buy_mode else 'sellPrice'
+            return sorted(results, key=lambda r: r.get(field, 0), reverse=not is_buy_mode)
+        if any(word in order_by.lower() for word in ('supply', 'stock', 'demand')):
+            field = 'stock' if is_buy_mode else 'demand'
+            return sorted(results, key=lambda r: r.get(field, 0), reverse=True)
+        if 'Last update' in order_by:
+            from datetime import datetime, timezone
+            def timestamp(row):
+                try:
+                    stamp = datetime.fromisoformat(row.get('updatedAt', '').replace('Z', '+00:00'))
+                    return stamp.replace(tzinfo=stamp.tzinfo or timezone.utc)
+                except (ValueError, TypeError, AttributeError):
+                    return datetime.min.replace(tzinfo=timezone.utc)
+            return sorted(results, key=timestamp, reverse=True)
+        return sorted(results, key=lambda r: float('inf') if r.get('distance') is None else r['distance'])

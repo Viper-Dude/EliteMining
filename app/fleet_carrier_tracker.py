@@ -35,50 +35,6 @@ class FleetCarrierTracker:
         if self._journal_parser is not None:
             self._journal_parser.on_carrier_updated = callback
 
-    # ------------------------------------------------------------------
-    # Convenience accessors (backwards-compatible with old code)
-    # ------------------------------------------------------------------
-
-    def get_carrier_system(self) -> Optional[str]:
-        cd = self.carrier_data
-        return cd['system'] if cd else None
-
-    def get_carrier_name(self) -> Optional[str]:
-        cd = self.carrier_data
-        return cd['name'] if cd else None
-
-    def get_carrier_callsign(self) -> Optional[str]:
-        cd = self.carrier_data
-        return cd['callsign'] if cd else None
-
-    def get_carrier_info(self) -> Optional[Dict]:
-        """Legacy-compatible summary dict."""
-        cd = self.carrier_data
-        if not cd or not cd.get('system'):
-            return None
-        return {
-            'carrier_name': cd.get('name'),
-            'callsign': cd.get('callsign'),
-            'system_name': cd.get('system'),
-            'fuel_level': cd.get('fuel_level'),
-            'fuel_capacity': cd.get('fuel_capacity', 1000),
-            'balance': cd.get('balance'),
-            'reserve_percent': cd.get('reserve_percent'),
-            'space_free': cd.get('space_free'),
-            'space_total': cd.get('space_total'),
-            'jump_destination': cd.get('jump_destination'),
-            'jump_departure_time': cd.get('jump_departure_time'),
-            'crew': cd.get('crew', []),
-            'docking_access': cd.get('docking_access'),
-            'timestamp': cd.get('last_updated'),
-        }
-
-
-
-    def set_journal_directory(self, journal_dir: str):
-        """Accept a journal directory - no-op; JournalParser handles all file reading."""
-        pass
-
 
 # Global instance
 _tracker = None

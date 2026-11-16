@@ -137,7 +137,10 @@ class MiningChartsPanel:
             'Default': '#00CED1'        # Dark turquoise
         }
         
+        self._charts_dirty = True
+        self._chart_refresh_id = None
         self._create_charts()
+        self.frame.bind('<Map>', self._on_map, add='+')
         
     def _create_charts(self):
         """Create the chart widgets"""
@@ -348,12 +351,22 @@ class MiningChartsPanel:
         """Get color for a material"""
         return self.material_colors.get(material_name, self.material_colors['Default'])
     
+    def _on_map(self, event):
+        if event.widget is self.frame and self._charts_dirty:
+            self.update_charts()
+
     def update_charts(self):
-        """Update charts with current session data - always refreshes"""
         if not MATPLOTLIB_AVAILABLE:
             return
-        self.refresh_charts()
-    
+        self._charts_dirty = True
+        if self.frame.winfo_viewable() and self._chart_refresh_id is None:
+            self._chart_refresh_id = self.frame.after(100, self._refresh_visible_charts)
+
+    def _refresh_visible_charts(self):
+        self._chart_refresh_id = None
+        if self._charts_dirty and self.frame.winfo_viewable():
+            self.refresh_charts()
+
     def refresh_charts(self):
         """Refresh both charts with latest data"""
         if not MATPLOTLIB_AVAILABLE:
@@ -361,6 +374,7 @@ class MiningChartsPanel:
         try:
             self._update_timeline_chart()
             self._update_bar_chart()
+            self._charts_dirty = False
         except Exception as e:
             print(f"Error refreshing charts: {e}")
     
@@ -540,6 +554,9 @@ class MiningChartsPanel:
         if not MATPLOTLIB_AVAILABLE:
             return False
             
+        if self._charts_dirty:
+            self.refresh_charts()
+
         # Only save if we have data
         has_timeline = self.has_timeline_data()
         has_comparison = self.has_comparison_data()
@@ -647,6 +664,8 @@ class MiningChartsPanel:
             
             if not export_dir:
                 return
+            if self._charts_dirty:
+                self.refresh_charts()
             
             # Generate timestamp for unique filenames
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -689,6 +708,8 @@ class MiningChartsPanel:
             
             if not export_dir:
                 return
+            if self._charts_dirty:
+                self.refresh_charts()
             
             # Generate timestamp for unique filenames
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

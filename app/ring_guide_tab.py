@@ -11,6 +11,7 @@ import os
 from typing import Dict, List
 
 from config import scaled_font
+from app_utils import bind_mousewheel_recursive
 
 log = logging.getLogger("EliteMining.RingGuide")
 
@@ -150,9 +151,6 @@ class RingGuideTab(tk.Frame):
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # Bind mousewheel to canvas and enable on enter/leave
-        self.canvas.bind("<Enter>", lambda e: self.canvas.bind_all("<MouseWheel>", self._on_mousewheel))
-        self.canvas.bind("<Leave>", lambda e: self.canvas.unbind_all("<MouseWheel>"))
         
         # Create expandable sections for each ring type in left column
         for ring_type in self.RING_DATA.keys():
@@ -165,6 +163,7 @@ class RingGuideTab(tk.Frame):
         
         # Add RES Sites info section to right column
         self._create_res_info_section(right_column)
+        bind_mousewheel_recursive(self.canvas, self._on_mousewheel)
     
     def _create_res_info_section(self, parent):
         """Create expandable RES Sites section in right column"""
@@ -357,6 +356,7 @@ class RingGuideTab(tk.Frame):
     def _on_mousewheel(self, event):
         """Handle mousewheel scrolling"""
         self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        return 'break'
     
     def _create_ring_section(self, ring_type: str):
         """Create an expandable section for a ring type"""
@@ -527,11 +527,3 @@ class RingGuideTab(tk.Frame):
                 justify="left"
             )
             minerals_label.pack(side="left", fill="x", expand=True, pady=2)
-    
-    def destroy(self):
-        """Clean up on destroy"""
-        try:
-            self.canvas.unbind_all("<MouseWheel>")
-        except:
-            pass
-        super().destroy()

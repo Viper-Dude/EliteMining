@@ -15,12 +15,41 @@ from tkinter import ttk, messagebox
 import tkinter as tk
 
 
+def bind_mousewheel_recursive(widget, callback):
+    widget.bind('<MouseWheel>', callback)
+    for child in widget.winfo_children():
+        bind_mousewheel_recursive(child, callback)
+
+
 # ==================== PATH UTILITIES ====================
 
 def compact_classic_button(button) -> None:
     from config import load_theme, scaled_font, scaled_px
     if load_theme() in ("elite_orange", "dark_gray"):
         button.configure(font=scaled_font(8), padx=scaled_px(6), pady=scaled_px(2), width=0)
+
+
+def create_action_button(parent, primary=False, **kwargs):
+    from config import load_theme, scaled_font, scaled_px
+    if load_theme() in ("modern", "modern_slate", "modern_orange"):
+        from ui.modern_widgets import RoundedButton
+        text = kwargs.get("text", "")
+        if primary:
+            text = text.lstrip("".join(char for char in text if not char.isalnum())).strip()
+        return RoundedButton(parent, text=text, command=kwargs.get("command"), primary=primary,
+                             font=scaled_font(9, "bold" if primary else "normal"),
+                             padx=scaled_px(11), pady=scaled_px(3))
+    kwargs.setdefault('font', scaled_font(8))
+    kwargs.setdefault('padx', scaled_px(15 if primary else 8))
+    kwargs.setdefault('pady', scaled_px(4))
+    kwargs.setdefault('bg', '#2a4a2a' if primary else '#4a3a2a')
+    kwargs.setdefault('fg', '#e0e0e0')
+    kwargs.setdefault('activebackground', '#3a5a3a' if primary else '#5a4a3a')
+    kwargs.setdefault('activeforeground', '#ffffff')
+    kwargs.setdefault('relief', 'ridge')
+    kwargs.setdefault('bd', 1)
+    kwargs.setdefault('cursor', 'hand2')
+    return tk.Button(parent, **kwargs)
 
 
 def get_app_data_dir() -> str:
@@ -598,8 +627,10 @@ def format_market_station_type(api_type):
         station_type = 'MegaShip'
     elif api_type == 'Unknown':
         station_type = 'Unknown'
-    elif 'Surface' in api_type or 'Crater' in api_type or 'Ground' in api_type:
+    elif any(k in api_type for k in ('Surface', 'Crater', 'Ground', 'Planetary')):
         station_type = 'Surface/Station'
+    elif 'Space' in api_type and 'Construction' in api_type:
+        station_type = 'Orbital/Station'
     elif 'Carrier' in api_type or 'Drake' in api_type:
         station_type = 'Carrier'
     elif 'Settlement' in api_type or 'OnFoot' in api_type:
@@ -611,3 +642,20 @@ def format_market_station_type(api_type):
     else:
         station_type = 'Orbital/Station'  # Safe default for any future types
     return station_type
+
+
+def format_market_pad(size):
+    if isinstance(size, int):
+        return {0: '?', 1: 'S', 2: 'M', 3: 'L'}.get(size, '?')
+    return size.upper() if isinstance(size, str) and size.upper() in ('S', 'M', 'L') else '?'
+
+
+def format_market_powerplay(entry, include_age=False, no_data=None):
+    from localization import t
+    power, state = entry.get('controlling_power', ''), entry.get('power_state', '')
+    if power == '~none~':
+        text = state or t('common.pp_no_power')
+    else:
+        text = ' / '.join(x for x in (power, state) if x) or (no_data or t('common.no_data'))
+    age = format_relative_age(entry.get('updated_at')) if include_age and (power or state) else ''
+    return f'{text} ({age})' if age else text

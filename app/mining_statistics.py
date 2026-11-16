@@ -6,18 +6,38 @@ Handles material tracking, percentage yield calculations, and session analytics.
 import logging
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 
 log = logging.getLogger(__name__)
 
 
+def session_date(value):
+    try:
+        stamp = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        return stamp.astimezone(timezone.utc)
+    except (ValueError, TypeError, AttributeError, OverflowError):
+        return None
+
+
+@lru_cache(maxsize=256)
+def _read_session_report(path, mtime_ns, size):
+    return Path(path).read_text(encoding='utf-8')
+
+
+def read_session_report(path):
+    try:
+        report = Path(path)
+        stat = report.stat()
+        return _read_session_report(str(report.resolve()), stat.st_mtime_ns, stat.st_size)
+    except (OSError, UnicodeError):
+        return ''
+
+
 def parse_mineral_performance(session_file_path):
     import re
-    from pathlib import Path
-    try:
-        content = Path(session_file_path).read_text(encoding='utf-8')
-    except (OSError, UnicodeError):
-        return {}
+    content = read_session_report(session_file_path)
     section = re.search(r'--- (?:Mineral|Material) Performance ---\s*\n(.*?)(?=\n\s*(?:Overall Quality:|Best Performer:|===|---)|\Z)', content, re.S)
     if not section:
         return {}

@@ -6,20 +6,15 @@ from tkinter import ttk
 from typing import List
 
 from localization import t
+from ui.search_control import SearchControl
 from marketplace_api import MarketplaceAPI
-from app_utils import compact_classic_button
+from core.constants import MINING_COMMODITY_ORDER
+from app_utils import create_action_button, format_market_pad, format_market_powerplay, format_relative_age
 
 MAX_MINERALS = 5
-CHECK_COLUMNS = 3
-MULTI_MINERALS = ["Platinum", "Rhodplumsite", "Benitoite", "Painite", "Serendibite", "Grandidierite",
-                  "Osmium", "Monazite", "Alexandrite", "Low Temperature Diamonds", "Musgravite", "Void Opals"]
-
-ORBITAL_KW = ["Coriolis", "Orbis", "Ocellus", "Outpost", "AsteroidBase", "Asteroid", "Dodec"]
-SURFACE_KW = ["Crater", "OnFoot", "Planetary", "Surface"]
-
 
 class MultiMineralTab:
-    """Reuses the main app's commodity/station/age maps, age filter and MarketplaceAPI.search_buyers."""
+    """Uses the shared market filters and the main app's localized option maps."""
 
     def __init__(self, frame: ttk.Frame, main_app):
         self.app = main_app
@@ -53,16 +48,18 @@ class MultiMineralTab:
         ref_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
         from system_autocomplete import SystemAutocomplete
         self._ac_ref = SystemAutocomplete(ref_entry, self.ref_var, app)
-        tk.Button(ref_row, text=t('marketplace.use_current'), command=self._use_current_system,
+        create_action_button(ref_row, text=t('marketplace.use_current'), command=self._use_current_system,
                   bg="#4a3a2a", fg="#e0e0e0", activebackground="#5a4a3a", activeforeground="#ffffff",
-                  relief="ridge", bd=1, padx=6, pady=2, font=app._scaled_font(8), cursor="hand2").pack(side="left")
+                  relief="ridge", bd=1, cursor="hand2").pack(side="left")
 
         tk.Label(box, text=t('marketplace.multi_select_minerals').format(max=MAX_MINERALS), bg=bg, fg=fg,
                  font=app._scaled_font(9)).pack(anchor="w", pady=(0, 4))
         grid = tk.Frame(box, bg=bg)
         grid.pack(fill="x", pady=(0, 8))
+        self._mineral_checks = []
+        self._mineral_columns = 0
         self._mineral_vars = {}
-        for i, name in enumerate(MULTI_MINERALS):
+        for name in MINING_COMMODITY_ORDER:
             var = tk.BooleanVar(value=False)
             self._mineral_vars[name] = var
             cb = tk.Checkbutton(grid, text=app._commodity_map.get(name, name), variable=var,
@@ -70,7 +67,9 @@ class MultiMineralTab:
                                 bg=bg, fg="#e0e0e0", selectcolor=bg, activebackground=bg,
                                 activeforeground="#ffffff", highlightthickness=0, bd=0, relief="flat",
                                 font=app._scaled_font(9), anchor="w")
-            cb.grid(row=i // CHECK_COLUMNS, column=i % CHECK_COLUMNS, sticky="w", padx=(0, 20))
+            self._mineral_checks.append(cb)
+            cb.grid(row=0, column=0, sticky="w", padx=(0, app._scaled_px(16)))
+        grid.bind('<Configure>', self._layout_minerals)
 
         filt = tk.Frame(box, bg=bg)
         filt.pack(fill="x")
@@ -80,20 +79,23 @@ class MultiMineralTab:
                      values=[app._station_type_map[k] for k in app._station_type_order]).pack(side="left", padx=(0, 15))
         self.exclude_carriers_var = tk.BooleanVar(value=app.marketplace_exclude_carriers.get())
         self.large_pad_var = tk.BooleanVar(value=app.marketplace_large_pad_only.get())
+        self.station_var.trace_add('write', self._on_station_type_change)
         for text, var in ((t('marketplace.exclude_carriers'), self.exclude_carriers_var),
                           (t('marketplace.large_pads'), self.large_pad_var)):
-            tk.Checkbutton(filt, text=text, variable=var, bg=bg, fg="#e0e0e0", selectcolor=bg,
+            cb = tk.Checkbutton(filt, text=text, variable=var, bg=bg, fg="#e0e0e0", selectcolor=bg,
                            activebackground=bg, activeforeground="#ffffff", highlightthickness=0, bd=0,
-                           relief="flat", font=app._scaled_font(9)).pack(side="left", padx=(0, 10))
+                           relief="flat", font=app._scaled_font(9))
+            if var is self.exclude_carriers_var:
+                self.exclude_carriers_cb = cb
+            cb.pack(side="left", padx=(0, 10))
+        self._on_station_type_change()
         ttk.Label(filt, text=t('marketplace.max_age')).pack(side="left", padx=(10, 5))
         self.age_var = tk.StringVar(value=app.marketplace_max_age.get())
         ttk.Combobox(filt, textvariable=self.age_var, state="readonly", width=10,
                      values=[app._age_map[k] for k in app._age_order]).pack(side="left", padx=(0, 15))
-        self.search_btn = tk.Button(filt, text="🔍 " + t('marketplace.search'), command=self.start_search,
+        self.search_btn = create_action_button(filt, primary=True, text="🔍 " + t('marketplace.search'), command=self.start_search,
                                     bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                                    activeforeground="#ffffff", relief="ridge", bd=1, padx=10, pady=4,
-                                    font=app._scaled_font(9, "bold"), cursor="hand2")
-        compact_classic_button(self.search_btn)
+                                    activeforeground="#ffffff", relief="ridge", bd=1, cursor="hand2")
         self.search_btn.pack(side="left")
 
         results_header = ttk.Frame(container)
@@ -130,7 +132,7 @@ class MultiMineralTab:
                 self.tree.heading(c, text="", anchor="w")
                 self.tree.column(c, width=app._scaled_px(20), stretch=True)
                 continue
-            anchor = "center" if c == "pad" else "w"
+            anchor = "w"
             self.tree.heading(c, text=headings[c], anchor=anchor, command=lambda col=c: self._sort(col))
             self.tree.column(c, width=max(app._scaled_px(widths[c]), min_for(c)), minwidth=min_for(c),
                              stretch=False, anchor=anchor)
@@ -157,9 +159,13 @@ class MultiMineralTab:
         self.tree.bind("<ButtonRelease-1>", save_widths)
         self.tree.bind("<Double-1>", lambda e: app._on_commodity_tree_double_click(e, self.tree, refresh_powerplay=False))
         vsb = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
+        hsb = ttk.Scrollbar(table, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+        table.rowconfigure(0, weight=1)
+        table.columnconfigure(0, weight=1)
 
     # Station rows hold location/pad/distance/LS/powerplay; their mineral rows hold mineral/demand/price/age.
     _PAD_ORDER = {"?": 0, "S": 1, "M": 2, "L": 3}
@@ -225,6 +231,20 @@ class MultiMineralTab:
         arrow = (ARROW_DOWN if self._sort_rev else ARROW_UP) if self._sort_col == "#0" else ""
         self.tree.heading("#0", text=text + arrow)
 
+    def _layout_minerals(self, event):
+        grid = event.widget
+        cell_width = max(cb.winfo_reqwidth() for cb in self._mineral_checks) + self.app._scaled_px(16)
+        columns = max(1, min(len(self._mineral_checks), event.width // cell_width))
+        if columns == self._mineral_columns:
+            return
+        for column in range(self._mineral_columns):
+            grid.columnconfigure(column, minsize=0)
+        for column in range(columns):
+            grid.columnconfigure(column, minsize=cell_width)
+        for index, cb in enumerate(self._mineral_checks):
+            cb.grid_configure(row=index // columns, column=index % columns)
+        self._mineral_columns = columns
+
     def _on_toggle(self, name: str) -> None:
         if sum(v.get() for v in self._mineral_vars.values()) > MAX_MINERALS:
             self._mineral_vars[name].set(False)
@@ -249,6 +269,11 @@ class MultiMineralTab:
             self._mineral_vars[name].set(True)
 
     def start_search(self) -> None:
+        if not hasattr(self, '_search_control'):
+            self._search_control = SearchControl(self.app, self.search_btn, self.status_label)
+        if self._search_control.running:
+            self._search_control.stop()
+            return
         app = self.app
         minerals = [n for n, v in self._mineral_vars.items() if v.get()]
         system = self.ref_var.get().strip()
@@ -260,45 +285,31 @@ class MultiMineralTab:
             return
         station_type = app._station_type_rev_map.get(self.station_var.get(), self.station_var.get())
         max_age = app._age_rev_map.get(self.age_var.get(), self.age_var.get())
-        exclude_carriers = self.exclude_carriers_var.get()
+        exclude_carriers = self.exclude_carriers_var.get() and station_type != "Fleet Carrier"
         large_pad = self.large_pad_var.get()
 
         self.status_label.config(text=t('marketplace.searching_selling'))
-        self.search_btn.config(state="disabled")
+        self._search_control.start()
         threading.Thread(target=self._worker, daemon=True,
                          args=(minerals, system, station_type, max_age, exclude_carriers, large_pad)).start()
 
     def _worker(self, minerals, system, station_type, max_age, exclude_carriers, large_pad):
+        control = self._search_control
         try:
             def fetch(mineral):
-                return mineral, MarketplaceAPI.search_buyers(mineral, system, None, 30, exclude_carriers)
+                if control.is_cancelled():
+                    return mineral, []
+                return mineral, MarketplaceAPI.search_buyers(mineral, system, None, 30, exclude_carriers, is_cancelled=control.is_cancelled)
             with ThreadPoolExecutor(max_workers=3) as pool:
                 raw = list(pool.map(fetch, minerals))
             stations = self._group(raw, station_type, max_age, exclude_carriers, large_pad)
-            self.app.after(0, lambda: self._complete(stations, len(minerals)))
+            control.complete(stations, self._complete, len(minerals))
         except Exception as e:
             err = str(e)
-            self.app.after(0, lambda: self._failed(err))
+            control.failed(err)
 
     def _filter(self, results, station_type, max_age, exclude_carriers, large_pad):
-        results = [r for r in results if r.get('demand', 0) > 0]
-        stype = lambda r: r.get('stationType') or ''
-        if exclude_carriers and station_type != "Fleet Carrier":
-            results = [r for r in results if "FleetCarrier" not in stype(r)]
-        if station_type == "Orbital":
-            results = [r for r in results if any(k in stype(r) for k in ORBITAL_KW)
-                       and not any(k in stype(r) for k in SURFACE_KW)]
-        elif station_type == "Surface":
-            results = [r for r in results if any(k in stype(r) for k in SURFACE_KW)]
-        elif station_type == "Fleet Carrier":
-            results = [r for r in results if "FleetCarrier" in stype(r)]
-        elif station_type == "Megaship":
-            results = [r for r in results if "Mega" in stype(r)]
-        elif station_type == "Stronghold":
-            results = [r for r in results if "Stronghold" in stype(r)]
-        if large_pad:
-            results = [r for r in results if r.get('maxLandingPadSize') == 3]
-        return self.app._filter_results_by_age(results, max_age)
+        return MarketplaceAPI.filter_results(results, station_type, max_age, exclude_carriers, large_pad)
 
     def _group(self, raw, station_type, max_age, exclude_carriers, large_pad):
         """Group per-mineral results by station; most minerals bought first, then highest total price."""
@@ -315,12 +326,8 @@ class MultiMineralTab:
                                      sum(m.get('sellPrice', 0) for m in s['minerals'].values())), reverse=True)
         return stations[:50]
 
-    def _failed(self, err: str) -> None:
-        self.search_btn.config(state="normal")
-        self.status_label.config(text=t('marketplace.search_failed').format(error=err))
 
     def _complete(self, stations, mineral_count: int) -> None:
-        from datetime import datetime, timezone
         app = self.app
         self.search_btn.config(state="normal")
         self.tree.delete(*self.tree.get_children())
@@ -333,35 +340,23 @@ class MultiMineralTab:
         pp_names = list({s['info'].get('systemName') for s in stations if s['info'].get('systemName')})
         pp_data = SystemFinderAPI._batch_get_powerplay(pp_names) if pp_names else {}
 
-        def powerstate(system):
-            e = pp_data.get(system, {})
-            power, state = e.get('controlling_power', ''), e.get('power_state', '')
-            if power == '~none~':
-                return state or t('common.no_data')
-            return " / ".join(x for x in (power, state) if x) or t('common.no_data')
-
-        now = datetime.now(timezone.utc)
-        pad_map = {0: '?', 1: 'S', 2: 'M', 3: 'L'}
-
-        def age(r):
-            try:
-                diff = now - datetime.fromisoformat(r.get('updatedAt', '').replace('Z', '+00:00'))
-                mins = diff.total_seconds() / 60
-                return f"{int(mins)}m" if mins < 60 else f"{int(mins / 60)}h" if mins < 1440 else f"{int(mins / 1440)}d"
-            except Exception:
-                return "?"
-
         for s in stations:
             info = s['info']
             dist = info.get('distance')
             ls = info.get('distanceToArrival')
             parent = self.tree.insert("", "end", open=True, text="", values=(
                 f"{info.get('systemName', '')} / {info.get('stationName', '')[:25]}",
-                                pad_map.get(info.get('maxLandingPadSize'), '?'),
+                format_market_pad(info.get('maxLandingPadSize')),
                 f"{dist:.1f}" if dist is not None else "-",
-                f"{int(ls):,}" if ls is not None else "?", "", "",
-                powerstate(info.get('systemName', '')), ""))
+                f"{int(float(ls)):,}" if ls is not None else "?", "", "",
+                format_market_powerplay(pp_data.get(info.get('systemName', ''), {})), ""))
             for mineral, r in sorted(s['minerals'].items(), key=lambda kv: -kv[1].get('sellPrice', 0)):
                 self.tree.insert(parent, "end", text=app._commodity_map.get(mineral, mineral), values=(
-                    "", "", "", "", f"{r.get('demand', 0):,}", f"{r.get('sellPrice', 0):,} CR", "", age(r)))
+                    "", "", "", "", f"{r.get('demand', 0):,}", f"{r.get('sellPrice', 0):,} CR", "", format_relative_age(r.get('updatedAt')) or '?'))
         self.status_label.config(text=t('marketplace.multi_found').format(count=len(stations)))
+
+    def _on_station_type_change(self, *args):
+        carrier = self.app._station_type_rev_map.get(self.station_var.get(), self.station_var.get()) == 'Fleet Carrier'
+        if carrier:
+            self.exclude_carriers_var.set(False)
+        self.exclude_carriers_cb.config(state='disabled' if carrier else 'normal')

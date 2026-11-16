@@ -3,20 +3,19 @@ import math
 import threading
 import tkinter as tk
 import tkinter.font as tkfont
-import webbrowser
-from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from itertools import combinations
 from tkinter import ttk
 
 from localization import t
+from ui.search_control import SearchControl
 from marketplace_api import MarketplaceAPI
 from config import _load_cfg, update_config_value
 from ui.tooltip import ToolTip, add_header_tooltips
-from column_visibility_helper import ColumnVisibilityMixin, displayed_column
+from column_visibility_helper import ColumnVisibilityMixin
 from core.constants import get_menu_colors
-from app_utils import format_market_station_type, open_system_website
+from app_utils import create_action_button, format_market_station_type, open_system_website
 
 
 def sale_cargo(cargo, missions):
@@ -51,7 +50,8 @@ def _distance(first, second):
                      [float(second[k]) for k in ('systemX', 'systemY', 'systemZ')])
 
 
-def build_plans(cargo, markets):
+def build_plans(cargo, markets, is_cancelled=None):
+    total_cargo = sum(cargo.values())
     stations = {}
     for name, rows in markets:
         for row in rows:
@@ -87,7 +87,7 @@ def build_plans(cargo, markets):
             legs.append(leg)
             distance = distance + leg if distance is not None and leg is not None else None
         return {'stops': stops, 'sales': sales, 'total': total, 'sold': sold,
-                'unsold': sum(cargo.values()) - sold, 'distance': distance, 'legs': legs}
+                'unsold': total_cargo - sold, 'distance': distance, 'legs': legs}
 
     singles = [make_plan([station]) for station in stations.values()]
     if not singles:
@@ -99,7 +99,18 @@ def build_plans(cargo, markets):
                 plan['distance'] if plan['distance'] is not None else math.inf,
                 plan['stops'][0]['info'].get('distanceToArrival') or 0))
     pair_best = None
-    for a, b in combinations(stations.values(), 2):
+    upper_total = sum(count * max((s['prices'].get(name, {}).get('sellPrice', 0) for s in stations.values()), default=0)
+                      for name, count in cargo.items())
+    # This ignores demand, so it is a safe upper bound on every two-station payout.
+    pairs = () if score(best) >= (upper_total, total_cargo) else combinations(stations.values(), 2)
+    for a, b in pairs:
+        if is_cancelled and is_cancelled():
+            break
+        upper_pair = sum(count * max(a['prices'].get(name, {}).get('sellPrice', 0),
+                                     b['prices'].get(name, {}).get('sellPrice', 0))
+                         for name, count in cargo.items())
+        if (upper_pair, total_cargo) <= score(pair_best or best):
+            continue
         first, second = a, b
         if (b['info'].get('distance') if b['info'].get('distance') is not None else math.inf) < (
                 a['info'].get('distance') if a['info'].get('distance') is not None else math.inf):
@@ -107,6 +118,8 @@ def build_plans(cargo, markets):
         plan = make_plan([first, second])
         if plan and (pair_best is None or score(plan) > score(pair_best)):
             pair_best = plan
+            if score(pair_best) >= (upper_total, total_cargo):
+                break
     plans = [('one_stop', best), ('quick_sale', quick)]
     if pair_best and score(pair_best) > score(best):
         plans.append(('two_stops', pair_best))
@@ -140,7 +153,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.system_entry.bind('<FocusOut>', lambda event: self.system_entry.selection_clear())
         from system_autocomplete import SystemAutocomplete
         self._ac_system = SystemAutocomplete(self.system_entry, self.system_var, app)
-        ttk.Button(reference, text=t('marketplace.use_current'), command=self._use_current_system).pack(side='left')
+        create_action_button(reference, text=t('marketplace.use_current'), command=self._use_current_system).pack(side='left')
         filters = ttk.Frame(controls)
         filters.pack(fill='x', pady=8)
         self.large = tk.BooleanVar(value=self.preferences.get('large_pads', app.marketplace_large_pad_only.get()))
@@ -161,7 +174,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         for combo in (self.radius_combo, self.age_combo):
             combo.bind('<<ComboboxSelected>>', lambda event: event.widget.selection_clear(), add='+')
             combo.bind('<FocusOut>', lambda event: event.widget.selection_clear(), add='+')
-        self.button = ttk.Button(filters, text=t('marketplace.search'), command=self.search)
+        self.button = create_action_button(filters, primary=True, text=t('marketplace.search'), command=self.search)
         self.button.pack(side='left', padx=8)
         self.status = ttk.Label(controls, wraplength=1000)
         self.status.pack(anchor='w')
@@ -263,48 +276,54 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self._ac_system.hide()
 
     def _poll(self):
-        if self.plans and self.snapshot is not None and self.snapshot != self._cargo():
+        searching = getattr(self, '_search_control', None) and self._search_control.running
+        if not searching and self.plans and self.snapshot is not None and self.snapshot != self._cargo():
             self.status.config(text=t('sell_hold.changed'))
         self.frame.after(1000, self._poll)
 
     def search(self):
+        if not hasattr(self, '_search_control'):
+            self._search_control = SearchControl(self.app, self.button, self.status)
+        if self._search_control.running:
+            self._search_control.stop()
+            return
         system, cargo, protected = self._cargo()
-        self.tree.delete(*self.tree.get_children())
-        self.details.delete(*self.details.get_children())
-        self.plans.clear()
-        self.destinations.clear()
-        self.snapshot = (system, cargo, protected)
+        snapshot = (system, cargo, protected)
         self.summary.config(text=t('sell_hold.cargo').format(
             tons=sum(cargo.values()), reserved=sum(protected.values()), system=system or '?'))
         if not system or not cargo:
+            self.tree.delete(*self.tree.get_children())
+            self.details.delete(*self.details.get_children())
+            self.plans.clear()
+            self.destinations.clear()
             self.status.config(text=t('sell_hold.empty'))
             return
-        self.button.config(state='disabled')
+        self._search_control.start()
         self.status.config(text=t('sell_hold.searching'))
         options = (int(self.radius.get()), self.app._age_rev_map.get(self.age.get(), self.age.get()),
                    self.carriers.get(), self.large.get())
-        threading.Thread(target=self._worker, args=(self.snapshot, options), daemon=True).start()
+        threading.Thread(target=self._worker, args=(snapshot, options), daemon=True).start()
 
     def _worker(self, snapshot, options):
+        control = self._search_control
         try:
             system, cargo, protected = snapshot
             radius, age, carriers, large = options
             def fetch(name):
-                rows = MarketplaceAPI.search_buyers(name, system, radius, 30, carriers)
-                rows = self.app.multi_mineral_tab._filter(rows, 'All', age, carriers, large)
+                if control.is_cancelled():
+                    return name, []
+                rows = MarketplaceAPI.search_buyers(name, system, radius, 30, carriers, is_cancelled=control.is_cancelled)
+                rows = MarketplaceAPI.filter_results(rows, 'All', age, carriers, large)
                 rows = [row for row in rows if row.get('distance') is not None and row['distance'] <= radius]
                 return name, rows
             with ThreadPoolExecutor(max_workers=3) as pool:
                 markets = list(pool.map(fetch, cargo))
-            plans = build_plans(cargo, markets)
-            self.app.after(0, lambda: self._complete(snapshot, plans))
+            plans = build_plans(cargo, markets, is_cancelled=control.is_cancelled)
+            control.complete(plans, lambda rows: self._complete(snapshot, rows))
         except Exception as exc:
             message = str(exc)
-            self.app.after(0, lambda: self._failed(message))
+            control.failed(message)
 
-    def _failed(self, message):
-        self.button.config(state='normal')
-        self.status.config(text=t('marketplace.search_failed').format(error=message))
 
     def _complete(self, snapshot, plans):
         self.button.config(state='normal')

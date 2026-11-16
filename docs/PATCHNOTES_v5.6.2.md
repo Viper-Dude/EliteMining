@@ -8,7 +8,7 @@
 - Added Iridium to the Metals list under Commodity Market → Trade Commodities.
 
 - Fixed the Customize Columns scrollbar to match the selected theme throughout the app.
-
+commit and push, use the existing message
 - Added Sell My Hold under Commodity Market to compare cargo sale options, show station types and reserve mission cargo.
 
 - Added a Sidebar menu option to swap Cargo Monitor.

@@ -5,10 +5,11 @@ Provides nearby system lookup with full server-side filtering (security, allegia
 import requests
 import logging
 import sqlite3
-import json
 import re
 import datetime
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional
+
+from localization import t
 
 log = logging.getLogger(__name__)
 
@@ -135,11 +136,11 @@ class SystemFinderAPI:
         since a blocking HTTP call can't be aborted mid-flight from another thread.
         """
         if is_cancelled and is_cancelled():
-            print("[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment skipped (search already cancelled)")
+            log.debug("[SYSTEM_FINDER] Spansh PowerPlay enrichment skipped (search already cancelled)")
             return {}
         spansh_filters = cls._build_spansh_filters({'power': power, 'pp_state': pp_state})
         if not spansh_filters:
-            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment skipped (no filters built for power={power!r}, pp_state={pp_state!r})")
+            log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment skipped (no filters built for power={power!r}, pp_state={pp_state!r})")
             return {}
 
         payload = {
@@ -150,16 +151,16 @@ class SystemFinderAPI:
         }
 
         import time
-        print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment: querying {reference_system!r} (max {max_distance} LY) with filters={spansh_filters}")
+        log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment: querying {reference_system!r} (max {max_distance} LY) with filters={spansh_filters}")
 
         try:
             _t0 = time.time()
             response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.ENRICHMENT_TIMEOUT)
-            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment: request took {time.time() - _t0:.1f}s")
+            log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment: request took {time.time() - _t0:.1f}s")
             response.raise_for_status()
             data = response.json()
             results = data.get('results', [])
-            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment: got {len(results)} raw results from Spansh")
+            log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment: got {len(results)} raw results from Spansh")
 
             pp_systems = {}
             for system in results:
@@ -178,10 +179,10 @@ class SystemFinderAPI:
                     'updated_at': system.get('updated_at', ''),
                     'distance': system.get('distance', 0),
                 }
-            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment: {len(pp_systems)} within {max_distance} LY after distance filter")
+            log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment: {len(pp_systems)} within {max_distance} LY after distance filter")
             return pp_systems
         except Exception as e:
-            print(f"[SYSTEM_FINDER DEBUG] Spansh PowerPlay enrichment failed: {e}")
+            log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment failed: {e}")
             return {}
 
     # PowerPlay states Spansh's systems-search can filter on directly (Expansion/Contested
@@ -257,10 +258,10 @@ class SystemFinderAPI:
         pp_data = {}
         last_call = 0.0
         truncated = system_names[:50]
-        print(f"[SYSTEM_FINDER DEBUG] Spansh per-system PowerPlay lookup: {len(truncated)} systems to query (of {len(system_names)} total)")
+        log.debug(f"[SYSTEM_FINDER] Spansh per-system PowerPlay lookup: {len(truncated)} systems to query (of {len(system_names)} total)")
         for i, system_name in enumerate(truncated):
             if is_cancelled and is_cancelled():
-                print(f"[SYSTEM_FINDER DEBUG] Spansh per-system PowerPlay lookup cancelled at {i}/{len(truncated)}")
+                log.debug(f"[SYSTEM_FINDER] Spansh per-system PowerPlay lookup cancelled at {i}/{len(truncated)}")
                 break
 
             elapsed = time.time() - last_call
@@ -273,16 +274,16 @@ class SystemFinderAPI:
                     'size': 1,
                     'sort': [{'distance': {'direction': 'asc'}}],
                 }
-                print(f"[SYSTEM_FINDER DEBUG] Spansh call {i+1}/{len(truncated)}: POST {cls.SPANSH_URL} {payload}")
+                log.debug(f"[SYSTEM_FINDER] Spansh call {i+1}/{len(truncated)}: POST {cls.SPANSH_URL} {payload}")
                 response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
                 response.raise_for_status()
                 results = response.json().get('results', [])
                 if not results:
-                    print(f"[SYSTEM_FINDER DEBUG]   -> no results for {system_name!r}")
+                    log.debug(f"[SYSTEM_FINDER]   -> no results for {system_name!r}")
                     continue
                 system = results[0]
                 if system.get('name', '') != system_name:
-                    print(f"[SYSTEM_FINDER DEBUG]   -> name mismatch: asked {system_name!r}, got {system.get('name', '')!r}, skipping")
+                    log.debug(f"[SYSTEM_FINDER]   -> name mismatch: asked {system_name!r}, got {system.get('name', '')!r}, skipping")
                     continue
                 # Unoccupied systems have no 'controlling_power' (there is no controller) but
                 # Spansh still reports the nearby/contesting power in the 'power' list - fall
@@ -291,22 +292,22 @@ class SystemFinderAPI:
                 controlling_power = cls._normalize_power_name(power)
                 power_state = system.get('power_state', '')
                 if not controlling_power and power_state not in cls.SPANSH_BACKED_PP_STATES:
-                    print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: no usable PowerPlay data")
+                    log.debug(f"[SYSTEM_FINDER]   -> {system_name!r}: no usable PowerPlay data")
                     continue
                 # Still no power at all (e.g. genuinely no PowerPlay activity nearby) — store
                 # the sentinel like every other PP write path (Inara fetch, EDDN cache).
                 if not controlling_power:
                     controlling_power = '~none~'
-                print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: {controlling_power} / {power_state}")
+                log.debug(f"[SYSTEM_FINDER]   -> {system_name!r}: {controlling_power} / {power_state}")
                 pp_data[system_name] = {
                     'controlling_power': controlling_power,
                     'power_state': power_state,
                     'updated_at': system.get('updated_at', ''),
                 }
             except Exception as e:
-                print(f"[SYSTEM_FINDER DEBUG]   -> {system_name!r}: request failed: {e}")
+                log.debug(f"[SYSTEM_FINDER]   -> {system_name!r}: request failed: {e}")
                 continue
-        print(f"[SYSTEM_FINDER DEBUG] Spansh per-system PowerPlay lookup: {len(pp_data)}/{len(truncated)} systems returned PowerPlay data")
+        log.debug(f"[SYSTEM_FINDER] Spansh per-system PowerPlay lookup: {len(pp_data)}/{len(truncated)} systems returned PowerPlay data")
         return pp_data
 
     @classmethod
@@ -321,7 +322,7 @@ class SystemFinderAPI:
                     ' WHERE system_name = ? COLLATE NOCASE',
                     (system_name,)
                 ).fetchone()
-            if row and row[0]:
+            if row and (row[0] or row[1]):
                 return {'controlling_power': cls._normalize_power_name(row[0]), 'power_state': row[1], 'updated_at': row[2]}
         except Exception as e:
             log.debug(f"[SYSTEM_FINDER] EDDN powerplay lookup error: {e}")
@@ -436,8 +437,10 @@ class SystemFinderAPI:
         Returns:
             List of systems with full status info, sorted by distance
         """
+        if is_cancelled and is_cancelled():
+            return []
         if progress_callback:
-            progress_callback(0, 100, "Searching systems...")
+            progress_callback(0, 100, t('system_finder.searching'))
         
         max_results = max_results or cls.MAX_RESULTS
         filters = filters or {}
@@ -461,11 +464,10 @@ class SystemFinderAPI:
             payload['filters'] = spansh_filters
         
         log.info(f"[SYSTEM_FINDER] Searching near {reference_system} with filters: {filters}")
-        print(f"[SYSTEM_FINDER DEBUG] Spansh payload: {payload}")
         
         try:
             if progress_callback:
-                progress_callback(20, 100, "Searching Spansh galaxy database...")
+                progress_callback(20, 100, t('system_finder.searching'))
             
             response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
             response.raise_for_status()
@@ -475,11 +477,13 @@ class SystemFinderAPI:
             results = data.get('results', [])
             
             log.info(f"[SYSTEM_FINDER] Spansh returned {len(results)} of {total_count} matching systems")
-            print(f"[SYSTEM_FINDER DEBUG] Found {total_count} total, returned {len(results)}")
             
             if progress_callback:
-                progress_callback(80, 100, f"Processing {len(results)} results...")
+                progress_callback(80, 100, t('system_finder.processing').format(count=len(results)))
             
+            if not results:
+                return []
+
             # Batch-fetch powerplay data from local EDDN cache for all returned systems
             system_names = [s.get('name', '') for s in results if s.get('name')]
             pp_cache = cls._batch_get_powerplay(system_names)
@@ -529,18 +533,16 @@ class SystemFinderAPI:
                 converted = converted[:max_results]
 
             if progress_callback:
-                progress_callback(100, 100, f"Found {len(converted)} systems")
+                progress_callback(100, 100, t('system_finder.results_count').format(count=len(converted)))
 
             return converted
             
         except requests.exceptions.RequestException as e:
             log.error(f"[SYSTEM_FINDER] Spansh API error: {e}")
-            print(f"[SYSTEM_FINDER DEBUG] API error: {e}")
-            return []
+            raise
         except Exception as e:
             log.error(f"[SYSTEM_FINDER] Unexpected error: {e}")
-            print(f"[SYSTEM_FINDER DEBUG] Unexpected error: {e}")
-            return []
+            raise
     
     @classmethod
     def _build_spansh_filters(cls, filters: Dict[str, str]) -> Dict:
@@ -652,7 +654,7 @@ class SystemFinderAPI:
         if not allegiance or allegiance == 'None':
             allegiance = 'Independent'  # Unpopulated systems are in Independent space
         
-        population = system.get('population', 0)
+        population = system.get('population')
         
         system_name = system.get('name', '')
 
@@ -664,9 +666,9 @@ class SystemFinderAPI:
             pp_state = cached_pp['power_state'] or None
             pp_updated_at = cached_pp.get('updated_at')
         else:
-            pp_power = None
+            pp_power = cls._normalize_power_name(system.get('controlling_power') or (system.get('power') or [None])[0])
             pp_state = system.get('power_state') or None
-            pp_updated_at = None
+            pp_updated_at = system.get('updated_at') if (pp_power or pp_state) else None
 
         # EDDN cache only ever infers a generic 'Unoccupied' — it never emits 'Expansion'
         # or a specific controller for that case. If Spansh's own data disagrees (a real
@@ -680,7 +682,7 @@ class SystemFinderAPI:
 
         return {
             'systemName': system_name,
-            'distance': system.get('distance', 0),
+            'distance': system.get('distance'),
             'systemAddress': system.get('id64'),
             'coords': {
                 'x': system.get('x', 0),
@@ -701,7 +703,7 @@ class SystemFinderAPI:
     
     @classmethod
     def search_material_traders(cls, reference_system: str, trader_type: str,
-                                max_results: int = None, progress_callback=None) -> List[Dict]:
+                                max_results: int = None, progress_callback=None, is_cancelled=None) -> List[Dict]:
         """
         Search for the nearest stations with a specific material trader using Spansh API.
 
@@ -719,8 +721,10 @@ class SystemFinderAPI:
         as it may be 'has_encoded_materials_trader' / 'has_manufactured_materials_trader' /
         'has_raw_materials_trader' boolean flags instead of a single typed field.
         """
+        if is_cancelled and is_cancelled():
+            return []
         if progress_callback:
-            progress_callback(0, 100, f"Searching for {trader_type} material traders...")
+            progress_callback(0, 100, t('system_finder.searching_traders'))
 
         max_results = max_results or cls.MAX_RESULTS
 
@@ -742,11 +746,10 @@ class SystemFinderAPI:
         }
 
         log.info(f"[SYSTEM_FINDER] Searching {trader_type} material traders near {reference_system}")
-        print(f"[SYSTEM_FINDER DEBUG] Material trader payload: {payload}")
 
         try:
             if progress_callback:
-                progress_callback(20, 100, "Searching Spansh station database...")
+                progress_callback(20, 100, t('system_finder.searching_traders'))
 
             response = requests.post(cls.SPANSH_STATIONS_URL, json=payload, timeout=cls.TIMEOUT)
             response.raise_for_status()
@@ -756,26 +759,23 @@ class SystemFinderAPI:
             results = data.get('results', [])
 
             log.info(f"[SYSTEM_FINDER] Spansh returned {len(results)} of {total_count} material trader stations")
-            print(f"[SYSTEM_FINDER DEBUG] Material traders found: {total_count} total, {len(results)} returned")
 
             if progress_callback:
-                progress_callback(80, 100, f"Processing {len(results)} results...")
+                progress_callback(80, 100, t('system_finder.processing').format(count=len(results)))
 
             converted = [cls._convert_spansh_station(s, trader_type) for s in results]
 
             if progress_callback:
-                progress_callback(100, 100, f"Found {len(converted)} {trader_type} material traders")
+                progress_callback(100, 100, t('system_finder.trader_results_count').format(count=len(converted)))
 
             return converted
 
         except requests.exceptions.RequestException as e:
             log.error(f"[SYSTEM_FINDER] Spansh stations API error: {e}")
-            print(f"[SYSTEM_FINDER DEBUG] Material trader API error: {e}")
-            return []
+            raise
         except Exception as e:
             log.error(f"[SYSTEM_FINDER] Unexpected error in material trader search: {e}")
-            print(f"[SYSTEM_FINDER DEBUG] Material trader unexpected error: {e}")
-            return []
+            raise
 
     @classmethod
     def _convert_spansh_station(cls, station: Dict, trader_type: str = '') -> Dict:
@@ -792,7 +792,7 @@ class SystemFinderAPI:
 
         return {
             'systemName':        station.get('system_name', ''),
-            'distance':          station.get('distance', 0),
+            'distance':          station.get('distance'),
             'stationName':       station.get('name', ''),
             'stationType':       station.get('type') or '-',
             'landingPad':        pad_size,
@@ -801,18 +801,6 @@ class SystemFinderAPI:
             'traderType':        trader_type,
         }
 
-    # Legacy method for backwards compatibility - now uses Spansh
-    @classmethod
-    def get_systems_with_status(cls, reference_system: str, max_range: int = 100,
-                                 progress_callback=None) -> List[Dict]:
-        """
-        Legacy method - now uses Spansh without filters.
-        Kept for backwards compatibility.
-        """
-        return cls.search_systems(reference_system, filters={}, 
-                                  max_results=cls.MAX_RESULTS, 
-                                  progress_callback=progress_callback)
-    
     @classmethod
     def get_system_status(cls, system_name: str) -> Optional[Dict]:
         """
@@ -849,53 +837,10 @@ class SystemFinderAPI:
                 log.warning(f"[SYSTEM_FINDER] System name mismatch: {system.get('name')} != {system_name}")
                 return None
             
-            # Get state (show 'Normal' if no active state)
-            state = system.get('controlling_minor_faction_state')
-            if not state or state == 'None':
-                state = 'Normal'
-            
-            # Get allegiance - default to Independent for unpopulated
-            allegiance = system.get('allegiance')
-            if not allegiance or allegiance == 'None':
-                allegiance = 'Independent'
-            
-            # Get economy
-            primary_economy = system.get('primary_economy') or '-'
-            secondary_economy = system.get('secondary_economy')
-            
-            # Powerplay — EDDN cache preferred. If the cache only has the generic
-            # inferred 'Unoccupied' (EDDN/journal never emits it explicitly, so it's a
-            # local guess), fall back to Spansh's own controlling_power/power_state for
-            # this same response when Spansh reports something more specific.
             cached_pp = cls._get_powerplay_from_cache(system_name)
-            if cached_pp:
-                power = cached_pp['controlling_power']
-                power_state = cached_pp['power_state'] or None
-                log.debug(f"[POWERPLAY] EDDN cache hit: power={power!r} state={power_state!r}")
-            else:
-                power = None
-                power_state = None
-                log.debug(f"[POWERPLAY] No EDDN cache entry for {system_name!r}")
+            pp_cache = {system['name']: cached_pp} if cached_pp else {}
+            return cls._convert_spansh_system(system, pp_cache)
 
-            if power == '~none~' and (not power_state or power_state == 'Unoccupied'):
-                spansh_state = system.get('power_state') or None
-                if spansh_state and spansh_state != 'Unoccupied':
-                    power = system.get('controlling_power') or power
-                    power_state = spansh_state
-                    log.debug(f"[POWERPLAY] Spansh fallback for {system_name!r}: power={power!r} state={power_state!r}")
-
-            return {
-                'security': system.get('security') or 'Anarchy',
-                'allegiance': allegiance,
-                'government': system.get('government') or '-',
-                'state': state,
-                'economy': {'primary': primary_economy, 'secondary': secondary_economy},
-                'population': system.get('population', 0),
-                'faction': system.get('controlling_minor_faction') or '-',
-                'power': power,
-                'power_state': power_state,
-            }
-            
         except requests.exceptions.RequestException as e:
             log.error(f"[SYSTEM_FINDER] Spansh API error for {system_name}: {e}")
             return None
@@ -903,15 +848,6 @@ class SystemFinderAPI:
             log.error(f"[SYSTEM_FINDER] Error getting system status: {e}")
             return None
     
-    @classmethod
-    def filter_systems(cls, systems: List[Dict], filters: Dict[str, Any]) -> List[Dict]:
-        """
-        Legacy local filter method - no longer needed with Spansh server-side filtering.
-        Kept for backwards compatibility but just returns systems unchanged.
-        """
-        # With Spansh, filtering is done server-side, so this is a no-op
-        return systems
-
 
 # Predefined filter options for UI dropdowns
 SECURITY_OPTIONS = ['Any', 'High', 'Medium', 'Low', 'Anarchy']
@@ -957,12 +893,7 @@ ELITE_POWERS = [
 ]
 
 # Power filter options for system search (includes Any)
-POWER_FILTER_OPTIONS = [
-    'Any', 'Aisling Duval', 'Archon Delaine',
-    'Arissa Lavigny-Duval', 'Denton Patreus', 'Edmund Mahon',
-    'Felicia Winters', 'Jerome Archer', 'Li Yong-Rui', 'Nakato Kaine',
-    'Pranav Antal', 'Yuri Grom', 'Zemina Torval'
-]
+POWER_FILTER_OPTIONS = ['Any', *ELITE_POWERS[1:]]
 
 # Powerplay state filter options. Unoccupied/Exploited/Fortified/Stronghold are searched via
 # Spansh; Expansion/Contested aren't in Spansh's index, so those search the local EDDN cache

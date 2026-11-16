@@ -1454,7 +1454,8 @@ class UserDatabase:
             log.error(f"Error creating user database tables: {e}")
             raise
     
-    def _normalize_body_name(self, body_name: str, system_name: str) -> str:
+    @staticmethod
+    def _normalize_body_name(body_name: str, system_name: str) -> str:
         """Normalize body name by removing system name prefix and fixing case issues
         
         This ensures consistency between EDTools data (e.g., "2 A Ring") and 
@@ -1762,6 +1763,27 @@ class UserDatabase:
             log.error(f"Error getting hotspot data: {e}")
             return None
     
+    def bulk_get_reserve_levels_for_rings(self, system_names: list) -> dict:
+        from contextlib import closing
+        result = {}
+        if not system_names:
+            return result
+        systems = list(set(system_names))
+        try:
+            with closing(sqlite3.connect(self.db_path)) as conn:
+                for offset in range(0, len(systems), 500):
+                    chunk = systems[offset:offset + 500]
+                    placeholders = ','.join('?' for _ in chunk)
+                    rows = conn.execute(
+                        f'SELECT system_name, body_name, reserve_level FROM hotspot_data '
+                        f'WHERE system_name IN ({placeholders}) AND reserve_level IS NOT NULL', chunk)
+                    for system, body, reserve in rows:
+                        if reserve:
+                            result.setdefault((system, body), reserve)
+        except Exception as e:
+            log.error(f"Error bulk getting reserve levels: {e}")
+        return result
+
     def get_reserve_level(self, system_name: str, body_name: str) -> Optional[str]:
         """Get reserve level for a ring
         
@@ -2556,6 +2578,22 @@ class UserDatabase:
             else:
                 return f"{visit_count} visits"
     
+    def get_recent_visited_systems(self, limit: int = 10) -> List[Dict]:
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute('''
+                    SELECT system_name AS system, last_visit_date, visit_count AS visits
+                    FROM visited_systems
+                    WHERE visit_count > 0 AND last_visit_date > '0001-01-01T00:00:00Z'
+                    ORDER BY julianday(last_visit_date) DESC, system_name COLLATE NOCASE
+                    LIMIT ?
+                ''', (limit,)).fetchall()
+                return [dict(row) for row in rows]
+        except Exception as e:
+            log.error(f"Error getting recently visited systems: {e}")
+            return []
+
     def get_last_visited_system(self) -> Optional[str]:
         """Get the most recently visited system from the database.
         

@@ -17,6 +17,7 @@ from app_utils import open_system_website
 from config import _load_cfg, update_config_value, scaled_font, scaled_px
 from core.constants import get_menu_colors
 from localization import t, get_material
+from mining_statistics import session_date
 from ui.tooltip import ToolTip, add_header_tooltips
 
 
@@ -26,14 +27,6 @@ def material_names(row):
     if best and best.lower() not in ('unknown', 'none'):
         names.append(best)
     return sorted(set(name.strip() for name in names))
-
-
-def session_date(value):
-    try:
-        stamp = datetime.fromisoformat(value.replace('Z', '+00:00'))
-        return stamp.replace(tzinfo=stamp.tzinfo or timezone.utc).astimezone(timezone.utc)
-    except (ValueError, TypeError):
-        return None
 
 
 def prepare_sessions(rows, parse_elapsed, ship_lookup):
@@ -112,6 +105,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.owner = owner
         self.parent = parent
         self.rows = []
+        self.visited_rows = []
         self.lookups = {}
         self.loading = False
         self.preferences = _load_cfg().get('session_statistics', {})
@@ -156,12 +150,28 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.overview.pack(fill='both', expand=True)
         self.best_tree = self._table('best_locations', ('system', 'body', 'distance', 'ls', 'mineral_avg', 'mineral_best', 'mineral_hits', 'best', 'avg', 'low', 'count', 'hours', 'duration', 'date', 'mineral'))
         self.recent_tree = self._table('recent_locations', ('system', 'body', 'distance', 'ls', 'date', 'mineral', 'mineral_avg', 'mineral_best', 'mineral_hits', 'tph', 'ship', 'duration', 'count', 'hours'))
+        self.visited_tree = self._table('recent_systems', ('system', 'date', 'distance', 'visits'))
+        self.book.bind('<<NotebookTabChanged>>', self._on_tab_changed)
         self.parent.bind('<Map>', self._on_map, add='+')
         self.parent.after_idle(self.reload)
 
     def _on_map(self, event):
         if event.widget is self.parent:
             self.reload()
+
+    def _on_tab_changed(self, event=None):
+        self._update_filter_controls()
+        if self._visits_selected():
+            self.reload()
+
+    def _visits_selected(self):
+        return self.book.select() == str(self.visited_tree.master.master)
+
+    def _update_filter_controls(self):
+        visits = self._visits_selected()
+        for combo in (self.ship_combo, self.mineral_combo, self.period_combo):
+            combo.configure(state='disabled' if visits else 'readonly')
+        self.note.configure(text=t('statistics_expanded.visits_scope' if visits else 'statistics_expanded.scope'))
 
     def _table(self, name, columns):
         pane = ttk.Frame(self.book, padding=8)
@@ -195,8 +205,11 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         tree.bind('<ButtonRelease-1>', lambda event: self._save_widths(tree, name), add='+')
         report_tips = {'system': 'system', 'body': 'body', 'ship': 'ship', 'date': 'datetime',
                        'duration': 'duration', 'tph': 'tph'}
+        if name == 'recent_systems':
+            report_tips.pop('date')
         add_header_tooltips(tree, lambda column: t('tooltips.reports_' + report_tips[column])
-                            if column in report_tips else t('statistics_expanded.header_tips.' + column))
+                            if column in report_tips else t('statistics_expanded.header_tips.' +
+                            ('visit_date' if name == 'recent_systems' and column == 'date' else column)))
         x = ttk.Scrollbar(table, orient='horizontal', command=tree.xview)
         y = ttk.Scrollbar(table, orient='vertical', command=tree.yview)
         tree.configure(xscrollcommand=x.set, yscrollcommand=y.set)
@@ -205,7 +218,8 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         y.grid(row=0, column=1, sticky='ns')
         table.rowconfigure(0, weight=1)
         table.columnconfigure(0, weight=1)
-        ToolTip(header, t('statistics_expanded.ranking_help' if name == 'best_locations' else 'statistics_expanded.recent_help'))
+        if name != 'recent_systems':
+            ToolTip(header, t('statistics_expanded.ranking_help' if name == 'best_locations' else 'statistics_expanded.recent_help'))
         self.lookups[tree] = {}
         return tree
 
@@ -242,7 +256,12 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                     self._add_location_distances(rows, current_system)
                 else:
                     rows = []
-                results.put(('loaded', rows))
+                user_db = getattr(getattr(app, 'cargo_monitor', None), 'user_db', None)
+                visited = user_db.get_recent_visited_systems(limit=20) if user_db else []
+                for row in visited:
+                    row['_stamp'] = session_date(row['last_visit_date'])
+                self._add_location_distances(visited, current_system, include_ls=False)
+                results.put(('loaded', (rows, visited)))
             except Exception:
                 logging.getLogger('EliteMining').exception('Could not load session statistics')
                 results.put(('failed', None))
@@ -256,11 +275,13 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             self.parent.after(50, lambda: self._poll_load(results))
             return
         if status == 'loaded':
-            self._loaded(rows)
+            self._loaded(*rows)
         else:
             self._load_failed()
 
-    def _add_location_distances(self, rows, current_system):
+    def _add_location_distances(self, rows, current_system, include_ls=True):
+        if not rows:
+            return
         app = self.owner.main_app
         finder = getattr(app, 'ring_finder', None)
         user_db = getattr(getattr(app, 'cargo_monitor', None), 'user_db', None)
@@ -290,7 +311,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                 target = coords(system)
                 distance = (0.0 if current_system and system.casefold() == current_system.casefold()
                             else finder._calculate_distance(reference, target) if reference and target else None)
-                ls = user_db.get_ls_distance(system, body) if user_db else None
+                ls = user_db.get_ls_distance(system, body) if user_db and include_ls else None
                 locations[key] = distance, ls
             row['_distance'], row['_ls'] = locations[key]
 
@@ -299,9 +320,10 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.refresh_button.configure(state='normal')
         self.note.configure(text=t('statistics_expanded.load_failed'))
 
-    def _loaded(self, rows):
+    def _loaded(self, rows, visited=None):
         self.loading = False
         self.rows = rows
+        self.visited_rows = visited or []
         self.refresh_button.configure(state='normal')
         ships = sorted({row['_ship'] for row in rows if row['_ship']})
         font = tkfont.Font(font=self.ship_combo.cget('font'))
@@ -315,6 +337,20 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             self.mineral.set(get_material(self._initial_mineral))
             self._initial_mineral = ''
         self.apply_filters()
+        self._show_visited_systems()
+
+    def _show_visited_systems(self):
+        tree = self.visited_tree
+        tree.delete(*tree.get_children())
+        self.lookups[tree].clear()
+        for row in self.visited_rows:
+            values = dict(system=row['system'], date=self._date(row), visits=row['visits'],
+                          distance=f"{row['_distance']:.1f}" if row.get('_distance') is not None else '—')
+            item = tree.insert('', 'end', values=[values.get(col, '') for col in tree['columns']])
+            self.lookups[tree][item] = row
+        if getattr(tree, '_sort_column', None):
+            tree._sort_reverse = not tree._sort_reverse
+            self._sort(tree, tree._sort_column)
 
     @staticmethod
     def _date(row):
@@ -328,7 +364,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         update_config_value('session_statistics', self.preferences.copy())
         rows = select_sessions(self.rows, ship, mineral, days)
         stats = self.owner._calculate_session_statistics(rows)
-        self.note.configure(text=t('statistics_expanded.scope'))
+        self._update_filter_controls()
         self._overview(rows, stats)
         best, recent = location_summary(rows, mineral)
         for tree in (self.best_tree, self.recent_tree):
@@ -440,6 +476,14 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         reverse = getattr(tree, '_sort_column', None) != column or not getattr(tree, '_sort_reverse', False)
         def key(item):
             value = tree.set(item, column)
+            if tree is self.visited_tree:
+                row = self.lookups[tree][item]
+                if column == 'distance':
+                    return row['_distance'] if row.get('_distance') is not None else (float('-inf') if reverse else float('inf'))
+                if column == 'date':
+                    return row['_stamp'] or datetime.min.replace(tzinfo=timezone.utc)
+                if column == 'visits':
+                    return row['visits']
             if column == 'duration':
                 return self.owner._parse_elapsed_to_hours(value)
             return (float('-inf') if value == '—' else float(value)) if column in ('tph', 'best', 'avg', 'low', 'count', 'hours', 'distance', 'ls', 'mineral_avg', 'mineral_best', 'mineral_hits') else value.casefold()
@@ -465,7 +509,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
 
     @staticmethod
     def _open_report(row):
-        if row['_report'] and os.path.exists(row['_report']):
+        if row.get('_report') and os.path.exists(row['_report']):
             os.startfile(row['_report'])
 
     def _menu(self, event, tree):
@@ -481,8 +525,9 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             menu.add_command(label=t('context_menu.open_' + site),
                              command=lambda service=site: open_system_website(row['system'], service))
         menu.add_separator()
-        menu.add_command(label=t('statistics_expanded.open_report'), command=lambda: self._open_report(row),
-                         state='normal' if row['_report'] and os.path.exists(row['_report']) else 'disabled')
+        if '_report' in row:
+            menu.add_command(label=t('statistics_expanded.open_report'), command=lambda: self._open_report(row),
+                             state='normal' if row['_report'] and os.path.exists(row['_report']) else 'disabled')
         app = self.owner.main_app
         menu.add_command(label=t('statistics_expanded.find_location'), command=lambda: self._find_location(row),
                          state='normal' if app and hasattr(app, 'ring_finder') else 'disabled')

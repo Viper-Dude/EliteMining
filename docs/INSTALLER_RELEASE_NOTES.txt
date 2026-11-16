@@ -1,21 +1,9 @@
-﻿What's new in EliteMining v5.6.3
+﻿What's new in EliteMining v5.6.4
 
-Hotfixes in v5.6.3
+- General optimisations for more reliable searches and results.
 
-- Fixed Sell My Hold freezing and going blank while a mining session was running.
+- Statistics now shows your commander's last 20 visited systems, with dates, distances and visit counts.
 
-- Fixed unwanted column stretching in Sell My Hold.
+- Multiple Prices now includes all mining commodities.
 
-- Fixed excessive decimal places in the Sell My Hold LS column.
-
-Included changes from v5.6.2
-
-- Reworked Mining Statistics with its own tab, filters, mineral performance, recent progress and your best and latest mining locations.
-
-- Added Iridium to the Metals list under Commodity Market → Trade Commodities.
-
-- Fixed the Customize Columns scrollbar to match the selected theme throughout the app.
-
-- Added Sell My Hold under Commodity Market to compare cargo sale options, show station types and reserve mission cargo.
-
-- Added a Sidebar menu option to swap Cargo Monitor.
+- Fixed missing Fleet Carriers and unknown distances in commodity searches.

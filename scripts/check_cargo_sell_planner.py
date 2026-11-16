@@ -94,7 +94,7 @@ class CargoSellPlannerTests(unittest.TestCase):
         self.assertEqual(build_plans({'Gold': 100}, [('Gold', [])]), [])
 
     def test_system_links_encode_names(self):
-        with patch('cargo_sell_planner.webbrowser.open') as open_url:
+        with patch('webbrowser.open') as open_url:
             for site, prefix in (
                 ('inara', 'https://inara.cz/elite/starsystem/?search='),
                 ('edsm', 'https://www.edsm.net/en/system/id/0/name/'),
@@ -183,7 +183,7 @@ class CargoSellPlannerTests(unittest.TestCase):
                 self.assertEqual(tab._row_systems(tab.tree, plan_row), ['Sol', 'Achenar'])
                 with patch.object(tab.tree, 'identify_region', return_value='cell'), \
                      patch.object(tab.tree, 'identify_row', return_value=plan_row), \
-                     patch('cargo_sell_planner.webbrowser.open') as open_url:
+                     patch('webbrowser.open') as open_url:
                     tab._open_row_system(SimpleNamespace(x=10, y=30), tab.tree)
                     open_url.assert_called_once_with('https://inara.cz/elite/starsystem/?search=Sol')
                 tab.plans[plan_row]['stops'] = original_stops

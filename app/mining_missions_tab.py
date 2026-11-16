@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timezone
 
 from config import scaled_font
+from app_utils import bind_mousewheel_recursive
 
 log = logging.getLogger("EliteMining.MissionsTab")
 
@@ -40,6 +41,8 @@ class MiningMissionsTab(tk.Frame):
         self.configure(bg=self.bg_color)
         self._build_ui()
         self._register_tracker_callback()
+        self.bind('<Map>', self._on_map, add='+')
+        self._countdown_after_id = self.after(30000, self._tick_countdowns)
     
     def _setup_colors(self):
         """Setup theme colors"""
@@ -131,7 +134,7 @@ class MiningMissionsTab(tk.Frame):
         scrollbar.grid(row=0, column=1, sticky="ns")
         
         # Bind mousewheel
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        bind_mousewheel_recursive(self.canvas, self._on_mousewheel)
         
         # Initial refresh
         self._refresh_missions()
@@ -143,6 +146,25 @@ class MiningMissionsTab(tk.Frame):
     def _on_mousewheel(self, event):
         """Handle mousewheel scrolling"""
         self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        return 'break'
+
+    def _on_map(self, event):
+        if event.widget is self:
+            self._update_countdowns()
+
+    def _update_countdowns(self):
+        from localization import t
+        for widgets in self._mission_cards.values():
+            text = self._format_time_remaining(widgets['expiry'])
+            widgets['time_label'].configure(
+                text=text, fg='#ff6666' if text == t('mining_missions.expired') else self.fg_dim)
+
+    def _tick_countdowns(self):
+        self._countdown_after_id = None
+        if self.winfo_viewable():
+            self._update_countdowns()
+        self._countdown_after_id = self.after(30000, self._tick_countdowns)
+
     
     def _register_tracker_callback(self):
         """Register callback with mission tracker"""
@@ -252,6 +274,7 @@ class MiningMissionsTab(tk.Frame):
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
         self._show_no_missions_message()
+        bind_mousewheel_recursive(self.scrollable_frame, self._on_mousewheel)
         # Clear status bar
         self.status_label.configure(text="")
     
@@ -271,6 +294,7 @@ class MiningMissionsTab(tk.Frame):
             row = i // 2  # 0, 0, 1, 1, 2, 2, ...
             col = i % 2   # 0, 1, 0, 1, 0, 1, ...
             self._create_mission_card(mission, cargo_items, i, row, col)
+        bind_mousewheel_recursive(self.scrollable_frame, self._on_mousewheel)
     
     def _update_mission_values(self, missions: list, cargo_items: Dict[str, int]):
         """Update existing mission cards in-place without rebuilding"""
@@ -516,13 +540,14 @@ class MiningMissionsTab(tk.Frame):
         
         # Time remaining (right side of row2)
         time_text = self._format_time_remaining(expiry)
-        tk.Label(
+        time_label = tk.Label(
             row2,
             text=time_text,
             bg=self.accent_bg,
-            fg="#ff6666" if "Expired" in time_text else self.fg_dim,
+            fg="#ff6666" if time_text == t('mining_missions.expired') else self.fg_dim,
             font=scaled_font(8)
-        ).pack(side="right")
+        )
+        time_label.pack(side="right")
         
         # Row 3: Reward info on separate line
         if reward:
@@ -550,7 +575,9 @@ class MiningMissionsTab(tk.Frame):
                 'commodity_label': commodity_label,
                 'cargo_bar_fill': cargo_bar_fill,
                 'delivered_label': delivered_label,
-                'delivered_bar_fill': delivered_bar_fill
+                'delivered_bar_fill': delivered_bar_fill,
+                'time_label': time_label,
+                'expiry': expiry
             }
     
     def _format_time_remaining(self, expiry: str) -> str:
@@ -719,10 +746,8 @@ class MiningMissionsTab(tk.Frame):
         except:
             pass
         
-        # Unbind mousewheel
-        try:
-            self.canvas.unbind_all("<MouseWheel>")
-        except:
-            pass
+        if self._countdown_after_id is not None:
+            self.after_cancel(self._countdown_after_id)
+            self._countdown_after_id = None
         
         super().destroy()

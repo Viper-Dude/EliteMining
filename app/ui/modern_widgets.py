@@ -207,7 +207,8 @@ def _blend(c1, c2, t):
 
 
 # Primary-action labels (letters only, lowercase): EN + DE
-_SEARCH_WORDS = {"search", "suchen", "calculatedistance", "entfernungberechnen"}
+_SEARCH_WORDS = {"search", "suchen", "stop", "stopp", "stopping", "wirdgestoppt",
+                 "calculatedistance", "entfernungberechnen"}
 
 
 def _letters(text):
@@ -247,6 +248,12 @@ class ModernButton(RoundedButton):
         """Search buttons are the primary action: orange fill + bold, like the Hotspots Finder one."""
         if self._fill and _is_green(self._fill) and _letters(self._text) not in _KEEP_GREEN:
             self._fill = None
+        from localization import t
+        self._bookmark_action = next((action for action in ('add', 'edit', 'delete')
+                                     if _letters(self._text) == _letters(t(f'bookmarks.{action}_bookmark'))), None)
+        if self._bookmark_action:
+            self._fill = None
+            self._fg_override = None
         primary = _is_search_label(self._text)
         if primary:
             # No emoji on the primary button: drop any leading symbols/spaces from the label
@@ -273,6 +280,8 @@ class ModernButton(RoundedButton):
 
     def _colors(self):
         c = self._c
+        if getattr(self, '_bookmark_action', None):
+            return RoundedButton._colors(self)
         if self._primary:
             return RoundedButton._colors(self)
         if self._fill:
