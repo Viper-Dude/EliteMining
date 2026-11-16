@@ -1,9 +1,15 @@
 ﻿What's new in EliteMining v5.6.4
 
-- General optimisations for more reliable searches and results.
+- General optimisations for more reliable searches,results and more.
 
 - Statistics now shows your commander's last 20 visited systems, with dates, distances and visit counts.
 
 - Multiple Prices now includes all mining commodities.
+
+- Sliders are now easier to see in Modern themes.
+
+- Ring Finder's More filters button now sits beside Columns in Modern themes.
+
+- Bookmarks and Announcements buttons now use more consistent colours in Modern themes.
 
 - Fixed missing Fleet Carriers and unknown distances in commodity searches.

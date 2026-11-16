@@ -258,6 +258,23 @@ Gold:
                 overview_text = widget.overview.get('1.0', 'end')
                 self.assertIn('Average Tons per Session: 100.0 t', overview_text)
                 self.assertIn('Average Session Duration: 01:00:00', overview_text)
+                self.assertNotIn('Recent Progress', overview_text)
+                self.assertIn('Session Records', overview_text)
+                self.assertIn('Average T/hr: 118.5 / 108.5 (+10.0)', widget.progress.get('1.0', 'end'))
+                from config import scaled_px
+                for width, column in ((1100, 1), (650, 0), (1100, 1)):
+                    root.geometry(f'{scaled_px(width)}x800+-3000+-3000')
+                    root.update()
+                    self.assertEqual(int(widget.progress.grid_info()['column']), column)
+                    self.assertEqual(widget.overview.yview(), (0.0, 1.0))
+                    self.assertEqual(widget.progress.yview(), (0.0, 1.0))
+                    if column:
+                        self.assertEqual(widget.overview.winfo_y(), widget.progress.winfo_y())
+                    else:
+                        self.assertGreater(widget.progress.winfo_y(), widget.overview.winfo_y())
+                        widget.overview_canvas.yview_moveto(1)
+                        root.update()
+                        self.assertAlmostEqual(widget.overview_canvas.yview()[1], 1.0)
                 self.assertEqual(len(widget.best_tree.get_children()), 4)
                 self.assertEqual(len(widget.recent_tree.get_children()), 4)
                 widget._sort(widget.best_tree, 'best')

@@ -1852,6 +1852,7 @@
     "col_ship": "Schiff",
     "ranking_help": "Sortiert nach der besten Sitzungsrate pro Ort. Datum und Dauer gehören zu dieser Sitzung.",
     "recent_help": "Letzte Bergbauorte, neueste zuerst. Jeder Ort erscheint einmal. Sitzungsdaten stammen aus der letzten Bergbausitzung.",
+    "records": "Sitzungsrekorde",
     "record_help": "Rekorde stammen aus einzelnen Sitzungen.\nKurze Sitzungen können hohe T/Std. ergeben.",
     "record": "Beste einzelne Sitzung: {tph:.1f} T/Std.\n{system} | {body}\nDauer: {duration} | {date}",
     "no_sessions": "Keine gespeicherten Sitzungen entsprechen diesen Filtern.",

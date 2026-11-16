@@ -1844,6 +1844,7 @@
     "col_ship": "Ship",
     "ranking_help": "Ranked by each location's best session T/hr. Date and duration refer to that session.",
     "recent_help": "Last mined locations, newest first. Each location appears once. Session details come from its latest mining session.",
+    "records": "Session Records",
     "record_help": "Records are single sessions.\nShort sessions can give high T/hr.",
     "record": "Best single session: {tph:.1f} T/hr\n{system} | {body}\nDuration: {duration} | {date}",
     "no_sessions": "No saved sessions match these filters.",

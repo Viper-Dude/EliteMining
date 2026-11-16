@@ -13,7 +13,7 @@ from queue import Queue, Empty
 from tkinter import ttk
 
 from column_visibility_helper import ColumnVisibilityMixin, displayed_column
-from app_utils import open_system_website
+from app_utils import bind_mousewheel_recursive, open_system_website
 from config import _load_cfg, update_config_value, scaled_font, scaled_px
 from core.constants import get_menu_colors
 from localization import t, get_material
@@ -136,24 +136,56 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.book.pack(fill='both', expand=True)
         overview = ttk.Frame(self.book, padding=8)
         self.book.add(overview, text=t('statistics_expanded.overview'))
-        self.overview = tk.Text(overview, wrap='word', relief='flat', font=scaled_font(10), state='disabled')
         from config import load_theme
         from ui.theme import get_theme_colors
         colors = get_theme_colors(load_theme())
-        self.overview.configure(bg=colors['bg'], fg=colors['fg'], insertbackground=colors['fg'])
-        self.overview.tag_configure('heading', font=scaled_font(11, 'bold'))
-        self.overview.bind('<Configure>', lambda event: self.overview.tag_configure(
-            'body', rmargin=max(0, event.width - scaled_px(800))))
-        scroll = ttk.Scrollbar(overview, command=self.overview.yview)
-        self.overview.configure(yscrollcommand=scroll.set)
+        self.overview_canvas = tk.Canvas(overview, bg=colors['bg'], highlightthickness=0)
+        scroll = ttk.Scrollbar(overview, command=self.overview_canvas.yview)
+        self.overview_canvas.configure(yscrollcommand=scroll.set)
         scroll.pack(side='right', fill='y')
-        self.overview.pack(fill='both', expand=True)
+        self.overview_canvas.pack(fill='both', expand=True)
+        self.overview_content = tk.Frame(self.overview_canvas, bg=colors['bg'])
+        self.overview_window = self.overview_canvas.create_window(
+            (0, 0), window=self.overview_content, anchor='nw')
+        for name in ('overview', 'progress'):
+            text = tk.Text(self.overview_content, width=1, height=1, wrap='word', relief='flat',
+                           borderwidth=0, highlightthickness=0, font=scaled_font(10), state='disabled',
+                           bg=colors['bg'], fg=colors['fg'], insertbackground=colors['fg'],
+                           padx=scaled_px(12), pady=scaled_px(12))
+            text.tag_configure('heading', font=scaled_font(11, 'bold'))
+            text.bind('<Configure>', lambda event: self._fit_overview_text(event.widget))
+            setattr(self, name, text)
+        self.overview_content.bind('<Configure>', lambda event: self.overview_canvas.configure(
+            scrollregion=self.overview_canvas.bbox('all')))
+        self.overview_canvas.bind('<Configure>', self._layout_overview)
+        bind_mousewheel_recursive(self.overview_canvas, self._scroll_overview)
         self.best_tree = self._table('best_locations', ('system', 'body', 'distance', 'ls', 'mineral_avg', 'mineral_best', 'mineral_hits', 'best', 'avg', 'low', 'count', 'hours', 'duration', 'date', 'mineral'))
         self.recent_tree = self._table('recent_locations', ('system', 'body', 'distance', 'ls', 'date', 'mineral', 'mineral_avg', 'mineral_best', 'mineral_hits', 'tph', 'ship', 'duration', 'count', 'hours'))
         self.visited_tree = self._table('recent_systems', ('system', 'date', 'distance', 'visits'))
         self.book.bind('<<NotebookTabChanged>>', self._on_tab_changed)
         self.parent.bind('<Map>', self._on_map, add='+')
         self.parent.after_idle(self.reload)
+
+    def _layout_overview(self, event):
+        self.overview_canvas.itemconfigure(self.overview_window, width=event.width)
+        wide = event.width >= scaled_px(850)
+        gap = scaled_px(8)
+        self.overview_content.columnconfigure(0, weight=1, uniform='overview')
+        self.overview_content.columnconfigure(1, weight=1 if wide else 0, uniform='overview' if wide else '')
+        self.overview.grid(row=0, column=0, sticky='new', padx=(0, gap if wide else 0))
+        self.progress.grid(row=0 if wide else 1, column=1 if wide else 0,
+                           sticky='new', pady=(0 if wide else gap, 0))
+
+    def _fit_overview_text(self, widget):
+        pixels = int(widget.tk.call(widget, 'count', '-update', '-ypixels', '1.0', 'end'))
+        line_height = tkfont.Font(font=widget.cget('font')).metrics('linespace')
+        height = max(1, (pixels + line_height - 1) // line_height)
+        if int(widget.cget('height')) != height:
+            widget.configure(height=height)
+
+    def _scroll_overview(self, event):
+        self.overview_canvas.yview_scroll(int(-event.delta / 120), 'units')
+        return 'break'
 
     def _on_map(self, event):
         if event.widget is self.parent:
@@ -406,7 +438,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                            ('total_asteroids', stats.get('total_asteroids', 0)),
                            ('avg_hit_rate', f"{sum(row['_hit'] for row in rows) / len(rows) if rows else 0:.1f}%")]:
             lines.append(label(key, value))
-        lines.extend(['', t('statistics_expanded.record_help'), ''])
+        lines.extend(['', t('statistics_expanded.records'), '', t('statistics_expanded.record_help'), ''])
         if rows:
             record = max(rows, key=lambda row: row['_tph'])
             lines += [t('statistics_expanded.record').format(tph=record['_tph'], system=record.get('system', ''),
@@ -417,15 +449,22 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         else:
             lines.append(t('statistics_expanded.no_sessions'))
         n, previous_n, current, previous = recent_progress(rows)
-        lines.extend(['', t('statistics_expanded.progress'), t('statistics_expanded.progress_help').format(current=n, previous=previous_n), ''])
+        progress = [t('statistics_expanded.progress'), '',
+                    t('statistics_expanded.progress_help').format(current=n, previous=previous_n), '']
         if current:
             for i, key in enumerate(('tph', 'hit', 'tpa')):
                 now_value = current[i]
                 old_value = previous[i] if previous else None
-                lines.append(t('statistics_expanded.metric_' + key) + ': ' +
+                progress.append(t('statistics_expanded.metric_' + key) + ': ' +
                              ('—' if now_value is None else f'{now_value:.1f}') + ' / ' +
                              ('—' if old_value is None else f'{old_value:.1f}') +
                              (f' ({now_value - old_value:+.1f})' if now_value is not None and old_value is not None else ''))
+        self.progress.configure(state='normal')
+        self.progress.delete('1.0', 'end')
+        self.progress.insert('1.0', '\n'.join(progress))
+        self.progress.tag_add('heading', '1.0', '1.end')
+        self.progress.configure(state='disabled')
+        self.parent.after_idle(lambda: self._fit_overview_text(self.progress))
         self.overview.configure(state='normal')
         for tag in self.overview.tag_names():
             if tag.startswith('location_'):
@@ -433,7 +472,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.overview.delete('1.0', 'end')
         self.overview.insert('1.0', '\n'.join(lines))
         self.overview.tag_add('body', '1.0', 'end')
-        for heading in (t('statistics.session_overview'), t('statistics_expanded.progress')):
+        for heading in (t('statistics.session_overview'), t('statistics_expanded.records')):
             position = self.overview.search(heading, '1.0', stopindex='end', exact=True)
             if position:
                 self.overview.tag_add('heading', position, f'{position}+{len(heading)}c')
@@ -444,6 +483,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             prefix = t('statistics.most_mined_system') + ' '
             self._link_location('location_most', prefix + system, system, len(prefix))
         self.overview.configure(state='disabled')
+        self.parent.after_idle(lambda: self._fit_overview_text(self.overview))
 
     def _link_location(self, tag, text, system, offset=0):
         if not system:
