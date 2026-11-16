@@ -8,7 +8,7 @@
 - Multiple Prices now includes all mining commodities.
 - Sliders are now easier to see in Modern themes.
 - Ring Finder's More filters button now sits beside Columns in Modern themes.
-- Bookmarks and Announcements buttons now use more consistent colours in Modern themes.
+- Bookmarks,Mining Reports and Announcements buttons now use more consistent colours in Modern themes.
 - Fixed missing Fleet Carriers and unknown distances in commodity searches.
 
 

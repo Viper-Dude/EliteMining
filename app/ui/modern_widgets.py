@@ -254,6 +254,14 @@ class ModernButton(RoundedButton):
         if self._bookmark_action:
             self._fill = None
             self._fg_override = None
+        report_text_colors = {'reports.share_discord': '#A6A0CF',
+                              'reports.mining_card': self._c['accent'],
+                              'reports.open_mining_card': self._c['accent']}
+        for key, color in report_text_colors.items():
+            if _letters(self._text) == _letters(t(key)):
+                self._fill = None
+                self._fg_override = color
+                break
         primary = _is_search_label(self._text)
         if primary:
             # No emoji on the primary button: drop any leading symbols/spaces from the label
