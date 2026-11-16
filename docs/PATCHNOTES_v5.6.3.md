@@ -1,5 +1,5 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-November-15
+**Release Date:** 2026-November-16
 
 ## Hotfixes in v5.6.3
 
@@ -8,6 +8,8 @@
 - Fixed unwanted column stretching in Sell My Hold.
 
 - Fixed excessive decimal places in the Sell My Hold LS column.
+
+- Cleanup images folder, removed old images that not in use.
 
 ## Included changes from v5.6.2
 

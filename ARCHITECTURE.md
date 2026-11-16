@@ -198,6 +198,9 @@ python app/create_release.py
 - The version script generates `app/Images/EliteMining_splash.png` from `app/Images/EliteMining_splash_base.png`, adding both version labels each time. It requires Pillow and the installed `Orbitron-VariableFont_wght.ttf` font (Medium weight).
 - When changing the splash artwork in Affinity, export the complete artwork with only the version labels hidden and refresh `EliteMining_splash_base.png` with that clean export. Keep the base at full resolution; never replace it with the generated splash containing version labels.
 - The release builder resizes the generated splash to fit 1200 × 675 and the main logo to fit 1600 × 900; it leaves the splash base unchanged.
+- Every installer clears only the installed `{app}\app\Images` folder before copying the current runtime images. ZIP extraction does not remove old files.
+- Keep the installer image exclusions in `EliteMiningInstaller.iss` and ZIP image exclusions in `app/create_release.py` in sync. Build-only and unused artwork stays in the project but is excluded from both packages, including the clean splash base and README main logo.
+- Keep `EliteMining_txt_logo_transp_resize.png` in both packages: non-Modern status bars, About screens, and generated mining cards still use it.
 
 ---
 
