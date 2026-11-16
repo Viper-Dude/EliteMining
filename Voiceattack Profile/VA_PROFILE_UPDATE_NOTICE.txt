@@ -1,12 +1,12 @@
 ================================================================================
-  EliteMining v5.6.2 — VoiceAttack Profile Update 
+  EliteMining v5.6.4 — VoiceAttack Profile Update 
 ================================================================================
 
-This release includes an updated VoiceAttack profile (v5.6.2).
+This release includes an updated VoiceAttack profile (v5.6.4).
 
 
 What's changed:
-- Improved mining preparation sounds and reset behavior, clearing active commands at startup and after leaving supercruise to prevent conflicts.
+- Fixed that Stop Continuous boost failed to kill the Start Continuous boost command.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.

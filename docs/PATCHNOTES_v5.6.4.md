@@ -12,6 +12,8 @@
 - Fixed missing Fleet Carriers and unknown distances in commodity searches.
 
 
-### Voiceattack Profile - no update (v5.6.2)
+### Voiceattack Profile update (v5.6.4)
+- Fixed that Stop Continuous boost failed to kill the Start Continuous boost command.
+
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
