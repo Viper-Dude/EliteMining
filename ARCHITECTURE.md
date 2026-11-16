@@ -258,5 +258,5 @@ python app/create_release.py
 ## Cargo Monitor Display Changes
 
 - The user-facing cargo display is `EliteMiningApp._update_integrated_cargo_display()` in `app/main.py`. Make Cargo Monitor display changes there.
-- The legacy popup (`CargoMonitor.update_display()`) is not exposed to users in the shipped app. Do not propagate display changes to it unless the user explicitly asks.
+- `CargoMonitor` handles cargo tracking; the sidebar and in-game cargo overlay display its data. The legacy cargo popup and its settings have been removed.
 

@@ -2445,13 +2445,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         _poll_position()
         nb.after(50, _position_session_help_link)
 
-    # --- Cargo Monitor ---
-    def _open_cargo_monitor(self) -> None:
-        """Open the cargo monitor window from main app"""
-        if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
-            self.main_app.cargo_monitor.show()
-        else:
-            print("Cargo monitor not available")
 
 
     # --- Reports window (reads from CSV index) ---
@@ -9657,9 +9650,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         
                         # DON'T add to cargo_items - refinery materials are tracked separately
                         # This prevents double-counting in end_session_tracking()
-                        
-                        # Update display to show current cargo (without refinery materials in main display)
-                        self.main_app.cargo_monitor.update_display()
                         
                         # Trigger update callback to refresh integrated cargo display
                         if self.main_app.cargo_monitor.update_callback:

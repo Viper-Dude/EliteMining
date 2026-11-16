@@ -170,16 +170,7 @@ def save_window_geometry(geom: Dict[str, Any]) -> None:
     cfg["window"] = geom
     _save_cfg(cfg)
 
-def load_cargo_window_position() -> Dict[str, int]:
-    """Load cargo monitor window position from config"""
-    cfg = _load_cfg()
-    return cfg.get("cargo_window", {"x": 100, "y": 100})
 
-def save_cargo_window_position(x: int, y: int) -> None:
-    """Save cargo monitor window position to config"""
-    cfg = _load_cfg()
-    cfg["cargo_window"] = {"x": x, "y": y}
-    _save_cfg(cfg)
 
 def load_ring_finder_filters() -> Dict[str, Any]:
     """Load ring finder filter settings from config"""

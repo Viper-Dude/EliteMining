@@ -92,7 +92,7 @@ except Exception as e:
 # Now import modules that depend on localization
 from ring_finder import RingFinder
 from marketplace_api import MarketplaceAPI
-from config import _load_cfg, _save_cfg, flush_config, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry, load_cargo_window_position, save_cargo_window_position
+from config import _load_cfg, _save_cfg, flush_config, load_saved_va_folder, save_va_folder, load_window_geometry, save_window_geometry
 from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
 from update_checker import UpdateChecker
 from user_database import UserDatabase
@@ -1778,7 +1778,6 @@ class CargoMonitor:
     Cargo monitoring system that reads Elite Dangerous game data.
     
     The main app uses App._update_integrated_cargo_display().
-    The legacy popup is not exposed in the shipped UI.
 
     Cargo data:
     - self.cargo_items: Refined minerals/cargo
@@ -1789,11 +1788,6 @@ class CargoMonitor:
         self._lock = threading.RLock()  # Reentrant lock for thread safety
         self._stop_event = threading.Event()  # For clean thread shutdown
         
-        self.cargo_window = None
-        self.cargo_label = None
-        self.position = "upper_right"
-        self.display_mode = "progress"  # "progress", "detailed", "compact"
-        self.transparency = 90
         self.max_cargo = 200  # Will be auto-detected from journal
         self.current_cargo = 0
         self.cargo_items = {}  # Dict of item_name: quantity (current cargo hold)
@@ -1849,12 +1843,6 @@ class CargoMonitor:
             "Yttrium": 4
         }
 
-        # Load saved window position
-        saved_pos = load_cargo_window_position()
-        self.window_x = saved_pos["x"]
-        self.window_y = saved_pos["y"]
-        
-        self.enabled = False
         self.journal_monitor_active = False
         self.last_journal_file = None
         self.last_file_size = 0
@@ -2007,7 +1995,7 @@ class CargoMonitor:
         # Start journal monitoring regardless of window state
         self.start_journal_monitoring()
         
-        # Start a separate update check that works without the cargo window
+        # Start background cargo and journal monitoring
         self._start_background_monitoring()
         
         # Try to initialize cargo capacity from Status.json on startup
@@ -2262,153 +2250,7 @@ class CargoMonitor:
             parts.append(f"- {ship_type_display}" if parts else ship_type_display)
         
         return " ".join(parts) if parts else ""
-    
-    def create_window(self):
-        """Create the cargo monitor as a separate window (not overlay)"""
-        if self.cargo_window:
-            return
-            
-        self.cargo_window = tk.Toplevel()
-        self.cargo_window.title(t('dialogs.cargo_monitor_title'))
-        
-        # Set app icon using centralized function
-        try:
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                self.cargo_window.iconbitmap(icon_path)
-            elif icon_path and icon_path.endswith('.png'):
-                self.cargo_window.iconphoto(False, tk.PhotoImage(file=icon_path))
-        except Exception as e:
-            # Use system default icon if all attempts fail
-            pass
-        
-        self.cargo_window.resizable(True, True)  # Make resizable
-        self.cargo_window.wm_attributes("-topmost", True)  # Always on top
-        
-        # Set window size and position using saved position
-        self.cargo_window.geometry(f"500x400+{self.window_x}+{self.window_y}")
-        
-        # Set minimum window size to prevent it from shrinking too small
-        self.cargo_window.minsize(500, 400)
-        
-        # Set window style
-        self.cargo_window.configure(bg="#1e1e1e")
-        
-        # Window close behavior
-        self.cargo_window.protocol("WM_DELETE_WINDOW", self._on_close)
-        
-        # Make window draggable by title bar only
-        self.cargo_window.bind("<Button-1>", self.start_drag)
-        self.cargo_window.bind("<B1-Motion>", self.do_drag)
-        
-        # Main frame with scrollable text area
-        main_frame = tk.Frame(self.cargo_window, bg="#1e1e1e", padx=10, pady=8)
-        main_frame.pack(fill="both", expand=True)
-        
-        # Title label
-        title_label = tk.Label(main_frame, text="🚛 " + t('dialogs.cargo_hold_monitor'), 
-                              bg="#1e1e1e", fg="#00FF00", 
-                              font=("Segoe UI", 10, "bold"))
-        title_label.pack(anchor="w")
-        
-        # Cargo summary label
-        self.cargo_summary = tk.Label(
-            main_frame,
-            text="Cargo: 0/200t (0%)",
-            bg="#1e1e1e",
-            fg="#00FF00",
-            font=("Segoe UI", 10, "normal"),
-            justify="left",
-            anchor="w"
-        )
-        self.cargo_summary.pack(anchor="w", pady=(5, 0))
-        
-        # Separator line
-        separator = tk.Frame(main_frame, height=1, bg="#444444")
-        separator.pack(fill="x", pady=(5, 5))
-        
-        # Scrollable cargo list
-        list_frame = tk.Frame(main_frame, bg="#1e1e1e")
-        list_frame.pack(fill="both", expand=True)
-        
-        # Create scrollable text widget for cargo contents
-        self.cargo_text = tk.Text(
-            list_frame,
-            bg="#1e1e1e",
-            fg="#ffffff",
-            font=("Consolas", 9, "normal"),  # Monospace font for proper alignment
-            relief="flat",
-            bd=0,
-            highlightthickness=0,
-            wrap="none",
-            height=10,
-            width=30
-        )
-        
-        # Scrollbar for the text widget
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.cargo_text.yview)
-        self.cargo_text.configure(yscrollcommand=scrollbar.set)
-        
-        # Pack text widget and scrollbar
-        self.cargo_text.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Status label for journal monitoring
-        self.status_label = tk.Label(
-            main_frame,
-            text="🔍 " + t('dialogs.monitoring_journal'),
-            bg="#1e1e1e",
-            fg="#888888",
-            font=("Segoe UI", 8, "italic")
-        )
-        self.status_label.pack(anchor="w", pady=(5, 0))
-        
-        # Capacity status label
-        self.capacity_label = tk.Label(
-            main_frame,
-            text="⚙️ " + t('dialogs.waiting_loadout'),
-            bg="#1e1e1e",
-            fg="#666666",
-            font=("Segoe UI", 8, "italic")
-        )
-        self.capacity_label.pack(anchor="w", pady=(2, 0))
-        
-        # Refinery note - discrete version
-        refinery_note = tk.Label(
-            main_frame,
-            text="ℹ️ " + t('dialogs.refinery_note'),
-            bg="#1e1e1e",
-            fg="#888888",
-            font=("Segoe UI", 7, "italic"),
-            wraplength=480,
-            justify="left"
-        )
-        refinery_note.pack(anchor="w", pady=(5, 0))
-        
-        # Close button
-        close_frame = tk.Frame(main_frame, bg="#1e1e1e")
-        close_frame.pack(anchor="w", pady=(10, 0))
-        
-        close_btn = tk.Button(close_frame, text="✕ " + t('common.close'), 
-                             command=self.close_window,
-                             bg="#444444", fg="#ffffff",
-                             activebackground="#555555", activeforeground="#ffffff",
-                             font=("Segoe UI", 10, "bold"), relief="flat")
-        close_btn.pack()
-        
-        self.set_position(self.position)
-        
-        # Force the window size and position after all setup is complete
-        self.cargo_window.after(10, lambda: self.cargo_window.geometry(f"500x400+{self.window_x}+{self.window_y}"))
-        
-        self.update_display()
-        
-        # Enable live monitoring for Spansh API calls
-        self.journal_parser.is_live_monitoring = True
-        
-        # Start periodic journal checking
-        self.check_journal_updates()
-    
+
     def reset_cargo_hold(self):
         """Reset cargo hold to actual game state using real-time Status.json data"""
         print("Resetting cargo hold...")
@@ -2483,16 +2325,9 @@ class CargoMonitor:
             if self.cargo_items or self.current_cargo > 0:
                 success = True
                 print("Reset: Loaded cargo from journal")
-        
-        # Update display with force refresh
-        self.update_display()
-        
-        # Force refresh the display by clearing any cached display elements
-        if hasattr(self, 'item_vars'):
-            self.item_vars.clear()
+
         
         # Update display again to ensure changes are shown
-        self.update_display()
         
         # Notify main app
         if self.update_callback:
@@ -2587,8 +2422,7 @@ class CargoMonitor:
             # Update mining mission progress from cargo
             self._update_mission_progress_from_cargo()
 
-            # The rest touches Tk widgets (update_display, status_label, and
-            # whatever update_callback does) — must run on the main thread.
+            # The update callback touches Tk widgets and must run on the main thread.
             # Tcl/Tk is not thread-safe and this can be reached from the
             # background journal-monitor thread.
             main_app = getattr(self, 'main_app_ref', None)
@@ -2604,11 +2438,8 @@ class CargoMonitor:
 
     def _finish_read_cargo_json(self):
         """UI-touching tail of read_cargo_json — must run on the main thread."""
-        self.update_display()
         if self.update_callback:
             self.update_callback()
-        if hasattr(self, 'status_label'):
-            self.status_label.configure(text=f"✅ Cargo.json: {len(self.cargo_items)} items, {self.current_cargo}t")
     
     def _update_mission_progress_from_cargo(self):
         """Update mining mission progress based on current cargo contents"""
@@ -2630,8 +2461,6 @@ class CargoMonitor:
     
     def force_cargo_update(self):
         """Force read the latest cargo data from Cargo.json and journal"""
-        if hasattr(self, 'status_label'):
-            self.status_label.configure(text="🔄 " + t('dialogs.forcing_update'))
         
         # First, try to read from Cargo.json (most accurate)
         if self.read_cargo_json():
@@ -2682,207 +2511,24 @@ class CargoMonitor:
                                 self.cargo_items[item_name] = item_count
                         
                         self.current_cargo = sum(self.cargo_items.values())
-                        self.update_display()
                         
                         # Notify main app of changes
                         if self.update_callback:
                             self.update_callback()
                         
-                        if hasattr(self, 'status_label'):
-                            self.status_label.configure(text=f"✅ Cargo loaded: {len(self.cargo_items)} items, {self.current_cargo}t")
                     else:
                         self.current_cargo = count  # At least show the total
-                        self.update_display()
                         
                         # Notify main app of changes
                         if self.update_callback:
                             self.update_callback()
-                        
-                        if hasattr(self, 'status_label'):
-                            self.status_label.configure(text=f"⚠️ {count}t detected - need detailed data (open cargo in game)")
-                else:
-                    if hasattr(self, 'status_label'):
-                        self.status_label.configure(text="❌ " + t('dialogs.no_cargo_data'))
-                        
+
         except Exception as e:
-            if hasattr(self, 'status_label'):
-                self.status_label.configure(text="❌ " + t('dialogs.journal_read_error'))
-    
-    def show_cargo_instructions(self):
-        """Show instructions for getting detailed cargo data"""
-        instructions = f"""🔍 HOW TO GET DETAILED CARGO DATA
-        
-📋 Current Status: Your cargo monitor shows {self.current_cargo}/{self.max_cargo} tons total, 
-but Elite Dangerous is only providing the total count without 
-the detailed breakdown of items.
+            pass
 
-✅ TO GET DETAILED CARGO INVENTORY:
-
-1. 🎮 Make sure Elite Dangerous is running
-2. 🗂️ Press "4" key to open your right panel
-3. 📦 Click on "CARGO" tab to view your cargo hold
-4. ⏱️ Wait 2-3 seconds for Elite to log the data
-5. 🔄 Click "Force Update" in this cargo monitor
-
-🔧 ALTERNATIVE METHODS:
-• Buy/sell any item at a station (triggers detailed cargo event)
-• Jettison 1 unit of cargo (triggers update, then scoop it back)
-• Dock/undock at a station
-• Transfer cargo between ship and SRV
-
-💡 WHY THIS HAPPENS:
-Elite Dangerous sometimes only writes simplified cargo events 
-that show total weight but not individual items. Opening the 
-cargo panel forces Elite to write detailed inventory data.
-
-📊 YOUR CURRENT DATA:
-• Ship Capacity: {self.max_cargo} tons (✅ detected correctly)
-• Current Total: {self.current_cargo} tons (✅ detected correctly)  
-• Item Details: {"✅ Available - " + str(len(self.cargo_items)) + " items" if self.cargo_items else "❌ Not available (need detailed cargo event)"}
-
-🎯 Try opening your cargo hold in Elite, then click Force Update!"""
-
-        # Create help window
-        try:
-            help_window = tk.Toplevel(self.cargo_window)
-            help_window.title(t('dialogs.cargo_monitor_help'))
-            help_window.geometry("600x500")
-            help_window.configure(bg="#2c3e50")
-            
-            # Make it stay on top
-            help_window.attributes('-topmost', True)
-            
-            # Add text widget with scrollbar
-            text_frame = tk.Frame(help_window, bg="#2c3e50")
-            text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-            
-            scrollbar = ttk.Scrollbar(text_frame)
-            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-            
-            text_widget = tk.Text(text_frame, bg="#34495e", fg="#ecf0f1", 
-                                 font=("Segoe UI", 9), wrap=tk.WORD,
-                                 yscrollcommand=scrollbar.set)
-            text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            scrollbar.config(command=text_widget.yview)
-            
-            text_widget.insert(tk.END, instructions)
-            text_widget.config(state=tk.DISABLED)
-            
-            # Add close button
-            close_btn = tk.Button(help_window, text="✅ " + t('dialogs.got_it'), 
-                                 command=help_window.destroy,
-                                 bg="#27ae60", fg="white", 
-                                 font=("Segoe UI", 10, "bold"))
-            close_btn.pack(pady=10)
-        except Exception as e:
-            print(f"Error showing help window: {e}")
-    
-    def start_drag(self, event):
-        """Start dragging the window"""
-        self.start_x = event.x_root
-        self.start_y = event.y_root
-    
-    def do_drag(self, event):
-        """Handle window dragging"""
-        if self.cargo_window:
-            x = self.cargo_window.winfo_x() + (event.x_root - self.start_x)
-            y = self.cargo_window.winfo_y() + (event.y_root - self.start_y)
-            self.cargo_window.geometry(f"+{x}+{y}")
-            self.window_x = x
-            self.window_y = y
-            self.start_x = event.x_root
-            self.start_y = event.y_root
-    
-    def show(self):
-        """Show the cargo monitor"""
-        self.enabled = True
-        if not self.cargo_window:
-            self.create_window()
-        self.cargo_window.deiconify()
-        self.update_display()
-    
-    def hide(self):
-        """Hide the cargo monitor"""
-        self.enabled = False
-        if self.cargo_window:
-            # Save current window position before hiding
-            self._save_window_position()
-            self.cargo_window.withdraw()
-    
-    def set_position(self, position: str):
-        """Set window position"""
-        self.position = position
-        if not self.cargo_window:
-            return
-            
-        screen_width = self.cargo_window.winfo_screenwidth()
-        screen_height = self.cargo_window.winfo_screenheight()
-        
-        # Get current window size or use default
-        try:
-            current_geometry = self.cargo_window.geometry()
-            # Parse current geometry (format: "500x400+x+y")
-            size_part = current_geometry.split('+')[0]
-            width, height = size_part.split('x')
-            window_width = int(width)
-            window_height = int(height)
-        except:
-            # Use default size if parsing fails
-            window_width = 500
-            window_height = 400
-            
-        # Enforce minimum size
-        window_width = max(window_width, 500)  # Minimum 500px wide
-        window_height = max(window_height, 400)  # Minimum 400px tall
-        
-        if position == "upper_right":
-            x = screen_width - window_width - 50
-            y = 50
-        elif position == "upper_left":
-            x = 50
-            y = 50
-        elif position == "lower_right":
-            x = screen_width - window_width - 50
-            y = screen_height - window_height - 100
-        elif position == "lower_left":
-            x = 50
-            y = screen_height - window_height - 100
-        else:  # custom position
-            x = self.window_x
-            y = self.window_y
-            
-        self.cargo_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
-    
-    def _save_window_position(self):
-        """Save current window position to config"""
-        if self.cargo_window:
-            try:
-                # Get current window geometry
-                current_geometry = self.cargo_window.geometry()
-                # Parse position from geometry string (format: "500x400+x+y")
-                if '+' in current_geometry:
-                    parts = current_geometry.split('+')
-                    if len(parts) >= 3:
-                        x = int(parts[1])
-                        y = int(parts[2])
-                        save_cargo_window_position(x, y)
-            except Exception as e:
-                pass
-    
-    def _on_close(self):
-        """Handle window close event - save position and hide window"""
-        self._save_window_position()
-        self.hide()
-    
-    def set_display_mode(self, mode: str):
-        """Set display mode: progress, detailed, compact"""
-        self.display_mode = mode
-        self.update_display()
-    
     def set_max_cargo(self, max_cargo: int):
         """Set maximum cargo capacity"""
         self.max_cargo = max_cargo
-        self.update_display()
     
     def update_cargo(self, item_name: str, quantity: int):
         """Update cargo item quantity and track session minerals"""
@@ -2909,7 +2555,6 @@ cargo panel forces Elite to write detailed inventory data.
                 self.refinery_prompt_shown_for_this_transfer = False
         
         self.current_cargo = sum(self.cargo_items.values())
-        self.update_display()
         
         # Record mining activity for session end detection
         self.record_mining_activity()
@@ -2921,165 +2566,15 @@ cargo panel forces Elite to write detailed inventory data.
     def set_total_cargo(self, total: int):
         """Set total cargo directly (for manual updates)"""
         self.current_cargo = total
-        self.update_display()
         
         # Notify main app of changes
         if self.update_callback:
             self.update_callback()
-    
-    def update_display(self):
-        """
-        Update the POPUP WINDOW display with exact cargo contents.
-        
-        Legacy popup display, not exposed in the shipped UI.
-        See App._update_integrated_cargo_display() for the user-facing display.
-        """
-        if not hasattr(self, 'cargo_summary') or not hasattr(self, 'cargo_text'):
-            return
-            
-        percentage = (self.current_cargo / self.max_cargo * 100) if self.max_cargo > 0 else 0
-        
-        # Update summary line
-        status_color = ""
-        if percentage > 95:
-            status_color = " 🔴 FULL!"
-        elif percentage > 85:
-            status_color = " 🟡 Nearly Full"
-        elif percentage > 50:
-            status_color = " 🟢 Good"
-            
-        summary_text = f"Total: {self.current_cargo}/{self.max_cargo} tons ({percentage:.1f}%){status_color}"
-        self.cargo_summary.configure(text=summary_text)
-        
-        # Update detailed cargo list
-        self.cargo_text.configure(state="normal")  # Enable editing temporarily
-        self.cargo_text.delete(1.0, tk.END)
-        
-        # Display Cargo Hold section
-        if not self.cargo_items:
-            self.cargo_text.insert(tk.END, "CARGO DETECTED BUT NO ITEM DETAILS\n\n")
-            
-            if self.current_cargo > 0:
-                self.cargo_text.insert(tk.END, f"🔍 Total cargo detected: {self.current_cargo} tons\n")
-                self.cargo_text.insert(tk.END, f"⚙️ Ship capacity: {self.max_cargo} tons\n\n")
-                self.cargo_text.insert(tk.END, "❌ Elite Dangerous is only providing total weight\n")
-                self.cargo_text.insert(tk.END, "    without detailed item breakdown.\n\n")
-                self.cargo_text.insert(tk.END, "✅ TO GET DETAILED CARGO:\n")
-                self.cargo_text.insert(tk.END, "1. Open Elite Dangerous\n")
-                self.cargo_text.insert(tk.END, "2. Press '4' key → Right Panel\n")
-                self.cargo_text.insert(tk.END, "3. Click 'CARGO' tab\n")
-                self.cargo_text.insert(tk.END, "4. Wait 2-3 seconds\n")
-                self.cargo_text.insert(tk.END, "5. Click 'Force Update' here\n\n")
-                self.cargo_text.insert(tk.END, "💡 Alternative: Buy/sell anything at a station\n")
-                self.cargo_text.insert(tk.END, "   or jettison 1 unit of cargo (then scoop it back)")
-            else:
-                self.cargo_text.insert(tk.END, f"🔸 {t('sidebar.empty_cargo')}\n\n")
-                self.cargo_text.insert(tk.END, "📋 To see your actual cargo:\n")
-                self.cargo_text.insert(tk.END, "1. Open Elite Dangerous\n")
-                self.cargo_text.insert(tk.END, "2. Open your cargo hold (4 key)\n") 
-                self.cargo_text.insert(tk.END, "3. Click 'Force Update' button")
-        else:
-            # Sort items by quantity (highest first), limpets always last
-            sorted_items = sorted(self.cargo_items.items(), key=lambda x: (x[0].lower() != 'limpet', -x[1]))
-            
-            # Configure clickable limpet tag (theme-aware color + hand cursor)
-            limpet_color = "#ff8c00" if self.current_theme == "elite_orange" else "#e0e0e0"
-            self.cargo_text.tag_configure("limpet_clickable", 
-                                         foreground=limpet_color)
-            self.cargo_text.tag_bind("limpet_clickable", "<Button-1>", 
-                                    lambda e: self.adjust_limpet_count())
-            self.cargo_text.tag_bind("limpet_clickable", "<Enter>", 
-                                    lambda e: self.cargo_text.configure(cursor="hand2"))
-            self.cargo_text.tag_bind("limpet_clickable", "<Leave>", 
-                                    lambda e: self.cargo_text.configure(cursor=""))
-            
-            # Add each cargo item with type icons - single line format with proper alignment
-            for i, (item_name, quantity) in enumerate(sorted_items, 1):
-                # Format item name (remove underscores, capitalize) 
-                display_name = item_name.replace('_', ' ').replace('$', '').title()
-                # Limit name length for better alignment
-                if len(display_name) > 12:
-                    display_name = display_name[:12]
-                
-                # Check if this is a limpet
-                is_limpet = "limpet" in item_name.lower()
-                
-                # Use same symbol for all items for consistent alignment
-                icon = "●"  # Filled circle for all cargo
-                
-                # Simple fixed format: icon + space + name + spaces + quantity
-                name_field = f"{display_name:<12}"[:12]  # 12 characters for name
-                quantity_text = f"{quantity:>4}t"
-                
-                line = f"{icon} {name_field} {quantity_text}\n"
-                
-                # Make limpet lines clickable
-                if is_limpet:
-                    self.cargo_text.insert(tk.END, line, "limpet_clickable")
-                else:
-                    self.cargo_text.insert(tk.END, line)
-            
-            # Add total at bottom
-            self.cargo_text.insert(tk.END, "─" * 30 + "\n")
-            self.cargo_text.insert(tk.END, f"Total Items: {len(self.cargo_items)}\n")
-            self.cargo_text.insert(tk.END, f"Total Weight: {self.current_cargo} tons")
-        
-        # Display Engineering Materials section
-        if self.materials_collected:
-            self.cargo_text.insert(tk.END, "\n\n")
-            self.cargo_text.insert(tk.END, "Engineering Materials 🔩\n")
-            self.cargo_text.insert(tk.END, "─" * 30 + "\n")
-            
-            # Sort materials alphabetically
-            sorted_materials = sorted(self.materials_collected.items(), key=lambda x: x[0])
-            
-            for material_name, quantity in sorted_materials:
-                # Get grade for this material
-                grade = self.MATERIAL_GRADES.get(material_name, 0)
-                
-                # Use localized name for display if available, otherwise use English name
-                localized_name = self.materials_localized_names.get(material_name, material_name)
-                display_name = localized_name[:20]
-                line = f"{display_name} (G{grade}){' ' * (24 - len(display_name))}{quantity:>4}"
-                self.cargo_text.insert(tk.END, f"{line}\n")
-            
-            # Add materials total
-            self.cargo_text.insert(tk.END, "─" * 30 + "\n")
-            self.cargo_text.insert(tk.END, f"Total Materials: {len(self.materials_collected)}\n")
-            self.cargo_text.insert(tk.END, f"Total Pieces: {sum(self.materials_collected.values())}")
-        
-        # Make text widget read-only
-        self.cargo_text.configure(state="disabled")
-        
-        # Only auto-scroll if user was already at bottom (don't fight manual scrolling)
-        # Check if scrollbar is at or near bottom (within 5% of end)
-        try:
-            yview = self.cargo_text.yview()
-            # yview returns (top, bottom) as fractions 0.0 to 1.0
-            # Only scroll to end if bottom is at least 0.95 (user is near bottom)
-            if yview[1] >= 0.95:
-                self.cargo_text.see(tk.END)
-        except:
-            # If check fails, default to scrolling to end
-            self.cargo_text.see(tk.END)
-        
-        # Update window size to fit content (but keep resizable)
-        self.cargo_window.update_idletasks()
-    
-    def close_window(self):
-        """Close the cargo monitor window"""
-        if self.cargo_window:
-            # Save current window position before closing
-            self._save_window_position()
-            self.cargo_window.destroy()
-            self.cargo_window = None
-            self.journal_monitor_active = False
-    
+
     def clear_cargo(self):
         """Clear all cargo items"""
         self.cargo_items.clear()
         self.current_cargo = 0
-        self.update_display()
     
     def reset_materials(self):
         """Reset materials counters and session tracking (called when mining session starts)"""
@@ -3091,8 +2586,6 @@ cargo panel forces Elite to write detailed inventory data.
         # This ensures only NEW materials mined after session start are tracked
         # (Already handled by cargo_items being preserved, tracking only counts increases)
         
-        if hasattr(self, 'cargo_window') and self.cargo_window:
-            self.update_display()
         print("[CargoMonitor] Materials counters and session tracking reset")
         print(f"[CargoMonitor] Session baseline: {len(self.cargo_items)} items, {self.current_cargo}t total")
     
@@ -3102,7 +2595,7 @@ cargo panel forces Elite to write detailed inventory data.
         self.find_latest_journal()
     
     def _start_background_monitoring(self):
-        """Start background monitoring that works without cargo window"""
+        """Start background cargo and journal monitoring"""
         self.last_status_mtime = 0
         self.last_capacity_check = 0
         self.last_heartbeat = time.time()  # Track thread health
@@ -3183,14 +2676,7 @@ cargo panel forces Elite to write detailed inventory data.
                         if 2 <= new_capacity <= 2048:
                             old_capacity = self.max_cargo
                             self.max_cargo = new_capacity
-                            
-                            if hasattr(self, 'capacity_label'):
-                                self.capacity_label.configure(text=f"⚙️ Ship cargo capacity: {self.max_cargo} tons")
-                            if hasattr(self, 'status_label'):
-                                self.status_label.configure(text=f"🔄 Ship changed: {old_capacity}t → {self.max_cargo}t")
-                            
-                            self.update_display()
-                            
+
                             # Notify main app of capacity change
                             if self.capacity_changed_callback:
                                 self.capacity_changed_callback(self.max_cargo)
@@ -3253,47 +2739,29 @@ cargo panel forces Elite to write detailed inventory data.
         
         # Stop journal monitoring
         self.journal_monitor_active = False
-        
-        # Close cargo window if open
-        if self.cargo_window:
-            try:
-                self.cargo_window.destroy()
-                self.cargo_window = None
-            except:
-                pass
-        
+
         print("[CargoMonitor] Cleanup completed")
     
     def find_latest_journal(self):
         """Find the most recent journal file"""
         try:
             if not os.path.exists(self.journal_dir):
-                if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="❌ " + t('dialogs.ed_folder_not_found'))
                 return
                 
             journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
             if not journal_files:
-                if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="❌ " + t('dialogs.no_journal_files'))
                 return
                 
             # Get the most recent journal file
             latest_file = max(journal_files, key=os.path.getmtime)
             self.last_journal_file = latest_file
             self.last_file_size = os.path.getsize(latest_file)
-            
-            if hasattr(self, 'status_label'):
-                filename = os.path.basename(latest_file)
-                self.status_label.configure(text=f"📊 Monitoring: {filename}")
-            
+
             # Scan for existing cargo capacity in the journal
             self.scan_journal_for_cargo_capacity(latest_file)
             
         except Exception as e:
             print(f"Error finding journal files: {e}")
-            if hasattr(self, 'status_label'):
-                self.status_label.configure(text="❌ " + t('dialogs.journal_monitor_error'))
     
     def scan_journal_for_cargo_capacity(self, journal_file):
         """Scan existing journal file for the most recent CargoCapacity, current system location, and ring metadata"""
@@ -3357,9 +2825,6 @@ cargo panel forces Elite to write detailed inventory data.
                         if "CargoCapacity" in event:
                             old_capacity = self.max_cargo
                             self.max_cargo = event["CargoCapacity"]
-                            if hasattr(self, 'capacity_label'):
-                                self.capacity_label.configure(text=f"⚙️ Ship cargo capacity: {self.max_cargo} tons")
-                            self.update_display()
                             
                             # Notify main app of capacity change
                             if old_capacity != self.max_cargo and self.capacity_changed_callback:
@@ -3372,9 +2837,6 @@ cargo panel forces Elite to write detailed inventory data.
                         if "CargoCapacity" in ship_data:
                             old_capacity = self.max_cargo
                             self.max_cargo = ship_data["CargoCapacity"]
-                            if hasattr(self, 'capacity_label'):
-                                self.capacity_label.configure(text=f"⚙️ Ship cargo capacity: {self.max_cargo} tons")
-                            self.update_display()
                             
                             # Notify main app of capacity change
                             if old_capacity != self.max_cargo and self.capacity_changed_callback:
@@ -3424,36 +2886,7 @@ cargo panel forces Elite to write detailed inventory data.
                 self.ship_info_changed_callback()
         except Exception as e:
             pass
-    
-    def check_journal_updates(self):
-        """Check for journal file updates and cargo changes"""
-        if not self.journal_monitor_active or not self.cargo_window:
-            return
-            
-        try:
-            # First priority: Check for Cargo.json updates (most accurate)
-            self.read_cargo_json()
-            
-            # Check if journal file has grown (new entries)
-            if self.last_journal_file and os.path.exists(self.last_journal_file):
-                current_size = os.path.getsize(self.last_journal_file)
-                if current_size > self.last_file_size:
-                    self.read_new_journal_entries()
-                    self.last_file_size = current_size
-            else:
-                # Check for new journal file
-                self.find_latest_journal()
-                
-        except Exception as e:
-            print(f"Error checking updates: {e}")
-        
-        # Schedule next check
-        if self.cargo_window:
-            self.cargo_window.after(1000, self.check_journal_updates)  # Check every second
-            
-        # Check for session end (after scheduling next check)
-        self.check_session_end()
-    
+
     def check_session_end(self):
         """Check if mining session has ended and show refinery dialog if needed"""
         import time
@@ -3481,12 +2914,10 @@ cargo panel forces Elite to write detailed inventory data.
             if time_since_activity >= self.mining_activity_timeout:
                 self.session_end_dialog_shown = True
                 
-                # Get parent window (prefer main app over cargo window for proper positioning)
+                # Get the main app window for proper positioning.
                 parent_window = None
                 if hasattr(self, 'prospector_panel') and self.prospector_panel:
                     parent_window = self.prospector_panel.winfo_toplevel()
-                elif self.cargo_window:
-                    parent_window = self.cargo_window
                 
                 # Show refinery dialog
                 try:
@@ -3513,18 +2944,7 @@ cargo panel forces Elite to write detailed inventory data.
                         
                         # Calculate totals
                         refinery_total = sum(result.values())
-                        
-                        # Update display with adjustment info
-                        if hasattr(self, 'cargo_text') and self.cargo_text:
-                            self.cargo_text.insert(tk.END, f"\n⚗️ REFINERY ADJUSTMENT:\n")
-                            for material, quantity in result.items():
-                                self.cargo_text.insert(tk.END, f"   +{material}: {quantity} tons\n")
-                            self.cargo_text.insert(tk.END, f"📊 Total Added: {refinery_total} tons from refinery\n")
-                            self.cargo_text.see(tk.END)
-                        
-                        # Update all displays to reflect new cargo totals
-                        self.update_display()
-                        
+
                         # Notify main app of changes
                         if self.update_callback:
                             self.update_callback()
@@ -3587,8 +3007,6 @@ cargo panel forces Elite to write detailed inventory data.
             if hasattr(self, 'prospector_panel') and self.prospector_panel:
                 # Get the actual top-level window, not the panel widget
                 parent_window = self.prospector_panel.winfo_toplevel()
-            elif self.cargo_window:
-                parent_window = self.cargo_window
             
             # Ask if user wants to add refinery materials - use parent directly
             add_refinery = centered_yesno_dialog(
@@ -3729,9 +3147,6 @@ cargo panel forces Elite to write detailed inventory data.
                 if "CargoCapacity" in event:
                     old_capacity = self.max_cargo
                     self.max_cargo = event["CargoCapacity"]
-                    if hasattr(self, 'capacity_label'):
-                        self.capacity_label.configure(text=f"⚙️ Ship cargo capacity: {self.max_cargo} tons")
-                    self.update_display()
                     
                     # Notify main app of capacity change
                     if old_capacity != self.max_cargo and self.capacity_changed_callback:
@@ -3745,9 +3160,6 @@ cargo panel forces Elite to write detailed inventory data.
                     if "CargoCapacity" in ship_data:
                         old_capacity = self.max_cargo
                         self.max_cargo = ship_data["CargoCapacity"]
-                        if hasattr(self, 'capacity_label'):
-                            self.capacity_label.configure(text=f"⚙️ Ship cargo capacity: {self.max_cargo} tons")
-                        self.update_display()
                         
                         # Notify main app of capacity change
                         if old_capacity != self.max_cargo and self.capacity_changed_callback:
@@ -3767,21 +3179,14 @@ cargo panel forces Elite to write detailed inventory data.
                 if total_capacity > 0:
                     old_capacity = self.max_cargo
                     self.max_cargo = total_capacity
-                    if hasattr(self, 'capacity_label'):
-                        self.capacity_label.configure(text=f"⚙️ Ship cargo capacity: {total_capacity} tons")
-                    self.update_display()
                     
                     # Notify main app of capacity change
                     if old_capacity != self.max_cargo and self.capacity_changed_callback:
                         self.capacity_changed_callback(self.max_cargo)
-            
 
-            
             elif event_type in ["ShipyardSwap", "StoredShips", "LoadGame", "ShipyardBuy", "ShipyardSell", 
                                 "ShipyardTransfer", "SwitchToMainShip", "VehicleSwitch", "Commander", "Location"]:
                 # Handle ship changes - aggressive capacity refresh
-                if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="🚀 " + t('dialogs.ship_changed'))
                 
                 # Multiple refresh attempts to ensure we get the right capacity
                 refresh_success = False
@@ -3796,16 +3201,10 @@ cargo panel forces Elite to write detailed inventory data.
                 
                 # 3. If still no valid capacity, clear data and force a fresh read
                 if not refresh_success:
-                    if hasattr(self, 'status_label'):
-                        self.status_label.configure(text="⚠️ " + t('dialogs.capacity_failed'))
                     self.cargo_items.clear()
                     self.current_cargo = 0
                     self.max_cargo = 200  # Reset to default
-                    self.update_display()
                     
-                    # Schedule delayed retry
-                    if hasattr(self, 'cargo_window') and self.cargo_window:
-                        self.cargo_window.after(2000, self._delayed_capacity_refresh)
                 
             elif event_type == "Cargo":
                 # Handle cargo events - check if we have detailed inventory
@@ -3848,20 +3247,12 @@ cargo panel forces Elite to write detailed inventory data.
                     # Update cargo items
                     self.cargo_items = new_cargo
                     self.current_cargo = sum(self.cargo_items.values())
-                    self.update_display()
-                    
-                    if hasattr(self, 'status_label'):
-                        self.status_label.configure(text=f"📊 Detailed cargo: {len(self.cargo_items)} items, {self.current_cargo}t")
-                        
+
                 elif count > 0:
                     # We only have total count - update current cargo but keep existing items
                     if count != self.current_cargo:
                         self.current_cargo = count
-                        self.update_display()
-                        
-                        if hasattr(self, 'status_label'):
-                            self.status_label.configure(text=f"📊 Cargo total: {self.current_cargo}t (no details)")
-                
+
             elif event_type == "MarketSell":
                 # Handle selling items
                 type_name = event.get("Type", "").replace("$", "").replace("_name;", "")
@@ -3877,11 +3268,7 @@ cargo panel forces Elite to write detailed inventory data.
                         del self.cargo_items[item_name]
                     
                     self.current_cargo = sum(self.cargo_items.values())
-                    self.update_display()
-                    
-                    if hasattr(self, 'status_label'):
-                        self.status_label.configure(text=f"💰 Sold {count}x {item_name}")
-                    
+
                     # Notify prospector panel for multi-session tracking
                     if self.update_callback:
                         self.update_callback(event_type="MarketSell", count=count)
@@ -3949,7 +3336,6 @@ cargo panel forces Elite to write detailed inventory data.
                 
                 # Update cargo display after any transfer (toship or tocarrier)
                 self.current_cargo = sum(self.cargo_items.values())
-                self.update_display()
                 
                 # Notify main app to update mineral analysis table
                 print(f"[DEBUG] CargoTransfer complete - notifying main app with cargo_items: {self.cargo_items}")
@@ -3958,8 +3344,6 @@ cargo panel forces Elite to write detailed inventory data.
                 
                 # Only count minerals transferred TO carrier for multi-session tracking
                 if total_transferred > 0:
-                    if hasattr(self, 'status_label'):
-                        self.status_label.configure(text=f"📦 Transferred {total_transferred}t to carrier")
                     
                     # DON'T notify prospector panel - transfers are not mining!
                     # Multi-session tracking should only count actual mining via read_cargo_json increases
@@ -4009,11 +3393,7 @@ cargo panel forces Elite to write detailed inventory data.
                         del self.cargo_items[found_key]
                     
                     self.current_cargo = sum(self.cargo_items.values())
-                    self.update_display()
-                    
-                    if hasattr(self, 'status_label'):
-                        self.status_label.configure(text=f"🗑️ Ejected {count}x {item_name}")
-                    
+
                     # Subtract ejected cargo from multi-session tracking
                     # This ensures ejected materials don't count in session totals
                     if found_key in self.session_minerals_mined:
@@ -4038,8 +3418,6 @@ cargo panel forces Elite to write detailed inventory data.
                 
                 if is_cargo_related:
                     print(f"DEBUG: Cargo module change detected - Event: {event_type}, Slot: {slot}, Item: {item}")
-                    if hasattr(self, 'status_label'):
-                        self.status_label.configure(text="⚙️ " + t('dialogs.cargo_module_changed'))
                     
                     # Force immediate capacity refresh
                     refresh_success = self.refresh_ship_capacity()
@@ -4047,10 +3425,6 @@ cargo panel forces Elite to write detailed inventory data.
                     # If Status.json doesn't have updated capacity yet, try journal scan
                     if not refresh_success:
                         self._force_loadout_scan()
-                    
-                    # Final fallback - force a delayed refresh to catch Status.json updates
-                    if hasattr(self, 'cargo_window') and self.cargo_window:
-                        self.cargo_window.after(1000, self._delayed_capacity_refresh)
 
             elif event_type == "FSDJump":
                 # Player jumped to a new system in their own ship - count as visit
@@ -4203,15 +3577,6 @@ cargo panel forces Elite to write detailed inventory data.
                     self.journal_parser.process_saa_signals_found(event, scanned_system)
                     
                     # Show notification in status (if available)
-                    if hasattr(self, 'status_label') and body_name:
-                        signals = event.get("Signals", [])
-                        if signals:
-                            first_signal = signals[0]
-                            material_name = first_signal.get("Type_Localised", first_signal.get("Type", ""))
-                            count = first_signal.get("Count", 0)
-                            self.status_label.configure(
-                                text=f"🔍 Ring scan: {material_name} ({count}) in {body_name}"
-                            )
                     
                     print(f"[OK] SAASignalsFound processed successfully")
                     
@@ -4244,12 +3609,7 @@ cargo panel forces Elite to write detailed inventory data.
                             self.materials_localized_names[material_name] = material_name_display.title()
                             logging.info(f"[MaterialCollected] ✓ Added {count}x {material_name} (Display: {material_name_display}) (Total: {self.materials_collected[material_name]})")
                             logging.debug(f"[MaterialCollected] Current materials_collected: {self.materials_collected}")
-                            
-                            # Update popup window display if it exists
-                            if hasattr(self, 'cargo_window') and self.cargo_window:
-                                self.update_display()
-                                logging.debug("[MaterialCollected] Updated popup window display")
-                            
+
                             # Notify main app to update integrated display
                             if self.update_callback:
                                 self.update_callback()
@@ -4329,11 +3689,6 @@ cargo panel forces Elite to write detailed inventory data.
                         self.max_cargo = new_capacity
                         
                         if old_capacity != self.max_cargo:
-                            if hasattr(self, 'capacity_label'):
-                                self.capacity_label.configure(text=f"⚙️ Ship cargo capacity: {self.max_cargo} tons")
-                            if hasattr(self, 'status_label'):
-                                self.status_label.configure(text=f"🔄 Updated cargo capacity: {old_capacity}t → {self.max_cargo}t")
-                            self.update_display()
                             
                             # Notify main app of capacity change
                             if self.capacity_changed_callback:
@@ -4346,14 +3701,10 @@ cargo panel forces Elite to write detailed inventory data.
                             return True
                     else:
                         # Invalid capacity detected - try to recover from journal
-                        if hasattr(self, 'status_label'):
-                            self.status_label.configure(text=f"⚠️ Invalid capacity {new_capacity}t - checking journal...")
                         self._recover_capacity_from_journal()
                         
         except Exception as e:
             # If Status.json fails, try to recover from journal
-            if hasattr(self, 'status_label'):
-                self.status_label.configure(text="⚠️ " + t('dialogs.status_json_error'))
             self._recover_capacity_from_journal()
         return False
     
@@ -4385,29 +3736,11 @@ cargo panel forces Elite to write detailed inventory data.
                         continue
         except Exception as e:
             pass
-    
-    def _delayed_capacity_refresh(self):
-        """Delayed capacity refresh as last resort"""
-        try:
-            if hasattr(self, 'status_label'):
-                self.status_label.configure(text="🔄 " + t('dialogs.retrying_capacity'))
-            
-            # Try all methods again
-            if self.refresh_ship_capacity() or self._validate_cargo_capacity():
-                if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="✅ " + t('dialogs.capacity_detected'))
-            else:
-                if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="⚠️ " + t('dialogs.default_capacity'))
-        except Exception as e:
-            pass
-    
+
     def _force_cargo_refresh(self):
         """Force immediate cargo data refresh from all sources"""
         try:
             # Clear current data to force fresh read
-            old_items = self.cargo_items.copy()
-            old_cargo = self.current_cargo
             
             # Read from Cargo.json first (most accurate)
             self.read_cargo_json()
@@ -4415,13 +3748,7 @@ cargo panel forces Elite to write detailed inventory data.
             # If no data from Cargo.json, try reading latest journal entries
             if not self.cargo_items and self.last_journal_file:
                 self.read_new_journal_entries()
-            
-            # Update display if we got new data
-            if self.cargo_items != old_items or self.current_cargo != old_cargo:
-                self.update_display()
-                if hasattr(self, 'status_label'):
-                    self.status_label.configure(text=f"🔄 Cargo refreshed: {self.current_cargo}t")
-                    
+
         except Exception as e:
             pass  # Silent fail
     
@@ -4455,8 +3782,6 @@ cargo panel forces Elite to write detailed inventory data.
     def _validate_cargo_capacity(self):
         """Validate current cargo capacity is reasonable"""
         if not (2 <= self.max_cargo <= 2048):
-            if hasattr(self, 'status_label'):
-                self.status_label.configure(text=f"⚠️ Invalid capacity {self.max_cargo}t - refreshing...")
             return False
         return True
 
@@ -4551,8 +3876,6 @@ cargo panel forces Elite to write detailed inventory data.
         self.materials_collected.clear()
         
         # Update display to show materials cleared
-        if hasattr(self, 'cargo_window') and self.cargo_window:
-            self.update_display()
         if self.update_callback:
             self.update_callback()
         
@@ -4710,8 +4033,6 @@ cargo panel forces Elite to write detailed inventory data.
             # Find the parent window - prefer main app if available
             if hasattr(self, 'main_app_ref') and self.main_app_ref:
                 parent = self.main_app_ref
-            elif self.cargo_window:
-                parent = self.cargo_window
             else:
                 parent = None
             
@@ -4852,7 +4173,6 @@ cargo panel forces Elite to write detailed inventory data.
                     # Force re-read of Cargo.json
                     self.last_cargo_mtime = 0
                     self.read_cargo_json()
-                    self.update_display()
                     # Also update integrated display if available
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_integrated_cargo_display'):
                         self.main_app_ref._update_integrated_cargo_display()
@@ -4950,7 +4270,7 @@ cargo panel forces Elite to write detailed inventory data.
         """Show the refinery adjustment dialog and store the results"""
         try:
             dialog = RefineryDialog(
-                parent=self.cargo_window if self.cargo_window else None,
+                parent=getattr(self, 'main_app_ref', None),
                 cargo_monitor=self,
                 current_cargo_items=self.cargo_items.copy()
             )
@@ -4970,18 +4290,7 @@ cargo panel forces Elite to write detailed inventory data.
                 
                 # Update current cargo total
                 self.current_cargo = sum(self.cargo_items.values())
-                
-                # Update display with adjustment info
-                if hasattr(self, 'cargo_text') and self.cargo_text:
-                    self.cargo_text.insert(tk.END, f"\n⚗️ REFINERY MATERIALS ADDED:\n")
-                    for material, quantity in result.items():
-                        self.cargo_text.insert(tk.END, f"   +{material}: {quantity} tons\n")
-                    self.cargo_text.insert(tk.END, f"📊 Total Added: {total_refinery} tons from refinery\n")
-                    self.cargo_text.see(tk.END)
-                
-                # Update all displays to reflect new cargo totals
-                self.update_display()
-                
+
                 # Notify main app of changes
                 if self.update_callback:
                     self.update_callback()
@@ -5135,7 +4444,6 @@ from prospector_panel import ProspectorPanel
 # -------------------- Main GUI --------------------
 
 from column_visibility_helper import ColumnVisibilityMixin, displayed_column
-
 
 class App(tk.Tk, ColumnVisibilityMixin):
     def _set_dark_title_bar(self):
@@ -5643,11 +4951,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._setup_keyboard_shortcuts()
         
         # Cargo monitor preferences
-        self.cargo_enabled = tk.BooleanVar(value=False)
-        self.cargo_display_mode = tk.StringVar(value="progress")
-        self.cargo_position = tk.StringVar(value="Upper Right")
         self.cargo_max_capacity = tk.IntVar(value=200)
-        self.cargo_transparency = tk.IntVar(value=90)
         self.cargo_show_in_overlay = tk.BooleanVar(value=True)
         self.overlay_only_game_focused = tk.BooleanVar(value=True)
         self.cargo_text_overlay.focus_blocked = lambda: self.overlay_only_game_focused.get() and not is_game_focused()
@@ -5667,11 +4971,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.prospector_show_all.trace('w', self._on_show_all_change)
         
         # Cargo monitor traces
-        self.cargo_enabled.trace('w', self._on_cargo_toggle)
-        self.cargo_display_mode.trace('w', self._on_cargo_display_change)
-        self.cargo_position.trace('w', self._on_cargo_position_change)
         self.cargo_max_capacity.trace('w', self._on_cargo_capacity_change)
-        self.cargo_transparency.trace('w', self._on_cargo_transparency_change)
         self.cargo_show_in_overlay.trace('w', self._on_cargo_overlay_toggle)
         self.hide_overlays_in_supercruise.trace('w', lambda *a: self._save_cargo_preferences())
 
@@ -6323,14 +5623,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.integrated_cargo_text.configure(yscrollcommand=integrated_scrollbar.set)
         content_frame.columnconfigure(1, weight=0)
         
-        # Compact status at bottom - single line (hidden but functional)
-        self.integrated_status_label = ttk.Label(
-            cargo_frame,
-            text="",  # Hidden text but label remains functional
-            font=self._scaled_font(7)  # Even smaller font
-        )
-        self.integrated_status_label.grid(row=2, column=0, sticky="w")
-        
         # Set up periodic update for integrated display
         self._update_integrated_cargo_display()
         self.after(1000, self._periodic_integrated_cargo_update)
@@ -6445,19 +5737,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except:
                 pass
         
-        # Update status - more compact
-        try:
-            if hasattr(cargo, 'status_label') and cargo.status_label:
-                status_text = cargo.status_label.cget('text')
-                # Shorten status text
-                if "Monitoring:" in status_text:
-                    status_text = "📊 " + status_text.split(":")[-1].strip()
-                elif "detected" in status_text:
-                    status_text = status_text.replace("Cargo loaded:", "✅").replace(" items,", "i,")
-                self.integrated_status_label.configure(text=status_text[:50] + "..." if len(status_text) > 50 else status_text)
-        except:
-            pass
-    
     def refresh_overlays(self):
         """Rebuild the cargo overlay and re-assert topmost on both overlays (recovers one the game window buried)."""
         log.info("[OVERLAY] refresh_overlays")
@@ -7048,7 +6327,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         Reset cargo hold to actual game state by calling cargo monitor reset.
         
         This method provides UI feedback and delegates to the CargoMonitor's reset functionality.
-        Works for both popup window and integrated cargo displays.
+        Refreshes the integrated cargo display.
         """
         if hasattr(self, 'cargo_monitor') and self.cargo_monitor is not None:
             success = self.cargo_monitor.reset_cargo_hold()
@@ -14666,11 +13945,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _load_cargo_preferences(self) -> None:
         """Load cargo monitor preferences from config"""
         cfg = _load_cfg()
-        self.cargo_enabled.set(cfg.get("cargo_enabled", False))
-        self.cargo_display_mode.set(cfg.get("cargo_display_mode", "Progress Bar"))
-        self.cargo_position.set(cfg.get("cargo_position", "Upper Right"))
         self.cargo_max_capacity.set(cfg.get("cargo_max_capacity", 200))
-        self.cargo_transparency.set(cfg.get("cargo_transparency", 90))
         self.cargo_show_in_overlay.set(cfg.get("cargo_show_in_overlay", True))
         self.overlay_only_game_focused.set(cfg.get("overlay_only_game_focused", True))
         self.hide_overlays_in_supercruise.set(cfg.get("hide_overlays_in_supercruise", False))
@@ -14682,49 +13957,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Save cargo monitor preferences to config"""
         from config import update_config_values
         updates = {
-            "cargo_enabled": bool(self.cargo_enabled.get()),
-            "cargo_display_mode": str(self.cargo_display_mode.get()),
-            "cargo_position": str(self.cargo_position.get()),
             "cargo_max_capacity": int(self.cargo_max_capacity.get()),
-            "cargo_transparency": int(self.cargo_transparency.get()),
             "cargo_show_in_overlay": bool(self.cargo_show_in_overlay.get()),
             "overlay_only_game_focused": bool(self.overlay_only_game_focused.get()),
             "hide_overlays_in_supercruise": bool(self.hide_overlays_in_supercruise.get()),
             "overlay_only_mining_session": bool(self.overlay_only_mining_session.get())
         }
         update_config_values(updates)
-    
-    def _on_cargo_toggle(self, *args) -> None:
-        """Called when cargo monitor checkbox is toggled"""
-        enabled = bool(self.cargo_enabled.get())
-        if enabled:
-            self.cargo_monitor.show()
-        else:
-            self.cargo_monitor.hide()
-        self._save_cargo_preferences()
-    
-    def _on_cargo_display_change(self, *args) -> None:
-        """Called when cargo display mode is changed"""
-        mode_name = self.cargo_display_mode.get()
-        mode_map = {"Progress Bar": "progress", "Detailed List": "detailed", "Compact": "compact"}
-        mode = mode_map.get(mode_name, "progress")
-        self.cargo_monitor.set_display_mode(mode)
-        self._save_cargo_preferences()
-    
-    def _on_cargo_position_change(self, *args) -> None:
-        """Called when cargo position is changed"""
-        position_name = self.cargo_position.get()
-        position_map = {
-            "Upper Right": "upper_right",
-            "Upper Left": "upper_left", 
-            "Lower Right": "lower_right",
-            "Lower Left": "lower_left",
-            "Custom": "custom"
-        }
-        position = position_map.get(position_name, "upper_right")
-        self.cargo_monitor.set_position(position)
-        self._save_cargo_preferences()
-    
+
     def _on_cargo_capacity_change(self, *args) -> None:
         """Called when cargo capacity is changed manually in UI"""
         capacity = int(self.cargo_max_capacity.get())
@@ -14795,11 +14035,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     assignments[self._parse_preset_ship_type(new_name)[0].casefold()] = new_name
         save_ship_preset_auto_load(assignments)
     
-    def _on_cargo_transparency_change(self, *args) -> None:
-        """Called when cargo transparency is changed"""
-        transparency = int(self.cargo_transparency.get())
-        self.cargo_monitor.set_transparency(transparency)
-        self._save_cargo_preferences()
 
     def _on_cargo_overlay_toggle(self, *args) -> None:
         """Called when cargo monitor overlay checkbox is toggled"""
@@ -16530,7 +15765,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
         # Clean up cargo monitor with enhanced resource management
         if hasattr(self, 'cargo_monitor'):
-            self.cargo_monitor.hide()
             self.cargo_monitor.cleanup()  # Enhanced cleanup method
             
         # Clean up TTS system
