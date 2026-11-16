@@ -42,7 +42,7 @@ Type: filesandordirs; Name: "{app}\app\Sound_Packs"; Check: IsVADetected and Sou
 [Files]
 Source: "docs\INSTALLER_RELEASE_NOTES.txt"; Flags: dontcopy
 ; Only include specific file types from needed subfolders (exclude .py files)
-Source: "app\Images\*";    DestDir: "{app}\app\Images";    Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.py,*.pyc,__pycache__,EliteMining_splash_base.png,brasil.png,france.png,spain.png,Discord-Symbol-Blurple.png,Logo no version.png,logo256.png,EliteMining_Main_logo.png"
+Source: "app\Images\*";    DestDir: "{app}\app\Images";    Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.py,*.pyc,__pycache__,EliteMining_splash_base.png,brasil.png,france.png,spain.png,Discord-Symbol-Blurple.png,Logo no version.png,logo256.png,EliteMining_main_logo.png"
 ; Localization files (v4.6.7+) - required for UI translations
 Source: "app\localization\*.json";  DestDir: "{app}\app\localization";  Flags: ignoreversion
 ; VoiceAttack-specific files (only installed if VA detected)

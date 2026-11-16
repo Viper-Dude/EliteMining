@@ -190,7 +190,7 @@ class ReleaseBuilder:
                                     if item == "Images" and file_path.name in (
                                             "EliteMining_splash_base.png", "brasil.png", "france.png", "spain.png",
                                             "Discord-Symbol-Blurple.png", "Logo no version.png", "logo256.png",
-                                            "EliteMining_Main_logo.png"):
+                                            "EliteMining_main_logo.png"):
                                         continue
                                     # Skip test data and version flag files from Reports directory
                                     if item == "Reports" and file_path.name in ["sessions_index.csv", ".v430_wipe_done"]:
@@ -405,7 +405,7 @@ class ReleaseBuilder:
     def resize_splash_image(self):
         """Resize splash (max 1200x675) and main logo (max 1600x900) before building"""
         self.print_step(0, "Resizing Splash/Logo Images")
-        for name, max_size in (("EliteMining_splash.png", (1200, 675)), ("EliteMining_Main_logo.png", (1600, 900))):
+        for name, max_size in (("EliteMining_splash.png", (1200, 675)), ("EliteMining_main_logo.png", (1600, 900))):
             img_path = self.script_dir / "Images" / name
             if not img_path.exists():
                 print(f"⚠️  Image not found: {img_path} — skipping")
