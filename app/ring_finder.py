@@ -1068,7 +1068,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Results section with help text in header
         results_header = ttk.Frame(self.scrollable_frame)
-        results_header.pack(fill="x", padx=10, pady=(2, 0))
+        results_header.pack(fill="x", padx=(10, 15), pady=(2, 0))
         
         ttk.Label(results_header, text=t('ring_finder.search_results'), font=scaled_font(9, "bold")).pack(side="left")
         results_info = ttk.Label(results_header, text="\u24d8", foreground=modern_color("#8A94A3"),
