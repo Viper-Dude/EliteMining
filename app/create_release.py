@@ -187,6 +187,11 @@ class ReleaseBuilder:
                             # Add directory and all its contents
                             for file_path in item_path.rglob('*'):
                                 if file_path.is_file():
+                                    if item == "Images" and file_path.name in (
+                                            "EliteMining_splash_base.png", "brasil.png", "france.png", "spain.png",
+                                            "Discord-Symbol-Blurple.png", "Logo no version.png", "logo256.png",
+                                            "EliteMining_Main_logo.png"):
+                                        continue
                                     # Skip test data and version flag files from Reports directory
                                     if item == "Reports" and file_path.name in ["sessions_index.csv", ".v430_wipe_done"]:
                                         print(f"⏩ Skipped: {file_path.name} (development/test file)")
