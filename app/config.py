@@ -468,6 +468,9 @@ def needs_config_migration(config: Dict[str, Any]) -> bool:
     
     current_config_version = get_config_version()
     file_config_version = config.get("config_version", "0.0.0")
+
+    if "discord_webhook_url" in config:
+        return True
     
     # Force migration for versions before 4.3.6
     if file_config_version in ["4.1.7", "4.1.8"]:
@@ -630,10 +633,8 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
         log.info(f"Added new materials: {', '.join(materials_added)}")
     
     # Add Discord integration fields if missing
+    config.pop("discord_webhook_url", None)
     discord_fields_added = []
-    if "discord_webhook_url" not in config:
-        config["discord_webhook_url"] = ""
-        discord_fields_added.append("discord_webhook_url")
     if "discord_enabled" not in config:
         config["discord_enabled"] = True
         discord_fields_added.append("discord_enabled")
