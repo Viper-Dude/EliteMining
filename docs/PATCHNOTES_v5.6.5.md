@@ -7,6 +7,8 @@
 - Added alternating row shading to tables and reduced empty space in Statistics.
 - Statistics now shows your top 20 best locations and last 20 mining locations instead of 10.
 - Updated the user guide at github and added more direct help links in the app.
+- Fixed mining reports sometimes losing the original system and ring type starting the game inside a ring.
+- Mining TXT reports now include the ring type when known.
 
 
 ### Voiceattack Profile update (v5.6.5)

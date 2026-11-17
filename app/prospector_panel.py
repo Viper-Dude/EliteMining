@@ -806,6 +806,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self._pending_ring_finder_switch = False
         self.session_system = tk.StringVar(value="")
         self.session_body = tk.StringVar(value="")
+        self.session_mining_system = ""
         self.session_mining_body = ""  # Preserved mining location (won't be overwritten by docking events)
         self.session_elapsed = tk.StringVar(value="00:00:00")
         self.live_tph_var = tk.StringVar(value="")
@@ -3897,9 +3898,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if timestamp is None:
             timestamp = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         
-        sysname = (self.session_system.get().strip() or self._get_current_system() or "Unknown").replace(" ", "_")
-        body = (self.session_body.get().strip() or self.last_body or "Unknown").replace(" ", "_")
-        fname = f"Session_{timestamp}_{sysname}_{body}.txt"
+        sysname = self.session_mining_system or self.session_system.get().strip() or self._get_current_system() or "Unknown"
+        body = self.session_mining_body or self.session_body.get().strip() or self.last_body or "Unknown"
+        fname = f"Session_{timestamp}_{sysname.replace(' ', '_')}_{body.replace(' ', '_')}.txt"
         os.makedirs(self.reports_dir, exist_ok=True)
         fpath = os.path.join(self.reports_dir, fname)
 
@@ -3908,6 +3909,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Add ship name if available
         if hasattr(self, 'session_ship_name') and self.session_ship_name:
             parts.append(f"Ship: {self.session_ship_name}")
+
+        if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
+            ring_type = self.main_app.cargo_monitor.user_db.get_ring_type(sysname, body)
+            if ring_type:
+                parts.append(f"Ring Type: {ring_type}")
         
         # Add refined materials section
         if lines:
@@ -7894,6 +7900,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             )
                             self.session_body.set(body_display)
                             # PRESERVE mining location for report (won't be overwritten by docking)
+                            self.session_mining_system = self.last_system or self.session_system.get().strip()
                             self.session_mining_body = body_display
                             print(f"[Session Location] Updated body from mining: {body_display}")
                             print(f"[Session Location] PRESERVED mining body: {self.session_mining_body}")
@@ -8507,6 +8514,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.session_screenshots = []  # Initialize screenshots list for this session
         self.session_yield_data = {}  # Track yield data during session {material: [percentages]}
         self.session_location_captured_from_mining = False  # Flag to update location on first material collected
+        self.session_mining_system = ""
         self.session_mining_body = ""  # Reset preserved mining location for new session
         
         # Reset and start mining statistics for new session
@@ -9722,8 +9730,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # No cargo data available - empty session
             print(f"[SESSION] Warning: No materials_mined in cargo data")
 
-        sysname = self.session_system.get().strip() or self.last_system or "Unknown System"
-        # Use preserved mining body if available (prevents docking from overwriting actual mining location)
+        sysname = self.session_mining_system or self.session_system.get().strip() or self.last_system or "Unknown System"
+        # Keep the mining system and body paired when the current location changes.
         body = self.session_mining_body or self.session_body.get().strip() or self.last_body or "Unknown Body"
         elapsed_txt = self.session_elapsed.get()
         
