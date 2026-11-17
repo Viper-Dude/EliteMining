@@ -7065,7 +7065,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._active_ship_announcement_slot = None  # Linked announcement preset slot for the active ship preset
 
         # Basic announcement controls
-        ttk.Label(frame, text=t('settings.announcement_settings'), font=self._scaled_font(12, "bold")).grid(row=0, column=0, sticky="nw", pady=(0, 10))
+        from ui.help_link import create_help_link
+        announcement_heading = ttk.Frame(frame)
+        announcement_heading.grid(row=0, column=0, sticky="nw", pady=(0, 10))
+        ttk.Label(announcement_heading, text=t('settings.announcement_settings'), font=self._scaled_font(12, "bold")).pack(side="left")
+        create_help_link(announcement_heading, "announcement-panel", t('common.help_tooltip'), ToolTip).pack(side="left", padx=(6, 0))
 
         # Check if prospector panel is available for advanced controls
         if hasattr(self, 'prospector_panel') and self.prospector_panel:
@@ -8543,7 +8547,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
 
         # ========== BACKUP & RESTORE SECTION ==========
-        ttk.Label(scrollable_frame, text=t('settings.backup_restore_title'), font=self._scaled_font(10, "bold")).grid(row=r, column=0, sticky="w", pady=(5, 8))
+        from ui.help_link import create_help_link
+        backup_heading = ttk.Frame(scrollable_frame)
+        backup_heading.grid(row=r, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(backup_heading, text=t('settings.backup_restore_title'), font=self._scaled_font(10, "bold")).pack(side="left")
+        create_help_link(backup_heading, "backup--restore", t('common.help_tooltip'), ToolTip).pack(side="left", padx=(6, 0))
         r += 1
         
         # Add a subtle separator line
@@ -17650,7 +17658,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_ref_val_pp_merits.pack(side="left")
         ToolTip(_merits_lbl, t('system_finder.pp_tooltip_merits'))
         ToolTip(self.sysfinder_ref_val_pp_merits, t('system_finder.pp_tooltip_merits'))
-        create_help_link(row_pp, "powerplay-merits-and-mining", t('system_finder.pp_tooltip_merits'), ToolTip,
+        create_help_link(row_pp, "powerplay-merit-mining", t('system_finder.pp_tooltip_merits'), ToolTip,
                           bg=sf_bg, fg="#ffcc00").pack(side="left", padx=(4, 0))
 
 

@@ -7,6 +7,7 @@ Small clickable "?" label that opens a README section on GitHub.
 import tkinter as tk
 from tkinter import ttk
 import webbrowser
+from typing import Callable
 
 from config import load_theme, scaled_font
 from ui.theme import get_theme_colors
@@ -14,9 +15,9 @@ from ui.theme import get_theme_colors
 REPO_URL = "https://github.com/Viper-Dude/EliteMining"
 
 
-def create_help_link(parent, anchor: str, tooltip_text: str = "", tooltip_class=None,
+def create_help_link(parent, anchor: str | Callable[[], str], tooltip_text: str = "", tooltip_class=None,
                       bg: str = None, fg: str = None) -> tk.Label:
-    """Create a clickable '?' label that opens the README at the given anchor.
+    """Create a clickable '?' label; callable anchors are resolved when clicked.
 
     `bg`/`fg` default to the current theme's background and tip color. Pass them
     explicitly when the parent widget doesn't use the shared theme background
@@ -27,7 +28,7 @@ def create_help_link(parent, anchor: str, tooltip_text: str = "", tooltip_class=
     theme = get_theme_colors(load_theme())
     link = tk.Label(parent, text="?", font=scaled_font(9, "bold"),
                      bg=bg or theme["bg"], fg=fg or theme["tip_fg"], cursor="hand2")
-    link.bind("<Button-1>", lambda e: webbrowser.open(f"{REPO_URL}#{anchor}"))
+    link.bind("<Button-1>", lambda e: webbrowser.open(f"{REPO_URL}#{anchor() if callable(anchor) else anchor}"))
     if tooltip_class and tooltip_text:
         tooltip_class(link, tooltip_text)
     return link

@@ -15,6 +15,7 @@
     "visible": "Sichtbar"
   },
   "common": {
+    "help_tooltip": "Hilfe zu diesem Abschnitt öffnen (README)",
     "stopping": "Wird gestoppt...",
     "search": "Suchen",
     "cancel": "Abbrechen",

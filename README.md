@@ -7,7 +7,7 @@
   <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/EliteMining_main_logo.png" alt="EliteMining Logo" width="100%">
 </p>
 
-**EliteMining** optimizes your mining efficiency with live analytics, automated announcements, performance tracking, and a comprehensive hotspot finder with 80,000+ mining locations plus Spansh API integration for galaxy-wide ring search, overlaps, and RES sites as a standalone application. Built-in PowerPlay merit-mining tools help you find Fortified/Stronghold systems to mine in and nearby Unoccupied systems to sell in for Acquisition merits. Optional VoiceAttack integration enables voice/hotkey mining sequences for complete hands-free operation.
+**EliteMining** is a mining companion for Elite Dangerous. Find hotspots, compare sell prices, track mining sessions, and receive mineral announcements without VoiceAttack. Optional VoiceAttack integration adds voice commands, hotkeys, and automated mining sequences.
 
 💡 **Tip:** Most tables throughout the app support right-click for additional options — copying data, opening systems in Inara/EDSM/Spansh, saving to your local database, exporting results, and more context-specific actions. Sorted columns show an up/down arrow, and hovering a comment or note shows its full text.
 
@@ -29,6 +29,7 @@
 - [Hotspot Finder](#hotspot-finder)
 - [PowerPlay Merit Mining](#powerplay-merit-mining)
 - [Commodity Market](#commodity-market)
+  - [Sell My Hold](#sell-my-hold)
 - [Mining Missions](#mining-missions)
 - [Ring Mining Reference](#ring-mining-reference)
 - [Star Systems](#star-systems)
@@ -36,14 +37,22 @@
 - [Fleet Carrier](#fleet-carrier)
 - [Backup & Restore](#backup--restore)
 - [Getting Started](#getting-started)
+- [Mining Session](#mining-session)
+  - [Session Options](#session-options)
+  - [Analytics](#mining-analytics)
+  - [Reports](#reports)
+  - [Statistics](#mining-statistics)
+- [Bookmarks](#bookmarks)
+- [Ship Presets & Cargo Monitor](#ship-presets--cargo-monitor-sidebar)
+- [Settings](#settings-tab)
+  - [Announcements](#announcement-panel)
 - [VoiceAttack Commands](#voiceattack-commands)
 - [Mining Presets](#mining-presets)
 - [Usage Tips](#usage-tips)
+- [Compatibility](#compatibility)
 - [Known Limitations](#known-limitations)
 - [Training Speech Recognition](#training-speech-recognition)
-- [In Development](#in-development)
 - [FAQ](FAQ.md)
-- [Contact](#contact)
 - [Community & Resources](#community--resources)
 - [License](#license--third-party-notices)
 - [Credits](#credits)
@@ -55,36 +64,18 @@
 ## Features and Usage Options
 
 ### Standalone (Without VoiceAttack)
-Full-featured mining companion with GUI controls:
-- Real-time mining statistics  
-- Automated cargo monitoring  
-- Mining announcements & notifications  
-- **Engineering materials tracking** – Monitor raw materials by grade
-- **Auto-start mining session** – Automatically begins tracking when you fire your first prospector limpet
-- **Auto-resume mining session** – A paused session resumes automatically when you launch a prospector limpet
-- **Auto-end mining session** – Automatically ends and saves the session when you enter supercruise or jump
-- **Auto-Switch Tabs** – Automatically switches to Mining Session when you fire a prospector, returns to Hotspots Finder after session ends
-- **Cargo full notification** – Prompts you to end session when cargo hold is 100% full and idle for 1 minute
-- Session tracking & history  
-- Ship configuration management  
-- GUI for firegroups, timers, toggles, and announcements  
-- **Detailed HTML Reports** – Generate detailed reports with charts, screenshots, and analytics tooltips  
-- **Hotspot Finder** – Search 80,000+ mining hotspots by minerals, ring type, and distance with detailed location data  
-- **Overlaps** – Find and tag double/triple hotspot overlaps for maximum yield  
-- **RES Sites** – Locate Resource Extraction Sites (Hazardous, High, Low)  
-- **Commodity Market** – Find the best sell prices for your mined commodities with real-time market data and distance calculations  
-- **Mining Missions** – Track active mining missions and find hotspots directly from mission requirements  
-- **Backup & Restore** – Save and restore full setup including settings, bookmarks, and reports
+
+- **Find mining spots** — Search 80,000+ hotspots and galaxy-wide ring data, including overlaps and RES sites.
+- **Find buyers** — Compare mineral prices, trade goods, or sale options for your whole cargo hold.
+- **Track mining** — Live prospector reports, cargo and engineering materials, session history, charts, and reports.
+- **Hear announcements** — Choose minerals and thresholds, with optional in-game text overlays.
+- **Manage your setup** — Mining missions, bookmarks, ship presets, and backup/restore.
+
+See [Session Options](#session-options) for automatic session start, resume, and end.
 
 ### With VoiceAttack Integration (Optional)
-All standalone features **plus** voice/hotkey automation:
-- Voice/hotkey mining sequences  
-- Automated collector & prospector deployment  
-- Smart targeting & laser management  
-- **Repeated mining cycles** – Configure automated multi-cycle mining (1-10 repeats)
-- Custom commands & presets
-- Ship presets
-- Includes [EliteAPI by Somfic](https://docs.somfic.dev/projects/eliteva) (bundled with installer)  
+
+Adds voice/hotkey mining sequences, collector and prospector deployment, targeting, repeated mining cycles (1–10), and ship presets. The installer includes [EliteVA by Somfic](https://docs.somfic.dev/projects/eliteva).
 
 [Back to Top](#top)
 
@@ -144,7 +135,7 @@ The installer bundles the **EliteVA plugin**. No separate download required.
 
 ### VoiceAttack  Installation  
 1. Open VoiceAttack → Profile → Import Profile  
-2. Select **EliteMining v4.76-Profile.vap** (versioned format)  
+2. Select the bundled **EliteMining profile** (`EliteMining v<version>-Profile.vap`)
 3. Configure your mining hotkeys in the **"Custom Keybinds for Mining Control"** category
 
 ### Enable VoiceAttack Plugins
@@ -160,12 +151,8 @@ VoiceAttack must have plugin support enabled and the EliteAPI plugin activated:
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_plugin.png" width="900"><br>
 *Enable the EliteAPI plugin in VoiceAttack*
 
-**Note:** Plugin changes require a VoiceAttack restart.
-
-**Note (v4.76+):** Keybind preservation is now automatic! When updating, EliteMining will prompt you to export your profile and automatically merge your keybinds into the new version.
-
 ### Preserving Keybinds During Updates (v4.76+)
-EliteMining now automatically detects when a new VoiceAttack profile is available and guides you through keybind preservation:
+When a new VoiceAttack profile is available, EliteMining guides you through preserving your keybinds:
 1. Start EliteMining after updating
 2. Follow the on-screen prompt to export your current profile as XML
 3. Select the exported file
@@ -186,11 +173,7 @@ EliteMining now automatically detects when a new VoiceAttack profile is availabl
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_profile_options.png" width="900"><br>
 *Include custom profiles to add your own commands without modifying EliteMining*
 
-**Benefits:**
-- Your custom commands won't be overwritten during EliteMining updates
-- Easy to enable/disable your customizations
-- Clean separation between EliteMining and personal commands
-- Keybind merger won't affect your custom profile
+Your custom commands stay separate and survive EliteMining profile updates and keybind merging.
 
 **Note:** Commands in EliteMining profile take priority over included profiles if names conflict.
 
@@ -200,7 +183,7 @@ EliteMining now automatically detects when a new VoiceAttack profile is availabl
 
 ## EliteMining App  
 
-The **EliteMining App** provides a comprehensive GUI for configuring mining automation, tracking sessions, and managing all settings. It can run standalone without VoiceAttack.
+Use the app to track mining, search for locations and prices, and configure announcements and optional VoiceAttack automation.
 
 ### Start EliteMining  
 - EliteMining Desktop icon or direct: `\EliteMining\Configurator\EliteMining.exe`
@@ -300,33 +283,31 @@ Plays a sound or spoken voice for mining events, such as starting or resetting t
 
 ## Hotspot Finder
 
-The Hotspot Finder provides access to a comprehensive database of 80,000+ confirmed mining hotspots with detailed location data, minerals information, and intelligent filtering capabilities, plus integrated Spansh data.
+Search saved hotspots and Spansh ring data by mineral, ring type, and distance. Right-click results for prices, bookmarks, and ring data.
 
 ### Key Features
-- **Search Planetary Rings** – Find optimal mining rings (Ice, Metal Rich, Rocky, Metallic)
-- **Filter by Minerals** – Search for specific minerals (Painite, Platinum, Low Temperature Diamonds, etc.)
-- **Spansh Data Integration** – Search includes Spansh.co.uk data alongside your personal scans for comprehensive coverage (~50 LY typical, Ring Search mode reaches 300 LY)
-- **Ring Type Only Search** – Find rings by type without requiring hotspot data, useful for exploring unmarked rings
-- **Data Source Selection** – Choose between Database (your scans), Spansh (Spansh data), or Both for best results
-- **Min Hotspots Filter** – Filter results to show only rings with X or more hotspots (1-20 range, available when specific mineral selected)
-- **Save to Local Database** – Right-click Spansh results to save them to your personal database for offline access (max 50 rows)
-- **Auto-Save Tick Box** – Next to the Data Source options (Spansh and Both only). Off by default. Tick it to automatically save new hotspots from Spansh searches to your local database; entries you already have are never changed.
-- **Update Reserve Level** – Right-click local entries with missing reserve data to fetch and update from Spansh
-- **Auto-Search** – Automatically searches for hotspots when jumping to new systems and auto-refreshes results when scanning rings (remembers preference across restarts)
-- **Pre-loaded Database** – 80,000+ hotspots with mineral type, ring type, reserve level, etc.
-- **Auto-Import & Tracking** – Automatically imports hotspots from journal files and tracks new discoveries
-- **Distance-Based Results** – Filter by jump range (up to 500 LY) to find nearby opportunities
-- **Ring Composition Details** – View distance from arrival (LS) with comma-separated formatting
-- **Smart Sorting** – Results ranked by distance and hotspot overlaps
-- **Overlap Tracking** – Add and find hotspot overlaps (2x, 3x) for higher yield mining locations
-- **RES Site Tracking** – Add and find Resource Extraction Sites (Hazardous, High, Low) for combat mining
-- **Pre-loaded Overlap & RES Data** – Ships with 161 known overlaps and 71 RES site locations
-- **Power/State Filter** – Filter results by controlling Power and PowerPlay state (Local Database source only). Selecting Fortified or Stronghold searches up to 500 LY via Spansh for fast, accurate territory data; other states rely on the local EDDN cache and the Max Distance setting.
-- **PowerPlay Column** – Displays the controlling power and state for each system. Fills in instantly for systems you jump into yourself, and via EDDN (live data from other commanders, stored locally while the app runs) for the rest — coverage of systems you haven't visited can take hours to days to build up. Double-click the System or Powerplay cell to open the system on Inara and refresh its Powerplay data.
-- **PowerPlay Tick Box** – Next to the Data Source options (Local searches only). Off (default) searches faster and shows only the PowerPlay info already saved on your PC. Tick it to also look up the latest PowerPlay info online from Spansh.
-- **Best Minerals to Mine** – Right-click a ring or system and choose "Best Minerals to Mine" to see the best sell prices for the hotspot minerals nearby. Use "+ add" to include minerals without hotspots (e.g. Osmium).
-- **Find Acquisition Systems** – Right-click a Fortified or Stronghold system to list nearby Unoccupied systems with a station buying your mineral, for PowerPlay Acquisition merits (search radius 20 Ly for Fortified, 30 Ly for Stronghold). Works with any mineral, including ones without hotspots like Osmium.
-- **Auto Prices** – Requires Auto-Search. After a jump to a system with known hotspots, automatically fetches live sell prices and opens the Best Mineral to Mine window without stealing focus. Right-click the Auto Prices checkbox to show the results on the in-game text overlay instead (all minerals with price, station, landing pad, distance and demand, while you're in supercruise) and to switch "In-system prices only" on or off.
+
+#### Searching and Filters
+
+- **Data Source** — Choose Local Database (saved rings and scans), Spansh, or Both. Ring Type Only finds rings without requiring hotspots.
+- **Mineral and ring filters** — Choose a mineral, ring type, distance, and minimum hotspot count (1–20 when a mineral is selected).
+- **Search range** — Local searches support up to 500 LY; Spansh hotspot coverage is typically around 50 LY, and Ring Search reaches 300 LY.
+- **Overlaps and RES sites** — Find double/triple hotspots and Resource Extraction Sites. The bundled data includes 161 overlaps and 71 RES locations.
+- **Power/State** — Available for Local Database searches. Fortified/Stronghold searches use Spansh up to 500 LY; other states use locally received data and Max Distance.
+- **PowerPlay checkbox** — Off uses saved PowerPlay information for faster searches. On also checks Spansh. Your own visits update information immediately; coverage elsewhere depends on other commanders. Double-click a System or PowerPlay cell to open Inara and refresh its PowerPlay information.
+
+#### Prices and PowerPlay
+
+- **Best Minerals to Mine** — Right-click a ring or system to compare sell prices for its hotspot minerals. Use **+ add** to include minerals without hotspots, such as Osmium.
+- **Auto Prices** — With Auto-Search enabled, fetch prices after arriving in a system with known hotspots. Right-click its checkbox to choose in-system prices or [overlay results](#text-overlay).
+- **Find Acquisition Systems** — Right-click a Fortified/Stronghold system to find nearby Unoccupied systems buying your mineral. See [PowerPlay Merit Mining](#powerplay-merit-mining).
+
+#### Saving and Automatic Updates
+
+- Journal scans are imported automatically, and newly discovered hotspots are tracked.
+- **Auto-Search** searches after jumps and refreshes after ring scans; your choice is remembered.
+- Right-click Spansh results to save up to 50 selected rows locally or update missing reserve levels.
+- **Auto-Save** (Spansh/Both only, off by default) saves new hotspots without changing existing entries.
 
 ### Setting & Managing Overlap/RES Data
 - **Edit Ring Data** – Right-click a ring saved in your local database to set hotspot counts, reserve level, overlaps (2x, 3x), RES sites (Hazardous, High, Normal, Low), ring type, visit count and density
@@ -337,23 +318,28 @@ The Hotspot Finder provides access to a comprehensive database of 80,000+ confir
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder_edit_ring.png" width="400"><br>
 *Edit Ring Data, opened from the right-click menu.*
 
-Automatically imports hotspots from your Elite Dangerous journal files and continuously tracks newly discovered locations.
-
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="900"><br>
 *Hotspot Finder showing search results with minerals filters and distance calculations.*
 
+<details>
+<summary>View acquisition searches and mineral price examples</summary>
+
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acquisition_targets.png" width="900"><br>
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acquisition_targets_results.png" width="900"><br>
-*Best Minerals to Mine from the right-click menu and its results.*
+*Find Acquisition Systems: search for nearby Unoccupied systems and compare their buyers.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/best_minerals_ring.png" width="900"><br>
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/best_minerals_add_ring.png" width="900"><br>
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/best_minerals_system.png" width="900"><br>
 *Best Minerals to Mine for a ring or the entire system.*
 
+</details>
+
 [Back to Top](#top)
 
 ---
+
+<a name="powerplay-merits-and-mining"></a>
 
 ## PowerPlay Merit Mining
 
@@ -372,36 +358,23 @@ How the app helps (all in the [Hotspot Finder](#hotspot-finder)):
 
 ## Commodity Market
 
-The Commodity Market helps you find the best prices for mining commodities and trade goods using real-time market data from the Ardent API, with automatic distance calculations to help you maximize profits.
+Find buyers for your mined cargo or stations selling trade goods. Choose a reference system, search mode, and filters, then click **Search**.
 
 ### Key Features
-- **Four Tabs:**
-  - **Mining Commodities** – Search for 28 mineable resources (Painite, Platinum, Low Temperature Diamonds, etc.)
-  - **Multiple Prices** – Tick up to 5 minerals and find the best stations to sell them together in one stop
-  - **Sell My Hold** – Compare one-stop, nearby, and two-stop sales for your current cargo while reserving cargo needed for mining missions
-  - **Trade Commodities** – Search across 15 categories of trade goods (Chemicals, Machinery, Medicines, Technology, and more)
-- **Two Search Modes:**
-  - **Near System** – Find top 30 stations within 500 LY, filtered by distance
-  - **Galaxy-Wide** – Find top 30 best prices anywhere in the galaxy with calculated distances
-- **Buy/Sell Toggle:**
-  - **Sell Mode** – Find stations buying your commodities (best sell prices)
-  - **Buy Mode** – Find stations selling commodities you want to purchase (lowest buy prices)
-- **Real-Time Market Data** – Live commodity prices from multiple sources: Ardent API, Spansh, and a local EDDN cache (data broadcast by other commanders in real-time, retained for 24 hours). EDDN coverage depends on commander traffic, so it can take hours to days to fill in for less-visited systems — Ardent and Spansh cover the gaps in the meantime.
-- **Smart Filtering:**
-  - Station type (Orbital/Surface/Fleet Carrier/MegaShip)
-  - Landing pad size (Large pads only option)
-  - Exclude Fleet Carriers
-- **Distance Calculations** – Automatically calculates jump distance from your reference system
-- **Data Freshness** – Shows when prices were last updated (minutes/hours/days ago)
-- **Sortable Results** – Click column headers to sort by location, type, distance, demand, or price
-- **Threaded Updates** – Results appear instantly with distances calculated in background for smooth performance
-- **Inara Shortcut** – Double-click a System/Station cell to open the system on Inara.
-- **External Links** – Right-click any search result to:
-  - Open station in Inara (station search)
-  - Open system in EDSM (system page with all stations)
-  - Copy system name to clipboard
 
-Perfect for planning your mining runs and finding the most profitable stations to sell your haul or locate trade goods.
+| Tab | Use it to |
+|---|---|
+| Mining Commodities | Find prices for one mining commodity. |
+| Multiple Prices | Compare buyers for up to five minerals at one station. |
+| Sell My Hold | Compare one-stop, nearby, and two-stop sales for your cargo, reserving mission requirements. |
+| Trade Commodities | Search trade goods across 15 categories. |
+
+- **Near System / Galaxy-Wide** — Search around your reference system (up to 500 LY) or across the galaxy.
+- **Sell / Buy** — Find stations buying your cargo or selling goods you want.
+- **Filters** — Choose station type, landing pad size, and whether to include Fleet Carriers.
+- **Results** — Compare prices, demand, distance, and price age. Click headers to sort. Double-click a System/Station cell for Inara; right-click for external links or copying.
+
+Prices combine Ardent, Spansh, and reports from other commanders. Coverage varies, and prices and demand can change before you arrive. Check the price age before travelling.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commodity_market.png" width="900"><br>
 *Commodity Market showing mining commodities search results with filters and distance calculations.*
@@ -528,8 +501,21 @@ Monitor your fleet carrier status at a glance — populated automatically from y
 ---
 
 ## Getting Started
+
+### Standalone Quick Start
+
+1. Start EliteMining and log into Elite Dangerous so the app can read your current system and ship.
+2. Use [Hotspot Finder](#hotspot-finder) to choose a mining location.
+3. In **Mining → Session**, enable **Auto-start**, then fire a prospector limpet to begin tracking.
+4. Configure minerals and thresholds in [Settings → Announcements](#announcement-panel).
+5. End the session to save it, review [Reports](#reports), and use [Commodity Market](#commodity-market) to find buyers.
+
+### VoiceAttack Setup
+
+Complete [VoiceAttack installation](#voiceattack--installation) first, then configure the firegroups and hotkeys below.
+
 <details open>
-<summary>Click to expand</summary>
+<summary>Firegroups and hotkeys</summary>
 
 ### Firegroup (FG) Setup  
 | Component | FG | Fire Button | Notes |
@@ -576,21 +562,16 @@ Monitor your fleet carrier status at a glance — populated automatically from y
 
 ---
 
-### EliteMining GUI  
-<details open>
-<summary>Click to expand</summary>
+## EliteMining GUI
 
 ### Mining Session Tab  
 
 #### Mining Session  
+
+Open **Mining → Session** to track prospector scans, mineral quality, cargo collected, and mining rate. Use **Start**, **Resume**, **End**, or **Cancel** to control the session, or enable the automatic options below. **End** saves the session for Reports and Statistics.
+
 <img src="Screenshot/mining_session.png" width="900"><br>
-*Tracks time, prospector reports, minerals, and progress.*  
-
-<img src="Screenshot/mining_analytics_yield_timeline.png" width="900"><br>
-*Yield comparisons across sessions.*  
-
-<img src="Screenshot/mining_analytics_material_comparison.png" width="900"><br>
-*Minerals collection comparisons.*  
+*Tracks time, prospector reports, minerals, and progress.*
 
 #### Session Options
 Tick these under the Start / End buttons:
@@ -602,7 +583,25 @@ Tick these under the Start / End buttons:
 
 For a fully hands-free setup, tick **Auto-start** and **Auto-end** and turn off **Prompt when full**. Sessions then start and save by themselves.
 
-#### Reports 
+#### Mining Analytics
+
+Open **Mining → Analytics** to compare yields over time and the materials collected. Use the charts to review how your mining performance changes during a session.
+
+<details>
+<summary>View analytics charts</summary>
+
+<img src="Screenshot/mining_analytics_yield_timeline.png" width="900"><br>
+*Mineral percentages over the session timeline.*
+
+<img src="Screenshot/mining_analytics_material_comparison.png" width="900"><br>
+*Minerals collection comparisons.*
+
+</details>
+
+#### Reports
+
+Open **Mining → Reports** to review saved sessions. Right-click a session to generate a detailed report, attach screenshots, or create a mining card.
+
 <img src="Screenshot/mining_reports.png" width="900"><br>
 *Detailed mining statistics and summaries.*  
 - **Ring Type** column next to Planet/Ring (blank if the ring isn't in your saved ring data)
@@ -610,14 +609,13 @@ For a fully hands-free setup, tick **Auto-start** and **Auto-end** and turn off 
 #### Detailed HTML Reports  
 *HTML reports with charts and statistics.*  
 
-> **Work in Progress:** The detailed HTML report system is under active development. New features and improvements are being added regularly. Report layouts, analytics calculations, and data presentation may change in future updates.
+> Report layouts and calculations may change as the detailed report system develops.
 
-Generate comprehensive HTML reports with interactive charts, mining analytics, and session comments. Features include:
+Detailed reports include:
 - **Dark/Light Theme Toggle** - Switch between themes with one click  
 - **Session Comments** - Add notes and observations to your reports  
 - **Visual Charts** - Minerals breakdowns and performance graphs  
 - **Screenshot Integration** - Attach screenshots to document your sessions  
-- **Mining Statistics** - Track session averages, mineral performance, recent progress, and your best and latest mining locations under **Mining → Statistics**.
 - **Analytics Tooltips** - Hover explanations for all efficiency metrics
 - **Clickable Images** - Charts and screenshots expand to full size
 - **Data Preservation** - Reports protected during software updates
@@ -628,12 +626,12 @@ Generate comprehensive HTML reports with interactive charts, mining analytics, a
 - Screenshots: `Reports/Mining Session/Detailed Reports/Screenshots/`
 - Performance graphs: `Reports/Mining Session/Graphs/`  
 
-Right-click any mining session to generate a detailed report, add screenshots, or manage existing reports. All reports are saved with your session data and can be opened directly from the reports tab.
+Open saved reports from the Reports tab.
 
 #### Discord Integration
 *Manually share mining session reports to Discord channels.*  
 
-Share completed mining session summaries to Discord channels via webhook integration. Configure your Discord webhook URL in settings, then manually share individual session reports with custom comments. Reports include materials found, yields, performance metrics, and session duration. 
+Set a Discord webhook URL in Settings, then manually share a completed session from Reports. Shared summaries include minerals, yields, mining rate, duration, and your comments.
 
 #### 📊 Mining Cards
 Generate shareable PNG cards from your mining sessions.
@@ -670,7 +668,7 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 #### Mining Statistics
 
-Open **Mining → Statistics** and filter by ship, mineral, or time period.
+Open **Mining → Statistics** to review saved mining sessions. Ship, Mineral, and Time filters apply to mining statistics. **Last 20 Visited Systems** shows visit history independently; those filters are hidden on that tab.
 
 - **Overview** — Session totals, averages, and records, plus your latest 10 sessions compared with the previous 10.
 - **Top 20 Best Locations** — Locations ranked by their best session T/hr, with average and lowest rates, session counts, and mining time.
@@ -685,6 +683,9 @@ Right-click a location to copy its system, open Inara/EDSM/Spansh, view its repo
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_statistics_overview.png" alt="Mining Statistics overview with session averages, records and recent progress" width="900"><br>
 *Overview: totals, averages, records, and recent progress.*
 
+<details>
+<summary>View location tables and visited systems</summary>
+
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_statistics_top_20_locations.png" alt="Best Locations with mining rates and mineral performance" width="900"><br>
 *Top 20 Best Locations: compare mining rates and mineral performance.*
 
@@ -693,6 +694,8 @@ Right-click a location to copy its system, open Inara/EDSM/Spansh, view its repo
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_statistics_last_20_visited_systems.png" alt="Last 20 Visited Systems with visit dates, distances and visit counts" width="900"><br>
 *Last 20 Visited Systems: recent system visits, distances, and visit counts.*
+
+</details>
 
 ---
 
@@ -708,11 +711,22 @@ Right-click a location to copy its system, open Inara/EDSM/Spansh, view its repo
 
 ---
 
-#### Settings Tab  
+#### Settings Tab
+
+Open **Settings** and choose **Announcements** for mineral alerts and presets, or **General Settings** for themes, UI scale, session automation, overlays, and backup/restore. Hover over controls for individual explanations. See [Themes](#themes), [Session Options](#session-options), and [Text Overlay](#text-overlay) for details.
+
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/settings.png" width="900"><br>
 *UI and announcement preferences.*  
 
-#### Announcement Panel  
+#### Announcement Panel
+
+Open **Settings → Announcements** to choose which minerals trigger alerts and their minimum percentages.
+
+- Enable the announcement types you want, then select minerals and set their thresholds.
+- **Set All** applies the shared percentage to all material thresholds. Core-only minerals do not use percentage thresholds.
+- Save different choices in announcement presets. Link a preset to a ship preset through the sidebar's right-click menu if you want them to load together.
+- Use [Voice Feedback](#voice-feedback) to choose sounds or spoken feedback for mining events.
+
 <img src="Screenshot/mining_announcements.png" width="900"><br>
 *Controls announcements, thresholds, and filters.*  
 
@@ -720,8 +734,13 @@ Right-click a location to copy its system, open Inara/EDSM/Spansh, view its repo
 <img src="Screenshot/text_overlay.png" width="900"><br>
 *Text overlay showing real-time mining announcements in-game.*
 
+<details>
+<summary>View the enhanced text overlay</summary>
+
 <img src="Screenshot/text_overlay_enhanced.png" width="900"><br>
 *Enhanced overlay with improved readability and detailed mining statistics.*
+
+</details>
 
 > **Note:** The text overlay automatically follows the game window across monitors. On high DPI scaling settings (above 150%), the overlay position may be slightly offset. For best results, use 100–150% display scaling on the monitor running the game.
 
@@ -729,7 +748,12 @@ Right-click a location to copy its system, open Inara/EDSM/Spansh, view its repo
 
 > **Only during Mining Session:** Enable "Only during Mining Session" to show overlays only while a mining session is active. When no session is running, overlays stay hidden to keep your screen clean.
 
-> **Auto Prices on the overlay:** In the Hotspots Finder, right-click the Auto Prices checkbox and tick "Show on overlay" (also available in the General Settings tab) to see the best sell prices on the text overlay after a jump instead of in a window. It appears only while you're in supercruise, ignores "Hide in Supercruise", stays for its own display duration (10–60 seconds), and needs "Enable Text Overlay" to be on. If the text overlay is off, the Best Mineral to Mine window is used instead. To also see prices for minerals that have no hotspot in the system or ring, add them with the "+ Also Check" button in the Best Mineral to Mine window.
+**Auto Prices on the overlay:**
+
+- Right-click **Auto Prices** in Hotspots Finder and tick **Show on overlay**, or enable it in General Settings.
+- Requires **Enable Text Overlay**. If that is off, results open in the Best Mineral to Mine window.
+- Appears only in supercruise, ignores **Hide in Supercruise**, and uses its own display duration (10–60 seconds).
+- Use **+ Also Check** in Best Mineral to Mine to include minerals without hotspots.
 
 <img src="Screenshot/text_overlay_auto_prices.png" width="900"><br>
 *Auto Prices on the text overlay: best sell price, demand, station and distance for each mineral.*
@@ -737,14 +761,17 @@ Right-click a location to copy its system, open Inara/EDSM/Spansh, view its repo
 <img src="Screenshot/text_overlay_settings.png" width="900"><br>
 *Text overlay settings in the General Settings tab.*
 
-</details>
-
 [Back to Top](#top)
 
 ---
 
 ### Backup & Restore 
-- Easily save and restore your complete EliteMining setup including settings, bookmarks, and reports. Create timestamped backups before updates or quickly restore previous configurations with one click.  
+Open **Settings → General Settings → Backup & Restore**.
+
+- **Backup** — Choose what to include (or select everything), then save the ZIP file.
+- **Restore** — Select an EliteMining backup ZIP and choose which available items to restore. Restoring replaces the selected saved data, so create a backup first.
+
+Backups can include settings, ship presets, reports, bookmarks, ring data, journals, and the VoiceAttack profile.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/settings_backup_restore.png" width="900"><br>
 
@@ -878,10 +905,12 @@ Enable, disable, or check the status of 15 EliteMining settings by voice. Spoken
 ---
 
 
+## Compatibility
+
+- Works alongside EDCopilot.
 
 ## Known Limitations
 - **Only works with in-game keybinds (HOTAS setup manual)**
-- **Works with EDCopilot**
 - **DPI / Resolution changes require restart** — If you change your display DPI scaling or screen resolution, restart EliteMining for the text overlays to render correctly.
 
 > **Note:** VoiceAttack startup warnings about EliteVA plugin bindings are normal due to recent Elite Dangerous changes and can be safely ignored – they don't impact EliteMining voice commands.

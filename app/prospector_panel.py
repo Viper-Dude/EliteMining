@@ -1677,7 +1677,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         from ui.help_link import create_help_link
         _ms_theme = get_theme_colors(load_theme())
         self._session_help_link = create_help_link(
-            nb, "mining-session-tab", t('mining_session.help_tooltip'), self.ToolTip,
+            nb, lambda: self._mining_help_sections.get(nb.select(), "mining-session-tab"),
+            t('common.help_tooltip'), self.ToolTip,
             bg=_ms_theme["bg_accent"], fg=_ms_theme["tip_fg"])
 
         # Reports tab (live prospector readouts)
@@ -1686,6 +1687,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         rep.columnconfigure(1, weight=0)
         rep.rowconfigure(4, weight=1)  # PanedWindow gets the weight
         nb.add(rep, text=t('mining_session.mining_analytics'))
+        self._mining_help_sections = {str(rep): "mining-session"}
 
         # --- Distance and Ship Info Row ---
         distance_ship_row = ttk.Frame(rep)
@@ -2337,6 +2339,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # COMBINED: Analytics tab with Graphs and Statistics sub-sections
         analytics = ttk.Frame(nb, padding=8)
         nb.add(analytics, text=t('mining_session.analytics'))
+        self._mining_help_sections[str(analytics)] = "mining-analytics"
         analytics.columnconfigure(0, weight=1)
         analytics.rowconfigure(0, weight=1)
         
@@ -2362,6 +2365,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Statistics sub-tab
         statistics = ttk.Frame(nb, padding=8)
         nb.add(statistics, text=t('mining_session.statistics'))
+        self._mining_help_sections[str(statistics)] = "mining-statistics"
         statistics.columnconfigure(0, weight=1)
         statistics.rowconfigure(0, weight=1)
         
@@ -2371,6 +2375,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Reports tab - Session reports and management
         reports = ttk.Frame(nb, padding=8)
         nb.insert(statistics, reports, text=t('mining_session.reports'))
+        self._mining_help_sections[str(reports)] = "reports"
         reports.columnconfigure(0, weight=1)
         reports.rowconfigure(0, weight=1)
         
@@ -2382,6 +2387,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             from mining_missions_tab import MiningMissionsTab
             missions_frame = ttk.Frame(nb, padding=8)
             nb.add(missions_frame, text=t('mining_missions.title'))
+            self._mining_help_sections[str(missions_frame)] = "mining-missions"
             missions_frame.columnconfigure(0, weight=1)
             missions_frame.rowconfigure(0, weight=1)
             
@@ -2405,6 +2411,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             from ring_guide_tab import RingGuideTab
             reference_frame = ttk.Frame(nb, padding=8)
             nb.add(reference_frame, text=t('ring_guide.tab_title'))
+            self._mining_help_sections[str(reference_frame)] = "ring-mining-reference"
             reference_frame.columnconfigure(0, weight=1)
             reference_frame.rowconfigure(0, weight=1)
             

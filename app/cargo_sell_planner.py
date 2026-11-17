@@ -136,7 +136,11 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.preferences = _load_cfg().get('sell_hold', {})
         controls = ttk.Frame(frame, padding=10)
         controls.pack(fill='x')
-        ttk.Label(controls, text=t('sell_hold.description'), wraplength=900).pack(anchor='w')
+        from ui.help_link import create_help_link
+        heading = ttk.Frame(controls)
+        heading.pack(fill='x')
+        ttk.Label(heading, text=t('sell_hold.description'), wraplength=900).pack(side='left')
+        create_help_link(heading, 'sell-my-hold', t('common.help_tooltip'), ToolTip).pack(side='left', padx=(6, 0))
         reference = ttk.Frame(controls)
         reference.pack(fill='x', pady=(8, 0))
         market_status = app.market_mining_status_label

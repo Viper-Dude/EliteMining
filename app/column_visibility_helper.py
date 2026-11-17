@@ -199,8 +199,14 @@ class ColumnVisibilityMixin:
 
         content = tk.Frame(dialog, bg=colors['bg'])
         content.pack(padx=scaled_px(16), pady=scaled_px(12))
-        tk.Label(content, text=t('column_order.description'), bg=colors['bg'], fg=colors['fg'],
-                 font=scaled_font(9)).pack(anchor="w", pady=(0, scaled_px(8)))
+        from ui.help_link import create_help_link
+        from ui.tooltip import ToolTip
+        heading = tk.Frame(content, bg=colors['bg'])
+        heading.pack(fill='x', pady=(0, scaled_px(8)))
+        tk.Label(heading, text=t('column_order.description'), bg=colors['bg'], fg=colors['fg'],
+                 font=scaled_font(9)).pack(side='left')
+        create_help_link(heading, 'customize-table-columns', t('common.help_tooltip'), ToolTip,
+                         bg=colors['bg'], fg=colors['fg']).pack(side='left', padx=(scaled_px(6), 0))
         list_frame = tk.Frame(content, bg=colors['bg'])
         list_frame.pack(fill="both", expand=True)
         listing = ttk.Treeview(list_frame, columns=('visible',), show='tree headings',
