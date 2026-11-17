@@ -3,6 +3,7 @@
 Hotspot Finder Module for EliteMining
 Provides mining hotspot location services with live API data integration
 """
+from ui.striped_treeview import StripedTreeview
 from ui.theme import modern_color
 from ui.search_control import SearchControl
 
@@ -1176,7 +1177,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         # Results treeview with enhanced columns including source
         columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "PowerPlay", "Source", "Favourite", "Last Mined", "Comment", "Density", "_spacer")
-        self.results_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview", selectmode='extended')
+        self.results_tree = StripedTreeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview", selectmode='extended')
         
         # Track column visibility and default widths
         self.column_default_widths = {
@@ -7679,7 +7680,7 @@ class RingFinder(ColumnVisibilityMixin):
         self._cv_add_columns_button(columns_header, 'rank_minerals')
 
         columns = ("Mineral", "RingType", "Price", "Station", "Type", "Pad", "Dist", "LS", "Demand", "PowerPlay", "Updated")
-        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=min(len(results), 8),
+        tree = StripedTreeview(tree_frame, columns=columns, show="headings", height=min(len(results), 8),
                             selectmode="browse", style="RankMinerals.Treeview")
         column_labels = {
             "Mineral": t('ring_finder.col_mineral'),
@@ -8506,7 +8507,7 @@ class RingFinder(ColumnVisibilityMixin):
         tree_frame.pack(fill="both", expand=True, pady=(0, 10))
 
         columns = ("System", "Dist", "Mineral", "Price", "Station", "Type", "LS", "PowerPlay", "Updated")
-        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=min(len(results), 10),
+        tree = StripedTreeview(tree_frame, columns=columns, show="headings", height=min(len(results), 10),
                             selectmode="browse", style="ReverseSearch.Treeview")
         column_labels = {
             "System": t('ring_finder.col_mine_here'),
@@ -9072,7 +9073,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         show_mineral_col = mineral_filter is None
         columns = ("System", "Station", "Type", "Pad", "Dist", "Power", "Mineral", "Demand", "Price", "Updated")
-        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=min(len(results), 15),
+        tree = StripedTreeview(tree_frame, columns=columns, show="headings", height=min(len(results), 15),
                             selectmode="browse", style="AcquisitionSearch.Treeview")
         price_header = (t('ring_finder.acquisition_search_col_price').format(mineral=t('ring_finder.all_minerals'))
                         if show_mineral_col else

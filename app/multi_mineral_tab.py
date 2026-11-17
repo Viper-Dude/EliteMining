@@ -1,4 +1,5 @@
 """Multi-Mineral sub-tab of Commodity Market: find the best stations to sell several minerals at once."""
+from ui.striped_treeview import StripedTreeview
 import threading
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
@@ -106,7 +107,7 @@ class MultiMineralTab:
         table = ttk.Frame(container, relief="solid", borderwidth=1)
         table.pack(fill="both", expand=True, pady=(5, 0))
         cols = ("location", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
-        self.tree = ttk.Treeview(table, columns=cols, show="tree headings", height=15,
+        self.tree = StripedTreeview(table, columns=cols, show="tree headings", height=15,
                                  style="Marketplace.Treeview", selectmode="browse")
         headings = {"location": t('marketplace.multi_col_station'),
                     "pad": t('marketplace.pad'), "distance": t('marketplace.distance'),

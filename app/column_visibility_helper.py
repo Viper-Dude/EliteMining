@@ -2,6 +2,7 @@
 Column Visibility Helper
 Provides reusable column visibility functionality for all tables in EliteMining
 """
+from ui.striped_treeview import StripedTreeview
 
 import tkinter as tk
 from typing import Dict, Callable
@@ -209,7 +210,7 @@ class ColumnVisibilityMixin:
                          bg=colors['bg'], fg=colors['fg']).pack(side='left', padx=(scaled_px(6), 0))
         list_frame = tk.Frame(content, bg=colors['bg'])
         list_frame.pack(fill="both", expand=True)
-        listing = ttk.Treeview(list_frame, columns=('visible',), show='tree headings',
+        listing = StripedTreeview(list_frame, columns=('visible',), show='tree headings',
                                height=12, selectmode='browse')
         listing.heading('#0', text=t('column_order.column'), anchor='w')
         listing.heading('visible', text=t('column_order.visible'), anchor='center')

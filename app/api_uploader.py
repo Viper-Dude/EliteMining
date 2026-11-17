@@ -35,6 +35,9 @@ class APIUploader:
         self.queue_file = Path(get_app_data_dir()) / "failed_api_uploads.json"
         self.max_queue_size = 100
         self.upload_queue = []
+        self._queue_lock = threading.RLock()
+        self._retry_lock = threading.Lock()
+        self._stop_event = threading.Event()
         
         # Retry delays (seconds)
         self.retry_delays = [0, 30, 120, 300]  # immediate, 30s, 2min, 5min
@@ -84,13 +87,14 @@ class APIUploader:
     
     def _save_queue(self):
         """Save failed uploads queue to disk."""
-        try:
-            self.queue_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.queue_file, 'w', encoding='utf-8') as f:
-                json.dump(self.upload_queue, f, indent=2)
-        except Exception as e:
-            logger.error(f"Error saving upload queue: {e}")
-    
+        with self._queue_lock:
+            try:
+                self.queue_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(self.queue_file, 'w', encoding='utf-8') as f:
+                    json.dump(self.upload_queue, f, indent=2)
+            except Exception as e:
+                logger.error(f"Error saving upload queue: {e}")
+
     def parse_txt_report(self, filepath: str) -> Optional[Dict[str, Any]]:
         """Parse TXT session report and extract data."""
         try:
@@ -343,8 +347,11 @@ class APIUploader:
         
         return json_data
     
-    def upload_session(self, session_data: Dict[str, Any], retry_count: int = 0) -> bool:
+    def upload_session(self, session_data: Dict[str, Any], retry_count: int = 0,
+                       queue_on_failure: bool = True) -> bool:
         """Upload single session to API with retry logic."""
+        if self._stop_event.is_set():
+            return False
         if not self.enabled:
             logger.debug("API upload disabled, skipping")
             return False
@@ -365,7 +372,8 @@ class APIUploader:
                 delay = self.retry_delays[retry_count]
                 if delay > 0:
                     logger.info(f"Retry attempt {retry_count}, waiting {delay}s...")
-                    time.sleep(delay)
+                    if self._stop_event.wait(delay):
+                        return False
             
             logger.info(f"Uploading session to {endpoint}")
             response = requests.post(
@@ -389,31 +397,35 @@ class APIUploader:
             elif response.status_code == 429:
                 logger.warning("Rate limited by server")
                 if retry_count < len(self.retry_delays) - 1:
-                    return self.upload_session(session_data, retry_count + 1)
+                    return self.upload_session(session_data, retry_count + 1, queue_on_failure=queue_on_failure)
             else:
                 logger.error(f"Upload failed with status {response.status_code}: {response.text}")
                 if retry_count < len(self.retry_delays) - 1:
-                    return self.upload_session(session_data, retry_count + 1)
+                    return self.upload_session(session_data, retry_count + 1, queue_on_failure=queue_on_failure)
             
             # If we've exhausted retries, queue it
             if retry_count >= len(self.retry_delays) - 1:
-                self._add_to_queue(session_data, 'session')
+                if queue_on_failure:
+                    self._add_to_queue(session_data, 'session')
                 
         except requests.exceptions.Timeout:
             logger.error(f"Upload timeout (retry {retry_count})")
             if retry_count < len(self.retry_delays) - 1:
-                return self.upload_session(session_data, retry_count + 1)
+                return self.upload_session(session_data, retry_count + 1, queue_on_failure=queue_on_failure)
             else:
-                self._add_to_queue(session_data, 'session')
+                if queue_on_failure:
+                    self._add_to_queue(session_data, 'session')
         except requests.exceptions.ConnectionError as e:
             logger.error(f"Connection error: {e}")
             if retry_count < len(self.retry_delays) - 1:
-                return self.upload_session(session_data, retry_count + 1)
+                return self.upload_session(session_data, retry_count + 1, queue_on_failure=queue_on_failure)
             else:
-                self._add_to_queue(session_data, 'session')
+                if queue_on_failure:
+                    self._add_to_queue(session_data, 'session')
         except Exception as e:
             logger.error(f"Unexpected error uploading session: {e}")
-            self._add_to_queue(session_data, 'session')
+            if queue_on_failure:
+                self._add_to_queue(session_data, 'session')
         
         return False
     
@@ -434,46 +446,56 @@ class APIUploader:
     
     def _add_to_queue(self, data: Dict[str, Any], data_type: str):
         """Add failed upload to queue."""
-        if len(self.upload_queue) >= self.max_queue_size:
-            logger.warning(f"Upload queue full ({self.max_queue_size}), removing oldest item")
-            self.upload_queue.pop(0)
-        
-        queue_item = {
-            'data': data,
-            'type': data_type,
-            'timestamp': datetime.now().isoformat(),
-            'retry_count': 0
-        }
-        
-        self.upload_queue.append(queue_item)
-        self._save_queue()
-        logger.info(f"Added {data_type} to upload queue (queue size: {len(self.upload_queue)})")
-    
-    def retry_queued_uploads(self):
-        """Retry all queued uploads on app startup."""
-        if not self.enabled or not self.upload_queue:
-            return
-        
-        logger.info(f"Retrying {len(self.upload_queue)} queued uploads...")
-        
-        successful = []
-        for item in self.upload_queue:
-            data_type = item['type']
-            data = item['data']
-            
-            if data_type == 'session':
-                if self.upload_session(data):
-                    successful.append(item)
-            # TODO: Add hotspot upload retry
-        
-        # Remove successful uploads from queue
-        for item in successful:
-            self.upload_queue.remove(item)
-        
-        if successful:
+        with self._queue_lock:
+            if len(self.upload_queue) >= self.max_queue_size:
+                logger.warning(f"Upload queue full ({self.max_queue_size}), removing oldest item")
+                self.upload_queue.pop(0)
+
+            queue_item = {
+                'data': data,
+                'type': data_type,
+                'timestamp': datetime.now().isoformat(),
+                'retry_count': 0
+            }
+            self.upload_queue.append(queue_item)
             self._save_queue()
-            logger.info(f"Successfully uploaded {len(successful)} queued items")
-    
+            logger.info(f"Added {data_type} to upload queue (queue size: {len(self.upload_queue)})")
+
+    def retry_queued_uploads(self, background: bool = False):
+        """Retry a snapshot of queued uploads without re-queuing failed items."""
+        if background:
+            worker = threading.Thread(target=self.retry_queued_uploads, daemon=True)
+            worker.start()
+            return worker
+        if not self._retry_lock.acquire(blocking=False):
+            return
+        try:
+            if not self.enabled or self._stop_event.is_set():
+                return
+            with self._queue_lock:
+                pending = list(self.upload_queue)
+            if not pending:
+                return
+            logger.info(f"Retrying {len(pending)} queued uploads...")
+            successful = []
+            for item in pending:
+                if self._stop_event.is_set():
+                    break
+                if item['type'] == 'session':
+                    if self.upload_session(item['data'], queue_on_failure=False):
+                        successful.append(item)
+            if successful:
+                with self._queue_lock:
+                    self.upload_queue[:] = [item for item in self.upload_queue
+                                            if not any(item is done for done in successful)]
+                    self._save_queue()
+                logger.info(f"Successfully uploaded {len(successful)} queued items")
+        finally:
+            self._retry_lock.release()
+
+    def stop(self):
+        self._stop_event.set()
+
     def test_connection(self) -> Tuple[bool, str]:
         """Test API connection and authentication."""
         if not self.api_url:

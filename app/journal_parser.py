@@ -773,7 +773,7 @@ class JournalParser:
 
     # ------------------------------------------------------------------
 
-    def process_scan(self, event: Dict[str, Any]) -> None:
+    def process_scan(self, event: Dict[str, Any], fetch_reserves: bool = True) -> None:
         """Process Scan event to extract ring class information
 
         Args:
@@ -861,7 +861,7 @@ class JournalParser:
                         reserve_level = self.system_reserve_levels.get(ring_name)
                         
                         # Only fall back to Spansh if not in journal AND not in cache AND live monitoring
-                        if not reserve_level and star_system and self.is_live_monitoring:
+                        if fetch_reserves and not reserve_level and star_system and self.is_live_monitoring:
                             log.info(f"Reserve level not in journal or cache for {ring_name}, fetching from Spansh...")
                             spansh_data = self._fetch_system_reserve_levels_from_spansh(star_system)
                             self.system_reserve_levels.update(spansh_data)

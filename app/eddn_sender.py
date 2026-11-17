@@ -9,6 +9,9 @@ import requests
 import json
 import gzip
 import os
+import queue
+import threading
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
 import logging
@@ -41,6 +44,10 @@ class EDDNSender:
         self.app_version = app_version
         self.enabled = False
         self.messages_sent = 0
+        self._journal_queue = queue.Queue()
+        self._journal_worker = None
+        self._journal_lock = threading.Lock()
+        self._stopped = False
         
         # Game version info (updated from journal LoadGame event)
         self.game_version = ""
@@ -184,16 +191,17 @@ class EDDNSender:
             log.error(f"Error sending commodity data to EDDN: {e}")
             return False
     
-    def send_journal_event(self, event_type: str, event_data: Dict) -> bool:
+    def send_journal_event(self, event_type: str, event_data: Dict, background: bool = False) -> bool:
         """
         Send journal event to EDDN
         
         Args:
             event_type: Event type (e.g., "FSDJump", "Docked")
             event_data: Event data from journal
+            background: Queue the message for ordered background delivery
             
         Returns:
-            True if sent successfully
+            True if sent successfully, or queued when background=True
         """
         if not self.enabled:
             return False
@@ -220,19 +228,49 @@ class EDDNSender:
                 "message": filtered_data
             }
             
-            # Send to EDDN
-            success = self._send_message(message)
-            
-            if success:
-                self.messages_sent += 1
-                log.debug(f"Sent journal event '{event_type}' to EDDN")
-            
-            return success
+            if background:
+                with self._journal_lock:
+                    if self._stopped:
+                        return False
+                    self._journal_queue.put((deepcopy(message), event_type))
+                    if self._journal_worker is None:
+                        self._journal_worker = threading.Thread(target=self._journal_upload_loop, daemon=True)
+                        self._journal_worker.start()
+                return True
+            return self._send_journal_message(message, event_type)
             
         except Exception as e:
             log.error(f"Error sending journal event to EDDN: {e}")
             return False
     
+    def _send_journal_message(self, message: Dict, event_type: str) -> bool:
+        success = self._send_message(message)
+        if success:
+            self.messages_sent += 1
+            log.debug(f"Sent journal event '{event_type}' to EDDN")
+        return success
+
+    def _journal_upload_loop(self):
+        while True:
+            item = self._journal_queue.get()
+            try:
+                if item is None:
+                    return
+                if self.enabled and not self._stopped:
+                    self._send_journal_message(*item)
+            except Exception:
+                log.exception("Error sending queued journal event to EDDN")
+            finally:
+                self._journal_queue.task_done()
+
+    def stop(self):
+        with self._journal_lock:
+            if not self._stopped:
+                self._stopped = True
+                self.enabled = False
+                if self._journal_worker is not None:
+                    self._journal_queue.put(None)
+
     def _send_message(self, message: Dict) -> bool:
         """
         Send message to EDDN gateway

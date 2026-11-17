@@ -4,6 +4,8 @@
 
 This release includes an updated VoiceAttack profile (v5.6.5).
 What's changed:
+- Improved mining sequence reliability, including scanner controls, scoop cancellation, and prospector targeting.
+
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.
 After updating, please check all your key and joystick bindings.

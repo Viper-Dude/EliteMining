@@ -17,6 +17,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+from ui.striped_treeview import StripedTreeview
 from ui.theme import modern_color
 from ui.search_control import SearchControl
 
@@ -54,6 +55,7 @@ else:
 
 import json
 import glob
+from journal_reader import journal_resume_offset, read_complete_journal_lines
 import re
 import shutil
 import datetime as dt
@@ -2592,7 +2594,8 @@ class CargoMonitor:
     def start_journal_monitoring(self):
         """Start monitoring Elite Dangerous journal files"""
         self.journal_monitor_active = True
-        self.find_latest_journal()
+        self._journal_initializing = True
+        self.find_latest_journal(skip_existing=True)
     
     def _start_background_monitoring(self):
         """Start background cargo and journal monitoring"""
@@ -2626,26 +2629,7 @@ class CargoMonitor:
                     # Check for Cargo.json updates (most accurate)
                     self.read_cargo_json()
                     
-                    # Check if journal file has grown (new entries) OR if a newer journal file exists
-                    if self.last_journal_file and os.path.exists(self.last_journal_file):
-                        current_size = os.path.getsize(self.last_journal_file)
-                        
-                        # Also check if there's a NEWER journal file (daily rotation)
-                        journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
-                        if journal_files:
-                            latest_file = max(journal_files)  # name sort; stat-ing every journal each loop was slow
-                            if latest_file != self.last_journal_file:
-                                logging.info(f"[JOURNAL_ROTATION] Detected new journal file: {os.path.basename(latest_file)}")
-                                self.last_journal_file = latest_file
-                                self.last_file_size = 0  # Start reading from beginning of new file
-                                continue  # Skip to next iteration to process new file
-                        
-                        if current_size > self.last_file_size:
-                            self.read_new_journal_entries()
-                            self.last_file_size = current_size
-                    else:
-                        # Check for new journal file
-                        self.find_latest_journal()
+                    self._poll_journal()
                         
                 except Exception as e:
                     logging.error(f"[BACKGROUND_MONITOR] ERROR: {e}")
@@ -2742,27 +2726,60 @@ class CargoMonitor:
 
         print("[CargoMonitor] Cleanup completed")
     
-    def find_latest_journal(self):
-        """Find the most recent journal file"""
+    def _poll_journal(self):
+        if getattr(self, '_journal_initializing', False):
+            self.find_latest_journal(skip_existing=True)
+            return
+        journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
+        with self._lock:
+            current = self.last_journal_file
+        if current and os.path.normcase(os.path.abspath(os.path.dirname(current))) != os.path.normcase(os.path.abspath(self.journal_dir)):
+            with self._lock:
+                self.last_journal_file = None
+                self.last_file_size = 0
+            self._journal_initializing = True
+            self.find_latest_journal(skip_existing=True)
+            return
+        if current:
+            paths = [current] + sorted(path for path in journal_files if path > current)
+        else:
+            paths = sorted(journal_files)
+        for path in paths:
+            if not os.path.exists(path):
+                continue
+            with self._lock:
+                if getattr(self, '_reading_journal', False):
+                    return
+                if path != self.last_journal_file:
+                    logging.info(f"[JOURNAL_ROTATION] Detected new journal file: {os.path.basename(path)}")
+                    self.last_journal_file = path
+                    self.last_file_size = 0
+            if not self.read_new_journal_entries():
+                if os.path.exists(path):
+                    break
+
+    def find_latest_journal(self, skip_existing=False):
+        """Attach to the latest journal, skipping history only during startup."""
         try:
-            if not os.path.exists(self.journal_dir):
-                return
-                
             journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
             if not journal_files:
+                if skip_existing:
+                    self._journal_initializing = False
                 return
-                
-            # Get the most recent journal file
-            latest_file = max(journal_files, key=os.path.getmtime)
-            self.last_journal_file = latest_file
-            self.last_file_size = os.path.getsize(latest_file)
-
-            # Scan for existing cargo capacity in the journal
+            latest_file = max(journal_files)
+            with self._lock:
+                if getattr(self, '_reading_journal', False):
+                    return
+                if latest_file == self.last_journal_file and not skip_existing:
+                    return
+                offset = journal_resume_offset(latest_file) if skip_existing else 0
+                self.last_journal_file = latest_file
+                self.last_file_size = offset
+                self._journal_initializing = False
             self.scan_journal_for_cargo_capacity(latest_file)
-            
         except Exception as e:
             print(f"Error finding journal files: {e}")
-    
+
     def scan_journal_for_cargo_capacity(self, journal_file):
         """Scan existing journal file for the most recent CargoCapacity, current system location, and ring metadata"""
         try:
@@ -2872,7 +2889,7 @@ class CargoMonitor:
 
                     # Process Scan events for ring metadata (new logic)
                     elif event_type == "Scan" and scans_processed < max_scans:
-                        self.journal_parser.process_scan(event)
+                        self._process_scan_event(event)
                         scans_processed += 1
                         continue
 
@@ -3060,23 +3077,33 @@ class CargoMonitor:
             print(f"Error prompting for refinery contents: {e}")
     
     def read_new_journal_entries(self):
+        with self._lock:
+            if getattr(self, '_reading_journal', False):
+                return False
+            self._reading_journal = True
+        try:
+            return self._read_new_journal_entries()
+        finally:
+            with self._lock:
+                self._reading_journal = False
+
+    def _read_new_journal_entries(self):
         """Read new entries from the journal file with retry logic for file locking issues"""
         max_retries = 3
         retry_delay = 0.1  # 100ms delay between retries
         
         for attempt in range(max_retries):
             try:
-                with open(self.last_journal_file, 'r', encoding='utf-8') as f:
-                    f.seek(self.last_file_size)  # Start from where we left off
-                    new_lines = f.readlines()
+                with self._lock:
+                    new_lines, position = read_complete_journal_lines(self.last_journal_file, self.last_file_size)
+                    self.last_file_size = position
 
                 for line in new_lines:
                     line = line.strip()
                     if line:
                         self.process_journal_event(line)
 
-                # Success - exit retry loop
-                return
+                return True
                         
             except PermissionError as e:
                 # File is locked by another application - retry
@@ -3087,13 +3114,13 @@ class CargoMonitor:
                 else:
                     print(f"Journal file locked by another application after {max_retries} retries (other apps scanning journals?)")
             except FileNotFoundError:
-                # Journal file was deleted/rotated - this is normal, find new journal
+                # The next poll will discover the replacement journal.
                 print(f"Journal file not found (rotated to new file): {self.last_journal_file}")
-                self.find_latest_journal()
-                return
+                return False
             except Exception as e:
                 print(f"Error reading journal entries: {e}")
-                return
+                return False
+        return False
     
     def process_journal_event(self, line: str):
         """Process a single journal event.
@@ -3121,6 +3148,18 @@ class CargoMonitor:
         elif "Ship" in event:
             ship_id = event["Ship"].lower()
             self.ship_type = self.ship_type_map.get(ship_id, event["Ship"].replace("_", " ").title())
+
+    def _process_scan_event(self, event):
+        self.journal_parser.process_scan(event, fetch_reserves=False)
+        system_name = event.get("StarSystem")
+        main_app = getattr(self, 'main_app_ref', None)
+        if (self.journal_parser.is_live_monitoring and system_name
+                and not event.get("ReserveLevel")
+                and any(ring.get("Name") and ring.get("RingClass")
+                        and ring["Name"] not in self.journal_parser.system_reserve_levels
+                        for ring in event.get("Rings", []))
+                and main_app is not None):
+            main_app.after(0, main_app._fetch_reserve_levels_for_system, system_name)
 
     def _process_journal_event_impl(self, line: str):
         try:
@@ -3446,7 +3485,7 @@ class CargoMonitor:
                     
                     print(f"[JUMP] FSDJump: Arrived at {system_name}")
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
-                        self.main_app_ref.eddn_sender.send_journal_event("FSDJump", event)
+                        self.main_app_ref.eddn_sender.send_journal_event("FSDJump", event, background=True)
                     try:
                         if self.journal_parser.eddn_cache_path:
                             pp_result = self.journal_parser._upsert_pp_from_event(event)
@@ -3478,7 +3517,7 @@ class CargoMonitor:
                     
                     print(f"[CARRIER] CarrierJump: Now at {system_name}")
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
-                        self.main_app_ref.eddn_sender.send_journal_event("CarrierJump", event)
+                        self.main_app_ref.eddn_sender.send_journal_event("CarrierJump", event, background=True)
                     try:
                         if self.journal_parser.eddn_cache_path:
                             pp_result = self.journal_parser._upsert_pp_from_event(event)
@@ -3521,7 +3560,7 @@ class CargoMonitor:
                     else:
                         self.current_system = system_name
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
-                        self.main_app_ref.eddn_sender.send_journal_event("Location", event)
+                        self.main_app_ref.eddn_sender.send_journal_event("Location", event, background=True)
                     try:
                         if self.journal_parser.eddn_cache_path:
                             pp_result = self.journal_parser._upsert_pp_from_event(event)
@@ -3535,7 +3574,7 @@ class CargoMonitor:
             elif event_type == "Scan":
                 # Process Scan events through JournalParser to store ring info
                 try:
-                    self.journal_parser.process_scan(event)
+                    self._process_scan_event(event)
                 except Exception as scan_err:
                     print(f"Warning: Failed to process Scan event: {scan_err}")
                         
@@ -5033,7 +5072,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if self.api_uploader.enabled:
             print(f"[OK] API uploader enabled - endpoint: {self.api_uploader.api_url}")
             # Retry any queued uploads from previous sessions
-            self.after(3000, lambda: self.api_uploader.retry_queued_uploads())
+            self.after(3000, lambda: self.api_uploader.retry_queued_uploads(background=True))
         else:
             print(f"API uploader disabled")
         
@@ -5069,8 +5108,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # was already docked at a market before EliteMining was launched.
             market_path = os.path.join(journal_dir, 'Market.json')
             if os.path.exists(market_path) and hasattr(self, 'market_handler'):
-                self.market_handler.process_market_file(market_path)
-                print(f"[OK] Processed existing Market.json on startup")
+                threading.Thread(target=self.market_handler.process_market_file,
+                                 args=(market_path,), daemon=True).start()
+                print(f"[OK] Queued existing Market.json for startup processing")
         else:
             print(f"[WARN] Could not set up EDDN file watcher - journal_dir not available")
         
@@ -5197,28 +5237,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if hasattr(self, 'ring_finder') and self.ring_finder:
                 self.ring_finder.status_var.set(f"Fetching reserve levels for {current_sys}...")
             
-            try:
-                reserve_levels = self.cargo_monitor.journal_parser._fetch_system_reserve_levels_from_spansh(current_sys)
-                self.cargo_monitor.journal_parser.system_reserve_levels = reserve_levels
-                if reserve_levels:
-                    print(f"[STARTUP] Fetched {len(reserve_levels)} reserve levels")
-                    
-                    # Bulk update existing database entries with reserve levels
-                    if hasattr(self.cargo_monitor, 'user_db'):
-                        updated_count = self.cargo_monitor.user_db.bulk_update_reserve_levels(current_sys, reserve_levels)
-                        if updated_count > 0:
-                            print(f"[STARTUP] Updated {updated_count} database entries with reserve levels")
-                    
-                    if hasattr(self, 'ring_finder') and self.ring_finder:
-                        self.ring_finder.status_var.set(f"Fetched {len(reserve_levels)} reserve levels for {current_sys}")
-                else:
-                    print(f"[STARTUP] No reserve levels found for {current_sys}")
-                    if hasattr(self, 'ring_finder') and self.ring_finder:
-                        self.ring_finder.status_var.set(f"No reserve levels found for {current_sys}")
-            except Exception as e:
-                print(f"[STARTUP] Error fetching reserve levels: {e}")
+            def completed(reserve_levels, error):
+                if getattr(self, 'current_system', current_sys) != current_sys:
+                    return
                 if hasattr(self, 'ring_finder') and self.ring_finder:
-                    self.ring_finder.status_var.set(f"Error fetching reserve levels")
+                    if error:
+                        self.ring_finder.status_var.set("Error fetching reserve levels")
+                    elif reserve_levels:
+                        self.ring_finder.status_var.set(f"Fetched {len(reserve_levels)} reserve levels for {current_sys}")
+                    else:
+                        self.ring_finder.status_var.set(f"No reserve levels found for {current_sys}")
+
+            self._fetch_reserve_levels_for_system(current_sys, on_complete=completed)
 
     def _setup_keyboard_shortcuts(self):
         """Setup keyboard shortcuts for the application"""
@@ -7209,7 +7239,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                font=self._scaled_font(9, "bold"))
 
                 # Material tree
-                self.ann_mat_tree = ttk.Treeview(materials_frame, columns=("announce", "material", "minpct"), show="headings", height=18, style="Announcements.Treeview")
+                self.ann_mat_tree = StripedTreeview(materials_frame, columns=("announce", "material", "minpct"), show="headings", height=18, style="Announcements.Treeview")
                 self.ann_mat_tree.heading("announce", text=t('settings.announce'))
                 self.ann_mat_tree.heading("material", text=t('settings.mineral'))
                 self.ann_mat_tree.heading("minpct", text=t('settings.minimal_pct'))
@@ -8908,7 +8938,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             _pl_parent.columnconfigure(0, weight=1)
             _pl_parent.rowconfigure(0, weight=1)
             _pl_row = 0
-        self.preset_list = ttk.Treeview(_pl_parent, columns=("name",), show="tree", selectmode="browse", style="ShipPresets.Treeview")
+        self.preset_list = StripedTreeview(_pl_parent, columns=("name",), show="tree", selectmode="browse", style="ShipPresets.Treeview")
         self.preset_list.column("#0", anchor="w", stretch=True, width=280, minwidth=220)
         self.preset_list.column("name", width=0, stretch=False)  # Hidden column to store full preset name
         self.preset_list.grid(row=_pl_row, column=0, sticky="nsew")
@@ -13282,25 +13312,39 @@ class App(tk.Tk, ColumnVisibilityMixin):
             messagebox.showerror("Error", f"Failed to save settings: {e}")
     
     def _test_api_connection(self) -> None:
-        """Test connection to API server"""
+        """Test connection to API server without blocking Tk."""
+        if getattr(self, '_api_test_in_progress', False):
+            return
         from api_uploader import APIUploader
         try:
-            # Save settings first
             self._save_api_settings()
-            
-            # Test connection
             uploader = APIUploader()
-            success, message = uploader.test_connection()
-            
-            from app_utils import centered_message
-            if success:
-                centered_message(self, "Connection Test", f"✓ {message}")
-            else:
-                centered_message(self, "Connection Test", f"✗ {message}")
         except Exception as e:
+            self._finish_api_connection_test(f"Error: {e}")
+            return
+
+        self._api_test_in_progress = True
+
+        def worker():
+            try:
+                success, message = uploader.test_connection()
+                result = f"{'✓' if success else '✗'} {message}"
+            except Exception as e:
+                result = f"Error: {e}"
+            if not getattr(self, '_network_closing', False):
+                try:
+                    self.after(0, self._finish_api_connection_test, result)
+                except (RuntimeError, tk.TclError):
+                    pass
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_api_connection_test(self, message):
+        self._api_test_in_progress = False
+        if not getattr(self, '_network_closing', False) and self.winfo_exists():
             from app_utils import centered_message
-            centered_message(self, "Connection Test", f"Error: {e}")
-    
+            centered_message(self, "Connection Test", message)
+
     def _bulk_upload_api_data(self) -> None:
         """Bulk upload all sessions and hotspots"""
         if not self.api_upload_enabled.get():
@@ -13512,6 +13556,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.prospector_panel.journal_dir = sel
                 self.prospector_panel._jrnl_path = None
                 self.prospector_panel._jrnl_pos = 0
+                self.prospector_panel._journal_attached = False
             
             # Update cargo_monitor to keep them synchronized
             if hasattr(self, 'cargo_monitor'):
@@ -15763,6 +15808,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception:
             pass
         
+        self._network_closing = True
+        if hasattr(self, 'eddn_sender'):
+            self.eddn_sender.stop()
+        if hasattr(self, 'api_uploader'):
+            self.api_uploader.stop()
+
         # Clean up text overlay
         if hasattr(self, 'text_overlay'):
             self.text_overlay.destroy()
@@ -17795,7 +17846,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                  background=[('selected', selection_bg)],
                  foreground=[('selected', selection_fg)])
         
-        tree = ttk.Treeview(
+        tree = StripedTreeview(
             table_frame, columns=columns, show="headings", height=15, style="SystemFinder.Treeview"
         )
         
@@ -18565,7 +18616,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ])
         
         # Create Treeview with custom style
-        self.marketplace_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
+        self.marketplace_tree = StripedTreeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
         
         # Define headings with sorting - explicitly set anchor to left-align header text
         numeric_columns = {"distance", "ls", "demand", "price", "updated"}
@@ -19494,7 +19545,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         columns = ("location", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
 
         # Create separate Treeview for trade tab
-        self.trade_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
+        self.trade_tree = StripedTreeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
 
         # Define headings with sorting
         numeric_columns = {"distance", "ls", "demand", "price", "updated"}
@@ -20780,15 +20831,9 @@ Your keybinds will need to be reconfigured manually."""
                         log.info(f"Startup: Regular scan - {len(journals_to_scan)} new journal file(s) since last scan")
                     self.after(0, lambda n=len(journals_to_scan): self._set_status(f"Scanning {n} journals..." if n else "Journals up to date", 0 if n else 3000))
 
-                self._process_journals_for_catchup(journals_to_scan, is_full_sync=False, resume_offsets=resume_offsets)
-
-                if all_journals:
-                    newest_file = all_journals[-1]
-                    try:
-                        newest_offset = os.path.getsize(newest_file)
-                        self._save_journal_scan_checkpoint(os.path.basename(newest_file), newest_offset)
-                    except OSError:
-                        pass
+                scanned_checkpoint = self._process_journals_for_catchup(journals_to_scan, is_full_sync=False, resume_offsets=resume_offsets)
+                if scanned_checkpoint:
+                    self._save_journal_scan_checkpoint(*scanned_checkpoint)
 
                 # Historical catch-up is done — from here on, FSDJump/Location events reaching
                 # the live journal watcher are genuinely live (current PP2.0-era session), so it's
@@ -20934,6 +20979,8 @@ Your keybinds will need to be reconfigured manually."""
             current_size = os.path.getsize(last_path)
         except OSError:
             current_size = 0
+        if current_size < last_offset:
+            last_offset = 0
         if current_size > last_offset:
             journals_to_scan.append(last_path)
             resume_offsets[last_path] = last_offset
@@ -21383,6 +21430,8 @@ Your keybinds will need to be reconfigured manually."""
         """
         import json
         
+        scanned_checkpoint = None
+        checkpoint_valid = True
         visits_added = 0
         hotspots_added = 0
         missions_found = 0
@@ -21411,16 +21460,25 @@ Your keybinds will need to be reconfigured manually."""
                 self.after(0, lambda p=progress: self._set_status(p, 0))
 
             try:
-                with open(journal_path, 'r', encoding='utf-8') as f:
+                with open(journal_path, 'rb') as f:
                     if resume_offsets and journal_path in resume_offsets:
                         try:
-                            f.seek(resume_offsets[journal_path])
+                            offset = resume_offsets[journal_path]
+                            if offset <= os.fstat(f.fileno()).st_size:
+                                f.seek(offset)
                         except Exception:
                             pass
                     current_system = None
 
+                    position = f.tell()
                     for line in f:
-                        line = line.strip()
+                        if not line.endswith(b'\n'):
+                            try:
+                                json.loads(line)
+                            except (ValueError, UnicodeError):
+                                break
+                        position = f.tell()
+                        line = line.decode('utf-8', errors='replace').strip()
                         if not line:
                             continue
                         
@@ -21514,7 +21572,10 @@ Your keybinds will need to be reconfigured manually."""
                             continue
                         except:
                             continue
+                    if checkpoint_valid:
+                        scanned_checkpoint = (os.path.basename(journal_path), position)
             except Exception as e:
+                checkpoint_valid = False
                 print(f"[JOURNAL] Error reading {os.path.basename(journal_path)}: {e}")
                 continue
         
@@ -21575,6 +21636,8 @@ Your keybinds will need to be reconfigured manually."""
         # Also trigger System A ↔ B calculation if both fields are populated
         if hasattr(self, '_calculate_distances'):
             self.after(300, self._auto_calculate_if_populated)
+
+        return scanned_checkpoint
 
     def _auto_calculate_if_populated(self):
         """Auto-calculate System A ↔ B distance if both fields have values"""
@@ -21709,45 +21772,49 @@ Your keybinds will need to be reconfigured manually."""
             pass
         return False
     
-    def _fetch_reserve_levels_for_system(self, system_name: str) -> None:
-        """Fetch reserve levels from Spansh API and update database for a system
-        
-        Called when entering a new system to ensure reserve level data is available.
-        Runs in background thread to avoid blocking UI.
-        """
-        import threading
-        
+    def _fetch_reserve_levels_for_system(self, system_name: str, on_complete=None) -> None:
+        """Fetch reserve levels in the background, sharing overlapping requests."""
+        if getattr(self, '_network_closing', False):
+            return
+        monitor = getattr(self, 'cargo_monitor', None)
+        jp = getattr(monitor, 'journal_parser', None)
+        if jp is None:
+            return
+        pending = getattr(self, '_reserve_requests', None)
+        if pending is None:
+            pending = self._reserve_requests = {}
+        if system_name in pending:
+            if on_complete:
+                pending[system_name].append(on_complete)
+            return
+        pending[system_name] = [on_complete] if on_complete else []
+
+        def complete(reserve_levels, error):
+            callbacks = pending.pop(system_name, [])
+            if getattr(self, '_network_closing', False):
+                return
+            jp.system_reserve_levels.update(reserve_levels)
+            for callback in callbacks:
+                callback(reserve_levels, error)
+
         def fetch_worker():
+            reserve_levels, error = {}, None
             try:
-                if not hasattr(self, 'cargo_monitor') or not self.cargo_monitor:
-                    return
-                    
-                jp = self.cargo_monitor.journal_parser
-                if not jp:
-                    return
-                
-                print(f"[RESERVE] Fetching reserve levels for {system_name}...")
                 reserve_levels = jp._fetch_system_reserve_levels_from_spansh(system_name)
-                jp.system_reserve_levels = reserve_levels
-                
-                if reserve_levels:
-                    print(f"[RESERVE] Fetched {len(reserve_levels)} reserve levels for {system_name}")
-                    
-                    # Bulk update existing database entries with reserve levels
-                    if hasattr(self.cargo_monitor, 'user_db') and self.cargo_monitor.user_db:
-                        updated_count = self.cargo_monitor.user_db.bulk_update_reserve_levels(system_name, reserve_levels)
-                        if updated_count > 0:
-                            print(f"[RESERVE] Updated {updated_count} database entries with reserve levels")
-                else:
-                    print(f"[RESERVE] No reserve levels found for {system_name}")
-                    
+                if (reserve_levels and not getattr(self, '_network_closing', False)
+                        and monitor.user_db):
+                    monitor.user_db.bulk_update_reserve_levels(system_name, reserve_levels)
             except Exception as e:
-                print(f"[RESERVE] Error fetching reserve levels: {e}")
-        
-        # Run in background thread to avoid blocking UI
-        thread = threading.Thread(target=fetch_worker, daemon=True)
-        thread.start()
-    
+                error = str(e)
+                log.warning("Error fetching reserve levels for %s: %s", system_name, e)
+            if not getattr(self, '_network_closing', False):
+                try:
+                    self.after(0, complete, reserve_levels, error)
+                except (RuntimeError, tk.TclError):
+                    pass
+
+        threading.Thread(target=fetch_worker, daemon=True).start()
+
     def update_current_system(self, system_name: str, coords: Optional[tuple] = None, count_visit: bool = True, event_timestamp: Optional[str] = None) -> None:
         """Centralized method to update current system - notifies all interested components
         

@@ -2,12 +2,15 @@
 **Release Date:** 2026-November-17
 
 ## New Features & Improvements
+- General code optimization.
+- Added a new Database tab in Statistics tab with an overview of mining locations and your activity
+- Added alternating row shading to tables and reduced empty space in Statistics.
+- Statistics now shows your top 20 best locations and last 20 mining locations instead of 10.
+- Updated the user guide at github and added more direct help links in the app.
 
 
-
-### Voiceattack Profile
-
-
+### Voiceattack Profile update (v5.6.5)
+- Improved mining sequence reliability, including scanner controls, scoop cancellation, and prospector targeting.
 
 ### Important Notes 
 

@@ -1,3 +1,4 @@
+from ui.striped_treeview import StripedTreeview
 from ui.theme import modern_color
 # ================================================================
 # Mining Analytics Panel - Final Baseline Version
@@ -12,10 +13,12 @@ import os
 import sys
 import json
 import glob
+from journal_reader import journal_resume_offset, read_complete_journal_lines
 import re
 import csv
 import logging
 import time
+import threading
 import datetime as dt
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -763,6 +766,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Watcher state
         self._jrnl_path: Optional[str] = None
         self._jrnl_pos: int = 0
+        self._journal_attached = False
 
         # Last known system/body and location context
         self.last_system: str = ""
@@ -789,8 +793,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.min_pct_map: Dict[str, float] = self._load_min_pct_map()
         self.threshold = tk.DoubleVar(value=self._load_threshold()) 
         self._startup_skip: bool = True
-        self._last_mtime: float = 0.0
-        self._last_size: int = 0
         
 
         # Session tracking
@@ -1820,7 +1822,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_prospector = ttk.Frame(prospector_pane, relief="solid", borderwidth=1)
         tree_frame_prospector.grid(row=1, column=0, sticky="nsew")
 
-        self.tree = ttk.Treeview(tree_frame_prospector, columns=("materials", "content", "time"), show="headings", height=4, style="ProspectorReports.Treeview")
+        self.tree = StripedTreeview(tree_frame_prospector, columns=("materials", "content", "time"), show="headings", height=4, style="ProspectorReports.Treeview")
         self.tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
         self.tree.heading("materials", text=t('mining_session.minerals'), anchor="w")
@@ -2011,7 +2013,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_mineral.grid(row=0, column=0, sticky="nsew")
         
         # Statistics tree for live percentage yields
-        self.stats_tree = ttk.Treeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "core_hits", "all_hits", "quality_rate", "_spacer"),
+        self.stats_tree = StripedTreeview(tree_frame_mineral, columns=("material", "tons", "tph", "tons_per", "avg_all", "avg_pct", "best_pct", "latest_pct", "count", "core_hits", "all_hits", "quality_rate", "_spacer"),
                            show="headings", height=7, style="MineralAnalysis.Treeview")
         self.stats_tree.tag_configure('oddrow', background=tree_bg, foreground=tree_fg)
         self.stats_tree.tag_configure('evenrow', background=alt_row_bg, foreground=tree_fg)
@@ -2914,6 +2916,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
     def _share_to_discord(self):
         """Share selected mining session report to Discord"""
+        if getattr(self, '_discord_share_in_progress', False):
+            return
         try:
             # Check if a session is selected
             selected = self.reports_tree_tab.selection()
@@ -2973,22 +2977,39 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                  "Contact the administrator if you believe this is an error.")
                 return
             
-            # Send to Discord
-            success, message = send_discord_report(session_with_user)
-            
-            from app_utils import centered_message
-            if success:
-                centered_message(self.winfo_toplevel(), "Discord Share", message)
-                self._set_status("Report shared to Discord successfully!")
-            else:
-                centered_message(self.winfo_toplevel(), "Discord Error", message)
-                self._set_status(f"Discord share failed: {message}")
-                
+            parent = self.winfo_toplevel()
+            self._discord_share_in_progress = True
+
+            def worker():
+                try:
+                    success, message = send_discord_report(session_with_user)
+                except Exception as e:
+                    success, message = False, f"Failed to share to Discord: {e}"
+                if not getattr(parent, '_network_closing', False):
+                    try:
+                        parent.after(0, self._finish_discord_share, success, message)
+                    except (RuntimeError, tk.TclError):
+                        pass
+
+            threading.Thread(target=worker, daemon=True).start()
+
         except Exception as e:
             error_msg = f"Failed to share to Discord: {e}"
             self._set_status(error_msg)
             from tkinter import messagebox
             messagebox.showerror("Error", error_msg)
+
+    def _finish_discord_share(self, success, message):
+        self._discord_share_in_progress = False
+        if not self.winfo_exists() or getattr(self.winfo_toplevel(), '_network_closing', False):
+            return
+        from app_utils import centered_message
+        if success:
+            centered_message(self.winfo_toplevel(), "Discord Share", message)
+            self._set_status("Report shared to Discord successfully!")
+        else:
+            centered_message(self.winfo_toplevel(), "Discord Error", message)
+            self._set_status(f"Discord share failed: {message}")
 
     def _get_discord_username(self):
         """Get Discord username with re-prompt option (Option 4)"""
@@ -3856,6 +3877,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             self.journal_lbl.config(text=sel)
             self._jrnl_path = None
             self._jrnl_pos = 0
+            self._journal_attached = False
             
             # Save to config.json so it persists across restarts
             from config import update_config_value
@@ -5052,7 +5074,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_reports.grid_rowconfigure(0, weight=1)
 
         # Create sortable treeview with Material Analysis columns (Ship column added - parsed from journal files)
-        self.reports_tree_tab = ttk.Treeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "ring_type", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced", "_spacer"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
+        self.reports_tree_tab = StripedTreeview(tree_frame_reports, columns=("date", "duration", "session_type", "ship", "system", "body", "ring_type", "tons", "tph", "tons_per", "asteroids", "materials", "total_hits", "core_hits", "hit_rate", "quality", "cargo", "prospects", "eng_materials", "comment", "enhanced", "_spacer"), show="headings", height=16, selectmode="extended", style="ReportsTab.Treeview")
         self.reports_tree_tab.grid(row=0, column=0, sticky="nsew")
         
         # Configure row tags for alternating colors (theme-aware)
@@ -7346,55 +7368,35 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
     def _watch_once(self) -> None:
         latest = self._find_latest_journal(self.journal_dir)
+        if not self._journal_attached:
+            try:
+                self._jrnl_pos = journal_resume_offset(latest) if latest else 0
+            except OSError:
+                return
+            self._jrnl_path = latest
+            self._journal_attached = True
+            return
         if not latest:
             return
-        try:
-            current_size = os.path.getsize(latest)
-            current_mtime = os.path.getmtime(latest)
-        except Exception:
-            return
-        if self._jrnl_path != latest:
-            self._jrnl_path = latest
-            # Skip to end of file to avoid reading old events
+
+        paths = [self._jrnl_path] if self._jrnl_path else []
+        if latest != self._jrnl_path:
+            candidates = glob.glob(os.path.join(self.journal_dir, "Journal*.log"))
+            paths.extend(sorted(path for path in candidates if not self._jrnl_path or path > self._jrnl_path))
+        new_lines = []
+        for path in paths:
+            offset = self._jrnl_pos if path == self._jrnl_path else 0
             try:
-                file_size = os.path.getsize(latest)
-                self._jrnl_pos = file_size  # Start at end, not 0!
-            except Exception:
-                self._jrnl_pos = 0
-            self._last_mtime = current_mtime
-            self._last_size = current_size
-        elif (current_mtime <= self._last_mtime and current_size <= self._last_size):
-            return  # No changes
-        self._last_mtime = current_mtime
-        self._last_size = current_size
-        if not latest:
-            return
-        if self._jrnl_path != latest:
-            self._jrnl_path = latest
-            self._jrnl_pos = 0
+                lines, position = read_complete_journal_lines(path, offset)
+            except FileNotFoundError:
+                continue
+            except OSError:
+                break
+            self._jrnl_path = path
+            self._jrnl_pos = position
+            new_lines.extend(lines)
 
-        try:
-            try:
-                size_now = os.path.getsize(self._jrnl_path)
-            except Exception:
-                size_now = None
-            if size_now is not None and self._jrnl_pos > size_now:
-                self._jrnl_pos = 0
-
-            with open(self._jrnl_path, "r", encoding="utf-8") as f:
-                if self._jrnl_pos > 0:  # Explicit comparison, not truthiness
-                    f.seek(self._jrnl_pos)
-                new_data = f.read()
-                if not new_data:
-                    return
-                self._jrnl_pos = f.tell()
-        except Exception:
-            return
-
-        if not new_data:
-            return
-
-        for line in new_data.splitlines():
+        for line in new_lines:
             line = line.strip()
             if not line or '"event"' not in line:
                 continue
@@ -10137,7 +10139,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         tree_frame_bookmarks.grid_rowconfigure(0, weight=1)
 
         # Create bookmarks treeview with multiple selection enabled
-        self.bookmarks_tree = ttk.Treeview(tree_frame_bookmarks, columns=("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "density", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
+        self.bookmarks_tree = StripedTreeview(tree_frame_bookmarks, columns=("last_visited", "last_mined", "system", "body", "distance", "sol_dist", "hotspot", "reserve", "density", "materials", "avg_yield", "overlap", "res_site", "visits", "rating", "notes"), show="headings", height=16, selectmode="extended", style="Bookmarks.Treeview")
         self.bookmarks_tree.grid(row=0, column=0, sticky="nsew")
         
         # Configure row tags for alternating colors (theme-aware)
@@ -13230,7 +13232,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             # Treeview for session selection
             columns = ('select', 'date', 'system', 'tonnage', 'tph')
-            session_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=15)
+            session_tree = StripedTreeview(list_frame, columns=columns, show='headings', height=15)
             
             session_tree.heading('select', text='Select', anchor='w')
             session_tree.heading('date', text='Date', anchor='w')

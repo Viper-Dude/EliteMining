@@ -1,4 +1,5 @@
 """Whole-hold sale plans using reported market prices and demand."""
+from ui.striped_treeview import StripedTreeview
 import math
 import threading
 import tkinter as tk
@@ -234,7 +235,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self._cv_add_columns_button(header, config_key)
         box = ttk.Frame(parent)
         box.pack(fill='both', expand=True, padx=10, pady=5)
-        tree = ttk.Treeview(box, columns=columns, show='headings', height=height,
+        tree = StripedTreeview(box, columns=columns, show='headings', height=height,
                            selectmode='browse', style='Marketplace.Treeview')
         heading_font = tkfont.Font(font=self.app._scaled_font(9, 'bold'))
         shared_headers = {'route': 'location', 'stop': 'location', 'distance': 'distance', 'leg_distance': 'distance',

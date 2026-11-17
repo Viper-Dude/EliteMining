@@ -1,4 +1,5 @@
 """Saved-session statistics, location records and recent mining history."""
+from ui.striped_treeview import StripedTreeview
 import csv
 import logging
 import os
@@ -110,7 +111,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.loading = False
         self.preferences = _load_cfg().get('session_statistics', {})
         self._initial_mineral = self.preferences.get('mineral', '')
-        controls = ttk.Frame(parent)
+        controls = self.controls = ttk.Frame(parent)
         controls.pack(fill='x', pady=(0, 8))
         self.filter_controls = ttk.Frame(controls)
         self.filter_controls.pack(side='left')
@@ -128,8 +129,8 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             combo.bind('<<ComboboxSelected>>', lambda event: (event.widget.selection_clear(), self.apply_filters()))
             setattr(self, key + '_combo', combo)
         self.period_combo.configure(values=list(self.periods))
-        self.refresh_button = ttk.Button(controls, text=t('statistics_expanded.refresh'), command=self.reload)
-        self.refresh_button.pack(side='right')
+        self.refresh_button = ttk.Button(parent, text=t('statistics_expanded.refresh'), command=self.reload)
+        self.refresh_button.pack(in_=controls, side='right')
         self.note = ttk.Label(parent, text=t('statistics_expanded.scope'), wraplength=1000)
         self.note.pack(anchor='w', pady=(0, 5))
         parent.bind('<Configure>', lambda event: self.note.configure(
@@ -164,6 +165,11 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.best_tree = self._table('best_locations', ('system', 'body', 'distance', 'ls', 'mineral_avg', 'mineral_best', 'mineral_hits', 'best', 'avg', 'low', 'count', 'hours', 'duration', 'date', 'mineral'))
         self.recent_tree = self._table('recent_locations', ('system', 'body', 'distance', 'ls', 'date', 'mineral', 'mineral_avg', 'mineral_best', 'mineral_hits', 'tph', 'ship', 'duration', 'count', 'hours'))
         self.visited_tree = self._table('recent_systems', ('system', 'date', 'distance', 'visits'))
+        self.database_tree = self._table('database', ('mineral', 'hotspots', 'rings', 'mined', 'coverage', 'double', 'triple', 'res_low', 'res_normal', 'res_high', 'haz'))
+        self.database_summary = ttk.Label(self.database_tree.master.master, wraplength=900)
+        self.database_summary.pack(fill='x', before=self.database_tree.master)
+        self.database_summary.master.bind('<Configure>', lambda event: self.database_summary.configure(wraplength=max(scaled_px(100), event.width - scaled_px(20))), add='+')
+        self.database_records = []
         self.book.bind('<<NotebookTabChanged>>', self._on_tab_changed)
         self.parent.bind('<Map>', self._on_map, add='+')
         self.parent.after_idle(self.reload)
@@ -195,19 +201,29 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
 
     def _on_tab_changed(self, event=None):
         self._update_filter_controls()
-        if self._visits_selected():
+        if self._visits_selected() or self._database_selected():
             self.reload()
+
+    def _database_selected(self):
+        return self.book.select() == str(self.database_tree.master.master)
 
     def _visits_selected(self):
         return self.book.select() == str(self.visited_tree.master.master)
 
     def _update_filter_controls(self):
-        visits = self._visits_selected()
+        visits = self._visits_selected() or self._database_selected()
         if visits:
             self.filter_controls.pack_forget()
         else:
-            self.filter_controls.pack(side='left', before=self.refresh_button)
-        self.note.configure(text=t('statistics_expanded.visits_scope' if visits else 'statistics_expanded.scope'))
+            self.filter_controls.pack(side='left')
+        if visits:
+            self.controls.pack_forget()
+            header = (self.database_tree if self._database_selected() else self.visited_tree).master.master.winfo_children()[0]
+            self.refresh_button.pack(in_=header, side='right', padx=(scaled_px(8), 0))
+        else:
+            self.refresh_button.pack(in_=self.controls, side='right')
+            self.controls.pack(fill='x', pady=(0, scaled_px(8)), before=self.note)
+        self.note.configure(text=t('statistics_expanded.database_scope' if self._database_selected() else 'statistics_expanded.visits_scope' if visits else 'statistics_expanded.scope'))
 
     def _table(self, name, columns):
         pane = ttk.Frame(self.book, padding=8)
@@ -219,10 +235,20 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self._cv_add_columns_button(header, key)
         table = ttk.Frame(pane)
         table.pack(fill='both', expand=True, pady=(5, 0))
-        tree = ttk.Treeview(table, columns=columns + ('_spacer',), show='headings', selectmode='browse')
+        tree = StripedTreeview(table, columns=columns + ('_spacer',), show='headings', selectmode='browse')
+        if name == 'database':
+            from config import load_theme
+            from ui.theme import modern_color
+            theme = load_theme()
+            if theme in ('modern', 'modern_slate', 'modern_orange'):
+                backgrounds = (modern_color('#232A31'), modern_color('#1D2228'))
+            else:
+                backgrounds = ('#252525' if theme == 'elite_orange' else '#282828', '#1e1e1e')
+            for tag, background in zip(('evenrow', 'oddrow'), backgrounds):
+                tree.tag_configure(tag, background=background)
         heading_font = tkfont.Font(font=scaled_font(9, 'bold'))
         for col in columns:
-            text = t('statistics_expanded.col_minerals_mined' if col == 'mineral'
+            text = t('statistics_expanded.col_mineral' if col == 'mineral' and name == 'database' else 'statistics_expanded.col_minerals_mined' if col == 'mineral'
                      else 'statistics_expanded.col_' + col)
             minimum = max(heading_font.measure(text) + scaled_px(24), scaled_px(60))
             anchor = 'center' if col in ('tph', 'count', 'hours') else 'w'
@@ -235,16 +261,18 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.setup_column_visibility(tree, columns, {col: tree.column(col, 'width') for col in columns},
                                      key, use_displaycolumns=True, allow_reorder=True)
         self._context_handlers = getattr(self, '_context_handlers', {})
-        self._context_handlers[key] = lambda event: self._menu(event, tree)
-        tree.bind('<Double-1>', lambda event: self._open_clicked(event, tree))
-        tree.bind('<Control-c>', lambda event: self._copy_selected_system(tree))
+        self._context_handlers[key] = (lambda event: None) if name == 'database' else lambda event: self._menu(event, tree)
+        if name != 'database':
+            tree.bind('<Double-1>', lambda event: self._open_clicked(event, tree))
+        if name != 'database':
+            tree.bind('<Control-c>', lambda event: self._copy_selected_system(tree))
         tree.bind('<ButtonRelease-1>', lambda event: self._save_widths(tree, name), add='+')
         report_tips = {'system': 'system', 'body': 'body', 'ship': 'ship', 'date': 'datetime',
                        'duration': 'duration', 'tph': 'tph'}
         if name == 'recent_systems':
             report_tips.pop('date')
         add_header_tooltips(tree, lambda column: t('tooltips.reports_' + report_tips[column])
-                            if column in report_tips else t('statistics_expanded.header_tips.' +
+                            if column in report_tips else t('statistics_expanded.coverage_tip') if name == 'database' and column == 'coverage' else t('statistics_expanded.col_' + column) if name == 'database' else t('statistics_expanded.header_tips.' +
                             ('visit_date' if name == 'recent_systems' and column == 'date' else column)))
         x = ttk.Scrollbar(table, orient='horizontal', command=tree.xview)
         y = ttk.Scrollbar(table, orient='vertical', command=tree.yview)
@@ -254,7 +282,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         y.grid(row=0, column=1, sticky='ns')
         table.rowconfigure(0, weight=1)
         table.columnconfigure(0, weight=1)
-        if name != 'recent_systems':
+        if name not in ('recent_systems', 'database'):
             ToolTip(header, t('statistics_expanded.ranking_help' if name == 'best_locations' else 'statistics_expanded.recent_help'))
         self.lookups[tree] = {}
         return tree
@@ -293,11 +321,16 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                 else:
                     rows = []
                 user_db = getattr(getattr(app, 'cargo_monitor', None), 'user_db', None)
+                import sqlite3
+                records = []
+                if user_db:
+                    with sqlite3.connect(user_db.db_path) as connection:
+                        records = connection.execute('SELECT system_name, body_name, material_name, hotspot_count, overlap_tag, res_tag FROM hotspot_data').fetchall()
                 visited = user_db.get_recent_visited_systems(limit=20) if user_db else []
                 for row in visited:
                     row['_stamp'] = session_date(row['last_visit_date'])
                 self._add_location_distances(visited, current_system, include_ls=False)
-                results.put(('loaded', (rows, visited)))
+                results.put(('loaded', (rows, visited, records)))
             except Exception:
                 logging.getLogger('EliteMining').exception('Could not load session statistics')
                 results.put(('failed', None))
@@ -356,7 +389,8 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.refresh_button.configure(state='normal')
         self.note.configure(text=t('statistics_expanded.load_failed'))
 
-    def _loaded(self, rows, visited=None):
+    def _loaded(self, rows, visited=None, records=None):
+        self.database_records = records or []
         self.loading = False
         self.rows = rows
         self.visited_rows = visited or []
@@ -374,6 +408,76 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             self._initial_mineral = ''
         self.apply_filters()
         self._show_visited_systems()
+        self._show_database()
+
+    def _show_database(self):
+        from user_database import UserDatabase
+        def location(system, body):
+            return (system.strip().casefold(), UserDatabase._normalize_body_name(body, system).strip().casefold())
+        mined = set()
+        mineral_mined = defaultdict(set)
+        for row in self.rows:
+            if row['_tons'] <= 0 or not row.get('body'):
+                continue
+            key = location(row.get('system', ''), row['body'])
+            mined.add(key)
+            for name, amount in re.findall(r'(?:^|[,;])\s*([^:,;]+):\s*([0-9.]+)', row.get('materials_breakdown', '').strip('"')):
+                if float(amount) > 0:
+                    mineral_mined[name.strip().casefold()].add(key)
+        systems, rings, haz = set(), set(), set()
+        groups = {}
+        hotspots = overlaps = 0
+        for system, body, mineral, count, overlap, res in self.database_records:
+            key = location(system, body)
+            systems.add(key[0])
+            rings.add(key)
+            tags = {tag.strip().casefold() for tag in (res or '').split(',')}
+            hazardous = bool(tags & {'haz', 'hazardous'})
+            if hazardous:
+                haz.add(key)
+            hotspots += count or 0
+            overlaps += overlap in ('2x', '3x')
+            group = groups.setdefault(mineral, dict(hotspots=0, rings=set(), double=set(), triple=set(), res_low=set(), res_normal=set(), res_high=set(), haz=set()))
+            group['hotspots'] += count or 0
+            group['rings'].add(key)
+            if overlap in ('2x', '3x'):
+                group['double' if overlap == '2x' else 'triple'].add(key)
+            if hazardous:
+                group['haz'].add(key)
+            for tag in ('low', 'normal', 'high'):
+                if tag in tags:
+                    group['res_' + tag].add(key)
+        total_mined = len(rings & mined)
+        app = self.owner.main_app
+        visited_label = getattr(app, 'total_systems_label_value', None)
+        visited_systems = visited_label.cget('text') if visited_label is not None else ''
+        visited_systems = f'{int(visited_systems):,}' if str(visited_systems).isdigit() else '—'
+        self.database_summary.configure(text=t('statistics_expanded.database_totals').format(
+            visited=visited_systems,
+            systems=len(systems), rings=len(rings), hotspots=hotspots, overlaps=overlaps,
+            haz=len(haz), mined=total_mined, percent=100 * total_mined / len(rings) if rings else 0))
+        logging.getLogger('EliteMining').info('[Database statistics] Saved sessions=%s, mined session locations=%s, matching database rings=%s; sample session locations=%s; sample database rings=%s', len(self.rows), len(mined), total_mined, sorted(mined)[:3], sorted(rings)[:3])
+        tree = self.database_tree
+        tree.delete(*tree.get_children())
+        totals = defaultdict(int)
+        for index, (mineral, group) in enumerate(sorted(groups.items())):
+            values = dict(mineral=get_material(mineral), hotspots=group['hotspots'],
+                          mined=len(group['rings'] & mineral_mined[mineral.casefold()]))
+            values.update({key: len(group[key]) for key in ('rings', 'double', 'triple', 'res_low', 'res_normal', 'res_high', 'haz')})
+            values['coverage'] = f"{100 * values['mined'] / values['rings'] if values['rings'] else 0:.1f}%"
+            for col, value in values.items():
+                if isinstance(value, int):
+                    totals[col] += value
+            tree.insert('', 'end', tags=('evenrow' if index % 2 == 0 else 'oddrow',), values=[f'{values[col]:,}' if isinstance(values.get(col), int) else values.get(col, '') for col in tree['columns']])
+
+        tree.tag_configure('database_total', font=scaled_font(9, 'bold'))
+        tree.insert('', 'end', iid='database_total', tags=('database_total',), values=[
+            t('statistics_expanded.total') if col == 'mineral' else '' if col == '_spacer' else f"{100 * totals['mined'] / totals['rings'] if totals['rings'] else 0:.1f}%" if col == 'coverage' else f'{totals[col]:,}'
+            for col in tree['columns']])
+
+        if getattr(tree, '_sort_column', None):
+            tree._sort_reverse = not tree._sort_reverse
+            self._sort(tree, tree._sort_column)
 
     def _show_visited_systems(self):
         tree = self.visited_tree
@@ -520,6 +624,8 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         reverse = getattr(tree, '_sort_column', None) != column or not getattr(tree, '_sort_reverse', False)
         def key(item):
             value = tree.set(item, column)
+            if tree is self.database_tree and column != 'mineral':
+                return float(value.replace(',', '').rstrip('%') or 0)
             if tree is self.visited_tree:
                 row = self.lookups[tree][item]
                 if column == 'distance':
@@ -531,12 +637,17 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             if column == 'duration':
                 return self.owner._parse_elapsed_to_hours(value)
             return (float('-inf') if value == '—' else float(value)) if column in ('tph', 'best', 'avg', 'low', 'count', 'hours', 'distance', 'ls', 'mineral_avg', 'mineral_best', 'mineral_hits') else value.casefold()
-        for i, item in enumerate(sorted(tree.get_children(), key=key, reverse=reverse)):
+        items = [item for item in tree.get_children() if tree is not self.database_tree or item != 'database_total']
+        for i, item in enumerate(sorted(items, key=key, reverse=reverse)):
             tree.move(item, '', i)
+            if tree is self.database_tree:
+                tree.item(item, tags=('evenrow' if i % 2 == 0 else 'oddrow',))
+        if tree is self.database_tree and tree.exists('database_total'):
+            tree.move('database_total', '', 'end')
         for col in tree['columns']:
             if col == '_spacer':
                 continue
-            text = t('statistics_expanded.col_minerals_mined' if col == 'mineral'
+            text = t('statistics_expanded.col_mineral' if col == 'mineral' and tree is self.database_tree else 'statistics_expanded.col_minerals_mined' if col == 'mineral'
                      else 'statistics_expanded.col_' + col)
             tree.heading(col, text=text + (' ▼' if reverse else ' ▲') if col == column else text)
         tree._sort_column, tree._sort_reverse = column, reverse
