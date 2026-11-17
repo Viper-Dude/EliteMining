@@ -1798,6 +1798,7 @@
     "hours": "{hours:.1f} h ago"
   },
   "statistics_expanded": {
+    "low_temp_diamonds": "Low Temp Diamonds",
     "col_coverage": "Coverage",
     "coverage_tip": "Percentage of saved rings where you have mined this mineral, based on saved mining sessions.",
     "total": "Total",

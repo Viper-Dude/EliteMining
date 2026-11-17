@@ -1806,6 +1806,7 @@
     "hours": "vor {hours:.1f} Std."
   },
   "statistics_expanded": {
+    "low_temp_diamonds": "Tieftemperaturdiamanten",
     "col_coverage": "Abdeckung",
     "coverage_tip": "Anteil der gespeicherten Ringe, in denen du dieses Mineral abgebaut hast, basierend auf gespeicherten Abbausitzungen.",
     "total": "Gesamt",
