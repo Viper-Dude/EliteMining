@@ -632,7 +632,7 @@ def migrate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     # Add Discord integration fields if missing
     discord_fields_added = []
     if "discord_webhook_url" not in config:
-        config["discord_webhook_url"] = "https://discord.com/api/webhooks/1431645227634131005/ZtoPZTa-_d1hYrP11FZbP_jBpb4nVo8e8HSMK3i33-7Nmu94wm7Xzc3GUEb2nPfr0DcO"
+        config["discord_webhook_url"] = ""
         discord_fields_added.append("discord_webhook_url")
     if "discord_enabled" not in config:
         config["discord_enabled"] = True
