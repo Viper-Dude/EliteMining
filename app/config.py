@@ -64,6 +64,18 @@ def _load_cfg() -> Dict[str, Any]:
         return _cached_config.copy()
 
     _last_load_time = now
+    template_path = CONFIG_FILE + ".template"
+    if not os.path.exists(CONFIG_FILE) and os.path.exists(template_path):
+        try:
+            with open(template_path, "r", encoding="utf-8") as template:
+                defaults = template.read()
+            with open(CONFIG_FILE, "x", encoding="utf-8") as config:
+                config.write(defaults)
+        except FileExistsError:
+            pass
+        except OSError as e:
+            log.warning(f"Failed to create config from template: {e}")
+
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:

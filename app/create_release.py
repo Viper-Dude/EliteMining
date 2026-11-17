@@ -144,7 +144,7 @@ class ReleaseBuilder:
                 
                 # Add configuration files in EliteMining root
                 config_files = [
-                    ("app/config.json.template", "config.json"),  # Use template for clean config
+                    ("app/config.json.template", "config.json.template"),
                     ("LICENSE", "LICENSE"),
                     ("NOTICE", "NOTICE")
                 ]
