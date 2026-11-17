@@ -1813,7 +1813,7 @@
       "low": "Lowest session T/hr at this location.",
       "count": "Mining sessions at this location.",
       "hours": "Total mining time at this location, in hours.",
-      "mineral": "Minerals from the record session (Top 10) or latest session (Last 10)."
+      "mineral": "Minerals from the record session (Top 20) or latest session (Last 20)."
     },
     "all_ships": "All Ships",
     "col_minerals_mined": "Minerals Mined",
@@ -1825,8 +1825,8 @@
     "refresh": "Refresh",
     "scope": "Filters select sessions. T/hr includes all mined minerals.",
     "overview": "Overview",
-    "best_locations": "Top 10 Best Locations",
-    "recent_locations": "Last 10 Mining Locations",
+    "best_locations": "Top 20 Best Locations",
+    "recent_locations": "Last 20 Mining Locations",
     "recent_systems": "Last 20 Visited Systems",
     "visits_scope": "Your latest visited systems. LY is measured from your current system.",
     "col_visits": "Visits",

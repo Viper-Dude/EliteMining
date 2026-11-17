@@ -83,7 +83,7 @@ def location_summary(rows, mineral=''):
             recent.append(entry)
     ranked.sort(key=lambda entry: entry['best']['_tph'], reverse=True)
     recent.sort(key=lambda entry: entry['latest']['_stamp'], reverse=True)
-    return ranked[:10], recent[:10]
+    return ranked[:20], recent[:20]
 
 
 def recent_progress(rows):
@@ -112,6 +112,8 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self._initial_mineral = self.preferences.get('mineral', '')
         controls = ttk.Frame(parent)
         controls.pack(fill='x', pady=(0, 8))
+        self.filter_controls = ttk.Frame(controls)
+        self.filter_controls.pack(side='left')
         self.ship = tk.StringVar(value=self.preferences.get('ship') or t('statistics_expanded.all_ships'))
         self.mineral = tk.StringVar(value=self.preferences.get('mineral', ''))
         self.period = tk.StringVar()
@@ -120,8 +122,8 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.period.set(next((key for key, value in self.periods.items()
                               if value == self.preferences.get('days', 0)), next(iter(self.periods))))
         for key, variable, width in [('ship', self.ship, 25), ('mineral', self.mineral, 22), ('period', self.period, 16)]:
-            ttk.Label(controls, text=t('statistics_expanded.' + key)).pack(side='left', padx=(0, 5))
-            combo = ttk.Combobox(controls, textvariable=variable, width=width, state='readonly')
+            ttk.Label(self.filter_controls, text=t('statistics_expanded.' + key)).pack(side='left', padx=(0, 5))
+            combo = ttk.Combobox(self.filter_controls, textvariable=variable, width=width, state='readonly')
             combo.pack(side='left', padx=(0, 12))
             combo.bind('<<ComboboxSelected>>', lambda event: (event.widget.selection_clear(), self.apply_filters()))
             setattr(self, key + '_combo', combo)
@@ -201,8 +203,10 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
 
     def _update_filter_controls(self):
         visits = self._visits_selected()
-        for combo in (self.ship_combo, self.mineral_combo, self.period_combo):
-            combo.configure(state='disabled' if visits else 'readonly')
+        if visits:
+            self.filter_controls.pack_forget()
+        else:
+            self.filter_controls.pack(side='left', before=self.refresh_button)
         self.note.configure(text=t('statistics_expanded.visits_scope' if visits else 'statistics_expanded.scope'))
 
     def _table(self, name, columns):

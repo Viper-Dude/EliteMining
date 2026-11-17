@@ -17,3 +17,7 @@
 - The established remote for this checkout is `https://github.com/Viper-Dude/EliteMining.git`. Confirm the current configuration still matches; do not change the destination automatically.
 - Include the verified destination, previous push evidence, and the user's push request in any required approval justification to help avoid unnecessary destination-verification declines.
 - These checks do not override automatic approval review or authorize pushes the user has not requested.
+
+## Release Notice Formatting
+
+- Keep `Voiceattack Profile/VA_PROFILE_UPDATE_NOTICE.txt` and `docs/INSTALLER_RELEASE_NOTES.txt` compact. Do not insert blank lines between every sentence or bullet; use blank lines only between distinct sections.

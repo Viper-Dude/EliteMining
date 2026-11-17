@@ -1,16 +1,11 @@
 ================================================================================
-  EliteMining v5.6.4 — VoiceAttack Profile Update 
+  EliteMining v5.6.5 — VoiceAttack Profile Update 
 ================================================================================
 
-This release includes an updated VoiceAttack profile (v5.6.4).
-
-
+This release includes an updated VoiceAttack profile (v5.6.5).
 What's changed:
-- Fixed that Stop Continuous boost failed to kill the Start Continuous boost command.
-
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.
-
 After updating, please check all your key and joystick bindings.
 
 --------------------------------------------------------------------------------

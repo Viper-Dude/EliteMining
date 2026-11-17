@@ -4806,7 +4806,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 column = tree.identify_column(event.x)
                 
                 tooltips = {
-                    "#1": "Shows material name with your announcement threshold\nExample: Platinum (27%) means you're only alerted when\nasteroids have 27% or higher Platinum content\n\nCore-only materials (Void Opals, Alexandrite, etc.) show\n'(Core)' as percentage thresholds don't apply to them",
+                    "#1": "Shows material name with your announcement threshold\nExample: Platinum (27%) means you're only alerted when\nasteroids have 27% or higher Platinum content",
                     "#2": "Total tons of this material collected this session",
                     "#3": "Mining rate: Tons per hour for this material",
                     "#4": "Average % across ALL asteroids you prospected\n(includes low-quality asteroids below threshold)",
@@ -8168,19 +8168,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 return f"0/{all_hits} (0%)"
             return "—"
 
-        def _material_label(mat, display, stats_all):
-            has_core = has_ncore = False
-            if stats_all and hasattr(stats_all, 'finds'):
-                for f in stats_all.finds:
-                    if f.is_core:   has_core  = True
-                    else:           has_ncore = True
-            thr = self.min_pct_map.get(mat, self.threshold.get())
+        def _material_label(mat, display):
             if mat in CORE_ONLY:
-                return f"{display} (Core)"
-            elif has_core and has_ncore:
-                return f"{display} (Core, {thr:.1f}%)"
-            elif has_core:
-                return f"{display} (Core)"
+                return display
+            thr = self.min_pct_map.get(mat, self.threshold.get())
             return f"{display} ({thr:.1f}%)"
 
         # Pass 1 — threshold-meeting materials
@@ -8199,7 +8190,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 core_hits = int(stats['core_hits']) if stats and stats.get('core_hits') is not None else 0
                 core_hits_str = str(core_hits) if core_hits > 0 else "—"
                 display_name  = self._abbreviate_material_for_stats(mat)
-                mat_label     = _material_label(mat, display_name, stats_all)
+                mat_label     = _material_label(mat, display_name)
                 if not self.session_active and hasattr(self, 'last_session_data'):
                     saved  = self.last_session_data.get(mat, {})
                     m_tons = saved.get('tons', 0.0)
@@ -8227,7 +8218,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             stats_all    = (self.session_analytics.material_stats_all.get(mat)
                             if hasattr(self.session_analytics, 'material_stats_all') else None)
             display_name = self._abbreviate_material_for_stats(mat)
-            mat_label    = _material_label(mat, display_name, stats_all)
+            mat_label    = _material_label(mat, display_name)
             m_tph        = m_tons / elapsed_hours if elapsed_hours > 0 else 0.0
             tph_str      = f"{m_tph:.1f}" if m_tph > 0 else "—"
             core_hits    = stats_all.get_core_hit_count() if stats_all else 0
@@ -8259,7 +8250,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     continue
                 displayed.add(mat)
                 display_name = self._abbreviate_material_for_stats(mat)
-                mat_label    = _material_label(mat, display_name, mat_stats)
+                mat_label    = _material_label(mat, display_name)
                 avg_all  = mat_stats.get_average_percentage()
                 avg_all_pct = f"{avg_all:.1f}%" if avg_all and avg_all > 0 else "0.0%"
                 best     = mat_stats.get_best_percentage()

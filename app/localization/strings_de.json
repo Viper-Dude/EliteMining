@@ -1821,7 +1821,7 @@
       "low": "Niedrigste T/Std. einer Sitzung an diesem Ort.",
       "count": "Bergbausitzungen an diesem Ort.",
       "hours": "Gesamte Bergbauzeit an diesem Ort in Stunden.",
-      "mineral": "Mineralien der Rekordsitzung (Top 10) oder letzten Sitzung (Letzte 10)."
+      "mineral": "Mineralien der Rekordsitzung (Top 20) oder letzten Sitzung (Letzte 20)."
     },
     "all_ships": "Alle Schiffe",
     "col_minerals_mined": "Abgebaute Mineralien",
@@ -1833,8 +1833,8 @@
     "refresh": "Aktualisieren",
     "scope": "Filter wählen Sitzungen. T/Std. umfasst alle abgebauten Mineralien.",
     "overview": "Übersicht",
-    "best_locations": "Top 10 Bergbauorte",
-    "recent_locations": "Letzte 10 Bergbauorte",
+    "best_locations": "Top 20 Bergbauorte",
+    "recent_locations": "Letzte 20 Bergbauorte",
     "recent_systems": "Letzte 20 besuchte Systeme",
     "visits_scope": "Deine zuletzt besuchten Systeme. LY wird von deinem aktuellen System aus gemessen.",
     "col_visits": "Besuche",
