@@ -305,6 +305,8 @@ class ReleaseBuilder:
                 item = re.match(r"^\s*(?:[-*+]|\d+[.)])\s+(.+)", line)
                 if item:
                     section.append("- " + item.group(1))
+                elif line.strip() and not line.lstrip().startswith(("[", "<", "**Release Date:")):
+                    section.append(line.strip())
         release_notice = self.project_root / "docs" / "INSTALLER_RELEASE_NOTES.txt"
         release_notice.write_text(
             f"What's new in EliteMining v{get_version()}\n\n" + "\n".join(highlights) + "\n",

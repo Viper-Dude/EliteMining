@@ -1,5 +1,6 @@
 ﻿What's new in EliteMining v5.6.5
 
+This update mostly focuses on under-the-hood code optimization, making the app feel smoother overall with faster, more reliable searches across all tabs
 - Added a new **Database** tab inside the Statistics view with an overview of mining locations and your activity.
 - Mining TXT reports now include the ring type when known.
 - Added more direct help links throughout the app and updated the user guide on GitHub.
