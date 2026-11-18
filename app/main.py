@@ -12665,6 +12665,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 _schedule("offline")
         
         threading.Thread(target=_background_check, daemon=True).start()
+        self.after(300000, self._check_market_api_status)
     
     def _update_market_api_status(self, status: str):
         """Update market API status labels - called on UI thread"""
@@ -17792,8 +17793,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(2000, self._populate_sysfinder_system)
         
         # Start Spansh and EDDN status checks
-        self.after(60000, self._check_sysfinder_spansh_status)
-        self.after(60000, self._check_sysfinder_eddn_status)
+        self.after(300000, self._check_sysfinder_spansh_status)
+        self.after(300000, self._check_sysfinder_eddn_status)
         
         # Remove focus from entry field (prevent highlight on tab switch)
         # Focus the frame instead of the entry
@@ -18300,7 +18301,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _check_sysfinder_spansh_status(self):
         self.ring_finder._check_spansh_status()
-        self.after(60000, self._check_sysfinder_spansh_status)
+        self.after(300000, self._check_sysfinder_spansh_status)
 
     def _update_sysfinder_spansh_status(self, status: str):
         """Update Spansh status label in system finder - called on UI thread"""
@@ -18317,7 +18318,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _check_sysfinder_eddn_status(self):
         self.ring_finder._check_eddn_status()
-        self.after(60000, self._check_sysfinder_eddn_status)
+        self.after(300000, self._check_sysfinder_eddn_status)
 
     def _update_sysfinder_eddn_status(self, status: str):
         """Update EDDN status label in system finder - called on UI thread"""
