@@ -298,7 +298,9 @@ class ReleaseBuilder:
                     section = profile_highlights
                 elif heading.startswith("important notes"):
                     section = None
-                elif section is highlights and heading.startswith(("hotfixes in v", "included changes from v")):
+                elif section is highlights and level > 1:
+                    if highlights:
+                        section.append("")
                     section.append(line.lstrip('#').strip())
                 sections.append((level, section))
             elif section is not None:
@@ -309,7 +311,8 @@ class ReleaseBuilder:
                     section.append(line.strip())
         release_notice = self.project_root / "docs" / "INSTALLER_RELEASE_NOTES.txt"
         release_notice.write_text(
-            f"What's new in EliteMining v{get_version()}\n\n" + "\n".join(highlights) + "\n",
+            f"What's new in EliteMining v{get_version()}\n\n"
+            + re.sub(r"\*\*(.+?)\*\*", r"\1", "\n".join(highlights)) + "\n",
             encoding="utf-8-sig",
         )
 

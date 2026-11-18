@@ -668,7 +668,8 @@ class MarketplaceAPI:
                     result = coords['x'], coords['y'], coords['z']
             except Exception:
                 pass
-        _system_coords_cache[system_name] = result
+        if result is not None:
+            _system_coords_cache[system_name] = result
         return result
 
     @staticmethod
@@ -1381,6 +1382,78 @@ class MarketplaceAPI:
                                 result['systemX'], result['systemY'], result['systemZ'] = coords
                 except Exception as _ce:
                     print(f"[DISTANCE CALC] Batch coord lookup failed: {_ce}")
+
+            if MarketplaceAPI.EDDN_CACHE_PATH:
+                try:
+                    import sqlite3
+                    from contextlib import closing
+                    missing_names = list({r['systemName'] for r in missing_coord_results
+                                          if any(r.get(axis) is None for axis in ('systemX', 'systemY', 'systemZ'))})
+                    coord_lookup = {}
+                    with closing(sqlite3.connect(MarketplaceAPI.EDDN_CACHE_PATH)) as conn:
+                        for start in range(0, len(missing_names), 500):
+                            names = missing_names[start:start + 500]
+                            placeholders = ','.join('?' for _ in names)
+                            rows = conn.execute(
+                                f"SELECT system_name, system_x, system_y, system_z FROM commodity_prices_data "
+                                f"WHERE system_name IN ({placeholders}) "
+                                "AND system_x IS NOT NULL AND system_y IS NOT NULL AND system_z IS NOT NULL "
+                                "ORDER BY updated_at", names)
+                            for name, x, y, z in rows:
+                                coord_lookup[name] = (x, y, z)
+                            rows = conn.execute(
+                                f"SELECT name, x, y, z FROM system_coords WHERE name IN ({placeholders}) "
+                                "AND x IS NOT NULL AND y IS NOT NULL AND z IS NOT NULL", names)
+                            for name, x, y, z in rows:
+                                coord_lookup[name] = (x, y, z)
+                    for result in missing_coord_results:
+                        coords = coord_lookup.get(result['systemName'])
+                        if coords:
+                            result['systemX'], result['systemY'], result['systemZ'] = coords
+                except Exception as e:
+                    print(f"[DISTANCE CALC] Market coord lookup failed: {e}")
+
+            missing_names = list({r['systemName'] for r in missing_coord_results
+                                  if any(r.get(axis) is None for axis in ('systemX', 'systemY', 'systemZ'))})
+            coord_lookup = {name.casefold(): _system_coords_cache[name] for name in missing_names
+                            if _system_coords_cache.get(name) is not None}
+            missing_names = [name for name in missing_names if name.casefold() not in coord_lookup]
+
+            def fetch_coords(names):
+                if is_cancelled and is_cancelled():
+                    return []
+                try:
+                    response = requests.get(
+                        'https://www.edsm.net/api-v1/systems',
+                        params=[('systemName[]', name) for name in names] + [('showCoordinates', 1)],
+                        headers={'User-Agent': 'EliteMining/5.1.3'}, timeout=15)
+                    response.raise_for_status()
+                    return response.json()
+                except Exception as e:
+                    print(f"[DISTANCE CALC] EDSM batch lookup failed: {e}")
+                    return []
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                for start in range(0, len(missing_names), 200):
+                    if is_cancelled and is_cancelled():
+                        break
+                    batches = [missing_names[i:i + 100]
+                               for i in range(start, min(start + 200, len(missing_names)), 100)]
+                    for systems in pool.map(fetch_coords, batches):
+                        for system in systems:
+                            coords = system.get('coords') or {}
+                            if all(coords.get(axis) is not None for axis in ('x', 'y', 'z')):
+                                name = system['name'].casefold()
+                                coord_lookup[name] = coords['x'], coords['y'], coords['z']
+                                _system_coords_cache[name] = coord_lookup[name]
+            for name in missing_names:
+                coords = coord_lookup.get(name.casefold())
+                if coords:
+                    _system_coords_cache[name] = coords
+            for result in missing_coord_results:
+                coords = coord_lookup.get(result['systemName'].casefold())
+                if coords:
+                    result['systemX'], result['systemY'], result['systemZ'] = coords
 
             # Calculate distance for each result
             for result in results:

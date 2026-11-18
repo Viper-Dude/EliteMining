@@ -182,9 +182,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.button = create_action_button(filters, primary=True, text=t('marketplace.search'), command=self.search)
         self.button.pack(side='left', padx=8)
         self.status = ttk.Label(controls, wraplength=1000)
-        self.status.pack(anchor='w')
         self.summary = ttk.Label(controls, wraplength=1000)
-        self.summary.pack(anchor='w', pady=4)
         ttk.Label(frame, text=t('sell_hold.notice'), wraplength=1000).pack(side='bottom', anchor='w', padx=10, pady=6)
         self.tables_paned = ttk.PanedWindow(frame, orient=tk.VERTICAL)
         self.tables_paned.pack(fill='both', expand=True, padx=10, pady=5)
@@ -292,6 +290,8 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         if self._search_control.running:
             self._search_control.stop()
             return
+        self.status.pack(anchor='w')
+        self.summary.pack(anchor='w', pady=4)
         system, cargo, protected = self._cargo()
         snapshot = (system, cargo, protected)
         self.summary.config(text=t('sell_hold.cargo').format(

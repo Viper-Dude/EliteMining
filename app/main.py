@@ -12682,6 +12682,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.market_mining_status_label.config(text=status_text, fg=status_color)
         if hasattr(self, 'market_trade_status_label'):
             self.market_trade_status_label.config(text=trade_text, fg=status_color)
+        if hasattr(self, 'multi_mineral_tab'):
+            self.multi_mineral_tab.market_status_label.config(text=status_text, fg=status_color)
         if hasattr(self, 'cargo_sell_planner'):
             self.cargo_sell_planner.market_status_label.config(text=status_text, fg=status_color)
     
@@ -16837,11 +16839,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Search section
+        search_header = ttk.Frame(main_container)
+        search_header.pack(fill="x")
+        from ui.help_link import create_labelframe_title
+        create_labelframe_title(
+            search_header, t('marketplace.search_title'), "commodity-market", t('marketplace.help_tooltip'), ToolTip).pack(side="left")
         search_frame = ttk.LabelFrame(main_container, padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
-        from ui.help_link import create_labelframe_title
-        search_frame.configure(labelwidget=create_labelframe_title(
-            search_frame, t('marketplace.search_title'), "commodity-market", t('marketplace.help_tooltip'), ToolTip))
 
         # Load marketplace preferences from config
         cfg = _load_cfg()
@@ -16864,12 +16868,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row0_frame.pack(fill="x", pady=(0, 10))
 
         # Status label (packed right FIRST so it claims far-right space)
-        self.marketplace_total_label = tk.Label(row0_frame, text='',
+        self.marketplace_total_label = tk.Label(search_header, text='',
                                                bg=_mkt_cb_bg, fg="gray", font=self._scaled_font(8))
         self.marketplace_total_label.pack(side="right", padx=(0, 5))
 
-        # Market API status indicator, packed right next (just left of the hint text)
-        self.market_mining_status_label = tk.Label(row0_frame, text="⚫ Market API",
+        # Market API status indicator, just left of the status text
+        self.market_mining_status_label = tk.Label(search_header, text="⚫ Market API",
                                           font=self._scaled_font(8), fg="#888888", bg=_mkt_cb_bg)
         self.market_mining_status_label.pack(side="right", padx=(0, 15))
         ToolTip(self.market_mining_status_label, t('tooltips.market_api_status'))
@@ -17138,11 +17142,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Search section
+        search_header = ttk.Frame(main_container)
+        search_header.pack(fill="x")
+        from ui.help_link import create_labelframe_title
+        create_labelframe_title(
+            search_header, t('marketplace.search_title'), "commodity-market", t('marketplace.help_tooltip'), ToolTip).pack(side="left")
         search_frame = ttk.LabelFrame(main_container, padding=10)
         search_frame.pack(fill="x", pady=(0, 10))
-        from ui.help_link import create_labelframe_title
-        search_frame.configure(labelwidget=create_labelframe_title(
-            search_frame, t('marketplace.search_title'), "commodity-market", t('marketplace.help_tooltip'), ToolTip))
 
         # Load marketplace preferences from config
         cfg = _load_cfg()
@@ -17165,12 +17171,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row0_frame.pack(fill="x", pady=(0, 10))
 
         # Status label (packed right FIRST so it claims far-right space)
-        self.trade_total_label = tk.Label(row0_frame, text='',
+        self.trade_total_label = tk.Label(search_header, text='',
                                           bg=_trade_cb_bg, fg="gray", font=self._scaled_font(8))
         self.trade_total_label.pack(side="right", padx=(0, 5))
 
-        # Market API status indicator, packed right next (just left of the hint text)
-        self.market_trade_status_label = tk.Label(row0_frame, text="⚫ Market API",
+        # Market API status indicator, just left of the status text
+        self.market_trade_status_label = tk.Label(search_header, text="⚫ Market API",
                                           font=self._scaled_font(8), fg="#888888", bg=_trade_cb_bg)
         self.market_trade_status_label.pack(side="right", padx=(0, 15))
         ToolTip(self.market_trade_status_label, t('tooltips.market_api_trade_status'))

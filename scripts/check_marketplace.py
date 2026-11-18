@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / 'app'))
 from app_utils import format_market_pad, format_market_powerplay, format_market_station_type
 from cargo_sell_planner import build_plans
 from column_visibility_helper import ColumnVisibilityMixin, displayed_column
-from marketplace_api import MarketplaceAPI, _short_cache, _short_cache_key_locks
+from marketplace_api import MarketplaceAPI, _short_cache, _short_cache_key_locks, _system_coords_cache
 from multi_mineral_tab import MultiMineralTab
 from check_search_stop import App, ImmediateThread, Widget
 
@@ -32,6 +32,47 @@ def market(index, **changes):
 
 
 class MarketTests(unittest.TestCase):
+    def test_distances_use_coordinates_from_other_local_market_records(self):
+        import sqlite3
+        from tempfile import TemporaryDirectory
+        from contextlib import closing
+        with TemporaryDirectory() as folder:
+            db = str(Path(folder) / 'market.db')
+            with closing(sqlite3.connect(db)) as conn, conn:
+                conn.execute('CREATE TABLE commodity_prices_data (system_name, system_x, system_y, system_z, updated_at)')
+                conn.execute('CREATE TABLE system_coords (name, x, y, z)')
+                conn.execute("INSERT INTO commodity_prices_data VALUES ('Wolf 1143', 3, 4, 0, '2026-11-18')")
+                conn.execute("INSERT INTO system_coords VALUES ('Other', 0, 0, 12)")
+            rows = [market(1, systemName='Wolf 1143', distance=None),
+                    market(2, systemName='Other', distance=None),
+                    market(3, systemName='Unknown', distance=None)]
+            with patch.object(MarketplaceAPI, 'EDDN_CACHE_PATH', db), \
+                 patch.object(MarketplaceAPI, '_get_system_coords', side_effect=lambda name: (0, 0, 0) if name == 'Sol' else None), \
+                 patch('local_database.LocalSystemsDatabase.is_database_available', return_value=False), \
+                 patch('marketplace_api.requests.get', return_value=Mock(json=lambda: [])):
+                measured = MarketplaceAPI.add_distances_to_results(rows, 'Sol')
+            self.assertEqual([r['distance'] for r in measured], [5, 12, None])
+
+    def test_distances_batch_missing_systems_and_reuse_coordinates(self):
+        rows = [market(i, systemName=f'Remote {i // 2}', distance=None) for i in range(450)]
+        response = Mock()
+        def fetch(url, params, **kwargs):
+            response = Mock()
+            response.json.return_value = [dict(name=name.lower(), coords=dict(x=3, y=4, z=0))
+                                          for key, name in params if key == 'systemName[]']
+            return response
+        with patch.dict(_system_coords_cache, {}, clear=True), \
+             patch.object(MarketplaceAPI, 'EDDN_CACHE_PATH', None), \
+             patch('local_database.LocalSystemsDatabase.is_database_available', return_value=False), \
+             patch.object(MarketplaceAPI, '_get_system_coords', return_value=(0, 0, 0)), \
+             patch('marketplace_api.requests.get', side_effect=fetch) as lookup:
+            measured = MarketplaceAPI.add_distances_to_results(rows, 'Sol')
+            self.assertEqual([r['distance'] for r in measured], [5] * 450)
+            self.assertEqual(lookup.call_count, 3)
+            fresh = [market(1, systemName='Remote 0', distance=None)]
+            self.assertEqual(MarketplaceAPI.add_distances_to_results(fresh, 'Sol')[0]['distance'], 5)
+            self.assertEqual(lookup.call_count, 3)
+
     def test_merge_missing_invalid_and_mixed_timezones(self):
         for stamp in ('', None, 'invalid', '2026-11-14T12:00:00', '2026-11-15T13:00:00+02:00'):
             for reverse in (False, True):

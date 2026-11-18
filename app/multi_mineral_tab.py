@@ -32,14 +32,25 @@ class MultiMineralTab:
         container = ttk.Frame(frame)
         container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        box = ttk.LabelFrame(container, text=t('marketplace.multi_title'), padding=10)
+        search_header = ttk.Frame(container)
+        search_header.pack(fill="x")
+        ttk.Label(search_header, text=t('marketplace.multi_title'), style="TLabelframe.Label").pack(side="left")
+        self.status_label = tk.Label(search_header, text='', bg=bg, fg="gray",
+                                     font=app._scaled_font(8))
+        self.status_label.pack(side="right", padx=(0, 5))
+        market_status = app.market_mining_status_label
+        self.market_status_label = tk.Label(search_header, text=market_status.cget('text'),
+                                            fg=market_status.cget('fg'), bg=bg,
+                                            font=app._scaled_font(8))
+        self.market_status_label.pack(side="right", padx=(0, 15))
+        from ui.tooltip import ToolTip
+        ToolTip(self.market_status_label, t('tooltips.market_api_status'))
+
+        box = ttk.LabelFrame(container, padding=10)
         box.pack(fill="x", pady=(0, 10))
 
         ref_row = tk.Frame(box, bg=bg)
         ref_row.pack(fill="x", pady=(0, 8))
-        self.status_label = tk.Label(ref_row, text='', bg=bg, fg="gray",
-                                     font=app._scaled_font(8))
-        self.status_label.pack(side="right", padx=(0, 5))
         ttk.Label(ref_row, text=t('marketplace.ref_system'), width=12).pack(side="left", padx=(0, 5))
         self.ref_var = tk.StringVar(value=app.marketplace_reference_system.get())
         ref_entry = ttk.Entry(ref_row, textvariable=self.ref_var, width=30)

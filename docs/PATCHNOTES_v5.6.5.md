@@ -2,13 +2,12 @@
 **Release Date:** 2026-November-18
 
 ## New Features
-This update mostly focuses on under-the-hood code optimization, making the app feel smoother overall with faster, more reliable searches across all tabs
-
 - Added a new **Database** tab inside the Statistics view with an overview of mining locations and your activity.
 - Mining TXT reports now include the ring type when known.
 - Added more direct help links throughout the app and updated the user guide on GitHub.
 
 ## Improvements
+- Under-the-hood code optimization, making the app feel smoother overall with faster, more reliable searches across all tabs.
 - Faster system and commodity searches.
 - Expanded Statistics lists to show your top 20 best locations and last 20 mining locations (up from 10).
 - Added alternating row shading to tables and reduced empty space in Statistics.

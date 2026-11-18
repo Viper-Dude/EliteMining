@@ -7,17 +7,33 @@ Keep shared architecture, UI conventions, and working rules here. Keep assistant
 ## Chat Rules
 
 - **Be concise.** Short, direct responses. No padding, no preamble, no trailing summaries of what you just did.
-- **Code-first.** Show code changes directly. Don't narrate what you're about to do — just do it.
+- **Code-first.** Proceed directly with straightforward work. Keep required progress updates brief and useful; avoid narrating routine tool calls.
 - **No unsolicited refactoring.** Fix what was asked. Don't clean up surrounding code, rename variables, or restructure unless explicitly requested.
 - **No feature creep.** Don't add error handling, validation, or abstractions for scenarios not in scope. Don't design for hypothetical future requirements.
 - **No comments unless the WHY is non-obvious.** Don't explain what the code does. Don't add task/PR references in comments.
 - **No emojis** unless explicitly asked.
 - **Follow existing patterns.** Match the style, naming conventions, and architecture already in the codebase. Check how similar things are done before inventing a new approach.
-- **Reuse existing functions.** Before writing new logic, check if an existing function already does it (or almost does it). Call it, or extract a shared helper/add a parameter — don't copy-paste and duplicate the implementation. This applies across tabs and modules, not just within one file (e.g. distance/coordinate lookups already exist in `ring_finder.py`).
+- **Reuse existing functions.** Before writing new logic, search the likely modules for an existing function that does it (or almost does it), including across tabs (e.g. distance/coordinate lookups in `ring_finder.py`). Reuse or minimally extend it instead of duplicating the implementation. Keep the search bounded to the requested behavior; widen it only when evidence points elsewhere. Text-only edits do not require a helper search.
 - **Patch notes** (`docs/PATCHNOTES_v*.md`): one short, precise sentence per change, plain English from the player's view. No technical or dev language (no EDDN, API, cache, database, function names).
 - **Git commits**: No `Co-Authored-By` trailers. Commit messages should be concise and focus on the "why".
-- **When uncertain**, ask one targeted question rather than listing options or making assumptions.
+- **When uncertain**, ask one targeted question if the uncertainty materially affects scope, correctness, or risk. Resolve routine implementation choices using existing patterns and session context.
 - **Don't re-explain decisions** already made in the conversation. Move forward.
+- **End-of-chat review.** When the user says they are ending the chat, check whether any lasting decisions, preferences, lessons, or unresolved issues should be saved to project memory or documentation. Check existing guidance to avoid duplication. Update only files the user has authorized you to modify; otherwise briefly identify any recommended updates. Do not save routine chat history or make changes when nothing useful needs preserving.
+
+---
+
+## Task Effort and Validation
+
+Scale inspection, planning, and validation to the change's complexity and consequences. Risk takes precedence over patch size; a small change to database writes, threading, shared configuration, or a VoiceAttack contract may need extensive validation.
+
+- **Small, low-risk tasks** (wording, simple UI adjustments, minor configuration changes): inspect the relevant code and required paired resources, make the change directly, and review the diff with an applicable syntax, format, or visual check. Avoid elaborate plans and full test suites unless a specific risk justifies them.
+- **Medium tasks** (bug fixes, existing-feature changes, several affected functions): inspect affected code paths and direct dependencies, run targeted tests, and check likely regressions.
+- **Large or high-risk tasks** (architecture, major refactoring, concurrency, database changes, multiple components): examine dependencies and integration points, and run appropriate comprehensive tests covering compatibility and relevant failure or recovery paths.
+- **Read once, reuse context.** Read original instruction files and the memory index once per session, plus task-relevant linked guidance. Reuse established facts; reread when files change, context is missing, or newly relevant scope requires additional guidance. Do not read unrelated memories or repeatedly inspect unchanged code.
+- **Keep investigation focused.** Start with the reported symptom and the smallest useful inspection. For runtime-value bugs, prefer a targeted observation or diagnostic and one reproduction over speculative exploration. Broaden the search when evidence warrants it.
+- **Use tools efficiently.** Batch independent searches and reads, request only useful output, and keep plans proportional to the work.
+- **Choose checks for a reason.** Each test or validation step should answer a specific correctness or regression question. Add tests where they provide meaningful coverage; avoid tests that merely mirror implementation details. Do not reduce necessary testing to save tokens.
+- **Stop when sufficient evidence exists.** Once the requested behavior is supported and applicable checks pass, stop. Repeat or broaden checks only after relevant edits, failures, or new unresolved concerns. Report validation and material limitations accurately.
 
 ---
 
@@ -158,7 +174,7 @@ Apply these rules whenever creating a table or changing an existing table's colu
 - **Number formatting**: match equivalent columns in existing tabs. LS uses Ring Finder's whole-number format with thousands separators (`f'{int(float(value)):,}'`); LY uses the existing distance precision. Keep unknown values distinct from zero and sort numeric columns by their underlying numeric values.
 - **Localization and scale**: use both English and German strings and the app's UI scale helpers; do not hardcode new user-visible labels or unscaled table dimensions.
 
-Before marking table work complete, verify:
+For new tables, substantial table changes, or shared table-helper changes, verify the full applicable checklist below. For localized changes, check only affected behavior and credible regressions: a header wording change needs translated-header and minimum-width checks, but does not by itself require retesting unchanged ordering or persistence.
 
 1. Drag columns wider and narrower: widths remain stable after release, result refresh, and window resizing; headers remain readable at the minimum width.
 2. Scroll horizontally through wide columns and vertically through all rows.
@@ -166,7 +182,7 @@ Before marking table work complete, verify:
 4. Hide, show, and reorder columns where supported: no text slivers, incorrect context menus, or mismatched tooltips.
 5. Check English and German headers, supported UI scales, and number formatting, including fractional LS, zero, and missing data.
 
-Report any checks that could not be run; do not claim visual verification from code inspection alone.
+Report applicable checks that could not be run; do not claim visual verification from code inspection alone.
 
 ---
 
@@ -218,6 +234,7 @@ python app/create_release.py
 
 ## Commodity Market
 
+- Local coordinate databases are a shortcut to save API calls; missing coordinates must fall back to APIs. For large result sets, batch requests and reuse coordinates per system rather than requesting each row separately. Match returned system names case-insensitively.
 - Mining and Trade searches display all matching returned results; sorting changes their order without removing rows. Calculate distances for all returned matches when a reference system is supplied.
 - When merging market records, retain coordinates from another record only if both name the same system; a Fleet Carrier may have jumped since the older record. Stations in the reference system have a distance of zero even when their market record lacks coordinates.
 - Multiple Prices uses `MINING_COMMODITY_ORDER` from `app/core/constants.py`, matching the Mining Commodities dropdown. Its mineral choices wrap across the available width to preserve space for results.
