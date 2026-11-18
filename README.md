@@ -668,16 +668,16 @@ Cards saved to: `app/Reports/Mining Session/Cards/`
 
 #### Mining Statistics
 
-Open **Mining → Statistics** to review saved mining sessions. Ship, Mineral, and Time filters apply to mining statistics. **Last 20 Visited Systems** and **Database** work independently of those filters.
+Open **Mining → Statistics** to review saved mining sessions. Ship, Mineral, and Time filters apply to mining statistics. **Last 20 Visited Systems** and **My Mining Data** work independently of those filters.
 
 - **Overview** — Session totals, averages, and records, plus your latest 10 sessions compared with the previous 10.
 - **Top 20 Best Locations** — Locations ranked by their best session T/hr, with average and lowest rates, session counts, and mining time.
 - **Last 20 Mining Locations** — Your latest mining locations, newest first. Each system/ring appears once.
 - **Last 20 Visited Systems** — Your latest visited systems, with visit dates, distance from your current system, and visit counts.
-- **Database** — Hotspots, rings, mined rings, 2x/3x overlaps, and Low, Normal, High and Haz RES rings for each mineral. **Coverage** shows the percentage of saved rings where you have mined that mineral.
+- **My Mining Data** — Hotspots, rings, mined rings, 2x/3x overlaps, and Low, Normal, High and Haz RES rings for each mineral. **Coverage** shows the percentage of saved rings where you have mined that mineral.
 - **Mineral Performance** — Select a mineral to see Avg %, Best %, and Hits from saved reports. These follow your announcement thresholds; T/hr still includes all mined minerals.
 
-The Database summary shows saved systems, unique mined locations and your total visited systems. Mined counts use saved mining sessions. The **Total** row sums each column and stays at the bottom when sorting; rings listed under several minerals count in each mineral, and total Coverage uses the summed mined rings divided by summed rings.
+The My Mining Data heading shows your commander name when known, and the summary shows saved systems, unique mined locations and your total visited systems. Mined counts use saved mining sessions. The **Total** row sums each column and stays at the bottom when sorting; rings listed under several minerals count in each mineral, and total Coverage uses the summed mined rings divided by summed rings.
 
 Both location tables include **Dist (LY)** from your current system and **LS** from the arrival star. Use **Columns** to reorder or hide columns, and hover over headers for descriptions.
 
@@ -686,8 +686,8 @@ Right-click a location to copy its system, open Inara/EDSM/Spansh, view its repo
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_statistics_overview.png" alt="Mining Statistics overview with session averages, records and recent progress" width="900"><br>
 *Overview: totals, averages, records, and recent progress.*
 
-<img src="Screenshot/mining_statistics_database.png" alt="Database statistics with mineral totals, mined rings, coverage, overlaps and RES types" width="900"><br>
-*Database: compare saved mining locations and your mined coverage by mineral.*
+<img src="Screenshot/mining_statistics_my_data.png" alt="My Mining Data with mineral totals, mined rings, coverage, overlaps and RES types" width="900"><br>
+*My Mining Data: compare saved mining locations and your mined coverage by mineral.*
 
 <details>
 <summary>View location tables and visited systems</summary>

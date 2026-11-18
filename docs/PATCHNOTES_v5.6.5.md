@@ -2,7 +2,7 @@
 **Release Date:** 2026-November-18
 
 ## New Features
-- Added a new **Database** tab inside the Statistics view with an overview of mining locations and your activity.
+- Added a new **My Mining Data** tab inside the Statistics view with your commander name and an overview of mining locations and your activity.
 - Mining TXT reports now include the ring type when known.
 - Added more direct help links throughout the app and updated the user guide on GitHub.
 
