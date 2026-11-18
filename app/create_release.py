@@ -400,8 +400,7 @@ class ReleaseBuilder:
             print(f"Found Inno Setup compiler: {inno_compiler}")
             print(f"Working directory: {self.project_root}")
             
-            # Force a clean compile with verbose output
-            command = f'"{inno_compiler}" /Q- "{self.installer_iss}"'  # /Q- for verbose output
+            command = f'"{inno_compiler}" "{self.installer_iss}"'
             result = self.run_command(command, cwd=str(self.project_root))
             
             # Verify the new installer was created and show its info
