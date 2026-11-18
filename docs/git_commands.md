@@ -2,14 +2,14 @@
 python firstrun_sim.py
 
 # Git Commands Change message only
-  git commit --amend -m v5.1.2 - EDDN market data fix and minor UX improvements"
+  git commit --amend -m "v5.6.5 - Code optimization,Improve mining statistics, searches, reports and VoiceAttack stability"
   git push --force
 
 # Git Commands Reference
 
 # Git Push
 git add -A
-git commit -m "v5.6.5: Code optimization,Improve mining statistics, searches, reports and VoiceAttack stability"
+git commit -m "v5.6.5 - Code optimization,Improve mining statistics, searches, reports and VoiceAttack stability"
 git push
 
 ## Standard Commit and Push Process
