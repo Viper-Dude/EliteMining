@@ -2367,6 +2367,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         
         # Statistics sub-tab
         statistics = ttk.Frame(nb, padding=8)
+        self._statistics_tab_frame = statistics
         nb.add(statistics, text=t('mining_session.statistics'))
         self._mining_help_sections[str(statistics)] = "mining-statistics"
         statistics.columnconfigure(0, weight=1)
@@ -2377,6 +2378,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Reports tab - Session reports and management
         reports = ttk.Frame(nb, padding=8)
+        self._reports_tab_frame = reports
         nb.insert(statistics, reports, text=t('mining_session.reports'))
         self._mining_help_sections[str(reports)] = "reports"
         reports.columnconfigure(0, weight=1)
@@ -2397,6 +2399,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Create missions tab content
             self.missions_tab = MiningMissionsTab(missions_frame)
             self.missions_tab.pack(fill="both", expand=True)
+            self._missions_tab_frame = missions_frame
             
             # Pass references after main app is set
             if self.main_app:

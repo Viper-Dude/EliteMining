@@ -6110,6 +6110,28 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 action = parts[1] if len(parts) > 1 else ""
                 self._va_handle_app(action)
                 
+            elif cmd_type == "SIDEBAR":
+                action = parts[1] if len(parts) > 1 else ""
+                if action in ("SHOW", "HIDE") and self._sidebar_visible != (action == "SHOW"):
+                    self._toggle_sidebar_visibility()
+                elif action == "SWAP" and self._sidebar_visible:
+                    self._swap_sidebar_panes()
+
+            elif cmd_type == "SEARCH":
+                action = parts[1] if len(parts) > 1 else ""
+                if action == "BEST_MINING_SYSTEM":
+                    self.switch_to_tab('hotspots_finder')
+                    self.ring_finder._show_reverse_search_dialog()
+
+            elif cmd_type == "BOOKMARK":
+                action = parts[1] if len(parts) > 1 else ""
+                if action == "ADD":
+                    self.switch_to_tab('bookmarks')
+                    self.prospector_panel._show_bookmark_dialog({
+                        'system': self.prospector_panel.last_system,
+                        'body': self.prospector_panel.last_body,
+                    })
+
             elif cmd_type == "OVERLAY":
                 # Overlay control: OVERLAY:ENABLE, OVERLAY:DISABLE, OVERLAY:STANDARD,
                 # OVERLAY:ENHANCED, OVERLAY:CARGO:ON, OVERLAY:CARGO:OFF
@@ -6124,6 +6146,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _va_switch_tab(self, tab_name: str):
         """Switch to specified tab"""
+        mining_tabs = {
+            'REPORTS': '_reports_tab_frame',
+            'STATISTICS': '_statistics_tab_frame',
+            'MISSIONS': '_missions_tab_frame',
+        }
+        if tab_name in mining_tabs:
+            panel = self.prospector_panel
+            frame = getattr(panel, mining_tabs[tab_name], None)
+            if frame is not None:
+                self.switch_to_tab('mining_session')
+                panel.nb.select(frame)
+            return
+
         tab_mapping = {
             'MINING': 'mining_session',
             'HOTSPOTS': 'hotspots_finder',

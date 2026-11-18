@@ -822,11 +822,19 @@ Configure how many times the laser mining extra sequence runs:
 | Close Elite Mining | Close app gracefully |
 | Minimize Elite Mining | Minimize to taskbar |
 | Restore Elite Mining | Restore from taskbar |
+| Hide sidebar | Hide Ship Presets and Cargo Monitor |
+| Show sidebar | Show Ship Presets and Cargo Monitor |
+| Swap sidebar panels | Swap Ship Presets and Cargo Monitor while the sidebar is visible |
+| Find best mining system | Open the best mining system search dialog |
+| Bookmark this location | Open the bookmark dialog with the current system and body filled in |
 
 ### UI Navigation
 | Voice Command | Action |
 |---------------|--------|
 | Show mining | Switch to Mining Session tab |
+| Show mining reports | Switch to the mining Reports sub-tab |
+| Show mining statistics | Switch to the mining Statistics sub-tab |
+| Show mining missions | Switch to the Mining Missions sub-tab |
 | Show hotspots | Switch to Hotspots Finder tab |
 | Show market | Switch to Commodity Market tab |
 | Show missions | Switch to Mining Missions tab |

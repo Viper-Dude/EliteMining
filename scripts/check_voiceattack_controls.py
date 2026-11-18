@@ -8,6 +8,7 @@ import sys
 import tkinter as tk
 import types
 import unittest
+import xml.etree.ElementTree as ET
 from unittest.mock import patch
 
 
@@ -17,7 +18,7 @@ APP = next(n for n in TREE.body if isinstance(n, ast.ClassDef) and n.name == 'Ap
 METHODS = {n.name: n for n in APP.body if isinstance(n, ast.FunctionDef)}
 SELECTED = {
     '_on_voice_set_toggle', '_reset_sound_events', '_save_sound_events',
-    '_clear_voice_set', '_apply_mapping', '_save_timer',
+    '_clear_voice_set', '_apply_mapping', '_save_timer', '_execute_va_command', '_va_switch_tab',
 }
 
 
@@ -47,6 +48,9 @@ class VoiceAttackChecks(unittest.TestCase):
             return self.confirm
 
         self.ns = {
+            'log': types.SimpleNamespace(info=lambda *args: None,
+                                         warning=lambda *args: None,
+                                         error=lambda *args: self.fail(str(args))),
             'Dict': dict, 'Any': object,
             'SOUND_EVENT_CATEGORIES': {'first': 'mining', 'second': 'mining', 'ship': 'ship'},
             'PRESET_EXCLUDED_TOGGLES': {'Voice Feedback'},
@@ -80,6 +84,86 @@ class VoiceAttackChecks(unittest.TestCase):
         })
         for var in (*self.app.sound_event_vars.values(), *self.app.sound_event_tts_vars.values()):
             var.trace_add('write', lambda *args: self.app._save_sound_events())
+
+    def test_sidebar_commands_preserve_requested_state_when_repeated(self):
+        toggles = []
+        self.app._sidebar_visible = True
+
+        def toggle():
+            self.app._sidebar_visible = not self.app._sidebar_visible
+            toggles.append(self.app._sidebar_visible)
+
+        self.app._toggle_sidebar_visibility = toggle
+        for command, expected in (
+            ('SIDEBAR:SHOW', True), ('SIDEBAR:HIDE', False),
+            ('SIDEBAR:HIDE', False), ('sidebar:show', True),
+            ('SIDEBAR:SHOW', True), ('SIDEBAR', True), ('SIDEBAR:UNKNOWN', True),
+        ):
+            with self.subTest(command=command):
+                self.app._execute_va_command(command)
+                self.assertEqual(self.app._sidebar_visible, expected)
+        self.assertEqual(toggles, [False, True])
+
+    def test_mining_subtab_commands_select_parent_and_named_frame(self):
+        selected = []
+        self.app.switch_to_tab = lambda tab: selected.append(tab)
+        self.app.prospector_panel = types.SimpleNamespace(
+            nb=types.SimpleNamespace(select=lambda frame: selected.append(frame)),
+            _reports_tab_frame='reports-frame', _statistics_tab_frame='statistics-frame',
+            _missions_tab_frame='missions-frame')
+        for name in ('REPORTS', 'STATISTICS', 'MISSIONS'):
+            selected.clear()
+            self.app._execute_va_command(f'TAB:{name}')
+            self.assertEqual(selected, ['mining_session', f'{name.lower()}-frame'])
+
+    def test_sidebar_swap_requires_visible_sidebar(self):
+        swaps = []
+        self.app._swap_sidebar_panes = lambda: swaps.append(True)
+        for visible in (False, True):
+            self.app._sidebar_visible = visible
+            self.app._execute_va_command('SIDEBAR:SWAP')
+            self.assertEqual(len(swaps), int(visible))
+
+    def test_search_and_bookmark_open_existing_dialogs(self):
+        calls = []
+        self.app.switch_to_tab = lambda tab: calls.append(tab)
+        self.app.ring_finder = types.SimpleNamespace(
+            _show_reverse_search_dialog=lambda: calls.append('search-dialog'))
+        self.app.prospector_panel = types.SimpleNamespace(
+            last_system='Sol', last_body='Sol A 1 A Ring',
+            _show_bookmark_dialog=lambda data: calls.append(data))
+        self.app._execute_va_command('SEARCH:BEST_MINING_SYSTEM')
+        self.assertEqual(calls, ['hotspots_finder', 'search-dialog'])
+        calls.clear()
+        self.app._execute_va_command('BOOKMARK:ADD')
+        self.assertEqual(calls, ['bookmarks', {'system': 'Sol', 'body': 'Sol A 1 A Ring'}])
+
+    def test_app_profile_commands_write_matching_actions(self):
+        profile = ET.parse(ROOT / 'Voiceattack Profile/EliteMining v5.6.5-Profile.vap')
+        phrases = {
+            'SIDEBAR:HIDE': 'Hide sidebar', 'SIDEBAR:SHOW': 'Show sidebar',
+            'SIDEBAR:SWAP': 'Swap sidebar panels', 'TAB:REPORTS': 'Show mining reports',
+            'TAB:STATISTICS': 'Show mining statistics', 'TAB:MISSIONS': 'Show mining missions',
+            'SEARCH:BEST_MINING_SYSTEM': 'Find best mining system',
+            'BOOKMARK:ADD': 'Bookmark this location',
+        }
+        for action, phrase in phrases.items():
+            commands = [command for command in profile.findall('.//Command')
+                        if command.findtext('ActionSequence/CommandAction/Context') == action]
+            self.assertEqual(len(commands), 1)
+            command = commands[0]
+            self.assertIn(phrase, [part.strip() for part in command.findtext('CommandString').split(';')])
+            self.assertEqual(command.findtext('Category'), 'EliteMining App Commands')
+            if action not in ('SIDEBAR:HIDE', 'SIDEBAR:SHOW'):
+                self.assertEqual(command.findtext('keyValue'), '0')
+            self.assertEqual(command.findtext('UseSpokenPhrase'), 'true')
+            actions = command.findall('ActionSequence/CommandAction')
+            self.assertEqual(len(actions), 1)
+            self.assertEqual(actions[0].findtext('ActionType'), 'WriteText')
+            self.assertEqual(actions[0].findtext('X'), '1')
+            self.assertEqual(actions[0].findtext('ConditionPairing'), '0')
+            self.assertEqual(actions[0].findtext('Context2'),
+                             r'{VA_APPS}\EliteMining\Variables\eliteMiningCommand.txt')
 
     def test_voice_set_saves_once_and_restores_custom_choices(self):
         original = self.cfg['sound_events'].copy()

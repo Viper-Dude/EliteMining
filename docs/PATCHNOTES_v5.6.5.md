@@ -18,6 +18,7 @@
 
 
 ## Voiceattack Profile update (v5.6.5)
+- Added voice commands to show or hide the sidebar, swap its panels, open mining reports, statistics and missions, find the best mining system, and bookmark your current location.
 - General stability and logic improvements.
 
 ### Important Notes 
