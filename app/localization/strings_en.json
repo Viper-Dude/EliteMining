@@ -350,6 +350,11 @@
     "no_item_details": "No item details"
   },
   "status_bar": {
+    "services_checking": "Services: Checking",
+    "services_online": "Services: Online",
+    "services_partial": "Services: Partial",
+    "services_offline": "Services: Offline",
+    "service_status": "Service status",
     "market_api": "Market API",
     "cmdr": "CMDR:",
     "current_system": "| Current Syst:",

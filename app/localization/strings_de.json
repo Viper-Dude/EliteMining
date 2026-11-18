@@ -346,6 +346,11 @@
     "no_item_details": "Keine Artikeldetails"
   },
   "status_bar": {
+    "services_checking": "Dienste: Prüfung läuft",
+    "services_online": "Dienste: Online",
+    "services_partial": "Dienste: Teilweise verfügbar",
+    "services_offline": "Dienste: Offline",
+    "service_status": "Dienststatus",
     "market_api": "Markt-API",
     "cmdr": "CMDR:",
     "current_system": "| Akt. Syst:",

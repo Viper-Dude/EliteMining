@@ -929,7 +929,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.6.5"
+APP_VERSION = "v5.6.6"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -5460,17 +5460,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.route_label_value.grid(row=0, column=8, sticky="w")
         _ind_frame = tk.Frame(actions, bg=_info_bg)
         _ind_frame.grid(row=0, column=1, sticky="e", padx=(0, 12))
-        if _info_theme in ("modern", "modern_slate", "modern_orange"):
-            self._footer_eddn_label = tk.Label(_ind_frame, text="\u26ab EDDN: checking...", fg="#888888",
-                                               bg=_info_bg, font=self._scaled_font(8))
-            self._footer_eddn_label.pack(side="left", padx=(0, 14))
-            self._footer_spansh_label = tk.Label(_ind_frame, text="\u26ab Spansh: checking...", fg="#888888",
-                                                 bg=_info_bg, font=self._scaled_font(8))
-            self._footer_spansh_label.pack(side="left")
-        self._footer_market_label = tk.Label(_ind_frame,
-            text=t('system_finder.service_checking').format(service=t('status_bar.market_api')),
-            fg="#888888", bg=_info_bg, font=self._scaled_font(8))
-        self._footer_market_label.pack(side="left", padx=(14, 0) if _info_theme in ("modern", "modern_slate", "modern_orange") else 0)
+        self._footer_service_statuses = dict.fromkeys(('eddn', 'spansh', 'market'), 'checking')
+        self._footer_services_label = tk.Label(
+            _ind_frame, text='', fg="#888888", bg=_info_bg,
+            font=self._scaled_font(8), cursor="hand2")
+        self._footer_services_label.pack(side="left")
+        self._footer_services_tip = ToolTip(self._footer_services_label, '', anchor_above=True)
+        self._footer_services_label.bind('<Button-1>', self._show_service_status)
+        self._update_footer_indicator('market', 'checking')
         
         # Load CMDR name in background
         self.after(500, self._update_cmdr_system_display)
@@ -12694,10 +12691,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(300000, self._check_market_api_status)
     
     def _update_market_api_status(self, status: str):
-        key = 'system_finder.service_online' if status == 'online' else 'system_finder.service_offline'
-        status_text = t(key).format(service=t('status_bar.market_api'))
-        status_color = "#00ff00" if status == 'online' else "#ff4444"
-        self._update_footer_indicator('market', status_text, status_color)
+        self._update_footer_indicator('market', status)
 
     # ==================== END DISTANCE CALCULATOR ====================
 
@@ -14741,11 +14735,34 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception:
             log.exception("Modern recolor failed")
 
-    def _update_footer_indicator(self, kind: str, text: str, color: str) -> None:
-        """Update a service status in the footer."""
-        label = getattr(self, '_footer_' + kind + '_label', None)
-        if label is not None:
-            label.config(text=text, fg={'#00ff00': '#4FB87A', '#ff4444': '#C06060'}.get(color, color))
+    def _update_footer_indicator(self, kind: str, status: str) -> None:
+        if not hasattr(self, '_footer_services_label'):
+            return
+        self._footer_service_statuses[kind] = status
+        statuses = self._footer_service_statuses.values()
+        if 'checking' in statuses:
+            overall, color = 'checking', '#888888'
+        elif all(value == 'online' for value in statuses):
+            overall, color = 'online', '#4FB87A'
+        elif all(value == 'offline' for value in statuses):
+            overall, color = 'offline', '#C06060'
+        else:
+            overall, color = 'partial', '#D9A441'
+        self._footer_services_label.config(
+            text=t('status_bar.services_' + overall), fg=color)
+        self._footer_services_tip.text = '\n'.join(
+            t('system_finder.service_' + value).format(service=service)
+            for key, service in (('eddn', 'EDDN'), ('spansh', 'Spansh'),
+                                 ('market', t('status_bar.market_api')))
+            for value in (self._footer_service_statuses[key],))
+        window = self._footer_services_tip.tooltip_window
+        if window is not None:
+            for label in window.winfo_children():
+                label.config(text=self._footer_services_tip.text)
+
+    def _show_service_status(self, event=None) -> None:
+        self._footer_services_tip.on_leave()
+        centered_info_dialog(self, t('status_bar.service_status'), self._footer_services_tip.text)
 
     _THEME_STR_KEYS = {"elite_orange": "orange_theme", "dark_gray": "dark_theme", "modern": "modern_theme", "modern_slate": "modern_slate_theme", "modern_orange": "modern_orange_theme"}
 
@@ -15005,7 +15022,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             cursor="hand2",
             padx=4
         )
-        self._version_label.pack(side="left", padx=(8, 0))
+        self._version_label.pack(side="left", padx=(8, 6))
         
         # Bind click to show About dialog
         self._version_label.bind("<Button-1>", lambda e: self._show_about_dialog())
@@ -18333,7 +18350,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         if hasattr(self, 'sysfinder_spansh_status_label'):
             self.sysfinder_spansh_status_label.config(text=status_text, fg=status_color)
-        self._update_footer_indicator('spansh', status_text, status_color)
+        self._update_footer_indicator('spansh', status)
 
     def _check_sysfinder_eddn_status(self):
         self.ring_finder._check_eddn_status()
@@ -18350,7 +18367,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         if hasattr(self, 'sysfinder_eddn_status_label'):
             self.sysfinder_eddn_status_label.config(text=status_text, fg=status_color)
-        self._update_footer_indicator('eddn', status_text, status_color)
+        self._update_footer_indicator('eddn', status)
 
     def _search_systems(self):
         """Search for systems matching criteria"""
@@ -22022,32 +22039,33 @@ Your keybinds will need to be reconfigured manually."""
 
 
 if __name__ == "__main__":
-    # Single instance check - also lets the installer detect a running instance
-    # via AppMutex without the slow Restart Manager scan.
-    import win32event
-    import win32api
-    import winerror
-
-    mutex_name = "Global\\EliteMining_SingleInstance_Mutex"
     mutex = None
+    if getattr(sys, 'frozen', False):
+        # Single instance check - also lets the installer detect a running instance
+        # via AppMutex without the slow Restart Manager scan.
+        import win32event
+        import win32api
+        import winerror
 
-    try:
-        mutex = win32event.CreateMutex(None, False, mutex_name)
-        last_error = win32api.GetLastError()
+        mutex_name = "Global\\EliteMining_SingleInstance_Mutex"
 
-        if last_error == winerror.ERROR_ALREADY_EXISTS:
-            # Another instance is already running
-            import tkinter.messagebox as messagebox
-            messagebox.showerror(
-                "EliteMining Already Running",
-                "EliteMining is already running.\n\n"
-                "Only one instance can run at a time to prevent duplicate announcements and conflicts.\n\n"
-                "Please close the other instance first."
-            )
-            sys.exit(0)
-    except Exception as e:
-        print(f"Warning: Could not create mutex for single instance check: {e}")
-        # Continue anyway - better to run than to fail completely
+        try:
+            mutex = win32event.CreateMutex(None, False, mutex_name)
+            last_error = win32api.GetLastError()
+
+            if last_error == winerror.ERROR_ALREADY_EXISTS:
+                # Another instance is already running
+                import tkinter.messagebox as messagebox
+                messagebox.showerror(
+                    "EliteMining Already Running",
+                    "EliteMining is already running.\n\n"
+                    "Only one instance can run at a time to prevent duplicate announcements and conflicts.\n\n"
+                    "Please close the other instance first."
+                )
+                sys.exit(0)
+        except Exception as e:
+            print(f"Warning: Could not create mutex for single instance check: {e}")
+            # Continue anyway - better to run than to fail completely
 
     # Clean up any restart flag from previous run
     try:

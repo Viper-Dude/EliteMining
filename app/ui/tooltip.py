@@ -33,10 +33,11 @@ class ToolTip:
     tooltips_enabled = True  # Global tooltip enable/disable flag
     _tooltip_instances = {}  # Store references to prevent garbage collection
     
-    def __init__(self, widget, text, follow_pointer=False):
+    def __init__(self, widget, text, follow_pointer=False, anchor_above=False):
         self.widget = widget
         self.text = text
         self.follow_pointer = follow_pointer
+        self.anchor_above = anchor_above
         self.tooltip_window = None
         self.tooltip_timer = None  # For delay timer
         
@@ -125,7 +126,14 @@ class ToolTip:
                             font=scaled_font(8), wraplength=340,
                             padx=4, pady=2)
             label.pack()
-            if self.follow_pointer:
+            if self.anchor_above:
+                tw.update_idletasks()
+                width, height = tw.winfo_reqwidth(), tw.winfo_reqheight()
+                x = max(root_x, min(widget_x + (widget_width - width) // 2,
+                                    root_x + root_width - width))
+                y = max(root_y, widget_y - height - 8)
+                tw.wm_geometry(f"{x:+d}{y:+d}")
+            elif self.follow_pointer:
                 tw.update_idletasks()
                 width, height = tw.winfo_reqwidth(), tw.winfo_reqheight()
                 pointer_x, pointer_y = self.widget.winfo_pointerxy()
