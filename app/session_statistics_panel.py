@@ -230,7 +230,10 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.book.add(pane, text=t('statistics_expanded.' + name))
         header = ttk.Frame(pane)
         header.pack(fill='x')
-        ttk.Label(header, text=t('statistics_expanded.' + name), font=scaled_font(10, 'bold')).pack(side='left')
+        heading = ttk.Label(header, text=t('statistics_expanded.' + name), font=scaled_font(10, 'bold'))
+        heading.pack(side='left')
+        if name == 'database':
+            self.database_heading = heading
         key = 'statistics_' + name
         self._cv_add_columns_button(header, key)
         table = ttk.Frame(pane)
@@ -449,6 +452,11 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                     group['res_' + tag].add(key)
         total_mined = len(rings & mined)
         app = self.owner.main_app
+        commander = getattr(app, '_cached_cmdr_name', '') or ''
+        heading = t('statistics_expanded.database')
+        if commander:
+            heading += f" — {t('status_bar.cmdr')} {commander}"
+        self.database_heading.configure(text=heading)
         parser = getattr(getattr(app, 'cargo_monitor', None), 'journal_parser', None)
         visited_systems = parser.get_systems_visited() if parser is not None else None
         visited_systems = f'{visited_systems:,}' if visited_systems is not None else '—'
