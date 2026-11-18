@@ -1156,8 +1156,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             latest_event = None
             latest_timestamp = None
             
-            # Check last 1000 lines to ensure we get CarrierJump if it exists
-            for line in reversed(lines[-1000:]):
+            for line in reversed(lines):
                 try:
                     entry = json.loads(line.strip())
                     event_type = entry.get("event", "")
@@ -7384,6 +7383,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 return
             self._jrnl_path = latest
             self._journal_attached = True
+            self._read_initial_location_from_journal()
+            if self.last_system or self.last_body:
+                self._update_location_display()
             return
         if not latest:
             return
@@ -8462,6 +8464,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
     def _session_start(self) -> None:
         if self.session_active:
             return
+        if not self.last_body and not self.session_body.get():
+            self._read_initial_location_from_journal()
         current_system = self._get_current_system()
         if current_system and not self.session_system.get():
             self.session_system.set(current_system)

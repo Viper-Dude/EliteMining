@@ -113,6 +113,27 @@ class SessionLocationChecks(unittest.TestCase):
         self.assertIn(f'{self.system} — {self.body}', report.read_text(encoding='utf-8'))
         self.assertIn('Ring Type: Icy\n', report.read_text(encoding='utf-8'))
 
+    def test_location_written_between_startup_scan_and_journal_attach(self):
+        p = self.panel
+        p.last_body = 'Old system 1 A Ring'
+        p.last_body_type = 'PlanetaryRing'
+        p.session_body.set('')
+        p._journal_attached = False
+        p._watch_once()
+        self.assertEqual(p.last_body, f'{self.system} {self.body}')
+        p._update_location_display.assert_called()
+
+    def test_session_start_recovers_location_after_many_events(self):
+        with self.journal.open('a', encoding='utf-8') as stream:
+            stream.write((json.dumps({'event': 'Cargo'}) + '\n') * 1100)
+        p = self.panel
+        p.session_active = False
+        p.last_body = p.last_body_type = ''
+        p.session_body.set('')
+        p._session_start()
+        self.assertEqual(p.session_body.get(), self.body)
+        self.assertEqual(self.save(), (self.system, self.body))
+
     def test_location_changes_preserve_report_and_ring_type(self):
         self.mine()
         p = self.panel
