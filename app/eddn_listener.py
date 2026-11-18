@@ -121,6 +121,10 @@ class EDDNListener:
                     ON commodity_prices_data(commodity_name)
                 ''')
                 cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_commodity_name_lower_updated
+                    ON commodity_prices_data(LOWER(commodity_name), updated_at)
+                ''')
+                cursor.execute('''
                     CREATE INDEX IF NOT EXISTS idx_market_id
                     ON commodity_prices_data(market_id)
                 ''')
@@ -150,6 +154,10 @@ class EDDNListener:
                         powers TEXT,
                         updated_at TEXT
                     )
+                ''')
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_powerplay_system_nocase
+                    ON system_powerplay(system_name COLLATE NOCASE)
                 ''')
                 # Drop FTS5 table if it exists from older versions (unused, wastes space)
                 cursor.execute('DROP TABLE IF EXISTS commodity_prices_fts')

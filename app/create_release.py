@@ -285,24 +285,29 @@ class ReleaseBuilder:
         patchnotes = self.project_root / "docs" / f"PATCHNOTES_v{get_version()}.md"
         highlights = []
         profile_highlights = []
-        section = None
+        section = highlights
+        sections = []
         for line in patchnotes.read_text(encoding="utf-8").splitlines():
             if line.startswith("#"):
+                level = len(line) - len(line.lstrip('#'))
                 heading = line.lstrip('#').strip().lower()
-                if heading == "new features & improvements":
-                    section = highlights
-                elif heading.startswith(("hotfixes in v", "included changes from v")):
-                    section = highlights
-                    section.append(line.lstrip('#').strip())
-                elif heading.startswith("voiceattack profile"):
+                while sections and sections[-1][0] >= level:
+                    sections.pop()
+                section = sections[-1][1] if sections else highlights
+                if heading.startswith("voiceattack profile"):
                     section = profile_highlights
-                else:
+                elif heading.startswith("important notes"):
                     section = None
-            elif section is not None and line.startswith("- "):
-                section.append(line)
+                elif section is highlights and heading.startswith(("hotfixes in v", "included changes from v")):
+                    section.append(line.lstrip('#').strip())
+                sections.append((level, section))
+            elif section is not None:
+                item = re.match(r"^\s*(?:[-*+]|\d+[.)])\s+(.+)", line)
+                if item:
+                    section.append("- " + item.group(1))
         release_notice = self.project_root / "docs" / "INSTALLER_RELEASE_NOTES.txt"
         release_notice.write_text(
-            f"What's new in EliteMining v{get_version()}\n\n" + "\n\n".join(highlights) + "\n",
+            f"What's new in EliteMining v{get_version()}\n\n" + "\n".join(highlights) + "\n",
             encoding="utf-8-sig",
         )
 

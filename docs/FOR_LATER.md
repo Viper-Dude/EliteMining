@@ -1,84 +1,48 @@
-# EliteMining - For Later
+# EliteMining - Completed Stability Work
 
-Saved: 17 November 2026
+Updated: 18 November 2026
 
-## Decision
+## Status
 
-Finish testing the journal-reading fix and, if everything works as intended, keep this release focused on stability. Leave the two remaining optimization items for a future release. There is no agreed release date for them.
+All four items are implemented. The user accepted the completed work, reported much faster searches, and reported no issues after testing the settings changes. There is no remaining deferred work in this document. Keep this file as a completion record; its filename is retained for existing references.
 
-Work on one item at a time, with approval before implementation and testing between changes. This document records future work; it does not authorize starting it.
-
-## Where we stopped
-
-| Original item | Status | Plain-English purpose |
+| Original item | Status | Purpose |
 | --- | --- | --- |
-| 1. GUI responsiveness | Implemented; user reported Discord sharing and jumping, scanning, and mining worked | Keep slow online requests from holding up the app. |
-| 2. Journal reading | Implemented; awaiting user confirmation from in-game testing | Prevent missed or repeated events when journal entries arrive in pieces, files change, or files are temporarily locked. |
-| 3. Faster system lookups | Deferred | Help the app find system information more quickly in its local database. |
-| 4. Safer settings saves | Deferred | Better protect saved preferences if a settings write is interrupted. |
+| 1. GUI responsiveness | Completed; user reported Discord sharing and jumping, scanning, and mining worked | Keep slow online requests from holding up the app. |
+| 2. Journal reading | Implemented; included in the user's acceptance of the completed work | Prevent missed or repeated events during partial writes, journal changes, and temporary file locks. |
+| 3. Faster system lookups | Completed; user reported much faster searches | Speed up local system, PowerPlay, and commodity searches. |
+| 4. Safer settings saves | Completed; user reported no issues in live testing | Preserve the previous settings file when a save fails or is interrupted. |
 
-After item 2, 107 relevant automated checks passed, including 34 new journal checks. This was targeted validation, not a claim that every project test passes. Previously identified Statistics UI test failures were outside this work.
+## Implementation and validation
 
-Before considering item 2 fully verified, check normal jumping, prospector launches, scanning, mining, cargo, and session totals. Also leave EliteMining open while restarting the game to check switching to a new journal file.
+### Items 1 and 2 - Responsiveness and journal reading
 
-## Item 3 - Faster system lookups
+- Item 1 changed `app/main.py`, `app/prospector_panel.py`, `app/journal_parser.py`, `app/api_uploader.py`, and `app/eddn_sender.py`. Regression coverage: `scripts/check_network_responsiveness.py` (25 checks).
+- Item 2 changed `app/main.py` and `app/prospector_panel.py`, added `app/journal_reader.py`, and added `scripts/check_journal_reading.py` (34 checks). Coverage includes partial writes, UTF-8, file rotation, locks, overlapping reads, startup history suppression, and catch-up checkpoints.
+- After item 2, 107 relevant checks passed: journal reading (34), network responsiveness (25), Fleet Carrier (17), cargo tracking (8), mining tab (12), VoiceAttack controls (8), and `VisitDataChecks` from `check_visited_systems.py` (3).
+- These are targeted results, not a claim that every project test passes. Previously identified Statistics UI failures were outside this work. The journal-specific game-restart scenario was not separately confirmed in this conversation.
 
-**What it means:** A database index acts like a book's index: it can help find a system without searching through many entries.
+### Item 3 - Faster local lookups
 
-**Why revisit it:** Local system and coordinate lookups may become noticeably slower with a large database. An index that matches the actual search could help; it will not speed up a slow external service.
+- Added `idx_systems_name_nocase` to the shipped `app/data/galaxy_systems.db`. All table records remained unchanged, including all 89,731 systems.
+- Verified 105 coordinate lookup cases, including mixed-case names, unknown systems, and duplicate names, plus four nearby-search/distance comparisons. Integrity checks passed. Median sampled lookup time on the database file improved from 4.11 ms to 0.005 ms.
+- The existing installer replaces `galaxy_systems.db` on upgrades; the release ZIP includes the same file. ZIP updates receive it when extraction overwrites the existing copy. No startup migration was added for this bundled database.
+- Added `idx_commodity_name_lower_updated` and `idx_powerplay_system_nocase` through `EDDNListener._init_database()` in `app/eddn_listener.py`. Missing indexes are created automatically for both existing caches and fresh installations.
+- Seven checks in `scripts/check_marketplace_indexes.py` and 16 existing non-UI marketplace checks passed. Coverage includes upgrades, repeated initialization, unchanged results, incoming writes, and cleanup.
+- On a temporary copy of the existing cache, every record was preserved. Sampled PowerPlay lookups improved from 8.37 ms to 0.03 ms; commodity queries improved from 51.24 ms to 14.55 ms. First-time index creation took about 0.16 seconds. Timings depend on the user's data and machine.
+- Checked both the working and first-install `user_data.db`: the system lookups reviewed already use suitable indexes. Neither user database was changed.
 
-**Evidence and limits:** The coordinate lookup uses `WHERE name = ? COLLATE NOCASE`. Before changing anything, inspect the current database indexes and query plan and measure real lookup times. Do not assume a suitable index is missing or promise a speed increase without checking.
+### Item 4 - Safer settings saves
 
-**Starting points:**
+- Updated `app/config.py` to write complete settings to a unique temporary file in the same directory, flush and sync it, close it, then replace the previous settings file.
+- Settings use a strict mode of the existing text-write helper: failed replacement does not fall back to overwriting the original. Existing VoiceAttack text-write behavior is preserved.
+- Configuration access and saves share a lock; the common key-update helpers hold it across reading and saving. Save snapshots are copied, and failed or throttled changes remain in the cache for a later save or flush.
+- Preserved settings locations, load caching, save throttling, pending-save flushing, and restore behavior.
+- All 36 checks passed: `scripts/check_config_saving.py` (14), `scripts/check_settings.py` (14), and `scripts/check_voiceattack_controls.py` (8).
+- Coverage includes serialization, temporary-file creation, partial writes, flushing, syncing, replacement failures, process exit before replacement, overlapping saves, rapid changes, restart persistence, presets, backup/restore, and VoiceAttack compatibility.
 
-- `app/ring_finder.py`: `_get_system_coords_from_galaxy_db()`.
-- `app/system_finder_api.py`: system-name lookups and related cache queries.
-- The code that creates or updates the affected database, once the exact database and query are confirmed.
+## Handoff
 
-**Possible change:** Add only the index demonstrated to be useful, through the existing database setup/update path. Keep returned results and name matching identical.
+No release build, commit, or push was performed as part of this work. The user handles release builds. Preserve unrelated workspace changes.
 
-**Benefit:** Faster affected local lookups if measurement confirms a bottleneck.
-
-**Risk:** Low to medium. Index creation takes time and disk space and can slow database writes. Check compatibility with existing installations and the packaged database.
-
-**Before calling it done:** Compare timings before and after; verify mixed-case names, unknown systems, coordinates, distances, and search results remain correct.
-
-**Priority:** Medium; revisit when local searches feel slow or measurements justify it.
-
-## Item 4 - Safer settings saves
-
-**What it means:** Write the complete new settings to a temporary file, then replace the previous file after the write succeeds.
-
-**Why revisit it:** `_save_cfg()` currently writes directly to the settings file. An interrupted or failed write could leave it incomplete. This is a verified write pattern and a potential failure risk; no settings loss was reported in this work.
-
-**Starting points:**
-
-- `app/config.py`: `_save_cfg()`, `_load_cfg()`, `flush_config()`, and the callers that update shared settings.
-- `scripts/check_settings.py` and `scripts/check_voiceattack_controls.py`.
-
-**Possible change:** Use a temporary file in the same directory and replace the settings file only after successfully writing it. Review overlapping saves so an older snapshot cannot overwrite newer settings.
-
-**Benefit:** Better protection of preferences during interrupted or failed saves.
-
-**Risk:** Medium. Many features share configuration. Preserve the existing cache, save throttling, pending-save flush, file location, preset behavior, and VoiceAttack compatibility.
-
-**Before calling it done:** Simulate write/replacement failures using temporary files, confirm the previous settings survive, and verify rapid changes, restart persistence, presets, and backup/restore.
-
-**Priority:** Medium; revisit for a future reliability release, or sooner if settings problems are reported.
-
-## How to resume
-
-### Handoff for in-game testing
-
-- Item 1 touched `app/main.py`, `app/prospector_panel.py`, `app/journal_parser.py`, `app/api_uploader.py`, and `app/eddn_sender.py`. Its regression script is `scripts/check_network_responsiveness.py` (25 checks).
-- Item 2 touched `app/main.py` and `app/prospector_panel.py`, added the shared `app/journal_reader.py`, and added `scripts/check_journal_reading.py` (34 checks). It covers partial writes, UTF-8, file rotation, locks, overlapping reads, startup history suppression, and catch-up checkpoints.
-- The 107 passing checks comprised journal reading (34), network responsiveness (25), Fleet Carrier (17), cargo tracking (8), mining tab (12), VoiceAttack controls (8), and `VisitDataChecks` from `check_visited_systems.py` (3). The unrelated Statistics UI tests were excluded from that count.
-- Run the relevant script with `.venv\Scripts\python.exe -B scripts/check_journal_reading.py` or `.venv\Scripts\python.exe -B scripts/check_network_responsiveness.py` from the project root. Tests use isolated fixtures; in-game testing is still needed.
-- No release build, commit, or push was performed for these two fixes. The workspace also contains unrelated earlier changes; preserve them when investigating a problem.
-- If testing reveals an issue, note what happened, what you expected, the approximate time, and whether the game had just restarted or created a new journal. Relevant logs are described in `ARCHITECTURE.md`.
-
-### Returning to deferred work
-
-Ask: "Read docs/FOR_LATER.md and review item 3 [or item 4]. Check whether it is still needed, explain the proposed change simply, and wait for my approval before implementing it."
-
-Re-read the current project instructions and affected code first. Keep changes small, preserve existing features and behavior, and stop after the approved item for testing. Broader cleanup or rewrites are not part of these deferred items.
+For a reported regression, record what happened, what was expected, the approximate time, and whether the game or app had just restarted. Log locations are documented in `ARCHITECTURE.md`.

@@ -3,6 +3,9 @@ import sys
 import json
 import logging
 import time
+import copy
+import tempfile
+import threading
 from typing import Dict, Any, Optional, List
 VA_TTS_ANNOUNCEMENT = "ttsProspectorAnnouncement"
 
@@ -17,6 +20,7 @@ _save_throttle_seconds = 0.5  # Minimum time between saves
 
 # True when _cached_config has changes not yet written to disk (throttled save)
 _cache_dirty = False
+_config_lock = threading.RLock()
 
 # Get the correct config file path based on execution context
 def _get_config_path() -> str:
@@ -57,81 +61,60 @@ log = logging.getLogger("EliteMining.Config")
 
 def _load_cfg() -> Dict[str, Any]:
     global _last_load_time, _cached_config
-    now = time.time()
+    with _config_lock:
+        now = time.time()
 
-    # Only reload if more than 2 seconds have passed
-    if (now - _last_load_time < 2.0 or _cache_dirty) and _cached_config:
-        return _cached_config.copy()
+        # Only reload if more than 2 seconds have passed
+        if _cache_dirty or (now - _last_load_time < 2.0 and _cached_config):
+            return _cached_config.copy()
 
-    _last_load_time = now
-    template_path = CONFIG_FILE + ".template"
-    if not os.path.exists(CONFIG_FILE) and os.path.exists(template_path):
-        try:
-            with open(template_path, "r", encoding="utf-8") as template:
-                defaults = template.read()
-            with open(CONFIG_FILE, "x", encoding="utf-8") as config:
-                config.write(defaults)
-        except FileExistsError:
-            pass
-        except OSError as e:
-            log.warning(f"Failed to create config from template: {e}")
+        _last_load_time = now
+        template_path = CONFIG_FILE + ".template"
+        if not os.path.exists(CONFIG_FILE) and os.path.exists(template_path):
+            try:
+                with open(template_path, "r", encoding="utf-8") as template:
+                    defaults = template.read()
+                with open(CONFIG_FILE, "x", encoding="utf-8") as config:
+                    config.write(defaults)
+            except FileExistsError:
+                pass
+            except OSError as e:
+                log.warning(f"Failed to create config from template: {e}")
 
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                _cached_config = data
-                return data
-        except Exception as e:
-            log.warning(f"Failed to load config from {CONFIG_FILE}: {e}")
-    else:
-        log.warning(f"Config file not found: {CONFIG_FILE}")
-    
-    _cached_config = {}
-    return {}
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    _cached_config = data
+                    return data.copy()
+            except Exception as e:
+                log.warning(f"Failed to load config from {CONFIG_FILE}: {e}")
+        else:
+            log.warning(f"Config file not found: {CONFIG_FILE}")
+
+        _cached_config = {}
+        return {}
 
 def _save_cfg(cfg: Dict[str, Any]) -> None:
     global _cached_config, _last_load_time, _last_save_time, _cache_dirty
+    with _config_lock:
+        try:
+            snapshot = copy.deepcopy(cfg)
+            _cached_config = snapshot
+            _cache_dirty = True
+            now = time.time()
 
-    now = time.time()
+            if now - _last_save_time < _save_throttle_seconds:
+                log.debug(f"Config save throttled (last save {now - _last_save_time:.2f}s ago)")
+                return
 
-    # Throttle saves - if we saved less than 0.5 seconds ago, skip with DEBUG log
-    if now - _last_save_time < _save_throttle_seconds:
-        log.debug(f"Config save throttled (last save {now - _last_save_time:.2f}s ago)")
-        # Update cache anyway so the data isn't lost, and mark it dirty so a
-        # later _load_cfg() doesn't re-read stale data from disk and clobber
-        # this unflushed change before it's actually written out.
-        _cached_config = cfg.copy()
-        _cache_dirty = True
-        return
-
-    try:
-        # Ensure the directory exists
-        config_dir = os.path.dirname(CONFIG_FILE)
-        if not os.path.exists(config_dir):
-            os.makedirs(config_dir, exist_ok=True)
-            log.info(f"Created config directory: {config_dir}")
-        
-        # Use DEBUG level for routine saves to reduce log spam
-        log.debug(f"Config saved (v{cfg.get('config_version', 'MISSING')}): {os.path.basename(CONFIG_FILE)}")
-        
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2)
-        
-        # Update cache and save time
-        _cached_config = cfg.copy()
-        _last_load_time = now
-        _last_save_time = now
-        _cache_dirty = False
-
-        # Only log verification if there's an issue
-        if not os.path.exists(CONFIG_FILE):
-            log.error(f"Config file was not created: {CONFIG_FILE}")
-        elif os.path.getsize(CONFIG_FILE) == 0:
-            log.error(f"Config file is empty: {CONFIG_FILE}")
-            
-    except Exception as e:
-        log.exception("Failed saving config: %s", e)
+            _atomic_write_text(CONFIG_FILE, json.dumps(snapshot, indent=2), allow_fallback=False)
+            _last_load_time = now
+            _last_save_time = now
+            _cache_dirty = False
+            log.debug(f"Config saved (v{snapshot.get('config_version', 'MISSING')}): {os.path.basename(CONFIG_FILE)}")
+        except Exception as e:
+            log.exception("Failed saving config: %s", e)
 
 def flush_config() -> None:
     """Force-write the cached config to disk, bypassing the save throttle.
@@ -140,22 +123,26 @@ def flush_config() -> None:
     throttle window) isn't lost because it only reached the in-memory cache.
     """
     global _last_save_time
-    if _cached_config is not None:
-        _last_save_time = 0
-        _save_cfg(_cached_config)
-        log.info(f"Config flushed to disk on shutdown: {CONFIG_FILE}")
+    with _config_lock:
+        if _cached_config is not None:
+            _last_save_time = 0
+            _save_cfg(_cached_config)
+            if not _cache_dirty:
+                log.info(f"Config flushed to disk on shutdown: {CONFIG_FILE}")
 
 def update_config_value(key: str, value: Any) -> None:
     """Update a single config key without affecting other values"""
-    cfg = _load_cfg()
-    cfg[key] = value
-    _save_cfg(cfg)
+    with _config_lock:
+        cfg = _load_cfg()
+        cfg[key] = value
+        _save_cfg(cfg)
 
 def update_config_values(updates: Dict[str, Any]) -> None:
     """Update multiple config keys without affecting other values"""
-    cfg = _load_cfg()
-    cfg.update(updates)
-    _save_cfg(cfg)
+    with _config_lock:
+        cfg = _load_cfg()
+        cfg.update(updates)
+        _save_cfg(cfg)
 
 def load_saved_va_folder() -> Optional[str]:
     cfg = _load_cfg()
@@ -444,21 +431,40 @@ def save_mineral_analysis_column_widths(widths: Dict[str, int]) -> None:
 
 
 # --- Safe text write (atomic) ---
-def _atomic_write_text(path: str, text: str) -> None:
+def _atomic_write_text(path: str, text: str, *, allow_fallback: bool = True) -> None:
+    tmp_path = None
     try:
         folder = os.path.dirname(path) or "."
         os.makedirs(folder, exist_ok=True)
-        tmp_path = path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        if allow_fallback:
+            tmp_path = path + ".tmp"
+            stream = open(tmp_path, "w", encoding="utf-8")
+        else:
+            stream = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=folder,
+                                                 prefix=os.path.basename(path) + ".", suffix=".tmp",
+                                                 delete=False)
+            tmp_path = stream.name
+        with stream as f:
             f.write(text)
+            if not allow_fallback:
+                f.flush()
+                os.fsync(f.fileno())
         os.replace(tmp_path, path)
     except Exception as e:
+        if not allow_fallback:
+            raise
         try:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
         except Exception:
             pass
         log.exception("Atomic write failed for %s: %s", path, e)
+    finally:
+        if not allow_fallback and tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                log.warning("Could not remove temporary config file: %s", tmp_path)
 
 
 # --- Config Migration System ---

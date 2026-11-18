@@ -1,18 +1,23 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 **Release Date:** 2026-November-17
 
-## New Features & Improvements
-- General code optimization.
-- Added a new Database tab in Statistics tab with an overview of mining locations and your activity
-- Added alternating row shading to tables and reduced empty space in Statistics.
-- Statistics now shows your top 20 best locations and last 20 mining locations instead of 10.
-- Updated the user guide at github and added more direct help links in the app.
-- Fixed mining reports sometimes losing the original system and ring type starting the game inside a ring.
+## New Features
+- Added a new **Database** tab inside the Statistics view with an overview of mining locations and your activity.
 - Mining TXT reports now include the ring type when known.
+- Added more direct help links throughout the app and updated the user guide on GitHub.
+
+## Improvements
+- Faster system and commodity searches.
+- Expanded Statistics lists to show your top 20 best locations and last 20 mining locations (up from 10).
+- Added alternating row shading to tables and reduced empty space in Statistics.
+- General code optimization.
+
+## Bug Fixes
+- Fixed an issue where mining reports could lose the original system and ring type when starting the game inside a ring.
 
 
-### Voiceattack Profile update (v5.6.5)
-- Improved mining sequence reliability, including scanner controls, scoop cancellation, and prospector targeting.
+## Voiceattack Profile update (v5.6.5)
+- General stability and logic improvements.
 
 ### Important Notes 
 
