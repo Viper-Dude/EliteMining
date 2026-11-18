@@ -14,6 +14,7 @@ import os
 import glob
 import threading
 import requests
+from service_status import tracked_request
 import time
 import zlib
 import datetime
@@ -501,13 +502,11 @@ class RingFinder(ColumnVisibilityMixin):
                                             font=scaled_font(8), fg="#888888", bg=_sh_bg)
         if _sh_theme not in ("modern", "modern_slate", "modern_orange"):
             self.spansh_status_label.pack(side="right", padx=(0, 15))
-        ToolTip(self.spansh_status_label, "Spansh API status - checks connectivity to spansh.co.uk")
 
         self.eddn_status_label = tk.Label(search_header, text="⚫ EDDN: checking...",
                                           font=scaled_font(8), fg="#888888", bg=_sh_bg)
         if _sh_theme not in ("modern", "modern_slate", "modern_orange"):
             self.eddn_status_label.pack(side="right", padx=(0, 10))
-        ToolTip(self.eddn_status_label, "EDDN status - live data feed for PowerPlay and market data")
         
         # Distance info (below title on separate line) - label in white, values in yellow
         distance_header = ttk.Frame(self.scrollable_frame)
@@ -3555,7 +3554,7 @@ class RingFinder(ColumnVisibilityMixin):
                 
                 self._last_spansh_call = time.time()
                 
-                response = requests.post(
+                response = tracked_request('spansh', requests.post,
                     'https://spansh.co.uk/api/bodies/search',
                     json=payload,
                     headers=headers,
@@ -3799,7 +3798,7 @@ class RingFinder(ColumnVisibilityMixin):
             
             print(f"[SPANSH] Searching for {ring_type} rings within {max_distance}ly of {reference_system}")
             
-            response = requests.post(
+            response = tracked_request('spansh', requests.post,
                 'https://spansh.co.uk/api/bodies/search',
                 json=payload,
                 headers=headers,
@@ -9839,7 +9838,7 @@ class RingFinder(ColumnVisibilityMixin):
                 "size": 50
             }
             
-            response = requests.post(
+            response = tracked_request('spansh', requests.post,
                 'https://spansh.co.uk/api/bodies/search',
                 json=payload,
                 headers={'Content-Type': 'application/json'},

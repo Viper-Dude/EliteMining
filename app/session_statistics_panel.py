@@ -449,9 +449,9 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                     group['res_' + tag].add(key)
         total_mined = len(rings & mined)
         app = self.owner.main_app
-        visited_label = getattr(app, 'total_systems_label_value', None)
-        visited_systems = visited_label.cget('text') if visited_label is not None else ''
-        visited_systems = f'{int(visited_systems):,}' if str(visited_systems).isdigit() else '—'
+        parser = getattr(getattr(app, 'cargo_monitor', None), 'journal_parser', None)
+        visited_systems = parser.get_systems_visited() if parser is not None else None
+        visited_systems = f'{visited_systems:,}' if visited_systems is not None else '—'
         self.database_summary.configure(text=t('statistics_expanded.database_totals').format(
             visited=visited_systems,
             systems=len(systems), rings=len(rings), hotspots=hotspots, overlaps=overlaps,

@@ -1,5 +1,6 @@
 """Multi-Mineral sub-tab of Commodity Market: find the best stations to sell several minerals at once."""
 from ui.striped_treeview import StripedTreeview
+from ui.theme import modern_color
 import threading
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
@@ -35,17 +36,10 @@ class MultiMineralTab:
         search_header = ttk.Frame(container)
         search_header.pack(fill="x")
         ttk.Label(search_header, text=t('marketplace.multi_title'), style="TLabelframe.Label").pack(side="left")
-        self.status_label = tk.Label(search_header, text='', bg=bg, fg="gray",
-                                     font=app._scaled_font(8))
-        self.status_label.pack(side="right", padx=(0, 5))
-        market_status = app.market_mining_status_label
-        self.market_status_label = tk.Label(search_header, text=market_status.cget('text'),
-                                            fg=market_status.cget('fg'), bg=bg,
-                                            font=app._scaled_font(8))
-        self.market_status_label.pack(side="right", padx=(0, 15))
-        from ui.tooltip import ToolTip
-        ToolTip(self.market_status_label, t('tooltips.market_api_status'))
-
+        if theme not in ("modern", "modern_slate", "modern_orange"):
+            self.status_label = tk.Label(search_header, text='', bg=bg, fg="gray",
+                                         font=app._scaled_font(8))
+            self.status_label.pack(side="right", padx=(0, 5))
         box = ttk.LabelFrame(container, padding=10)
         box.pack(fill="x", pady=(0, 10))
 
@@ -115,6 +109,10 @@ class MultiMineralTab:
         ttk.Label(results_header, text=t('marketplace.search_results'),
                   font=app._scaled_font(10, "bold")).pack(side="left")
         app._cv_add_columns_button(results_header, 'multiple_prices')
+        if theme in ("modern", "modern_slate", "modern_orange"):
+            self.status_label = ttk.Label(results_header, text='', anchor="w",
+                font=app._scaled_font(9, "bold"), foreground=modern_color("#E6EAF0"))
+            self.status_label.pack(side="left", fill="x", expand=True, padx=(10, 0))
         table = ttk.Frame(container, relief="solid", borderwidth=1)
         table.pack(fill="both", expand=True, pady=(5, 0))
         cols = ("location", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")

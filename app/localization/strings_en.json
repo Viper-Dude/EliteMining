@@ -350,6 +350,7 @@
     "no_item_details": "No item details"
   },
   "status_bar": {
+    "market_api": "Market API",
     "cmdr": "CMDR:",
     "current_system": "| Current Syst:",
     "visits": "| Visits:",

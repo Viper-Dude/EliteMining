@@ -346,6 +346,7 @@
     "no_item_details": "Keine Artikeldetails"
   },
   "status_bar": {
+    "market_api": "Markt-API",
     "cmdr": "CMDR:",
     "current_system": "| Akt. Syst:",
     "visits": "| Besuche:",

@@ -5047,6 +5047,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         MarketplaceAPI.EDDN_CACHE_PATH = eddn_cache_path
         from system_finder_api import SystemFinderAPI
         SystemFinderAPI.EDDN_CACHE_PATH = eddn_cache_path
+        import service_status
+        service_status.status_callback = self._queue_search_service_status
 
         # Wire the EDDN cache path into the live journal parser so every FSDJump the player
         # makes is also written directly to system_powerplay (no EDDN round-trip needed).
@@ -5440,9 +5442,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.visits_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"), cursor="hand2")
         self.route_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=_info_lbl_font)
         self.route_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
-        self.total_systems_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=_info_lbl_font)
-        self.total_systems_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
-        
         # Make visits clickable to edit
         self.visits_label_value.bind("<Button-1>", lambda e: self._show_edit_visits_dialog_for_current_system())
         self.visits_label_prefix.bind("<Button-1>", lambda e: self._show_edit_visits_dialog_for_current_system())
@@ -5459,24 +5458,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.visits_label_value.grid(row=0, column=6, sticky="w")
         self.route_label_prefix.grid(row=0, column=7, sticky="e")
         self.route_label_value.grid(row=0, column=8, sticky="w")
-        self.total_systems_label_prefix.grid(row=0, column=9, sticky="e")
-        self.total_systems_label_value.grid(row=0, column=10, sticky="w")
-        
-        # Help indicator for Tot Syst (updates on game restart)
-        self.total_systems_help = tk.Label(info_frame, text="(?)", fg="gray", bg=_info_bg, font=self._scaled_font(9))
-        self.total_systems_help.grid(row=0, column=11, sticky="w")
-        ToolTip(self.total_systems_help, t('status_bar.total_systems_tooltip'))
-
-        # Modern theme: live EDDN/Spansh indicators live here once (tab headers hide theirs)
+        _ind_frame = tk.Frame(actions, bg=_info_bg)
+        _ind_frame.grid(row=0, column=1, sticky="e", padx=(0, 12))
         if _info_theme in ("modern", "modern_slate", "modern_orange"):
-            _ind_frame = tk.Frame(actions, bg=_info_bg)
-            _ind_frame.grid(row=0, column=1, sticky="e", padx=(0, 12))
             self._footer_eddn_label = tk.Label(_ind_frame, text="\u26ab EDDN: checking...", fg="#888888",
                                                bg=_info_bg, font=self._scaled_font(8))
             self._footer_eddn_label.pack(side="left", padx=(0, 14))
             self._footer_spansh_label = tk.Label(_ind_frame, text="\u26ab Spansh: checking...", fg="#888888",
                                                  bg=_info_bg, font=self._scaled_font(8))
             self._footer_spansh_label.pack(side="left")
+        self._footer_market_label = tk.Label(_ind_frame,
+            text=t('system_finder.service_checking').format(service=t('status_bar.market_api')),
+            fg="#888888", bg=_info_bg, font=self._scaled_font(8))
+        self._footer_market_label.pack(side="left", padx=(14, 0) if _info_theme in ("modern", "modern_slate", "modern_orange") else 0)
         
         # Load CMDR name in background
         self.after(500, self._update_cmdr_system_display)
@@ -10903,20 +10897,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.route_label_prefix.config(text=t('status_bar.systems_in_route') + " ")
             self.route_label_value.config(text=str(jumps_remaining))
             
-            # Get total systems visited from journal Statistics event (game's official count)
-            # Note: This updates when docking, quitting, or periodically - not after every jump
-            total_systems = 0
-            if hasattr(self, 'prospector_panel') and self.prospector_panel.journal_dir:
-                try:
-                    from journal_parser import JournalParser
-                    parser = JournalParser(self.prospector_panel.journal_dir)
-                    total_systems = parser.get_systems_visited() or 0
-                except:
-                    pass
-            
-            self.total_systems_label_prefix.config(text=t('status_bar.total_systems') + " ")
-            self.total_systems_label_value.config(text=str(total_systems))
-            
         except Exception as e:
             print(f"Error updating CMDR/system display: {e}")
 
@@ -12640,6 +12620,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             self.edsm_status_label.config(text=t('distance_calculator.edsm_offline'), fg="#ff4444")
     
+    def _queue_search_service_status(self, service: str, status: str):
+        def update():
+            if service == 'market':
+                self._update_market_api_status(status)
+            elif service == 'spansh':
+                self.ring_finder._update_spansh_status(status)
+        try:
+            self.after(0, update)
+        except (RuntimeError, tk.TclError):
+            pass
+
     def _check_market_api_status(self):
         """Check market API status in background and update indicator"""
         def _background_check():
@@ -12668,26 +12659,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(300000, self._check_market_api_status)
     
     def _update_market_api_status(self, status: str):
-        """Update market API status labels - called on UI thread"""
-        if status == "online":
-            status_text = "🟢 Market API"
-            trade_text  = "🟢 Market API"
-            status_color = "#00ff00"
-        else:
-            status_text = "🔴 Market API"
-            trade_text  = "🔴 Market API"
-            status_color = "#ff4444"
-        
-        # Update both commodity tab status labels
-        if hasattr(self, 'market_mining_status_label'):
-            self.market_mining_status_label.config(text=status_text, fg=status_color)
-        if hasattr(self, 'market_trade_status_label'):
-            self.market_trade_status_label.config(text=trade_text, fg=status_color)
-        if hasattr(self, 'multi_mineral_tab'):
-            self.multi_mineral_tab.market_status_label.config(text=status_text, fg=status_color)
-        if hasattr(self, 'cargo_sell_planner'):
-            self.cargo_sell_planner.market_status_label.config(text=status_text, fg=status_color)
-    
+        key = 'system_finder.service_online' if status == 'online' else 'system_finder.service_offline'
+        status_text = t(key).format(service=t('status_bar.market_api'))
+        status_color = "#00ff00" if status == 'online' else "#ff4444"
+        self._update_footer_indicator('market', status_text, status_color)
+
     # ==================== END DISTANCE CALCULATOR ====================
 
     def _load_selected_preset(self) -> None:
@@ -14731,7 +14707,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             log.exception("Modern recolor failed")
 
     def _update_footer_indicator(self, kind: str, text: str, color: str) -> None:
-        """Mirror a connection status into the Modern footer (no-op in other themes)."""
+        """Update a service status in the footer."""
         label = getattr(self, '_footer_' + kind + '_label', None)
         if label is not None:
             label.config(text=text, fg={'#00ff00': '#4FB87A', '#ff4444': '#C06060'}.get(color, color))
@@ -16868,16 +16844,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row0_frame = tk.Frame(search_frame, bg=_mkt_cb_bg)
         row0_frame.pack(fill="x", pady=(0, 10))
 
-        # Status label (packed right FIRST so it claims far-right space)
-        self.marketplace_total_label = tk.Label(search_header, text='',
-                                               bg=_mkt_cb_bg, fg="gray", font=self._scaled_font(8))
-        self.marketplace_total_label.pack(side="right", padx=(0, 5))
-
-        # Market API status indicator, just left of the status text
-        self.market_mining_status_label = tk.Label(search_header, text="⚫ Market API",
-                                          font=self._scaled_font(8), fg="#888888", bg=_mkt_cb_bg)
-        self.market_mining_status_label.pack(side="right", padx=(0, 15))
-        ToolTip(self.market_mining_status_label, t('tooltips.market_api_status'))
+        if _mkt_cb_theme not in ("modern", "modern_slate", "modern_orange"):
+            self.marketplace_total_label = tk.Label(search_header, text='',
+                                                   bg=_mkt_cb_bg, fg="gray", font=self._scaled_font(8))
+            self.marketplace_total_label.pack(side="right", padx=(0, 5))
 
         # Start market API status check
         self.after(1000, self._check_market_api_status)
@@ -17101,11 +17071,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         results_info = ttk.Label(results_header, text="\u24d8", foreground=modern_color("#8A94A3"),
                                  cursor="hand2", font=self._scaled_font(10))
         results_info.pack(side="left", padx=(6, 2))
-        ToolTip(results_info, t('marketplace.right_click_options'))
-
-        tk.Label(results_header, text="  •  " + t('marketplace.fc_docking_note'),
-                bg=_mkt_cb_bg, fg="#888888",
-                font=self._scaled_font(8)).pack(side="left")
+        if _mkt_cb_theme in ("modern", "modern_slate", "modern_orange"):
+            ToolTip(results_info, t('marketplace.right_click_options') + "\n\n" + t('marketplace.fc_docking_note'))
+        else:
+            ToolTip(results_info, t('marketplace.right_click_options'))
+            tk.Label(results_header, text="  •  " + t('marketplace.fc_docking_note'),
+                    bg=_mkt_cb_bg, fg="#888888",
+                    font=self._scaled_font(8)).pack(side="left")
         
         self._cv_add_columns_button(results_header, 'mining_commodities')
 
@@ -17117,6 +17089,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.marketplace_best_label = tk.Label(results_header, text="",
                                                bg=_mkt_cb_bg, fg=_avg_fg, font=self._scaled_font(8, "bold"))
         self.marketplace_best_label.pack(side="right", padx=(0, 10))
+
+        if _mkt_cb_theme in ("modern", "modern_slate", "modern_orange"):
+            self.marketplace_total_label = ttk.Label(results_header, text='', anchor="w",
+                font=self._scaled_font(9, "bold"), foreground=modern_color("#E6EAF0"))
+            self.marketplace_total_label.pack(side="left", fill="x", expand=True, padx=(10, 0))
 
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
@@ -17171,16 +17148,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row0_frame = tk.Frame(search_frame, bg=_trade_cb_bg)
         row0_frame.pack(fill="x", pady=(0, 10))
 
-        # Status label (packed right FIRST so it claims far-right space)
-        self.trade_total_label = tk.Label(search_header, text='',
-                                          bg=_trade_cb_bg, fg="gray", font=self._scaled_font(8))
-        self.trade_total_label.pack(side="right", padx=(0, 5))
-
-        # Market API status indicator, just left of the status text
-        self.market_trade_status_label = tk.Label(search_header, text="⚫ Market API",
-                                          font=self._scaled_font(8), fg="#888888", bg=_trade_cb_bg)
-        self.market_trade_status_label.pack(side="right", padx=(0, 15))
-        ToolTip(self.market_trade_status_label, t('tooltips.market_api_trade_status'))
+        if _trade_cb_theme not in ("modern", "modern_slate", "modern_orange"):
+            self.trade_total_label = tk.Label(search_header, text='',
+                                              bg=_trade_cb_bg, fg="gray", font=self._scaled_font(8))
+            self.trade_total_label.pack(side="right", padx=(0, 5))
 
         rb1 = tk.Radiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.trade_search_mode,
                       value="near_system", bg=_trade_cb_bg, fg="#ffffff", selectcolor=_trade_cb_select,
@@ -17381,11 +17352,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         results_info = ttk.Label(results_header, text="\u24d8", foreground=modern_color("#8A94A3"),
                                  cursor="hand2", font=self._scaled_font(10))
         results_info.pack(side="left", padx=(6, 2))
-        ToolTip(results_info, t('marketplace.right_click_options'))
-
-        tk.Label(results_header, text="  •  " + t('marketplace.fc_docking_note'),
-                bg=_trade_cb_bg, fg="#888888",
-                font=self._scaled_font(8)).pack(side="left")
+        if _trade_cb_theme in ("modern", "modern_slate", "modern_orange"):
+            ToolTip(results_info, t('marketplace.right_click_options') + "\n\n" + t('marketplace.fc_docking_note'))
+        else:
+            ToolTip(results_info, t('marketplace.right_click_options'))
+            tk.Label(results_header, text="  •  " + t('marketplace.fc_docking_note'),
+                    bg=_trade_cb_bg, fg="#888888",
+                    font=self._scaled_font(8)).pack(side="left")
         
         self._cv_add_columns_button(results_header, 'trade_commodities')
 
@@ -17397,6 +17370,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.trade_best_label = tk.Label(results_header, text="",
                                          bg=_trade_cb_bg, fg=_avg_fg, font=self._scaled_font(8, "bold"))
         self.trade_best_label.pack(side="right", padx=(0, 10))
+
+        if _trade_cb_theme in ("modern", "modern_slate", "modern_orange"):
+            self.trade_total_label = ttk.Label(results_header, text='', anchor="w",
+                font=self._scaled_font(9, "bold"), foreground=modern_color("#E6EAF0"))
+            self.trade_total_label.pack(side="left", fill="x", expand=True, padx=(10, 0))
 
         results_frame = tk.Frame(main_container, bg="#2d2d2d", relief="sunken", bd=1)
         results_frame.pack(fill="both", expand=True, pady=(5, 0))
@@ -17466,7 +17444,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Search section
         search_frame = ttk.LabelFrame(main_container, padding=10)
-        search_frame.pack(fill="x", pady=(0, 10))
+        search_frame.pack(fill="x", pady=(0, 0) if sf_theme in ("modern", "modern_slate", "modern_orange") else (0, 10))
         from ui.help_link import create_labelframe_title, create_help_link
         search_frame.configure(labelwidget=create_labelframe_title(
             search_frame, t('system_finder.title'), "star-systems", t('system_finder.help_tooltip'), ToolTip))
@@ -17523,7 +17501,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         )
         if self.current_theme not in ("modern", "modern_slate", "modern_orange"):
             self.sysfinder_spansh_status_label.pack(side="right", padx=(0, 8))
-        ToolTip(self.sysfinder_spansh_status_label, t('system_finder.spansh_status_tooltip'))
 
         # EDDN status indicator - to the left of Spansh
         self.sysfinder_eddn_status_label = tk.Label(
@@ -17533,7 +17510,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         )
         if self.current_theme not in ("modern", "modern_slate", "modern_orange"):
             self.sysfinder_eddn_status_label.pack(side="right", padx=(0, 4))
-        ToolTip(self.sysfinder_eddn_status_label, t('system_finder.eddn_status_tooltip'))
         
         # Row 1: Allegiance and Population
         row = 1
@@ -17720,16 +17696,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
                           bg=sf_bg, fg="#ffcc00").pack(side="left", padx=(4, 0))
 
 
-        # Row 6: Separator
-        ttk.Separator(search_frame, orient='horizontal').grid(
-            row=6, column=0, columnspan=4, sticky="ew", pady=(8, 4))
-
-        # Row 6: Material Trader search
-        ttk.Label(search_frame, text=t('system_finder.material_trader') + ':').grid(
-            row=7, column=0, sticky="e", padx=(0, 5), pady=3)
-
-        trader_ctrl_frame = ttk.Frame(search_frame)
-        trader_ctrl_frame.grid(row=7, column=1, columnspan=3, sticky="w", padx=5, pady=3)
+        if sf_theme in ("modern", "modern_slate", "modern_orange"):
+            trader_ctrl_frame = ttk.Frame(row0_mypower)
+            trader_ctrl_frame.pack(side="left", padx=(self._scaled_px(24), 0))
+            ttk.Label(trader_ctrl_frame, text=t('system_finder.material_trader') + ':').pack(side="left", padx=(0, 5))
+        else:
+            ttk.Separator(search_frame, orient='horizontal').grid(
+                row=6, column=0, columnspan=4, sticky="ew", pady=(8, 4))
+            ttk.Label(search_frame, text=t('system_finder.material_trader') + ':').grid(
+                row=7, column=0, sticky="e", padx=(0, 5), pady=3)
+            trader_ctrl_frame = ttk.Frame(search_frame)
+            trader_ctrl_frame.grid(row=7, column=1, columnspan=3, sticky="w", padx=5, pady=3)
 
         self.sysfinder_trader_type = tk.StringVar(value=self._sysfinder_option_label("Encoded"))
         trader_combo = ttk.Combobox(
@@ -17755,7 +17732,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Results section
         results_frame = ttk.LabelFrame(main_container, padding=(5, 8, 5, 5))
-        results_frame.pack(fill="both", expand=True, pady=(5, 0))
+        results_frame.pack(fill="both", expand=True, pady=(self._scaled_px(4), 0) if sf_theme in ("modern", "modern_slate", "modern_orange") else (5, 0))
         self.sysfinder_results_frame = results_frame
 
         # Title row: "Systems" + help text + status/count, used as the LabelFrame's title
@@ -17766,13 +17743,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                  cursor="hand2", font=self._scaled_font(10))
         systems_info.pack(side="left", padx=(6, 2))
         ToolTip(systems_info, t('ring_finder.right_click_help'))
-        self.sysfinder_status_label = ttk.Label(title_row, text="", font=self._scaled_font(8))
-        self.sysfinder_status_label.pack(side="left", padx=(10, 0))
+        if sf_theme not in ("modern", "modern_slate", "modern_orange"):
+            self.sysfinder_status_label = ttk.Label(title_row, text="", font=self._scaled_font(8))
+            self.sysfinder_status_label.pack(side="left", padx=(10, 0))
         title_row.pack(fill="x", pady=(0, 4))
         self._sysfinder_columns_buttons = {
             key: self._cv_add_columns_button(title_row, key)
             for key in ('system_finder', 'system_finder_traders')
         }
+        if sf_theme in ("modern", "modern_slate", "modern_orange"):
+            self.sysfinder_status_label = ttk.Label(title_row, text="", anchor="w",
+                font=self._scaled_font(9, "bold"), foreground=modern_color("#E6EAF0"))
+            self.sysfinder_status_label.pack(side="left", fill="x", expand=True, padx=(10, 0))
         
         # Store theme colors for context menu (before creating it)
         self._sysfinder_menu_bg = sf_menu_bg

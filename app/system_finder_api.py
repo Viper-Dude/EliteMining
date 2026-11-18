@@ -3,6 +3,7 @@ System Finder API - Spansh API integration for system searches
 Provides nearby system lookup with full server-side filtering (security, allegiance, state, etc.)
 """
 import requests
+from service_status import tracked_request
 import logging
 import sqlite3
 import re
@@ -155,7 +156,7 @@ class SystemFinderAPI:
 
         try:
             _t0 = time.time()
-            response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.ENRICHMENT_TIMEOUT)
+            response = tracked_request('spansh', requests.post, cls.SPANSH_URL, json=payload, timeout=cls.ENRICHMENT_TIMEOUT)
             log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment: request took {time.time() - _t0:.1f}s")
             response.raise_for_status()
             data = response.json()
@@ -275,7 +276,7 @@ class SystemFinderAPI:
                     'sort': [{'distance': {'direction': 'asc'}}],
                 }
                 log.debug(f"[SYSTEM_FINDER] Spansh call {i+1}/{len(truncated)}: POST {cls.SPANSH_URL} {payload}")
-                response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
+                response = tracked_request('spansh', requests.post, cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
                 response.raise_for_status()
                 results = response.json().get('results', [])
                 if not results:
@@ -469,7 +470,7 @@ class SystemFinderAPI:
             if progress_callback:
                 progress_callback(20, 100, t('system_finder.searching'))
             
-            response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
+            response = tracked_request('spansh', requests.post, cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
             response.raise_for_status()
             data = response.json()
             
@@ -751,7 +752,7 @@ class SystemFinderAPI:
             if progress_callback:
                 progress_callback(20, 100, t('system_finder.searching_traders'))
 
-            response = requests.post(cls.SPANSH_STATIONS_URL, json=payload, timeout=cls.TIMEOUT)
+            response = tracked_request('spansh', requests.post, cls.SPANSH_STATIONS_URL, json=payload, timeout=cls.TIMEOUT)
             response.raise_for_status()
             data = response.json()
 
@@ -820,7 +821,7 @@ class SystemFinderAPI:
                 'sort': [{'distance': {'direction': 'asc'}}]
             }
             
-            response = requests.post(cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
+            response = tracked_request('spansh', requests.post, cls.SPANSH_URL, json=payload, timeout=cls.TIMEOUT)
             response.raise_for_status()
             data = response.json()
             

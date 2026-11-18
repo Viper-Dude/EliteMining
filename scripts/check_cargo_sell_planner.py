@@ -119,7 +119,6 @@ class CargoSellPlannerTests(unittest.TestCase):
         try:
             root.marketplace_large_pad_only = tk.BooleanVar(root, False)
             root.marketplace_max_age = tk.StringVar(root, '2 days')
-            root.market_mining_status_label = tk.Label(root, text='Market API', fg='gray', bg='#1e1e1e')
             root._age_map = {'2 days': '2 days'}
             root._age_rev_map = {'2 days': '2 days'}
             root._age_order = ['2 days']

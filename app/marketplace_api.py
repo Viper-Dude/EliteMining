@@ -5,6 +5,7 @@ All sources are queried in parallel. Results are merged by marketId, keeping the
 record with the newer updatedAt timestamp so the freshest price always wins.
 """
 import requests
+from service_status import tracked_request
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional
 
@@ -172,7 +173,7 @@ class MarketplaceAPI:
                     }
                     if reference_system and max_distance:
                         body["reference_system"] = reference_system
-                    resp = requests.post(
+                    resp = tracked_request('spansh', requests.post,
                         f"{MarketplaceAPI.SPANSH_URL}/api/stations/search",
                         json=body, timeout=15)
                     resp.raise_for_status()
@@ -341,7 +342,7 @@ class MarketplaceAPI:
                         "size": 100,
                         "page": page_num,
                     }
-                    resp = requests.post(
+                    resp = tracked_request('spansh', requests.post,
                         f"{MarketplaceAPI.SPANSH_URL}/api/stations/search",
                         json=body, timeout=15)
                     resp.raise_for_status()
@@ -719,7 +720,7 @@ class MarketplaceAPI:
                         "size": 100,
                         "page": page_num,
                     }
-                    resp = requests.post(
+                    resp = tracked_request('spansh', requests.post,
                         f"{MarketplaceAPI.SPANSH_URL}/api/stations/search",
                         json=body, timeout=15)
                     resp.raise_for_status()
@@ -859,7 +860,7 @@ class MarketplaceAPI:
             return []
         try:
             url = f"{MarketplaceAPI.ARDENT_URL}{path}"
-            r = requests.get(url, params=params, timeout=timeout)
+            r = tracked_request('market', requests.get, url, params=params, timeout=timeout)
             r.raise_for_status()
             data = r.json()
             if isinstance(data, list):

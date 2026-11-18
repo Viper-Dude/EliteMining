@@ -10007,6 +10007,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
     def _create_bookmarks_panel(self, parent: ttk.Widget) -> None:
         """Create the bookmarks panel interface"""
+        from config import load_theme
+        _bm_theme = load_theme()
+        _bm_modern = _bm_theme in ("modern", "modern_slate", "modern_orange")
+        table_row = 3 if _bm_modern else 2
         # Create main frame with proper grid configuration
         parent.columnconfigure(0, weight=1)
         parent.rowconfigure(0, weight=1)
@@ -10016,9 +10020,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(0, weight=0)  # Title row
         main_frame.rowconfigure(1, weight=0)  # Filter frame
-        main_frame.rowconfigure(2, weight=1)  # Treeview
-        main_frame.rowconfigure(3, weight=0)  # Horizontal scrollbar
-        main_frame.rowconfigure(4, weight=0)  # Buttons
+        main_frame.rowconfigure(table_row, weight=1)  # Treeview
+        main_frame.rowconfigure(table_row + 1, weight=0)  # Horizontal scrollbar
+        main_frame.rowconfigure(table_row + 2, weight=0)  # Buttons
 
         # Title row with help link
         title_row = ttk.Frame(main_frame)
@@ -10029,7 +10033,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Filter frame
         filter_frame = ttk.Frame(main_frame)
-        filter_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 24))
+        filter_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4) if _bm_modern else (0, 24))
         
         ttk.Label(filter_frame, text=t('bookmarks.filter')).pack(side="left", padx=(0, 5))
         
@@ -10086,14 +10090,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         search_entry.bind("<KeyRelease>", self._on_bookmark_search_changed)
         search_entry.bind("<FocusOut>", lambda e: e.widget.selection_clear())
         
-        self._cv_add_columns_button(filter_frame, 'bookmarks')
+        columns_parent = filter_frame
+        if _bm_modern:
+            columns_parent = ttk.Frame(main_frame)
+            columns_parent.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+        self._cv_add_columns_button(columns_parent, 'bookmarks')
 
         self.ToolTip(filter_combo, t('tooltips.bookmark_filter'))
         self.ToolTip(search_entry, t('tooltips.bookmark_search'))
 
         # Configure Bookmarks Treeview style (theme-aware)
-        from config import load_theme
-        _bm_theme = load_theme()
         style = ttk.Style()
         
         if _bm_theme == "elite_orange":
@@ -10142,7 +10148,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Create wrapper frame for bordered table
         tree_frame_bookmarks = ttk.Frame(main_frame, relief="solid", borderwidth=1)
-        tree_frame_bookmarks.grid(row=2, column=0, sticky="nsew")
+        tree_frame_bookmarks.grid(row=table_row, column=0, sticky="nsew")
         tree_frame_bookmarks.grid_columnconfigure(0, weight=1)
         tree_frame_bookmarks.grid_rowconfigure(0, weight=1)
 
@@ -10256,7 +10262,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Add horizontal scrollbar
         h_scrollbar = ttk.Scrollbar(main_frame, orient="horizontal", command=self.bookmarks_tree.xview)
-        h_scrollbar.grid(row=3, column=0, sticky="ew")
+        h_scrollbar.grid(row=table_row + 1, column=0, sticky="ew")
         self.bookmarks_tree.configure(xscrollcommand=h_scrollbar.set)
 
         # Add sorting functionality — persist sort state so refreshes re-apply it
@@ -10269,7 +10275,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         # Buttons frame
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=(8, 0), sticky="ew")
+        button_frame.grid(row=table_row + 2, column=0, columnspan=2, pady=(8, 0), sticky="ew")
         
         # Add Bookmark button
         add_btn = tk.Button(button_frame, text=t('bookmarks.add_bookmark'), 

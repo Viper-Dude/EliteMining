@@ -1,5 +1,6 @@
 """Whole-hold sale plans using reported market prices and demand."""
 from ui.striped_treeview import StripedTreeview
+from ui.theme import modern_color
 import math
 import threading
 import tkinter as tk
@@ -12,7 +13,7 @@ from tkinter import ttk
 from localization import t
 from ui.search_control import SearchControl
 from marketplace_api import MarketplaceAPI
-from config import _load_cfg, update_config_value
+from config import _load_cfg, update_config_value, load_theme
 from ui.tooltip import ToolTip, add_header_tooltips
 from column_visibility_helper import ColumnVisibilityMixin
 from core.constants import get_menu_colors
@@ -144,12 +145,6 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         create_help_link(heading, 'sell-my-hold', t('common.help_tooltip'), ToolTip).pack(side='left', padx=(6, 0))
         reference = ttk.Frame(controls)
         reference.pack(fill='x', pady=(8, 0))
-        market_status = app.market_mining_status_label
-        self.market_status_label = tk.Label(reference, text=market_status.cget('text'),
-                                            fg=market_status.cget('fg'), bg=market_status.cget('bg'),
-                                            font=app._scaled_font(8))
-        self.market_status_label.pack(side='right', padx=(0, 15))
-        ToolTip(self.market_status_label, t('tooltips.market_api_status'))
         ttk.Label(reference, text=t('marketplace.ref_system')).pack(side='left', padx=(0, 6))
         self.system_var = tk.StringVar(value=self.preferences.get('system', app.get_current_system() or ''))
         self.system_entry = ttk.Entry(reference, textvariable=self.system_var, width=30)
@@ -181,7 +176,8 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             combo.bind('<FocusOut>', lambda event: event.widget.selection_clear(), add='+')
         self.button = create_action_button(filters, primary=True, text=t('marketplace.search'), command=self.search)
         self.button.pack(side='left', padx=8)
-        self.status = ttk.Label(controls, wraplength=1000)
+        if load_theme() not in ("modern", "modern_slate", "modern_orange"):
+            self.status = ttk.Label(controls, wraplength=1000)
         self.summary = ttk.Label(controls, wraplength=1000)
         ttk.Label(frame, text=t('sell_hold.notice'), wraplength=1000).pack(side='bottom', anchor='w', padx=10, pady=6)
         self.tables_paned = ttk.PanedWindow(frame, orient=tk.VERTICAL)
@@ -230,7 +226,16 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         title_key = 'sale_options' if columns[0] == 'plan' else 'details'
         ttk.Label(header, text=t('sell_hold.' + title_key),
                   font=self.app._scaled_font(10, 'bold')).pack(side='left')
+        if columns[0] == 'plan' and load_theme() in ("modern", "modern_slate", "modern_orange"):
+            info = ttk.Label(header, text="\u24d8", foreground=modern_color("#8A94A3"),
+                             cursor='hand2', font=self.app._scaled_font(10))
+            info.pack(side='left', padx=(6, 2))
+            ToolTip(info, t('sell_hold.header_tips.plan'))
         self._cv_add_columns_button(header, config_key)
+        if columns[0] == 'plan' and load_theme() in ("modern", "modern_slate", "modern_orange"):
+            self.status = ttk.Label(header, anchor='w', font=self.app._scaled_font(9, 'bold'),
+                                    foreground=modern_color("#E6EAF0"))
+            self.status.pack(side='left', fill='x', expand=True, padx=(10, 0))
         box = ttk.Frame(parent)
         box.pack(fill='both', expand=True, padx=10, pady=5)
         tree = StripedTreeview(box, columns=columns, show='headings', height=height,
@@ -290,7 +295,8 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         if self._search_control.running:
             self._search_control.stop()
             return
-        self.status.pack(anchor='w')
+        if load_theme() not in ("modern", "modern_slate", "modern_orange"):
+            self.status.pack(anchor='w')
         self.summary.pack(anchor='w', pady=4)
         system, cargo, protected = self._cargo()
         snapshot = (system, cargo, protected)
