@@ -687,7 +687,7 @@
     "seconds": "seconds",
     "enable": "Enable",
     "import_settings": "Import settings",
-    "tip_stop_commands": "Settings sync to VoiceAttack automatically | Tip: Use 'Stop all commands' to interrupt sequences",
+    "tip_stop_commands": "Tip: Use 'Stop all commands' to interrupt sequences",
     "assign_firegroups": "Assign Firegroups (A–H) and Primary / Secondary Fire Buttons",
     "firegroup": "Firegroup",
     "primary_fire": "Primary Fire Button",

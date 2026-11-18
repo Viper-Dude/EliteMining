@@ -683,7 +683,7 @@
     "seconds": "Sekunden",
     "enable": "Aktivieren",
     "import_settings": "Einstellungen importieren",
-    "tip_stop_commands": "Einstellungen werden automatisch mit VoiceAttack synchronisiert | Tipp: 'Alle Befehle stoppen' zum Unterbrechen verwenden",
+    "tip_stop_commands": "Tipp: 'Alle Befehle stoppen' zum Unterbrechen verwenden",
     "assign_firegroups": "Feuergruppen (A–H) und Primär-/Sekundär-Feuertasten zuweisen",
     "firegroup": "Feuergruppe",
     "primary_fire": "Primäre Feuertaste",
