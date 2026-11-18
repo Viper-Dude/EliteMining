@@ -584,6 +584,8 @@
     "best_supply": "Best supply",
     "last_update": "Last update",
     "max_age": "Max age:",
+    "max_results": "Max results:",
+    "showing_matches": "Showing {shown:,} of {total:,} matches · {sort}",
     "any": "Any",
     "1_hour": "1 hour",
     "8_hours": "8 hours",
@@ -1441,7 +1443,7 @@
     "about": "Click for app info, links, and credits",
     
     "near_system_search": "Search within 500 LY of reference system - returns all matching stations in range",
-    "galaxy_wide_search": "Search entire galaxy for best prices. Shows up to 30 results matching your filters.",
+    "galaxy_wide_search": "Search across the galaxy with no distance limit. Max results follows the selected sort order.",
     "sell_mode": "Search for stations buying this commodity (where you can sell)",
     "buy_mode": "Search for stations selling this commodity (where you can buy)",
     "station_type_filter": "Filter by station type: Orbital, Surface, Fleet Carrier, Megaship, or Stronghold",

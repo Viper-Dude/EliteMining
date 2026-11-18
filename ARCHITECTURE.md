@@ -235,7 +235,7 @@ python app/create_release.py
 ## Commodity Market
 
 - Local coordinate databases are a shortcut to save API calls; missing coordinates must fall back to APIs. For large result sets, batch requests and reuse coordinates per system rather than requesting each row separately. Match returned system names case-insensitively.
-- Mining and Trade searches display all matching returned results; sorting changes their order without removing rows. Calculate distances for all returned matches when a reference system is supplied.
+- Near System Mining and Trade searches display all matching returned results. Galaxy-Wide has its own age preference (default two days) and an explicit 100/250/500/All result limit (default 250), with shown/total counts. Apply station, pad and age filters before selecting results. Distance sorting measures all matches before limiting; other sorts select their best matches before calculating distances. All keeps every match. Near System preferences and behavior remain independent.
 - When merging market records, retain coordinates from another record only if both name the same system; a Fleet Carrier may have jumped since the older record. Stations in the reference system have a distance of zero even when their market record lacks coordinates.
 - Multiple Prices uses `MINING_COMMODITY_ORDER` from `app/core/constants.py`, matching the Mining Commodities dropdown. Its mineral choices wrap across the available width to preserve space for results.
 

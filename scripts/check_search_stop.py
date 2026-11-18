@@ -203,6 +203,7 @@ class BackendStopTests(unittest.TestCase):
 App = load_methods('app/main.py', 'App', {
     '_search_marketplace', '_search_trade_market', '_search_systems', '_search_material_traders',
     '_display_marketplace_search_results', '_display_trade_search_results',
+    '_galaxy_market_limit',
 })
 App._search_marketplace.__globals__.update(SearchControl=SearchControl, MarketplaceAPI=MarketplaceAPI,
                                           threading=threading, log=Mock())

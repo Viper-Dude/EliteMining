@@ -4,6 +4,7 @@ Marketplace API for commodity price lookups using Ardent Insight + Spansh APIs.
 All sources are queried in parallel. Results are merged by marketId, keeping the
 record with the newer updatedAt timestamp so the freshest price always wins.
 """
+import logging
 import requests
 from service_status import tracked_request
 from concurrent.futures import ThreadPoolExecutor
@@ -1349,6 +1350,7 @@ class MarketplaceAPI:
                 return results
             ref_coords = MarketplaceAPI._get_system_coords(reference_system)
             if ref_coords is None:
+                logging.warning("[DISTANCE CALC] No reference coordinates for %s; %d results", reference_system, len(results))
                 return results
             ref_x, ref_y, ref_z = ref_coords
 
@@ -1382,7 +1384,7 @@ class MarketplaceAPI:
                             if coords:
                                 result['systemX'], result['systemY'], result['systemZ'] = coords
                 except Exception as _ce:
-                    print(f"[DISTANCE CALC] Batch coord lookup failed: {_ce}")
+                    logging.warning("[DISTANCE CALC] Batch coord lookup failed: %s", _ce)
 
             if MarketplaceAPI.EDDN_CACHE_PATH:
                 try:
@@ -1412,7 +1414,7 @@ class MarketplaceAPI:
                         if coords:
                             result['systemX'], result['systemY'], result['systemZ'] = coords
                 except Exception as e:
-                    print(f"[DISTANCE CALC] Market coord lookup failed: {e}")
+                    logging.warning("[DISTANCE CALC] Market coord lookup failed: %s", e)
 
             missing_names = list({r['systemName'] for r in missing_coord_results
                                   if any(r.get(axis) is None for axis in ('systemX', 'systemY', 'systemZ'))})
@@ -1420,33 +1422,60 @@ class MarketplaceAPI:
                             if _system_coords_cache.get(name) is not None}
             missing_names = [name for name in missing_names if name.casefold() not in coord_lookup]
 
-            def fetch_coords(names):
-                if is_cancelled and is_cancelled():
-                    return []
-                try:
-                    response = requests.get(
-                        'https://www.edsm.net/api-v1/systems',
-                        params=[('systemName[]', name) for name in names] + [('showCoordinates', 1)],
-                        headers={'User-Agent': 'EliteMining/5.1.3'}, timeout=15)
-                    response.raise_for_status()
-                    return response.json()
-                except Exception as e:
-                    print(f"[DISTANCE CALC] EDSM batch lookup failed: {e}")
-                    return []
-
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                for start in range(0, len(missing_names), 200):
+            def wait_for_edsm(seconds):
+                while seconds > 0:
                     if is_cancelled and is_cancelled():
-                        break
-                    batches = [missing_names[i:i + 100]
-                               for i in range(start, min(start + 200, len(missing_names)), 100)]
-                    for systems in pool.map(fetch_coords, batches):
-                        for system in systems:
-                            coords = system.get('coords') or {}
-                            if all(coords.get(axis) is not None for axis in ('x', 'y', 'z')):
-                                name = system['name'].casefold()
-                                coord_lookup[name] = coords['x'], coords['y'], coords['z']
-                                _system_coords_cache[name] = coord_lookup[name]
+                        return False
+                    pause = min(seconds, 0.1)
+                    _time_mod.sleep(pause)
+                    seconds -= pause
+                return not (is_cancelled and is_cancelled())
+
+            def fetch_coords(names):
+                for attempt in range(3):
+                    if is_cancelled and is_cancelled():
+                        return None
+                    try:
+                        response = requests.get(
+                            'https://www.edsm.net/api-v1/systems',
+                            params=[('systemName[]', name) for name in names] + [('showCoordinates', 1)],
+                            headers={'User-Agent': 'EliteMining/5.1.3'}, timeout=15)
+                        if response.status_code == 429:
+                            retry_after = response.headers.get('Retry-After')
+                            try:
+                                delay = max(1.1, float(retry_after))
+                            except (TypeError, ValueError):
+                                from email.utils import parsedate_to_datetime
+                                try:
+                                    delay = max(1.1, parsedate_to_datetime(retry_after).timestamp() - _time_mod.time())
+                                except (TypeError, ValueError, AttributeError):
+                                    delay = 10 * (2 ** attempt)
+                            logging.warning("[DISTANCE CALC] EDSM rate limit; retry %d/3 in %.1fs",
+                                            attempt + 1, delay)
+                            if attempt == 2 or not wait_for_edsm(delay):
+                                return None
+                            continue
+                        response.raise_for_status()
+                        return response.json()
+                    except Exception as e:
+                        logging.warning("[DISTANCE CALC] EDSM batch lookup failed (%d systems; sample %s): %s",
+                                        len(names), names[:3], str(e).split(' for url:')[0])
+                        return []
+
+            logging.info("[DISTANCE CALC] Reference %s; %d results; %d systems need EDSM",
+                         reference_system, len(results), len(missing_names))
+            for start in range(0, len(missing_names), 100):
+                if start and not wait_for_edsm(1.1):
+                    break
+                systems = fetch_coords(missing_names[start:start + 100])
+                if systems is None:
+                    break
+                for system in systems:
+                    coords = system.get('coords') or {}
+                    if all(coords.get(axis) is not None for axis in ('x', 'y', 'z')):
+                        name = system['name'].casefold()
+                        coord_lookup[name] = coords['x'], coords['y'], coords['z']
+                        _system_coords_cache[name] = coord_lookup[name]
             for name in missing_names:
                 coords = coord_lookup.get(name.casefold())
                 if coords:
@@ -1473,10 +1502,13 @@ class MarketplaceAPI:
                     except (TypeError, ValueError) as e:
                         print(f"[DISTANCE CALC] Bad coords for {result.get('systemName')}: {e}")
 
+            unresolved = [r.get('systemName') for r in results if r.get('distance') is None]
+            logging.info("[DISTANCE CALC] Completed: %d/%d distances; unresolved sample: %s",
+                         len(results) - len(unresolved), len(results), list(dict.fromkeys(unresolved))[:10])
             return results
             
-        except Exception as e:
-            print(f"[DISTANCE CALC] Error: {e}")
+        except Exception:
+            logging.exception("[DISTANCE CALC] Failed")
             return results
     
 
@@ -1549,6 +1581,20 @@ class MarketplaceAPI:
         if large_pad:
             results = [r for r in results if r.get('maxLandingPadSize') == 3]
         return MarketplaceAPI.filter_results_by_age(results, max_age)
+
+    @staticmethod
+    def prepare_galaxy_results(results, order_by, is_buy_mode=False, max_results=250,
+                               reference_system='', is_cancelled=None, on_distances=None):
+        ranked = MarketplaceAPI.sort_results(results, order_by, is_buy_mode)
+        distance_sort = order_by == 'Distance'
+        if max_results is not None and not distance_sort:
+            ranked = ranked[:max_results]
+        if ranked and reference_system and not (is_cancelled and is_cancelled()):
+            if on_distances:
+                on_distances()
+            ranked = MarketplaceAPI.add_distances_to_results(ranked, reference_system, is_cancelled=is_cancelled)
+            ranked = MarketplaceAPI.sort_results(ranked, order_by, is_buy_mode)
+        return ranked if max_results is None else ranked[:max_results]
 
     @staticmethod
     def sort_results(results, order_by, is_buy_mode=False):

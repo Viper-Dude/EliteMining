@@ -17112,6 +17112,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Load saved preferences
         self._load_marketplace_preferences()
+        self._setup_galaxy_market_options('marketplace', filter_grid, cfg, self._age_map)
     
     def _build_trade_commodities_tab(self, frame: ttk.Frame) -> None:
         """Build the Trade Commodities sub-tab with category selection"""
@@ -17394,6 +17395,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Load saved preferences
         self._load_trade_preferences()
+        self._setup_galaxy_market_options('trade', filter_grid, cfg, self._trade_age_map)
     
     # ==================== FLEET CARRIER TAB ====================
     def _build_fleet_carrier_tab(self, frame: ttk.Frame) -> None:
@@ -19120,6 +19122,69 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.marketplace_order_by.set(options[2])
             # Distance and Last update remain the same
     
+    def _setup_galaxy_market_options(self, prefix, filter_grid, cfg, age_map):
+        mode = getattr(self, prefix + '_search_mode')
+        age = getattr(self, prefix + '_max_age')
+        age_reverse = {value: key for key, value in age_map.items()}
+        options = {
+            'mode': mode.get(),
+            'ages': {
+                'near_system': age_reverse.get(age.get(), age.get()),
+                'galaxy_wide': cfg.get(prefix + '_galaxy_max_age', '2 days'),
+            },
+        }
+        if not hasattr(self, '_galaxy_market_options'):
+            self._galaxy_market_options = {}
+        self._galaxy_market_options[prefix] = options
+        saved_limit = str(cfg.get(prefix + '_galaxy_max_results', '250'))
+        if saved_limit not in ('100', '250', '500', 'All'):
+            saved_limit = '250'
+        limit = tk.StringVar(value=t('marketplace.all') if saved_limit == 'All' else saved_limit)
+        setattr(self, prefix + '_galaxy_max_results', limit)
+        label = ttk.Label(filter_grid, text=t('marketplace.max_results'))
+        label.grid(row=3, column=3, sticky='w', padx=(0, 8), pady=(8, 0))
+        combo = ttk.Combobox(filter_grid, textvariable=limit,
+                             values=('100', '250', '500', t('marketplace.all')), state='readonly', width=10)
+        combo.grid(row=3, column=4, sticky='w', pady=(8, 0))
+        save = getattr(self, '_save_' + prefix + '_preferences')
+        combo.bind('<<ComboboxSelected>>', lambda e: save())
+        combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
+
+        def show_mode():
+            selected = options['mode']
+            age.set(age_map.get(options['ages'][selected], options['ages'][selected]))
+            for widget in (label, combo):
+                if selected == 'galaxy_wide':
+                    widget.grid()
+                else:
+                    widget.grid_remove()
+
+        def change_mode(*args):
+            options['ages'][options['mode']] = age_reverse.get(age.get(), age.get())
+            options['mode'] = mode.get()
+            show_mode()
+            save()
+
+        show_mode()
+        mode.trace_add('write', change_mode)
+
+    def _galaxy_market_limit(self, prefix):
+        variable = getattr(self, prefix + '_galaxy_max_results', None)
+        value = variable.get() if variable is not None else '250'
+        return int(value) if value in ('100', '250', '500') else None
+
+    def _market_age_preferences(self, prefix, max_age):
+        options = getattr(self, '_galaxy_market_options', {}).get(prefix)
+        if options is None:
+            return {prefix + '_max_age': max_age}
+        options['ages'][options['mode']] = max_age
+        limit = self._galaxy_market_limit(prefix)
+        return {
+            prefix + '_max_age': options['ages']['near_system'],
+            prefix + '_galaxy_max_age': options['ages']['galaxy_wide'],
+            prefix + '_galaxy_max_results': limit if limit is not None else 'All',
+        }
+
     def _convert_age_to_days(self, age_str):
         """Convert max age string to days for API (API expects integer days, rounds up sub-day values)"""
         age_map = {
@@ -19289,8 +19354,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "marketplace_exclude_carriers": bool(self.marketplace_exclude_carriers.get()),
             "marketplace_large_pad_only": bool(self.marketplace_large_pad_only.get()),
             "marketplace_order_by": order_by_english,
-            "marketplace_max_age": max_age_english
         }
+        updates.update(self._market_age_preferences('marketplace', max_age_english))
         update_config_values(updates)
     
     # ==================== TRADE COMMODITIES TAB HELPERS ====================
@@ -19419,8 +19484,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             "trade_exclude_carriers": bool(self.trade_exclude_carriers.get()),
             "trade_large_pad_only": bool(self.trade_large_pad_only.get()),
             "trade_order_by": order_by_english,
-            "trade_max_age": max_age_english
         }
+        updates.update(self._market_age_preferences('trade', max_age_english))
         update_config_values(updates)
     
     def _search_trade_market(self):
@@ -19457,6 +19522,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             large_pad_only = self.trade_large_pad_only.get()
             trade_order_by = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
 
+            max_results = self._galaxy_market_limit('trade') if search_mode == 'galaxy_wide' else None
+            order_label = self.trade_order_by.get()
+
             # Show searching status
             is_buy_mode = self.trade_buy_mode.get()
             if is_buy_mode:
@@ -19486,14 +19554,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
                     results = MarketplaceAPI.filter_results(
                         results, trade_station_type_filter, max_age_str, exclude_carriers, large_pad_only, is_buy_mode)
-                    results_sorted = MarketplaceAPI.sort_results(results, trade_order_by, is_buy_mode)
-                    if results_sorted and search_mode == 'galaxy_wide' and reference_system and not control.is_cancelled():
-                        control.progress(t('marketplace.calculating_distances'))
-                        measured = MarketplaceAPI.add_distances_to_results(
-                            results_sorted, reference_system, is_cancelled=control.is_cancelled)
-                        results_sorted = MarketplaceAPI.sort_results(measured, trade_order_by, is_buy_mode)
+                    matched_count = len(results) if search_mode == 'galaxy_wide' else None
+                    if search_mode == 'galaxy_wide':
+                        results_sorted = MarketplaceAPI.prepare_galaxy_results(
+                            results, trade_order_by, is_buy_mode, max_results, reference_system,
+                            is_cancelled=control.is_cancelled,
+                            on_distances=lambda: control.progress(t('marketplace.calculating_distances')))
+                    else:
+                        results_sorted = MarketplaceAPI.sort_results(results, trade_order_by, is_buy_mode)
                     control.complete(results_sorted, self._display_trade_search_results,
-                                     search_mode, is_buy_mode, original_count)
+                                     search_mode, is_buy_mode, original_count, matched_count, order_label)
                 except Exception as e:
                     log.error(f"trade search failed: {e}")
                     control.failed(str(e))
@@ -19505,7 +19575,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             log.error(f"Trade search failed: {e}")
             control.failed(str(e))
     
-    def _display_trade_search_results(self, results_sorted: list, search_mode: str, is_buy_mode: bool, original_count: int):
+    def _display_trade_search_results(self, results_sorted: list, search_mode: str, is_buy_mode: bool, original_count: int,
+                                      matched_count=None, order_label=''):
         """Display pre-filtered/sorted trade results on the main thread (UI only)"""
         control = getattr(self, '_trade_search_control', None)
         enrich_powerplay = not (control and control.is_cancelled())
@@ -19519,7 +19590,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             return
 
         self._display_trade_results(results_sorted, enrich_powerplay=enrich_powerplay)
-        self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
+        if search_mode == 'galaxy_wide' and matched_count is not None:
+            self.trade_total_label.config(text=t('marketplace.showing_matches').format(
+                shown=len(results_sorted), total=matched_count, sort=order_label))
+        else:
+            self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
 
     def _create_trade_results_table(self, parent_frame):
         """Create results table for trade commodities - separate from mining table"""
@@ -19852,6 +19927,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             large_pad_only = self.marketplace_large_pad_only.get()
             order_by = self._sort_rev_map.get(self.marketplace_order_by.get(), self.marketplace_order_by.get())
             
+            max_results = self._galaxy_market_limit('marketplace') if search_mode == 'galaxy_wide' else None
+            order_label = self.marketplace_order_by.get()
+
             distance_reference = reference_system or self.marketplace_reference_system.get().strip()
 
             # Show searching status
@@ -19884,14 +19962,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
                     results = MarketplaceAPI.filter_results(
                         results, station_type_filter, max_age_str, exclude_carriers, large_pad_only, is_buy_mode)
-                    results_sorted = MarketplaceAPI.sort_results(results, order_by, is_buy_mode)
-                    if results_sorted and search_mode == 'galaxy_wide' and distance_reference and not control.is_cancelled():
-                        control.progress(t('marketplace.calculating_distances'))
-                        measured = MarketplaceAPI.add_distances_to_results(
-                            results_sorted, distance_reference, is_cancelled=control.is_cancelled)
-                        results_sorted = MarketplaceAPI.sort_results(measured, order_by, is_buy_mode)
+                    matched_count = len(results) if search_mode == 'galaxy_wide' else None
+                    if search_mode == 'galaxy_wide':
+                        results_sorted = MarketplaceAPI.prepare_galaxy_results(
+                            results, order_by, is_buy_mode, max_results, distance_reference,
+                            is_cancelled=control.is_cancelled,
+                            on_distances=lambda: control.progress(t('marketplace.calculating_distances')))
+                    else:
+                        results_sorted = MarketplaceAPI.sort_results(results, order_by, is_buy_mode)
                     control.complete(results_sorted, self._display_marketplace_search_results,
-                                     search_mode, reference_system, is_buy_mode, exclude_carriers, original_count)
+                                     search_mode, reference_system, is_buy_mode, exclude_carriers, original_count, matched_count, order_label)
                 except Exception as e:
                     log.error(f"marketplace search failed: {e}")
                     control.failed(str(e))
@@ -19903,7 +19983,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             control.failed(str(e))
 
     def _display_marketplace_search_results(self, results_sorted: list, search_mode: str, reference_system: str,
-                                             is_buy_mode: bool, exclude_carriers: bool, original_count: int):
+                                             is_buy_mode: bool, exclude_carriers: bool, original_count: int,
+                                             matched_count=None, order_label=''):
         """Display pre-filtered/sorted marketplace results on the main thread (UI only)"""
         control = getattr(self, '_marketplace_search_control', None)
         enrich_powerplay = not (control and control.is_cancelled())
@@ -19920,7 +20001,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             return
 
         self._display_marketplace_results(results_sorted, enrich_powerplay=enrich_powerplay)
-        self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
+        if search_mode == 'galaxy_wide' and matched_count is not None:
+            self.marketplace_total_label.config(text=t('marketplace.showing_matches').format(
+                shown=len(results_sorted), total=matched_count, sort=order_label))
+        else:
+            self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
 
     def _on_commodity_tree_double_click(self, event, tree, refresh_powerplay=True):
         """Open Inara from a System/Station or Powerplay cell, refreshing Powerplay when supported."""

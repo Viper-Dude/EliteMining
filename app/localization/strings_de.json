@@ -580,6 +580,8 @@
     "best_supply": "Bestes Angebot",
     "last_update": "Letzte Aktualisierung",
     "max_age": "Max. Alter:",
+    "max_results": "Max. Ergebnisse:",
+    "showing_matches": "Zeige {shown:,} von {total:,} Treffern · {sort}",
     "any": "Beliebig",
     "1_hour": "1 Stunde",
     "8_hours": "8 Stunden",
@@ -1449,7 +1451,7 @@
     "about": "Klicken für App-Info, Links und Credits",
     
     "near_system_search": "Suche innerhalb von 500 LY vom Referenzsystem - gibt alle passenden Stationen in Reichweite zurück",
-    "galaxy_wide_search": "Durchsuche die gesamte Galaxie nach besten Preisen. Zeigt bis zu 30 Ergebnisse, die deinen Filtern entsprechen.",
+    "galaxy_wide_search": "Galaxisweite Suche ohne Entfernungsgrenze. Max. Ergebnisse richtet sich nach der gewählten Sortierung.",
     "sell_mode": "Suche nach Stationen, die diese Ware kaufen (wo Sie verkaufen können)",
     "buy_mode": "Suche nach Stationen, die diese Ware verkaufen (wo Sie kaufen können)",
     "station_type_filter": "Nach Stationstyp filtern: Orbital, Oberfläche, Flottenträger, Megaschiff oder Festung",

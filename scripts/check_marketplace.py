@@ -4,6 +4,7 @@ import random
 import sys
 import threading
 import tkinter as tk
+from tkinter import ttk
 import tkinter.font as tkfont
 import unittest
 from contextlib import ExitStack
@@ -22,6 +23,7 @@ from column_visibility_helper import ColumnVisibilityMixin, displayed_column
 from marketplace_api import MarketplaceAPI, _short_cache, _short_cache_key_locks, _system_coords_cache
 from multi_mineral_tab import MultiMineralTab
 from check_search_stop import App, ImmediateThread, Widget
+from check_ring_finder_search import load_methods
 
 
 def market(index, **changes):
@@ -57,7 +59,7 @@ class MarketTests(unittest.TestCase):
         rows = [market(i, systemName=f'Remote {i // 2}', distance=None) for i in range(450)]
         response = Mock()
         def fetch(url, params, **kwargs):
-            response = Mock()
+            response = Mock(status_code=200)
             response.json.return_value = [dict(name=name.lower(), coords=dict(x=3, y=4, z=0))
                                           for key, name in params if key == 'systemName[]']
             return response
@@ -65,13 +67,37 @@ class MarketTests(unittest.TestCase):
              patch.object(MarketplaceAPI, 'EDDN_CACHE_PATH', None), \
              patch('local_database.LocalSystemsDatabase.is_database_available', return_value=False), \
              patch.object(MarketplaceAPI, '_get_system_coords', return_value=(0, 0, 0)), \
-             patch('marketplace_api.requests.get', side_effect=fetch) as lookup:
+             patch('marketplace_api.requests.get', side_effect=fetch) as lookup, \
+             patch('marketplace_api._time_mod.sleep'):
             measured = MarketplaceAPI.add_distances_to_results(rows, 'Sol')
             self.assertEqual([r['distance'] for r in measured], [5] * 450)
             self.assertEqual(lookup.call_count, 3)
             fresh = [market(1, systemName='Remote 0', distance=None)]
             self.assertEqual(MarketplaceAPI.add_distances_to_results(fresh, 'Sol')[0]['distance'], 5)
             self.assertEqual(lookup.call_count, 3)
+
+    def test_distance_rate_limit_retries_same_batch_and_can_stop(self):
+        for stop in (False, True):
+            with self.subTest(stop=stop):
+                cancelled = [False]
+                limited = Mock(status_code=429, headers={'Retry-After': '2'})
+                success = Mock(status_code=200)
+                success.json.return_value = [dict(name='Remote', coords=dict(x=3, y=4, z=0))]
+                def pause(seconds):
+                    cancelled[0] = stop
+                with patch.dict(_system_coords_cache, {}, clear=True), \
+                     patch.object(MarketplaceAPI, 'EDDN_CACHE_PATH', None), \
+                     patch('local_database.LocalSystemsDatabase.is_database_available', return_value=False), \
+                     patch.object(MarketplaceAPI, '_get_system_coords', return_value=(0, 0, 0)), \
+                     patch('marketplace_api.requests.get', side_effect=[limited, success]) as lookup, \
+                     patch('marketplace_api._time_mod.sleep', side_effect=pause) as sleep:
+                    rows = [market(1, systemName='Remote', distance=None)]
+                    measured = MarketplaceAPI.add_distances_to_results(rows, 'Sol', lambda: cancelled[0])
+                    self.assertEqual(measured[0]['distance'], None if stop else 5)
+                    self.assertEqual(lookup.call_count, 1 if stop else 2)
+                    if not stop:
+                        self.assertEqual(lookup.call_args_list[0], lookup.call_args_list[1])
+                        self.assertAlmostEqual(sum(call.args[0] for call in sleep.call_args_list), 2)
 
     def test_merge_missing_invalid_and_mixed_timezones(self):
         for stamp in ('', None, 'invalid', '2026-11-14T12:00:00', '2026-11-15T13:00:00+02:00'):
@@ -161,14 +187,14 @@ class MarketTests(unittest.TestCase):
 
 
 class SearchTests(unittest.TestCase):
-    def run_search(self, trade, order, rows, buy=False, mode='galaxy_wide'):
+    def run_search(self, trade, order, rows, buy=False, mode='galaxy_wide', limit='250'):
         app = App()
         parent = Widget()
         app.after = parent.after
         prefix = 'trade' if trade else 'marketplace'
         for key, value in dict(commodity='Platinum', search_mode=mode, reference_system='Sol', max_age='Any',
                                buy_mode=buy, sell_mode=not buy, exclude_carriers=False, station_type='All',
-                               large_pad_only=False, order_by=order).items():
+                               large_pad_only=False, order_by=order, galaxy_max_results=limit).items():
             setattr(app, prefix + '_' + key, SimpleNamespace(get=lambda value=value: value))
         setattr(app, prefix + '_search_btn', Widget())
         setattr(app, prefix + '_total_label', Widget())
@@ -197,6 +223,34 @@ class SearchTests(unittest.TestCase):
                 found, measure = self.run_search(trade, 'Distance', rows)
                 self.assertEqual(len(measure.call_args.args[0]), 61)
                 self.assertEqual(found[0]['marketId'], 60)
+
+    def test_limits_follow_selected_sort_and_reduce_distance_work_when_possible(self):
+        for trade in (False, True):
+            for buy in (False, True):
+                for order in ('Distance', 'Best price (lowest)' if buy else 'Best price (highest)',
+                              'Best supply' if buy else 'Best demand', 'Last update'):
+                    with self.subTest(trade=trade, buy=buy, order=order):
+                        rows = [market(i, buyPrice=i+1, sellPrice=i+1, demand=i+1, stock=i+1,
+                                       updatedAt=f'2026-11-18T12:{i // 60:02}:{i % 60:02}Z', distance=None)
+                                for i in range(400)]
+                        # A higher-priced station excluded by the filters must not consume a slot.
+                        rows.append(market(999, buyPrice=0, sellPrice=0))
+                        found, measure = self.run_search(trade, order, rows, buy, limit='100')
+                        self.assertEqual(len(found), 100)
+                        self.assertEqual(len(measure.call_args.args[0]), 400 if order == 'Distance' else 100)
+                        expected = set(range(100)) if buy and 'price' in order else set(range(300, 400))
+                        self.assertEqual({r['marketId'] for r in found}, expected)
+
+    def test_default_limit_all_and_near_system_isolation(self):
+        for trade in (False, True):
+            for mode, limit, count in (('galaxy_wide', '250', 250), ('galaxy_wide', '500', 400),
+                                       ('galaxy_wide', 'All', 400), ('near_system', '100', 400)):
+                with self.subTest(trade=trade, mode=mode, limit=limit):
+                    found, measure = self.run_search(trade, 'Best price (highest)',
+                        [market(i) for i in range(400)], mode=mode, limit=limit)
+                    self.assertEqual(len(found), count)
+                    if mode == 'near_system':
+                        measure.assert_not_called()
 
     def test_actual_buy_workers_sort_price_and_supply(self):
         for trade in (False, True):
@@ -231,6 +285,90 @@ class SearchTests(unittest.TestCase):
                 else:
                     app._display_marketplace_search_results(rows, 'galaxy_wide', 'Sol', True, False, len(rows))
                 self.assertEqual(len(render.call_args.args[0]), 139)
+
+    def test_result_summary_reports_filtered_total_and_selected_order(self):
+        strings = json.loads((ROOT / 'app/localization/strings_en.json').read_text(encoding='utf-8-sig'))
+        with patch.dict(App._display_trade_search_results.__globals__,
+                        t=lambda key: strings['marketplace'][key.split('.')[1]]):
+            for trade in (False, True):
+                app = App()
+                app.config = Mock()
+                prefix = 'trade' if trade else 'marketplace'
+                setattr(app, '_display_' + prefix + '_results', Mock())
+                label = Widget()
+                setattr(app, prefix + '_total_label', label)
+                rows = [market(i) for i in range(100)]
+                if trade:
+                    app._display_trade_search_results(rows, 'galaxy_wide', False, 450, 400, 'Distance')
+                else:
+                    app._display_marketplace_search_results(rows, 'galaxy_wide', 'Sol', False, False,
+                                                            450, 400, 'Distance')
+                self.assertIn('100', label.cget('text'))
+                self.assertIn('400', label.cget('text'))
+                self.assertNotIn('450', label.cget('text'))
+                self.assertIn('Distance', label.cget('text'))
+
+
+class GalaxyOptionsTests(unittest.TestCase):
+    def test_age_preferences_visibility_and_limits_are_isolated_and_restored(self):
+        methods = load_methods('app/main.py', 'App', {
+            '_setup_galaxy_market_options', '_market_age_preferences', '_galaxy_market_limit'})
+        for language in ('en', 'de'):
+            strings = json.loads((ROOT / f'app/localization/strings_{language}.json').read_text(encoding='utf-8-sig'))
+            def translate(key):
+                section, key = key.split('.')
+                return strings[section][key]
+            methods._setup_galaxy_market_options.__globals__.update(tk=tk, ttk=ttk, t=translate)
+            for prefix in ('marketplace', 'trade'):
+                with self.subTest(language=language, prefix=prefix):
+                    root = tk.Tk()
+                    root.withdraw()
+                    try:
+                        for name in ('_setup_galaxy_market_options', '_market_age_preferences', '_galaxy_market_limit'):
+                            setattr(root, name, getattr(methods, name).__get__(root))
+                        ages = {'Any': strings['marketplace']['any'],
+                                '1 hour': strings['marketplace']['1_hour'],
+                                '1 day': strings['marketplace']['1_day'],
+                                '2 days': strings['marketplace']['2_days']}
+                        reverse = {value: key for key, value in ages.items()}
+                        saved = {}
+                        for mode in ('near_system', 'galaxy_wide'):
+                            frame = ttk.Frame(root)
+                            frame.pack()
+                            mode_var = tk.StringVar(root, mode)
+                            age_var = tk.StringVar(root, ages[saved.get(prefix + '_max_age', 'Any')])
+                            setattr(root, prefix + '_search_mode', mode_var)
+                            setattr(root, prefix + '_max_age', age_var)
+                            save = Mock(side_effect=lambda: saved.update(root._market_age_preferences(
+                                prefix, reverse[age_var.get()])))
+                            setattr(root, '_save_' + prefix + '_preferences', save)
+                            root._setup_galaxy_market_options(prefix, frame, saved, ages)
+                            combo = next(w for w in frame.winfo_children() if isinstance(w, ttk.Combobox))
+                            if mode == 'near_system':
+                                self.assertFalse(combo.grid_info())
+                                self.assertEqual(age_var.get(), ages['Any'])
+                                age_var.set(ages['1 hour'])
+                                mode_var.set('galaxy_wide')
+                                self.assertTrue(combo.grid_info())
+                                self.assertEqual(age_var.get(), ages['2 days'])
+                                self.assertEqual(root._galaxy_market_limit(prefix), 250)
+                                age_var.set(ages['1 day'])
+                                getattr(root, prefix + '_galaxy_max_results').set('100')
+                                mode_var.set('near_system')
+                                self.assertEqual(age_var.get(), ages['1 hour'])
+                                self.assertEqual(saved[prefix + '_max_age'], '1 hour')
+                                mode_var.set('galaxy_wide')
+                                self.assertEqual(age_var.get(), ages['1 day'])
+                            else:
+                                self.assertEqual(age_var.get(), ages['1 day'])
+                                self.assertEqual(root._galaxy_market_limit(prefix), 100)
+                                getattr(root, prefix + '_galaxy_max_results').set(translate('marketplace.all'))
+                                save()
+                                self.assertEqual(saved[prefix + '_galaxy_max_results'], 'All')
+                                self.assertIsNone(root._galaxy_market_limit(prefix))
+                            frame.destroy()
+                    finally:
+                        root.destroy()
 
 
 class PlannerTests(unittest.TestCase):
