@@ -9,7 +9,7 @@ python firstrun_sim.py
 
 # Git Push
 git add -A
-git commit -m "v5.6.0: Show all ring hotspots, reset VA variables on session load, and optimize profile"
+git commit -m "v5.6.5: Code optimization,Improve mining statistics, searches, reports and VoiceAttack stability"
 git push
 
 ## Standard Commit and Push Process

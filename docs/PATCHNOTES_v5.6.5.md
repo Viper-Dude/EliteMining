@@ -1,7 +1,7 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
 **Release Date:** 2026-November-18
 
-This update focuses on under-the-hood code optimization, making the app feel smoother overall with faster, more reliable searches across all tabs.
+This update mostly focuses on under-the-hood code optimization, making the app feel smoother overall with faster, more reliable searches across all tabs
 
 ## New Features
 - Added a new **Database** tab inside the Statistics view with an overview of mining locations and your activity.
