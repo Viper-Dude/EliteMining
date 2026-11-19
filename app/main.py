@@ -3501,6 +3501,16 @@ class CargoMonitor:
                         import traceback
                         print(f"[PP] live-write block raised: {pp_exc}")
                         traceback.print_exc()
+                    try:
+                        if self.journal_parser.eddn_cache_path:
+                            info = self.journal_parser._upsert_system_info_from_event(event)
+                            if info and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
+                                self.main_app_ref.after(0, self.main_app_ref._sysfinder_apply_system_info,
+                                                        info['system_name'], info)
+                    except Exception as info_exc:
+                        import traceback
+                        print(f"[SYSTEM_INFO] live-write block raised: {info_exc}")
+                        traceback.print_exc()
 
             elif event_type == "CarrierJump":
                 # Player is docked on Fleet Carrier that jumped - player arrived at new system
@@ -3532,6 +3542,16 @@ class CargoMonitor:
                     except Exception as pp_exc:
                         import traceback
                         print(f"[PP] live-write block raised: {pp_exc}")
+                        traceback.print_exc()
+                    try:
+                        if self.journal_parser.eddn_cache_path:
+                            info = self.journal_parser._upsert_system_info_from_event(event)
+                            if info and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
+                                self.main_app_ref.after(0, self.main_app_ref._sysfinder_apply_system_info,
+                                                        info['system_name'], info)
+                    except Exception as info_exc:
+                        import traceback
+                        print(f"[SYSTEM_INFO] live-write block raised: {info_exc}")
                         traceback.print_exc()
             
             elif event_type == "Location":
@@ -3575,6 +3595,16 @@ class CargoMonitor:
                     except Exception as pp_exc:
                         import traceback
                         print(f"[PP] live-write block raised: {pp_exc}")
+                        traceback.print_exc()
+                    try:
+                        if self.journal_parser.eddn_cache_path:
+                            info = self.journal_parser._upsert_system_info_from_event(event)
+                            if info and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
+                                self.main_app_ref.after(0, self.main_app_ref._sysfinder_apply_system_info,
+                                                        info['system_name'], info)
+                    except Exception as info_exc:
+                        import traceback
+                        print(f"[SYSTEM_INFO] live-write block raised: {info_exc}")
                         traceback.print_exc()
 
             elif event_type == "Scan":
@@ -18290,6 +18320,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if vals and len(vals) > 7 and vals[0] == system_name:
                     vals[7] = pp_str
                     tree.item(item, values=vals)
+            if result.get('system_info'):
+                self._sysfinder_apply_system_info(system_name, result['system_info'])
             if not quiet:
                 if pp_power == '~none~':
                     self.sysfinder_status_label.config(text=t('ring_finder.pp_fetch_no_power').format(system=system_name))
@@ -18357,6 +18389,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         key = 'system_finder.options.' + value.lower().replace(' ', '_').replace(',', '')
         label = t(key)
         return value if label == key else label
+
+    @classmethod
+    def _sysfinder_state_label(cls, state):
+        if state == 'Normal':
+            return t('system_finder.normal')
+        return ', '.join(cls._sysfinder_option_label(s) for s in state.split(', '))
 
     def _sysfinder_option_value(self, value):
         return getattr(self, '_sysfinder_option_values', {}).get(value, value)
@@ -18463,9 +18501,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 value = self._format_sysfinder_population(value)
             elif isinstance(value, dict):
                 value = value.get('primary')
-            elif field == 'state' and value == 'Normal':
-                value = t('system_finder.normal')
-            if isinstance(value, str) and field != 'population':
+            elif field == 'state' and value:
+                value = self._sysfinder_state_label(value)
+            if isinstance(value, str) and field not in ('population', 'state'):
                 value = self._sysfinder_option_label(value)
             getattr(self, 'sysfinder_ref_val_' + label).config(text=' ' + str(value) if value is not None and value != '' else empty)
         power = status.get('power') if status else None
@@ -18481,7 +18519,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.sysfinder_ref_val_pp_power.config(text=' ' + power_text)
         self.sysfinder_ref_val_pp_state.config(text=' ' + self._sysfinder_option_label(power_state or '-'))
         self.sysfinder_ref_val_pp_foryou.config(text=' ' + self._compute_pp_foryou(power, power_state, player_power))
-        self.sysfinder_ref_val_pp_merits.config(text=' ' + self._compute_pp_merits(power_state, status.get('state')))
+        bgs_state = 'Boom' if 'Boom' in (status.get('active_states') or []) else status.get('state')
+        self.sysfinder_ref_val_pp_merits.config(text=' ' + self._compute_pp_merits(power_state, bgs_state))
         self.sysfinder_pp_frame.pack(anchor='center')
 
     def _check_sysfinder_spansh_status(self):
@@ -18587,26 +18626,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             formatted_rows = []
             for idx, system in enumerate(systems):
                 row_tag = 'oddrow' if idx % 2 == 0 else 'evenrow'
-                pop = system.get('population')
-                pop_str = self._format_sysfinder_population(pop)
-                economy = system.get('economy', {})
-                eco_str = economy.get('primary') or '-' if isinstance(economy, dict) else (str(economy) if economy else '-')
-                distance = system.get('distance')
-                dist_str = f"{distance:.1f}" if distance is not None else "-"
-                state_val = system.get('state', 'Normal')
-                if not state_val or state_val in ('-', 'None'):
-                    state_val = 'Normal'
-                from app_utils import format_market_powerplay
-                pp_str = format_market_powerplay({
-                    'controlling_power': system.get('power'),
-                    'power_state': self._sysfinder_option_label(system.get('power_state') or ''),
-                    'updated_at': system.get('power_updated_at'),
-                }, include_age=True, no_data=t('common.pp_no_data'))
-                formatted_rows.append((
-                    (system.get('systemName', '-'), dist_str, self._sysfinder_option_label(system.get('security') or '-'),
-                     self._sysfinder_option_label(system.get('allegiance') or '-'), t('system_finder.normal') if state_val == 'Normal' else self._sysfinder_option_label(state_val), pop_str, self._sysfinder_option_label(eco_str), pp_str),
-                    row_tag, {'distance': distance, 'population': pop}
-                ))
+                values, numbers = self._format_sysfinder_row(system)
+                formatted_rows.append((values, row_tag, numbers))
 
             control.complete(formatted_rows, self._sysfinder_search_complete, None, has_filters)
             
@@ -18655,6 +18676,47 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._sysfinder_columns_buttons[config_key].pack(side='right', padx=(self._scaled_px(8), 0))
         label = 'system_finder.systems' if config_key == 'system_finder' else 'system_finder.material_traders'
         self.sysfinder_results_title.config(text=t(label))
+
+    def _format_sysfinder_row(self, system):
+        """Return (values, numbers) for a Star Systems result row."""
+        pop = system.get('population')
+        pop_str = self._format_sysfinder_population(pop)
+        economy = system.get('economy', {})
+        eco_str = economy.get('primary') or '-' if isinstance(economy, dict) else (str(economy) if economy else '-')
+        distance = system.get('distance')
+        dist_str = f"{distance:.1f}" if distance is not None else "-"
+        state_val = system.get('state', 'Normal')
+        if not state_val or state_val in ('-', 'None'):
+            state_val = 'Normal'
+        from app_utils import format_market_powerplay
+        pp_str = format_market_powerplay({
+            'controlling_power': system.get('power'),
+            'power_state': self._sysfinder_option_label(system.get('power_state') or ''),
+            'updated_at': system.get('power_updated_at'),
+        }, include_age=True, no_data=t('common.pp_no_data'))
+        values = (system.get('systemName', '-'), dist_str, self._sysfinder_option_label(system.get('security') or '-'),
+                  self._sysfinder_option_label(system.get('allegiance') or '-'), self._sysfinder_state_label(state_val),
+                  pop_str, self._sysfinder_option_label(eco_str), pp_str)
+        return values, {'distance': distance, 'population': pop, 'system': system}
+
+    def _sysfinder_apply_system_info(self, system_name, info):
+        """Update result rows for system_name when info comes from a newer report than the row shows."""
+        from system_finder_api import SystemFinderAPI
+        tree = self._sysfinder_tables['system_finder']['tree']
+        for item in tree.get_children():
+            numbers = tree._sysfinder_numbers.get(item) or {}
+            system = numbers.get('system')
+            if not system or system.get('systemName', '').lower() != system_name.lower():
+                continue
+            updated = SystemFinderAPI.apply_system_info(system, info)
+            if not updated:
+                continue
+            new_values, new_numbers = self._format_sysfinder_row(updated)
+            vals = list(tree.item(item, 'values'))
+            # Keep the PowerPlay cell, which has its own refresh
+            vals[2:7] = new_values[2:7]
+            tree.item(item, values=vals)
+            numbers.update(population=new_numbers['population'], system=updated)
 
     def _populate_sysfinder_rows(self, results):
         tree = self.sysfinder_tree

@@ -14,6 +14,7 @@ import time
 from datetime import datetime
 from typing import Optional
 import logging
+import system_info_cache
 
 log = logging.getLogger('EliteMining.EDDN')
 
@@ -159,6 +160,8 @@ class EDDNListener:
                     CREATE INDEX IF NOT EXISTS idx_powerplay_system_nocase
                     ON system_powerplay(system_name COLLATE NOCASE)
                 ''')
+                # System status (security, faction states...) from FSDJump/Location/CarrierJump
+                system_info_cache.ensure_table(cursor)
                 # Drop FTS5 table if it exists from older versions (unused, wastes space)
                 cursor.execute('DROP TABLE IF EXISTS commodity_prices_fts')
                 conn.commit()
@@ -246,7 +249,8 @@ class EDDNListener:
                     cursor = conn.cursor()
                     # Delete oldest 20% of rows in each table to avoid repeatedly hitting the cap
                     trimmed = 0
-                    for table, pk in (('commodity_prices_data', 'id'), ('system_powerplay', 'system_name')):
+                    for table, pk in (('commodity_prices_data', 'id'), ('system_powerplay', 'system_name'),
+                                      ('system_info', 'system_name')):
                         cursor.execute(f'''
                             DELETE FROM {table}
                             WHERE {pk} IN (
@@ -378,7 +382,7 @@ class EDDNListener:
             msg_data = message.get('message', {})
             event = msg_data.get('event', '')
 
-            if event not in ('Docked', 'Location', 'FSDJump'):
+            if event not in ('Docked', 'Location', 'FSDJump', 'CarrierJump'):
                 return
 
             timestamp = msg_data.get('timestamp') or message.get('header', {}).get('gatewayTimestamp', '')
@@ -409,6 +413,9 @@ class EDDNListener:
             if event in ('FSDJump', 'Location'):
                 self._process_powerplay_from_event(msg_data, timestamp)
 
+            if event in ('FSDJump', 'Location', 'CarrierJump'):
+                self._process_system_info_from_event(message, msg_data)
+
         except Exception as e:
             log.error(f"EDDN: Error processing journal message: {e}")
 
@@ -438,6 +445,22 @@ class EDDNListener:
                 conn.commit()
         except Exception as e:
             log.debug(f"EDDN: system_powerplay write error: {e}")
+
+    def _process_system_info_from_event(self, message: dict, msg_data: dict):
+        """Store system status from a jump/location event, keeping whichever report is newest."""
+        # Legacy (pre-Odyssey) galaxy has its own faction states
+        game_version = str(message.get('header', {}).get('gameversion') or '')
+        if 'legacy' in game_version.lower() or game_version.startswith(('2.', '3.')):
+            return
+        info = system_info_cache.info_from_journal_event(msg_data)
+        if not info:
+            return
+        try:
+            with sqlite3.connect(self.database_path) as conn:
+                system_info_cache.upsert(conn, info)
+                conn.commit()
+        except Exception as e:
+            log.debug(f"EDDN: system_info write error: {e}")
 
     @staticmethod
     def _infer_max_pad(station_type: str) -> int:

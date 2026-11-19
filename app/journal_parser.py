@@ -1231,6 +1231,19 @@ class JournalParser:
         log.info(f"[PP] Journal live-write: {system_name} -> {controlling_power} / {power_state}")
         return {'system_name': system_name, 'controlling_power': controlling_power, 'power_state': power_state}
 
+    def _upsert_system_info_from_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Store system status from a journal jump/location event in the EDDN cache.
+        Returns the stored row (the newest report for that system), or None."""
+        import system_info_cache
+        info = system_info_cache.info_from_journal_event(event)
+        if not info:
+            return None
+        try:
+            return system_info_cache.store(self.eddn_cache_path, info)
+        except Exception as e:
+            log.error(f"[SYSTEM_INFO] Journal cache write failed for {info['system_name']}: {e}")
+            return None
+
     def scan_recent_journals_for_powerplay(self, max_age_hours: int = 24) -> int:
         """Scan recent journal files for FSDJump/Location events with PowerPlay data
         and write them to the EDDN cache. Events older than max_age_hours are skipped
@@ -1253,7 +1266,9 @@ class JournalParser:
                 if f not in recent_files:
                     recent_files.append(f)
 
+        import system_info_cache
         rows: Dict[str, tuple] = {}
+        infos: Dict[str, Dict[str, Any]] = {}
         for fpath in recent_files:
             try:
                 with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
@@ -1293,11 +1308,25 @@ class JournalParser:
                             except Exception:
                                 continue
 
+                        info = system_info_cache.info_from_journal_event(event)
+                        if info:
+                            infos[system_name] = info
+
                         powers_json = json.dumps(powers) if powers else None
                         # Later entries overwrite earlier ones — keeps most recent jump per system
                         rows[system_name] = (system_name, controlling_power, power_state, powers_json, timestamp)
             except Exception as e:
                 log.debug(f"[PP] Error reading {fpath}: {e}")
+
+        if infos:
+            try:
+                with sqlite3.connect(self.eddn_cache_path) as conn:
+                    system_info_cache.ensure_table(conn)
+                    for info in infos.values():
+                        system_info_cache.upsert(conn, info)
+                    conn.commit()
+            except Exception as e:
+                log.debug(f"[SYSTEM_INFO] Batch journal write error: {e}")
 
         if not rows:
             return 0

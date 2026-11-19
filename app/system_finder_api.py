@@ -11,6 +11,7 @@ import datetime
 from typing import List, Dict, Optional
 
 from localization import t
+import system_info_cache
 
 log = logging.getLogger(__name__)
 
@@ -347,6 +348,86 @@ class SystemFinderAPI:
 
     _INARA_CHALLENGE_PATTERN = re.compile(r"'([a-f0-9]{32})'")
 
+    _INARA_ITEMPAIR_PATTERN = re.compile(
+        r'<div class="itempairlabel"[^>]*>([^<]+)</div><div class="itempairvalue "\s*>(.*?)</div>', re.DOTALL)
+    _INARA_TIME_PATTERN = re.compile(r'(\d{1,2}) ([A-Za-z]{3}) (\d{4}), (\d{1,2}):(\d{2})\s*(am|pm)', re.I)
+    _MONTHS = {m: i for i, m in enumerate(
+        ('jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'), 1)}
+
+    @staticmethod
+    def _inara_title(value: Optional[str]) -> Optional[str]:
+        if not value or value.strip().lower() == 'none':
+            return None
+        return ' '.join(w[:1].upper() + w[1:] for w in value.split())
+
+    @classmethod
+    def _parse_inara_time(cls, value: Optional[str]) -> Optional[str]:
+        """'18 Nov 2026, 9:04pm' (UTC on Inara) -> '2026-11-18T21:04:00Z'."""
+        m = cls._INARA_TIME_PATTERN.search(value or '')
+        month = cls._MONTHS.get(m.group(2).lower()) if m else None
+        if not month:
+            return None
+        hour = int(m.group(4)) % 12 + (12 if m.group(6).lower() == 'pm' else 0)
+        try:
+            dt = datetime.datetime(int(m.group(3)), month, int(m.group(1)), hour, int(m.group(5)),
+                                   tzinfo=datetime.timezone.utc)
+        except ValueError:
+            return None
+        return system_info_cache.normalize_timestamp(dt)
+
+    @classmethod
+    def _parse_inara_system_page(cls, page: str, system_name: str):
+        """Return (info_updated_at, system_info) from an Inara star system page.
+
+        The header 'State' field is not the controlling faction's state, so active states are
+        read from that faction's row in the minor factions table. system_info is None when the
+        page carries no update time, since undated data cannot be compared with other sources.
+        """
+        import html as html_lib
+        pairs = {label.strip(): value for label, value in cls._INARA_ITEMPAIR_PATTERN.findall(page)}
+
+        def text(label):
+            raw = pairs.get(label)
+            value = html_lib.unescape(re.sub(r'<[^>]+>', '', raw)).strip() if raw else ''
+            return value or None
+
+        info_ts = cls._parse_inara_time(text('Info updated'))
+        stamps = [s for s in (info_ts, cls._parse_inara_time(text('Factions updated'))) if s]
+        if not stamps:
+            return info_ts, None
+
+        economies = [cls._inara_title(e) for e in (text('Economy') or '').split(' / ')]
+        population = None
+        pop_text = (text('Population') or '').replace(',', '').lower()
+        pop_match = re.match(r'[\d.]+', pop_text)
+        if pop_match:
+            multiplier = 1_000_000_000 if 'billion' in pop_text else 1_000_000 if 'million' in pop_text else 1
+            population = int(round(float(pop_match.group(0)) * multiplier))
+
+        faction = text('Controlling faction')
+        active_states = [] if not faction else None
+        faction_id = re.search(r'href="/elite/minorfaction/(\d+)/"', pairs.get('Controlling faction') or '')
+        if faction_id:
+            row = re.search(r'<tr><td[^>]*><a href="/elite/minorfaction/%s/">.*?</tr>' % faction_id.group(1),
+                            page, re.DOTALL)
+            cells = re.findall(r'<td[^>]*>(.*?)</td>', row.group(0), re.DOTALL) if row else []
+            if len(cells) >= 5:
+                active_states = [cls._inara_title(s) for s in
+                                 re.findall(r'<span class="statetag[^"]*">([^<]+)</span>', cells[4])]
+
+        return info_ts, {
+            'system_name': system_name,
+            'security': cls._inara_title(text('Security level')),
+            'allegiance': cls._inara_title(text('Allegiance')),
+            'government': cls._inara_title(text('Government')),
+            'economy': economies[0] if economies else None,
+            'second_economy': economies[1] if len(economies) > 1 else None,
+            'population': population,
+            'controlling_faction': faction,
+            'active_states': active_states,
+            'updated_at': min(stamps),
+        }
+
     _INARA_HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -382,8 +463,15 @@ class SystemFinderAPI:
                     resp = session.get(url, timeout=10)
                     resp.raise_for_status()
                     html = resp.text
+            info_ts, info = cls._parse_inara_system_page(html, system_name)
+            stored_info = None
+            if info:
+                try:
+                    stored_info = system_info_cache.store(cls.EDDN_CACHE_PATH, info)
+                except Exception as e:
+                    log.debug(f"[SYSTEM_INFO] Inara store error for {system_name!r}: {e}")
             m = cls._INARA_PP_PATTERN.search(html)
-            timestamp = datetime.datetime.utcnow().isoformat()
+            timestamp = info_ts or datetime.datetime.utcnow().isoformat()
             if m:
                 controlling_power = m.group(1).strip()
                 power_state = m.group(2).strip()
@@ -402,8 +490,13 @@ class SystemFinderAPI:
                 # Preserve any 'powers' list already captured from EDDN — this fetch
                 # only knows controlling_power/power_state, not the contesting powers list.
                 existing = conn.execute(
-                    'SELECT powers FROM system_powerplay WHERE system_name = ?', (system_name,)
+                    'SELECT powers, controlling_power, power_state, updated_at FROM system_powerplay '
+                    'WHERE system_name = ?', (system_name,)
                 ).fetchone()
+                if existing and info_ts and not cls._is_newer(info_ts, existing[3]):
+                    # A newer report (EDDN or the player's own jump) is already stored
+                    return {'controlling_power': cls._normalize_power_name(existing[1]),
+                            'power_state': existing[2], 'updated_at': existing[3], 'system_info': stored_info}
                 powers_json = existing[0] if existing else None
                 conn.execute(
                     'INSERT OR REPLACE INTO system_powerplay '
@@ -412,7 +505,8 @@ class SystemFinderAPI:
                     (system_name, controlling_power, power_state, powers_json, timestamp)
                 )
                 conn.commit()
-            return {'controlling_power': controlling_power, 'power_state': power_state, 'updated_at': timestamp}
+            return {'controlling_power': controlling_power, 'power_state': power_state, 'updated_at': timestamp,
+                    'system_info': stored_info}
         except Exception as e:
             log.debug(f"[POWERPLAY] Inara fetch error for {system_name!r}: {e}")
             return None
@@ -450,6 +544,11 @@ class SystemFinderAPI:
         # reasonable pool of nearby systems to filter locally against the EDDN cache.
         pp_state = filters.get('pp_state', 'Any')
         local_only_pp = pp_state in cls.LOCAL_ONLY_PP_STATES
+        # Spansh filters on the faction's leftover journal state, which can outlive the state
+        # itself, so fetch a wider pool and keep only systems where it is still active.
+        bgs_state = filters.get('state', 'Any')
+        if bgs_state in ('Any', 'None', '-', ''):
+            bgs_state = None
 
         # Build Spansh filter object
         spansh_filters = cls._build_spansh_filters(filters)
@@ -457,7 +556,7 @@ class SystemFinderAPI:
         # Build request payload
         payload = {
             'reference_system': reference_system,
-            'size': cls.MAX_RESULTS if local_only_pp else max_results,
+            'size': cls.MAX_RESULTS if (local_only_pp or bgs_state) else max_results,
             'sort': [{'distance': {'direction': 'asc'}}]
         }
         
@@ -522,15 +621,21 @@ class SystemFinderAPI:
                 if to_persist:
                     cls._store_powerplay_batch(to_persist)
 
+            info_cache = system_info_cache.batch_get(cls.EDDN_CACHE_PATH, system_names)
+
             # Convert Spansh format to our format
             converted = []
             for system in results:
-                converted.append(cls._convert_spansh_system(system, pp_cache))
+                converted.append(cls._convert_spansh_system(system, pp_cache, info_cache))
 
             # Expansion/Contested: Spansh can't filter on these, so filter locally against
             # whatever the EDDN cache has for these nearby systems, then trim to max_results.
             if local_only_pp:
                 converted = [c for c in converted if c.get('power_state') == pp_state]
+            if bgs_state:
+                converted = [c for c in converted
+                             if c.get('active_states') is None or bgs_state in c['active_states']]
+            if local_only_pp or bgs_state:
                 converted = converted[:max_results]
 
             if progress_callback:
@@ -635,17 +740,35 @@ class SystemFinderAPI:
             return {'value': 1000000000, 'comparison': '<'}
         return None
     
+    @staticmethod
+    def _controlling_faction_states(system: Dict):
+        """Return (display_state, active_states) for the controlling faction.
+
+        Spansh's controlling_minor_faction_state comes from the journal's FactionState, which
+        the game keeps reporting after a state ends; the faction's active_states list is current.
+        active_states is None when Spansh has no presence data for the controlling faction.
+        """
+        leftover = system.get('controlling_minor_faction_state')
+        controlling = system.get('controlling_minor_faction')
+        presence = next((p for p in system.get('minor_faction_presences') or []
+                         if controlling and p.get('name') == controlling), None)
+        if presence is None:
+            state = leftover if leftover and leftover != 'None' else 'Normal'
+            return state, None
+        active = [s for s in presence.get('active_states') or [] if s and s != 'None']
+        if leftover in active:
+            active.remove(leftover)
+            active.insert(0, leftover)
+        return (', '.join(active) if active else 'Normal'), active
+
     @classmethod
-    def _convert_spansh_system(cls, system: Dict, pp_cache: Dict = None) -> Dict:
+    def _convert_spansh_system(cls, system: Dict, pp_cache: Dict = None, info_cache: Dict = None) -> Dict:
         """Convert Spansh system format to our display format"""
         # Get economy info
         primary_economy = system.get('primary_economy') or '-'
         secondary_economy = system.get('secondary_economy')
         
-        # Get state - controlling faction state (show 'Normal' if no active state)
-        state = system.get('controlling_minor_faction_state')
-        if not state or state == 'None':
-            state = 'Normal'
+        state, active_states = cls._controlling_faction_states(system)
         
         # Get controlling faction name
         faction = system.get('controlling_minor_faction') or '-'
@@ -681,7 +804,7 @@ class SystemFinderAPI:
                 pp_state = spansh_state
                 pp_updated_at = None
 
-        return {
+        converted = {
             'systemName': system_name,
             'distance': system.get('distance'),
             'systemAddress': system.get('id64'),
@@ -694,13 +817,37 @@ class SystemFinderAPI:
             'allegiance': allegiance,
             'government': system.get('government') or '-',
             'state': state,
+            'active_states': active_states,
             'economy': {'primary': primary_economy, 'secondary': secondary_economy},
             'population': population,
             'faction': faction,
             'power': pp_power,
             'power_state': pp_state,
             'power_updated_at': pp_updated_at,
+            'info_updated_at': system.get('updated_at'),
         }
+        return cls.apply_system_info(converted, (info_cache or {}).get(system_name)) or converted
+
+    @classmethod
+    def apply_system_info(cls, system: Dict, info: Optional[Dict]) -> Optional[Dict]:
+        """Return a copy of a converted system with cached EDDN/journal/Inara info applied, or None
+        when there is no cached info or it is not newer than what the system already shows."""
+        if not info or not cls._is_newer(info.get('updated_at'), system.get('info_updated_at')):
+            return None
+        system = dict(system)
+        if info.get('security'):
+            system['security'] = info['security']
+        system['allegiance'] = info.get('allegiance') or 'Independent'
+        system['government'] = info.get('government') or '-'
+        system['economy'] = {'primary': info.get('economy') or '-', 'secondary': info.get('second_economy')}
+        if info.get('population') is not None:
+            system['population'] = info['population']
+        system['faction'] = info.get('controlling_faction') or '-'
+        if info.get('active_states') is not None:
+            system['active_states'] = list(info['active_states'])
+            system['state'] = ', '.join(info['active_states']) or 'Normal'
+        system['info_updated_at'] = info['updated_at']
+        return system
     
     @classmethod
     def search_material_traders(cls, reference_system: str, trader_type: str,
@@ -840,7 +987,8 @@ class SystemFinderAPI:
             
             cached_pp = cls._get_powerplay_from_cache(system_name)
             pp_cache = {system['name']: cached_pp} if cached_pp else {}
-            return cls._convert_spansh_system(system, pp_cache)
+            info_cache = system_info_cache.batch_get(cls.EDDN_CACHE_PATH, [system['name']])
+            return cls._convert_spansh_system(system, pp_cache, info_cache)
 
         except requests.exceptions.RequestException as e:
             log.error(f"[SYSTEM_FINDER] Spansh API error for {system_name}: {e}")

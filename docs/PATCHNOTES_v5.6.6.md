@@ -10,17 +10,19 @@
 - Announcement presets now have a right-click Load / Save / Rename menu to prevent accidental overwrites.
 - Added a Ships tab to Mining Statistics with sessions, tons and T/hr for each ship.
 - Added a Patch Notes button to the About window.
-- VoiceAttack profile updates now keep your key and joystick shortcuts automatically, with no export needed.
-- Setup now asks you to close VoiceAttack when it updates the profile.
+
 
 ## Bug Fixes
 
 - Fixed Announcements column resizing and alignment, and accidental Minimal % changes while scrolling.
 - Simplified Distance Calculator messages and fixed unwanted popups when Home or Fleet Carrier is unset.
 - Fixed missing unsaved-change prompts for ship and announcement presets.
+- Star Systems no longer shows systems in a state, such as Boom, after that state has ended.
+- Star Systems now shows the newest available system information.
 
 
 ## Voiceattack Profile update (v5.6.6)
+- VoiceAttack profile updates now keep your key and joystick shortcuts automatically, with no export needed.
 - General stability and logic improvements.
 
 ### Important Notes 
