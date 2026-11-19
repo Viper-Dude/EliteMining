@@ -412,8 +412,11 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
     dialog.wait_window()
 
 
-def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str, yes_text: str = "Yes") -> bool:
-    """Show a centered Yes/No dialog and return True if Yes."""
+def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str, yes_text: str = "Yes",
+                      require_answer: bool = False) -> bool:
+    """Show a centered Yes/No dialog and return True if Yes.
+    With require_answer, the close button and Escape do nothing and a minimized dialog is restored,
+    so only Yes or No closes it."""
     from tkinter import ttk
     
     dialog = tk.Toplevel(parent)
@@ -452,8 +455,11 @@ def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str, yes
     
     # Keyboard bindings
     dialog.bind("<Return>", lambda e: on_yes())
-    dialog.bind("<Escape>", lambda e: on_no())
-    
+    if require_answer:
+        dialog.protocol("WM_DELETE_WINDOW", lambda: None)
+    else:
+        dialog.bind("<Escape>", lambda e: on_no())
+
     # Center on parent window manually
     try:
         dialog.update_idletasks()
@@ -494,12 +500,15 @@ def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str, yes
         def keep_on_top():
             try:
                 if dialog.winfo_exists():
+                    if require_answer and dialog.state() == 'iconic':
+                        dialog.deiconify()
+                        dialog.attributes('-topmost', True)
                     dialog.lift()
                     dialog.after(100, keep_on_top)
             except:
                 pass
         dialog.after(100, keep_on_top)
-        
+
         dialog.wait_window()
     except Exception as e:
         logging.error(f"[DIALOG] Error in centered_askyesno: {e}")

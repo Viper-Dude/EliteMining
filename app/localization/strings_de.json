@@ -848,6 +848,7 @@
     "confirm_read_title": "Ihr aktuelles Profil",
     "confirm_read_message": "Ihr Profil '{name}' mit {count} Kürzel(n) wurde gefunden.\n\nDiese Kürzel in das neue Profil übernehmen?\n\nKlicken Sie auf Nein, um Ihr Profil stattdessen manuell zu exportieren.",
     "read_failed_message": "EliteMining konnte Ihre Kürzel nicht automatisch aus VoiceAttack lesen.\n\nBitte exportieren Sie stattdessen Ihr aktuelles Profil.",
+    "profiles_tie_message": "EliteMining hat mehrere VoiceAttack-Profile gefunden, die Ihres sein könnten, und kann nicht entscheiden, welches verwendet werden soll.\n\nLöschen Sie die überzähligen Kopien in VoiceAttack und nutzen Sie danach in den Einstellungen 'Tastenbelegung übertragen'.\n\nExportieren Sie vorerst bitte stattdessen Ihr aktuelles Profil.",
     "yes_recommended": "Ja (empfohlen)",
     "merge_source": "\nÜbernommen aus Ihrem VoiceAttack-Profil '{name}'."
   },

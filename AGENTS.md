@@ -271,6 +271,9 @@ python app/create_release.py
 
 - When editing `.vap` profiles, preserve the UTF-8 BOM and CRLF line endings. Validate the XML after edits, and verify condition pairings after adding or removing actions.
 - After profile edits, remind the user to re-import the updated `.vap` into VoiceAttack to apply the changes.
+- VoiceAttack silently ignores command elements that are out of its export order. Any code that adds elements to a `.vap` must insert them in `COMMAND_ELEMENT_ORDER` (`app/va_keybind_applier.py`), and checks must test the order, because reading the file back in Python does not reveal the problem.
+- Renaming an existing player command in the profile requires an entry in `COMMAND_RENAMES` (`app/va_command_renames.py`), or players lose that command's shortcut on update.
+- The profile update flow runs only in the installed app, not in `python app/main.py`; test it with a built installer and `va_profile_state.json` set to an older version. See [VOICEATTACK_UPDATE_HANDOFF.md](docs/VOICEATTACK_UPDATE_HANDOFF.md).
 
 - Variables in `Variables/*.txt` use NATO phonetic (A→Alpha, C→Charlie). Case-sensitive.
 - `NATO_REVERSE` dict for reverse mapping ("ALPHA" → "A")

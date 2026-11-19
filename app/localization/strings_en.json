@@ -840,6 +840,7 @@
     "confirm_read_title": "Your Current Profile",
     "confirm_read_message": "Found your profile '{name}' with {count} shortcut(s).\n\nCopy these shortcuts to the new profile?\n\nClick No to export your profile manually instead.",
     "read_failed_message": "EliteMining could not read your shortcuts from VoiceAttack automatically.\n\nPlease export your current profile instead.",
+    "profiles_tie_message": "EliteMining found more than one VoiceAttack profile that could be yours and cannot tell which one to use.\n\nTo avoid this next time, delete the extra copies in VoiceAttack, then use Preserve / Re-apply Keybinds in Settings.\n\nFor now, please export your current profile instead.",
     "yes_recommended": "Yes (recommended)",
     "merge_source": "\nCopied from your VoiceAttack profile '{name}'.",
     "tool_seismic": "Seismic charge launcher:",

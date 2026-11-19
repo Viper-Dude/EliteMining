@@ -54,8 +54,10 @@ def selftest():
     assert choose(profiles + [P('e', 'EliteMining v5.7.0', 309, 0)])[0].id == 'b', 'skip unbound newest'
     assert choose([P('e', 'EliteMining v5.7.0', 309, 0), P('f', 'EliteMining v5.6.0', 300, 0)])[0].id == 'e', \
         'all unbound: highest version'
-    assert choose([P('g', 'EliteMining v5.5.8_old', 301, 5), P('h', 'EliteMining v5.5.8_old 2', 301, 5)])[0] is None, \
-        'tie gives no pick'
+    tie_pick, tie_reason = choose([P('g', 'EliteMining v5.5.8_old', 301, 5), P('h', 'EliteMining v5.5.8_old 2', 301, 5)])
+    assert tie_pick is None and tie_reason.startswith(reader.TIE_PREFIX), 'tie gives no pick and a tie reason'
+    assert choose([P('x', 'EliteMining v5.6.6', 308, 68), P('y', 'EliteMining v5.6.6', 308, 68)])[0] is None, \
+        'two profiles with the same name tie'
     assert choose([P('g', 'EliteMining v5.5.8_old', 301, 5), P('h', 'EliteMining v5.5.8_old 2', 301, 7)])[0].id == 'h', \
         'tie broken by bindings'
     assert choose([P('c', 'EDCoPilot', 3000, 10), P('i', 'My Mining', 300, 60)])[0] is None, 'no candidates'

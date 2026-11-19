@@ -20829,7 +20829,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             result = centered_askyesno(
                 self,
                 t("voiceattack.profile_update_title"),
-                message
+                message,
+                require_answer=True
             )
             
             logging.info(f"[VA_PROFILE] Update dialog answer: {'Yes' if result else 'No'}")
@@ -20858,7 +20859,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             from va_process_manager import VAProcessManager
             while VAProcessManager.is_running():
-                closed = centered_askyesno(self, t("voiceattack.close_va_title"), t("voiceattack.close_va_message"))
+                closed = centered_askyesno(self, t("voiceattack.close_va_title"), t("voiceattack.close_va_message"),
+                                           require_answer=True)
                 logging.info(f"[VA_PROFILE] Close VoiceAttack prompt answer: {'Yes' if closed else 'No'}")
                 if not closed:
                     self._va_profile_export_merge(new_version, profile_path)
@@ -20887,8 +20889,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from app_utils import centered_askyesno, centered_message
 
         if read is None:
-            logging.info("[VA_PROFILE] Reading VoiceAttack bindings failed, falling back to export")
-            centered_message(self, t("voiceattack.profile_update_title"), t("voiceattack.read_failed_message"))
+            import va_profile_reader
+            tie = (va_profile_reader.last_failure or "").startswith(va_profile_reader.TIE_PREFIX)
+            logging.info(f"[VA_PROFILE] Reading VoiceAttack bindings failed ({'profiles tie' if tie else 'other'}), "
+                         "falling back to export")
+            centered_message(self, t("voiceattack.profile_update_title"),
+                             t("voiceattack.profiles_tie_message" if tie else "voiceattack.read_failed_message"))
             self._va_profile_export_merge(new_version, profile_path)
             return
 
@@ -20901,7 +20907,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if read.guessed:
                 confirm = t("voiceattack.confirm_read_message").format(name=read.profile_name, count=bound)
                 confirmed = centered_askyesno(self, t("voiceattack.confirm_read_title"), confirm,
-                                              yes_text=t("voiceattack.yes_recommended"))
+                                              yes_text=t("voiceattack.yes_recommended"), require_answer=True)
                 logging.info(f"[VA_PROFILE] Profile confirmation answer: {'Yes' if confirmed else 'No'}")
                 if not confirmed:
                     self._va_profile_export_merge(new_version, profile_path)

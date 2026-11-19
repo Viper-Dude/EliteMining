@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 READER_TIMEOUT_SECS = 30
 GUESSED_REASON = "highest version with bindings"
+TIE_PREFIX = "cannot choose between"
+
+# Why the last read_profile_bindings() returned None; starts with TIE_PREFIX when profiles were indistinguishable
+last_failure: Optional[str] = None
 
 
 @dataclass
@@ -123,7 +127,7 @@ def choose_profile(profiles: List[VAProfileInfo],
     pool.sort(key=lambda p: (key(p) is not None, key(p) or (), p.bound), reverse=True)
     best = pool[0]
     if len(pool) > 1 and key(pool[1]) == key(best) and pool[1].bound == best.bound:
-        return None, f"cannot choose between '{best.name}' and '{pool[1].name}'"
+        return None, f"{TIE_PREFIX} '{best.name}' and '{pool[1].name}'"
     return best, GUESSED_REASON
 
 
@@ -167,6 +171,8 @@ def read_profile_bindings(installed_version: Optional[str] = None,
     in a new temp folder (the caller deletes it). Returns None on any failure.
     Pass include_live only when VoiceAttack is not running.
     """
+    global last_failure
+    last_failure = None
     backup = backup_path or newest_data_file(include_live=include_live)
     if not backup:
         logger.info("[VA_READER] No VoiceAttack data file found")
@@ -185,6 +191,7 @@ def read_profile_bindings(installed_version: Optional[str] = None,
         chosen, reason = choose_profile(profiles, installed_version)
         if chosen is None:
             logger.info(f"[VA_READER] {reason}")
+            last_failure = reason
             return None
 
         xml_path = os.path.join(work_dir, 'bindings.xml')
