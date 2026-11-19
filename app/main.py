@@ -18033,7 +18033,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             definitions = tuple((col, 'system_finder.col_' + col, width) for col, width in (
                 ('system', 150), ('distance', 70), ('security', 80), ('allegiance', 90),
-                ('state', 90), ('population', 100), ('economy', 120), ('powerplay', 170)))
+                ('state', 180), ('population', 100), ('economy', 120), ('powerplay', 170)))
         columns = tuple(col for col, _, _ in definitions) + ('_spacer',)
 
         # Configure treeview style based on theme
@@ -18145,6 +18145,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         from config import _load_cfg, update_config_value
         saved_widths = _load_cfg().get(config_key + '_column_widths', {})
+        # The State column now holds several states; widen a saved narrow default once.
+        state_flag = config_key + '_state_width_widened'
+        if 'state' in _base_widths and 'state' in saved_widths and not _load_cfg().get(state_flag):
+            saved_widths['state'] = max(saved_widths['state'], self._scaled_px(180))
+            from config import update_config_values
+            update_config_values({config_key + '_column_widths': saved_widths, state_flag: True})
         for col in _base_widths:
             if col in saved_widths:
                 tree.column(col, width=max(saved_widths[col], _minwidths[col]))
