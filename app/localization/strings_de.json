@@ -824,7 +824,7 @@
     "no_keybinds_title": "Keine Tastenbelegungen gefunden",
     "no_keybinds_message": "Keine benutzerdefinierten Tastenbelegungen in Ihrem exportierten Profil gefunden.\n\nDas ist normal, wenn Sie keine Sprachbefehle angepasst haben.\n\nImportieren Sie das neue Profil normal - keine Tastenbelegungen zu erhalten.",
     "merge_success_title": "Tastenbelegungen erfolgreich zusammengeführt!",
-    "merge_success_message": "✅ {count} Befehlskürzel wurden in das neue Profil übernommen!\n\nImportieren Sie jetzt das aktualisierte Profil in VoiceAttack:\n\n1. Öffnen Sie VoiceAttack\n2. Klicken Sie auf 'Profil importieren'\n3. Wählen Sie:\n   {path}\n\nIhre Tastenbelegungen bleiben im neuen Profil erhalten.\n\nOptionale Bereinigung:\nNach erfolgreichem Import können Sie das alte Profil in VoiceAttack löschen\nund die Sicherungsdatei entfernen (empfohlen: Sicherung aufbewahren).",
+    "merge_success_message": "✅ {count} Befehlskürzel wurden in das neue Profil übernommen!{not_applied}\n\nImportieren Sie jetzt das aktualisierte Profil in VoiceAttack:\n\n1. Öffnen Sie VoiceAttack\n2. Klicken Sie auf 'Profil importieren'\n3. Wählen Sie:\n   {path}\n\nIhre Tastenbelegungen bleiben im neuen Profil erhalten.\n\nOptionale Bereinigung:\nNach erfolgreichem Import können Sie das alte Profil in VoiceAttack löschen\nund die Sicherungsdatei entfernen (empfohlen: Sicherung aufbewahren).",
     "tool_seismic": "Seismische Sprengladung:",
     "tool_weapons": "Waffen:",
     "tool_ssm": "Unteroberflächenrakete:",
@@ -836,7 +836,12 @@
     "no_keybinds_title": "Keine Tastenbelegungen gefunden",
     "no_keybinds_message": "Keine benutzerdefinierten Tastenbelegungen in Ihrem exportierten Profil gefunden.\n\nDas ist normal, wenn Sie keine Sprachbefehle angepasst haben.\n\nImportieren Sie das neue Profil normal - keine Tastenbelegungen zu erhalten.",
     "merge_success_title": "Tastenbelegungen erfolgreich zusammengeführt!",
-    "merge_success_message": "✅ {count} Befehlskürzel wurden in das neue Profil übernommen!\n\nImportieren Sie jetzt das aktualisierte Profil in VoiceAttack:\n\n1. Öffnen Sie VoiceAttack\n2. Klicken Sie auf 'Profil importieren'\n3. Wählen Sie:\n   {path}\n\nIhre Tastenbelegungen bleiben im neuen Profil erhalten.\n\nOptionale Bereinigung:\nNach erfolgreichem Import können Sie das alte Profil in VoiceAttack löschen\nund die Sicherungsdatei entfernen (empfohlen: Sicherung aufbewahren).",
+    "merge_success_message": "✅ {count} Befehlskürzel wurden in das neue Profil übernommen!{not_applied}\n\nImportieren Sie jetzt das aktualisierte Profil in VoiceAttack:\n\n1. Öffnen Sie VoiceAttack\n2. Klicken Sie auf 'Profil importieren'\n3. Wählen Sie:\n   {path}\n\nIhre Tastenbelegungen bleiben im neuen Profil erhalten.\n\nOptionale Bereinigung:\nNach erfolgreichem Import können Sie das alte Profil in VoiceAttack löschen\nund die Sicherungsdatei entfernen (empfohlen: Sicherung aufbewahren).",
+    "merge_not_applied_header": "{n} Kürzel konnten nicht übernommen werden. Bitte in VoiceAttack neu setzen:\n{list}",
+    "merge_not_applied_more": "  ...und {n} weitere",
+    "merge_reason_no_match": "kein passender Befehl im neuen Profil",
+    "merge_reason_ambiguous": "mehrere mögliche Treffer",
+    "merge_reason_variable": "verwendet ein variables Kürzel",
     "select_new_profile": "Neues VoiceAttack-Profil (.vap) auswählen, auf das die Tastenbelegungen angewendet werden"
   },
   "bookmarks": {

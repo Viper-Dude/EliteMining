@@ -1,291 +1,163 @@
 """
 VoiceAttack Keybind Applier
-Applies keybinds to VoiceAttack profile XML
+Applies keybinds to VoiceAttack profile XML (VoiceAttack 2 export element names)
 """
 
 import xml.etree.ElementTree as ET
 import logging
-from typing import Dict
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
 try:
-    from app.va_keybind_extractor import CommandKeybinds
+    from app.va_keybind_extractor import CommandKeybinds, MOUSE_BUTTON_ELEMENTS, command_phrases, is_internal_command
+    from app.va_command_renames import COMMAND_RENAMES
 except ImportError:
-    from va_keybind_extractor import CommandKeybinds
+    from va_keybind_extractor import CommandKeybinds, MOUSE_BUTTON_ELEMENTS, command_phrases, is_internal_command
+    from va_command_renames import COMMAND_RENAMES
 
 logger = logging.getLogger(__name__)
+
+XSI_NIL = "{http://www.w3.org/2001/XMLSchema-instance}nil"
+
+# Reasons a binding was not applied
+NO_MATCH = "no_match"
+AMBIGUOUS = "ambiguous"
+VARIABLE = "variable"
+
+
+@dataclass
+class MergeResult:
+    applied: List[str] = field(default_factory=list)  # old command names
+    matched_by: Dict[str, str] = field(default_factory=dict)  # old name -> exact/renamed/phrase
+    not_applied: List[Tuple[str, str]] = field(default_factory=list)  # (old name, reason)
 
 
 class VAKeybindApplier:
     """Apply keybinds to VoiceAttack profile XML"""
-    
-    def apply(self, profile_xml: ET.ElementTree, 
+
+    def __init__(self, renames: Optional[Dict[str, str]] = None):
+        self.renames = COMMAND_RENAMES if renames is None else renames
+        self.last_result = MergeResult()
+
+    def apply(self, profile_xml: ET.ElementTree,
               keybinds: Dict[str, CommandKeybinds]) -> ET.ElementTree:
-        """
-        Apply keybinds to profile
-        
-        Args:
-            profile_xml: New profile XML tree
-            keybinds: Keybinds to apply
-        
-        Returns:
-            Modified profile XML tree
-        """
-        matched = 0
-        unmatched = []
-        
+        """Apply keybinds to the new profile; the outcome is left in self.last_result."""
+        result = MergeResult()
+        targets: Dict[str, ET.Element] = {}
         for command in profile_xml.findall(".//Command"):
-            cmd_name = self.get_command_name(command)
-            
-            if cmd_name in keybinds:
-                self.apply_keybinds_to_command(command, keybinds[cmd_name])
-                matched += 1
+            name = self.get_command_name(command)
+            if name and not is_internal_command(name) and name not in targets:
+                targets[name] = command
+
+        claimed: Dict[str, str] = {}  # new command name -> old name
+        pending: List[str] = []
+
+        for old_name in keybinds:
+            if old_name in targets:
+                claimed[old_name] = old_name
+                result.matched_by[old_name] = "exact"
             else:
-                if self.has_any_keybind(command):
-                    unmatched.append(cmd_name)
-        
-        logger.info(f"Applied keybinds: {matched} matched")
-        if unmatched:
-            logger.warning(f"Unmatched commands with keybinds: {len(unmatched)}")
-            logger.debug(f"Unmatched: {unmatched[:10]}")  # Log first 10
-        
+                pending.append(old_name)
+
+        still_pending = []
+        for old_name in pending:
+            new_name = self.renames.get(old_name)
+            if new_name and new_name in targets and new_name not in claimed:
+                claimed[new_name] = old_name
+                result.matched_by[old_name] = "renamed"
+            else:
+                still_pending.append(old_name)
+
+        # Shared-phrase fallback: only an unambiguous, one-to-one match is applied
+        phrase_owner: Dict[str, List[str]] = {}
+        for new_name in targets:
+            if new_name in claimed:
+                continue
+            for phrase in command_phrases(new_name):
+                phrase_owner.setdefault(phrase, []).append(new_name)
+
+        picks: Dict[str, str] = {}
+        for old_name in still_pending:
+            candidates = {n for p in command_phrases(old_name) for n in phrase_owner.get(p, [])}
+            if len(candidates) == 1:
+                picks[old_name] = next(iter(candidates))
+            elif len(candidates) > 1:
+                result.not_applied.append((old_name, AMBIGUOUS))
+            else:
+                result.not_applied.append((old_name, NO_MATCH))
+        pick_counts: Dict[str, int] = {}
+        for new_name in picks.values():
+            pick_counts[new_name] = pick_counts.get(new_name, 0) + 1
+        for old_name, new_name in picks.items():
+            if pick_counts[new_name] > 1:
+                result.not_applied.append((old_name, AMBIGUOUS))
+            else:
+                claimed[new_name] = old_name
+                result.matched_by[old_name] = "phrase"
+
+        for new_name, old_name in claimed.items():
+            self.apply_keybinds_to_command(targets[new_name], keybinds[old_name])
+            result.applied.append(old_name)
+
+        logger.info(f"Applied keybinds: {len(result.applied)} applied, {len(result.not_applied)} not applied")
+        for old_name, reason in result.not_applied:
+            logger.warning(f"Keybind not applied ({reason}): {old_name}")
+        self.last_result = result
         return profile_xml
-    
-    def apply_keybinds_to_command(self, command: ET.Element, 
-                                   keybinds: CommandKeybinds):
-        """Apply keybinds to a single command"""
-        
-        # Apply keyboard shortcut
-        if keybinds.keyboard_shortcut:
-            self.set_keyboard_shortcut(
-                command, 
-                keybinds.keyboard_shortcut,
-                keybinds.keyboard_release
-            )
-        
-        # Apply joystick shortcut
-        if keybinds.joystick_shortcut:
-            self.set_joystick_shortcut(
-                command,
-                keybinds.joystick_shortcut,
-                keybinds.joystick_release,
-                keybinds.joystick_number,
-                keybinds.joystick_button,
-                keybinds.joystick_number2,
-                keybinds.joystick_button2
-            )
-        
-        # Apply mouse shortcut
-        if keybinds.mouse_shortcut:
-            self.set_mouse_shortcut(
-                command,
-                keybinds.mouse_shortcut,
-                keybinds.mouse_release
-            )
-        
-        # Apply shortcut options
-        self.set_shortcut_options(command, keybinds)
-        
-        # Apply enabled state
-        self.set_enabled(command, keybinds.enabled)
-    
-    def set_keyboard_shortcut(self, command: ET.Element, shortcut: str, release: bool = False):
-        """Set keyboard shortcut on command"""
-        # Enable keyboard shortcut
-        use_shortcut = command.find("UseShortcut")
-        if use_shortcut is None:
-            use_shortcut = ET.SubElement(command, "UseShortcut")
-        use_shortcut.text = "true"
-        
-        # Set shortcut value
-        shortcut_elem = command.find("CommandKeyValue")
-        if shortcut_elem is None:
-            shortcut_elem = ET.SubElement(command, "CommandKeyValue")
-        shortcut_elem.text = shortcut
-        
-        # Set release mode
-        release_elem = command.find("KeysReleased")
-        if release_elem is None:
-            release_elem = ET.SubElement(command, "KeysReleased")
-        release_elem.text = "true" if release else "false"
-    
-    def set_joystick_shortcut(self, command: ET.Element, shortcut: str, release: bool = False,
-                               joystick_number: str = None, joystick_button: str = None,
-                               joystick_number2: str = None, joystick_button2: str = None):
-        """Set joystick shortcut on command"""
-        use_joystick = command.find("UseJoystick")
-        if use_joystick is None:
-            use_joystick = ET.SubElement(command, "UseJoystick")
-        use_joystick.text = "true"
-        
-        shortcut_elem = command.find("JoystickValue")
-        if shortcut_elem is None:
-            shortcut_elem = ET.SubElement(command, "JoystickValue")
-        shortcut_elem.text = shortcut
-        
-        cmd_name = self.get_command_name(command)
-        
-        # Check if this is a compound keybind (has second button)
-        is_compound = joystick_button2 and joystick_button2 not in ('0', '-1', '')
-        
-        if is_compound:
-            logger.info(f"[COMPOUND KEYBIND] Applying compound keybind to '{cmd_name}': Joystick {joystick_number} Button {joystick_button} + Joystick {joystick_number2} Button {joystick_button2}")
-        
-        # Always set primary joystick number and button
-        if joystick_number is not None:
-            num_elem = command.find("joystickNumber")
-            if num_elem is None:
-                num_elem = ET.SubElement(command, "joystickNumber")
-            num_elem.text = joystick_number
-        
-        if joystick_button is not None:
-            btn_elem = command.find("joystickButton")
-            if btn_elem is None:
-                btn_elem = ET.SubElement(command, "joystickButton")
-            btn_elem.text = joystick_button
-        
-        # Set secondary joystick number and button (for compound keybinds)
-        num2_elem = command.find("joystickNumber2")
-        if num2_elem is None:
-            num2_elem = ET.SubElement(command, "joystickNumber2")
-        num2_elem.text = joystick_number2 if joystick_number2 else "0"
-        
-        btn2_elem = command.find("joystickButton2")
-        if btn2_elem is None:
-            btn2_elem = ET.SubElement(command, "joystickButton2")
-        btn2_elem.text = joystick_button2 if joystick_button2 else "0"
-        
-        if not is_compound:
-            logger.debug(f"[SIMPLE KEYBIND] Applied simple keybind to '{cmd_name}': {shortcut}")
-        
-        release_elem = command.find("JoystickButtonsReleased")
-        if release_elem is None:
-            release_elem = ET.SubElement(command, "JoystickButtonsReleased")
-        release_elem.text = "true" if release else "false"
-    
-    def set_mouse_shortcut(self, command: ET.Element, shortcut: str, release: bool = False):
-        """Set mouse shortcut on command"""
-        use_mouse = command.find("UseMouse")
-        if use_mouse is None:
-            use_mouse = ET.SubElement(command, "UseMouse")
-        use_mouse.text = "true"
-        
-        shortcut_elem = command.find("MouseValue")
-        if shortcut_elem is None:
-            shortcut_elem = ET.SubElement(command, "MouseValue")
-        shortcut_elem.text = shortcut
-        
-        release_elem = command.find("MouseButtonsReleased")
-        if release_elem is None:
-            release_elem = ET.SubElement(command, "MouseButtonsReleased")
-        release_elem.text = "true" if release else "false"
-    
-    def set_enabled(self, command: ET.Element, enabled: bool):
-        """Set command enabled state"""
-        enabled_elem = command.find("Enabled")
-        if enabled_elem is None:
-            enabled_elem = ET.SubElement(command, "Enabled")
-        enabled_elem.text = "true" if enabled else "false"    
-    def get_command_name(self, command: ET.Element) -> str:
-        """Get command name from XML"""
-        cmd_name = command.find("CommandString")
-        if cmd_name is not None and cmd_name.text:
-            return cmd_name.text
-        return "Unknown"    
-    def set_shortcut_options(self, command: ET.Element, keybinds: CommandKeybinds):
-        """Set shortcut options on command using correct VoiceAttack element names"""
-        # Boolean options
-        bool_options = [
-            ("DoubleTapInvoked", keybinds.double_tap_invoked),
-            ("LongTapInvoked", keybinds.long_tap_invoked),
-            ("ShortTapDelayedInvoked", keybinds.short_tap_delayed_invoked),
-            ("KeepRepeating", keybinds.keep_repeating),
-            ("RepeatIfKeysDown", keybinds.repeat_if_keys_down),
-            ("RepeatIfMouseDown", keybinds.repeat_if_mouse_down),
-            ("RepeatIfJoystickDown", keybinds.repeat_if_joystick_down),
-            ("NoOtherKeysDown", keybinds.no_other_keys_down),
-            ("NoOtherMouseButtonsDown", keybinds.no_other_mouse_buttons_down),
-            ("NoOtherJoystickButtonsDown", keybinds.no_other_joystick_buttons_down),
-            ("UseVariableJoystickShortcut", keybinds.use_variable_joystick_shortcut),
-            ("UseVariableMouseShortcut", keybinds.use_variable_mouse_shortcut),
-        ]
-        
-        for elem_name, value in bool_options:
-            elem = command.find(elem_name)
-            if elem is None:
-                elem = ET.SubElement(command, elem_name)
+
+    def apply_keybinds_to_command(self, command: ET.Element, kb: CommandKeybinds):
+        """Apply the enabled binding groups of one command"""
+        if kb.use_shortcut:
+            self._set(command, "UseShortcut", True)
+            self._set(command, "keyValue", kb.key_value)
+            self._set(command, "keyShift", kb.key_shift)
+            self._set(command, "keyAlt", kb.key_alt)
+            self._set(command, "keyCtrl", kb.key_ctrl)
+            self._set(command, "keyWin", kb.key_win)
+            self._set(command, "keyPassthru", kb.key_passthru)
+            self._set(command, "onlyKeyUp", kb.key_up)
+            self._set(command, "RepeatIfKeysDown", kb.repeat_if_keys_down)
+            self._set(command, "HotkeyDoubleTapLevel", kb.hotkey_double_tap_level)
+            self._set(command, "HotkeyLongTapLevel", kb.hotkey_long_tap_level)
+
+        if kb.use_joystick:
+            self._set(command, "UseJoystick", True)
+            self._set(command, "joystickNumber", kb.joystick_number)
+            self._set(command, "joystickButton", kb.joystick_button)
+            self._set(command, "joystickNumber2", kb.joystick_number2)
+            self._set(command, "joystickButton2", kb.joystick_button2)
+            self._set(command, "joystickUp", kb.joystick_up)
+            self._set(command, "joystickExclusive", kb.joystick_exclusive)
+            self._set(command, "RepeatIfJoystickDown", kb.repeat_if_joystick_down)
+            self._set(command, "JoystickDoubleTapLevel", kb.joystick_double_tap_level)
+            self._set(command, "JoystickLongTapLevel", kb.joystick_long_tap_level)
+
+        if kb.use_mouse:
+            self._set(command, "UseMouse", True)
+            for elem_name, value in zip(MOUSE_BUTTON_ELEMENTS, kb.mouse_buttons):
+                self._set(command, elem_name, value)
+            self._set(command, "MouseUpOnly", kb.mouse_up_only)
+            if kb.mouse_passthru is not None:
+                self._set(command, "MousePassThru", kb.mouse_passthru)
+            self._set(command, "RepeatIfMouseDown", kb.repeat_if_mouse_down)
+            self._set(command, "MouseDoubleTapLevel", kb.mouse_double_tap_level)
+            self._set(command, "MouseLongTapLevel", kb.mouse_long_tap_level)
+
+        self._set(command, "KeepRepeating", kb.keep_repeating)
+        self._set(command, "Enabled", kb.enabled)
+
+    def _set(self, command: ET.Element, elem_name: str, value):
+        elem = command.find(elem_name)
+        if elem is None:
+            elem = ET.SubElement(command, elem_name)
+        elem.attrib.pop(XSI_NIL, None)
+        if isinstance(value, bool):
             elem.text = "true" if value else "false"
-        
-        # Integer level options
-        int_options = [
-            ("HotkeyDoubleTapLevel", keybinds.hotkey_double_tap_level),
-            ("MouseDoubleTapLevel", keybinds.mouse_double_tap_level),
-            ("JoystickDoubleTapLevel", keybinds.joystick_double_tap_level),
-            ("HotkeyLongTapLevel", keybinds.hotkey_long_tap_level),
-            ("MouseLongTapLevel", keybinds.mouse_long_tap_level),
-            ("JoystickLongTapLevel", keybinds.joystick_long_tap_level),
-        ]
-        
-        for elem_name, value in int_options:
-            elem = command.find(elem_name)
-            if elem is None:
-                elem = ET.SubElement(command, elem_name)
+        else:
             elem.text = str(value)
-    
-    def clear_shortcut_options(self, command: ET.Element):
-        """Clear all shortcut options (reset to defaults)"""
-        # Boolean options to set to false
-        bool_options_to_clear = [
-            "DoubleTapInvoked",
-            "LongTapInvoked",
-            "ShortTapDelayedInvoked",
-            "KeepRepeating",
-            "RepeatIfKeysDown",
-            "RepeatIfMouseDown",
-            "RepeatIfJoystickDown",
-            "NoOtherKeysDown",
-            "NoOtherMouseButtonsDown",
-            "NoOtherJoystickButtonsDown",
-            "UseVariableJoystickShortcut",
-            "UseVariableMouseShortcut",
-            "KeysReleased",
-            "JoystickButtonsReleased",
-            "MouseButtonsReleased",
-        ]
-        
-        for elem_name in bool_options_to_clear:
-            elem = command.find(elem_name)
-            if elem is not None:
-                elem.text = "false"
-        
-        # Integer options to set to 0
-        int_options_to_clear = [
-            "HotkeyDoubleTapLevel",
-            "MouseDoubleTapLevel",
-            "JoystickDoubleTapLevel",
-            "HotkeyLongTapLevel",
-            "MouseLongTapLevel",
-            "JoystickLongTapLevel",
-        ]
-        
-        for elem_name in int_options_to_clear:
-            elem = command.find(elem_name)
-            if elem is not None:
-                elem.text = "0"
-    
+
     def get_command_name(self, command: ET.Element) -> str:
         """Get command name"""
         name_elem = command.find("CommandString")
         if name_elem is not None and name_elem.text:
             return name_elem.text
         return ""
-    
-    def has_any_keybind(self, command: ET.Element) -> bool:
-        """Check if command has any keybind"""
-        has_keyboard = command.find("UseShortcut")
-        has_joystick = command.find("UseJoystick")
-        has_mouse = command.find("UseMouse")
-        
-        return (
-            (has_keyboard is not None and has_keyboard.text == "true") or
-            (has_joystick is not None and has_joystick.text == "true") or
-            (has_mouse is not None and has_mouse.text == "true")
-        )

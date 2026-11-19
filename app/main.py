@@ -20908,7 +20908,7 @@ Your keybinds will need to be reconfigured manually."""
         keybind_count = len(keybinds)
         logging.info(f"[VA_PROFILE] Extracted {keybind_count} keybinds from old profile")
         
-        if keybind_count == 0:
+        if keybind_count == 0 and not extractor.skipped:
             centered_message(
                 self,
                 t("voiceattack.no_keybinds_title"),
@@ -20932,12 +20932,29 @@ Your keybinds will need to be reconfigured manually."""
         parser.save(merged_tree, new_profile_path, compress=False)
         logging.info(f"[VA_PROFILE] Merged profile saved to: {new_profile_path}")
         
-        # Step 6: Show success message
+        # Step 6: Show success message with applied count and the bindings that were not applied
+        result = applier.last_result
+        not_applied = list(result.not_applied) + list(extractor.skipped)
+        not_applied_text = ""
+        if not_applied:
+            max_listed = 15
+            lines = [
+                "  - {}: {}".format(name.split(";")[0].strip(), t(f"voiceattack.merge_reason_{reason}"))
+                for name, reason in not_applied[:max_listed]
+            ]
+            if len(not_applied) > max_listed:
+                lines.append(t("voiceattack.merge_not_applied_more").format(n=len(not_applied) - max_listed))
+            not_applied_text = "\n\n" + t("voiceattack.merge_not_applied_header").format(
+                n=len(not_applied), list="\n".join(lines)
+            )
+        logging.info(f"[VA_PROFILE] Merge applied {len(result.applied)} of {keybind_count} keybinds, "
+                     f"{len(not_applied)} not applied")
         centered_message(
             self,
             t("voiceattack.merge_success_title"),
             t("voiceattack.merge_success_message").format(
-                count=keybind_count,
+                count=len(result.applied),
+                not_applied=not_applied_text,
                 path=new_profile_path
             )
         )
