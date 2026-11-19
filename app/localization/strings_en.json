@@ -1423,8 +1423,7 @@
     "reddit": "Reddit",
     "github": "GitHub",
     "documentation": "Documentation",
-    "report_bug": "Report Bug",
-    "patch_notes": "Patch Notes"
+    "report_bug": "Report Bug"
   },
   "tooltips": {
     "cargo_status": "Current cargo fill level",

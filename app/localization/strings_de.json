@@ -1430,8 +1430,7 @@
     "reddit": "Reddit",
     "github": "GitHub",
     "documentation": "Dokumentation",
-    "report_bug": "Fehler melden",
-    "patch_notes": "Patchnotes"
+    "report_bug": "Fehler melden"
   },
   "tooltips": {
     "cargo_status": "Aktueller Frachtraum-Füllstand",
