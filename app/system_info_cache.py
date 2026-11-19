@@ -148,6 +148,28 @@ def upsert(conn, info: Dict):
     )
 
 
+def upsert_powerplay(conn, rows) -> int:
+    """Write system_powerplay rows (system_name, controlling_power, power_state, powers_json,
+    updated_at), replacing a stored row only when the incoming report is newer.
+    Returns the number of rows inserted or replaced."""
+    # Stored times come in several formats (Spansh uses '2026-11-14 03:18:29+00'),
+    # so compare parsed times rather than strings.
+    written = 0
+    for name, power, state, powers_json, updated_at in rows:
+        incoming = normalize_timestamp(updated_at)
+        existing = conn.execute('SELECT updated_at FROM system_powerplay WHERE system_name = ?',
+                                (name,)).fetchone()
+        stored = normalize_timestamp(existing[0]) if existing else None
+        if stored and (not incoming or incoming <= stored):
+            continue
+        conn.execute(
+            'INSERT OR REPLACE INTO system_powerplay '
+            '(system_name, controlling_power, power_state, powers, updated_at) VALUES (?, ?, ?, ?, ?)',
+            (name, power, state, powers_json, incoming or updated_at))
+        written += 1
+    return written
+
+
 def store(db_path: str, info: Dict) -> Optional[Dict]:
     """Create the table if needed, upsert info, and return the stored (newest) row."""
     if not db_path or not info:

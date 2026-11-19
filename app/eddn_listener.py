@@ -437,11 +437,8 @@ class EDDNListener:
 
         try:
             with sqlite3.connect(self.database_path) as conn:
-                conn.execute('''
-                    INSERT OR REPLACE INTO system_powerplay
-                    (system_name, controlling_power, power_state, powers, updated_at)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (system_name, controlling_power, power_state, powers_json, timestamp))
+                system_info_cache.upsert_powerplay(
+                    conn, [(system_name, controlling_power, power_state, powers_json, timestamp)])
                 conn.commit()
         except Exception as e:
             log.debug(f"EDDN: system_powerplay write error: {e}")

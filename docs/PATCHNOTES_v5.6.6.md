@@ -19,6 +19,7 @@
 - Fixed missing unsaved-change prompts for ship and announcement presets.
 - Star Systems no longer shows systems in a state, such as Boom, after that state has ended.
 - Star Systems now shows the newest available system information.
+- PowerPlay information is no longer replaced by older reports.
 
 
 ## Voiceattack Profile update (v5.6.6)

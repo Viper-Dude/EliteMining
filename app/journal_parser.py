@@ -1214,18 +1214,18 @@ class JournalParser:
             power_state = 'Unoccupied'
 
         powers_json = json.dumps(powers) if powers else None
+        import system_info_cache
         try:
             with sqlite3.connect(self.eddn_cache_path) as conn:
-                conn.execute(
-                    'INSERT OR REPLACE INTO system_powerplay '
-                    '(system_name, controlling_power, power_state, powers, updated_at) '
-                    'VALUES (?, ?, ?, ?, ?)',
-                    (system_name, controlling_power, power_state, powers_json, timestamp)
-                )
+                written = system_info_cache.upsert_powerplay(
+                    conn, [(system_name, controlling_power, power_state, powers_json, timestamp)])
                 conn.commit()
         except Exception as e:
             print(f"[PP] Journal cache write FAILED for {system_name}: {e}")
             log.error(f"[PP] Journal cache write failed for {system_name}: {e}")
+            return None
+        if not written:
+            print(f"[PP] {system_name}: newer PowerPlay report already stored, skipping")
             return None
         print(f"[PP] Journal live-write OK: {system_name} -> {controlling_power} / {power_state}")
         log.info(f"[PP] Journal live-write: {system_name} -> {controlling_power} / {power_state}")
@@ -1333,12 +1333,7 @@ class JournalParser:
 
         try:
             with sqlite3.connect(self.eddn_cache_path) as conn:
-                conn.executemany(
-                    'INSERT OR REPLACE INTO system_powerplay '
-                    '(system_name, controlling_power, power_state, powers, updated_at) '
-                    'VALUES (?, ?, ?, ?, ?)',
-                    rows.values()
-                )
+                system_info_cache.upsert_powerplay(conn, rows.values())
                 conn.commit()
             return len(rows)
         except Exception as e:
