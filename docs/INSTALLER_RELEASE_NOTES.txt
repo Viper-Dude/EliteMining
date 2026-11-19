@@ -1,16 +1,5 @@
-﻿What's new in EliteMining v5.6.5
+﻿What's new in EliteMining v5.6.6
 
-New Features
-- Added a new My Mining Data tab inside the Statistics view with your commander name and an overview of mining locations and your activity.
-- Mining TXT reports now include the ring type when known.
-- Added more direct help links throughout the app and updated the user guide on GitHub.
-
-Improvements
-- Under-the-hood code optimization, making the app feel smoother overall with faster, more reliable searches across all tabs.
-- Faster system and commodity searches.
-- Expanded Statistics lists to show your top 20 best locations and last 20 mining locations (up from 10).
-- Added alternating row shading to tables and reduced empty space in Statistics.
-- General code optimization.
-
-Bug Fixes
-- Fixed an issue where mining reports could lose the original system and ring type when starting the game inside a ring.
+New Features & Improvements
+- Combined the three service indicators into one status, with individual details available on hover or click.
+- Renamed Auto-Switch Tabs to Auto Switch, which now skips tab changes while you are busy and requires 30 seconds without app activity.

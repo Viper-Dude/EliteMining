@@ -4,6 +4,8 @@
 ## New Features & Improvements
 
 - Combined the three service indicators into one status, with individual details available on hover or click.
+- Renamed Auto-Switch Tabs to Auto Switch, which now skips tab changes while you are busy and requires 30 seconds without app activity.
+- Auto-Search, Auto Switch and Auto Prices are now in one Auto Options dropdown in Hotspots Finder.
 
 
 

@@ -299,12 +299,13 @@ Search saved hotspots and Spansh ring data by mineral, ring type, and distance. 
 #### Prices and PowerPlay
 
 - **Best Minerals to Mine** — Right-click a ring or system to compare sell prices for its hotspot minerals. Use **+ add** to include minerals without hotspots, such as Osmium.
-- **Auto Prices** — With Auto-Search enabled, fetch prices after arriving in a system with known hotspots. Right-click its checkbox to choose in-system prices or [overlay results](#text-overlay).
+- **Auto Prices** — With Auto-Search enabled, fetch prices after arriving in a system with known hotspots. Use **Auto Options > Auto Prices Options** to choose in-system prices or [overlay results](#text-overlay).
 - **Find Acquisition Systems** — Right-click a Fortified/Stronghold system to find nearby Unoccupied systems buying your mineral. See [PowerPlay Merit Mining](#powerplay-merit-mining).
 
 #### Saving and Automatic Updates
 
 - Journal scans are imported automatically, and newly discovered hotspots are tracked.
+- **Auto Options** (Hotspots Finder) holds the Auto-Search, Auto Switch and Auto Prices checkboxes in one dropdown.
 - **Auto-Search** searches after jumps and refreshes after ring scans; your choice is remembered.
 - Right-click Spansh results to save up to 50 selected rows locally or update missing reserve levels.
 - **Auto-Save** (Spansh/Both only, off by default) saves new hotspots without changing existing entries.
@@ -579,7 +580,7 @@ Tick these under the Start / End buttons:
 - **Auto-end** – Ends and saves the session when you enter supercruise or jump. The refinery and comment questions are skipped, and anything still in your refinery is not counted. Sessions with nothing mined are discarded. Not available with Multi-Session.
 - **Prompt when full** – Asks if you want to end the session when your cargo hold has been 100% full and idle for 1 minute. Turn this off if you want Auto-end to run with no pop-ups. Not available with Multi-Session.
 - **Multi-Session** – Keeps one session running across several cargo loads (mine, sell, return) and reports them as one. The session only ends when you press End.
-- **Auto-Switch Tabs** – Switches to the Mining Session tab when you fire a prospector and back to Hotspots Finder after the session ends.
+- **Auto Switch** – Switches to the Mining Session tab when you fire a prospector and back to Hotspots Finder after the session ends, only after 30 seconds without app activity and while no search or modal dialog is open; skipped switches wait for the next trigger.
 
 For a fully hands-free setup, tick **Auto-start** and **Auto-end** and turn off **Prompt when full**. Sessions then start and save by themselves.
 
@@ -756,7 +757,7 @@ Open **Settings → Announcements** to choose which minerals trigger alerts and 
 
 **Auto Prices on the overlay:**
 
-- Right-click **Auto Prices** in Hotspots Finder and tick **Show on overlay**, or enable it in General Settings.
+- In Hotspots Finder, open **Auto Options > Auto Prices Options** and tick **Show on overlay**, or enable it in General Settings.
 - Requires **Enable Text Overlay**. If that is off, results open in the Best Mineral to Mine window.
 - Appears only in supercruise, ignores **Hide in Supercruise**, and uses its own display duration (10–60 seconds).
 - Use **+ Also Check** in Best Mineral to Mine to include minerals without hotspots.

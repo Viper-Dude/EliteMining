@@ -33,7 +33,8 @@ class ToolTip:
     tooltips_enabled = True  # Global tooltip enable/disable flag
     _tooltip_instances = {}  # Store references to prevent garbage collection
     
-    def __init__(self, widget, text, follow_pointer=False, anchor_above=False):
+    def __init__(self, widget, text, follow_pointer=False, anchor_above=False, colors=None):
+        self.colors = colors  # optional (background, foreground, border) override
         self.widget = widget
         self.text = text
         self.follow_pointer = follow_pointer
@@ -121,11 +122,16 @@ class ToolTip:
             tw.wm_attributes("-topmost", True)
             tw.lift()
             
+            bg, fg, border = self.colors or ("#ffffe0", "#000000", None)
+            if border:
+                tw.configure(background=border)
             label = tk.Label(tw, text=self.text, justify=tk.LEFT,
-                            background="#ffffe0", relief=tk.SOLID, borderwidth=1,
+                            background=bg, foreground=fg,
+                            relief=tk.FLAT if border else tk.SOLID,
+                            borderwidth=0 if border else 1,
                             font=scaled_font(8), wraplength=340,
                             padx=4, pady=2)
-            label.pack()
+            label.pack(padx=1 if border else 0, pady=1 if border else 0)
             if self.anchor_above:
                 tw.update_idletasks()
                 width, height = tw.winfo_reqwidth(), tw.winfo_reqheight()

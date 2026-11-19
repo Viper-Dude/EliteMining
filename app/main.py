@@ -4934,6 +4934,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.auto_switch_tabs = tk.IntVar(value=1)  # Default enabled
         self._load_auto_switch_tabs_preference()
         self.auto_switch_tabs.trace('w', self._on_auto_switch_tabs_toggle)
+        self._last_ui_activity = time.monotonic()
+        for sequence in ('<KeyPress>', '<ButtonPress>', '<MouseWheel>', '<Motion>'):
+            self.bind_all(sequence, self._record_ui_activity, add='+')
 
         # Show Ring Finder Auto Prices on the text overlay (syncs with ring_finder)
         self.auto_prices_overlay = tk.IntVar(value=1 if _load_cfg().get("auto_prices_overlay", False) else 0)
@@ -5465,7 +5468,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
             _ind_frame, text='', fg="#888888", bg=_info_bg,
             font=self._scaled_font(8), cursor="hand2")
         self._footer_services_label.pack(side="left")
-        self._footer_services_tip = ToolTip(self._footer_services_label, '', anchor_above=True)
+        _tip_colors = None
+        if self.current_theme in ("modern", "modern_slate", "modern_orange"):
+            _tip_theme = get_theme_colors(self.current_theme)
+            _tip_colors = (_tip_theme["panel"], _tip_theme["fg"], _tip_theme["border"])
+        self._footer_services_tip = ToolTip(self._footer_services_label, '', anchor_above=True, colors=_tip_colors)
         self._footer_services_label.bind('<Button-1>', self._show_service_status)
         self._update_footer_indicator('market', 'checking')
         
@@ -12215,15 +12222,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                               font=self._scaled_font(8, "italic"), fg="#888888", bg=_dc_bg)
         self.distance_status_label.grid(row=row, column=0, columnspan=2, pady=(0, 5))
         
-        # EDSM API status indicator
-        self.edsm_status_label = tk.Label(calc_frame, text=t('distance_calculator.edsm_checking'), 
-                                          font=self._scaled_font(8), fg="#888888", bg=_dc_bg, anchor="e")
-        self.edsm_status_label.grid(row=row, column=2, pady=(0, 5), sticky="e", padx=(5, 0))
-        ToolTip(self.edsm_status_label, t('tooltips.edsm_status'))
-        
-        # Start EDSM status check
-        self.after(500, self._check_edsm_status)
-        
         # Results section
         results_frame = ttk.LabelFrame(main_container, text=t('distance_calculator.results'), padding=10)
         results_frame.pack(fill="both", expand=True, pady=(0, 10))
@@ -12608,50 +12606,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             parts.append(t('mining_session.' + label) + ' ' + text)
         return '➤ ' + ' | '.join(parts)
 
-    def _check_edsm_status(self):
-        """Check EDSM API status in background and update indicator"""
-        def _background_check():
-            import requests
-            def _schedule(status):
-                try:
-                    self.after(0, lambda: self._update_edsm_status(status))
-                except RuntimeError:
-                    pass  # Tkinter loop already stopped — app is shutting down
-            try:
-                response = requests.get(self.distance_calculator.api_base_url,
-                                       params={"systemName": "Sol", "showCoordinates": 1},
-                                       timeout=5, headers=self.distance_calculator.headers)
-                if response.status_code == 200 and response.text.strip():
-                    _schedule("online")
-                elif response.status_code >= 500:
-                    _schedule("offline")
-                elif response.status_code >= 400:
-                    _schedule("error")
-                else:
-                    _schedule("error")
-            except (requests.Timeout, requests.exceptions.ReadTimeout, requests.exceptions.ConnectTimeout):
-                _schedule("offline")
-            except requests.exceptions.RequestException:
-                _schedule("offline")
-            except Exception:
-                _schedule("offline")
-        
-        threading.Thread(target=_background_check, daemon=True).start()
-        # Re-check every 5 minutes so status stays current
-        self.after(300_000, self._check_edsm_status)
-    
-    def _update_edsm_status(self, status: str):
-        """Update EDSM status label - called on UI thread"""
-        if not hasattr(self, 'edsm_status_label'):
-            return
-            
-        if status == "online":
-            self.edsm_status_label.config(text=t('distance_calculator.edsm_online'), fg="#00ff00")
-        elif status == "error":
-            self.edsm_status_label.config(text=t('distance_calculator.edsm_slow'), fg="#ffaa00")
-        else:
-            self.edsm_status_label.config(text=t('distance_calculator.edsm_offline'), fg="#ff4444")
-    
     def _queue_search_service_status(self, service: str, status: str):
         def update():
             if service == 'market':
@@ -13163,6 +13117,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.auto_search_enabled.set(False)
         print(f"Loaded auto-search preference: False (default)")
     
+    def _record_ui_activity(self, event=None) -> None:
+        self._last_ui_activity = time.monotonic()
+
+    def _can_auto_switch_tabs(self) -> bool:
+        if not self.auto_switch_tabs.get():
+            return False
+        if time.monotonic() - self._last_ui_activity < 30:
+            return False
+        if self.grab_current() is not None:
+            return False
+        controls = [getattr(self, name, None) for name in (
+            '_marketplace_search_control', '_trade_search_control',
+            '_systems_search_control', '_traders_search_control')]
+        controls.append(getattr(getattr(self, 'multi_mineral_tab', None), '_search_control', None))
+        if any(control is not None and control.running for control in controls):
+            return False
+        return not getattr(getattr(self, 'ring_finder', None), '_search_in_progress', False)
+
     def _load_auto_switch_tabs_preference(self) -> None:
         """Load auto-switch tabs preference from config"""
         cfg = _load_cfg()

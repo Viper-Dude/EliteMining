@@ -7468,7 +7468,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         # Check if there's a pending switch from session end
                         if getattr(self, '_pending_ring_finder_switch', False):
                             self._pending_ring_finder_switch = False
-                            self._auto_switch_to_ring_finder_delayed()
+                            self._auto_switch_to_ring_finder_tab()
                         else:
                             self._auto_switch_to_ring_finder_tab()
             
@@ -7618,7 +7618,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     # Check if there's a pending switch from session end
                     if getattr(self, '_pending_ring_finder_switch', False):
                         self._pending_ring_finder_switch = False
-                        self._auto_switch_to_ring_finder_delayed()
+                        self._auto_switch_to_ring_finder_tab()
                     else:
                         self._auto_switch_to_ring_finder_tab()
                             
@@ -8361,6 +8361,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         """Auto-switch to Mining Session tab if the setting is enabled"""
         try:
             if self.main_app and hasattr(self.main_app, 'auto_switch_tabs'):
+                if not self.main_app._can_auto_switch_tabs():
+                    return
                 if self.main_app.auto_switch_tabs.get():
                     if hasattr(self.main_app, 'switch_to_tab'):
                         self.main_app.switch_to_tab('mining_session')
@@ -8377,6 +8379,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         Only switches once per supercruise entry — reset by SupercruiseExit.
         """
         try:
+            if self.main_app and not self.main_app._can_auto_switch_tabs():
+                return
+
             # Only switch once per supercruise entry
             if getattr(self, '_sc_tab_switched', False):
                 print("[AUTO-TAB] Already switched for this supercruise entry, skipping")
@@ -8395,26 +8400,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[AUTO-TAB] Error switching to hotspots finder tab: {e}")
     
-    def _auto_switch_to_ring_finder_delayed(self) -> None:
-        """Auto-switch to Hotspots Finder tab after a 10 second delay
-        
-        Called when SupercruiseEntry or FSDJump occurs after a session has ended.
-        The delay gives the user time before the tab switches.
-        """
-        try:
-            if self.main_app and hasattr(self.main_app, 'auto_switch_tabs'):
-                if self.main_app.auto_switch_tabs.get():
-                    print("[AUTO-TAB] In supercruise/FSD after session end - will switch to ring finder in 10 seconds")
-                    # Schedule the switch after 10 seconds (10000 ms)
-                    self.after(10000, self._auto_switch_to_ring_finder_tab)
-        except Exception as e:
-            print(f"[AUTO-TAB] Error scheduling delayed switch: {e}")
-    
     def _set_pending_ring_finder_switch(self) -> None:
         """Set a flag to switch to Ring Finder on next supercruise/FSD event
         
-        Called when session ends. If already in supercruise, triggers the delayed
-        switch immediately. Otherwise waits for SupercruiseEntry or FSDJump event.
+        Called when session ends. If already in supercruise, checks the idle
+        guard immediately. Otherwise waits for SupercruiseEntry or FSDJump event.
         """
         try:
             if self.main_app and hasattr(self.main_app, 'auto_switch_tabs'):
@@ -8426,9 +8416,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     in_supercruise = bool(flags & 16)
                     
                     if in_supercruise:
-                        # Already in supercruise - trigger delayed switch immediately
-                        print("[AUTO-TAB] Session ended while in supercruise - will switch to ring finder in 10 seconds")
-                        self._auto_switch_to_ring_finder_delayed()
+                        # Already in supercruise - check whether switching is allowed
+                        self._auto_switch_to_ring_finder_tab()
                     else:
                         # Not in supercruise - wait for next supercruise/FSD event
                         self._pending_ring_finder_switch = True

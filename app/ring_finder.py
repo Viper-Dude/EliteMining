@@ -608,69 +608,22 @@ class RingFinder(ColumnVisibilityMixin):
                                    font=scaled_font(8, "normal"), cursor="hand2")
         self.search_btn.pack(side="left", padx=(0, 5))
 
-        # Auto-search checkbox
-        self.auto_search_var = tk.BooleanVar(value=False)
-
-        # Load saved auto-search state
-        auto_search_enabled = self._load_auto_search_state()
-        self.auto_search_var.set(auto_search_enabled)
-
-        self.auto_search_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.auto_search'),
-                                           variable=self.auto_search_var,
-                                           command=self._on_auto_search_toggle,
-                                           bg=_cb_bg, fg="#e0e0e0",
-                                           activebackground="#2e2e2e", activeforeground="#ffffff",
-                                           selectcolor=_cb_select, relief="flat",
-                                           font=scaled_font(9))
-        self.auto_search_cb.pack(side="left", padx=(10, 0))
-
-        # Tooltip for auto-search
-        ToolTip(self.auto_search_cb, t('ring_finder.auto_search_tooltip'))
-
-        # Auto-switch tabs checkbox (synced with main app settings)
+        # Auto Options dropdown: Auto-Search, Auto Switch and Auto Prices checkboxes
+        self.auto_search_var = tk.BooleanVar(value=self._load_auto_search_state())
         self.auto_switch_tabs_var = tk.BooleanVar(value=False)
-
-        # Load auto-switch tabs state from main app
         self._load_auto_switch_tabs_state()
-
-        self.auto_switch_tabs_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.auto_switch_tabs'),
-                                           variable=self.auto_switch_tabs_var,
-                                           command=self._on_auto_switch_tabs_toggle,
-                                           bg=_cb_bg, fg="#e0e0e0",
-                                           activebackground="#2e2e2e", activeforeground="#ffffff",
-                                           selectcolor=_cb_select, relief="flat",
-                                           font=scaled_font(9))
-        self.auto_switch_tabs_cb.pack(side="left", padx=(18, 0))
-
-        # Tooltip for auto-switch tabs
-        ToolTip(self.auto_switch_tabs_cb, t('ring_finder.auto_switch_tooltip'))
-
-        # Prefetch sell prices on jump checkbox - independent of Auto-Search since it
-        # makes live API calls on every jump (separate cost the user should opt into).
-        self.prefetch_prices_var = tk.BooleanVar(value=False)
-        prefetch_prices_enabled = self._load_prefetch_prices_state()
-        self.prefetch_prices_var.set(prefetch_prices_enabled)
-
-        self.prefetch_prices_cb = tk.Checkbutton(buttons_frame, text=t('ring_finder.prefetch_prices'),
-                                           variable=self.prefetch_prices_var,
-                                           command=self._save_prefetch_prices_state,
-                                           bg=_cb_bg, fg="#e0e0e0",
-                                           activebackground="#2e2e2e", activeforeground="#ffffff",
-                                           selectcolor=_cb_select, relief="flat",
-                                           font=scaled_font(9))
-        self.prefetch_prices_cb.pack(side="left", padx=(18, 0))
-
-        # Tooltip for prefetch prices
-        ToolTip(self.prefetch_prices_cb, t('ring_finder.prefetch_prices_tooltip'))
-
-        # Show Auto Prices on the in-game text overlay instead of the popup window.
-        # Set from the right-click menu on the Auto Prices checkbox (and General Settings).
+        self.prefetch_prices_var = tk.BooleanVar(value=self._load_prefetch_prices_state())
+        # Shown on the in-game text overlay instead of the popup; set from the Auto Prices Options submenu (and General Settings).
         self.prices_overlay_var = tk.BooleanVar(value=self._load_prices_overlay_state())
-        prices_hint = tk.Label(buttons_frame, text=t('ring_finder.prefetch_prices_hint'),
-                               bg=_cb_bg, fg="#888888", font=scaled_font(8))
-        prices_hint.pack(side="left", padx=(0, 0))
-        self.prefetch_prices_cb.bind("<Button-3>", self._show_auto_prices_menu)
-        prices_hint.bind("<Button-3>", self._show_auto_prices_menu)
+
+        self.auto_options_btn = self._rf_button(buttons_frame, text=t('ring_finder.auto_options') + " ▾",
+                                   command=self._show_auto_options_menu,
+                                   bg="#3a3a3a", fg="#e0e0e0",
+                                   activebackground="#4a4a4a", activeforeground="#ffffff",
+                                   relief="ridge", bd=1, padx=scaled_px(10), pady=scaled_px(4),
+                                   font=scaled_font(8, "normal"), cursor="hand2")
+        self.auto_options_btn.pack(side="left", padx=(10, 0))
+        ToolTip(self.auto_options_btn, t('ring_finder.auto_options_tooltip'))
 
         # Auto Prices depends on hotspot data that Auto-Search writes to the local DB
         # on jump - it's non-functional without Auto-Search, so keep it locked to it.
@@ -898,7 +851,7 @@ class RingFinder(ColumnVisibilityMixin):
         # UI scale and don't scale at the same rate as the fixed-width combos.
         def _align_overlaps_row():
             search_frame.update_idletasks()
-            target_x = buttons_frame.winfo_x() + self.auto_search_cb.winfo_x()
+            target_x = buttons_frame.winfo_x() + self.auto_options_btn.winfo_x()
             current_x = right_filters_frame_row1.winfo_x() + _overlaps_align_spacer.winfo_x()
             # Checkbutton indicator/border offsets differ slightly between the
             # two rows' widgets, so nudge left a hair to line up the ticked boxes.
@@ -1428,7 +1381,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         def _debug_align():
             from config import load_ui_scale
-            a = self.auto_search_cb.winfo_rootx() - search_frame.winfo_rootx()
+            a = self.auto_options_btn.winfo_rootx() - search_frame.winfo_rootx()
             o = self.overlaps_only_cb.winfo_rootx() - search_frame.winfo_rootx()
             print(f"DEBUG ui_scale={load_ui_scale()} auto_search_x={a} overlaps_x={o} diff={o-a}")
         self.parent.after(500, _debug_align)
@@ -10345,31 +10298,85 @@ class RingFinder(ColumnVisibilityMixin):
             return
         self._show_mineral_ranking_dialog(system_name, results, modal=False, extra_candidates=extra_candidates, mineral_ring_types=mineral_ring_types)
 
-    def _show_auto_prices_menu(self, event):
-        """Right-click menu on the Auto Prices checkbox: show on overlay, and in-system prices
-        only (shared PowerPlay-mode setting)"""
-        from config import load_pp_mode, save_pp_mode
+    def _show_auto_options_menu(self):
+        """Auto Options dropdown: Auto-Search, Auto Switch, Auto Prices, plus an Auto Prices Options submenu
+        (show on overlay, in-system prices only). Hovering an entry shows its tooltip text in the status line."""
+        from config import load_pp_mode, save_pp_mode, scaled_font, scaled_px
         in_system_var = tk.BooleanVar(value=load_pp_mode())
 
-        def on_toggle():
+        def on_in_system_toggle():
             save_pp_mode(in_system_var.get())
             main_app = getattr(getattr(self, 'prospector_panel', None), 'main_app', None)
             settings_var = getattr(main_app, 'auto_prices_in_system', None)
             if settings_var is not None and settings_var.get() != in_system_var.get():
                 settings_var.set(in_system_var.get())
 
-        menu = tk.Menu(self.parent, tearoff=0,
-                       bg=self.context_menu.cget('bg'), fg=self.context_menu.cget('fg'),
-                       activebackground=self.context_menu.cget('activebackground'),
-                       activeforeground=self.context_menu.cget('activeforeground'),
-                       selectcolor=self.context_menu.cget('activebackground'))
-        menu.add_checkbutton(label=t('ring_finder.prices_overlay'), variable=self.prices_overlay_var,
-                             command=self._save_prices_overlay_state)
-        menu.add_checkbutton(label=t('settings.overlay_auto_prices_in_system'), variable=in_system_var, command=on_toggle)
+        colors = dict(bg=self.context_menu.cget('bg'), fg=self.context_menu.cget('fg'),
+                      activebackground=self.context_menu.cget('activebackground'),
+                      activeforeground=self.context_menu.cget('activeforeground'),
+                      selectcolor=self.context_menu.cget('activebackground'))
+        menu = tk.Menu(self.parent, tearoff=0, font=scaled_font(9), **colors)
+        sub = tk.Menu(menu, tearoff=0, font=scaled_font(9), **colors)
+        sub.add_checkbutton(label=t('ring_finder.prices_overlay'), variable=self.prices_overlay_var,
+                            command=self._save_prices_overlay_state)
+        sub.add_checkbutton(label=t('settings.overlay_auto_prices_in_system'), variable=in_system_var,
+                            command=on_in_system_toggle)
+
+        menu.add_checkbutton(label=t('ring_finder.auto_search'), variable=self.auto_search_var,
+                             command=self._on_auto_search_toggle)
+        menu.add_checkbutton(label=t('ring_finder.auto_switch_tabs'), variable=self.auto_switch_tabs_var,
+                             command=self._on_auto_switch_tabs_toggle)
+        menu.add_checkbutton(label=t('ring_finder.prefetch_prices'), variable=self.prefetch_prices_var,
+                             command=self._save_prefetch_prices_state,
+                             state="normal" if self.auto_search_var.get() else "disabled")
+        menu.add_separator()
+        menu.add_cascade(label=t('ring_finder.auto_prices_options'), menu=sub)
+
+        tips = [t('ring_finder.auto_search_tooltip'), t('ring_finder.auto_switch_tooltip'),
+                t('ring_finder.prefetch_prices_tooltip'), "", t('ring_finder.auto_prices_options_tooltip')]
+
+        def on_select(event):
+            try:
+                idx = menu.index("active")
+            except Exception:
+                idx = None
+            if isinstance(idx, int) and idx < len(tips):
+                self._auto_options_tip_label.config(text=tips[idx])
+            else:
+                self._auto_options_tip_label.config(text="")
+
+        # Tooltips don't show over menu entries, so show the hovered entry's text in a small label under the button.
+        tip_label = getattr(self, '_auto_options_tip_label', None)
+        if tip_label is None or not tip_label.winfo_exists():
+            tip_label = tk.Label(self.parent.winfo_toplevel(), text="", justify="left", anchor="w",
+                                 bg="#2b2b2b", fg="#e0e0e0", bd=1, relief="solid",
+                                 font=scaled_font(8), wraplength=scaled_px(460), padx=6, pady=4)
+            self._auto_options_tip_label = tip_label
+
+        import tkinter.font as tkfont
+        _mf = tkfont.Font(root=self.parent, font=scaled_font(9))
+        menu_text_w = max(_mf.measure(t(k)) for k in ('ring_finder.auto_search', 'ring_finder.auto_switch_tabs',
+                                                     'ring_finder.prefetch_prices', 'ring_finder.auto_prices_options')) + scaled_px(70)
+
+        def on_select_show(event):
+            on_select(event)
+            text = tip_label.cget('text')
+            if text:
+                btn = self.auto_options_btn
+                top = btn.winfo_toplevel()
+                tip_label.place(x=btn.winfo_rootx() - top.winfo_rootx() + max(btn.winfo_width(), menu.winfo_width(), menu.winfo_reqwidth(), menu_text_w) + scaled_px(24),
+                                y=btn.winfo_rooty() - top.winfo_rooty() + btn.winfo_height())
+                tip_label.lift()
+            else:
+                tip_label.place_forget()
+
+        menu.bind("<<MenuSelect>>", on_select_show)
         try:
-            menu.tk_popup(event.x_root, event.y_root)
+            menu.tk_popup(self.auto_options_btn.winfo_rootx(),
+                          self.auto_options_btn.winfo_rooty() + self.auto_options_btn.winfo_height())
         finally:
             menu.grab_release()
+            tip_label.place_forget()
 
     def _hide_prices_overlay(self):
         """Hide the Auto Prices overlay message early (e.g. on dropping out of supercruise)"""
@@ -10467,13 +10474,9 @@ class RingFinder(ColumnVisibilityMixin):
         """Auto Prices can't produce results without Auto-Search (it reads hotspot
         data that Auto-Search writes on jump), so grey it out and untick it whenever
         Auto-Search is off."""
-        if self.auto_search_var.get():
-            self.prefetch_prices_cb.config(state="normal")
-        else:
-            if self.prefetch_prices_var.get():
-                self.prefetch_prices_var.set(False)
-                self._save_prefetch_prices_state()
-            self.prefetch_prices_cb.config(state="disabled")
+        if not self.auto_search_var.get() and self.prefetch_prices_var.get():
+            self.prefetch_prices_var.set(False)
+            self._save_prefetch_prices_state()
 
     def _load_prefetch_prices_state(self) -> bool:
         """Load prefetch-prices-on-jump enabled state from Variables folder"""
