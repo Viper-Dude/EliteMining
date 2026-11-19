@@ -23,6 +23,7 @@ from va_profile_parser import VAProfileParser
 logger = logging.getLogger(__name__)
 
 READER_TIMEOUT_SECS = 30
+GUESSED_REASON = "highest version with bindings"
 
 
 @dataclass
@@ -42,6 +43,11 @@ class VAProfileReadResult:
     backup_mtime: float
     reason: str
     candidates: List[VAProfileInfo] = field(default_factory=list)
+
+    @property
+    def guessed(self) -> bool:
+        """True when several EliteMining profiles exist and none matched the previously installed version."""
+        return self.reason == GUESSED_REASON
 
 
 def voiceattack_data_dirs() -> List[str]:
@@ -118,7 +124,7 @@ def choose_profile(profiles: List[VAProfileInfo],
     best = pool[0]
     if len(pool) > 1 and key(pool[1]) == key(best) and pool[1].bound == best.bound:
         return None, f"cannot choose between '{best.name}' and '{pool[1].name}'"
-    return best, "highest version with bindings"
+    return best, GUESSED_REASON
 
 
 def _reader_exe_path() -> Path:

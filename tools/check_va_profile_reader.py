@@ -62,6 +62,12 @@ def selftest():
     assert choose([P('k', 'EliteMining Custom', 300, 9), P('l', 'EliteMining v5.6.6', 308, 1)])[0].id == 'l', \
         'unversioned ranks lowest'
 
+    def guessed(reason):
+        return reader.VAProfileReadResult('', '', '', '', 0, reason).guessed
+    assert guessed(choose(profiles)[1]), 'highest-version pick is a guess'
+    assert not guessed(choose(profiles, '5.6.1')[1]), 'installed version match is not a guess'
+    assert not guessed(choose([P('j', 'EliteMining v5.6.6', 300, 3)])[1]), 'single candidate is not a guess'
+
     work = tempfile.mkdtemp(prefix='em_va_selftest_')
     try:
         backup = os.path.join(work, 'VoiceAttack2', 'Backup')
@@ -192,7 +198,19 @@ def merge_check(reader_tree, extracted, new_vap):
             print(f"  not applied: {name!r} ({reason})")
         for name, f, a, b in mismatches[:20]:
             print(f"  {name!r} {f}: reader={a!r} merged={b!r}")
-        return not mismatches
+
+        # VoiceAttack ignores elements that are out of its export order
+        from va_keybind_applier import COMMAND_ELEMENT_ORDER
+        rank = {n: i for i, n in enumerate(COMMAND_ELEMENT_ORDER)}
+        out_of_order = []
+        for name, cmd in merged.items():
+            ranks = [rank[e.tag] for e in cmd if e.tag in rank]
+            if ranks != sorted(ranks):
+                out_of_order.append(name)
+        print(f"commands with elements out of VoiceAttack order: {len(out_of_order)}")
+        for name in out_of_order[:10]:
+            print(f"  {name!r}")
+        return not mismatches and not out_of_order
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

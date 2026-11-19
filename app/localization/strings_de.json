@@ -823,8 +823,8 @@
     "select_exported_profile": "Wählen Sie Ihr exportiertes XML-Profil (die gerade erstellte Sicherung)",
     "no_keybinds_title": "Keine Tastenbelegungen gefunden",
     "no_keybinds_message": "Keine benutzerdefinierten Tastenbelegungen in Ihrem exportierten Profil gefunden.\n\nDas ist normal, wenn Sie keine Sprachbefehle angepasst haben.\n\nImportieren Sie das neue Profil normal - keine Tastenbelegungen zu erhalten.",
-    "merge_success_title": "Tastenbelegungen erfolgreich zusammengeführt!",
-    "merge_success_message": "✅ {count} Befehlskürzel wurden in das neue Profil übernommen!{not_applied}\n\nImportieren Sie jetzt das aktualisierte Profil in VoiceAttack:\n\n1. Öffnen Sie VoiceAttack\n2. Klicken Sie auf 'Profil importieren'\n3. Wählen Sie:\n   {path}\n\nIhre Tastenbelegungen bleiben im neuen Profil erhalten.\n\nOptionale Bereinigung:\nNach erfolgreichem Import können Sie das alte Profil in VoiceAttack löschen\nund die Sicherungsdatei entfernen (empfohlen: Sicherung aufbewahren).",
+    "merge_success_title": "Kürzel übernommen",
+    "merge_success_message": "{count} Kürzel wurden in das neue Profil übernommen.{source}{not_applied}\n\nÖffnen Sie zum Abschluss VoiceAttack, klicken Sie auf 'Profil importieren' und wählen Sie:\n{path}\n\nDanach können Sie das alte EliteMining-Profil in VoiceAttack löschen.",
     "tool_seismic": "Seismische Sprengladung:",
     "tool_weapons": "Waffen:",
     "tool_ssm": "Unteroberflächenrakete:",
@@ -835,8 +835,8 @@
     "select_exported_profile": "Wählen Sie Ihr exportiertes XML-Profil (die gerade erstellte Sicherung)",
     "no_keybinds_title": "Keine Tastenbelegungen gefunden",
     "no_keybinds_message": "Keine benutzerdefinierten Tastenbelegungen in Ihrem exportierten Profil gefunden.\n\nDas ist normal, wenn Sie keine Sprachbefehle angepasst haben.\n\nImportieren Sie das neue Profil normal - keine Tastenbelegungen zu erhalten.",
-    "merge_success_title": "Tastenbelegungen erfolgreich zusammengeführt!",
-    "merge_success_message": "✅ {count} Befehlskürzel wurden in das neue Profil übernommen!{not_applied}\n\nImportieren Sie jetzt das aktualisierte Profil in VoiceAttack:\n\n1. Öffnen Sie VoiceAttack\n2. Klicken Sie auf 'Profil importieren'\n3. Wählen Sie:\n   {path}\n\nIhre Tastenbelegungen bleiben im neuen Profil erhalten.\n\nOptionale Bereinigung:\nNach erfolgreichem Import können Sie das alte Profil in VoiceAttack löschen\nund die Sicherungsdatei entfernen (empfohlen: Sicherung aufbewahren).",
+    "merge_success_title": "Kürzel übernommen",
+    "merge_success_message": "{count} Kürzel wurden in das neue Profil übernommen.{source}{not_applied}\n\nÖffnen Sie zum Abschluss VoiceAttack, klicken Sie auf 'Profil importieren' und wählen Sie:\n{path}\n\nDanach können Sie das alte EliteMining-Profil in VoiceAttack löschen.",
     "merge_not_applied_header": "{n} Kürzel konnten nicht übernommen werden. Bitte in VoiceAttack neu setzen:\n{list}",
     "merge_not_applied_more": "  ...und {n} weitere",
     "merge_reason_no_match": "kein passender Befehl im neuen Profil",
@@ -847,7 +847,9 @@
     "close_va_message": "Bitte schließen Sie VoiceAttack, damit EliteMining Ihre aktuellen Kürzel lesen kann.\n\nKlicken Sie auf Ja, sobald VoiceAttack geschlossen ist, oder auf Nein, um Ihr Profil stattdessen manuell zu exportieren.",
     "confirm_read_title": "Ihr aktuelles Profil",
     "confirm_read_message": "Ihr Profil '{name}' mit {count} Kürzel(n) wurde gefunden.\n\nDiese Kürzel in das neue Profil übernehmen?\n\nKlicken Sie auf Nein, um Ihr Profil stattdessen manuell zu exportieren.",
-    "read_failed_message": "EliteMining konnte Ihre Kürzel nicht automatisch aus VoiceAttack lesen.\n\nBitte exportieren Sie stattdessen Ihr aktuelles Profil."
+    "read_failed_message": "EliteMining konnte Ihre Kürzel nicht automatisch aus VoiceAttack lesen.\n\nBitte exportieren Sie stattdessen Ihr aktuelles Profil.",
+    "yes_recommended": "Ja (empfohlen)",
+    "merge_source": "\nÜbernommen aus Ihrem VoiceAttack-Profil '{name}'."
   },
   "bookmarks": {
     "title": "Bergbau-Lesezeichen",

@@ -412,7 +412,7 @@ def centered_message(parent: Optional[tk.Widget], title: str, message: str, icon
     dialog.wait_window()
 
 
-def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> bool:
+def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str, yes_text: str = "Yes") -> bool:
     """Show a centered Yes/No dialog and return True if Yes."""
     from tkinter import ttk
     
@@ -445,7 +445,7 @@ def centered_askyesno(parent: Optional[tk.Widget], title: str, message: str) -> 
         except:
             pass
     
-    yes_btn = ttk.Button(btn_frame, text="Yes", width=10, command=on_yes)
+    yes_btn = ttk.Button(btn_frame, text=yes_text, width=max(10, len(yes_text) + 2), command=on_yes)
     yes_btn.pack(side=tk.LEFT, padx=(0, 10))
     no_btn = ttk.Button(btn_frame, text="No", width=10, command=on_no)
     no_btn.pack(side=tk.LEFT)

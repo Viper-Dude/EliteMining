@@ -18,6 +18,29 @@ logger = logging.getLogger(__name__)
 
 XSI_NIL = "{http://www.w3.org/2001/XMLSchema-instance}nil"
 
+# Command element order in a VoiceAttack 2 export. VoiceAttack silently ignores elements that
+# are out of this order on import, and shipped profiles omit unbound fields, so missing
+# elements must be inserted in place rather than appended.
+COMMAND_ELEMENT_ORDER = [
+    'Referrer', 'ExecType', 'Confidence', 'PrefixActionCount', 'IsDynamicallyCreated', 'TargetProcessSet',
+    'TargetProcessType', 'TargetProcessLevel', 'CompareType', 'ExecFromWildcard', 'IsSubCommand', 'IsOverride',
+    'BaseId', 'OriginId', 'SessionEnabled', 'DoubleTapInvoked', 'SingleTapDelayedInvoked', 'LongTapInvoked',
+    'ShortTapDelayedInvoked', 'SleepFlag', 'Id', 'CommandString', 'ActionSequence', 'Async', 'Enabled',
+    'Description', 'Category', 'UseShortcut', 'keyValue', 'keyShift', 'keyAlt', 'keyCtrl', 'keyWin', 'keyPassthru',
+    'UseSpokenPhrase', 'onlyKeyUp', 'RepeatNumber', 'RepeatType', 'CommandType', 'SourceProfile', 'UseConfidence',
+    'minimumConfidenceLevel', 'UseJoystick', 'joystickNumber', 'joystickButton', 'joystickNumber2',
+    'joystickButton2', 'joystickUp', 'KeepRepeating', 'UseProcessOverride', 'ProcessOverride',
+    'ProcessOverrideActiveWindow', 'LostFocusStop', 'PauseLostFocus', 'LostFocusBackCompat', 'UseMouse',
+    'Mouse1', 'Mouse2', 'Mouse3', 'Mouse4', 'Mouse5', 'Mouse6', 'Mouse7', 'Mouse8', 'Mouse9', 'MouseUpOnly',
+    'MousePassThru', 'joystickExclusive', 'lastEditedAction', 'UseProfileProcessOverride', 'ProfileProcessOverride',
+    'ProfileProcessOverrideActiveWindow', 'RepeatIfKeysDown', 'RepeatIfMouseDown', 'RepeatIfJoystickDown', 'AH',
+    'CL', 'HasMB', 'UseVariableHotkey', 'CLE', 'EX1', 'EX2', 'InternalId', 'HasInput', 'HotkeyDoubleTapLevel',
+    'MouseDoubleTapLevel', 'JoystickDoubleTapLevel', 'HotkeyLongTapLevel', 'MouseLongTapLevel',
+    'JoystickLongTapLevel', 'AlwaysExec', 'ResourceBalance', 'PreventExec', 'ExternalEventsEnabled',
+    'ExcludeExecOnRecognized', 'UseVariableMouseShortcut', 'UseVariableJoystickShortcut', 'ForceGrammar',
+]
+_ELEMENT_RANK = {name: i for i, name in enumerate(COMMAND_ELEMENT_ORDER)}
+
 # Reasons a binding was not applied
 NO_MATCH = "no_match"
 AMBIGUOUS = "ambiguous"
@@ -148,7 +171,15 @@ class VAKeybindApplier:
     def _set(self, command: ET.Element, elem_name: str, value):
         elem = command.find(elem_name)
         if elem is None:
-            elem = ET.SubElement(command, elem_name)
+            elem = ET.Element(elem_name)
+            rank = _ELEMENT_RANK.get(elem_name)
+            index = len(command)
+            if rank is not None:
+                for i, child in enumerate(command):
+                    if _ELEMENT_RANK.get(child.tag, -1) > rank:
+                        index = i
+                        break
+            command.insert(index, elem)
         elem.attrib.pop(XSI_NIL, None)
         if isinstance(value, bool):
             elem.text = "true" if value else "false"

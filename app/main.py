@@ -20818,7 +20818,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.update_idletasks()
             
             from app_utils import centered_askyesno
-            from path_utils import get_app_data_dir
 
             # Show update message with keybind preservation info
             current_display = current_version if current_version else "Unknown"
@@ -20833,16 +20832,21 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 message
             )
             
-            # Save the new version to state file (user has been notified)
-            state_file = os.path.join(get_app_data_dir(), "va_profile_state.json")
-            self._save_va_profile_state(state_file, new_version)
-            logging.info(f"[VA_PROFILE] Saved new version to state: {new_version}")
-
+            logging.info(f"[VA_PROFILE] Update dialog answer: {'Yes' if result else 'No'}")
             if result:
                 self._va_profile_auto_merge(current_version, new_version, profile_path)
+            else:
+                self._mark_va_profile_handled(new_version)
 
         except Exception as e:
             logging.error(f"[VA_PROFILE] Error showing update dialog: {e}")
+
+    def _mark_va_profile_handled(self, new_version):
+        """Save the new version only once the update flow has finished, so an interrupted update is offered again"""
+        from path_utils import get_app_data_dir
+        state_file = os.path.join(get_app_data_dir(), "va_profile_state.json")
+        self._save_va_profile_state(state_file, new_version)
+        logging.info(f"[VA_PROFILE] Saved new version to state: {new_version}")
 
     def _va_profile_auto_merge(self, current_version, new_version, profile_path):
         """Read the player's current bindings from VoiceAttack's data file; any failure falls back to the export flow"""
@@ -20852,7 +20856,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             from va_process_manager import VAProcessManager
             while VAProcessManager.is_running():
-                if not centered_askyesno(self, t("voiceattack.close_va_title"), t("voiceattack.close_va_message")):
+                closed = centered_askyesno(self, t("voiceattack.close_va_title"), t("voiceattack.close_va_message"))
+                logging.info(f"[VA_PROFILE] Close VoiceAttack prompt answer: {'Yes' if closed else 'No'}")
+                if not closed:
                     self._va_profile_export_merge(new_version, profile_path)
                     return
             include_live = True
@@ -20860,6 +20866,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Without a running check, read only the backups VoiceAttack has finished writing
             logging.warning(f"[VA_PROFILE] Could not check whether VoiceAttack is running: {e}")
             include_live = False
+
+        logging.info(f"[VA_PROFILE] Reading VoiceAttack bindings (live file allowed: {include_live})")
 
         def worker():
             try:
@@ -20877,20 +20885,29 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from app_utils import centered_askyesno, centered_message
 
         if read is None:
+            logging.info("[VA_PROFILE] Reading VoiceAttack bindings failed, falling back to export")
             centered_message(self, t("voiceattack.profile_update_title"), t("voiceattack.read_failed_message"))
             self._va_profile_export_merge(new_version, profile_path)
             return
 
         try:
             chosen = next((p for p in read.candidates if p.id == read.profile_id), None)
-            confirm = t("voiceattack.confirm_read_message").format(
-                name=read.profile_name, count=chosen.bound if chosen else 0
-            )
-            if not centered_askyesno(self, t("voiceattack.confirm_read_title"), confirm):
-                self._va_profile_export_merge(new_version, profile_path)
-                return
+            bound = chosen.bound if chosen else 0
+            logging.info(f"[VA_PROFILE] Read '{read.profile_name}' ({read.reason}) with {bound} shortcuts "
+                         f"from {os.path.basename(read.backup_path)}")
+            # Ask only when the profile was a guess among several; otherwise the success dialog names it
+            if read.guessed:
+                confirm = t("voiceattack.confirm_read_message").format(name=read.profile_name, count=bound)
+                confirmed = centered_askyesno(self, t("voiceattack.confirm_read_title"), confirm,
+                                              yes_text=t("voiceattack.yes_recommended"))
+                logging.info(f"[VA_PROFILE] Profile confirmation answer: {'Yes' if confirmed else 'No'}")
+                if not confirmed:
+                    self._va_profile_export_merge(new_version, profile_path)
+                    return
             try:
-                self._merge_profiles_with_keybinds(read.xml_path, profile_path, new_version)
+                self._merge_profiles_with_keybinds(read.xml_path, profile_path, new_version,
+                                                   source_name=read.profile_name)
+                self._mark_va_profile_handled(new_version)
             except Exception as e:
                 logging.error(f"[VA_PROFILE] Merge from VoiceAttack data failed: {e}")
                 centered_message(self, t("voiceattack.profile_update_title"), t("voiceattack.read_failed_message"))
@@ -20900,6 +20917,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _va_profile_export_merge(self, new_version, profile_path):
         """Fallback: the player exports the current profile as XML and selects it"""
+        logging.info("[VA_PROFILE] Export flow started")
+        try:
+            self._va_profile_export_merge_steps(new_version, profile_path)
+        finally:
+            self._mark_va_profile_handled(new_version)
+
+    def _va_profile_export_merge_steps(self, new_version, profile_path):
         from app_utils import centered_message
         from tkinter import filedialog
 
@@ -20922,6 +20946,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             filetypes=[("VoiceAttack Profile", "*.vap"), ("All files", "*.*")],
             initialdir=elitemining_folder
         )
+        logging.info(f"[VA_PROFILE] Exported profile {'selected' if old_profile_path else 'not selected'}")
 
         if old_profile_path:
             # Try to merge keybinds
@@ -20945,7 +20970,7 @@ Import the new profile from:
 Your keybinds will need to be reconfigured manually."""
             centered_message(self, "Manual Update", manual_instructions)
 
-    def _merge_profiles_with_keybinds(self, old_profile_path, new_profile_path, new_version):
+    def _merge_profiles_with_keybinds(self, old_profile_path, new_profile_path, new_version, source_name=None):
         """Merge keybinds from old profile into new profile"""
         from va_profile_parser import VAProfileParser
         from va_keybind_extractor import VAKeybindExtractor
@@ -21013,6 +21038,7 @@ Your keybinds will need to be reconfigured manually."""
             t("voiceattack.merge_success_title"),
             t("voiceattack.merge_success_message").format(
                 count=len(result.applied),
+                source=t("voiceattack.merge_source").format(name=source_name) if source_name else "",
                 not_applied=not_applied_text,
                 path=new_profile_path
             )
