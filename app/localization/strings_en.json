@@ -1355,6 +1355,8 @@
     "session_active_cancel": "Keep session running",
     "unsaved_preset_title": "Unsaved Ship Preset Changes",
     "unsaved_preset_message": "You have unsaved changes to the ship preset \"{name}\".",
+    "unsaved_ann_preset_title": "Unsaved Announcement Preset Changes",
+    "unsaved_ann_preset_message": "You have unsaved changes to the announcement preset \"{name}\".",
     "unsaved_preset_yes": "Save changes",
     "unsaved_preset_no": "Discard changes",
     "unsaved_preset_cancel": "Don't close",

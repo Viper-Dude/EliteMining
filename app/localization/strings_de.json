@@ -1362,6 +1362,8 @@
     "session_active_cancel": "Sitzung weiterlaufen lassen",
     "unsaved_preset_title": "Ungespeicherte Schiff-Preset-Änderungen",
     "unsaved_preset_message": "Du hast ungespeicherte Änderungen am Schiff-Preset \"{name}\".",
+    "unsaved_ann_preset_title": "Ungespeicherte Ankündigungs-Preset-Änderungen",
+    "unsaved_ann_preset_message": "Du hast ungespeicherte Änderungen am Ankündigungs-Preset \"{name}\".",
     "unsaved_preset_yes": "Änderungen speichern",
     "unsaved_preset_no": "Änderungen verwerfen",
     "unsaved_preset_cancel": "Nicht schließen",

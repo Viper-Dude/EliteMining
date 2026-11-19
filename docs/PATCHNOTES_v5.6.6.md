@@ -18,6 +18,7 @@
 - Fixed Announcements table columns snapping back when resized, and Minimal % boxes not following their column.
 - Fixed the mouse wheel changing Minimal % values by accident while scrolling the list. It now only changes a value after you click into the box.
 - Fixed Distance Calculator messages staying on screen and popups appearing when Home or Fleet Carrier was not set.
+- Fixed the app not asking about unsaved ship preset changes when restarting, and not asking about unsaved announcement preset changes when closing or restarting.
 
 
 

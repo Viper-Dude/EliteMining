@@ -7795,17 +7795,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if i == self._active_preset_num:
                 # Active preset — highlighted
                 if is_modified:
-                    btn.config(text=f"{base_name} *", bg=active_bg, 
-                              activebackground=active_hover,
+                    diff_fg = self._preset_diff_fg()
+                    btn.config(text=f"{base_name} *", bg=active_bg, fg=diff_fg,
+                              activebackground=active_hover, activeforeground=diff_fg,
                               relief="raised")
                 else:
-                    btn.config(text=base_name, bg=active_bg, 
-                              activebackground=active_hover,
+                    btn.config(text=base_name, bg=active_bg, fg="#ffffff",
+                              activebackground=active_hover, activeforeground="#ffffff",
                               relief="raised")
             else:
                 # Inactive preset — default style
-                btn.config(text=base_name, bg=inactive_bg, 
-                          activebackground=inactive_hover,
+                btn.config(text=base_name, bg=inactive_bg, fg="#ffffff",
+                          activebackground=inactive_hover, activeforeground="#ffffff",
                           relief="raised")
 
     def _ann_show_preset_menu(self, num, event):
@@ -11541,7 +11542,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.preset_list.tag_configure('evenrow', background='#282828', foreground='#e6e6e6', font=self._scaled_font(9))
             self.preset_list.tag_configure('group', background='#1a1a1a', foreground='#aaaaaa', font=self._scaled_font(9, "bold"))
             self.preset_list.tag_configure('active_preset', background='#2a4a6a', foreground='#ffffff', font=self._scaled_font(9, "bold"))
-    
+
     def _parse_preset_ship_type(self, preset_name: str) -> tuple:
         """Parse preset name to extract ship type and build variant.
         
@@ -12737,7 +12738,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _preset_diff_fg(self):
         """Text colour for values changed since the active preset was saved or loaded."""
-        if self.current_theme in ('modern', 'modern_slate', 'modern_orange'):
+        if self.current_theme == "modern_orange":
+            return "#5CC8FF"  # nearly all text is orange here, so the accent orange would not stand out
+        if self.current_theme == "modern_slate":
+            return "#FF9A32"  # Slate's own accent is light grey, the same as its text, so use the plain orange
+        if self.current_theme == "modern":
             return modern_color("#FF9A32")
         return "#ffffff" if self.current_theme == "elite_orange" else "#ffcc00"
 
@@ -15362,6 +15367,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         import os
         import subprocess
 
+        # Restarting exits without going through _on_close, so ask about unsaved preset changes here
+        if not self._confirm_unsaved_presets():
+            return
+
         # Save window geometry before restart
         try:
             from config import save_window_geometry
@@ -15636,8 +15645,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         return result[0] if result[0] else "cancel"
 
-    def _show_unsaved_ship_preset_dialog(self) -> str:
+    def _show_unsaved_ship_preset_dialog(self, title=None, message=None) -> str:
         """Show a themed dialog when closing with unsaved ship preset changes.
+
+        title/message default to the ship preset texts; pass others to reuse it for announcement presets.
 
         Returns:
             'yes' - Save changes
@@ -15652,7 +15663,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Create themed dialog
         dialog = tk.Toplevel(self)
         dialog.withdraw()  # Hide initially to prevent flicker on wrong monitor
-        dialog.title(t('dialogs.unsaved_preset_title'))
+        dialog.title(title or t('dialogs.unsaved_preset_title'))
         # dialog.transient(self)  # Disabled - causes focus issues
         try:
             dialog.grab_set()
@@ -15712,7 +15723,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         tk.Label(
             msg_text_frame,
-            text=t('dialogs.unsaved_preset_message').format(name=self._active_ship_preset_name),
+            text=message or t('dialogs.unsaved_preset_message').format(name=self._active_ship_preset_name),
             font=self._scaled_font(11, "bold"),
             bg=bg_color,
             fg=fg_bright,
@@ -15821,6 +15832,27 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         return result[0] if result[0] else "cancel"
 
+    def _confirm_unsaved_presets(self) -> bool:
+        """Ask about unsaved ship and announcement preset changes. Returns False if the user cancels."""
+        if self._ship_is_preset_modified():
+            result = self._show_unsaved_ship_preset_dialog()
+            if result == "yes":
+                self._write_preset_file(self._active_ship_preset_name)
+            elif result != "no":
+                return False
+        if self._ann_is_preset_modified():
+            num = self._active_preset_num
+            names = self.prospector_panel._load_cfg().get('preset_names', {})
+            name = names.get(str(num), t('settings.preset_button').format(num=num))
+            result = self._show_unsaved_ship_preset_dialog(
+                title=t('dialogs.unsaved_ann_preset_title'),
+                message=t('dialogs.unsaved_ann_preset_message').format(name=name))
+            if result == "yes":
+                self._ann_save_preset(num)
+            elif result != "no":
+                return False
+        return True
+
     def _on_close(self) -> None:
         # Check if mining session is active
         if hasattr(self, 'prospector_panel') and self.prospector_panel.session_active:
@@ -15833,17 +15865,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             else:  # Cancel - Don't close
                 return
 
-        # Check if the active ship preset has unsaved changes
-        if self._ship_is_preset_modified():
-            result = self._show_unsaved_ship_preset_dialog()
+        # Check if the active ship or announcement preset has unsaved changes
+        if not self._confirm_unsaved_presets():
+            return
 
-            if result == "yes":  # Save changes
-                self._write_preset_file(self._active_ship_preset_name)
-            elif result == "no":  # Discard changes
-                pass
-            else:  # Cancel - Don't close
-                return
-        
         try:
             is_zoomed = (self.state() == "zoomed")
             if is_zoomed:
