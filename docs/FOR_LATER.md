@@ -45,4 +45,4 @@ All four items are implemented. The user accepted the completed work, reported m
 
 No release build, commit, or push was performed as part of this work. The user handles release builds. Preserve unrelated workspace changes.
 
-For a reported regression, record what happened, what was expected, the approximate time, and whether the game or app had just restarted. Log locations are documented in `ARCHITECTURE.md`.
+For a reported regression, record what happened, what was expected, the approximate time, and whether the game or app had just restarted. Log locations are documented in `AGENTS.md`.
