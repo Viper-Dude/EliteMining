@@ -10311,7 +10311,7 @@ class RingFinder(ColumnVisibilityMixin):
         colors = dict(bg=self.context_menu.cget('bg'), fg=self.context_menu.cget('fg'),
                       activebackground=self.context_menu.cget('activebackground'),
                       activeforeground=self.context_menu.cget('activeforeground'),
-                      selectcolor=self.context_menu.cget('activebackground'))
+                      selectcolor="#ff9a32")
         menu = tk.Menu(self.parent, tearoff=0, font=scaled_font(9), **colors)
         sub = tk.Menu(menu, tearoff=0, font=scaled_font(9), **colors)
         sub.add_checkbutton(label=t('ring_finder.prices_overlay'), variable=self.prices_overlay_var,

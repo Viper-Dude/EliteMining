@@ -12,6 +12,7 @@
 - Tooltips now match the Modern themes.
 - Cleaner Distance Calculator layout with less repeated information.
 - VoiceAttack Controls now show in color which values you changed since loading or saving your ship preset.
+- New Ships tab in Mining Statistics showing sessions, tons and T/hr for each of your ships.
 
 ## Bug Fixes
 

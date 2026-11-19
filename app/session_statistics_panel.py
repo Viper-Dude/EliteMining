@@ -30,6 +30,16 @@ def material_names(row):
     return sorted(set(name.strip() for name in names))
 
 
+MIN_SHIP_SESSIONS = 3
+
+
+def optional_int(value):
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
 def prepare_sessions(rows, parse_elapsed, ship_lookup):
     prepared = []
     for source in rows:
@@ -42,6 +52,7 @@ def prepare_sessions(rows, parse_elapsed, ship_lookup):
             row['_hours'] = parse_elapsed(row.get('elapsed') or '')
             row['_stamp'] = session_date(row.get('timestamp_utc', ''))
             row['_materials'] = material_names(row)
+            row['_prospectors'] = optional_int(row.get('prospectors_used'))
             row['_ship'], row['_report'] = ship_lookup(row.get('system', ''), row.get('body', ''), row.get('timestamp_utc', ''))
             prepared.append(row)
         except (ValueError, TypeError):
@@ -85,6 +96,35 @@ def location_summary(rows, mineral=''):
     ranked.sort(key=lambda entry: entry['best']['_tph'], reverse=True)
     recent.sort(key=lambda entry: entry['latest']['_stamp'], reverse=True)
     return ranked[:20], recent[:20]
+
+
+def ship_summary(rows):
+    groups = defaultdict(list)
+    for row in rows:
+        if row['_ship']:
+            groups[row['_ship']].append(row)
+    oldest = datetime.min.replace(tzinfo=timezone.utc)
+    entries = []
+    for name, sessions in groups.items():
+        counted = [row for row in sessions if row['_prospectors'] is not None and row['_tons'] > 0]
+        counted_tons = sum(row['_tons'] for row in counted)
+        places = defaultdict(list)
+        for row in sessions:
+            if row.get('system', '').strip():
+                places[(row['system'].strip().casefold(), row.get('body', '').strip().casefold())].append(row)
+        favourite = max(places.values(), key=lambda group: (len(group), max(row['_stamp'] or oldest for row in group)),
+                        default=None)
+        entries.append({'name': name, 'count': len(sessions),
+                        'hours': sum(row['_hours'] for row in sessions),
+                        'tons': sum(row['_tons'] for row in sessions),
+                        'avg': sum(row['_tph'] for row in sessions) / len(sessions),
+                        'best': max(sessions, key=lambda row: row['_tph']),
+                        'ppt': counted_tons / limpets if (limpets := sum(row['_prospectors'] for row in counted)) else None,
+                        'location': ' | '.join(part for part in (favourite[0]['system'].strip(), favourite[0].get('body', '').strip()) if part)
+                                    if favourite else '',
+                        'latest': max(sessions, key=lambda row: row['_stamp'] or oldest)})
+    entries.sort(key=lambda entry: entry['count'], reverse=True)
+    return entries
 
 
 def recent_progress(rows):
@@ -165,6 +205,12 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.best_tree = self._table('best_locations', ('system', 'body', 'distance', 'ls', 'mineral_avg', 'mineral_best', 'mineral_hits', 'best', 'avg', 'low', 'count', 'hours', 'duration', 'date', 'mineral'))
         self.recent_tree = self._table('recent_locations', ('system', 'body', 'distance', 'ls', 'date', 'mineral', 'mineral_avg', 'mineral_best', 'mineral_hits', 'tph', 'ship', 'duration', 'count', 'hours'))
         self.visited_tree = self._table('recent_systems', ('system', 'date', 'distance', 'visits'))
+        self.ship_tree = self._table('ships', ('ship', 'count', 'hours', 'tons', 'avg', 'best', 'ppt', 'location', 'last_used'))
+        ship_pane = self.ship_tree.master.master
+        self.ship_summary = ttk.Label(ship_pane, wraplength=900, justify='left')
+        self.ship_summary.pack(fill='x', before=self.ship_tree.master, pady=(scaled_px(5), 0))
+        ship_pane.bind('<Configure>', lambda event: self.ship_summary.configure(wraplength=max(scaled_px(100), event.width - scaled_px(20))), add='+')
+        self.filtered_rows = []
         self.database_tree = self._table('database', ('mineral', 'hotspots', 'rings', 'mined', 'coverage', 'double', 'triple', 'res_low', 'res_normal', 'res_high', 'haz'))
         self.database_summary = ttk.Label(self.database_tree.master.master, wraplength=900)
         self.database_summary.pack(fill='x', before=self.database_tree.master)
@@ -256,7 +302,8 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             minimum = max(heading_font.measure(text) + scaled_px(24), scaled_px(60))
             anchor = 'center' if col in ('tph', 'count', 'hours') else 'w'
             tree.heading(col, text=text, anchor=anchor, command=lambda c=col, widget=tree: self._sort(widget, c))
-            width = scaled_px(210 if col == 'system' else 150 if col in ('body', 'ship', 'mineral', 'date') else 100)
+            width = scaled_px(290 if name == 'ships' and col == 'ship' else 210 if col in ('system', 'location')
+                              else 150 if col in ('body', 'ship', 'mineral', 'date', 'last_used') else 100)
             saved = self.preferences.get(name + '_widths', {}).get(col, width)
             tree.column(col, width=max(saved, minimum), minwidth=minimum, anchor=anchor, stretch=False)
         tree.heading('_spacer', text='')
@@ -264,17 +311,18 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.setup_column_visibility(tree, columns, {col: tree.column(col, 'width') for col in columns},
                                      key, use_displaycolumns=True, allow_reorder=True)
         self._context_handlers = getattr(self, '_context_handlers', {})
-        self._context_handlers[key] = (lambda event: None) if name == 'database' else lambda event: self._menu(event, tree)
+        self._context_handlers[key] = (lambda event: None) if name in ('database', 'ships') else lambda event: self._menu(event, tree)
         if name != 'database':
             tree.bind('<Double-1>', lambda event: self._open_clicked(event, tree))
-        if name != 'database':
+        if name not in ('database', 'ships'):
             tree.bind('<Control-c>', lambda event: self._copy_selected_system(tree))
         tree.bind('<ButtonRelease-1>', lambda event: self._save_widths(tree, name), add='+')
         report_tips = {'system': 'system', 'body': 'body', 'ship': 'ship', 'date': 'datetime',
                        'duration': 'duration', 'tph': 'tph'}
         if name == 'recent_systems':
             report_tips.pop('date')
-        add_header_tooltips(tree, lambda column: t('tooltips.reports_' + report_tips[column])
+        add_header_tooltips(tree, lambda column: t('statistics_expanded.header_tips.ships_' + column) if name == 'ships'
+                            else t('tooltips.reports_' + report_tips[column])
                             if column in report_tips else t('statistics_expanded.coverage_tip') if name == 'database' and column == 'coverage' else t('statistics_expanded.col_' + column) if name == 'database' else t('statistics_expanded.header_tips.' +
                             ('visit_date' if name == 'recent_systems' and column == 'date' else column)))
         x = ttk.Scrollbar(table, orient='horizontal', command=tree.xview)
@@ -286,7 +334,8 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         table.rowconfigure(0, weight=1)
         table.columnconfigure(0, weight=1)
         if name not in ('recent_systems', 'database'):
-            ToolTip(header, t('statistics_expanded.ranking_help' if name == 'best_locations' else 'statistics_expanded.recent_help'))
+            ToolTip(header, t('statistics_expanded.ranking_help' if name == 'best_locations' else 'statistics_expanded.ships_help'
+                              if name == 'ships' else 'statistics_expanded.recent_help'))
         self.lookups[tree] = {}
         return tree
 
@@ -536,6 +585,36 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             if getattr(tree, '_sort_column', None):
                 tree._sort_reverse = not tree._sort_reverse
                 self._sort(tree, tree._sort_column)
+        self.filtered_rows = rows
+        self._show_ships()
+
+    def _show_ships(self):
+        tree = self.ship_tree
+        tree.delete(*tree.get_children())
+        self.lookups[tree].clear()
+        entries = ship_summary(self.filtered_rows)
+        for entry in entries:
+            values = {'ship': entry['name'], 'count': entry['count'], 'hours': f"{entry['hours']:.2f}",
+                      'tons': f"{entry['tons']:,.0f}", 'avg': f"{entry['avg']:.1f}", 'best': f"{entry['best']['_tph']:.1f}",
+                      'ppt': f"{entry['ppt']:.1f}" if entry['ppt'] is not None else '—',
+                      'location': entry['location'] or '—', 'last_used': self._date(entry['latest'])}
+            item = tree.insert('', 'end', values=[values.get(col, '') for col in tree['columns']])
+            self.lookups[tree][item] = entry['best']
+        if entries:
+            used = max(entries, key=lambda entry: (entry['count'], entry['hours']))
+            fastest = max((entry for entry in entries if entry['count'] >= MIN_SHIP_SESSIONS),
+                          key=lambda entry: entry['avg'], default=None)
+            heaviest = max(entries, key=lambda entry: entry['tons'])
+            short = lambda entry: entry['name'].split(' - ')[0]
+            self.ship_summary.configure(text=t('statistics_expanded.ships_totals').format(
+                used=t('statistics_expanded.ships_sessions').format(name=short(used), count=used['count']),
+                fastest=f"{short(fastest)} ({fastest['avg']:.1f})" if fastest else '—',
+                heaviest=f"{short(heaviest)} ({heaviest['tons']:,.0f} t)", ships=len(entries)))
+        else:
+            self.ship_summary.configure(text=t('statistics_expanded.no_sessions'))
+        if getattr(tree, '_sort_column', None):
+            tree._sort_reverse = not tree._sort_reverse
+            self._sort(tree, tree._sort_column)
 
     def _overview(self, rows, stats):
         def label(key, value):
@@ -644,7 +723,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                     return row['visits']
             if column == 'duration':
                 return self.owner._parse_elapsed_to_hours(value)
-            return (float('-inf') if value == '—' else float(value)) if column in ('tph', 'best', 'avg', 'low', 'count', 'hours', 'distance', 'ls', 'mineral_avg', 'mineral_best', 'mineral_hits') else value.casefold()
+            return (float('-inf') if value == '—' else float(value.replace(',', ''))) if column in ('tph', 'best', 'avg', 'low', 'count', 'hours', 'distance', 'ls', 'mineral_avg', 'mineral_best', 'mineral_hits', 'tons', 'ppt') else value.casefold()
         items = [item for item in tree.get_children() if tree is not self.database_tree or item != 'database_total']
         for i, item in enumerate(sorted(items, key=key, reverse=reverse)):
             tree.move(item, '', i)

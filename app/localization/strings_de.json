@@ -1862,7 +1862,16 @@
       "low": "Niedrigste T/Std. einer Sitzung an diesem Ort.",
       "count": "Bergbausitzungen an diesem Ort.",
       "hours": "Gesamte Bergbauzeit an diesem Ort in Stunden.",
-      "mineral": "Mineralien der Rekordsitzung (Top 20) oder letzten Sitzung (Letzte 20)."
+      "mineral": "Mineralien der Rekordsitzung (Top 20) oder letzten Sitzung (Letzte 20).",
+      "ships_ship": "Schiffsname und -typ.",
+      "ships_count": "Bergbausitzungen mit diesem Schiff.",
+      "ships_hours": "Gesamte Bergbauzeit mit diesem Schiff in Stunden.",
+      "ships_tons": "Insgesamt abgebaute Tonnen mit diesem Schiff.",
+      "ships_avg": "Durchschnittliche T/Std. der Sitzungen mit diesem Schiff.",
+      "ships_best": "Beste T/Std. einer Sitzung mit diesem Schiff. Doppelklick auf die Zeile öffnet diese Sitzung.",
+      "ships_ppt": "Abgebaute Tonnen pro verbrauchter Prospektor-Drohne. Mehr ist besser. Sitzungen ohne Drohnenzahl werden übersprungen.",
+      "ships_location": "Der Ring oder Körper, den du mit diesem Schiff am häufigsten abgebaut hast.",
+      "ships_last_used": "Letzte Sitzung mit diesem Schiff, angezeigt in Ortszeit."
     },
     "all_ships": "Alle Schiffe",
     "col_minerals_mined": "Abgebaute Mineralien",
@@ -1904,6 +1913,14 @@
     "metric_tpa": "Mittlere T/Asteroid",
     "open_report": "Sitzungsbericht öffnen",
     "find_location": "Im Hotspot-Finder suchen",
-    "load_failed": "Sitzungen konnten nicht geladen werden. Erneut aktualisieren; Details stehen im Protokoll."
+    "load_failed": "Sitzungen konnten nicht geladen werden. Erneut aktualisieren; Details stehen im Protokoll.",
+    "ships": "Schiffe",
+    "ships_help": "Eine Zeile pro Schiff, mit den gewählten Filtern. Beste Ø T/Std. braucht mindestens 3 Sitzungen. Doppelklick auf eine Zeile öffnet die beste Sitzung dieses Schiffs.",
+    "ships_totals": "Am meisten genutzt: {used}    Beste Ø T/Std.: {fastest}    Meiste Tonnen: {heaviest}    Schiffe: {ships}",
+    "ships_sessions": "{name} ({count} Sitzungen)",
+    "col_tons": "Tonnen",
+    "col_ppt": "T/Drohne",
+    "col_location": "Lieblingsring",
+    "col_last_used": "Zuletzt genutzt"
   }
 }

@@ -1854,7 +1854,16 @@
       "low": "Lowest session T/hr at this location.",
       "count": "Mining sessions at this location.",
       "hours": "Total mining time at this location, in hours.",
-      "mineral": "Minerals from the record session (Top 20) or latest session (Last 20)."
+      "mineral": "Minerals from the record session (Top 20) or latest session (Last 20).",
+      "ships_ship": "Ship name and type.",
+      "ships_count": "Mining sessions with this ship.",
+      "ships_hours": "Total mining time with this ship, in hours.",
+      "ships_tons": "Total tons mined with this ship.",
+      "ships_avg": "Average session T/hr with this ship.",
+      "ships_best": "Best session T/hr with this ship. Double-click the row to open that session.",
+      "ships_ppt": "Tons mined per prospector limpet used. Higher is better. Sessions without a limpet count are skipped.",
+      "ships_location": "The ring or body you mined most often with this ship.",
+      "ships_last_used": "Latest session with this ship, shown in local time."
     },
     "all_ships": "All Ships",
     "col_minerals_mined": "Minerals Mined",
@@ -1896,6 +1905,14 @@
     "metric_tpa": "Average T/asteroid",
     "open_report": "Open Session Report",
     "find_location": "Find in Hotspots Finder",
-    "load_failed": "Could not load sessions. Try Refresh; details are in the log."
+    "load_failed": "Could not load sessions. Try Refresh; details are in the log.",
+    "ships": "Ships",
+    "ships_help": "One row per ship, using the selected filters. Best Avg T/hr needs at least 3 sessions. Double-click a row to open that ship's best session.",
+    "ships_totals": "Most used: {used}    Best Avg T/hr: {fastest}    Most tons: {heaviest}    Ships: {ships}",
+    "ships_sessions": "{name} ({count} sessions)",
+    "col_tons": "Tons",
+    "col_ppt": "T/Limpet",
+    "col_location": "Favourite Ring",
+    "col_last_used": "Last Used"
   }
 }
