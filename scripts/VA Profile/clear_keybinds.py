@@ -182,7 +182,9 @@ def clear_keybinds_from_profile(input_profile: str, output_profile: str):
     logger.info(f"\n✓ Cleared keybinds from {cleared_count} commands")
     logger.info(f"\nSaving: {output_profile}")
     
-    tree.write(output_profile, encoding='utf-8', xml_declaration=True)
+    xml = ET.tostring(tree.getroot(), encoding='utf-8', xml_declaration=True).decode('utf-8')
+    xml = xml.replace('\r\n', '\n').replace('\n', '\r\n')
+    Path(output_profile).write_bytes(xml.encode('utf-8-sig'))
     
     logger.info("\n✓ Clean profile created successfully!")
     logger.info("="*60)

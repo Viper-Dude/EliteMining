@@ -300,7 +300,9 @@ class ModernButton(RoundedButton):
                 f = _blend(self._fill, c["bg"], 0.55)
                 return f, c["btn_fg_disabled"], f
             f = _blend(self._fill, "#FFFFFF", 0.15) if self._hover else self._fill
-            return f, "#FFFFFF", f
+            # A deliberate coloured text (e.g. the "changed" colour on an active preset) wins over white
+            custom = self._fg_override and self._fg_override.lower() not in ("#ffffff", "#e0e0e0", "#e6e6e6", "#e6eaf0")
+            return f, self._fg_override if custom else "#FFFFFF", f
         fill, fg, outline = RoundedButton._colors(self)
         if self._fg_override and self._state != "disabled":
             fg = self._fg_override

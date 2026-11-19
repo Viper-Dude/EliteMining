@@ -7208,6 +7208,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         "Non-Core Asteroids": (t('settings.non_core_asteroids'), t('settings.non_core_asteroids_help'))
                     }
                     
+                    self._ann_toggle_checks = {}
+                    self._ann_toggle_base_fg = {}
                     for name, (_fname, helptext) in ANNOUNCEMENT_TOGGLES.items():
                         # Check if the variable exists before trying to use it
                         if name in self.announcement_vars:
@@ -7220,6 +7222,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                                     highlightthickness=0, bd=0, font=self._scaled_font(9), 
                                                     padx=4, pady=1, anchor="w")
                             checkbox.pack(anchor="w", padx=(10, 0))
+                            self._ann_toggle_checks[name] = checkbox
                             ToolTip(checkbox, localized_help)
                 
                 # Right side: Threshold controls
@@ -7245,6 +7248,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
                                  font=self._scaled_font(9))
                 sp.pack(side="left", padx=(6, 4))
+                self._ann_threshold_spin = sp
                 ttk.Label(thr, text="%").pack(side="left")  # unit sits next to its value
                 sp.bind("<Return>", _ann_threshold_changed)
                 sp.bind("<FocusOut>", _ann_threshold_changed)
@@ -7424,11 +7428,55 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             _sp.configure(fg=_fg, insertbackground=_fg)
                         except tk.TclError:
                             pass
+                    _snap_on = _snap if getattr(self, '_active_preset_num', None) is not None else None
+                    # "Announce at" threshold
+                    _thr = getattr(self, '_ann_threshold_spin', None)
+                    if _thr is not None:
+                        try:
+                            _chg = (_snap_on is not None and 'announce_threshold' in _snap_on
+                                    and round(float(self.prospector_panel.threshold.get()), 1) != _snap_on['announce_threshold'])
+                        except Exception:
+                            _chg = False
+                        _fg = _ann_diff_fg if _chg else _ann_spinbox_fg
+                        try:
+                            _thr.configure(fg=_fg, insertbackground=_fg)
+                        except tk.TclError:
+                            pass
+                    # Core / Non-Core Asteroids checkboxes
+                    for _name, _cb in getattr(self, '_ann_toggle_checks', {}).items():
+                        try:
+                            _now = str(_cb.cget("fg"))
+                            if _now != _ann_diff_fg:
+                                self._ann_toggle_base_fg[_name] = _now
+                            _chg = (_snap_on is not None and _name in _snap_on
+                                    and bool(self.announcement_vars[_name].get()) != bool(_snap_on[_name]))
+                            _cb.configure(fg=_ann_diff_fg if _chg else self._ann_toggle_base_fg.get(_name, _now))
+                        except (tk.TclError, KeyError):
+                            pass
+                    # Announce column: a table cell can't be coloured alone, so the whole row is
+                    _tree = getattr(self, 'ann_mat_tree', None)
+                    if _tree is not None:
+                        try:
+                            _tree.tag_configure('ann_changed', foreground=_ann_diff_fg)
+                            _snap_map = (_snap_on or {}).get('announce_map', {})
+                            for _m in KNOWN_MATERIALS:
+                                _chg = (_snap_on is not None
+                                        and bool(self.prospector_panel.announce_map.get(_m, True)) != bool(_snap_map.get(_m, True)))
+                                _tags = tuple(_tree.item(_m, 'tags'))
+                                if _chg and 'ann_changed' not in _tags:
+                                    _tree.item(_m, tags=_tags + ('ann_changed',))
+                                elif not _chg and 'ann_changed' in _tags:
+                                    _tree.item(_m, tags=tuple(x for x in _tags if x != 'ann_changed'))
+                        except tk.TclError:
+                            pass
                 def _ann_queue_tint(*_a):
                     if not _ann_tint_pending[0]:
                         _ann_tint_pending[0] = True
                         self.after_idle(_ann_apply_tint)
                 self._ann_queue_tint = _ann_queue_tint  # also fired when the preset snapshot changes
+                self.prospector_panel.threshold.trace_add("write", _ann_queue_tint)
+                for _tv in getattr(self, 'announcement_vars', {}).values():
+                    _tv.trace_add("write", _ann_queue_tint)
 
                 def _on_ann_minpct_change_factory(material):
                     def _on_change():

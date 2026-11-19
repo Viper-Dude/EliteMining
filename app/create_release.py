@@ -86,6 +86,22 @@ class ReleaseBuilder:
         print("✅ Prerequisites check complete")
         return True
     
+    def clear_profile_keybinds(self):
+        sys.path.insert(0, str(self.project_root))
+        from scripts.update_version import VA_PROFILE_VERSION
+
+        if not VA_PROFILE_VERSION:
+            return True
+
+        print("Clearing keybinds from the updated VoiceAttack profile...")
+        cleaner = self.project_root / "scripts" / "VA Profile" / "clear_keybinds.py"
+        profile = self.project_root / "Voiceattack Profile" / f"EliteMining v{VA_PROFILE_VERSION}-Profile.vap"
+        return self.run_command(
+            [sys.executable, str(cleaner), str(profile)],
+            cwd=str(self.project_root),
+            shell=False,
+        )
+
     def run_build_script(self):
         """Execute PyInstaller build (cleans build/dist dirs first)"""
         self.print_step(2, "Building Executable")
@@ -439,6 +455,10 @@ class ReleaseBuilder:
         """Main method to build the complete release"""
         print("🚀 EliteMining Release Builder")
         print(f"Project root: {self.project_root}")
+
+        if not self.clear_profile_keybinds():
+            print("VoiceAttack keybind cleanup failed. Aborting release process.")
+            return False
         
         # Step 0: Resize splash image
         self.resize_splash_image()

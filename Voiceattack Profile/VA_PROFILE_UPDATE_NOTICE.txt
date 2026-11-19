@@ -1,10 +1,9 @@
 ================================================================================
-  EliteMining v5.6.5 — VoiceAttack Profile Update 
+  EliteMining v5.6.6 — VoiceAttack Profile Update 
 ================================================================================
 
-This release includes an updated VoiceAttack profile (v5.6.5).
+This release includes an updated VoiceAttack profile (v5.6.6).
 What's changed:
-- Added voice commands to show or hide the sidebar, swap its panels, open mining reports, statistics and missions, find the best mining system, and bookmark your current location.
 - General stability and logic improvements.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated

@@ -219,6 +219,7 @@ python app/create_release.py
 
 - Set `NEW_VERSION` in `scripts/update_version.py` and run that script before `app/create_release.py`.
 - Set `VA_PROFILE_VERSION` when releasing a new VoiceAttack profile; otherwise leave it empty so the splash uses the version from the bundled `.vap` filename.
+- When `VA_PROFILE_VERSION` is set, `app/create_release.py` automatically runs `clear_keybinds.py` on that profile before building and aborts if cleanup fails.
 - The version script generates `app/Images/EliteMining_splash.png` from `app/Images/EliteMining_splash_base.png`, adding both version labels each time. It requires Pillow and the installed `Orbitron-VariableFont_wght.ttf` font (Medium weight).
 - When changing the splash artwork in Affinity, export the complete artwork with only the version labels hidden and refresh `EliteMining_splash_base.png` with that clean export. Keep the base at full resolution; never replace it with the generated splash containing version labels.
 - The release builder resizes the generated splash to fit 1200 × 675 and the main logo to fit 1600 × 900; it leaves the splash base unchanged.
