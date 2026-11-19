@@ -7,6 +7,7 @@ New Features & Improvements
 - Changed values now appear in color in Announcements and VoiceAttack Controls.
 - Announcement presets now have a right-click Load / Save / Rename menu to prevent accidental overwrites.
 - Added a Ships tab to Mining Statistics with sessions, tons and T/hr for each ship.
+- Added a Patch Notes button to the About window.
 
 Bug Fixes
 - Fixed Announcements column resizing and alignment, and accidental Minimal % changes while scrolling.
