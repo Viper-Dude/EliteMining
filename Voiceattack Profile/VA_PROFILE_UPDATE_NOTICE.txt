@@ -4,6 +4,7 @@
 
 This release includes an updated VoiceAttack profile (v5.6.6).
 What's changed:
+- VoiceAttack profile updates now keep your key and joystick shortcuts automatically, with no export needed.
 - General stability and logic improvements.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated

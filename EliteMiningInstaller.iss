@@ -53,7 +53,9 @@ Source: "app\Sound_Packs\Sound_packs_For_install\*";  DestDir: "{app}\app\Sound_
 ; New Configurator executable
 Source: "dist\EliteMining.exe"; DestDir: "{app}\Configurator"; Flags: ignoreversion
 ; Reads the player's VoiceAttack bindings when the profile updates
-Source: "tools\va_profile_reader\bin\Release\net48\*"; DestDir: "{app}\Configurator\va_profile_reader"; Excludes: "*.pdb"; Flags: ignoreversion
+; DLLs omit ignoreversion so an unchanged one that VoiceAttack has loaded is skipped instead of failing with "Access is denied"
+Source: "tools\va_profile_reader\bin\Release\net48\*.dll"; DestDir: "{app}\Configurator\va_profile_reader"
+Source: "tools\va_profile_reader\bin\Release\net48\*"; DestDir: "{app}\Configurator\va_profile_reader"; Excludes: "*.pdb,*.dll"; Flags: ignoreversion
 
 ; EliteMiningPlugin.dll - DISABLED: Plugin is not used, all commands use direct file writes
 ; Source: "EliteMiningPlugin\bin\Release\net48\EliteMiningPlugin.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Check: ShouldInstallPlugin
