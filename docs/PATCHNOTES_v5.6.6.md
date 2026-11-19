@@ -3,31 +3,22 @@
 
 ## New Features & Improvements
 
-- Combined the three service indicators into one status, with individual details available on hover or click.
-- Renamed Auto-Switch Tabs to Auto Switch, which now skips tab changes while you are busy and requires 30 seconds without app activity.
-- Auto-Search, Auto Switch and Auto Prices are now in one Auto Options dropdown in Hotspots Finder.
-- Improved the Announcements tab: the Announce column is a checkbox you click once, and column sizes are remembered.
-- Minimal % boxes are easier to read, and values you changed since the last preset save show in color.
-- Right-click on an announcement preset now opens a Load / Save / Rename menu, so you can't overwrite a preset by accident.
-- Tooltips now match the Modern themes.
-- Cleaner Distance Calculator layout with less repeated information.
-- VoiceAttack Controls now show in color which values you changed since loading or saving your ship preset.
-- New Ships tab in Mining Statistics showing sessions, tons and T/hr for each of your ships.
+- Combined service indicators into one status, with details on hover or click.
+- Grouped Auto-Search, Auto Switch and Auto Prices under Auto Options; Auto Switch now waits until the app has been idle for 30 seconds.
+- Improved Announcements with single-click checkboxes, clearer Minimal % boxes and remembered column widths.
+- Changed values now appear in color in Announcements and VoiceAttack Controls.
+- Announcement presets now have a right-click Load / Save / Rename menu to prevent accidental overwrites.
+- Added a Ships tab to Mining Statistics with sessions, tons and T/hr for each ship.
 
 ## Bug Fixes
 
-- Fixed Announcements table columns snapping back when resized, and Minimal % boxes not following their column.
-- Fixed the mouse wheel changing Minimal % values by accident while scrolling the list. It now only changes a value after you click into the box.
-- Fixed Distance Calculator messages staying on screen and popups appearing when Home or Fleet Carrier was not set.
-- Fixed the app not asking about unsaved ship preset changes when restarting, and not asking about unsaved announcement preset changes when closing or restarting.
+- Fixed Announcements column resizing and alignment, and accidental Minimal % changes while scrolling.
+- Simplified Distance Calculator messages and fixed unwanted popups when Home or Fleet Carrier is unset.
+- Fixed missing unsaved-change prompts for ship and announcement presets.
 
 
-
-## Voiceattack Profile update (v5.6.5)
-
+## Voiceattack Profile update (v5.6.6)
 - General stability and logic improvements.
-
-
 
 ### Important Notes 
 

@@ -1171,9 +1171,11 @@ class RefineryDialog:
         self.material_var = tk.StringVar(value=t('refinery_dialog.select_material'))
         
         # Material selection button using standard app styling
+        from config import load_theme as _load_theme
+        _mat_btn_bg = get_theme_colors(_load_theme())["btn_bg"] if _load_theme() in ("modern", "modern_slate", "modern_orange") else "#4a9eff"
         material_btn = tk.Button(manual_inner, textvariable=self.material_var,
                                command=self._open_material_selector,
-                               bg="#4a9eff", fg="#ffffff", 
+                               bg=_mat_btn_bg, fg="#ffffff", 
                                font=("Segoe UI", 9))
         material_btn.grid(row=0, column=1, padx=5, sticky="w")
         
@@ -1268,7 +1270,9 @@ class RefineryDialog:
                                          font=("Segoe UI", 9), height=6)
         self.contents_listbox.pack(side="left", fill="x", expand=True)
         
-        scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=self.contents_listbox.yview)
+        from config import load_theme as _lt_sb
+        _SB = ttk.Scrollbar if _lt_sb() in ("modern", "modern_slate", "modern_orange") else tk.Scrollbar
+        scrollbar = _SB(list_frame, orient="vertical", command=self.contents_listbox.yview)
         scrollbar.pack(side="right", fill="y")
         self.contents_listbox.configure(yscrollcommand=scrollbar.set)
         
@@ -1720,7 +1724,9 @@ class RefineryDialog:
         list_frame = tk.Frame(selector, bg="#1e1e1e")
         list_frame.pack(fill="both", expand=True, padx=20, pady=(0, 15))
         
-        scrollbar = tk.Scrollbar(list_frame)
+        from config import load_theme as _lt_sb
+        _SB = ttk.Scrollbar if _lt_sb() in ("modern", "modern_slate", "modern_orange") else tk.Scrollbar
+        scrollbar = _SB(list_frame)
         scrollbar.pack(side="right", fill="y")
         
         materials_list = tk.Listbox(list_frame, bg="#2d2d2d", fg="#ffffff",
@@ -4793,6 +4799,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 install_modern_buttons()
             except Exception:
                 log.exception("Modern button install failed")
+            self.option_add("*TCombobox*Listbox.background", theme["panel"])
+            self.option_add("*TCombobox*Listbox.foreground", theme["fg"])
+            self.option_add("*TCombobox*Listbox.selectBackground", theme["selection_bg"])
+            self.option_add("*TCombobox*Listbox.selectForeground", theme["selection_fg"])
 
         self.title(f"{APP_TITLE} — {APP_VERSION}")
         self.resizable(True, True)
@@ -5523,6 +5533,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     w.after_idle(lambda: self._modern_recolor_all(w))
             # Class binding: fires only for Toplevels, not for every widget mapped on a tab switch
             self.bind_class("Toplevel", "<Map>", _recolor_new_popup, add="+")
+
+            if self.current_theme == "modern_orange":
+                def _orange_check_text(e):
+                    # Checkbutton/Radiobutton text set to white at build time (any tab, built at any time)
+                    w = e.widget
+                    try:
+                        if str(w.cget("fg")).lower() in ("white", "#ffffff", "#e0e0e0", "#e6e6e6", "#e6eaf0"):
+                            w.configure(fg=modern_color("#FF9A32"))
+                    except tk.TclError:
+                        pass
+                self.bind_class("Checkbutton", "<Map>", _orange_check_text, add="+")
+                self.bind_class("Radiobutton", "<Map>", _orange_check_text, add="+")
 
         # Import existing values from VoiceAttack profile
         self.after(100, self._import_all_from_txt)
@@ -14658,10 +14680,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.main_paned.update_idletasks()
 
     _MODERN_REMAP = {"#1e1e1e": modern_color("#14171B"), "#1a1a1a": modern_color("#14171B"), "#2d2d2d": modern_color("#1D2228"), "#2b2b2b": modern_color("#1D2228"),
-                     "#252525": modern_color("#1D2228"), "#282828": modern_color("#1D2228"), "#2a2a2a": modern_color("#1D2228")}
+                     "#252525": modern_color("#1D2228"), "#282828": modern_color("#1D2228"), "#2a2a2a": modern_color("#1D2228"),
+                     "#444444": modern_color("#343B44"), "#333333": modern_color("#2A3038"), "#3a3a3a": modern_color("#2A3038"),
+                     "#2e2e2e": modern_color("#232A31"), "#4a4a4a": modern_color("#323941"),
+                     "#2c3e50": modern_color("#1D2228"), "#34495e": modern_color("#2A3038")}
     _MODERN_CONTENT_CLASSES = ("Text", "Listbox", "Entry", "Spinbox")
     _MODERN_RECOLOR_CLASSES = ("Frame", "Label", "Labelframe", "Checkbutton", "Radiobutton", "Canvas",
-                               "Text", "Listbox", "Entry", "Spinbox", "Toplevel", "Scale", "Message")
+                               "Text", "Listbox", "Entry", "Spinbox", "Toplevel", "Scale", "Message", "Menubutton")
     _MODERN_COLOR_OPTIONS = ("bg", "activebackground", "selectcolor", "troughcolor", "highlightbackground",
                              "buttonbackground", "disabledbackground", "readonlybackground")
 
@@ -14718,6 +14743,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                     child.configure(**{opt: modern_color("#FF9A32")})
                             except tk.TclError:
                                 pass
+                    if cls in ("Checkbutton", "Radiobutton") and self.current_theme == "modern_orange":
+                        try:
+                            if str(child.cget("fg")).lower() in ("white", "#ffffff", "#e0e0e0", "#e6e6e6", "#e6eaf0"):
+                                child.configure(fg=modern_color("#FF9A32"))
+                        except tk.TclError:
+                            pass
                     if cls == "Labelframe":
                         try:
                             child.configure(relief="flat", bd=0, highlightthickness=1,
@@ -15022,10 +15053,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._current_lang_label.bind("<Button-1>", self._show_language_menu)
         
         # Hover effect (subtle) - use add='+' to not override ToolTip bindings
+        _flag_modern = self.current_theme in ("modern", "modern_slate", "modern_orange")
         def on_enter_flag(e):
-            self._current_lang_label.config(bg="#2a2a2a")
+            if _flag_modern:
+                self._flag_rest_bg = str(self._current_lang_label.cget("bg"))
+                self._current_lang_label.config(bg=self.theme_colors["btn_bg"])
+            else:
+                self._current_lang_label.config(bg="#2a2a2a")
         def on_leave_flag(e):
-            self._current_lang_label.config(bg="#1e1e1e")
+            if _flag_modern:
+                self._current_lang_label.config(bg=getattr(self, "_flag_rest_bg", self.theme_colors["bg"]))
+            else:
+                self._current_lang_label.config(bg="#1e1e1e")
         self._current_lang_label.bind("<Enter>", on_enter_flag, add='+')
         self._current_lang_label.bind("<Leave>", on_leave_flag, add='+')
         
@@ -15297,9 +15336,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _show_language_menu(self, event):
         """Show popup menu with language options"""
-        menu = tk.Menu(self, tearoff=0, bg="#2a2a2a", fg="#ffffff", 
-                      activebackground="#4a4a4a", activeforeground="#ffffff",
-                      font=self._scaled_font(10))
+        if self.current_theme in ("modern", "modern_slate", "modern_orange"):
+            menu = tk.Menu(self, tearoff=0, bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
+                          activebackground=MENU_COLORS["activebackground"],
+                          activeforeground=MENU_COLORS["activeforeground"],
+                          font=self._scaled_font(10))
+        else:
+            menu = tk.Menu(self, tearoff=0, bg="#2a2a2a", fg="#ffffff", 
+                          activebackground="#4a4a4a", activeforeground="#ffffff",
+                          font=self._scaled_font(10))
         
         from localization import get_language
         current_lang = get_language()

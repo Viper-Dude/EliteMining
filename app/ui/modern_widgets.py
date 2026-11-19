@@ -284,7 +284,10 @@ class ModernButton(RoundedButton):
         if bg is not None and b is not None:
             self._fill = None if (b in _NEUTRAL_FILLS or not b.startswith("#") or len(b) != 7) else b
         if fg is not None and str(fg).startswith("#") and len(str(fg)) == 7:
-            self._fg_override = str(fg)
+            if load_theme() == "modern_orange" and str(fg).lower() in ("#ffffff", "#e0e0e0", "#e6e6e6", "#e6eaf0"):
+                self._fg_override = None  # white text becomes the theme's orange button text
+            else:
+                self._fg_override = str(fg)
 
     def _colors(self):
         c = self._c

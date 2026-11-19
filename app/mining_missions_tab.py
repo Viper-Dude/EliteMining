@@ -58,6 +58,20 @@ class MiningMissionsTab(tk.Frame):
             self.btn_bg = "#333333"
             self.btn_fg = "#ff8c00"
             self.complete_color = "#00cc00"
+        elif self.theme in ("modern", "modern_slate", "modern_orange"):
+            from ui.theme import get_theme_colors, modern_color
+            tc = get_theme_colors(self.theme)
+            self.bg_color = tc["bg"]
+            self.fg_color = tc["fg"]
+            self.fg_bright = tc["fg_bright"]
+            self.fg_dim = tc["fg_muted"]
+            self.accent_bg = tc["panel"]
+            self.progress_bg = modern_color("#2A3038")
+            self.progress_fg = tc["accent"]
+            self.delivered_fg = "#00cc00"
+            self.btn_bg = tc["btn_bg"]
+            self.btn_fg = tc["btn_fg"]
+            self.complete_color = "#00cc00"
         else:
             self.bg_color = "#1e1e1e"
             self.fg_color = "#e6e6e6"
