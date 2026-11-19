@@ -1272,7 +1272,7 @@
     "updates_desc": "Check GitHub for newer versions of EliteMining",
     "va_profile_section": "VoiceAttack Profile",
     "va_keybind_preserve_button": "Preserve / Re-apply Keybinds",
-    "va_keybind_preserve_desc": "Re-apply your custom keybinds from an old exported profile into a new profile"
+    "va_keybind_preserve_desc": "Copy your VoiceAttack shortcuts into the newest EliteMining profile file"
   },
   "dialogs": {
     "save": "Save",
@@ -1457,7 +1457,7 @@
     "bulk_upload": "Not available - server infrastructure in development",
     "backup": "Create backup of Ship Presets, Reports, Bookmarks, and VoiceAttack Profile\nBackup is saved as a timestamped zip file",
     "restore": "Restore from backup zip file\nSelect which data to restore and handle conflicts",
-    "va_keybind_preserve": "Manually merge keybinds from an old exported profile into a new profile",
+    "va_keybind_preserve": "Copy your VoiceAttack shortcuts into the newest EliteMining profile file, then import that file into VoiceAttack",
     "import_va": "Read VoiceAttack settings from game files\n(Firegroups, Mining Controls, Announcements)",
     "apply_va": "Save settings to VoiceAttack variable files\nPress after:\n• Selecting a Ship Preset\n• Changing any settings in Mining Controls or Firegroups tab",
     

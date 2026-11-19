@@ -20843,6 +20843,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _mark_va_profile_handled(self, new_version):
         """Save the new version only once the update flow has finished, so an interrupted update is offered again"""
+        if not new_version:
+            return
         from path_utils import get_app_data_dir
         state_file = os.path.join(get_app_data_dir(), "va_profile_state.json")
         self._save_va_profile_state(state_file, new_version)
@@ -21044,8 +21046,36 @@ Your keybinds will need to be reconfigured manually."""
             )
         )
     
+    def _newest_shipped_va_profile(self):
+        """Newest 'EliteMining v*-Profile.vap' in the EliteMining folder, or None"""
+        import glob
+        from va_profile_parser import VAProfileParser
+
+        folder = self.va_root if hasattr(self, 'va_root') and self.va_root else None
+        if not folder:
+            return None
+
+        def key(path):
+            version = VAProfileParser.version_from_name(os.path.basename(path))
+            try:
+                return tuple(int(p) for p in version.split('.'))
+            except (AttributeError, ValueError):
+                return ()
+
+        files = glob.glob(os.path.join(folder, "EliteMining v*-Profile.vap"))
+        return max(files, key=key) if files else None
+
     def _manual_va_keybind_preserve(self):
-        """Triggered from Settings tab - full keybind merge flow"""
+        """Triggered from Settings tab - read the current shortcuts from VoiceAttack and merge them into the newest profile"""
+        profile_path = self._newest_shipped_va_profile()
+        if profile_path:
+            logging.info(f"[VA_PROFILE] Manual shortcut merge into {os.path.basename(profile_path)}")
+            self._va_profile_auto_merge(None, None, profile_path)
+        else:
+            self._manual_va_keybind_preserve_files()
+
+    def _manual_va_keybind_preserve_files(self):
+        """No shipped profile found: the player picks the exported old profile and the new profile"""
         try:
             from app_utils import centered_message
             from tkinter import filedialog

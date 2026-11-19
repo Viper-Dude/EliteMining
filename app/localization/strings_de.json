@@ -1277,7 +1277,7 @@
     "updates_desc": "GitHub nach neueren Versionen von EliteMining durchsuchen",
     "va_profile_section": "VoiceAttack-Profil",
     "va_keybind_preserve_button": "Tastenbelegung übertragen",
-    "va_keybind_preserve_desc": "Benutzerdefinierte Tastenbelegungen aus einem alten exportierten Profil in ein neues Profil übernehmen"
+    "va_keybind_preserve_desc": "Ihre VoiceAttack-Kürzel in die neueste EliteMining-Profildatei übernehmen"
   },
   "dialogs": {
     "save": "Speichern",
@@ -1464,8 +1464,8 @@
     "bulk_upload": "Nicht verfügbar - Server-Infrastruktur in Entwicklung",
     "backup": "Backup von Schiff-Presets, Berichten, Lesezeichen und VoiceAttack-Profil erstellen\nBackup wird als ZIP-Datei mit Zeitstempel gespeichert",
     "restore": "Aus Backup-ZIP-Datei wiederherstellen\nWählen Sie die wiederherzustellenden Daten und behandeln Sie Konflikte",
-    "va_keybind_preserve": "Tastenbelegungen manuell aus einem alten exportierten Profil in ein neues Profil übertragen",
-    "va_keybind_preserve": "Tastenbelegungen manuell aus einem alten exportierten Profil in ein neues Profil übertragen",
+    "va_keybind_preserve": "Ihre VoiceAttack-Kürzel in die neueste EliteMining-Profildatei übernehmen und diese Datei anschließend in VoiceAttack importieren",
+    "va_keybind_preserve": "Ihre VoiceAttack-Kürzel in die neueste EliteMining-Profildatei übernehmen und diese Datei anschließend in VoiceAttack importieren",
     "import_va": "VoiceAttack-Einstellungen aus Spieldateien lesen\n(Feuergruppen, Bergbau-Steuerung, Ankündigungen)",
     "apply_va": "Einstellungen in VoiceAttack-Variablendateien speichern\nDrücken Sie nach:\n• Auswahl eines Schiff-Presets\n• Änderung der Einstellungen in Bergbau-Steuerung oder Feuergruppen",
     
