@@ -133,6 +133,18 @@ Drafted on 19 November 2026. The goal is to remove the manual export step. The a
 - Fall back to matching commands that share at least one spoken phrase when the list has no entry.
 - Change the result dialog in `_merge_profiles_with_keybinds()` ([main.py](../app/main.py)) to report how many bindings were applied and list those that were not, instead of the extracted count.
 
+### Phase 2 result (19 November 2026)
+
+**Done on branch `va-binding-reader`.** Not yet tested in VoiceAttack; the maintainer chose to test it together with Phase 3 in Phase 4.
+
+- **Extractor.** `CommandKeybinds` now holds the VoiceAttack 2 export fields: `keyValue`/`keyShift`/`keyAlt`/`keyCtrl`/`keyWin`, `keyPassthru`, `onlyKeyUp`, both joysticks, `joystickUp`, `joystickExclusive`, `Mouse1`–`Mouse9`, `MouseUpOnly`, `MousePassThru` (nullable), the three repeat flags, `KeepRepeating`, `Enabled` and the six tap levels. The old invented names and the always-false `DoubleTapInvoked`/`LongTapInvoked`/`ShortTapDelayedInvoked` are gone. A command counts as bound only when `UseShortcut`, `UseJoystick` or `UseMouse` is true, so leftover joystick values are ignored. Internal `((…))` commands are skipped. `is_command_enabled()` compares case-insensitively.
+- **Variable shortcuts.** When `UseVariableHotkey`, `UseVariableMouseShortcut` or `UseVariableJoystickShortcut` is on, that shortcut group is dropped and the command is listed in `extractor.skipped` with reason `variable`. The applier never writes the variable flags.
+- **Applier.** Writes only the groups enabled in the old command; other groups keep the new profile's defaults. Internal commands in the new profile are never touched. Matching order: exact `CommandString`, then the rename list (only if the new name exists and is not already taken by an exact match), then a spoken phrase (split on `;`, case-insensitive) shared with exactly one unclaimed new command. A phrase that fits several new commands, or a new command picked by several old ones, is reported as `ambiguous`; no match is `no_match`. `apply()` still returns the tree; the outcome is in `applier.last_result` (`applied`, `matched_by`, `not_applied`).
+- **Rename list.** `app/va_command_renames.py` (`COMMAND_RENAMES`), empty for now. Past renames were not reconstructed; add entries when a release renames a command.
+- **Result dialog.** `_merge_profiles_with_keybinds()` shows the applied count and lists up to 15 bindings that were not applied with a reason (English and German strings added). The "no keybinds" dialog shows only when nothing was bound and nothing was skipped.
+- **Checks.** `tools/check_va_keybind_merge.py`: the v1.0.0 test export gives 68 bound player commands and no internal ones; applying them to a copy with bindings cleared and re-reading gives identical bindings; synthetic cases cover rename, phrase match, ambiguous match, no match, variable skip and a disabled command. 18 of 18 pass.
+- `strings_de.json` already had duplicate keys in its `voiceattack` section; the new keys were added once after the last copy, which is the one that takes effect.
+
 ### Phase 3: update flow
 
 1. After an update, the app detects the changed profile as it does today.
