@@ -596,7 +596,7 @@ class MiningChartsPanel:
             if has_timeline:
                 timeline_filename = f"{session_prefix}_Timeline.png"
                 timeline_path = os.path.join(graphs_dir, timeline_filename)
-                self.timeline_fig.savefig(timeline_path, dpi=300, bbox_inches='tight', 
+                self.timeline_fig.savefig(timeline_path, dpi=150, bbox_inches='tight',
                                         facecolor='#2b2b2b', edgecolor='none')
                 saved_files.append(timeline_filename)
             
@@ -605,7 +605,7 @@ class MiningChartsPanel:
             if has_comparison:
                 comparison_filename = f"{session_prefix}_Comparison.png"
                 comparison_path = os.path.join(graphs_dir, comparison_filename)
-                self.bar_fig.savefig(comparison_path, dpi=300, bbox_inches='tight', 
+                self.bar_fig.savefig(comparison_path, dpi=150, bbox_inches='tight',
                                    facecolor='#2b2b2b', edgecolor='none')
                 saved_files.append(comparison_filename)
             

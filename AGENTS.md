@@ -235,6 +235,7 @@ python app/create_release.py
 - Use `read_session_report()` from `app/mining_statistics.py` when reading reports for display or analysis. Its bounded cache checks file modification time and size so edits are picked up without repeatedly reading unchanged files.
 - Normal session completion updates `sessions_index.csv` incrementally and refreshes Reports and Statistics once each. Full rebuilds are for repair or recovery of a missing or inconsistent index, not routine session saves.
 - Mining Missions and Reference use widget-local mousewheel bindings through `bind_mousewheel_recursive()` in `app/app_utils.py`; do not replace or remove global wheel bindings.
+- Report file names saved before 17 November 2026 can contain the wrong body (the System/Body field at stop time instead of the mined ring), and `graph_mappings.json` lacks entries for many older sessions. Find a session's graphs or cards by timestamp and system, or by the body in the report header or `sessions_index.csv`, not by the report file name.
 - Mark changed graphs dirty and combine visible refreshes. Defer hidden graph updates until shown, and refresh dirty graphs before saving or exporting them.
 
 ---

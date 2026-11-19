@@ -3,6 +3,7 @@ Detailed Report Generator for EliteMining
 Generates HTML reports with charts, statistics, and screenshots
 """
 
+import glob
 import json
 import logging
 import os
@@ -1560,12 +1561,11 @@ class ReportGenerator:
             graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
             mappings_file = os.path.join(graphs_dir, "graph_mappings.json")
             
-            if not os.path.exists(mappings_file):
-                return None
-            
-            with open(mappings_file, 'r', encoding='utf-8') as f:
-                mappings = json.load(f)
-            
+            mappings = {}
+            if os.path.exists(mappings_file):
+                with open(mappings_file, 'r', encoding='utf-8') as f:
+                    mappings = json.load(f)
+
             # First try exact match
             if session_id in mappings:
                 matched_session_id = session_id
@@ -1598,10 +1598,12 @@ class ReportGenerator:
                                 matched_session_id = mapping_key
                                 break
                 
-                if not matched_session_id:
+            if matched_session_id:
+                session_graphs = mappings[matched_session_id]
+            else:
+                session_graphs = self._find_unmapped_graphs(graphs_dir, session_id)
+                if not session_graphs:
                     return None
-            
-            session_graphs = mappings[matched_session_id]
             charts_html = ""
             
             # Add timeline chart if available
@@ -1645,6 +1647,21 @@ class ReportGenerator:
         except Exception as e:
             print(f"Error loading saved charts: {e}")
             return None
+
+    def _find_unmapped_graphs(self, graphs_dir, session_id):
+        """Find saved graphs missing from graph_mappings.json, matching the timestamp to the minute."""
+        parts = session_id.split('_', 3)
+        if len(parts) < 4:
+            return None
+        date_str, time_str, location = parts[1], parts[2], parts[3]
+        hour_min = '-'.join(time_str.split('-')[:2])
+        found = {}
+        for key, suffix in (('timeline_graph', 'Timeline'), ('comparison_graph', 'Comparison')):
+            pattern = f"Session_{date_str}_{hour_min}-??_{glob.escape(location)}_{suffix}.png"
+            matches = sorted(glob.glob(os.path.join(graphs_dir, pattern)))
+            if matches:
+                found[key] = os.path.basename(matches[0])
+        return found or None
 
     def _get_session_id_from_data(self, session_data):
         """Extract session ID from session data to match with saved graphs"""
