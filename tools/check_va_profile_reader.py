@@ -77,8 +77,40 @@ def selftest():
         assert os.path.basename(reader.newest_backup([os.path.join(work, 'VoiceAttack2')])) == \
             '20261119014435.VoiceAttack.dat', 'newest by mtime'
         assert reader.newest_backup([os.path.join(work, 'missing')]) is None, 'no backups'
+
+        va2 = os.path.join(work, 'VoiceAttack2')
+        live = os.path.join(va2, 'VoiceAttack.dat')
+        open(live, 'wb').close()
+        os.utime(live, (now + 60, now + 60))
+        open(os.path.join(va2, 'VoiceAttack_crashed.dat'), 'wb').close()
+        assert os.path.basename(reader.newest_data_file([va2])) == '20261119014435.VoiceAttack.dat', \
+            'live file ignored while VoiceAttack may be running'
+        assert reader.newest_data_file([va2], include_live=True) == live, 'newer live file used when closed'
+        os.utime(live, (now - 60, now - 60))
+        assert os.path.basename(reader.newest_data_file([va2], include_live=True)) == \
+            '20261119014435.VoiceAttack.dat', 'newer backup beats older live file'
+        os.utime(live, (now + 60, now + 60))
+        open(os.path.join(va2, 'VoiceAttack-log.dat'), 'wb').close()
+        assert os.path.basename(reader.newest_data_file([va2], include_live=True)) == \
+            '20261119014435.VoiceAttack.dat', 'live file with pending log skipped'
+        assert reader.newest_data_file([os.path.join(work, 'missing')], include_live=True) is None, 'no data files'
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+    frozen_exe = os.path.join('C:\\', 'VA', 'Apps', 'EliteMining', 'Configurator', 'EliteMining.exe')
+    saved = (getattr(sys, 'frozen', None), sys.executable)
+    try:
+        sys.frozen, sys.executable = True, frozen_exe
+        assert str(reader._reader_exe_path()) == os.path.join(
+            os.path.dirname(frozen_exe), 'va_profile_reader', 'va_profile_reader.exe'), 'installed helper path'
+    finally:
+        if saved[0] is None:
+            del sys.frozen
+        else:
+            sys.frozen = saved[0]
+        sys.executable = saved[1]
+    assert reader._reader_exe_path().parts[-5:] == ('va_profile_reader', 'bin', 'Release', 'net48',
+                                                    'va_profile_reader.exe'), 'dev helper path'
     print('selftest: all checks passed')
 
 
@@ -123,6 +155,48 @@ def compare(reader_xml, export_path):
     return not mismatches and set(ours) == set(theirs)
 
 
+def merge_check(reader_tree, extracted, new_vap):
+    """Apply the reader's bindings to a copy of new_vap (as the update flow does) and compare them read back."""
+    from va_keybind_applier import VAKeybindApplier
+
+    def norm(value):
+        return '' if value in (None, '', 'false', '0') else value
+
+    parser = VAProfileParser()
+    applier = VAKeybindApplier()
+    work = tempfile.mkdtemp(prefix='em_va_merge_')
+    try:
+        merged_path = os.path.join(work, 'merged.vap')
+        parser.save(applier.apply(parser.parse(new_vap), extracted), merged_path, compress=False)
+        result = applier.last_result
+        merged = {c.findtext('CommandString'): c
+                  for c in parser.parse(merged_path).getroot().findall('Commands/Command')}
+        source = {c.findtext('CommandString'): c for c in reader_tree.getroot().findall('Commands/Command')}
+        mismatches = []
+        for name in result.applied:
+            if result.matched_by.get(name) != 'exact':
+                continue
+            old = source.get(name)
+            new = merged.get(name)
+            if old is None or new is None:
+                continue
+            for f in BINDING_FIELDS:
+                if f.startswith('UseVariable'):
+                    continue
+                # The shipped profile omits elements left at their default
+                if norm(old.findtext(f)) != norm(new.findtext(f)):
+                    mismatches.append((name, f, old.findtext(f), new.findtext(f)))
+        print(f"merge into {os.path.basename(new_vap)}: {len(result.applied)} applied, "
+              f"{len(result.not_applied)} not applied, field mismatches on exact names: {len(mismatches)}")
+        for name, reason in result.not_applied:
+            print(f"  not applied: {name!r} ({reason})")
+        for name, f, a, b in mismatches[:20]:
+            print(f"  {name!r} {f}: reader={a!r} merged={b!r}")
+        return not mismatches
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def real(args):
     backup = reader.newest_backup()
     print(f"newest backup: {backup}")
@@ -164,6 +238,8 @@ def real(args):
         ok = True
         if args.export:
             ok = compare(result.xml_path, args.export)
+        if args.merge:
+            ok = merge_check(tree, extracted, args.merge) and ok
         return ok
     finally:
         shutil.rmtree(os.path.dirname(result.xml_path), ignore_errors=True)
@@ -177,6 +253,7 @@ def main():
     r.add_argument('--profile')
     r.add_argument('--export')
     r.add_argument('--installed')
+    r.add_argument('--merge', help='new .vap to apply the read bindings to (a temp copy)')
     args = ap.parse_args()
     if args.mode == 'selftest':
         selftest()

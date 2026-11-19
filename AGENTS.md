@@ -214,6 +214,7 @@ python app/create_release.py
 - `Configurator.spec` → PyInstaller → exe at `VoiceAttack\Apps\EliteMining\Configurator\`
 - `EliteMiningInstaller.iss` → Inno Setup installer with VoiceAttack path auto-detection
 - Output ZIP in `Output/` directory
+- `app/create_release.py` builds the VoiceAttack binding reader (`dotnet build tools/va_profile_reader -c Release`, needs the .NET SDK) and aborts if that fails. The installer and ZIP ship its output, without the `.pdb`, to `Configurator\va_profile_reader\`.
 
 ### Splash Version Labels
 

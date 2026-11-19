@@ -1,8 +1,9 @@
 """
 VoiceAttack profile reader
 Reads the player's EliteMining profile bindings from a temporary copy of
-VoiceAttack's newest data-file backup, using tools/va_profile_reader.exe.
-VoiceAttack's live VoiceAttack.dat is never opened.
+VoiceAttack's data file, using va_profile_reader.exe. The live VoiceAttack.dat
+is only copied, and only while VoiceAttack is closed; otherwise the newest
+backup is used. The helper only ever opens the copy.
 """
 
 import glob
@@ -10,6 +11,7 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -63,6 +65,27 @@ def newest_backup(data_dirs: Optional[List[str]] = None) -> Optional[str]:
     return max(backups, key=os.path.getmtime)
 
 
+def newest_data_file(data_dirs: Optional[List[str]] = None, include_live: bool = False) -> Optional[str]:
+    """
+    Newest of the backups and, with include_live (VoiceAttack closed), the live VoiceAttack.dat.
+    A live file with a LiteDB log beside it may hold unwritten changes, so it is skipped.
+    """
+    if data_dirs is None:
+        data_dirs = voiceattack_data_dirs()
+    files = []
+    backup = newest_backup(data_dirs)
+    if backup:
+        files.append(backup)
+    if include_live:
+        for d in data_dirs:
+            live = os.path.join(d, 'VoiceAttack.dat')
+            if os.path.isfile(live) and not os.path.exists(os.path.join(d, 'VoiceAttack-log.dat')):
+                files.append(live)
+    if not files:
+        return None
+    return max(files, key=os.path.getmtime)
+
+
 def _version_key(version: Optional[str]) -> Optional[Tuple[int, ...]]:
     if not version:
         return None
@@ -99,6 +122,8 @@ def choose_profile(profiles: List[VAProfileInfo],
 
 
 def _reader_exe_path() -> Path:
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).resolve().parent / "va_profile_reader" / "va_profile_reader.exe"
     return Path(__file__).resolve().parent.parent / "tools" / "va_profile_reader" / "bin" / "Release" / "net48" / "va_profile_reader.exe"
 
 
@@ -129,14 +154,16 @@ def list_profiles(dat_copy: str, out_xml: str) -> Optional[List[VAProfileInfo]]:
 
 
 def read_profile_bindings(installed_version: Optional[str] = None,
-                          backup_path: Optional[str] = None) -> Optional[VAProfileReadResult]:
+                          backup_path: Optional[str] = None,
+                          include_live: bool = False) -> Optional[VAProfileReadResult]:
     """
     Export the chosen EliteMining profile's commands and bindings to an XML file
     in a new temp folder (the caller deletes it). Returns None on any failure.
+    Pass include_live only when VoiceAttack is not running.
     """
-    backup = backup_path or newest_backup()
+    backup = backup_path or newest_data_file(include_live=include_live)
     if not backup:
-        logger.info("[VA_READER] No VoiceAttack backup found")
+        logger.info("[VA_READER] No VoiceAttack data file found")
         return None
 
     work_dir = tempfile.mkdtemp(prefix='em_va_reader_')

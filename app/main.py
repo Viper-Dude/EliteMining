@@ -20817,11 +20817,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.update()
                 self.update_idletasks()
             
-            from app_utils import centered_askyesno, centered_message
+            from app_utils import centered_askyesno
             from path_utils import get_app_data_dir
-            from tkinter import filedialog
-            import json
-            
+
             # Show update message with keybind preservation info
             current_display = current_version if current_version else "Unknown"
             message = t("voiceattack.profile_update_message").format(
@@ -20835,57 +20833,118 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 message
             )
             
+            # Save the new version to state file (user has been notified)
+            state_file = os.path.join(get_app_data_dir(), "va_profile_state.json")
+            self._save_va_profile_state(state_file, new_version)
+            logging.info(f"[VA_PROFILE] Saved new version to state: {new_version}")
+
             if result:
-                # Get the EliteMining folder path for instructions
-                elitemining_folder = self.va_root if hasattr(self, 'va_root') and self.va_root else profile_path.rsplit(os.sep, 1)[0]
-                suggested_filename = "EliteMining_old-Profile.vap"
-                
-                # Ask user to select their exported XML profile
-                export_instructions = t("voiceattack.export_instructions").format(
-                    folder=elitemining_folder,
-                    filename=suggested_filename
+                self._va_profile_auto_merge(current_version, new_version, profile_path)
+
+        except Exception as e:
+            logging.error(f"[VA_PROFILE] Error showing update dialog: {e}")
+
+    def _va_profile_auto_merge(self, current_version, new_version, profile_path):
+        """Read the player's current bindings from VoiceAttack's data file; any failure falls back to the export flow"""
+        import threading
+        from app_utils import centered_askyesno
+
+        try:
+            from va_process_manager import VAProcessManager
+            while VAProcessManager.is_running():
+                if not centered_askyesno(self, t("voiceattack.close_va_title"), t("voiceattack.close_va_message")):
+                    self._va_profile_export_merge(new_version, profile_path)
+                    return
+            include_live = True
+        except Exception as e:
+            # Without a running check, read only the backups VoiceAttack has finished writing
+            logging.warning(f"[VA_PROFILE] Could not check whether VoiceAttack is running: {e}")
+            include_live = False
+
+        def worker():
+            try:
+                from va_profile_reader import read_profile_bindings
+                read = read_profile_bindings(installed_version=current_version, include_live=include_live)
+            except Exception as e:
+                logging.error(f"[VA_PROFILE] Reading VoiceAttack bindings failed: {e}")
+                read = None
+            self.after(0, lambda: self._va_profile_auto_merge_complete(read, new_version, profile_path))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _va_profile_auto_merge_complete(self, read, new_version, profile_path):
+        import shutil
+        from app_utils import centered_askyesno, centered_message
+
+        if read is None:
+            centered_message(self, t("voiceattack.profile_update_title"), t("voiceattack.read_failed_message"))
+            self._va_profile_export_merge(new_version, profile_path)
+            return
+
+        try:
+            chosen = next((p for p in read.candidates if p.id == read.profile_id), None)
+            confirm = t("voiceattack.confirm_read_message").format(
+                name=read.profile_name, count=chosen.bound if chosen else 0
+            )
+            if not centered_askyesno(self, t("voiceattack.confirm_read_title"), confirm):
+                self._va_profile_export_merge(new_version, profile_path)
+                return
+            try:
+                self._merge_profiles_with_keybinds(read.xml_path, profile_path, new_version)
+            except Exception as e:
+                logging.error(f"[VA_PROFILE] Merge from VoiceAttack data failed: {e}")
+                centered_message(self, t("voiceattack.profile_update_title"), t("voiceattack.read_failed_message"))
+                self._va_profile_export_merge(new_version, profile_path)
+        finally:
+            shutil.rmtree(os.path.dirname(read.xml_path), ignore_errors=True)
+
+    def _va_profile_export_merge(self, new_version, profile_path):
+        """Fallback: the player exports the current profile as XML and selects it"""
+        from app_utils import centered_message
+        from tkinter import filedialog
+
+        # Get the EliteMining folder path for instructions
+        elitemining_folder = self.va_root if hasattr(self, 'va_root') and self.va_root else profile_path.rsplit(os.sep, 1)[0]
+        suggested_filename = "EliteMining_old-Profile.vap"
+
+        # Ask user to select their exported XML profile
+        export_instructions = t("voiceattack.export_instructions").format(
+            folder=elitemining_folder,
+            filename=suggested_filename
+        )
+
+        centered_message(self, t("voiceattack.export_step_title"), export_instructions)
+
+        # Open file dialog starting in the EliteMining folder
+        old_profile_path = filedialog.askopenfilename(
+            parent=self,
+            title=t("voiceattack.select_exported_profile"),
+            filetypes=[("VoiceAttack Profile", "*.vap"), ("All files", "*.*")],
+            initialdir=elitemining_folder
+        )
+
+        if old_profile_path:
+            # Try to merge keybinds
+            try:
+                self._merge_profiles_with_keybinds(old_profile_path, profile_path, new_version)
+            except Exception as e:
+                logging.error(f"[VA_PROFILE] Merge failed: {e}")
+                centered_message(
+                    self,
+                    "Merge Failed",
+                    f"Could not merge keybinds automatically:\n{e}\n\n"
+                    f"Please import the new profile manually from:\n{profile_path}"
                 )
-                
-                centered_message(self, t("voiceattack.export_step_title"), export_instructions)
-                
-                # Open file dialog starting in the EliteMining folder
-                old_profile_path = filedialog.askopenfilename(
-                    parent=self,
-                    title=t("voiceattack.select_exported_profile"),
-                    filetypes=[("VoiceAttack Profile", "*.vap"), ("All files", "*.*")],
-                    initialdir=elitemining_folder
-                )
-                
-                if old_profile_path:
-                    # Try to merge keybinds
-                    try:
-                        self._merge_profiles_with_keybinds(old_profile_path, profile_path, new_version)
-                    except Exception as e:
-                        logging.error(f"[VA_PROFILE] Merge failed: {e}")
-                        centered_message(
-                            self, 
-                            "Merge Failed", 
-                            f"Could not merge keybinds automatically:\n{e}\n\n"
-                            f"Please import the new profile manually from:\n{profile_path}"
-                        )
-                else:
-                    # User cancelled - show manual instructions
-                    manual_instructions = f"""Manual update:
+        else:
+            # User cancelled - show manual instructions
+            manual_instructions = f"""Manual update:
 
 Import the new profile from:
 {profile_path}
 
 Your keybinds will need to be reconfigured manually."""
-                    centered_message(self, "Manual Update", manual_instructions)
-            
-            # Save the new version to state file (user has been notified)
-            state_file = os.path.join(get_app_data_dir(), "va_profile_state.json")
-            self._save_va_profile_state(state_file, new_version)
-            logging.info(f"[VA_PROFILE] Saved new version to state: {new_version}")
-                
-        except Exception as e:
-            logging.error(f"[VA_PROFILE] Error showing update dialog: {e}")
-    
+            centered_message(self, "Manual Update", manual_instructions)
+
     def _merge_profiles_with_keybinds(self, old_profile_path, new_profile_path, new_version):
         """Merge keybinds from old profile into new profile"""
         from va_profile_parser import VAProfileParser

@@ -817,7 +817,7 @@
     "tool_prospector": "Prospektordrohne:",
     "tool_pulse_wave": "Pulswellenanalysator:",
     "profile_update_title": "VoiceAttack-Profil-Update",
-    "profile_update_message": "Neues VoiceAttack-Profil verfügbar!\n\nAktuelle Version: {current}\nNeue Version: {new}\n\nDas neue Profil enthält Updates und Verbesserungen.\n\nMöchten Sie mit automatischer Tastenbelegungserhaltung aktualisieren?\n(Sie müssen Ihr aktuelles Profil zuerst als XML exportieren)",
+    "profile_update_message": "Neues VoiceAttack-Profil verfügbar!\n\nAktuelle Version: {current}\nNeue Version: {new}\n\nDas neue Profil enthält Updates und Verbesserungen.\n\nMöchten Sie aktualisieren und Ihre Kürzel behalten?\n(EliteMining liest Ihre aktuellen Kürzel aus VoiceAttack)",
     "export_step_title": "Schritt 1: Aktuelles Profil exportieren",
     "export_instructions": "Um Ihre Tastenbelegungen zu erhalten, exportieren Sie zuerst Ihr AKTUELLES Profil:\n\n1. Öffnen Sie VoiceAttack\n2. Rechtsklick auf Ihr aktuelles EliteMining-Profil\n3. Wählen Sie 'Profil exportieren'\n4. Navigieren Sie zu:\n   {folder}\n5. Unter \"Dateityp:\" wählen Sie:\n   \"VoiceAttack Profile Expanded as XML (*.vap)\"\n6. Speichern als: {filename}\n\nDann OK klicken und diese Datei auswählen.",
     "select_exported_profile": "Wählen Sie Ihr exportiertes XML-Profil (die gerade erstellte Sicherung)",
@@ -829,7 +829,7 @@
     "tool_weapons": "Waffen:",
     "tool_ssm": "Unteroberflächenrakete:",
     "profile_update_title": "VoiceAttack-Profil-Update",
-    "profile_update_message": "Neues VoiceAttack-Profil verfügbar!\n\nAktuelle Version: {current}\nNeue Version: {new}\n\nDas neue Profil enthält Updates und Verbesserungen.\n\nMöchten Sie mit automatischer Tastenbelegungserhaltung aktualisieren?\n(Sie müssen Ihr aktuelles Profil zuerst als XML exportieren)",
+    "profile_update_message": "Neues VoiceAttack-Profil verfügbar!\n\nAktuelle Version: {current}\nNeue Version: {new}\n\nDas neue Profil enthält Updates und Verbesserungen.\n\nMöchten Sie aktualisieren und Ihre Kürzel behalten?\n(EliteMining liest Ihre aktuellen Kürzel aus VoiceAttack)",
     "export_step_title": "Schritt 1: Aktuelles Profil exportieren",
     "export_instructions": "Um Ihre Tastenbelegungen zu erhalten, exportieren Sie zuerst Ihr AKTUELLES Profil:\n\n1. Öffnen Sie VoiceAttack\n2. Rechtsklick auf Ihr aktuelles EliteMining-Profil\n3. Wählen Sie 'Profil exportieren'\n4. Navigieren Sie zu:\n   {folder}\n5. Unter \"Dateityp:\" wählen Sie:\n   \"VoiceAttack Profile Expanded as XML (*.vap)\"\n6. Speichern als: {filename}\n\nDann OK klicken und diese Datei auswählen.",
     "select_exported_profile": "Wählen Sie Ihr exportiertes XML-Profil (die gerade erstellte Sicherung)",
@@ -842,7 +842,12 @@
     "merge_reason_no_match": "kein passender Befehl im neuen Profil",
     "merge_reason_ambiguous": "mehrere mögliche Treffer",
     "merge_reason_variable": "verwendet ein variables Kürzel",
-    "select_new_profile": "Neues VoiceAttack-Profil (.vap) auswählen, auf das die Tastenbelegungen angewendet werden"
+    "select_new_profile": "Neues VoiceAttack-Profil (.vap) auswählen, auf das die Tastenbelegungen angewendet werden",
+    "close_va_title": "VoiceAttack schließen",
+    "close_va_message": "Bitte schließen Sie VoiceAttack, damit EliteMining Ihre aktuellen Kürzel lesen kann.\n\nKlicken Sie auf Ja, sobald VoiceAttack geschlossen ist, oder auf Nein, um Ihr Profil stattdessen manuell zu exportieren.",
+    "confirm_read_title": "Ihr aktuelles Profil",
+    "confirm_read_message": "Ihr Profil '{name}' mit {count} Kürzel(n) wurde gefunden.\n\nDiese Kürzel in das neue Profil übernehmen?\n\nKlicken Sie auf Nein, um Ihr Profil stattdessen manuell zu exportieren.",
+    "read_failed_message": "EliteMining konnte Ihre Kürzel nicht automatisch aus VoiceAttack lesen.\n\nBitte exportieren Sie stattdessen Ihr aktuelles Profil."
   },
   "bookmarks": {
     "title": "Bergbau-Lesezeichen",

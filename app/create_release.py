@@ -27,7 +27,9 @@ class ReleaseBuilder:
         self.project_root = self.script_dir.parent  # Go up one level from app folder
         self.build_bat = self.project_root / "build_eliteMining_with_icon.bat"
         self.installer_iss = self.project_root / "EliteMiningInstaller.iss"
-        
+        self.va_reader_project = self.project_root / "tools" / "va_profile_reader" / "va_profile_reader.csproj"
+        self.va_reader_output = self.project_root / "tools" / "va_profile_reader" / "bin" / "Release" / "net48"
+
     def print_step(self, step_num, description):
         """Print a formatted step message"""
         print(f"\n{'='*60}")
@@ -102,6 +104,20 @@ class ReleaseBuilder:
             shell=False,
         )
 
+    def build_va_reader(self):
+        """Build the VoiceAttack binding reader that the installer and ZIP ship beside EliteMining.exe"""
+        print("Building VoiceAttack binding reader...")
+        if not self.run_command(
+            ["dotnet", "build", str(self.va_reader_project), "-c", "Release"],
+            cwd=str(self.project_root),
+            shell=False,
+        ):
+            return False
+        if not (self.va_reader_output / "va_profile_reader.exe").exists():
+            print(f"❌ Missing: {self.va_reader_output / 'va_profile_reader.exe'}")
+            return False
+        return True
+
     def run_build_script(self):
         """Execute PyInstaller build (cleans build/dist dirs first)"""
         self.print_step(2, "Building Executable")
@@ -157,7 +173,12 @@ class ReleaseBuilder:
                 else:
                     print(f"❌ Missing: {exe_path}")
                     return False
-                
+
+                for file_path in sorted(self.va_reader_output.iterdir()):
+                    if file_path.is_file() and file_path.suffix.lower() != ".pdb":
+                        zipf.write(file_path, f"EliteMining/Configurator/va_profile_reader/{file_path.name}")
+                print("✅ Added: EliteMining/Configurator/va_profile_reader/")
+
                 # Add configuration files in EliteMining root
                 config_files = [
                     ("app/config.json.template", "config.json.template"),
@@ -476,7 +497,11 @@ class ReleaseBuilder:
             if not self.run_pyinstaller_direct():
                 print("❌ PyInstaller execution failed. Aborting release process.")
                 return False
-        
+
+        if not self.build_va_reader():
+            print("❌ VoiceAttack binding reader build failed. Aborting release process.")
+            return False
+
         # Wait a moment for file operations to complete
         print("\nWaiting 3 seconds for build to finalize...")
         time.sleep(3)

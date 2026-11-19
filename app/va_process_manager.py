@@ -84,7 +84,8 @@ class VAProcessManager:
         
         return None
     
-    def is_running(self) -> bool:
+    @staticmethod
+    def is_running() -> bool:
         """
         Check if VoiceAttack is running
         
