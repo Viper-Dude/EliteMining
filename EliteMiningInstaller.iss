@@ -139,6 +139,7 @@ UninstalledAll=EliteMining has been successfully uninstalled.%n%nNOTE: Some file
 var
   VADetected: Boolean;
   ReleasePage: TOutputMsgMemoWizardPage;
+  NoticeFormatted: Boolean;
   { InstallPlugin: Boolean; }  { DISABLED - plugin not used }
   ProfileNeedsUpdate: Boolean;
   VABasePath: String;  { Store VoiceAttack base path for EliteAPI checking }
@@ -433,6 +434,40 @@ begin
   until (N = '') and (O = '');
 end;
 
+function BuildNoticeRtf(Lines: TArrayOfString; ColonHeadings: Boolean): String;
+var
+  I, J: Integer;
+  Ch: Char;
+  Text, Trimmed: String;
+  IsHeading: Boolean;
+begin
+  Result := '{\rtf1\ansi\deff0{\fonttbl{\f0\fnil Segoe UI;}}\f0\fs18 ';
+  for I := 0 to GetArrayLength(Lines) - 1 do
+  begin
+    Text := '';
+    for J := 1 to Length(Lines[I]) do
+    begin
+      Ch := Lines[I][J];
+      if (Ch = '\') or (Ch = '{') or (Ch = '}') then
+        Text := Text + '\' + Ch
+      else if Ord(Ch) > 127 then
+        Text := Text + '\u' + IntToStr(Ord(Ch)) + '?'
+      else if Ord(Ch) <> $FEFF then
+        Text := Text + Ch;
+    end;
+    Trimmed := Trim(Text);
+    if ColonHeadings then
+      IsHeading := (Trimmed <> '') and ((Copy(Trimmed, Length(Trimmed), 1) = ':') or (Copy(Trimmed, 1, 13) = 'EliteMining v'))
+    else
+      IsHeading := (Trimmed <> '') and (Copy(Trimmed, 1, 2) <> '- ');
+    if IsHeading then
+      Result := Result + '\b ' + Text + '\b0\par '
+    else
+      Result := Result + Text + '\par ';
+  end;
+  Result := Result + '}';
+end;
+
 procedure InitializeWizard;
 var
   InstalledProfileVersion: String;
@@ -443,14 +478,12 @@ var
   StateFilePath: String;
   StateContent: AnsiString;
   ReleaseLines: TArrayOfString;
-  ReleaseLine: Integer;
 begin
   ExtractTemporaryFile('INSTALLER_RELEASE_NOTES.txt');
   ReleasePage := CreateOutputMsgMemoPage(wpLicense, 'What''s new',
     'Highlights of this EliteMining release.', 'Click Next to continue.', '');
   if LoadStringsFromFile(ExpandConstant('{tmp}\INSTALLER_RELEASE_NOTES.txt'), ReleaseLines) then
-    for ReleaseLine := 0 to GetArrayLength(ReleaseLines) - 1 do
-      ReleasePage.RichEditViewer.Lines.Add(ReleaseLines[ReleaseLine]);
+    ReleasePage.RichEditViewer.RTFText := AnsiString(BuildNoticeRtf(ReleaseLines, False));
   ExistingEliteAPIPath := '';
   ProfileNeedsUpdate := False;
   BundledProfileVersion := '5.6.6';
@@ -581,6 +614,7 @@ end;
 procedure CurPageChanged(CurPageID: Integer);
 var
   I: Integer;
+  NoticeArr: TArrayOfString;
 begin
   if CurPageID = ReleasePage.ID then
   begin
@@ -590,6 +624,14 @@ begin
   end;
   if CurPageID = wpInfoBefore then
   begin
+    if not NoticeFormatted then
+    begin
+      SetArrayLength(NoticeArr, WizardForm.InfoBeforeMemo.Lines.Count);
+      for I := 0 to WizardForm.InfoBeforeMemo.Lines.Count - 1 do
+        NoticeArr[I] := WizardForm.InfoBeforeMemo.Lines[I];
+      WizardForm.InfoBeforeMemo.RTFText := AnsiString(BuildNoticeRtf(NoticeArr, True));
+      NoticeFormatted := True;
+    end;
     WizardForm.InfoBeforeMemo.SelStart := 0;
     WizardForm.InfoBeforeMemo.SelLength := 0;
     SendMessage(WizardForm.InfoBeforeMemo.Handle, $00B7, 0, 0);

@@ -15267,6 +15267,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         links_row2 = [
             (t('about.documentation'), "https://github.com/Viper-Dude/EliteMining#readme"),
             (t('about.report_bug'), "https://github.com/Viper-Dude/EliteMining/issues/new"),
+            (t('about.patch_notes'), f"https://github.com/Viper-Dude/EliteMining/blob/main/docs/PATCHNOTES_v{__version__}.md"),
         ]
         
         for label, url in links_row2:
